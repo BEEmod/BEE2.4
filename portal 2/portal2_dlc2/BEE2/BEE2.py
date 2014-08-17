@@ -4,7 +4,7 @@ from tkinter import ttk
 
 Settings=None
 win=Tk()
-previewImg=PhotoImage(file='menu.gif') #image with the ingame items palette
+previewImg=PhotoImage(file='images/menu.gif') #image with the ingame items palette
 ItemsBG="#CDD0CE" # Colour of the main background to match the above image
 
 def initMainWind(): # ATM just a mockup, but it sort of works
@@ -51,7 +51,7 @@ def initMainWind(): # ATM just a mockup, but it sort of works
   UIbg.columnconfigure(1, weight=1)
   UIbg.rowconfigure(2, weight=1)
   
-  ttk.Label(itemsBox,text="HI").grid(row=0, column=0)
+  ttk.Label(itemsBox,text="Test").grid(row=0, column=0)
   
   recentBox=ttk.Frame(UIbg, borderwidth=4, relief="sunken", padding=5, width="330", height="132")
   recentBox.grid(row=3, column=1)
