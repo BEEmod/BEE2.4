@@ -4,7 +4,7 @@ from tkinter import ttk
 
 Settings=None
 win=Tk()
-previewImg=PhotoImage(file='images/menu.gif') #image with the ingame items palette
+previewImg=PhotoImage(file='bin/menu.gif') #image with the ingame items palette
 ItemsBG="#CDD0CE" # Colour of the main background to match the above image
 
 def initMainWind(): # ATM just a mockup, but it sort of works
