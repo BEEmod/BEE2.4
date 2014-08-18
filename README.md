@@ -1,4 +1,4 @@
-# Better Extended Editor 2.6
+# Better Extended Editor 2.4
 
 A Portal 2  Mod tool
 
