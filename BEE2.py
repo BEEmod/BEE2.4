@@ -12,9 +12,9 @@ ItemsBG="#CDD0CE" # Colour of the main background to match the above image
 paletteText = StringVar(value=('Palette 1','Empty','Portal 2', 'Portal 2 Collapsed'))
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
-voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS (refurbished)", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Art Therapy GLaDOS", "Apocalypse Announcer", "Apocalypse GLaDOS")
+voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Art Therapy GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You') 
-# Examples, we want to set some in styles with the [] to show recommended
+# Examples, we want to set some in styles
 games = ('common/portal2', 'common/aperturetag')
 gamesDisplay = ('Portal 2', 'Aperture Tag') # We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
 
@@ -37,7 +37,7 @@ def demoMusic():
 def initGameOpt(f):
   ttk.Label(f, text="Selected Game", anchor="center").grid(row=0, column=0, columnspan=2, sticky="EW")
   ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, columnspan=2, sticky="EW", pady=5)
-  gamesUI=ttk.Combobox(f, values=gamesDisplay)
+  gamesUI=ttk.Combobox(f, values=gamesDisplay, width=13)
   gamesUI.grid(row=3, column=0, rowspan=2, sticky="EW")
   gamesUI.current(0)
   ttk.Button(f, text="+", width=3).grid(row=3, column=1)
@@ -51,7 +51,7 @@ def initPalette(f):
   ttk.Button(f, text="+").grid(row=3, column=0) # Make new as blank
   ttk.Button(f, text="-").grid(row=3, column=1) # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
-def initOptions(f):
+def initOption(f):
   ttk.Label(f, text="Options").grid(row=0, column=0)
   ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
   ttk.Button(f, width=10, text="Save", command=save).grid(row=2, column=0)
@@ -83,6 +83,10 @@ def initOptions(f):
   UIVoice=ttk.Combobox(props, values=voiceText)
   UIVoice.current(0)
   UIVoice.grid(row=3, column=1, columnspan=2, sticky="EW")
+  
+def initStyleOpt(f):
+  ttk.Label(f, text="Style Options").grid(row=0, column=0)
+  #This should be remade for different styles
 
 def initPreview(f):
   f['image'] = previewImg
@@ -117,9 +121,16 @@ def initMainWind(win): # ATM just a mockup, but it sort of works
   palSplitFrame.rowconfigure(1, weight=1)
   initGameOpt(gameFrame)
   
-  optionFrame=ttk.Frame(UIbg, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=0, column=1, sticky=N, padx=2, pady=5)
-  initOptions(optionFrame)
+  optSplitFrame=Frame(UIbg, bg=ItemsBG)
+  optSplitFrame.grid(row=0, column=1, sticky="NS", padx=2, pady=5)
+  
+  optionFrame=ttk.Frame(optSplitFrame, padding=5, borderwidth=4, relief="raised")
+  optionFrame.grid(row=0, column=0, sticky=N)
+  initOption(optionFrame)
+  
+  styleOptFrame=ttk.Frame(optSplitFrame, padding=5, borderwidth=4, relief="raised")
+  styleOptFrame.grid(row=1, column=0, sticky=N, pady=(10,0))
+  initStyleOpt(styleOptFrame)
   
   previewFrame=ttk.Label(UIbg)
   previewFrame.grid(row=0, column=3, sticky=(N,W), padx=(2,5),pady=5)
