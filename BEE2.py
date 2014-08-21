@@ -3,15 +3,20 @@ from tkinter import ttk # themed ui components that match the OS
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
+import random
 
 window=Tk()
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
+FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
+FilterBoxes_all={}
+FilterVars={} # The variables for the checkboxes
+FilterVars_all={}
 Settings=None
 ItemsBG="#CDD0CE" # Colour of the main background to match the above image
 selectedPalette = 1
-selectedPalette_radio = 0 # fake value the menu radio buttons set
+selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
 # UI vars, most should be generated on startup
 palettes=('Palette 1','Empty','Portal 2', 'Portal 2 Collapsed')
@@ -53,7 +58,7 @@ def saveAs():
 def save():
   pal=palettes[selectedPalette]
   if pal in paletteReadOnly:
-    saveAs() # If it's readonly, prompt for a name
+    saveAs() # If it's readonly, prompt for a name and save somewhere else
   else:
     savePal(pal) # overwrite it
     
@@ -66,15 +71,17 @@ def demoMusic():
 def setPal_listbox(e):
   global selectedPalette
   selectedPalette = UI['palette'].curselection()[0]
+  selectedPalette_radio.set(selectedPalette)
   setPalette()
   
 def setPal_radio():
-  #selectedPalette = selectedPalette_radio
+  global selectedPalette
+  selectedPalette = selectedPalette_radio.get()
   setPalette()
 
 def setPalette():
-  print(selectedPalette)
-  #messagebox.showinfo(message='Update the listbox/menu to match, and reload the new palette.')
+  print("Palette chosen: ",selectedPalette, " = ",palettes[selectedPalette])
+  # TODO: Update the listbox/menu to match, and reload the new palette.
 
 def filterExpand(ignore):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -83,7 +90,25 @@ def filterContract(ignore):
   frames['filter_expanded'].grid_remove()
   
 def updateFilters():
-  pass # This should check all the filter checkboxes, and change what is shown in the list of items.
+  # First update the 'all' checkboxes to make half-selected if not fully selected.
+  for cat in FILTER_CATS: # do for each
+    no_alt=True
+    for i in FilterVars[cat]:
+      value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
+      if FilterVars[cat][i].get() != value:
+        FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, it doesn't match
+        no_alt=False
+        break
+    if no_alt:
+      FilterBoxes_all[cat].state(['!alternate']) # no alternate if they are all the same
+      
+  # TODO: This should check all the filter checkboxes, and change what is shown in the list of items.
+
+def filterAllCallback(col): # This sets all items in a category to true/false, then updates the item list
+  val=FilterVars_all[col].get()
+  for i in FilterVars[col]:
+    FilterVars[col][i].set(val)
+  updateFilters()
 
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initGameOpt(f):
@@ -178,14 +203,21 @@ def initPreview(f):
 def initPicker(f):
   ttk.Label(f, text="Items: ").grid(row=0, column=0)
   
-def initFilterCol(f, names):
-  arr={}
-  val=1
+def initFilterCol(cat, f, names):
+  FilterBoxes[cat]={}
+  FilterVars[cat]={}
+  FilterVars_all[cat]=IntVar(value=1)
+  
+  FilterBoxes_all[cat]=ttk.Checkbutton(f, text='All', onvalue=1, offvalue=0,  command=lambda: filterAllCallback(cat), variable=FilterVars_all[cat]) # We pass along the name of the category, so the function can figure out what to change.
+  FilterBoxes_all[cat].grid(row=1, column=0, sticky=W)
+  
+  val=0
   for name in names:
-    c=ttk.Checkbutton(f, text=name, command=updateFilters)
-    c.grid(row=val, column=0, sticky=W)
+    FilterVars[cat][val]=IntVar(value=1)
+    FilterBoxes[cat][val]=ttk.Checkbutton(f, text=name, command=updateFilters, variable=FilterVars[cat][val])
+    FilterBoxes[cat][val]['variable']=FilterVars[cat][val]
+    FilterBoxes[cat][val].grid(row=val+2, column=0, sticky=W, padx=(4,0))
     val+=1
-  return arr
   
 def initFilter(f):
 
@@ -204,10 +236,9 @@ def initFilter(f):
   pack.grid(row=1, column=1, sticky="NS")
   tags=ttk.Labelframe(f2, text="Tags")
   tags.grid(row=1, column=2, sticky="NS")
-  
-  FilterBoxes['author']  = initFilterCol(cat, authorText)
-  FilterBoxes['package'] = initFilterCol(pack, packageText)
-  FilterBoxes['tags']    = initFilterCol(tags, tagText)
+  FilterBoxes['author']  = initFilterCol('author', cat, authorText)
+  FilterBoxes['package'] = initFilterCol('package', pack, packageText)
+  FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
 
 def initMenuBar(win):
   bar=Menu(win)
