@@ -3,7 +3,6 @@ from tkinter import ttk # themed ui components that match the OS
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
-import random
 
 window=Tk()
 frames={} #Holds frames that we need to deal with later
@@ -14,34 +13,61 @@ FilterBoxes_all={}
 FilterVars={} # The variables for the checkboxes
 FilterVars_all={}
 Settings=None
-ItemsBG="#CDD0CE" # Colour of the main background to match the above image
+ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
 selectedPalette = 1
+PalEntry_TempText="New Palette>"
+PalEntry = StringVar(value=PalEntry_TempText)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
-# UI vars, most should be generated on startup
-palettes=('Palette 1','Empty','Portal 2', 'Portal 2 Collapsed')
+# UI vars, TODO: most should be generated on startup
+palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
 paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
 paletteText = StringVar(value=palettes)
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Art Therapy GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
-authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqit', 'TeamSpen210')
+authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
 tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
 # Examples, we want to set some in styles
 games = ('common/portal2', 'common/aperturetag')
-gamesDisplay = ('Portal 2', 'Aperture Tag') # We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
+gamesDisplay = ('Portal 2', 'Aperture Tag') #TODO: We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
+
+#Loading commands, will load/reload the items/styles/palettes/etc
+def load_settings():
+  pass
+
+def load_palettes():
+  pass
+
+def load_styles():
+  pass
+  
+def load_items():
+  pass
 
 def menu_quit():
   window.destroy()
 
 def menu_newPal():
   newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
+  
+def newPal_textbox(e):
+  newPal(PalEntry.get())
 
-def newPal(t):
+def newPal(name): # TODO: make a new palette based on a name
+  print("Make palette:",name)
   pass
+  save()
+  
+def pal_remTempText(e):
+  if PalEntry.get() == PalEntry_TempText:
+    PalEntry.set("")
 
+def pal_addTempText(e):
+  if PalEntry.get() == "":
+    PalEntry.set(PalEntry_TempText) 
 
 def saveAs():
   name=""
@@ -63,7 +89,9 @@ def save():
     savePal(pal) # overwrite it
     
 def savePal(name):
-  messagebox.showinfo(message = 'We should save the palette into "' + name + '".')
+  print('We should save the palette as ' + name)
+  # TODO: actually load
+  load_palettes() # reload to make it show up
   
 def demoMusic():
   messagebox.showinfo(message='This would play the track selected for a few seconds.')
@@ -77,32 +105,35 @@ def setPal_listbox(e):
 def setPal_radio():
   global selectedPalette
   selectedPalette = selectedPalette_radio.get()
+  UI['palette'].selection_clear(0,len(palettes))
+  UI['palette'].selection_set(selectedPalette)
   setPalette()
 
 def setPalette():
-  print("Palette chosen: ",selectedPalette, " = ",palettes[selectedPalette])
+  print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette])
   # TODO: Update the listbox/menu to match, and reload the new palette.
 
-def filterExpand(ignore):
+def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
 
-def filterContract(ignore):
+def filterContract(e):
   frames['filter_expanded'].grid_remove()
   
 def updateFilters():
   # First update the 'all' checkboxes to make half-selected if not fully selected.
   for cat in FILTER_CATS: # do for each
     no_alt=True
+    value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
     for i in FilterVars[cat]:
-      value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
       if FilterVars[cat][i].get() != value:
         FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, it doesn't match
         no_alt=False
         break
     if no_alt:
       FilterBoxes_all[cat].state(['!alternate']) # no alternate if they are all the same
+      FilterVars_all[cat].set(value)
       
-  # TODO: This should check all the filter checkboxes, and change what is shown in the list of items.
+  #TODO: This should check all the filter checkboxes, and change what is actually shown in the list of items.
 
 def filterAllCallback(col): # This sets all items in a category to true/false, then updates the item list
   val=FilterVars_all[col].get()
@@ -126,10 +157,13 @@ def initPalette(f):
   UI['palette']=Listbox(f, listvariable=paletteText, width=10)
   UI['palette'].grid(row=2,column=0, sticky="NSEW")
   UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
+  UI['palette'].selection_set(0)
   
-  UI['newBox']=ttk.Entry(f, text="Create New")
+  UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
   UI['newBox'].grid(row=3, column=0) # User types in and presses enter to create
-  UI['newBox'].bind("<Return>", newPal)
+  UI['newBox'].bind("<Return>", newPal_textbox)
+  UI['newBox'].bind("<FocusIn>", pal_remTempText)
+  UI['newBox'].bind("<FocusOut>", pal_addTempText)
   ttk.Button(f, text="-").grid(row=4, column=0) # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
 def initOption(f):
