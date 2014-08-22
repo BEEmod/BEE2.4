@@ -3,10 +3,13 @@ from tkinter import ttk # themed ui components that match the OS
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
+import random
 
 window=Tk()
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
+pal_picked={} # array of the picker icons
+pal_items={} # array of the "all items" icons
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
@@ -20,6 +23,10 @@ PalEntry_TempText="New Palette>"
 PalEntry = StringVar(value=PalEntry_TempText)
 selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
+
+testImg  = (PhotoImage(file='images/pal_test/portal_button.gif'), # test palette images
+            PhotoImage(file='images/pal_test/box_socket.gif'),
+            PhotoImage(file='images/pal_test/stairs.gif'))
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
@@ -234,14 +241,34 @@ def initStyleOpt(f):
   ttk.Checkbutton(frmOver, text="Have entry/exit puzzles").grid(row=0, column=0, sticky="W")
 
 def initPreview(f):
-  global previewImg
+  global previewImg, picker_canvas
   previewImg  = PhotoImage(file='images/menu.gif')
   #image with the ingame items palette, needs to be global to stop garbage collection
   f['image'] = previewImg
   ttk.Label(f, text="Item: Button").place(x=30,y=557)
+  for x in range(0,4):
+    pal_picked[x]={}
+    for y in range(0,8):
+      pal_picked[x][y]=ttk.Label(f, image=random.choice(testImg))
+      pal_picked[x][y].place(x=(x*65+27),y=(y*65+37))
   
 def initPicker(f):
-  ttk.Label(f, text="Items: ").grid(row=0, column=0)
+  global frame
+  ttk.Label(f, text="All Items: ").grid(row=0, column=0)
+  canvas=Canvas(f, scrollregion=(0,0,325,1950), width=320)
+  canvas.grid(row=1, column=0, sticky="NS") # need to use a canvas to allow scrolling
+  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=canvas.yview)
+  scroll.grid(column=2, row=0, rowspan=2, sticky="NS")
+  canvas['yscrollcommand'] = scroll.set
+  frame=ttk.Frame(canvas, width=320, height=1950)
+  canvas.create_window(1, 1, window=frame, anchor="nw")
+  for x in range(0,5):
+    pal_items[x]={}
+    for y in range(0,30):
+      pal_items[x][y]=ttk.Label(frame, image=random.choice(testImg))
+      pal_items[x][y].place(x=(x*65+1),y=(y*65+1))
+      #canvas.create_image(x*64,y*64,image=random.choice(testImg), anchor="nw", tags=str(x)+","+str(y))
+      #ttk.Label(item_frame, image=testImg, width=32).grid(row=y+1, column=x)
   
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
@@ -330,21 +357,21 @@ def initMainWind(win): # Generate the main window frames
   
   UIbg.rowconfigure(0, weight=1)
   
-  paletteFrame=ttk.Frame(UIbg, borderwidth=4, relief="raised", padding=5)
-  paletteFrame.grid(row=0, column=0, sticky=N, padx=2, pady=5)
+  splitFrame=Frame(UIbg, bg=ItemsBG)
+  splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
+  
+  paletteFrame=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
+  paletteFrame.grid(row=0, column=0, sticky="NW", padx=2, pady=5)
   paletteFrame.columnconfigure(0, weight=1)
-  UIbg.rowconfigure(0, weight=1)
+  splitFrame.rowconfigure(0, weight=1)
   initPalette(paletteFrame)
   
-  optSplitFrame=Frame(UIbg, bg=ItemsBG)
-  optSplitFrame.grid(row=0, column=1, sticky="NS", padx=2, pady=5)
-  
-  optionFrame=ttk.Frame(optSplitFrame, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=0, column=0, sticky=N)
+  optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
+  optionFrame.grid(row=1, column=0, columnspan=2, sticky=S)
   initOption(optionFrame)
   
-  frames['styleOpt']=ttk.Frame(optSplitFrame, padding=5, borderwidth=4, relief="raised")
-  frames['styleOpt'].grid(row=1, column=0, sticky=N, pady=(10,0))
+  frames['styleOpt']=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
+  frames['styleOpt'].grid(row=0, column=1, sticky="NE", pady=(10,0))
   initStyleOpt(frames['styleOpt'])
   
   previewFrame=ttk.Label(UIbg)
@@ -356,14 +383,20 @@ def initMainWind(win): # Generate the main window frames
   
   pickSplitFrame=Frame(UIbg, bg=ItemsBG)
   pickSplitFrame.grid(row=0, column=5, sticky="NS", padx=5, pady=5)
+  UIbg.columnconfigure(5, weight=1)
   
-  frames['picker']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=4, relief="raised")
+  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=4, relief="raised", width=320)
+  frames['filter'].place(x=0,y=0) # This will sit on top of the palette section!
+  initFilter(frames['filter'])
+  
+  frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised", height=500)
   frames['picker'].grid(row=0, column=0, sticky="NSEW")
   initPicker(frames['picker'])
+  pickSplitFrame.columnconfigure(0, weight=1)
+  pickSplitFrame.rowconfigure(0, weight=1)
   
-  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=4, relief="raised")
-  frames['filter'].grid(row=1, column=0, sticky=S)
-  initFilter(frames['filter'])
+  frames['filter'].lift()
+
 
 initMainWind(window)
 window.mainloop()
