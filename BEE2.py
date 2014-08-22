@@ -3,6 +3,7 @@ from tkinter import ttk # themed ui components that match the OS
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
+import tkinter_pny # png library for TKinter
 import random
 
 window=Tk()
