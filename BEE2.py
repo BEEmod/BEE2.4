@@ -1,12 +1,25 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
-from tkinter import messagebox
-from tkinter import filedialog
+from tkinter import messagebox # simple, standard modal dialogs
+from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
-import tkinter_pny # png library for TKinter
+from tkinter_png import * # png library for TKinter
+import os.path
 import random
 
+def loadIcon(name): # load in a palette icon, ensuring the correct size
+  if not os.path.isfile(name):
+    return img_error
+  tmp=PngImageTk(name)
+  tmp.convert()
+  img=tmp.image
+  if img.width() != 64 or img.height() != 64:
+    print("ERROR: \"" + name + "\" is not 64x64!")
+    return img_error
+  else:
+    return img
 window=Tk()
+img_error=loadIcon('images/pal_unknown.png') # If image is not readable, use this instead
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 pal_picked={} # array of the picker icons
@@ -25,9 +38,9 @@ PalEntry = StringVar(value=PalEntry_TempText)
 selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
-testImg  = (PhotoImage(file='images/pal_test/portal_button.gif'), # test palette images
-            PhotoImage(file='images/pal_test/box_socket.gif'),
-            PhotoImage(file='images/pal_test/stairs.gif'))
+testImg  = (loadIcon('images/pal_test/portal_button.png'), # test palette images
+            loadIcon('images/pal_test/box_socket.png'),
+            loadIcon('images/pal_test/stairs.png'))
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
@@ -243,7 +256,9 @@ def initStyleOpt(f):
 
 def initPreview(f):
   global previewImg, picker_canvas
-  previewImg  = PhotoImage(file='images/menu.gif')
+  tmp=PngImageTk('images/menu.png')
+  tmp.convert()
+  previewImg  = tmp.image
   #image with the ingame items palette, needs to be global to stop garbage collection
   f['image'] = previewImg
   ttk.Label(f, text="Item: Button").place(x=30,y=557)

@@ -1,4 +1,5 @@
 tkinter-png - pure python PNG implementation for tkinter
+(https://code.google.com/p/tkinter-png/)
 
 Copyright (C) 2012 James Wright <hokazenoflames@gmail.com>
 
