@@ -14,9 +14,11 @@ FilterVars={} # The variables for the checkboxes
 FilterVars_all={}
 Settings=None
 ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
-selectedPalette = 1
+selectedPalette = 0
+selectedGame=0
 PalEntry_TempText="New Palette>"
 PalEntry = StringVar(value=PalEntry_TempText)
+selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
 # UI vars, TODO: most should be generated on startup
@@ -46,6 +48,13 @@ def load_styles():
   
 def load_items():
   pass
+  
+#------
+# Perform the actual export to editoritems
+def export():
+  pass 
+  
+#------
 
 def menu_quit():
   window.destroy()
@@ -109,6 +118,12 @@ def setPal_radio():
   UI['palette'].selection_set(selectedPalette)
   setPalette()
 
+def setGame():
+  global selectedGame
+  selectedGame = selectedGame_radio.get()
+  print(selectedGame)
+  window.title('BEE2 - '+gamesDisplay[selectedGame])
+
 def setPalette():
   print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette])
   # TODO: Update the listbox/menu to match, and reload the new palette.
@@ -142,15 +157,6 @@ def filterAllCallback(col): # This sets all items in a category to true/false, t
   updateFilters()
 
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
-def initGameOpt(f):
-  ttk.Label(f, text="Selected Game", anchor="center").grid(row=0, column=0, columnspan=2, sticky="EW")
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, columnspan=2, sticky="EW", pady=5)
-  gamesUI=ttk.Combobox(f, values=gamesDisplay, width=13)
-  gamesUI.grid(row=3, column=0, rowspan=2, sticky="EW")
-  gamesUI.current(0)
-  ttk.Button(f, text="+", width=3).grid(row=3, column=1)
-  ttk.Button(f, text="-", width=3).grid(row=4, column=1)
-
 def initPalette(f):
   ttk.Label(f, text="Palettes", anchor="center").grid(row=0, column=0, sticky="EW")
   ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
@@ -281,25 +287,38 @@ def initMenuBar(win):
   
   menuFile=Menu(bar, name='apple') #Name is used to make this the special 'BEE2' menu item on Mac
   bar.add_cascade(menu=menuFile, label='File')
-  menuFile.add_command(label='New...', command=menu_newPal)
-  menuFile.add_command(label='Clear')
+  menuFile.add_command(label="Export", command=export)
+  menuFile.add_command(label="Find Game")
+  menuFile.add_command(label="Remove Game")
   menuFile.add_separator()
   val=0
-  for name in palettes: # Add a set of options to pick the palette into the menu system
-    menuFile.add_radiobutton(label=name, variable=selectedPalette_radio, value=val, command=setPal_radio)
+  for name in gamesDisplay: # Add a set of options to pick the palette into the menu system
+    menuFile.add_radiobutton(label=name, variable=selectedGame_radio, value=val, command=setGame)
     val+=1
- 
+  
   menuFile.add_separator()
-  menuFile.add_command(label="Quit", command=menu_quit)
+  menuFile.add_command(label="Quit", command=menu_quit) 
+  
+  menuPal=Menu(bar)
+  
+  bar.add_cascade(menu=menuPal, label='Palette')
+  menuPal.add_command(label='New...', command=menu_newPal)
+  menuPal.add_command(label='Clear')
+  menuPal.add_separator()
+  val=0
+  for name in palettes: # Add a set of options to pick the palette into the menu system
+    menuPal.add_radiobutton(label=name, variable=selectedPalette_radio, value=val, command=setPal_radio)
+    val+=1
   
   menuHelp=Menu(bar, name='help') # Name for Mac-specific stuff
   bar.add_cascade(menu=menuHelp, label='Help')
   menuHelp.add_command(label='About') # Authors etc
   menuHelp.add_command(label='Quotes') # show the list of quotes
+  
+  setGame()
 
 def initMainWind(win): # Generate the main window frames
   # Will probably want to move into a class or something
-  win.title("BEE 2")
   initMenuBar(win)
   
   UIbg=Frame(win, bg=ItemsBG)
@@ -309,20 +328,11 @@ def initMainWind(win): # Generate the main window frames
   
   UIbg.rowconfigure(0, weight=1)
   
-  palSplitFrame=Frame(UIbg, bg=ItemsBG)
-  palSplitFrame.grid(row=0, column=0, sticky="NS", padx=2, pady=5)
-  palSplitFrame.columnconfigure(0, weight=1)
-  
-  paletteFrame=ttk.Frame(palSplitFrame, borderwidth=4, relief="raised", padding=5)
-  paletteFrame.grid(row=0, column=0, sticky=N)
+  paletteFrame=ttk.Frame(UIbg, borderwidth=4, relief="raised", padding=5)
+  paletteFrame.grid(row=0, column=0, sticky=N, padx=2, pady=5)
   paletteFrame.columnconfigure(0, weight=1)
-  palSplitFrame.rowconfigure(0, weight=1)
+  UIbg.rowconfigure(0, weight=1)
   initPalette(paletteFrame)
-  
-  gameFrame=ttk.Frame(palSplitFrame, borderwidth=4, relief="raised", padding=5)
-  gameFrame.grid(row=1, column=0, sticky=N)
-  palSplitFrame.rowconfigure(1, weight=1)
-  initGameOpt(gameFrame)
   
   optSplitFrame=Frame(UIbg, bg=ItemsBG)
   optSplitFrame.grid(row=0, column=1, sticky="NS", padx=2, pady=5)
