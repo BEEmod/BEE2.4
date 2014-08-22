@@ -319,6 +319,8 @@ def initMenuBar(win):
 
 def initMainWind(win): # Generate the main window frames
   # Will probably want to move into a class or something
+  window.call('wm', 'iconbitmap', window._w, '-default', 'BEE2.ico') # set the window icon
+  
   initMenuBar(win)
   
   UIbg=Frame(win, bg=ItemsBG)
