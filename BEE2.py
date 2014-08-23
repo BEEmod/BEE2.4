@@ -6,6 +6,7 @@ from tkinter import simpledialog # Premade windows for asking for strings/ints/e
 from tkinter_png import * # png library for TKinter
 import os.path
 import random
+import math
 
 def loadIcon(name): # load in a palette icon, ensuring the correct size
   if not os.path.isfile(name):
@@ -22,8 +23,8 @@ window=Tk()
 img_error=loadIcon('images/pal_unknown.png') # If image is not readable, use this instead
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
-pal_picked={} # array of the picker icons
-pal_items={} # array of the "all items" icons
+pal_picked={} # 2d array of the picker icons
+pal_items=[] # array of the "all items" icons
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
@@ -269,22 +270,38 @@ def initPreview(f):
       pal_picked[x][y].place(x=(x*65+27),y=(y*65+37))
   
 def initPicker(f):
-  global frame
+  global frmScroll, pal_canvas
   ttk.Label(f, text="All Items: ").grid(row=0, column=0)
-  canvas=Canvas(f, scrollregion=(0,0,325,1950), width=320)
-  canvas.grid(row=1, column=0, sticky="NS") # need to use a canvas to allow scrolling
-  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=canvas.yview)
-  scroll.grid(column=2, row=0, rowspan=2, sticky="NS")
-  canvas['yscrollcommand'] = scroll.set
-  frame=ttk.Frame(canvas, width=320, height=1950)
-  canvas.create_window(1, 1, window=frame, anchor="nw")
-  for x in range(0,5):
-    pal_items[x]={}
-    for y in range(0,30):
-      pal_items[x][y]=ttk.Label(frame, image=random.choice(testImg))
-      pal_items[x][y].place(x=(x*65+1),y=(y*65+1))
-      #canvas.create_image(x*64,y*64,image=random.choice(testImg), anchor="nw", tags=str(x)+","+str(y))
-      #ttk.Label(item_frame, image=testImg, width=32).grid(row=y+1, column=x)
+  cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
+  cframe.grid(row=1, column=0, sticky="NSEW")
+  f.rowconfigure(1, weight=1)
+  f.columnconfigure(0, weight=1)
+  f.columnconfigure(1, weight=1)
+  pal_canvas=Canvas(cframe)
+  pal_canvas.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
+  cframe.rowconfigure(0, weight=1)
+  cframe.columnconfigure(0, weight=1, min=40)
+  scroll = ttk.Scrollbar(cframe, orient=VERTICAL, command=pal_canvas.yview)
+  scroll.grid(column=1, row=0, sticky="NS")
+  pal_canvas['yscrollcommand'] = scroll.set
+  frmScroll=ttk.Frame(pal_canvas, width=320, height=1950)
+  pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
+  for unused in range(0,random.randrange(50,150)):
+    pal_items.append(ttk.Label(frmScroll, image=random.choice(testImg))) # init with test objects
+  f.bind("<Configure>",flowPicker)
+  
+
+def flowPicker(e):
+  global frmScroll
+  frmScroll.update()
+  width=(pal_canvas.winfo_width()-10) // 65
+  if width <1:
+    width=1 # we got way too small, prevent division by zero
+  pal_canvas['scrollregion'] = (0, 0, width*65, math.ceil(len(pal_items)/width)*65+2) 
+  for i in range(0,len(pal_items)):
+      #print(i,((i%width) *65+1),((x//width)*65+1))
+      #pal_items[i]=ttk.Label(frmScroll, image=random.choice(testImg))
+      pal_items[i].place(x=((i%width) *65+1),y=((i//width)*65+1))
   
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
@@ -357,7 +374,7 @@ def initMenuBar(win):
   bar.add_cascade(menu=menuHelp, label='Help')
   menuHelp.add_command(label='About') # Authors etc
   menuHelp.add_command(label='Quotes') # show the list of quotes
-  
+
   setGame()
 
 def initMainWind(win): # Generate the main window frames
@@ -405,7 +422,7 @@ def initMainWind(win): # Generate the main window frames
   frames['filter'].place(x=0,y=0) # This will sit on top of the palette section!
   initFilter(frames['filter'])
   
-  frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised", height=500)
+  frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
   frames['picker'].grid(row=0, column=0, sticky="NSEW")
   initPicker(frames['picker'])
   pickSplitFrame.columnconfigure(0, weight=1)
