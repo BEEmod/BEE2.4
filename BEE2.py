@@ -152,9 +152,11 @@ def setPalette():
 
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
+  frames['filter']['borderwidth']=4
 
 def filterContract(e):
   frames['filter_expanded'].grid_remove()
+  frames['filter']['borderwidth']=0
   
 def updateFilters():
   # First update the 'all' checkboxes to make half-selected if not fully selected.
@@ -271,7 +273,7 @@ def initPreview(f):
   
 def initPicker(f):
   global frmScroll, pal_canvas
-  ttk.Label(f, text="All Items: ").grid(row=0, column=0)
+  ttk.Label(f, text="All Items: ", anchor="center").grid(row=0, column=0, sticky="EW")
   cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
   cframe.grid(row=1, column=0, sticky="NSEW")
   f.rowconfigure(1, weight=1)
@@ -294,13 +296,12 @@ def initPicker(f):
 def flowPicker(e):
   global frmScroll
   frmScroll.update()
+  frames['filter']['width']=pal_canvas.winfo_width()
   width=(pal_canvas.winfo_width()-10) // 65
   if width <1:
     width=1 # we got way too small, prevent division by zero
   pal_canvas['scrollregion'] = (0, 0, width*65, math.ceil(len(pal_items)/width)*65+2) 
   for i in range(0,len(pal_items)):
-      #print(i,((i%width) *65+1),((x//width)*65+1))
-      #pal_items[i]=ttk.Label(frmScroll, image=random.choice(testImg))
       pal_items[i].place(x=((i%width) *65+1),y=((i//width)*65+1))
   
 def initFilterCol(cat, f, names):
@@ -322,7 +323,9 @@ def initFilterCol(cat, f, names):
 def initFilter(f):
 
   ttk.Label(f, text="Filters:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
-  
+  f.columnconfigure(0, weight=1)
+  f.columnconfigure(1, weight=1)
+  f.columnconfigure(2, weight=1)
   f2=ttk.Frame(f)
   frames['filter_expanded']=f2
   # Not added to window, we add it below the others to expand the lists
@@ -331,11 +334,11 @@ def initFilter(f):
   f.bind("<Leave>", filterContract)
   
   cat=ttk.Labelframe(f2, text="Categories")
-  cat.grid(row=1, column=0, sticky="NS")
+  cat.grid(row=2, column=0, sticky="NS")
   pack=ttk.Labelframe(f2, text="Packages")
-  pack.grid(row=1, column=1, sticky="NS")
+  pack.grid(row=2, column=1, sticky="NS")
   tags=ttk.Labelframe(f2, text="Tags")
-  tags.grid(row=1, column=2, sticky="NS")
+  tags.grid(row=2, column=2, sticky="NS")
   FilterBoxes['author']  = initFilterCol('author', cat, authorText)
   FilterBoxes['package'] = initFilterCol('package', pack, packageText)
   FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
@@ -418,8 +421,8 @@ def initMainWind(win): # Generate the main window frames
   pickSplitFrame.grid(row=0, column=5, sticky="NS", padx=5, pady=5)
   UIbg.columnconfigure(5, weight=1)
   
-  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=4, relief="raised", width=320)
-  frames['filter'].place(x=0,y=0) # This will sit on top of the palette section!
+  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
+  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
   initFilter(frames['filter'])
   
   frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
