@@ -9,7 +9,9 @@ import random
 import math
 
 def loadIcon(name): # load in a palette icon, ensuring the correct size
+  name= "images/pal_test/" + name + ".png"
   if not os.path.isfile(name):
+    print("ERROR: \"" + name + "\" does not exist!")
     return img_error
   tmp=PngImageTk(name)
   tmp.convert()
@@ -20,7 +22,7 @@ def loadIcon(name): # load in a palette icon, ensuring the correct size
   else:
     return img
 window=Tk()
-img_error=loadIcon('images/pal_unknown.png') # If image is not readable, use this instead
+img_error=loadIcon('pal_unknown') # If image is not readable, use this instead
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 pal_picked={} # 2d array of the picker icons
@@ -39,9 +41,24 @@ PalEntry = StringVar(value=PalEntry_TempText)
 selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
-testImg  = (loadIcon('images/pal_test/portal_button.png'), # test palette images
-            loadIcon('images/pal_test/box_socket.png'),
-            loadIcon('images/pal_test/stairs.png'))
+testImg  = (loadIcon('portal_button'), # test palette images
+            loadIcon('box_socket'),
+            loadIcon('stairs'),
+            loadIcon('flipper'),
+            loadIcon('faithplate'),
+            loadIcon('goo'),
+            loadIcon('frankenturret'),
+            loadIcon('item_dropper'),
+            loadIcon('turret'),
+            loadIcon('hard_light_emitter'),
+            loadIcon('laser_receptacle'),
+            loadIcon('light_panel'),
+            loadIcon('paintsplat_water'),
+            loadIcon('paintsplat_speed'),
+            loadIcon('paintsplat_portal'),
+            loadIcon('tbeam'),
+            loadIcon('companion_cube'),
+            loadIcon('airlock'))
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
