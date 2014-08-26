@@ -8,19 +8,30 @@ import os.path
 import random
 import math
 
-def loadIcon(name): # load in a palette icon, ensuring the correct size
-  name= "images/pal_test/" + name + ".png"
-  if not os.path.isfile(name):
-    print("ERROR: \"" + name + "\" does not exist!")
+
+
+def loadPng(path):
+  path="images/"+path+".png"
+  if not os.path.isfile(path):
+    print("ERROR: \"" + path + "\" does not exist!")
     return img_error
-  tmp=PngImageTk(name)
-  tmp.convert()
-  img=tmp.image
+  tmp=PngImageTk(path)
+  tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
+  return tmp.image
+
+def loadSpr(name):
+  ico=loadPng('icons/'+name)
+  return ico.zoom(2)
+
+def loadIcon(name): # load in a palette icon, ensuring the correct size
+  name= "pal_test/" + name
+  img=loadPng(name)
   if img.width() != 64 or img.height() != 64:
     print("ERROR: \"" + name + "\" is not 64x64!")
     return img_error
   else:
     return img
+    
 window=Tk()
 img_error=loadIcon('pal_unknown') # If image is not readable, use this instead
 frames={} #Holds frames that we need to deal with later
@@ -42,7 +53,6 @@ selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
 testImg  = (loadIcon('portal_button'), # test palette images
-            loadIcon('box_socket'),
             loadIcon('stairs'),
             loadIcon('flipper'),
             loadIcon('faithplate'),
@@ -285,8 +295,16 @@ def initPreview(f):
   for x in range(0,4):
     pal_picked[x]={}
     for y in range(0,8):
-      pal_picked[x][y]=ttk.Label(f, image=random.choice(testImg))
+      img=random.choice(testImg)
+      pal_picked[x][y]=ttk.Label(f, image=img)
+      if x==2 and y==2:
+        img = loadIcon('box_socket')
+        pal_picked[x][y]['image']=img
+        pal_picked[x][y].img=img
+        pal_picked[x][y]['borderwidth']=4
       pal_picked[x][y].place(x=(x*65+27),y=(y*65+37))
+  pal_picked[2][2]['relief']="raised"
+  pal_picked[2][2].lift()
   
 def initPicker(f):
   global frmScroll, pal_canvas
@@ -309,7 +327,6 @@ def initPicker(f):
     pal_items.append(ttk.Label(frmScroll, image=random.choice(testImg))) # init with test objects
   f.bind("<Configure>",flowPicker)
   
-
 def flowPicker(e):
   global frmScroll
   frmScroll.update()
@@ -359,6 +376,49 @@ def initFilter(f):
   FilterBoxes['author']  = initFilterCol('author', cat, authorText)
   FilterBoxes['package'] = initFilterCol('package', pack, packageText)
   FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
+  
+def initProperties(f):
+  ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
+  
+  UI['prop_name']=ttk.Label(f, text="Weighted Button", anchor="center")
+  UI['prop_name'].grid(row=1, column=0, columnspan=3, sticky="EW")
+  
+  UI['prop_author']=ttk.Label(f, text=" Valve, Carl Kenner ", anchor="center", relief="sunken")
+  UI['prop_author'].grid(row=2, column=0, columnspan=3, sticky="EW")
+  
+  sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
+  sub_frame.grid(column=0, columnspan=3, row=3)
+  img=('_blank','portal_button','box_socket','ball_socket','_blank') # for now always show 'properties' for the ITEM_BUTTON_FLOOR
+  for i in range(0,5):
+    ico=loadIcon(img[i])
+    UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=ico)
+    UI['prop_sub_'+str(i)].grid(row=0, column=i)
+    if i==2:
+      UI['prop_sub_'+str(i)]['relief']='raised' #hardcode this to be selected
+    UI['prop_sub_'+str(i)].img=ico # save here to prevent python from garbage collecting
+  ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
+  spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
+  spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
+  img=('in_none','out_norm','rot_0','space_occupy','surf_wall_floor_ceil','ap_black') # in order: inputs, outputs, rotation handle, occupied/embed state, desiredFacing, is a Valve item (+ other authors in future)
+  for i in range(0,6):
+    spr=loadSpr(img[i])
+    UI['prop_spr_'+str(i)]=ttk.Label(spr_frame, image=spr, relief="raised")
+    UI['prop_spr_'+str(i)].grid(row=0, column=i)
+    UI['prop_spr_'+str(i)].img=spr
+  desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
+  desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
+  UI['prop_desc']=Text(desc_frame, width=40, height=8, wrap="word")
+  UI['prop_desc'].grid(row=0, column=0, sticky="EW")
+  
+  desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=UI['prop_desc'].yview)
+  UI['prop_desc']['yscrollcommand']=desc_scroll.set
+  desc_scroll.grid(row=0, column=1, sticky="NS")
+  UI['prop_desc'].insert("end", "Big pressure buttons activated by players or cubes. Cube buttons are only activated by cubes, sphere buttons only by spheres.")
+  UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
+  
+  # FLOOR_BUTTON won't need this part
+  #UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
+  #UI['prop_alternate'].grid(row=6, column=2, sticky=W)
 
 def initMenuBar(win):
   bar=Menu(win)
@@ -449,6 +509,10 @@ def initMainWind(win): # Generate the main window frames
   pickSplitFrame.rowconfigure(0, weight=1)
   
   frames['filter'].lift()
+  
+  frames['properties']=ttk.Frame(UIbg, borderwidth=4, relief="raised")
+  frames['properties'].place(x=483, y=230)
+  initProperties(frames['properties'])
 
 
 initMainWind(window)
