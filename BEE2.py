@@ -16,6 +16,7 @@ def loadPng(path):
     print("ERROR: \"" + path + "\" does not exist!")
     return img_error
   tmp=PngImageTk(path)
+  print("Loading \""+path+"\"")
   tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
   return tmp.image
 
@@ -34,6 +35,7 @@ def loadIcon(name): # load in a palette icon, ensuring the correct size
     
 window=Tk()
 img_error=loadIcon('pal_unknown') # If image is not readable, use this instead
+
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 pal_picked={} # 2d array of the picker icons
@@ -176,6 +178,12 @@ def setGame():
 def setPalette():
   print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette])
   # TODO: Update the listbox/menu to match, and reload the new palette.
+  
+def showProps(x,y):
+  frames['properties'].place(x=x, y=y)
+
+def hideProps(e):
+   frames['properties'].place_remove()
 
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -512,7 +520,6 @@ def initMainWind(win): # Generate the main window frames
   frames['filter'].lift()
   
   frames['properties']=ttk.Frame(UIbg, borderwidth=4, relief="raised")
-  frames['properties'].place(x=483, y=230)
   initProperties(frames['properties'])
 
 
