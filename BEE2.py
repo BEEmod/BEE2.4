@@ -276,7 +276,9 @@ def initStyleOpt(f):
   frmOver.grid(row=5, column=0, sticky="EW")
   
   ttk.Checkbutton(frmAll, text="Multiverse Cave").grid(row=0, column=0, sticky="W")
-  
+  ttk.Checkbutton(frmAll, text="Prevent Portal Bump (fizzler)").grid(row=1, column=0, sticky="W")
+  ttk.Checkbutton(frmAll, text="Prevent Portal Bump  (glass) ").grid(row=2, column=0, sticky="W")
+
   ttk.Checkbutton(frmOld, text="Real Observation Rooms").grid(row=0, column=0, sticky="W")
   ttk.Checkbutton(frmOld, text="Gel-Faith-Plates").grid(row=1, column=0, sticky="W")
   
