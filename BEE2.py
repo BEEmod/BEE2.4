@@ -288,12 +288,10 @@ def initStyleOpt(f):
   ttk.Checkbutton(frmOver, text="Have entry/exit puzzles").grid(row=0, column=0, sticky="W")
 
 def initPreview(f):
-  global previewImg, picker_canvas
-  tmp=PngImageTk('images/menu.png')
-  tmp.convert()
-  previewImg  = tmp.image
-  #image with the ingame items palette, needs to be global to stop garbage collection
+  global picker_canvas
+  previewImg  = loadPng('menu')
   f['image'] = previewImg
+  f.imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
   ttk.Label(f, text="Item: Button").place(x=30,y=557)
   for x in range(0,4):
     pal_picked[x]={}
