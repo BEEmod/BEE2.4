@@ -80,6 +80,7 @@ styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
+gooText = ('[Default]','[Bottomless Pit]','Regular', 'Overgrown', 'Portal 1')
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
 tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
@@ -200,7 +201,8 @@ def updateFilters():
     value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
     for i in FilterVars[cat]:
       if FilterVars[cat][i].get() != value:
-        FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, it doesn't match
+        FilterVars_all[cat].set(True) # force it to be true so when clicked it'll blank out all the checkboxes
+        FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, since they don't match
         no_alt=False
         break
     if no_alt:
@@ -210,7 +212,7 @@ def updateFilters():
   #TODO: This should check all the filter checkboxes, and change what is actually shown in the list of items.
 
 def filterAllCallback(col): # This sets all items in a category to true/false, then updates the item list
-  val=FilterVars_all[col].get()
+  val = FilterVars_all[col].get()
   for i in FilterVars[col]:
     FilterVars[col][i].set(val)
   updateFilters()
@@ -254,15 +256,21 @@ def initOption(f):
   UIMusic.current(0)
   ttk.Button(props, text=">", command=demoMusic, width='4pt').grid(row=1,column=2)
   
-  ttk.Label(props, text="Skybox: ").grid(row=2, column=0)
-  UISky=ttk.Combobox(props, values=skyboxText)
-  UISky.current(0)
-  UISky.grid(row=2, column=1, columnspan=2, sticky="EW")
-  
-  ttk.Label(props, text="Voice: ").grid(row=3, column=0)
+  ttk.Label(props, text="Voice: ").grid(row=2, column=0)
   UIVoice=ttk.Combobox(props, values=voiceText)
   UIVoice.current(0)
-  UIVoice.grid(row=3, column=1, columnspan=2, sticky="EW")
+  UIVoice.grid(row=2, column=1, columnspan=2, sticky="EW")
+  
+  ttk.Label(props, text="Skybox: ").grid(row=3, column=0)
+  UISky=ttk.Combobox(props, values=skyboxText)
+  UISky.current(0)
+  UISky.grid(row=3, column=1, columnspan=2, sticky="EW")
+  
+  
+  ttk.Label(props, text="Goo: ").grid(row=4, column=0)
+  UI['goo']=ttk.Combobox(props, values=gooText)
+  UI['goo'].current(0)
+  UI['goo'].grid(row=4, column=1, columnspan=2, sticky="EW")
   
 def initStyleOpt(f):
   ttk.Label(f, text="Style Options").grid(row=0, column=0)
