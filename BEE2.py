@@ -1,5 +1,6 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
+from tkinter import font
 from tkinter import messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
@@ -396,9 +397,14 @@ def initFilter(f):
   
 def initProperties(f):
   ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
+  entSpr=loadSpr('gear_ent')
   
   UI['prop_name']=ttk.Label(f, text="Weighted Button", anchor="center")
   UI['prop_name'].grid(row=1, column=0, columnspan=3, sticky="EW")
+  
+  UI['prop_ent_count']=ttk.Label(f, text="2", anchor="e", compound="left", image=entSpr)
+  UI['prop_ent_count'].img=entSpr
+  UI['prop_ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
   
   UI['prop_author']=ttk.Label(f, text=" Valve, Carl Kenner ", anchor="center", relief="sunken")
   UI['prop_author'].grid(row=2, column=0, columnspan=3, sticky="EW")
@@ -433,9 +439,11 @@ def initProperties(f):
   UI['prop_desc'].insert("end", "Big pressure buttons activated by players or cubes. Cube buttons are only activated by cubes, sphere buttons only by spheres.")
   UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
   
-  # FLOOR_BUTTON won't need this part
-  #UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
-  #UI['prop_alternate'].grid(row=6, column=2, sticky=W)
+  UI['prop_more']=ttk.Button(f, text="More Info>>")
+  UI['prop_more'].grid(row=6, column=2, sticky=E)
+  
+  UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
+  UI['prop_alternate'].grid(row=6, column=0, sticky=W)
 
 def initMenuBar(win):
   bar=Menu(win)
@@ -532,4 +540,5 @@ def initMainWind(win): # Generate the main window frames
 
 
 initMainWind(window)
+showProps(483,230)
 window.mainloop()

@@ -92,6 +92,7 @@ class PngImageTk(object):
       a_append = alphapixels.append
     else:
       values = 3
+      alphapixels = False
       
     pixelrows = []
     
@@ -129,7 +130,6 @@ class PngImageTk(object):
     pixelrows = tuple(tuple(x) for x in pixelrows) #convert our list of lists into a tuple of tuples
     put(pixelrows,(0,0, w,h)) #pixels are finally written to the PhotoImage
     # If we have alphapixels, set each stored coordinate to transparent
-    # TODO: commented this out - if we actually need alpha images I'll need to debug this (TeamSpen210)
-    # if alphapixels:
-      # for item in alphapixels:
-        # transSet(item[0],item[1], "True")
+    if alphapixels:
+      for item in alphapixels:
+        transSet(item[0],item[1], "True")
