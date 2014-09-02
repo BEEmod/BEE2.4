@@ -174,7 +174,7 @@ def setPal_radio():
 def setGame():
   global selectedGame
   selectedGame = selectedGame_radio.get()
-  print(selectedGame)
+  print("Game: [" + str(selectedGame) + "] = " + gamesDisplay[selectedGame])
   window.title('BEE2 - '+gamesDisplay[selectedGame])
 
 def setPalette():
