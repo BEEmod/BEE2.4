@@ -9,6 +9,7 @@ import os.path
 import random
 import math
 
+#import property_parser
 
 
 def loadPng(path):
@@ -88,6 +89,10 @@ tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
 # Examples, we want to set some in styles
 games = ('common/portal2', 'common/aperturetag')
 gamesDisplay = ('Portal 2', 'Aperture Tag') #TODO: We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
+
+styleOptions = [('MultiverseCave','Multiverse Cave', True),
+                ('FixPortalBump','Prevent Portal Bump  (glass)', False), # these three should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
+                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False)]
 
 #Loading commands, will load/reload the items/styles/palettes/etc
 def load_settings():
@@ -180,6 +185,10 @@ def setGame():
 def setPalette():
   print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette])
   # TODO: Update the listbox/menu to match, and reload the new palette.
+
+def setStyleOpt(key):
+  print(key)
+  return
   
 def showProps(x,y):
   frames['properties'].place(x=x, y=y)
@@ -274,11 +283,24 @@ def initOption(f):
   UI['goo'].grid(row=4, column=1, columnspan=2, sticky="EW")
   
 def initStyleOpt(f):
+  global styleCheck, styleOptVars
   ttk.Label(f, text="Style Options").grid(row=0, column=0)
   ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
   #This should automatically switch to match different styles
   frmAll=ttk.Labelframe(f, text="All")
   frmAll.grid(row=2, column=0, sticky="EW")
+    
+  pos=0
+  styleCheck={}
+  styleOptVars={}
+  for key in styleOptions:
+    styleOptVars[pos]=BooleanVar(value=styleOptions[pos][2])
+    styleCheck[pos]=ttk.Checkbutton(frmAll, variable=styleOptVars[pos], text=styleOptions[pos][1], command=lambda key=styleOptions[pos][0]: setStyleOpt(key)) # the key argument forces lambda to remember the string
+    styleCheck[pos].grid(row=pos, column=0, sticky="W")
+    pos=pos+1
+  
+  # TODO: These should come from .style or item settings
+  ttk.Checkbutton(frmAll, text="HEPs destroy cubes (Rexaura)").grid(row=4, column=0, sticky="W")
   
   frmOld=ttk.Labelframe(f, text="Old Aperture")
   frmOld.grid(row=3, column=0, sticky="EW")
@@ -292,11 +314,6 @@ def initStyleOpt(f):
   frmOver=ttk.Labelframe(f, text="Overgrown")
   frmOver.grid(row=5, column=0, sticky="EW")
   
-  ttk.Checkbutton(frmAll, text="Multiverse Cave").grid(row=0, column=0, sticky="W")
-  ttk.Checkbutton(frmAll, text="HEPs destroy cubes (Rexaura)").grid(row=1, column=0, sticky="W")
-  ttk.Checkbutton(frmAll, text="Prevent Portal Bump (fizzler)").grid(row=2, column=0, sticky="W")
-  ttk.Checkbutton(frmAll, text="Prevent Portal Bump  (glass) ").grid(row=3, column=0, sticky="W")
-
   ttk.Checkbutton(frmOld, text="Real Observation Rooms").grid(row=0, column=0, sticky="W")
   ttk.Checkbutton(frmOld, text="Gel-Faith-Plates").grid(row=1, column=0, sticky="W")
   
