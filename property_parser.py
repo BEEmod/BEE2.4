@@ -1,49 +1,54 @@
+import re
+import string
+
 class Property:
+  quote_wrap = None
+  
+  def __init():
+    with open("bin/quote-wrap") as file:
+      quote_wrap = re.compile(file.read())
+  
   def __init__(self):
     self.name = None
     self.value = None
     
-  def __init__(self, name, value)
+  def __init__(self, name, value):
     self.name = name
     self.value = value
-    
-  def parse(file-contents):
-    open-properties = []
-    open-properties.add(Property(None, []))
+  
+  def parse(file_contents):
+    open_properties = []
+    open_properties.append(Property(None, []))
     values = None
-    for line in file-contents:
-      values = open-properties.last.value
-      # TODO: Need data validation below
-      strippedline = line.strip().
-      if(strippedline.beginswith('"'):
-        # It is a Property. Make a new property and add it to the values, if it has a value in line: assign it
-        line-contents = strippedline.regex()()()
-        name = line-contents[0]
-        value = line-contents[1]
-        values.add(Property(name, value))
-      elif(strippedline.beginswith('{'):
-        # It is the beginning of a property section. Add the latest added properties to the list of open properties
-        if(values.last.value is not None):
-          # Throw a fit. We cant add to this if there is already something in there
+    line_num = 0
+    for line in file_contents:
+      line_num += 1
+      values = open_properties[-1].value
+      freshline = clean_line(line)
+      if(freshline != ""):
+        if(freshline.startswith('"')):
+          line_contents = quote_wrap.findall(freshline)
+          name = line_contents[0]
+          value = line_contents[2]
+          values.append(Property(name, value))
+        elif(freshline.startswith('{')):
+          if(values[-1].value is None):
+            values[-1].value = []
+          else:
+            raise ValueError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
+          open_properties.append(values[-1])
+        elif(freshline.startswith('}')):
+          open_properties.pop()
         else:
-          values.last.value = []
-        open-properties.add(values.last)
-      elif(strippedline.beginswith('}'):
-        # It is the end of a property section. Close section by pop the property off the open properties list
-        open-properties.pop
-      elif(strippedline == "")
-        # Ignore blank lines.
-      else:
-        # Throw a fit, It is unknown.
-      if(open-properties.len == 0):
-        # Throw a fit, there should always be atleast the fake Property on the stack
-    if(open-properties.len > 1)
-      # Throw a fit, there should only be one Property on the stack (the fake one), not all Properties were closed.    
+          raise ValueError("Unexpected beginning character. Line " + str(line_num) + ".")
+      if(len(open_properties) == 0):
+        raise ValueError("Too many closing brackets. Line " + str(line_num) + ".")
+    if(len(open_properties) > 1):
+        raise ValueError("End of text reached with remaining open sections.")  
     return values
 
-
-
-def remove_comments(string)
-  # Stub to be implemented later
-  return string
-  
+def clean_line(dirty_line):
+  line = dirty_line.strip()
+  if(line.startswith("\\\\")):
+    line = ""
+  return dirty_line
