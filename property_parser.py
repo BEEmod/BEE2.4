@@ -10,7 +10,7 @@
 import re
 
 class Property:
-  def __init__(self, name = None, value = None):
+  def __init__(self, name = None, value = ""):
     self.name = name
     self.value = value
     
@@ -54,3 +54,16 @@ def clean_line(dirty_line):
     line = ""
   # TODO: Actually strip comments off of the end of all lines
   return line
+  
+def to_strings(self):
+  out_val = ['"' + self.name + '"']
+  
+  if self.value is []: 
+    out_val.append('{')
+    for property in self.value:
+      for line in property.to_string():
+        out_val.append('\t' + line)
+    out_val.append('}')
+  else:
+    out_val[0] += ' "' + self.value + '"'
+  return out_val
