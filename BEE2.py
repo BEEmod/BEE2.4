@@ -516,13 +516,14 @@ def initMainWind(win): # Generate the main window frames
   splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
   
   paletteFrame=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
-  paletteFrame.grid(row=0, column=0, sticky="NW", padx=2, pady=5)
+  paletteFrame.grid(row=0, column=0, rowspan=2, sticky="NS", padx=2, pady=5)
   paletteFrame.columnconfigure(0, weight=1)
   splitFrame.rowconfigure(0, weight=1)
   initPalette(paletteFrame)
   
   optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=1, column=0, columnspan=2, sticky=S)
+  optionFrame.grid(row=1, column=1, sticky="NS")
+splitFrame.rowconfigure(1, weight=1)
   initOption(optionFrame)
   
   frames['styleOpt']=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
