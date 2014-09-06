@@ -189,11 +189,14 @@ def setStyleOpt(key):
   print("Toggle style option: " + key)
   return
   
-def showProps(x,y):
-  frames['properties'].place(x=x, y=y)
+def showProps(e):
+  print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
+  propWin.wm_deiconify()
+  propWin.lift(window)
+  propWin.geometry('+'+str(e.x_root - 100) + '+' + str(e.y_root - 100)) # TODO: Calculate and match to the icon's position
 
 def hideProps(e):
-   frames['properties'].place_remove()
+  propWin.wm_withdraw()
 
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -346,6 +349,9 @@ def initPreview(f):
     for y in range(0,8):
       img=random.choice(testImg)
       pal_picked[x][y]=ttk.Label(f, image=img)
+      pal_picked[x][y].bind("<Button-3>",showProps)
+      pal_picked[x][y].gr_x=x
+      pal_picked[x][y].gr_y=y # these can be referred to to figure out where it is
       if x==2 and y==2:
         img = loadIcon('box_socket')
         pal_picked[x][y]['image']=img
@@ -376,8 +382,10 @@ def initPicker(f):
   frmScroll=ttk.Frame(pal_canvas, width=320, height=1950) # add another frame inside to place labels on
   pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
   
-  for unused in range(0,random.randrange(50,1500)):
-    pal_items.append(ttk.Label(frmScroll, image=random.choice(testImg))) # init with test objects
+  for num in range(0,len(testImg)*10):
+    lbl=ttk.Label(frmScroll, image=testImg[num%len(testImg)]) # init with test objects
+    lbl.bind("<Button-3>",showProps)
+    pal_items.append(lbl)
   f.bind("<Configure>",flowPicker)
   
 def flowPicker(e):
@@ -391,6 +399,7 @@ def flowPicker(e):
   pal_canvas['scrollregion'] = (0, 0, width*65, math.ceil(len(pal_items)/width)*65+2) 
   for i in range(0,len(pal_items)):
       pal_items[i].place(x=((i%width) *65+1),y=((i//width)*65+1))
+      
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
   FilterVars[cat]={}
@@ -430,7 +439,19 @@ def initFilter(f):
   FilterBoxes['package'] = initFilterCol('package', pack, packageText)
   FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
   
-def initProperties(f):
+def initProperties(win):
+  global propWin
+  propWin=Toplevel(win)
+  propWin.wm_overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
+  propWin.resizable(False, False)
+  propWin.wm_transient(master=win)
+  
+  propWin.bind("<FocusOut>",hideProps)
+  win.bind("<Button-1>",hideProps)
+  
+  f=ttk.Frame(propWin, relief="raised", borderwidth="4")
+  f.grid(row=0, column=0)
+  
   ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
   entSpr=loadSpr('gear_ent')
   
@@ -518,11 +539,9 @@ def initMenuBar(win):
   setGame()
 
 def initMainWind(win): # Generate the main window frames
-  # Will probably want to move into a class or something
-  window.call('wm', 'iconbitmap', window._w, '-default', 'BEE2.ico') # set the window icon
-  
+  win.wm_iconbitmap(r'BEE2.ico')# set the window icon
   initMenuBar(win)
-  
+  win.wm_maxsize(width=2000, height=2000)
   UIbg=Frame(win, bg=ItemsBG)
   UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
   win.columnconfigure(0, weight=1)
@@ -568,10 +587,8 @@ def initMainWind(win): # Generate the main window frames
   
   frames['filter'].lift()
   
-  frames['properties']=ttk.Frame(UIbg, borderwidth=4, relief="raised")
-  initProperties(frames['properties'])
+  initProperties(win) #frames['properties'])
 
 
 initMainWind(window)
-showProps(483,230)
 window.mainloop()
