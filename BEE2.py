@@ -334,9 +334,11 @@ def initStyleOpt(f):
 
 def initPreview(f):
   global picker_canvas
+  img=Label(f, bg=ItemsBG)
   previewImg  = loadPng('menu')
-  f['image'] = previewImg
-  f.imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
+  img['image'] = previewImg
+  img.imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
+  img.grid(row=0,column=0)
  
   ttk.Label(f, text="Item: Button").place(x=10,y=552)
   for x in range(0,4):
@@ -531,10 +533,10 @@ def initMainWind(win): # Generate the main window frames
   splitFrame=Frame(UIbg, bg=ItemsBG)
   splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
   
-  paletteFrame=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
-  paletteFrame.grid(row=0, column=0, rowspan=2, sticky="NSEW", padx=2, pady=0)
+  frames['palette']=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
+  frames['palette'].grid(row=0, column=0, rowspan=2, sticky="NSEW", padx=2, pady=0)
   splitFrame.rowconfigure(0, weight=1)
-  initPalette(paletteFrame)
+  initPalette(frames['palette'])
   
   optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
   optionFrame.grid(row=0, column=1, sticky=N)
@@ -544,9 +546,9 @@ def initMainWind(win): # Generate the main window frames
   frames['styleOpt'].grid(row=1, column=1, sticky=N, pady=(10,0))
   initStyleOpt(frames['styleOpt'])
   
-  previewFrame=Label(UIbg, bg=ItemsBG)
-  previewFrame.grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
-  initPreview(previewFrame)
+  frames['palette']=Frame(UIbg, bg=ItemsBG)
+  frames['palette'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
+  initPreview(frames['palette'])
   
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
   
