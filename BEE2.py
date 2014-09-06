@@ -320,7 +320,9 @@ def initPreview(f):
   previewImg  = loadPng('menu')
   f['image'] = previewImg
   f.imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
-  ttk.Label(f, text="Item: Button").place(x=30,y=557)
+ 
+  ttk.Label(f, text="Item: Button").place(x=10,y=552)
+  
   for x in range(0,4):
     pal_picked[x]={}
     for y in range(0,8):
@@ -331,7 +333,7 @@ def initPreview(f):
         pal_picked[x][y]['image']=img
         pal_picked[x][y].img=img
         pal_picked[x][y]['borderwidth']=4
-      pal_picked[x][y].place(x=(x*65+27),y=(y*65+37))
+      pal_picked[x][y].place(x=(x*65+6),y=(y*65+32))
   pal_picked[2][2]['relief']="raised"
   pal_picked[2][2].lift()
   
@@ -527,8 +529,8 @@ def initMainWind(win): # Generate the main window frames
   frames['styleOpt'].grid(row=1, column=1, sticky=N, pady=(10,0))
   initStyleOpt(frames['styleOpt'])
   
-  previewFrame=ttk.Label(UIbg)
-  previewFrame.grid(row=0, column=3, sticky=(N,W), padx=(2,5),pady=5)
+  previewFrame=Label(UIbg, bg=ItemsBG)
+  previewFrame.grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
   initPreview(previewFrame)
   
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
