@@ -363,8 +363,6 @@ def initPreview(f):
         pal_picked[x][y].img=img
         pal_picked[x][y]['borderwidth']=4
       pal_picked[x][y].place(x=(x*65+4),y=(y*65+32))
-  pal_picked[2][2]['relief']="raised"
-  pal_picked[2][2].lift()
   
 def initPicker(f):
   global frmScroll, pal_canvas
