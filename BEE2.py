@@ -35,6 +35,7 @@ def loadIcon(name): # load in a palette icon, ensuring the correct size
     return img
     
 window=Tk()
+window.withdraw()
 img_error=loadIcon('pal_unknown') # If image is not readable, use this instead
 
 frames={} #Holds frames that we need to deal with later
@@ -193,7 +194,11 @@ def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
   propWin.wm_deiconify()
   propWin.lift(window)
-  propWin.geometry('+'+str(e.x_root - 100) + '+' + str(e.y_root - 100)) # TODO: Calculate and match to the icon's position
+  loc=[e.widget.winfo_rootx(),e.widget.winfo_rooty()]  # location of clicked-on item
+  diff=[propWin.winfo_rootx()-UI['prop_sub_2'].winfo_rootx(),propWin.winfo_rooty()-UI['prop_sub_0'].winfo_rooty()]
+  #The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
+
+  propWin.geometry('+'+str(loc[0]+diff[0])+"+"+str(loc[1]+diff[1])) # TODO: Calculate and match to the icon's position
 
 def hideProps(e):
   propWin.wm_withdraw()
@@ -390,7 +395,7 @@ def initPicker(f):
   
 def flowPicker(e):
   global frmScroll
-  frmScroll.update()
+  frmScroll.update_idletasks()
   frmScroll['width']=pal_canvas.winfo_width()
   frames['filter']['width']=pal_canvas.winfo_width()
   width=(pal_canvas.winfo_width()-10) // 65
@@ -445,8 +450,8 @@ def initProperties(win):
   propWin.wm_overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
   propWin.resizable(False, False)
   propWin.wm_transient(master=win)
+  propWin.withdraw() # starts hidden
   
-  propWin.bind("<FocusOut>",hideProps)
   win.bind("<Button-1>",hideProps)
   
   f=ttk.Frame(propWin, relief="raised", borderwidth="4")
@@ -591,4 +596,5 @@ def initMainWind(win): # Generate the main window frames
 
 
 initMainWind(window)
+window.deiconify()
 window.mainloop()
