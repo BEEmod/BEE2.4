@@ -202,6 +202,22 @@ def showProps(e):
 
 def hideProps(e):
   propWin.wm_withdraw()
+ 
+def showDrag(e):
+  dragWin.wm_deiconify()
+  dragWin.lift(window)
+  dragWin.
+  moveDrag(e)
+  UI['drag_lbl']['image']=e.widget.img
+  dragWin.bind("<B1-Motion>", moveDrag)
+  dragWin.bind("<ButtonRelease-1>", hideDrag)
+
+def hideDrag(e):
+  dragWin.wm_withdraw()
+  dragWin.unbind("<B1-Motion>")
+  
+def moveDrag(e):
+  dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
 
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -386,8 +402,11 @@ def initPicker(f):
   pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
   
   for num in range(0,len(testImg)*10):
-    lbl=ttk.Label(frmScroll, image=testImg[num%len(testImg)]) # init with test objects
+    lbl=ttk.Label(frmScroll, ) 
+    lbl.img=testImg[num%len(testImg)]# init with test objects
+    lbl['image']=lbl.img
     lbl.bind("<Button-3>",showProps)
+    lbl.bind("<Button-1>",showDrag)
     pal_items.append(lbl)
   f.bind("<Configure>",flowPicker)
   
@@ -503,6 +522,16 @@ def initProperties(win):
   
   UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
   UI['prop_alternate'].grid(row=6, column=0, sticky=W)
+  
+def initDragIcon(win):
+  global dragWin
+  dragWin=Toplevel(win)
+  dragWin.wm_overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
+  dragWin.resizable(False, False)
+  dragWin.wm_transient(master=win)
+  #dragWin.withdraw() # starts hidden
+  UI['drag_lbl']=Label(dragWin, image=loadIcon('_blank'))
+  UI['drag_lbl'].grid(row=0, column=0)
 
 def initMenuBar(win):
   bar=Menu(win)
@@ -590,7 +619,8 @@ def initMainWind(win): # Generate the main window frames
   
   frames['filter'].lift()
   
-  initProperties(win) #frames['properties'])
+  initProperties(win)
+  initDragIcon(win)
 
 
 initMainWind(window)
