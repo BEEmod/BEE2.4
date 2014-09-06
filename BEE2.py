@@ -194,11 +194,11 @@ def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
   propWin.wm_deiconify()
   propWin.lift(window)
-  loc=[e.widget.winfo_rootx(),e.widget.winfo_rooty()]  # location of clicked-on item
-  diff=[propWin.winfo_rootx()-UI['prop_sub_2'].winfo_rootx(),propWin.winfo_rooty()-UI['prop_sub_0'].winfo_rooty()]
+  loc_x=e.widget.winfo_rootx() + propWin.winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
   #The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
+  loc_y=e.widget.winfo_rooty() + propWin.winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
 
-  propWin.geometry('+'+str(loc[0]+diff[0])+"+"+str(loc[1]+diff[1])) # TODO: Calculate and match to the icon's position
+  propWin.geometry('+'+str(loc_x)+'+'+str(loc_y))
 
 def hideProps(e):
   propWin.wm_withdraw()
