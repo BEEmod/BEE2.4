@@ -222,17 +222,28 @@ def filterAllCallback(col): # This sets all items in a category to true/false, t
 def initPalette(f):
   ttk.Label(f, text="Palettes", anchor="center").grid(row=0, column=0, sticky="EW")
   ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
-  UI['palette']=Listbox(f, listvariable=paletteText, width=10)
-  UI['palette'].grid(row=2,column=0, sticky="NSEW")
+  
+  palFrame=ttk.Frame(f)
+  palFrame.grid(row=2, column=0, sticky="NSEW")
+  palFrame.rowconfigure(0, weight=1)
+  palFrame.columnconfigure(0, weight=1)
+  f.rowconfigure(2, weight=1)
+  
+  UI['palette']=Listbox(palFrame, listvariable=paletteText, width=10)
+  UI['palette'].grid(row=0,column=0, sticky="NSEW")
   UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
   UI['palette'].selection_set(0)
   
+  palScroll=ttk.Scrollbar(palFrame, orient=VERTICAL, command=UI['palette'].yview)
+  palScroll.grid(row=0,column=1, sticky="NS")
+  UI['palette']['yscrollcommand']=palScroll.set
+  
   UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
-  UI['newBox'].grid(row=3, column=0) # User types in and presses enter to create
+  UI['newBox'].grid(row=3, column=0, sticky=S) # User types in and presses enter to create
   UI['newBox'].bind("<Return>", newPal_textbox)
   UI['newBox'].bind("<FocusIn>", pal_remTempText)
   UI['newBox'].bind("<FocusOut>", pal_addTempText)
-  ttk.Button(f, text="-").grid(row=4, column=0) # Delete (we probably don't want to allow deleting "None" or "Portal 2")
+  ttk.Button(f, text=" - ").grid(row=4, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
 def initOption(f):
   ttk.Label(f, text="Options").grid(row=0, column=0)
@@ -327,20 +338,24 @@ def initPreview(f):
 def initPicker(f):
   global frmScroll, pal_canvas
   ttk.Label(f, text="All Items: ", anchor="center").grid(row=0, column=0, sticky="EW")
+  
   cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
   cframe.grid(row=1, column=0, sticky="NSEW")
   f.rowconfigure(1, weight=1)
   f.columnconfigure(0, weight=1)
-  f.columnconfigure(1, weight=1)
+  
   pal_canvas=Canvas(cframe)
   pal_canvas.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
   cframe.rowconfigure(0, weight=1)
-  cframe.columnconfigure(0, weight=1, min=40)
+  cframe.columnconfigure(0, weight=1)
+  
   scroll = ttk.Scrollbar(cframe, orient=VERTICAL, command=pal_canvas.yview)
   scroll.grid(column=1, row=0, sticky="NS")
   pal_canvas['yscrollcommand'] = scroll.set
-  frmScroll=ttk.Frame(pal_canvas, width=320, height=1950)
+  
+  frmScroll=ttk.Frame(pal_canvas, width=320, height=1950) # add another frame inside to place labels on
   pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
+  
   for unused in range(0,random.randrange(50,150)):
     pal_items.append(ttk.Label(frmScroll, image=random.choice(testImg))) # init with test objects
   f.bind("<Configure>",flowPicker)
@@ -348,6 +363,7 @@ def initPicker(f):
 def flowPicker(e):
   global frmScroll
   frmScroll.update()
+  frmScroll['width']=pal_canvas.winfo_width()
   frames['filter']['width']=pal_canvas.winfo_width()
   width=(pal_canvas.winfo_width()-10) // 65
   if width <1:
@@ -499,28 +515,26 @@ def initMainWind(win): # Generate the main window frames
   splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
   
   paletteFrame=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
-  paletteFrame.grid(row=0, column=0, sticky="NW", padx=2, pady=5)
-  paletteFrame.columnconfigure(0, weight=1)
+  paletteFrame.grid(row=0, column=0, rowspan=2, sticky="NSEW", padx=2, pady=0)
   splitFrame.rowconfigure(0, weight=1)
   initPalette(paletteFrame)
   
   optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=1, column=0, columnspan=2, sticky=S)
+  optionFrame.grid(row=0, column=1, sticky=N)
   initOption(optionFrame)
   
   frames['styleOpt']=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  frames['styleOpt'].grid(row=0, column=1, sticky="NE", pady=(10,0))
+  frames['styleOpt'].grid(row=1, column=1, sticky=N, pady=(10,0))
   initStyleOpt(frames['styleOpt'])
   
   previewFrame=ttk.Label(UIbg)
   previewFrame.grid(row=0, column=3, sticky=(N,W), padx=(2,5),pady=5)
-  UIbg.rowconfigure(1, weight=1)
   initPreview(previewFrame)
   
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
   
   pickSplitFrame=Frame(UIbg, bg=ItemsBG)
-  pickSplitFrame.grid(row=0, column=5, sticky="NS", padx=5, pady=5)
+  pickSplitFrame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
   UIbg.columnconfigure(5, weight=1)
   
   frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
@@ -529,9 +543,9 @@ def initMainWind(win): # Generate the main window frames
   
   frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
   frames['picker'].grid(row=0, column=0, sticky="NSEW")
-  initPicker(frames['picker'])
   pickSplitFrame.columnconfigure(0, weight=1)
   pickSplitFrame.rowconfigure(0, weight=1)
+  initPicker(frames['picker'])
   
   frames['filter'].lift()
   
