@@ -72,7 +72,7 @@ testImg  = (loadIcon('portal_button'), # test palette images
             loadIcon('paintsplat_portal'),
             loadIcon('tbeam'),
             loadIcon('companion_cube'),
-            loadIcon('airlockk'))
+            loadIcon('airlock'))
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
