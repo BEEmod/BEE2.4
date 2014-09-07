@@ -192,7 +192,7 @@ def setStyleOpt(key):
   
 def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
-  propWin.wm_deiconify()
+  propWin.deiconify()
   propWin.lift(window)
   loc_x=e.widget.winfo_rootx() + propWin.winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
   #The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
@@ -201,10 +201,10 @@ def showProps(e):
   propWin.geometry('+'+str(loc_x)+'+'+str(loc_y))
 
 def hideProps(e):
-  propWin.wm_withdraw()
+  propWin.withdraw()
  
 def showDrag(e):
-  dragWin.wm_deiconify()
+  dragWin.deiconify()
   dragWin.lift(window)
   dragWin.grab_set_global() # grab makes this window the only one to recieve mouse events, so we guarentee that it'll drop when the mouse is released.
   moveDrag(e)
@@ -213,7 +213,7 @@ def showDrag(e):
   dragWin.bind("<ButtonRelease-1>", hideDrag)
 
 def hideDrag(e):
-  dragWin.wm_withdraw()
+  dragWin.withdraw()
   dragWin.unbind("<B1-Motion>")
   dragWin.grab_release()
   # we should actually change the picker menu here (if applies) to add the dropped item.
@@ -221,7 +221,7 @@ def hideDrag(e):
 def moveDrag(e):
   dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
   if e.x_root > UI['pre_bg_img'].winfo_rootx() and e.y_root > UI['pre_bg_img'].winfo_rooty() and e.x_root < UI['pre_bg_img'].winfo_rootx() + UI['pre_bg_img'].winfo_width() and e.y_root < UI['pre_bg_img'].winfo_rooty() + UI['pre_bg_img'].winfo_height():
-    dragWin.configure(cursor='cross')
+    dragWin.configure(cursor='plus')
   else:
     dragWin.configure(cursor='no')
 
@@ -472,9 +472,9 @@ def initFilter(f):
 def initProperties(win):
   global propWin
   propWin=Toplevel(win)
-  propWin.wm_overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
+  propWin.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
   propWin.resizable(False, False)
-  propWin.wm_transient(master=win)
+  propWin.transient(master=win)
   propWin.withdraw() # starts hidden
   
   win.bind("<Button-1>",hideProps)
@@ -534,9 +534,10 @@ def initProperties(win):
 def initDragIcon(win):
   global dragWin
   dragWin=Toplevel(win)
-  dragWin.wm_overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
+  dragWin.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
   dragWin.resizable(False, False)
-  dragWin.wm_transient(master=win)
+  dragWin.withdraw()
+  dragWin.transient(master=win)
   #dragWin.withdraw() # starts hidden
   UI['drag_lbl']=Label(dragWin, image=loadIcon('_blank'))
   UI['drag_lbl'].grid(row=0, column=0)
@@ -544,7 +545,7 @@ def initDragIcon(win):
 def initMenuBar(win):
   bar=Menu(win)
   win['menu']=bar
-  win.option_add('*tearOff', False) #Suppress ability to make each menu a separate window - old TK behaviour
+  win.option_add('*tearOff', False) #Suppress ability to make each menu a separate window - weird old TK behaviour
   
   menuFile=Menu(bar, name='apple') #Name is used to make this the special 'BEE2' menu item on Mac
   bar.add_cascade(menu=menuFile, label='File')
@@ -559,7 +560,6 @@ def initMenuBar(win):
   
   menuFile.add_separator()
   menuFile.add_command(label="Quit", command=menu_quit) 
-  
   menuPal=Menu(bar)
   
   bar.add_cascade(menu=menuPal, label='Palette')
@@ -579,9 +579,9 @@ def initMenuBar(win):
   setGame()
 
 def initMainWind(win): # Generate the main window frames
-  win.wm_iconbitmap(r'BEE2.ico')# set the window icon
+  win.iconbitmap(r'BEE2.ico')# set the window icon
   initMenuBar(win)
-  win.wm_maxsize(width=2000, height=2000)
+  win.maxsize(width=2000, height=2000)
   UIbg=Frame(win, bg=ItemsBG)
   UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
   win.columnconfigure(0, weight=1)
