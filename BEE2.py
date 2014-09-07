@@ -36,7 +36,7 @@ def loadIcon(name): # load in a palette icon, ensuring the correct size
     
 window=Tk()
 window.withdraw()
-img_error=loadIcon('pal_unknown') # If image is not readable, use this instead
+img_error=loadIcon('_error') # If image is not readable, use this instead
 
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
@@ -72,7 +72,7 @@ testImg  = (loadIcon('portal_button'), # test palette images
             loadIcon('paintsplat_portal'),
             loadIcon('tbeam'),
             loadIcon('companion_cube'),
-            loadIcon('airlock'))
+            loadIcon('airlockk'))
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
@@ -624,7 +624,10 @@ def initMainWind(win): # Generate the main window frames
   pickSplitFrame.columnconfigure(0, weight=1)
   pickSplitFrame.rowconfigure(0, weight=1)
   initPicker(frames['picker'])
-  
+  win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
+  win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
+  win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
+
   frames['filter'].lift()
   
   initProperties(win)
