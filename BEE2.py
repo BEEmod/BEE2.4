@@ -206,7 +206,7 @@ def hideProps(e):
 def showDrag(e):
   dragWin.wm_deiconify()
   dragWin.lift(window)
-  dragWin.
+  dragWin.grab_set_global() # grab makes this window the only one to recieve mouse events, so we guarentee that it'll drop when the mouse is released.
   moveDrag(e)
   UI['drag_lbl']['image']=e.widget.img
   dragWin.bind("<B1-Motion>", moveDrag)
@@ -215,9 +215,16 @@ def showDrag(e):
 def hideDrag(e):
   dragWin.wm_withdraw()
   dragWin.unbind("<B1-Motion>")
+  dragWin.grab_release()
+  # we should actually change the picker menu here (if applies) to add the dropped item.
   
 def moveDrag(e):
   dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
+  if e.x_root > UI['pre_bg_img'].winfo_rootx() and e.y_root > UI['pre_bg_img'].winfo_rooty() and e.x_root < UI['pre_bg_img'].winfo_rootx() + UI['pre_bg_img'].winfo_width() and e.y_root < UI['pre_bg_img'].winfo_rooty() + UI['pre_bg_img'].winfo_height():
+    dragWin.configure(cursor='cross')
+  else:
+    dragWin.configure(cursor='no')
+
 
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -357,12 +364,11 @@ def initStyleOpt(f):
   ttk.Checkbutton(frmOver, text="Have entry/exit puzzles", variable=styleOptVars["OverEntryPuzzles"], command=lambda: setStyleOpt("OverEntryPuzzles")).grid(row=0, column=0, sticky="W")
 
 def initPreview(f):
-  global picker_canvas
-  img=Label(f, bg=ItemsBG)
+  UI['pre_bg_img']=Label(f, bg=ItemsBG)
   previewImg  = loadPng('menu')
-  img['image'] = previewImg
-  img.imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
-  img.grid(row=0,column=0)
+  UI['pre_bg_img']['image'] = previewImg
+  UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
+  UI['pre_bg_img'].grid(row=0,column=0)
  
   ttk.Label(f, text="Item: Button").place(x=10,y=552)
   for x in range(0,4):
@@ -370,7 +376,9 @@ def initPreview(f):
     for y in range(0,8):
       img=random.choice(testImg)
       pal_picked[x][y]=ttk.Label(f, image=img)
+      pal_picked[x][y].img=img
       pal_picked[x][y].bind("<Button-3>",showProps)
+      pal_picked[x][y].bind("<Button-1>",showDrag)
       pal_picked[x][y].gr_x=x
       pal_picked[x][y].gr_y=y # these can be referred to to figure out where it is
       if x==2 and y==2:
