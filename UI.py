@@ -9,6 +9,9 @@ import math
     
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
+
+png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
+
 testImg  = (png.loadIcon('portal_button'), # test palette images,remove when item loading done
           png.loadIcon('stairs'),
           png.loadIcon('flipper'),
@@ -27,9 +30,9 @@ testImg  = (png.loadIcon('portal_button'), # test palette images,remove when ite
           png.loadIcon('companion_cube'),
           png.loadIcon('airlock'))
   
-img_error=png.loadIcon('_error') # If image is not readable, use this instead
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
+windows={}
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 pal_picked={} # 2d array of the picker icons
@@ -102,6 +105,7 @@ def showProps(e):
 
 def hideProps(e):
   propWin.withdraw()
+  
 
 def showDrag(e):
   dragWin.deiconify()
@@ -164,6 +168,21 @@ def save():
     saveAs() # If it's readonly, prompt for a name and save somewhere else
   else:
     savePal(pal) # overwrite it
+    
+def toggleWin(button, window):
+  if window.vis:
+    window.vis=False
+    window.withdraw()
+    UI['tool_win_'+button].state(['!pressed'])
+  else:
+    window.vis=True
+    window.deiconify()
+    UI['tool_win_'+button].state(['pressed'])
+  
+def hideWin(button, window):
+  window.withdraw()
+  window.vis=False
+  UI['tool_win_'+button].state(['!pressed'])
   
 def menu_newPal():
   newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
@@ -205,14 +224,12 @@ def filterAllCallback(col):
 
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initPalette(f):
-  ttk.Label(f, text="Palettes", anchor="center").grid(row=0, column=0, sticky="EW")
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
 
   palFrame=ttk.Frame(f)
-  palFrame.grid(row=2, column=0, sticky="NSEW")
+  palFrame.grid(row=0, column=0, sticky="NSEW")
   palFrame.rowconfigure(0, weight=1)
   palFrame.columnconfigure(0, weight=1)
-  f.rowconfigure(2, weight=1)
+  f.rowconfigure(0, weight=1)
 
   UI['palette']=Listbox(palFrame, listvariable=paletteText, width=10)
   UI['palette'].grid(row=0,column=0, sticky="NSEW")
@@ -224,23 +241,21 @@ def initPalette(f):
   UI['palette']['yscrollcommand']=palScroll.set
 
   UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
-  UI['newBox'].grid(row=3, column=0, sticky=S) # User types in and presses enter to create
+  UI['newBox'].grid(row=1, column=0, sticky=S) # User types in and presses enter to create
   UI['newBox'].bind("<Return>", newPal_textbox)
   UI['newBox'].bind("<FocusIn>", pal_remTempText)
   UI['newBox'].bind("<FocusOut>", pal_addTempText)
-  ttk.Button(f, text=" - ").grid(row=4, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
+  ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
 def initOption(f):
-  ttk.Label(f, text="Options").grid(row=0, column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
-  ttk.Button(f, width=10, text="Save", command=save).grid(row=2, column=0)
-  ttk.Button(f, width=10, text="Save as", command=saveAs).grid(row=3, column=0)
-  ttk.Button(f, width=10, text="Export...").grid(row=4, column=0, pady=(0, 10))  
+  ttk.Button(f, width=10, text="Save", command=save).grid(row=0, column=0)
+  ttk.Button(f, width=10, text="Save as", command=saveAs).grid(row=1, column=0)
+  ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))  
 
-  ttk.Label(f, text="Properties").grid(row=5,column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=6, column=0, sticky="EW", pady=5)
+  ttk.Label(f, text="Properties").grid(row=3,column=0)
+  ttk.Separator(f, orient=HORIZONTAL).grid(row=4, column=0, sticky="EW", pady=5)
   props=ttk.Frame(f)
-  props.grid(row=7, column=0)
+  props.grid(row=5, column=0)
 
   ttk.Label(props, text="Style: ").grid(row=0, column=0)
   UIStyle=ttk.Combobox(props, values=styleText)
@@ -271,18 +286,12 @@ def initOption(f):
 
 def initStyleOpt(f):
   global styleCheck, styleOptVars
-  ttk.Label(f, text="Style Options").grid(row=0, column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
 
-  sframe=ttk.Frame(f, relief="sunken")
-  sframe.grid(row=2, column=0, sticky="NSEW")
-  f.rowconfigure(2, weight=1)
-
-  can=Canvas(sframe)
+  can=Canvas(f)
   can.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
-  sframe.rowconfigure(0, weight=1)
+  f.rowconfigure(0, weight=1)
 
-  scroll = ttk.Scrollbar(sframe, orient=VERTICAL, command=can.yview)
+  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=can.yview)
   scroll.grid(column=1, row=0, sticky="NS")
   can['yscrollcommand'] = scroll.set
   canFrame=ttk.Frame(can)
@@ -326,6 +335,35 @@ def initStyleOpt(f):
   can.create_window(0, 0, window=canFrame, anchor="nw")
   can.update_idletasks()
   can['width']=canFrame.winfo_reqwidth()
+  
+def initTool(f):
+  UI['tool_delete']=ttk.Button(f)
+  UI['tool_delete'].img = png.loadPng('icons/tool_delete')
+  UI['tool_delete']['image'] = UI['tool_delete'].img
+  UI['tool_delete'].grid(row=0, column=0, padx=2)
+  
+  UI['tool_subitem']=ttk.Button(f)
+  UI['tool_subitem'].img = png.loadPng('icons/tool_sub')
+  UI['tool_subitem']['image'] = UI['tool_subitem'].img
+  UI['tool_subitem'].grid(row=0, column=1, padx=(2,5))
+  
+  UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']))
+  UI['tool_win_pal'].img = png.loadPng('icons/win_pal')
+  UI['tool_win_pal']['image'] = UI['tool_win_pal'].img
+  UI['tool_win_pal'].state(["pressed"])
+  UI['tool_win_pal'].grid(row=0, column=3, padx=(5,2))
+  
+  UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']))
+  UI['tool_win_opt'].img = png.loadPng('icons/win_opt')
+  UI['tool_win_opt']['image'] = UI['tool_win_opt'].img
+  UI['tool_win_opt'].state(["pressed"])
+  UI['tool_win_opt'].grid(row=0, column=4, padx=2)
+  
+  UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']))
+  UI['tool_win_style'].img = png.loadPng('icons/win_style')
+  UI['tool_win_style']['image'] = UI['tool_win_style'].img
+  UI['tool_win_style'].state(["pressed"])
+  UI['tool_win_style'].grid(row=0, column=5, padx=2)
 
 def initPreview(f):
   UI['pre_bg_img']=Label(f, bg=ItemsBG)
@@ -335,6 +373,7 @@ def initPreview(f):
   UI['pre_bg_img'].grid(row=0,column=0)
 
   ttk.Label(f, text="Item: Button").place(x=10,y=552)
+  
   for x in range(0,4):
     pal_picked[x]={}
     for y in range(0,8):
@@ -559,27 +598,15 @@ def initMain():
   win.rowconfigure(0, weight=1)
 
   UIbg.rowconfigure(0, weight=1)
-
-  splitFrame=Frame(UIbg, bg=ItemsBG)
-  splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
-
-  frames['palette']=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
-  frames['palette'].grid(row=0, column=0, rowspan=2, sticky="NSEW", padx=2, pady=0)
-  splitFrame.rowconfigure(1, weight=1)
-  initPalette(frames['palette'])
-
-  optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=0, column=1, sticky=N)
-  initOption(optionFrame)
-
-  frames['styleOpt']=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  frames['styleOpt'].grid(row=1, column=1, sticky=N, pady=(10,0))
-  initStyleOpt(frames['styleOpt'])
-
-  frames['palette']=Frame(UIbg, bg=ItemsBG)
-  frames['palette'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
-  initPreview(frames['palette'])
-
+  
+  frames['preview']=Frame(UIbg, bg=ItemsBG)
+  frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
+  initPreview(frames['preview'])
+  
+  frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26)
+  frames['toolMenu'].place(x=75, y=2)
+  initTool(frames['toolMenu'])
+  
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
 
   pickSplitFrame=Frame(UIbg, bg=ItemsBG)
@@ -592,17 +619,66 @@ def initMain():
 
   frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
   frames['picker'].grid(row=0, column=0, sticky="NSEW")
-  pickSplitFrame.columnconfigure(0, weight=1)
   pickSplitFrame.rowconfigure(0, weight=1)
+  pickSplitFrame.columnconfigure(0, weight=1)
   initPicker(frames['picker'])
+  
   win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
   win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
   win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
 
+  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
+  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
+  initFilter(frames['filter'])
+
   frames['filter'].lift()
+  
+  windows['palette']=Toplevel(win)
+  windows['palette'].transient(master=win)
+  windows['palette'].resizable(False, True)
+  windows['palette'].title("Palettes")
+  windows['palette'].iconbitmap(r'BEE2.ico')
+  windows['palette'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal', windows['palette']))
+  windows['palette'].vis=True
+  initPalette(windows['palette'])
+
+  windows['option']=Toplevel(win)
+  windows['option'].transient(master=win)
+  windows['option'].resizable(False, False)
+  windows['option'].title("Options")
+  windows['option'].iconbitmap(r'BEE2.ico')
+  windows['option'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt', windows['option']))
+  windows['option'].vis=True
+  initOption(windows['option'])
+
+  windows['styleOpt']=Toplevel(win)
+  windows['styleOpt'].transient(master=win)
+  windows['styleOpt'].resizable(False, True)
+  windows['styleOpt'].title("Style Properties")
+  windows['styleOpt'].iconbitmap(r'BEE2.ico')
+  windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
+  windows['styleOpt'].vis=True
+  initStyleOpt(windows['styleOpt'])
 
   initProperties(win)
   initDragIcon(win)
   
   win.deiconify() # show it once we've loaded everything
+  
+  win.update_idletasks()
+  windows['styleOpt'].update_idletasks()
+  windows['option'].update_idletasks()
+  windows['palette'].update_idletasks()
+  
+  # move windows around to make it look nice on startup
+  if(win.winfo_rootx() < windows['palette'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
+    win.geometry('+' + str(win.winfo_rootx() - windows['palette'].winfo_reqwidth() - 50) + '+' + str(win.winfo_rooty()))
+  windows['palette'].geometry('+' + str(windows['palette'].winfo_width() + 50) + '+' + str(win.winfo_rooty()))
+  xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_width() + 10 )) + '+'
+  windows['option'].geometry(xpos + str(win.winfo_rooty()))
+  windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()))
+  
+  
   win.mainloop()
+  
+initMain()
