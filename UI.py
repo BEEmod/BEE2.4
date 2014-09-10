@@ -565,8 +565,34 @@ def initMain():
   frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
   initPreview(frames['preview'])
   
-  windows['palette']=Toplevel(win)
   
+  ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
+
+  pickSplitFrame=Frame(UIbg, bg=ItemsBG)
+  pickSplitFrame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
+  UIbg.columnconfigure(5, weight=1)
+
+  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
+  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
+  initFilter(frames['filter'])
+
+  frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
+  frames['picker'].grid(row=0, column=0, sticky="NSEW")
+  pickSplitFrame.rowconfigure(0, weight=1)
+  pickSplitFrame.columnconfigure(0, weight=1)
+  initPicker(frames['picker'])
+  
+  win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
+  win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
+  win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
+
+  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
+  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
+  initFilter(frames['filter'])
+
+  frames['filter'].lift()
+  
+  windows['palette']=Toplevel(win)
   windows['palette'].transient(master=win)
   windows['palette'].resizable(False, True)
   windows['palette'].title("Palettes")
@@ -583,21 +609,6 @@ def initMain():
   windows['styleOpt'].resizable(False, False)
   windows['styleOpt'].title("Style Properties")
   initStyleOpt(windows['styleOpt'])
- 
-  windows['picker']=Toplevel(win)
-  windows['picker'].transient(master=win)
-  windows['picker'].resizable(True, True)
-  windows['picker'].title("All Items")
-  initPicker(windows['picker'])
-  win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
-  win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
-  win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
-
-  frames['filter']=ttk.Frame(windows['picker'], padding=5, borderwidth=0, relief="raised")
-  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
-  initFilter(frames['filter'])
-
-  frames['filter'].lift()
 
   initProperties(win)
   initDragIcon(win)
