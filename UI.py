@@ -1,61 +1,33 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
-from tkinter import font
-from tkinter import messagebox # simple, standard modal dialogs
+from tkinter import font, messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
-from tkinter_png import * # png library for TKinter
-import os.path
+import tkinter_png as png # png library for TKinter
 import random
 import math
-
-def loadPng(path):
-    "Loads in and converts a png for use in TKinter."
-    path="images/"+path+".png"
-    if not os.path.isfile(path):
-      print("ERROR: \"" + path + "\" does not exist!")
-      return img_error
-    tmp=PngImageTk(path)
-    print("Loading \""+path+"\"")
-    tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
-    return tmp.image
-
-def loadSpr(name):
-  "load in the property icons and automatically double the dimensions"
-  ico=loadPng('icons/'+name)
-  return ico.zoom(2)
-
-def loadIcon(name): 
-  "load in a palette icon, ensuring the correct size"
-  name= "pal_test/" + name
-  img=loadPng(name)
-  if img.width() != 64 or img.height() != 64:
-    print("ERROR: \"" + name + "\" is not 64x64!")
-    return img_error
-  else:
-    return img
     
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
-testImg  = (loadIcon('portal_button'), # test palette images,remove when item loading done
-          loadIcon('stairs'),
-          loadIcon('flipper'),
-          loadIcon('faithplate'),
-          loadIcon('goo'),
-          loadIcon('frankenturret'),
-          loadIcon('item_dropper'),
-          loadIcon('turret'),
-          loadIcon('hard_light_emitter'),
-          loadIcon('laser_receptacle'),
-          loadIcon('light_panel'),
-          loadIcon('paintsplat_water'),
-          loadIcon('paintsplat_speed'),
-          loadIcon('paintsplat_portal'),
-          loadIcon('tbeam'),
-          loadIcon('companion_cube'),
-          loadIcon('airlock'))
+testImg  = (png.loadIcon('portal_button'), # test palette images,remove when item loading done
+          png.loadIcon('stairs'),
+          png.loadIcon('flipper'),
+          png.loadIcon('faithplate'),
+          png.loadIcon('goo'),
+          png.loadIcon('frankenturret'),
+          png.loadIcon('item_dropper'),
+          png.loadIcon('turret'),
+          png.loadIcon('hard_light_emitter'),
+          png.loadIcon('laser_receptacle'),
+          png.loadIcon('light_panel'),
+          png.loadIcon('paintsplat_water'),
+          png.loadIcon('paintsplat_speed'),
+          png.loadIcon('paintsplat_portal'),
+          png.loadIcon('tbeam'),
+          png.loadIcon('companion_cube'),
+          png.loadIcon('airlock'))
   
-img_error=loadIcon('_error') # If image is not readable, use this instead
+img_error=png.loadIcon('_error') # If image is not readable, use this instead
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
 frames={} #Holds frames that we need to deal with later
@@ -357,7 +329,7 @@ def initStyleOpt(f):
 
 def initPreview(f):
   UI['pre_bg_img']=Label(f, bg=ItemsBG)
-  previewImg  = loadPng('menu')
+  previewImg  = png.loadPng('menu')
   UI['pre_bg_img']['image'] = previewImg
   UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
   UI['pre_bg_img'].grid(row=0,column=0)
@@ -373,17 +345,12 @@ def initPreview(f):
       pal_picked[x][y].bind("<Button-1>",showDrag)
       pal_picked[x][y].gr_x=x
       pal_picked[x][y].gr_y=y # these can be referred to to figure out where it is
-      if x==2 and y==2:
-        img = loadIcon('box_socket')
-        pal_picked[x][y]['image']=img
-        pal_picked[x][y].img=img
-        pal_picked[x][y]['borderwidth']=4
       pal_picked[x][y].place(x=(x*65+4),y=(y*65+32))
 
 def initPicker(f):
   global frmScroll, pal_canvas, pal_items_fake
   ttk.Label(f, text="All Items: ", anchor="center").grid(row=0, column=0, sticky="EW")
-  UI['picker_empty_img']=loadIcon('_blank')
+  UI['picker_empty_img']=png.loadIcon('_blank')
   cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
   cframe.grid(row=1, column=0, sticky="NSEW")
   f.rowconfigure(1, weight=1)
@@ -486,7 +453,7 @@ def initProperties(win):
   f.grid(row=0, column=0)
 
   ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
-  entSpr=loadSpr('gear_ent')
+  entSpr=png.loadSpr('gear_ent')
 
   UI['prop_name']=ttk.Label(f, text="Weighted Button", anchor="center")
   UI['prop_name'].grid(row=1, column=0, columnspan=3, sticky="EW")
@@ -502,7 +469,7 @@ def initProperties(win):
   sub_frame.grid(column=0, columnspan=3, row=3)
   img=('_blank','portal_button','box_socket','ball_socket','_blank') # for now always show 'properties' for the ITEM_BUTTON_FLOOR
   for i in range(0,5):
-    ico=loadIcon(img[i])
+    ico=png.loadIcon(img[i])
     UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=ico)
     UI['prop_sub_'+str(i)].grid(row=0, column=i)
     if i==2:
@@ -513,7 +480,7 @@ def initProperties(win):
   spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
   img=('in_none','out_norm','rot_0','space_occupy','surf_wall_floor_ceil','ap_black') # in order: inputs, outputs, rotation handle, occupied/embed state, desiredFacing, is a Valve item (+ other authors in future)
   for i in range(0,6):
-    spr=loadSpr(img[i])
+    spr=png.loadSpr(img[i])
     UI['prop_spr_'+str(i)]=ttk.Label(spr_frame, image=spr, relief="raised")
     UI['prop_spr_'+str(i)].grid(row=0, column=i)
     UI['prop_spr_'+str(i)].img=spr
@@ -542,7 +509,7 @@ def initDragIcon(win):
   dragWin.withdraw()
   dragWin.transient(master=win)
   dragWin.withdraw() # starts hidden
-  UI['drag_lbl']=Label(dragWin, image=loadIcon('_blank'))
+  UI['drag_lbl']=Label(dragWin, image=png.loadIcon('_blank'))
   UI['drag_lbl'].grid(row=0, column=0)
 
 def initMenuBar(win):
