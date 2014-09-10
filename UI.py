@@ -30,6 +30,7 @@ testImg  = (png.loadIcon('portal_button'), # test palette images,remove when ite
 img_error=png.loadIcon('_error') # If image is not readable, use this instead
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
+windows={}
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 pal_picked={} # 2d array of the picker icons
@@ -559,45 +560,42 @@ def initMain():
   win.rowconfigure(0, weight=1)
 
   UIbg.rowconfigure(0, weight=1)
+  
+  frames['preview']=Frame(UIbg, bg=ItemsBG)
+  frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
+  initPreview(frames['preview'])
+  
+  windows['palette']=Toplevel(win)
+  
+  windows['palette'].transient(master=win)
+  windows['palette'].resizable(False, True)
+  windows['palette'].title("Palettes")
+  initPalette(windows['palette'])
 
-  splitFrame=Frame(UIbg, bg=ItemsBG)
-  splitFrame.grid(row=0, column=0, sticky="NSEW", padx=2, pady=5)
+  windows['option']=Toplevel(win)
+  windows['option'].transient(master=win)
+  windows['option'].resizable(False, False)
+  windows['option'].title("Options")
+  initOption(windows['option'])
 
-  frames['palette']=ttk.Frame(splitFrame, borderwidth=4, relief="raised", padding=5)
-  frames['palette'].grid(row=0, column=0, rowspan=2, sticky="NSEW", padx=2, pady=0)
-  splitFrame.rowconfigure(1, weight=1)
-  initPalette(frames['palette'])
-
-  optionFrame=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  optionFrame.grid(row=0, column=1, sticky=N)
-  initOption(optionFrame)
-
-  frames['styleOpt']=ttk.Frame(splitFrame, padding=5, borderwidth=4, relief="raised")
-  frames['styleOpt'].grid(row=1, column=1, sticky=N, pady=(10,0))
-  initStyleOpt(frames['styleOpt'])
-
-  frames['palette']=Frame(UIbg, bg=ItemsBG)
-  frames['palette'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
-  initPreview(frames['palette'])
-
-  ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
-
-  pickSplitFrame=Frame(UIbg, bg=ItemsBG)
-  pickSplitFrame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
-  UIbg.columnconfigure(5, weight=1)
-
-  frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
-  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
-  initFilter(frames['filter'])
-
-  frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
-  frames['picker'].grid(row=0, column=0, sticky="NSEW")
-  pickSplitFrame.columnconfigure(0, weight=1)
-  pickSplitFrame.rowconfigure(0, weight=1)
-  initPicker(frames['picker'])
+  windows['styleOpt']=Toplevel(win)
+  windows['styleOpt'].transient(master=win)
+  windows['styleOpt'].resizable(False, False)
+  windows['styleOpt'].title("Style Properties")
+  initStyleOpt(windows['styleOpt'])
+ 
+  windows['picker']=Toplevel(win)
+  windows['picker'].transient(master=win)
+  windows['picker'].resizable(True, True)
+  windows['picker'].title("All Items")
+  initPicker(windows['picker'])
   win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
   win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
   win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
+
+  frames['filter']=ttk.Frame(windows['picker'], padding=5, borderwidth=0, relief="raised")
+  frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
+  initFilter(frames['filter'])
 
   frames['filter'].lift()
 
