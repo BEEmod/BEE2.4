@@ -224,11 +224,9 @@ def filterAllCallback(col):
 
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initPalette(f):
-  ttk.Label(f, text="Palettes", anchor="center").grid(row=0, column=0, sticky="EW")
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
 
   palFrame=ttk.Frame(f)
-  palFrame.grid(row=2, column=0, sticky="NSEW")
+  palFrame.grid(row=0, column=0, sticky="NSEW")
   palFrame.rowconfigure(0, weight=1)
   palFrame.columnconfigure(0, weight=1)
   f.rowconfigure(2, weight=1)
@@ -243,23 +241,21 @@ def initPalette(f):
   UI['palette']['yscrollcommand']=palScroll.set
 
   UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
-  UI['newBox'].grid(row=3, column=0, sticky=S) # User types in and presses enter to create
+  UI['newBox'].grid(row=1, column=0, sticky=S) # User types in and presses enter to create
   UI['newBox'].bind("<Return>", newPal_textbox)
   UI['newBox'].bind("<FocusIn>", pal_remTempText)
   UI['newBox'].bind("<FocusOut>", pal_addTempText)
-  ttk.Button(f, text=" - ").grid(row=4, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
+  ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
 def initOption(f):
-  ttk.Label(f, text="Options").grid(row=0, column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
-  ttk.Button(f, width=10, text="Save", command=save).grid(row=2, column=0)
-  ttk.Button(f, width=10, text="Save as", command=saveAs).grid(row=3, column=0)
-  ttk.Button(f, width=10, text="Export...").grid(row=4, column=0, pady=(0, 10))  
+  ttk.Button(f, width=10, text="Save", command=save).grid(row=0, column=0)
+  ttk.Button(f, width=10, text="Save as", command=saveAs).grid(row=1, column=0)
+  ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))  
 
-  ttk.Label(f, text="Properties").grid(row=5,column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=6, column=0, sticky="EW", pady=5)
+  ttk.Label(f, text="Properties").grid(row=3,column=0)
+  ttk.Separator(f, orient=HORIZONTAL).grid(row=4, column=0, sticky="EW", pady=5)
   props=ttk.Frame(f)
-  props.grid(row=7, column=0)
+  props.grid(row=5, column=0)
 
   ttk.Label(props, text="Style: ").grid(row=0, column=0)
   UIStyle=ttk.Combobox(props, values=styleText)
@@ -290,18 +286,12 @@ def initOption(f):
 
 def initStyleOpt(f):
   global styleCheck, styleOptVars
-  ttk.Label(f, text="Style Options").grid(row=0, column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=1, column=0, sticky="EW", pady=5)
 
-  sframe=ttk.Frame(f, relief="sunken")
-  sframe.grid(row=2, column=0, sticky="NSEW")
-  f.rowconfigure(2, weight=1)
-
-  can=Canvas(sframe)
+  can=Canvas(f)
   can.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
-  sframe.rowconfigure(0, weight=1)
+  f.rowconfigure(0, weight=1)
 
-  scroll = ttk.Scrollbar(sframe, orient=VERTICAL, command=can.yview)
+  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=can.yview)
   scroll.grid(column=1, row=0, sticky="NS")
   can['yscrollcommand'] = scroll.set
   canFrame=ttk.Frame(can)
@@ -661,7 +651,7 @@ def initMain():
 
   windows['styleOpt']=Toplevel(win)
   windows['styleOpt'].transient(master=win)
-  windows['styleOpt'].resizable(False, False)
+  windows['styleOpt'].resizable(False, True)
   windows['styleOpt'].title("Style Properties")
   windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
   windows['styleOpt'].vis=True
