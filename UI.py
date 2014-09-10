@@ -229,7 +229,7 @@ def initPalette(f):
   palFrame.grid(row=0, column=0, sticky="NSEW")
   palFrame.rowconfigure(0, weight=1)
   palFrame.columnconfigure(0, weight=1)
-  f.rowconfigure(2, weight=1)
+  f.rowconfigure(0, weight=1)
 
   UI['palette']=Listbox(palFrame, listvariable=paletteText, width=10)
   UI['palette'].grid(row=0,column=0, sticky="NSEW")
@@ -637,6 +637,7 @@ def initMain():
   windows['palette'].transient(master=win)
   windows['palette'].resizable(False, True)
   windows['palette'].title("Palettes")
+  windows['palette'].iconbitmap(r'BEE2.ico')
   windows['palette'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal', windows['palette']))
   windows['palette'].vis=True
   initPalette(windows['palette'])
@@ -645,6 +646,7 @@ def initMain():
   windows['option'].transient(master=win)
   windows['option'].resizable(False, False)
   windows['option'].title("Options")
+  windows['option'].iconbitmap(r'BEE2.ico')
   windows['option'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt', windows['option']))
   windows['option'].vis=True
   initOption(windows['option'])
@@ -653,6 +655,7 @@ def initMain():
   windows['styleOpt'].transient(master=win)
   windows['styleOpt'].resizable(False, True)
   windows['styleOpt'].title("Style Properties")
+  windows['styleOpt'].iconbitmap(r'BEE2.ico')
   windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
   windows['styleOpt'].vis=True
   initStyleOpt(windows['styleOpt'])
