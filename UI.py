@@ -90,9 +90,6 @@ def setPalette():
 def setStyleOpt(key):
   print("Toggle style option: " + key)
   return
-  
-def menu_quit():
-  win.destroy()
                 
 def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
@@ -571,7 +568,7 @@ def initMenuBar(win):
     val+=1
 
   menuFile.add_separator()
-  menuFile.add_command(label="Quit", command=menu_quit) 
+  menuFile.add_command(label="Quit", command=win.destroy) 
   menuPal=Menu(bar)
 
   bar.add_cascade(menu=menuPal, label='Palette')
@@ -689,7 +686,6 @@ def initMain():
   xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
   windows['option'].geometry(xpos + str(win.winfo_rooty()-40))
   windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()+50))
-  
   
   win.mainloop()
   
