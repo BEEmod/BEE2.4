@@ -6,7 +6,7 @@ class PaletteItem:
       self.styles.append(style)
       
     subtypes={}
-  def addStyle(self, text, style)
+  def addStyle(self, text, style):
     self.text[style]=text
     if not style in self.styles:
       self.styles.append(style)

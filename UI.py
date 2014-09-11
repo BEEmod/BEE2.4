@@ -110,7 +110,8 @@ def hideProps(e):
 def showDrag(e):
   dragWin.deiconify()
   dragWin.lift(win)
-  dragWin.grab_set_global() # grab makes this window the only one to recieve mouse events, so we guarentee that it'll drop when the mouse is released.
+  dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so we guarentee that it'll drop when the mouse is released.
+  # NOTE: _global means no other programs can interact, make sure it's released eventually or you won't be able to quit!
   moveDrag(e) # move to correct position
   UI['drag_lbl']['image']=e.widget.img
   dragWin.bind("<B1-Motion>", moveDrag)
@@ -177,6 +178,7 @@ def toggleWin(button, window):
   else:
     window.vis=True
     window.deiconify()
+    win.focus() # return focus back to main window
     UI['tool_win_'+button].state(['pressed'])
   
 def hideWin(button, window):
@@ -292,7 +294,7 @@ def initStyleOpt(f):
   f.rowconfigure(0, weight=1)
 
   scroll = ttk.Scrollbar(f, orient=VERTICAL, command=can.yview)
-  scroll.grid(column=1, row=0, sticky="NS")
+  scroll.grid(column=1, row=0, rowspan=2, sticky="NS")
   can['yscrollcommand'] = scroll.set
   canFrame=ttk.Frame(can)
 
@@ -334,32 +336,33 @@ def initStyleOpt(f):
 
   can.create_window(0, 0, window=canFrame, anchor="nw")
   can.update_idletasks()
-  can['width']=canFrame.winfo_reqwidth()
+  can.config(scrollregion=can.bbox(ALL), width=canFrame.winfo_reqwidth())
+  ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=1, column=0)
   
-def initTool(f):
-  UI['tool_delete']=ttk.Button(f)
+def initTool(f): 
+  UI['tool_delete']=ttk.Button(f, style='BG.TButton')
   UI['tool_delete'].img = png.loadPng('icons/tool_delete')
   UI['tool_delete']['image'] = UI['tool_delete'].img
   UI['tool_delete'].grid(row=0, column=0, padx=2)
   
-  UI['tool_subitem']=ttk.Button(f)
+  UI['tool_subitem']=ttk.Button(f, style='BG.TButton')
   UI['tool_subitem'].img = png.loadPng('icons/tool_sub')
   UI['tool_subitem']['image'] = UI['tool_subitem'].img
   UI['tool_subitem'].grid(row=0, column=1, padx=(2,5))
   
-  UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']))
+  UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']), style='BG.TButton')
   UI['tool_win_pal'].img = png.loadPng('icons/win_pal')
   UI['tool_win_pal']['image'] = UI['tool_win_pal'].img
   UI['tool_win_pal'].state(["pressed"])
   UI['tool_win_pal'].grid(row=0, column=3, padx=(5,2))
   
-  UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']))
+  UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']), style='BG.TButton')
   UI['tool_win_opt'].img = png.loadPng('icons/win_opt')
   UI['tool_win_opt']['image'] = UI['tool_win_opt'].img
   UI['tool_win_opt'].state(["pressed"])
   UI['tool_win_opt'].grid(row=0, column=4, padx=2)
   
-  UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']))
+  UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']), style='BG.TButton')
   UI['tool_win_style'].img = png.loadPng('icons/win_style')
   UI['tool_win_style']['image'] = UI['tool_win_style'].img
   UI['tool_win_style'].state(["pressed"])
@@ -372,7 +375,7 @@ def initPreview(f):
   UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
   UI['pre_bg_img'].grid(row=0,column=0)
 
-  ttk.Label(f, text="Item: Button").place(x=10,y=552)
+  ttk.Label(f, text="Item: Button", style='BG.TLabel').place(x=10,y=552)
   
   for x in range(0,4):
     pal_picked[x]={}
@@ -427,17 +430,17 @@ def flowPicker(e):
   if width <1:
     width=1 # we got way too small, prevent division by zero
   itemNum=len(pal_items)
-  pal_canvas['scrollregion'] = (0, 0, width*65, math.ceil(itemNum/width)*65+2) 
+  pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
   frmScroll['height']=(math.ceil(itemNum/width)*65+2)
   for i in range(0,itemNum):
       pal_items[i].place(x=((i%width) *65+1),y=((i//width)*65+1))
     
   # this adds extra blank items on the end to finish the grid nicely.
   for i in range(0,len(pal_items_fake)):
-    if i>=(itemNum%width) and i<width:
+    if i>=(itemNum%width) and i<width: # if this space is empty
       pal_items_fake[i].place(x=((i%width)*65+1),y=(itemNum//width)*65+1)
     else:
-      pal_items_fake[i].place_forget()  
+      pal_items_fake[i].place_forget() # otherwise hide the fake item
     
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
@@ -591,17 +594,22 @@ def initMain():
   "Initialise all windows and panes."
   
   initMenuBar(win)
-  win.maxsize(width=2000, height=2000)
+  win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
   UIbg=Frame(win, bg=ItemsBG)
   UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
   win.columnconfigure(0, weight=1)
   win.rowconfigure(0, weight=1)
-
   UIbg.rowconfigure(0, weight=1)
+  
+  style=ttk.Style()
+  style.configure('BG.TButton', background=ItemsBG) # Custom button style with correct background
+  style.configure('Preview.TLabel', background='#F4F5F5') # Custom label style with correct background 
   
   frames['preview']=Frame(UIbg, bg=ItemsBG)
   frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
   initPreview(frames['preview'])
+  frames['preview'].update_idletasks()
+  win.minsize(width=frames['preview'].winfo_reqwidth()+200,height=frames['preview'].winfo_reqheight()+5) # Prevent making the window smaller than the preview pane
   
   frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26)
   frames['toolMenu'].place(x=75, y=2)
@@ -672,11 +680,15 @@ def initMain():
   
   # move windows around to make it look nice on startup
   if(win.winfo_rootx() < windows['palette'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
-    win.geometry('+' + str(win.winfo_rootx() - windows['palette'].winfo_reqwidth() - 50) + '+' + str(win.winfo_rooty()))
-  windows['palette'].geometry('+' + str(windows['palette'].winfo_width() + 50) + '+' + str(win.winfo_rooty()))
-  xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_width() + 10 )) + '+'
-  windows['option'].geometry(xpos + str(win.winfo_rooty()))
-  windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()))
+    win.geometry('+' + str(windows['palette'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
+  else:
+    win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
+  win.update_idletasks()
+  windows['palette'].geometry( str(windows['palette'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) + 
+    '+' + str(win.winfo_rootx()-windows['palette'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
+  xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
+  windows['option'].geometry(xpos + str(win.winfo_rooty()-40))
+  windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()+50))
   
   
   win.mainloop()
