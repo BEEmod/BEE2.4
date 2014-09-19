@@ -69,7 +69,7 @@ class PngImageTk(object):
     self.pixeldata = list(self.pixels) #pixeldata has each row of the image as an array
     self.x = 0
     self.y = 0
-    self.image = PhotoImage(width=self.w, height=self.h) #use photoimage as temporary oject to write to canvas
+    self.image = PhotoImage(width=self.w, height=self.h) #use photoimage as temporary object to write to canvas
 
   # Print meta data for image
   def __str__(self):

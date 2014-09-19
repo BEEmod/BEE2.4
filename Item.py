@@ -1,4 +1,4 @@
-class PaletteItem:
+class Item:
   def __init__(self, key, text, style="ALL"):
     self.text={style : text}
     self.styles={"ALL"}

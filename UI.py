@@ -12,31 +12,46 @@ win.withdraw() # hide the main window while everything is loading, so you don't 
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
 
-testImg  = (png.loadIcon('portal_button'), # test palette images,remove when item loading done
-          png.loadIcon('stairs'),
-          png.loadIcon('flipper'),
-          png.loadIcon('faithplate'),
-          png.loadIcon('goo'),
-          png.loadIcon('frankenturret'),
-          png.loadIcon('item_dropper'),
-          png.loadIcon('turret'),
-          png.loadIcon('hard_light_emitter'),
-          png.loadIcon('laser_receptacle'),
-          png.loadIcon('light_panel'),
-          png.loadIcon('paintsplat_water'),
-          png.loadIcon('paintsplat_speed'),
-          png.loadIcon('paintsplat_portal'),
-          png.loadIcon('tbeam'),
-          png.loadIcon('companion_cube'),
-          png.loadIcon('airlock'))
+testImg  = [
+          ('Weighted Button', 'ITEM_BUTTON:0', png.loadIcon('portal_button')), # test palette images,remove when item loading done
+          ('Stairs', 'ITEM_STAIRS', png.loadIcon('stairs')),
+          ('Flip Panel','ITEM_FLIP_PANEL', png.loadIcon('flipper')),
+          ('Faith Plate', 'ITEM_CATAPULT', png.loadIcon('faithplate')),
+          ('Deadly Goo', 'ITEM_GOO', png.loadIcon('goo')),
+          ('Storage Cube', 'ITEM_CUBE:0', png.loadIcon('cube')),
+          ('Companion Cube', 'ITEM_CUBE:1', png.loadIcon('companion_cube')),
+          ('Reflection Cube', 'ITEM_CUBE:2', png.loadIcon('reflection_cube')),
+          ('Safety Cube', 'ITEM_CUBE:3', png.loadIcon('edgeless_safety_cube')),
+          ('FrankenTurret', 'ITEM_CUBE:4', png.loadIcon('frankenturret')),
+          ('Cube Dropper', 'ITEM_CUBE_DROPPER', png.loadIcon('item_dropper')),
+          ('Sentry Turret', 'ITEM_TURRET', png.loadIcon('turret')),
+          ('Hard Light Bridge', 'ITEM_LIGHT_BRIDGE', png.loadIcon('hard_light_emitter')),
+          ('Laser Catcher', 'ITEM_LASER_CATCHER_CENTER', png.loadIcon('laser_receptacle')),
+          ('Light Strip', 'ITEM_LIGHTSTRIP', png.loadIcon('light_panel')),
+          ('Piston Platform', 'ITEM_PISTON_PLATFORM', png.loadIcon('arm_paneltop')),
+          ('Large Faith Plate', 'ITEM_CATAPULT_LARGE', png.loadIcon('faithplate_128')),
+          ('AutoPortal', 'ITEM_AUTOPORTAL', png.loadIcon('fixed_portal_door')),
+          ('Fizzler', 'ITEM_BARRIERHAZARD:0', png.loadIcon('fizzler')),
+          ('Discouragement Field', 'ITEM_BARRIERHAZARD:1', png.loadIcon('deathfield')),
+          ('Laser Relay', 'ITEM_LASER_RELAY_CENTER', png.loadIcon('laser_receptacle')),
+          ('Laser Emitter', 'ITEM_LASER_EMITTER_CENTER', png.loadIcon('laser_emitter')),
+          ('Repulsion Gel', 'ITEM_PAINT_SPLAT:0', png.loadIcon('paintsplat_bounce')),
+          ('Propulsion Gel', 'ITEM_PAINT_SPLAT:2', png.loadIcon('paintsplat_speed')),
+          ('Conversion Gel', 'ITEM_PAINT_SPLAT:3', png.loadIcon('paintsplat_portal')),
+          ('Cleansing Gel', 'ITEM_PAINT_SPLAT:4', png.loadIcon('paintsplat_water')),
+          ('Excursion Funnel', 'ITEM_TBEAM', png.loadIcon('tbeam')),
+          ('Glass Panel', 'ITEM_GLASS_PANEL', png.loadIcon('airlock'))]
   
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
 windows={}
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
-pal_picked={} # 2d array of the picker icons
+pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
+drag_item=-1 # the item currently being moved
+drag_orig_pos=-1
+drag_isPre=False # are we dragging a palette item?
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
@@ -90,6 +105,12 @@ def setPalette():
 def setStyleOpt(key):
   print("Toggle style option: " + key)
   return
+  
+def setDispName(name):
+  UI['pre_disp_name'].configure(text='Item: '+name)
+  
+def clearDispName(e):
+  UI['pre_disp_name'].configure(text='')
                 
 def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
@@ -103,29 +124,94 @@ def showProps(e):
 def hideProps(e):
   propWin.withdraw()
   
-
+def convScrToGrid(x,y):
+  "Returns the location of the item hovered over on the preview pane."
+  return ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65, 
+         (y-UI['pre_bg_img'].winfo_rooty()-32)//65)
+         
+def convScrToPos(x,y):
+  "Returns the index of the item hovered over on the preview pane."
+  return ((y-UI['pre_bg_img'].winfo_rooty()-32)//65)*4 +\
+         ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65)
+         
 def showDrag(e):
+  "Start dragging a palette item."
+  global drag_isPre,drag_item,drag_origPos
+  drag_origPos=convScrToPos(e.x_root,e.y_root)
+  drag_item=e.widget
+  drag_isPre=False
+  setDispName(drag_item.dispName)
+  for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
+    if item.key==drag_item.key:
+      drag_item=item
+      drag_item.place_forget()
+      drag_origPos=i
+      del pal_picked[drag_origPos]
+      drag_isPre=True
+      break
   dragWin.deiconify()
   dragWin.lift(win)
-  dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so we guarentee that it'll drop when the mouse is released.
+  dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
   # NOTE: _global means no other programs can interact, make sure it's released eventually or you won't be able to quit!
   moveDrag(e) # move to correct position
   UI['drag_lbl']['image']=e.widget.img
   dragWin.bind("<B1-Motion>", moveDrag)
   dragWin.bind("<ButtonRelease-1>", hideDrag)
+  UI['pre_sel_line'].lift()
 
 def hideDrag(e):
+  "User released the mouse button, complete the drag."
   dragWin.withdraw()
   dragWin.unbind("<B1-Motion>")
   dragWin.grab_release()
-  # we should actually change the picker menu here (if applies) to add the dropped item.
+  clearDispName(None)
+  UI['pre_sel_line'].place_forget()
+  pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  ind=pos_x+pos_y*4
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
+    if drag_isPre:
+      pal_picked.insert(ind,drag_item)
+    else:
+      newItem=copyItem(drag_item,frames['preview'])
+      if ind>=len(pal_picked):
+        pal_picked.append(newItem)
+      else:
+        pal_picked.insert(ind,newItem)
+    if len(pal_picked) > 32: # delete the item - it's fallen off the palette
+        pal_picked.pop().place_forget()
+    flowPreview()
+  elif drag_isPre:
+    flowPreview()
 
 def moveDrag(e):
+  "Update the position of dragged items as they move around."
+  setDispName(drag_item.dispName)
   dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
-  if e.x_root > UI['pre_bg_img'].winfo_rootx() and e.y_root > UI['pre_bg_img'].winfo_rooty() and e.x_root < UI['pre_bg_img'].winfo_rootx() + UI['pre_bg_img'].winfo_width() and e.y_root < UI['pre_bg_img'].winfo_rooty() + UI['pre_bg_img'].winfo_height():
+  pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
     dragWin.configure(cursor='plus')
+    UI['pre_sel_line'].place(x=pos_x*65+1, y=pos_y*65+32)
   else:
-    dragWin.configure(cursor='no')
+    if drag_isPre:
+      dragWin.configure(cursor='x_cursor')
+    else:
+      dragWin.configure(cursor='no')
+    UI['pre_sel_line'].place_forget()
+
+def createItem(name, key, img, frame):
+  "Create a label to show an item onscreen."
+  lbl=ttk.Label(frame, image=img)
+  lbl.img=img
+  lbl.key=key
+  lbl.dispName=name
+  lbl.bind("<Button-3>",showProps)
+  lbl.bind("<Button-1>", showDrag)
+  lbl.bind("<Enter>", lambda e, n=name: setDispName(n))
+  lbl.bind("<Leave>", clearDispName)
+  return lbl
+  
+def copyItem(item, frame):
+  return createItem(item.dispName, item.key, item.img, frame)
 
 def setPal_listbox(e):
   global selectedPalette
@@ -247,8 +333,8 @@ def initPalette(f):
   ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
 
 def initOption(f):
-  ttk.Button(f, width=10, text="Save", command=save).grid(row=0, column=0)
-  ttk.Button(f, width=10, text="Save as", command=saveAs).grid(row=1, column=0)
+  ttk.Button(f, width=10, text="Save...", command=save).grid(row=0, column=0)
+  ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1, column=0)
   ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))  
 
   ttk.Label(f, text="Properties").grid(row=3,column=0)
@@ -286,14 +372,14 @@ def initOption(f):
 def initStyleOpt(f):
   global styleCheck, styleOptVars
 
-  can=Canvas(f)
-  can.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
+  UI['style_can']=Canvas(f)
+  UI['style_can'].grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
   f.rowconfigure(0, weight=1)
 
-  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=can.yview)
+  scroll = ttk.Scrollbar(f, orient=VERTICAL, command=UI['style_can'].yview)
   scroll.grid(column=1, row=0, rowspan=2, sticky="NS")
-  can['yscrollcommand'] = scroll.set
-  canFrame=ttk.Frame(can)
+  UI['style_can']['yscrollcommand'] = scroll.set
+  canFrame=ttk.Frame(UI['style_can'])
 
   #This should automatically switch to match different styles
   frmAll=ttk.Labelframe(canFrame, text="All")
@@ -331,60 +417,57 @@ def initStyleOpt(f):
   ttk.Checkbutton(frm80s, text="Opened Sphere", variable=styleOptVars["OpenSphere"], command=lambda: setStyleOpt("OpenSphere")).grid(row=0, column=0, sticky="W", padx=3)
   ttk.Checkbutton(frmOver, text="Have entry/exit puzzles", variable=styleOptVars["OverEntryPuzzles"], command=lambda: setStyleOpt("OverEntryPuzzles")).grid(row=0, column=0, sticky="W", padx=3)
 
-  can.create_window(0, 0, window=canFrame, anchor="nw")
-  can.update_idletasks()
-  can.config(scrollregion=can.bbox(ALL), width=canFrame.winfo_reqwidth())
+  UI['style_can'].create_window(0, 0, window=canFrame, anchor="nw")
+  UI['style_can'].update_idletasks()
+  UI['style_can'].config(scrollregion=UI['style_can'].bbox(ALL), width=canFrame.winfo_reqwidth())
   ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=1, column=0)
   
 def initTool(f): 
-  UI['tool_delete']=ttk.Button(f, style='BG.TButton')
-  UI['tool_delete'].img = png.loadPng('icons/tool_delete')
-  UI['tool_delete']['image'] = UI['tool_delete'].img
-  UI['tool_delete'].grid(row=0, column=0, padx=2)
-  
-  UI['tool_subitem']=ttk.Button(f, style='BG.TButton')
-  UI['tool_subitem'].img = png.loadPng('icons/tool_sub')
-  UI['tool_subitem']['image'] = UI['tool_subitem'].img
-  UI['tool_subitem'].grid(row=0, column=1, padx=(2,5))
-  
+  "Creates the small toolbar above the icons that allows toggling subwindows."  
   UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']), style='BG.TButton')
   UI['tool_win_pal'].img = png.loadPng('icons/win_pal')
   UI['tool_win_pal']['image'] = UI['tool_win_pal'].img
   UI['tool_win_pal'].state(["pressed"])
-  UI['tool_win_pal'].grid(row=0, column=3, padx=(5,2))
+  UI['tool_win_pal'].grid(row=0, column=0, padx=(5,2))
   
   UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']), style='BG.TButton')
   UI['tool_win_opt'].img = png.loadPng('icons/win_opt')
   UI['tool_win_opt']['image'] = UI['tool_win_opt'].img
   UI['tool_win_opt'].state(["pressed"])
-  UI['tool_win_opt'].grid(row=0, column=4, padx=2)
+  UI['tool_win_opt'].grid(row=0, column=1, padx=2)
   
   UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']), style='BG.TButton')
   UI['tool_win_style'].img = png.loadPng('icons/win_style')
   UI['tool_win_style']['image'] = UI['tool_win_style'].img
   UI['tool_win_style'].state(["pressed"])
-  UI['tool_win_style'].grid(row=0, column=5, padx=2)
+  UI['tool_win_style'].grid(row=0, column=2, padx=2)
+  
+def flowPreview():
+  "Position all the preview icons based on the array. Run to refresh if items are moved around."
+  for i,item in enumerate(pal_picked):
+    item.gr_x=i%4
+    item.gr_y=i//4 # these can be referred to to figure out where it is
+    item.place(x=(i%4*65+4),y=(i//4*65+32))
+  UI['pre_sel_line'].lift()
 
 def initPreview(f):
-  UI['pre_bg_img']=Label(f, bg=ItemsBG)
+  "Generate the preview pane which shows the items that will export to the palette."
   previewImg  = png.loadPng('menu')
-  UI['pre_bg_img']['image'] = previewImg
+  UI['pre_bg_img']=Label(f, bg=ItemsBG, image=previewImg)
   UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
   UI['pre_bg_img'].grid(row=0,column=0)
 
-  ttk.Label(f, text="Item: Button", style='BG.TLabel').place(x=10,y=552)
+  UI['pre_disp_name']=ttk.Label(f, text="Item: Button", style='BG.TLabel')
+  UI['pre_disp_name'].place(x=10,y=552)
   
-  for x in range(0,4):
-    pal_picked[x]={}
-    for y in range(0,8):
-      img=random.choice(testImg)
-      pal_picked[x][y]=ttk.Label(f, image=img)
-      pal_picked[x][y].img=img
-      pal_picked[x][y].bind("<Button-3>",showProps)
-      pal_picked[x][y].bind("<Button-1>",showDrag)
-      pal_picked[x][y].gr_x=x
-      pal_picked[x][y].gr_y=y # these can be referred to to figure out where it is
-      pal_picked[x][y].place(x=(x*65+4),y=(y*65+32))
+  selImg=png.loadPng('sel_bar')
+  UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg)
+  UI['pre_sel_line'].imgsave=selImg
+  
+  for i in range(0,32):
+    img=random.choice(testImg)
+    pal_picked.append(createItem(img[0], img[1],img[2], frames['preview']))
+  flowPreview()
 
 def initPicker(f):
   global frmScroll, pal_canvas, pal_items_fake
@@ -408,12 +491,8 @@ def initPicker(f):
   pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
 
   for num in range(0,len(testImg)*10):
-    lbl=ttk.Label(frmScroll) 
-    lbl.img=testImg[num%len(testImg)]# init with test objects
-    lbl['image']=lbl.img
-    lbl.bind("<Button-3>",showProps)
-    lbl.bind("<Button-1>",showDrag)
-    pal_items.append(lbl)
+    img=testImg[num%len(testImg)] # init with test objects
+    pal_items.append(createItem(img[0], img[1], img[2],frmScroll))
   pal_items_fake=[]
   for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
     pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
@@ -429,15 +508,15 @@ def flowPicker(e):
   itemNum=len(pal_items)
   pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
   frmScroll['height']=(math.ceil(itemNum/width)*65+2)
-  for i in range(0,itemNum):
-      pal_items[i].place(x=((i%width) *65+1),y=((i//width)*65+1))
+  for i,item in enumerate(pal_items):
+      item.place(x=((i%width) *65+1),y=((i//width)*65+1))
     
   # this adds extra blank items on the end to finish the grid nicely.
-  for i in range(0,len(pal_items_fake)):
+  for i,blank in enumerate(pal_items_fake):
     if i>=(itemNum%width) and i<width: # if this space is empty
-      pal_items_fake[i].place(x=((i%width)*65+1),y=(itemNum//width)*65+1)
+      blank.place(x=((i%width)*65+1),y=(itemNum//width)*65+1)
     else:
-      pal_items_fake[i].place_forget() # otherwise hide the fake item
+      blank.place_forget() # otherwise hide the fake item
     
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
@@ -507,8 +586,8 @@ def initProperties(win):
   sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
   sub_frame.grid(column=0, columnspan=3, row=3)
   img=('_blank','portal_button','box_socket','ball_socket','_blank') # for now always show 'properties' for the ITEM_BUTTON_FLOOR
-  for i in range(0,5):
-    ico=png.loadIcon(img[i])
+  for i, ico in enumerate(img):
+    ico=png.loadIcon(ico)
     UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=ico)
     UI['prop_sub_'+str(i)].grid(row=0, column=i)
     if i==2:
@@ -518,8 +597,8 @@ def initProperties(win):
   spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
   spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
   img=('in_none','out_norm','rot_0','space_occupy','surf_wall_floor_ceil','ap_black') # in order: inputs, outputs, rotation handle, occupied/embed state, desiredFacing, is a Valve item (+ other authors in future)
-  for i in range(0,6):
-    spr=png.loadSpr(img[i])
+  for i, spr in enumerate(img):
+    spr=png.loadSpr(spr)
     UI['prop_spr_'+str(i)]=ttk.Label(spr_frame, image=spr, relief="raised")
     UI['prop_spr_'+str(i)].grid(row=0, column=i)
     UI['prop_spr_'+str(i)].img=spr
@@ -608,8 +687,8 @@ def initMain():
   frames['preview'].update_idletasks()
   win.minsize(width=frames['preview'].winfo_reqwidth()+200,height=frames['preview'].winfo_reqheight()+5) # Prevent making the window smaller than the preview pane
   
-  frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26)
-  frames['toolMenu'].place(x=75, y=2)
+  frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26, borderwidth=0)
+  frames['toolMenu'].place(x=73, y=2)
   initTool(frames['toolMenu'])
   
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
@@ -627,10 +706,6 @@ def initMain():
   pickSplitFrame.rowconfigure(0, weight=1)
   pickSplitFrame.columnconfigure(0, weight=1)
   initPicker(frames['picker'])
-  
-  win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
-  win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
-  win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
 
   frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
   frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
@@ -664,6 +739,14 @@ def initMain():
   windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
   windows['styleOpt'].vis=True
   initStyleOpt(windows['styleOpt'])
+  
+  win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
+  win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
+  win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
+  
+  windows['styleOpt'].bind("<MouseWheel>", lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
+  windows['styleOpt'].bind("<Button-4>", lambda e: UI['style_can'].yview_scroll(1, "units")) # needed for linux
+  windows['styleOpt'].bind("<Button-5>", lambda e: UI['style_can'].yview_scroll(-1, "units"))
 
   initProperties(win)
   initDragIcon(win)
@@ -688,5 +771,6 @@ def initMain():
   windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()+50))
   
   win.mainloop()
-  
-initMain()
+ 
+if __name__ == '__main__': # load the window if directly executing this file
+  initMain()
