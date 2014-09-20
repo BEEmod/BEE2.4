@@ -6,41 +6,46 @@ from tkinter import simpledialog # Premade windows for asking for strings/ints/e
 import tkinter_png as png # png library for TKinter
 import random
 import math
-    
+import itemPropWin
+
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
 
-testImg  = [
-          ('Weighted Button', 'ITEM_BUTTON:0', png.loadIcon('portal_button')), # test palette images,remove when item loading done
-          ('Stairs', 'ITEM_STAIRS', png.loadIcon('stairs')),
-          ('Flip Panel','ITEM_FLIP_PANEL', png.loadIcon('flipper')),
-          ('Faith Plate', 'ITEM_CATAPULT', png.loadIcon('faithplate')),
-          ('Deadly Goo', 'ITEM_GOO', png.loadIcon('goo')),
-          ('Storage Cube', 'ITEM_CUBE:0', png.loadIcon('cube')),
-          ('Companion Cube', 'ITEM_CUBE:1', png.loadIcon('companion_cube')),
-          ('Reflection Cube', 'ITEM_CUBE:2', png.loadIcon('reflection_cube')),
-          ('Safety Cube', 'ITEM_CUBE:3', png.loadIcon('edgeless_safety_cube')),
-          ('FrankenTurret', 'ITEM_CUBE:4', png.loadIcon('frankenturret')),
-          ('Cube Dropper', 'ITEM_CUBE_DROPPER', png.loadIcon('item_dropper')),
-          ('Sentry Turret', 'ITEM_TURRET', png.loadIcon('turret')),
-          ('Hard Light Bridge', 'ITEM_LIGHT_BRIDGE', png.loadIcon('hard_light_emitter')),
-          ('Laser Catcher', 'ITEM_LASER_CATCHER_CENTER', png.loadIcon('laser_receptacle')),
-          ('Light Strip', 'ITEM_LIGHTSTRIP', png.loadIcon('light_panel')),
-          ('Piston Platform', 'ITEM_PISTON_PLATFORM', png.loadIcon('arm_paneltop')),
-          ('Large Faith Plate', 'ITEM_CATAPULT_LARGE', png.loadIcon('faithplate_128')),
-          ('AutoPortal', 'ITEM_AUTOPORTAL', png.loadIcon('fixed_portal_door')),
-          ('Fizzler', 'ITEM_BARRIERHAZARD:0', png.loadIcon('fizzler')),
-          ('Discouragement Field', 'ITEM_BARRIERHAZARD:1', png.loadIcon('deathfield')),
-          ('Laser Relay', 'ITEM_LASER_RELAY_CENTER', png.loadIcon('laser_receptacle')),
-          ('Laser Emitter', 'ITEM_LASER_EMITTER_CENTER', png.loadIcon('laser_emitter')),
-          ('Repulsion Gel', 'ITEM_PAINT_SPLAT:0', png.loadIcon('paintsplat_bounce')),
-          ('Propulsion Gel', 'ITEM_PAINT_SPLAT:2', png.loadIcon('paintsplat_speed')),
-          ('Conversion Gel', 'ITEM_PAINT_SPLAT:3', png.loadIcon('paintsplat_portal')),
-          ('Cleansing Gel', 'ITEM_PAINT_SPLAT:4', png.loadIcon('paintsplat_water')),
-          ('Excursion Funnel', 'ITEM_TBEAM', png.loadIcon('tbeam')),
-          ('Glass Panel', 'ITEM_GLASS_PANEL', png.loadIcon('airlock'))]
+
+
+testImg  = [# test palette images,remove when item loading done
+          ('Weighted Button',      'ITEM_BUTTON',               0, png.loadIcon('portal_button')), 
+          ('Cube Button',          'ITEM_BUTTON',               1, png.loadIcon('box_socket')),
+          ('Sphere Button',        'ITEM_BUTTON',               2, png.loadIcon('ball_socket')),
+          ('Stairs',               'ITEM_STAIRS',               0, png.loadIcon('stairs')),
+          ('Flip Panel',           'ITEM_FLIP_PANEL',           0, png.loadIcon('flipper')),
+          ('Faith Plate',          'ITEM_CATAPULT',             0, png.loadIcon('faithplate')),
+          ('Deadly Goo',           'ITEM_GOO',                  0, png.loadIcon('goo')),
+          ('Storage Cube',         'ITEM_CUBE',                 0, png.loadIcon('cube')),
+          ('Companion Cube',       'ITEM_CUBE',                 1, png.loadIcon('companion_cube')),
+          ('Reflection Cube',      'ITEM_CUBE',                 2, png.loadIcon('reflection_cube')),
+          ('Safety Cube',          'ITEM_CUBE',                 3, png.loadIcon('edgeless_safety_cube')),
+          ('FrankenTurret',        'ITEM_CUBE',                 4, png.loadIcon('frankenturret')),
+          ('Cube Dropper',         'ITEM_CUBE_DROPPER',         0, png.loadIcon('item_dropper')),
+          ('Sentry Turret',        'ITEM_TURRET',               0, png.loadIcon('turret')),
+          ('Hard Light Bridge',    'ITEM_LIGHT_BRIDGE',         0, png.loadIcon('hard_light_emitter')),
+          ('Laser Catcher',        'ITEM_LASER_CATCHER_CENTER', 0, png.loadIcon('laser_catcher')),
+          ('Light Strip',          'ITEM_LIGHTSTRIP',           0, png.loadIcon('light_panel')),
+          ('Piston Platform',      'ITEM_PISTON_PLATFORM',      0, png.loadIcon('arm_paneltop')),
+          ('Large Faith Plate',    'ITEM_CATAPULT_LARGE',       0, png.loadIcon('faithplate_128')),
+          ('AutoPortal',           'ITEM_AUTOPORTAL',           0, png.loadIcon('fixed_portal_door')),
+          ('Fizzler',              'ITEM_BARRIERHAZARD',        0, png.loadIcon('fizzler')),
+          ('Discouragement Field', 'ITEM_BARRIERHAZARD',        1, png.loadIcon('deathfield')),
+          ('Laser Relay',          'ITEM_LASER_RELAY_CENTER',   0, png.loadIcon('laser_receptacle')),
+          ('Laser Emitter',        'ITEM_LASER_EMITTER_CENTER', 0, png.loadIcon('laser_emitter')),
+          ('Repulsion Gel',        'ITEM_PAINT_SPLAT',          0, png.loadIcon('paintsplat_bounce')),
+          ('Propulsion Gel',       'ITEM_PAINT_SPLAT',          2, png.loadIcon('paintsplat_speed')),
+          ('Conversion Gel',       'ITEM_PAINT_SPLAT',          3, png.loadIcon('paintsplat_portal')),
+          ('Cleansing Gel',        'ITEM_PAINT_SPLAT',          4, png.loadIcon('paintsplat_water')),
+          ('Excursion Funnel',     'ITEM_TBEAM',                0, png.loadIcon('tbeam')),
+          ('Glass Panel',          'ITEM_GLASS_PANEL',          0, png.loadIcon('airlock'))]
   
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
@@ -87,7 +92,7 @@ styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', False), 
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these five should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
                 ('UnlockMandatory','Unlock Default Items', False),
-                ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
+                ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
 
 def demoMusic():
   messagebox.showinfo(message='This would play the track selected for a few seconds.')
@@ -142,13 +147,12 @@ def showDrag(e):
   drag_isPre=False
   setDispName(drag_item.dispName)
   for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
-    if item.key==drag_item.key:
+    if item.key==drag_item.key and item.subKey==drag_item.subKey:
       drag_item=item
       drag_item.place_forget()
       drag_origPos=i
       del pal_picked[drag_origPos]
       drag_isPre=True
-      break
   dragWin.deiconify()
   dragWin.lift(win)
   dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
@@ -190,7 +194,7 @@ def moveDrag(e):
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
     dragWin.configure(cursor='plus')
-    UI['pre_sel_line'].place(x=pos_x*65+1, y=pos_y*65+32)
+    UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
   else:
     if drag_isPre:
       dragWin.configure(cursor='x_cursor')
@@ -198,11 +202,12 @@ def moveDrag(e):
       dragWin.configure(cursor='no')
     UI['pre_sel_line'].place_forget()
 
-def createItem(name, key, img, frame):
+def createItem(name, key, sub, img, frame):
   "Create a label to show an item onscreen."
   lbl=ttk.Label(frame, image=img)
   lbl.img=img
   lbl.key=key
+  lbl.subKey=sub
   lbl.dispName=name
   lbl.bind("<Button-3>",showProps)
   lbl.bind("<Button-1>", showDrag)
@@ -211,7 +216,7 @@ def createItem(name, key, img, frame):
   return lbl
   
 def copyItem(item, frame):
-  return createItem(item.dispName, item.key, item.img, frame)
+  return createItem(item.dispName, item.key, item.subKey, item.img, frame)
 
 def setPal_listbox(e):
   global selectedPalette
@@ -461,12 +466,12 @@ def initPreview(f):
   UI['pre_disp_name'].place(x=10,y=552)
   
   selImg=png.loadPng('sel_bar')
-  UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg)
+  UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
   UI['pre_sel_line'].imgsave=selImg
   
   for i in range(0,32):
     img=random.choice(testImg)
-    pal_picked.append(createItem(img[0], img[1],img[2], frames['preview']))
+    pal_picked.append(createItem(img[0], img[1], img[2], img[3], frames['preview']))
   flowPreview()
 
 def initPicker(f):
@@ -492,7 +497,7 @@ def initPicker(f):
 
   for num in range(0,len(testImg)*10):
     img=testImg[num%len(testImg)] # init with test objects
-    pal_items.append(createItem(img[0], img[1], img[2],frmScroll))
+    pal_items.append(createItem(img[0], img[1], img[2], img[3], frmScroll))
   pal_items_fake=[]
   for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
     pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
@@ -750,6 +755,7 @@ def initMain():
 
   initProperties(win)
   initDragIcon(win)
+  itemPropWin.init(win)
   
   win.deiconify() # show it once we've loaded everything
   
