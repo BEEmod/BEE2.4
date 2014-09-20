@@ -16,7 +16,7 @@ png.img_error=png.loadIcon('_error') # If image is not readable, use this instea
 
 
 testImg  = [# test palette images,remove when item loading done
-          ('Weighted Button',      'ITEM_BUTTON',               0, png.loadIcon('portal_button')), 
+          ('Weighted Button',      'ITEM_BUTTON',               0, png.loadIcon('portal_button')),
           ('Cube Button',          'ITEM_BUTTON',               1, png.loadIcon('box_socket')),
           ('Sphere Button',        'ITEM_BUTTON',               2, png.loadIcon('ball_socket')),
           ('Stairs',               'ITEM_STAIRS',               0, png.loadIcon('stairs')),
@@ -46,7 +46,7 @@ testImg  = [# test palette images,remove when item loading done
           ('Cleansing Gel',        'ITEM_PAINT_SPLAT',          4, png.loadIcon('paintsplat_water')),
           ('Excursion Funnel',     'ITEM_TBEAM',                0, png.loadIcon('tbeam')),
           ('Glass Panel',          'ITEM_GLASS_PANEL',          0, png.loadIcon('airlock'))]
-  
+
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
 windows={}
@@ -89,7 +89,7 @@ games = ('common/portal2', 'common/aperturetag')
 gamesDisplay = ('Portal 2', 'Aperture Tag') #TODO: We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
 
 styleOptions = [('MultiverseCave','Multiverse Cave', True),
-                ('FixPortalBump','Prevent Portal Bump  (glass)', False), 
+                ('FixPortalBump','Prevent Portal Bump  (glass)', False),
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these five should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
                 ('UnlockMandatory','Unlock Default Items', False),
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
@@ -110,13 +110,13 @@ def setPalette():
 def setStyleOpt(key):
   print("Toggle style option: " + key)
   return
-  
+
 def setDispName(name):
   UI['pre_disp_name'].configure(text='Item: '+name)
-  
+
 def clearDispName(e):
   UI['pre_disp_name'].configure(text='')
-                
+
 def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
   propWin.deiconify()
@@ -128,17 +128,23 @@ def showProps(e):
 
 def hideProps(e):
   propWin.withdraw()
-  
+
+def showItemProps():
+  itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], hideItemProps)
+
+def hideItemProps(vals):
+  print(vals)
+
 def convScrToGrid(x,y):
   "Returns the location of the item hovered over on the preview pane."
-  return ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65, 
+  return ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65,
          (y-UI['pre_bg_img'].winfo_rooty()-32)//65)
-         
+
 def convScrToPos(x,y):
   "Returns the index of the item hovered over on the preview pane."
   return ((y-UI['pre_bg_img'].winfo_rooty()-32)//65)*4 +\
          ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65)
-         
+
 def showDrag(e):
   "Start dragging a palette item."
   global drag_isPre,drag_item,drag_origPos
@@ -214,7 +220,7 @@ def createItem(name, key, sub, img, frame):
   lbl.bind("<Enter>", lambda e, n=name: setDispName(n))
   lbl.bind("<Leave>", clearDispName)
   return lbl
-  
+
 def copyItem(item, frame):
   return createItem(item.dispName, item.key, item.subKey, item.img, frame)
 
@@ -230,7 +236,7 @@ def setPal_radio():
   UI['palette'].selection_clear(0,len(palettes))
   UI['palette'].selection_set(selectedPalette)
   setPalette()
-  
+
 def pal_remTempText(e):
   if PalEntry.get() == PalEntry_TempText:
     PalEntry.set("")
@@ -238,7 +244,7 @@ def pal_remTempText(e):
 def pal_addTempText(e):
   if PalEntry.get() == "":
     PalEntry.set(PalEntry_TempText)
-  
+
 def saveAs():
   name=""
   while True:
@@ -257,7 +263,7 @@ def save():
     saveAs() # If it's readonly, prompt for a name and save somewhere else
   else:
     savePal(pal) # overwrite it
-    
+
 def toggleWin(button, window):
   if window.vis:
     window.vis=False
@@ -268,12 +274,12 @@ def toggleWin(button, window):
     window.deiconify()
     win.focus() # return focus back to main window
     UI['tool_win_'+button].state(['pressed'])
-  
+
 def hideWin(button, window):
   window.withdraw()
   window.vis=False
   UI['tool_win_'+button].state(['!pressed'])
-  
+
 def menu_newPal():
   newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
 
@@ -302,10 +308,10 @@ def updateFilters():
     if no_alt:
       FilterBoxes_all[cat].state(['!alternate']) # no alternate if they are all the same
       FilterVars_all[cat].set(value)
-    
+
 #TODO: This should check all the filter checkboxes, and change what is actually shown in the list of items.
 
-def filterAllCallback(col): 
+def filterAllCallback(col):
   "sets all items in a category to true/false, then updates the item list."
   val = FilterVars_all[col].get()
   for i in FilterVars[col]:
@@ -340,7 +346,7 @@ def initPalette(f):
 def initOption(f):
   ttk.Button(f, width=10, text="Save...", command=save).grid(row=0, column=0)
   ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1, column=0)
-  ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))  
+  ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))
 
   ttk.Label(f, text="Properties").grid(row=3,column=0)
   ttk.Separator(f, orient=HORIZONTAL).grid(row=4, column=0, sticky="EW", pady=5)
@@ -398,7 +404,7 @@ def initStyleOpt(f):
 
   frmOver=ttk.Labelframe(canFrame, text="Overgrown")
   frmOver.grid(row=3, column=0, sticky="EW")
-   
+
   pos=0
   styleCheck={}
   styleOptVars={
@@ -414,7 +420,7 @@ def initStyleOpt(f):
     pos=pos+1
 
   # TODO: These should be generated by a similar loop to above.
-  ttk.Checkbutton(frmAll, text="HEPs destroy cubes (Rexaura)", variable=styleOptVars["HepDestCube"], command=lambda: setStyleOpt("HepDestCube")).grid(row=5, column=0, sticky="W", padx=3) 
+  ttk.Checkbutton(frmAll, text="HEPs destroy cubes (Rexaura)", variable=styleOptVars["HepDestCube"], command=lambda: setStyleOpt("HepDestCube")).grid(row=5, column=0, sticky="W", padx=3)
 
   ttk.Checkbutton(frmOld, text="Real Observation Rooms", variable=styleOptVars["RealObs"], command=lambda: setStyleOpt("RealObs")).grid(row=0, column=0, sticky="W", padx=3)
   ttk.Checkbutton(frmOld, text="Gel-Faith-Plates", variable=styleOptVars["GelFaith"], command=lambda: setStyleOpt("GelFaith")).grid(row=1, column=0, sticky="W", padx=3)
@@ -426,27 +432,27 @@ def initStyleOpt(f):
   UI['style_can'].update_idletasks()
   UI['style_can'].config(scrollregion=UI['style_can'].bbox(ALL), width=canFrame.winfo_reqwidth())
   ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=1, column=0)
-  
-def initTool(f): 
-  "Creates the small toolbar above the icons that allows toggling subwindows."  
+
+def initTool(f):
+  "Creates the small toolbar above the icons that allows toggling subwindows."
   UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']), style='BG.TButton')
   UI['tool_win_pal'].img = png.loadPng('icons/win_pal')
   UI['tool_win_pal']['image'] = UI['tool_win_pal'].img
   UI['tool_win_pal'].state(["pressed"])
   UI['tool_win_pal'].grid(row=0, column=0, padx=(5,2))
-  
+
   UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']), style='BG.TButton')
   UI['tool_win_opt'].img = png.loadPng('icons/win_opt')
   UI['tool_win_opt']['image'] = UI['tool_win_opt'].img
   UI['tool_win_opt'].state(["pressed"])
   UI['tool_win_opt'].grid(row=0, column=1, padx=2)
-  
+
   UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']), style='BG.TButton')
   UI['tool_win_style'].img = png.loadPng('icons/win_style')
   UI['tool_win_style']['image'] = UI['tool_win_style'].img
   UI['tool_win_style'].state(["pressed"])
   UI['tool_win_style'].grid(row=0, column=2, padx=2)
-  
+
 def flowPreview():
   "Position all the preview icons based on the array. Run to refresh if items are moved around."
   for i,item in enumerate(pal_picked):
@@ -464,11 +470,11 @@ def initPreview(f):
 
   UI['pre_disp_name']=ttk.Label(f, text="Item: Button", style='BG.TLabel')
   UI['pre_disp_name'].place(x=10,y=552)
-  
+
   selImg=png.loadPng('sel_bar')
   UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
   UI['pre_sel_line'].imgsave=selImg
-  
+
   for i in range(0,32):
     img=random.choice(testImg)
     pal_picked.append(createItem(img[0], img[1], img[2], img[3], frames['preview']))
@@ -515,14 +521,14 @@ def flowPicker(e):
   frmScroll['height']=(math.ceil(itemNum/width)*65+2)
   for i,item in enumerate(pal_items):
       item.place(x=((i%width) *65+1),y=((i//width)*65+1))
-    
+
   # this adds extra blank items on the end to finish the grid nicely.
   for i,blank in enumerate(pal_items_fake):
     if i>=(itemNum%width) and i<width: # if this space is empty
       blank.place(x=((i%width)*65+1),y=(itemNum//width)*65+1)
     else:
       blank.place_forget() # otherwise hide the fake item
-    
+
 def initFilterCol(cat, f, names):
   FilterBoxes[cat]={}
   FilterVars[cat]={}
@@ -570,7 +576,6 @@ def initProperties(win):
   propWin.transient(master=win)
   propWin.withdraw() # starts hidden
 
-  win.bind("<Button-1>",hideProps)
 
   f=ttk.Frame(propWin, relief="raised", borderwidth="4")
   f.grid(row=0, column=0)
@@ -621,8 +626,12 @@ def initProperties(win):
   UI['prop_more']=ttk.Button(f, text="More Info>>")
   UI['prop_more'].grid(row=6, column=2, sticky=E)
 
+  UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
+  UI['prop_itemProps'].grid(row=6, column=1)
+
   UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
   UI['prop_alternate'].grid(row=6, column=0, sticky=W)
+
 
 def initDragIcon(win):
   global dragWin
@@ -652,7 +661,7 @@ def initMenuBar(win):
     val+=1
 
   menuFile.add_separator()
-  menuFile.add_command(label="Quit", command=win.destroy) 
+  menuFile.add_command(label="Quit", command=win.destroy)
   menuPal=Menu(bar)
 
   bar.add_cascade(menu=menuPal, label='Palette')
@@ -673,7 +682,7 @@ def initMenuBar(win):
 
 def initMain():
   "Initialise all windows and panes."
-  
+
   initMenuBar(win)
   win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
   UIbg=Frame(win, bg=ItemsBG)
@@ -681,21 +690,21 @@ def initMain():
   win.columnconfigure(0, weight=1)
   win.rowconfigure(0, weight=1)
   UIbg.rowconfigure(0, weight=1)
-  
+
   style=ttk.Style()
   style.configure('BG.TButton', background=ItemsBG) # Custom button style with correct background
-  style.configure('Preview.TLabel', background='#F4F5F5') # Custom label style with correct background 
-  
+  style.configure('Preview.TLabel', background='#F4F5F5') # Custom label style with correct background
+
   frames['preview']=Frame(UIbg, bg=ItemsBG)
   frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
   initPreview(frames['preview'])
   frames['preview'].update_idletasks()
   win.minsize(width=frames['preview'].winfo_reqwidth()+200,height=frames['preview'].winfo_reqheight()+5) # Prevent making the window smaller than the preview pane
-  
+
   frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26, borderwidth=0)
   frames['toolMenu'].place(x=73, y=2)
   initTool(frames['toolMenu'])
-  
+
   ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
 
   pickSplitFrame=Frame(UIbg, bg=ItemsBG)
@@ -717,7 +726,7 @@ def initMain():
   initFilter(frames['filter'])
 
   frames['filter'].lift()
-  
+
   windows['palette']=Toplevel(win)
   windows['palette'].transient(master=win)
   windows['palette'].resizable(False, True)
@@ -744,39 +753,44 @@ def initMain():
   windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
   windows['styleOpt'].vis=True
   initStyleOpt(windows['styleOpt'])
-  
+
   win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
   win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
   win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
-  
+
   windows['styleOpt'].bind("<MouseWheel>", lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
   windows['styleOpt'].bind("<Button-4>", lambda e: UI['style_can'].yview_scroll(1, "units")) # needed for linux
   windows['styleOpt'].bind("<Button-5>", lambda e: UI['style_can'].yview_scroll(-1, "units"))
+  
+  win.bind("<Button-1>",hideProps)
+  windows['styleOpt'].bind("<Button-1>",hideProps)
+  windows['option'].bind("<Button-1>",hideProps) 
+  windows['palette'].bind("<Button-1>",hideProps)
 
   initProperties(win)
   initDragIcon(win)
-  itemPropWin.init(win)
-  
+  itemPropWin.init(win, hideItemProps)
+
   win.deiconify() # show it once we've loaded everything
-  
+
   win.update_idletasks()
   windows['styleOpt'].update_idletasks()
   windows['option'].update_idletasks()
   windows['palette'].update_idletasks()
-  
+
   # move windows around to make it look nice on startup
   if(win.winfo_rootx() < windows['palette'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
     win.geometry('+' + str(windows['palette'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
   else:
     win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
   win.update_idletasks()
-  windows['palette'].geometry( str(windows['palette'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) + 
+  windows['palette'].geometry( str(windows['palette'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) +
     '+' + str(win.winfo_rootx()-windows['palette'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
   xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
   windows['option'].geometry(xpos + str(win.winfo_rooty()-40))
   windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()+50))
-  
+
   win.mainloop()
- 
+
 if __name__ == '__main__': # load the window if directly executing this file
   initMain()
