@@ -6,6 +6,8 @@ from tkinter import simpledialog # Premade windows for asking for strings/ints/e
 import tkinter_png as png # png library for TKinter
 import random
 import math
+import webbrowser
+
 import itemPropWin
 
 win=Tk()
@@ -15,37 +17,42 @@ png.img_error=png.loadIcon('_error') # If image is not readable, use this instea
 
 
 
-testImg  = [# test palette images,remove when item loading done
-          ('Weighted Button',      'ITEM_BUTTON',               0, png.loadIcon('portal_button')),
-          ('Cube Button',          'ITEM_BUTTON',               1, png.loadIcon('box_socket')),
-          ('Sphere Button',        'ITEM_BUTTON',               2, png.loadIcon('ball_socket')),
-          ('Stairs',               'ITEM_STAIRS',               0, png.loadIcon('stairs')),
-          ('Flip Panel',           'ITEM_FLIP_PANEL',           0, png.loadIcon('flipper')),
-          ('Faith Plate',          'ITEM_CATAPULT',             0, png.loadIcon('faithplate')),
-          ('Deadly Goo',           'ITEM_GOO',                  0, png.loadIcon('goo')),
-          ('Storage Cube',         'ITEM_CUBE',                 0, png.loadIcon('cube')),
-          ('Companion Cube',       'ITEM_CUBE',                 1, png.loadIcon('companion_cube')),
-          ('Reflection Cube',      'ITEM_CUBE',                 2, png.loadIcon('reflection_cube')),
-          ('Safety Cube',          'ITEM_CUBE',                 3, png.loadIcon('edgeless_safety_cube')),
-          ('FrankenTurret',        'ITEM_CUBE',                 4, png.loadIcon('frankenturret')),
-          ('Cube Dropper',         'ITEM_CUBE_DROPPER',         0, png.loadIcon('item_dropper')),
-          ('Sentry Turret',        'ITEM_TURRET',               0, png.loadIcon('turret')),
-          ('Hard Light Bridge',    'ITEM_LIGHT_BRIDGE',         0, png.loadIcon('hard_light_emitter')),
-          ('Laser Catcher',        'ITEM_LASER_CATCHER_CENTER', 0, png.loadIcon('laser_catcher')),
-          ('Light Strip',          'ITEM_LIGHTSTRIP',           0, png.loadIcon('light_panel')),
-          ('Piston Platform',      'ITEM_PISTON_PLATFORM',      0, png.loadIcon('arm_paneltop')),
-          ('Large Faith Plate',    'ITEM_CATAPULT_LARGE',       0, png.loadIcon('faithplate_128')),
-          ('AutoPortal',           'ITEM_AUTOPORTAL',           0, png.loadIcon('fixed_portal_door')),
-          ('Fizzler',              'ITEM_BARRIERHAZARD',        0, png.loadIcon('fizzler')),
-          ('Discouragement Field', 'ITEM_BARRIERHAZARD',        1, png.loadIcon('deathfield')),
-          ('Laser Relay',          'ITEM_LASER_RELAY_CENTER',   0, png.loadIcon('laser_receptacle')),
-          ('Laser Emitter',        'ITEM_LASER_EMITTER_CENTER', 0, png.loadIcon('laser_emitter')),
-          ('Repulsion Gel',        'ITEM_PAINT_SPLAT',          0, png.loadIcon('paintsplat_bounce')),
-          ('Propulsion Gel',       'ITEM_PAINT_SPLAT',          2, png.loadIcon('paintsplat_speed')),
-          ('Conversion Gel',       'ITEM_PAINT_SPLAT',          3, png.loadIcon('paintsplat_portal')),
-          ('Cleansing Gel',        'ITEM_PAINT_SPLAT',          4, png.loadIcon('paintsplat_water')),
-          ('Excursion Funnel',     'ITEM_TBEAM',                0, png.loadIcon('tbeam')),
-          ('Glass Panel',          'ITEM_GLASS_PANEL',          0, png.loadIcon('airlock'))]
+testImg  = [ # test palette images,remove when item loading done
+          ('Weighted Button',      'ITEM_BUTTON',                     0, png.loadIcon('portal_button')),
+          ('Cube Button',          'ITEM_BUTTON',                     1, png.loadIcon('box_socket')),
+          ('Sphere Button',        'ITEM_BUTTON',                     2, png.loadIcon('ball_socket')),
+          ('Pedestal Button',      'ITEM_PEDESTAL_BUTTON',            0, png.loadIcon('pedestal_button')),
+          ('Stairs',               'ITEM_STAIRS',                     0, png.loadIcon('stairs')),
+          ('Flip Panel',           'ITEM_FLIP_PANEL',                 0, png.loadIcon('flipper')),
+          ('Faith Plate',          'ITEM_CATAPULT',                   0, png.loadIcon('faithplate')),
+          ('Track Platform',       'ITEM_TRACK_PLATFORM',             0, png.loadIcon('arm_motionplatform')),
+          ('Deadly Goo',           'ITEM_GOO',                        0, png.loadIcon('goo')),
+          ('Storage Cube',         'ITEM_CUBE',                       0, png.loadIcon('cube')),
+          ('Companion Cube',       'ITEM_CUBE',                       1, png.loadIcon('companion_cube')),
+          ('Reflection Cube',      'ITEM_CUBE',                       2, png.loadIcon('reflection_cube')),
+          ('Safety Cube',          'ITEM_CUBE',                       3, png.loadIcon('edgeless_safety_cube')),
+          ('FrankenTurret',        'ITEM_CUBE',                       4, png.loadIcon('frankenturret')),
+          ('Cube Dropper',         'ITEM_CUBE_DROPPER',               0, png.loadIcon('item_dropper')),
+          ('Sentry Turret',        'ITEM_TURRET',                     0, png.loadIcon('turret')),
+          ('Hard Light Bridge',    'ITEM_LIGHT_BRIDGE',               0, png.loadIcon('hard_light_emitter')),
+          ('Laser Catcher',        'ITEM_LASER_CATCHER_CENTER',       0, png.loadIcon('laser_catcher')),
+          ('Light Strip',          'ITEM_LIGHTSTRIP',                 0, png.loadIcon('light_panel')),
+          ('Piston Platform',      'ITEM_PISTON_PLATFORM',            0, png.loadIcon('arm_paneltop')),
+          ('Large Faith Plate',    'ITEM_CATAPULT_LARGE',             0, png.loadIcon('faithplate_128')),
+          ('AutoPortal',           'ITEM_AUTOPORTAL',                 0, png.loadIcon('fixed_portal_door')),
+          ('Fizzler',              'ITEM_BARRIERHAZARD',              0, png.loadIcon('fizzler')),
+          ('Discouragement Field', 'ITEM_BARRIERHAZARD',              1, png.loadIcon('deathfield')),
+          ('Laser Relay',          'ITEM_LASER_RELAY_CENTER',         0, png.loadIcon('laser_receptacle')),
+          ('Laser Emitter',        'ITEM_LASER_EMITTER_CENTER',       0, png.loadIcon('laser_emitter')),
+          ('Repulsion Gel',        'ITEM_PAINT_SPLAT',                0, png.loadIcon('paintsplat_bounce')),
+          ('Propulsion Gel',       'ITEM_PAINT_SPLAT',                2, png.loadIcon('paintsplat_speed')),
+          ('Conversion Gel',       'ITEM_PAINT_SPLAT',                3, png.loadIcon('paintsplat_portal')),
+          ('Cleansing Gel',        'ITEM_PAINT_SPLAT',                4, png.loadIcon('paintsplat_water')),
+          ('Excursion Funnel',     'ITEM_TBEAM',                      0, png.loadIcon('tbeam')),
+          ('Glass Panel',          'ITEM_GLASS_PANEL',                0, png.loadIcon('airlock')),
+          ('Glass',                'ITEM_BARRIER',                    0, png.loadIcon('glass')),
+          ('Observation Room',     'ITEM_SECONDARY_OBSERVATION_ROOM', 0, png.loadIcon('observation_room')),
+          ('Angled Panel',         'ITEM_ANGLED_PANEL',               0, png.loadIcon('panel_flap'))]
 
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
@@ -623,7 +630,7 @@ def initProperties(win):
   UI['prop_desc'].insert("end", "Big pressure buttons activated by players or cubes. Cube buttons are only activated by cubes, sphere buttons only by spheres.")
   UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
 
-  UI['prop_more']=ttk.Button(f, text="More Info>>")
+  UI['prop_more']=ttk.Button(f, text="More Info>>", command=lambda: webbrowser.open('https://developer.valvesoftware.com/wiki/Portal_2_Puzzle_Maker/Button', new=2, autoraise=True))
   UI['prop_more'].grid(row=6, column=2, sticky=E)
 
   UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
