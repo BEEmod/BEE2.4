@@ -131,6 +131,14 @@ def showProps(e):
   loc_x=e.widget.winfo_rootx() + propWin.winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
 #The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
   loc_y=e.widget.winfo_rooty() + propWin.winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
+  if loc_x<15: # adjust to fit inside the screen, + small boundry to not obstruct taskbars, menus etc
+    loc_x=0
+  if loc_y<45:
+    loc_y=0
+  if loc_x > propWin.winfo_screenwidth()-propWin.winfo_reqwidth()-15:
+    loc_x=propWin.winfo_screenwidth()-propWin.winfo_reqwidth()-15
+  if loc_y > propWin.winfo_screenheight()-propWin.winfo_reqheight()-45:
+    loc_y=propWin.winfo_screenheight()-propWin.winfo_reqheight()-45
   propWin.geometry('+'+str(loc_x)+'+'+str(loc_y))
 
 def hideProps(e):
