@@ -194,14 +194,11 @@ def hideDrag(e):
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   ind=pos_x+pos_y*4
   if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
-    if drag_isPre:
-      pal_picked.insert(ind,drag_item)
+    newItem=copyItem(drag_item,frames['preview'])
+    if ind>=len(pal_picked):
+      pal_picked.append(newItem)
     else:
-      newItem=copyItem(drag_item,frames['preview'])
-      if ind>=len(pal_picked):
-        pal_picked.append(newItem)
-      else:
-        pal_picked.insert(ind,newItem)
+      pal_picked.insert(ind,newItem)
     if len(pal_picked) > 32: # delete the item - it's fallen off the palette
         pal_picked.pop().place_forget()
     flowPreview()
