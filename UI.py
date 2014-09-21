@@ -162,18 +162,18 @@ def convScrToPos(x,y):
 
 def showDrag(e):
   "Start dragging a palette item."
-  global drag_isPre,drag_item,drag_origPos
-  drag_origPos=convScrToPos(e.x_root,e.y_root)
+  global drag_isPre,drag_item
   drag_item=e.widget
   drag_isPre=False
   setDispName(drag_item.dispName)
+  toRem=[]
   for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
     if item.key==drag_item.key and item.subKey==drag_item.subKey:
-      drag_item=item
-      drag_item.place_forget()
-      drag_origPos=i
-      del pal_picked[drag_origPos]
+      item.place_forget()
+      toRem.append(i)
       drag_isPre=True
+  for i in reversed(toRem):
+    del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enmerate()
   dragWin.deiconify()
   dragWin.lift(win)
   dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
@@ -287,7 +287,7 @@ def toggleWin(button, window):
   else:
     window.vis=True
     window.deiconify()
-    win.focus() # return focus back to main window
+    win.focus() # return focus back to main window so it doesn't flicker between if you press the various buttons
     UI['tool_win_'+button].state(['pressed'])
 
 def hideWin(button, window):
@@ -491,7 +491,7 @@ def initPreview(f):
   UI['pre_sel_line'].imgsave=selImg
 
   for i in range(0,32):
-    img=random.choice(testImg)
+    img=testImg[0]#random.choice(testImg)
     pal_picked.append(createItem(img[0], img[1], img[2], img[3], frames['preview']))
   flowPreview()
 
