@@ -1,0 +1,2096 @@
+"Item"
+{
+	"Type"		"ITEM_CATAPULT_TARGET"
+	"ItemClass"		"ItemCatapultTarget"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_catapult_target"
+			"Model"
+			{
+				"ModelName"			"handletarget.3ds"
+				"TextureName"		"buttonweight.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_CATAPULT"
+		"RenderColor"		"146 221 234 255"
+		"OccupiesVoxel"		"0"
+	}
+	"Properties"
+	{
+		"VerticalAlignment"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"			"instances/p2editor_clean/faith_plate_target.vmf"
+				"EntityCount"	"2"
+			}
+		}
+
+		"TargetName"		"target"
+		"Offset"		"64 64 64"
+
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"				"0 0 0"
+				"CollideType"		"COLLIDE_NOTHING"
+				"CollideAgainst"	"COLLIDE_NOTHING"
+
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_BARRIER_HAZARD_EXTENT"
+	"ItemClass"	"ItemBarrierHazardExtent"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Model"
+			{
+				"ModelName"		"handle_grip_trianglesmall.3ds"
+				"TextureName"	"buttonweight.png"
+			}
+		}
+		"MovementHandle"	"HANDLE_NONE"
+		"OccupiesVoxel"		"0"
+		"Deletable"			"0"
+		"Copyable"			"0"
+		"PseudoHandle"		"1"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_BARRIER_EXTENT"
+	"ItemClass"		"ItemBarrierExtent"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Model"
+			{
+				"ModelName"		"handle_grip_trianglesmall.3ds"
+				"TextureName"	"buttonweight.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"OccupiesVoxel"		"0"
+		"Deletable"			"0"
+		"Copyable"			"0"
+		"PseudoHandle"		"1"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_PISTON_PLATFORM_EXTENT"
+	"ItemClass"		"ItemPistonPlatformExtent"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Model"
+			{
+				"ModelName"			"handle_grip_sphere.3ds"
+				"TextureName"		"buttonweight.png"
+			}
+			"Model"
+			{
+				"ModelName"		"destination_arrow.3ds"
+				"TextureName"	"black_white_unlit.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"OccupiesVoxel"		"0"
+		"Deletable"			"0"
+		"Copyable"			"0"
+		"PseudoHandle"		"1"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_RAIL_PLATFORM_EXTENT"
+	"ItemClass"	"ItemRailPlatformExtent"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Model"
+			{
+				"ModelName"		"handle_grip_trianglesmall.3ds"
+				"TextureName"	"buttonweight.png"
+			}
+		}
+		"MovementHandle"	"HANDLE_NONE"
+		"OccupiesVoxel"		"0"
+		"Deletable"			"0"
+		"Copyable"			"0"
+		"PseudoHandle"		"1"
+	}
+}
+"Item"
+{
+	"Type"			"ITEM_LASER_EMITTER_OFFSET"
+	"ItemClass"		"ItemLaserEmitter"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"		"PORTAL2_PuzzleEditor_Item_laser_emitter"
+			"Model"
+			{
+				"ModelName"		"laseremit.3ds"
+				"TextureName"		"laser_models.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_5_POSITIONS"
+	}
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"StartEnabled"
+		{
+			"DefaultValue"		"1"
+			"Index"		"2"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/laser_emitter_offset.vmf"
+				"EntityCount"		"9"
+				"BrushCount"		"4"
+				"BrushSideCount"	"27"
+			}
+		}
+
+		"TargetName"		"le"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"		"instance:counter;Subtract"
+			}
+		}
+		"Offset"		"64 64 64"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+
+				"Surface"
+				{
+					"Pos"	"0 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"0 2 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 2 0"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+		"EmbedFace"
+		{
+			"Solid"
+			{
+				"Center"		"32 16 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"32 112 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"96 64 128"
+				"Dimensions"	"64 128 4"
+				"Grid"			"2x2"
+			}
+		}
+
+		"ConnectionPoints"
+		{
+			// left
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 3 0"
+				"SignageOffset"		"-2 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"	"0"
+			}
+
+
+			// right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 3 0"
+				"SignageOffset"		"5 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 4 0"
+				"SignageOffset"		"5 5 0"
+				"Priority"	"0"
+			}
+
+			// top
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"1 6 0"
+				"SignageOffset"		"0 7 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"2 6 0"
+				"SignageOffset"		"3 7 0"
+				"Priority"	"0"
+			}
+
+			// bottom
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"1 1 0"
+				"SignageOffset"		"0 0 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"2 1 0"
+				"SignageOffset"		"3 0 0"
+				"Priority"	"0"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_LASER_CATCHER_OFFSET"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_laser_catcher"
+			"Model"
+			{
+				"ModelName"			"laserrecw.3ds"
+				"TextureName"		"laser_models.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_5_POSITIONS"
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/laser_catcher_offset.vmf"
+				"EntityCount"		"3"
+				"BrushCount"		"4"
+				"BrushSideCount"	"27"
+			}
+		}
+
+		"TargetName"		"lc"
+		"Outputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:laser_catcher;OnPowered"
+				"Deactivate"		"instance:laser_catcher;OnUnpowered"
+			}
+		}
+		"Offset"		"64 64 64"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+
+				"Surface"
+				{
+					"Pos"	"0 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"0 2 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 2 0"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+		"EmbedFace"
+		{
+			"Solid"
+			{
+				"Center"		"32 16 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"32 112 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"96 64 128"
+				"Dimensions"	"64 128 4"
+				"Grid"			"2x2"
+			}
+		}
+		"ConnectionPoints"
+		{
+			// left
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 3 0"
+				"SignageOffset"		"-2 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"	"0"
+			}
+
+			// right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 3 0"
+				"SignageOffset"		"5 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 4 0"
+				"SignageOffset"		"5 5 0"
+				"Priority"	"0"
+			}
+
+			// top
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"1 6 0"
+				"SignageOffset"		"0 7 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"2 6 0"
+				"SignageOffset"		"3 7 0"
+				"Priority"	"0"
+			}
+
+
+			// bottom
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"1 1 0"
+				"SignageOffset"		"0 0 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"2 1 0"
+				"SignageOffset"		"3 0 0"
+				"Priority"	"0"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_LASER_RELAY_OFFSET"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"		"PORTAL2_PuzzleEditor_Item_laser_relay"
+			"Model"
+			{
+				"ModelName"		"laserrelay.3ds"
+				"TextureName"	"laser_models.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_5_POSITIONS"
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/laser_relay_offset.vmf"
+				"EntityCount"		"3"
+				"BrushCount"		"4"
+				"BrushSideCount"	"27"
+			}
+		}
+
+		"TargetName"		"lr"
+		"Outputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"			"instance:relay;OnPowered"
+				"Deactivate"		"instance:relay;OnUnpowered"
+			}
+		}
+		"Offset"		"64 64 64"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+
+				"Surface"
+				{
+					"Pos"	"0 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"0 2 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 1 0"
+				}
+				"Surface"
+				{
+					"Pos"	"1 2 0"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+		"EmbedFace"
+		{
+			"Solid"
+			{
+				"Center"		"32 16 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"32 112 128"
+				"Dimensions"	"64 32 4"
+				"Grid"			"4x4"
+			}
+			"Solid"
+			{
+				"Center"		"96 64 128"
+				"Dimensions"	"64 128 4"
+				"Grid"			"2x2"
+			}
+		}
+		"ConnectionPoints"
+		{
+			// left
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 3 0"
+				"SignageOffset"		"-2 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"	"0"
+			}
+
+			// right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 3 0"
+				"SignageOffset"		"5 2 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"4 4 0"
+				"SignageOffset"		"5 5 0"
+				"Priority"	"0"
+			}
+
+			// top
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"1 6 0"
+				"SignageOffset"		"0 7 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"2 6 0"
+				"SignageOffset"		"3 7 0"
+				"Priority"	"0"
+			}
+
+			// bottom
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"1 1 0"
+				"SignageOffset"		"0 0 0"
+				"Priority"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"2 1 0"
+				"SignageOffset"		"3 0 0"
+				"Priority"	"0"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_ENTRY_DOOR"
+	"ItemClass"	"ItemEntranceDoor"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_entry_door"
+			"Model"
+			{
+				"ModelName"		"doorentry.3ds"
+				"TextureName"		"portal_door.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"CEILING FLOOR"
+		"Deletable"		"0"
+		"Copyable"		"0"
+	}
+	"Properties"
+	{
+		"CoopDoor"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_1.vmf"
+				"EntityCount"		"59"
+				"BrushCount"		"141"
+				"BrushSideCount"	"996"
+			}
+			"1"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_2.vmf"
+				"EntityCount"		"59"
+				"BrushCount"		"144"
+				"BrushSideCount"	"1012"
+			}
+			"2"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_3.vmf"
+				"EntityCount"		"60"
+				"BrushCount"		"140"
+				"BrushSideCount"	"948"
+			}
+			"3"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_4.vmf"
+				"EntityCount"		"58"
+				"BrushCount"		"136"
+				"BrushSideCount"	"920"
+			}
+			"4"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_5.vmf"
+				"EntityCount"		"48"
+				"BrushCount"		"127"
+				"BrushSideCount"	"870"
+			}
+			"5"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_6.vmf"
+				"EntityCount"		"64"
+				"BrushCount"		"148"
+				"BrushSideCount"	"1002"
+			}
+			"6"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_7.vmf"
+				"EntityCount"		"46"
+				"BrushCount"		"124"
+				"BrushSideCount"	"838"
+			}
+			"7"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_white.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+			"8"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_black.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+
+			// NOTE: Elevator instances must go after door instances
+			"9"
+			{
+				"Name"				"instances/p2editor_clean/elevator_entrance.vmf"
+				"EntityCount"		"215"
+				"BrushCount"		"296"
+				"BrushSideCount"	"2468"
+			}
+			"10"
+			{
+				"Name"				"instances/p2editor_clean/elevator_exit.vmf"
+				"EntityCount"		"222"
+				"BrushCount"		"347"
+				"BrushSideCount"	"2823"
+			}
+			"11"
+			{
+				"Name"				"instances/p2editor_clean/arrival_departure_transition_ents.vmf"
+				"EntityCount"		"22"
+				"BrushCount"		"21"
+				"BrushSideCount"	"126"
+			}
+		}
+
+		"TargetName"		"doorentry"
+		"Offset"		"64 64 0"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Volume"
+			{
+				"Pos1"		"-1 -1 0"
+				"Pos2"		"1 1 -3"
+			} 
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_COOP_ENTRY_DOOR"
+	"ItemClass"	"ItemCoopEntranceDoor"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_entry_door"
+			"Model"
+			{
+				"ModelName"		"doorentrycoop2x.3ds"
+				"TextureName"		"portal_door.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"CEILING FLOOR"
+		"Deletable"		"0"
+		"Copyable"		"0"
+	}
+	"Properties"
+	{
+		"CoopDoor"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/door_entrance_coop_1.vmf"
+				"EntityCount"		"63"
+				"BrushCount"		"107"
+				"BrushSideCount"	"695"
+			}
+			"1"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_white_coop.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+			"2"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_black_coop.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+
+			// NOTE: Elevator instances must go after door instances
+			"3"
+			{
+				"Name"				"instances/p2editor_clean/coop_exit.vmf"
+				"EntityCount"		"250"
+				"BrushCount"		"404"
+				"BrushSideCount"	"2947"
+			}
+			"4"
+			{
+				"Name"				"instances/p2editor_clean/arrival_departure_transition_ents.vmf"
+				"EntityCount"		"22"
+				"BrushCount"		"21"
+				"BrushSideCount"	"126"
+			}
+		}
+
+		"TargetName"		"doorentry"
+		"Offset"		"64 64 0"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+			"Voxel"
+			{
+				"Pos"		"1 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Volume"
+			{
+				"Pos1"		"-1 -1 0"
+				"Pos2"		"3 1 -3"
+			} 
+		}
+	}
+}
+"Item"
+{
+	"Type"			"ITEM_EXIT_DOOR"
+	"ItemClass"		"ItemExitDoor"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_exit_door"
+			"Model"
+			{
+				"ModelName"		"door.3ds"
+				"TextureName"		"portal_door.png"
+			}
+			"Model"
+			{
+				"ModelName"		"door_open.3ds"
+				"TextureName"		"portal_door.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"CEILING FLOOR"
+		"Deletable"		"0"
+		"Copyable"		"0"
+	}
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"StartOpen"
+		{
+			"DefaultValue"		"1"
+			"Index"		"2"
+		}
+		"CoopDoor"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_1.vmf"
+				"EntityCount"		"55"
+				"BrushCount"		"48"
+				"BrushSideCount"	"310"
+			}
+			"1"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_2.vmf"
+				"EntityCount"		"43"
+				"BrushCount"		"54"
+				"BrushSideCount"	"346"
+			}
+			"2"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_3.vmf"
+				"EntityCount"		"51"
+				"BrushCount"		"65"
+				"BrushSideCount"	"412"
+			}
+			"3"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_4.vmf"
+				"EntityCount"		"46"
+				"BrushCount"		"57"
+				"BrushSideCount"	"364"
+			}
+			"4"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_white.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+			"5"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_black.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+		}
+
+		"TargetName"		"doorexit"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"		"instance:counter;Subtract"
+			}
+		}
+		"Offset"		"64 64 0"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Volume"
+			{
+				"Pos1"		"-1 -1 0"
+				"Pos2"		"1 1 -3"
+			}
+		}
+
+		"ConnectionPoints"
+		{
+			// top edge left to right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 6 0"
+				"SignageOffset"		"9 7 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 4 0"
+				"SignageOffset"		"9 5 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 2 0"
+				"SignageOffset"		"9 3 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 0 0"
+				"SignageOffset"		"9 1 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+
+			// left edge top to bottom
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"6 -1 0"
+				"SignageOffset"		"7 -2 0"
+				"Priority"  "0"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"4 -1 0"
+				"SignageOffset"		"5 -2 0"
+				"Priority"  "1"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"2 -1 0"
+				"SignageOffset"		"3 -2 0"
+				"Priority"  "2"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"0 -1 0"
+				"SignageOffset"		"1 -2 0"
+				"Priority"  "3"
+				"GroupID"	"1"
+			}
+
+			// right edge top to bottom
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"6 8 0"
+				"SignageOffset"		"7 9 0"
+				"Priority"  "0"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"4 8 0"
+				"SignageOffset"		"5 9 0"
+				"Priority"  "1"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"2 8 0"
+				"SignageOffset"		"3 9 0"
+				"Priority"  "2"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"0 8 0"
+				"SignageOffset"		"1 9 0"
+				"Priority"  "3"
+				"GroupID"	"2"
+			}
+
+			// bottom edge left to right
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 6 0"
+				"SignageOffset"		"-2 7 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 2 0"
+				"SignageOffset"		"-2 3 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 0 0"
+				"SignageOffset"		"-2 1 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"			"ITEM_COOP_EXIT_DOOR"
+	"ItemClass"		"ItemCoopExitDoor"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_coop_exit_door"
+			"Model"
+			{
+				"ModelName"		"door.3ds"
+				"TextureName"		"portal_door.png"
+			}
+			"Model"
+			{
+				"ModelName"		"door_open.3ds"
+				"TextureName"		"portal_door.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"CEILING FLOOR"
+		"Deletable"		"0"
+		"Copyable"		"0"
+	}
+	"Properties"
+	{
+		"CoopDoor"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"StartLocked"
+		{
+			"DefaultValue"		"0"
+			"Index"		"2"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_coop_1.vmf"
+				"EntityCount"		"76"
+				"BrushCount"		"61"
+				"BrushSideCount"	"388"
+			}
+			"1"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_coop_2.vmf"
+				"EntityCount"		"73"
+				"BrushCount"		"58"
+				"BrushSideCount"	"370"
+			}
+			"2"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_coop_3.vmf"
+				"EntityCount"		"81"
+				"BrushCount"		"69"
+				"BrushSideCount"	"436"
+			}
+			"3"
+			{
+				"Name"				"instances/p2editor_clean/door_exit_coop_4.vmf"
+				"EntityCount"		"76"
+				"BrushCount"		"61"
+				"BrushSideCount"	"388"
+			}
+			"4"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_white_exit_coop.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+			"5"
+			{
+				"Name"				"instances/p2editor_clean/door_frame_black_exit_coop.vmf"
+				"EntityCount"		"1"
+				"BrushCount"		"27"
+				"BrushSideCount"	"188"
+			}
+		}
+
+		"TargetName"		"doorexit"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"		"instance:counter;Subtract"
+			}
+		}
+		"Offset"		"64 64 0"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+			"Voxel"
+			{
+				"Pos"		"1 0 0"
+				"Surface"
+				{
+					"Pos"		"0 1 0"
+					"Normal"	"0 0 1"
+				}
+				"Surface"
+				{
+					"Pos"		"0 2 0"
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Volume"
+			{
+				"Pos1"		"-1 -1 0"
+				"Pos2"		"1 1 -3"
+			}
+		}
+
+		"EmbedFace"
+		{
+			"Solid"
+			{
+				"Center"		"192 64 128"
+				"Dimensions"	"128 128 4"
+				"Grid"			"Grid_Default"
+			}
+		}
+
+
+		"ConnectionPoints"
+		{
+			// top edge left to right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 6 0"
+				"SignageOffset"		"9 7 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 4 0"
+				"SignageOffset"		"9 5 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 2 0"
+				"SignageOffset"		"9 3 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 0 0"
+				"SignageOffset"		"9 1 0"
+				"Priority"  "1"
+				"GroupID"	"0"
+			}
+
+			// left edge top to bottom
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"6 -1 0"
+				"SignageOffset"		"7 -2 0"
+				"Priority"  "0"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"4 -1 0"
+				"SignageOffset"		"5 -2 0"
+				"Priority"  "1"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"2 -1 0"
+				"SignageOffset"		"3 -2 0"
+				"Priority"  "2"
+				"GroupID"	"1"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"0 -1 0"
+				"SignageOffset"		"1 -2 0"
+				"Priority"  "3"
+				"GroupID"	"1"
+			}
+
+			// right edge top to bottom
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"6 8 0"
+				"SignageOffset"		"7 9 0"
+				"Priority"  "0"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"4 8 0"
+				"SignageOffset"		"5 9 0"
+				"Priority"  "1"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"2 8 0"
+				"SignageOffset"		"3 9 0"
+				"Priority"  "2"
+				"GroupID"	"2"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"0 8 0"
+				"SignageOffset"		"1 9 0"
+				"Priority"  "3"
+				"GroupID"	"2"
+			}
+
+			// bottom edge left to right
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 6 0"
+				"SignageOffset"		"-2 7 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 2 0"
+				"SignageOffset"		"-2 3 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 0 0"
+				"SignageOffset"		"-2 1 0"
+				"Priority"  "2"
+				"GroupID"	"3"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_OBSERVATION_ROOM"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_observation_room"
+			"Model"
+			{
+				"ModelName"		"observationroom.3ds"
+				"TextureName"		"observationroom.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"CEILING FLOOR"
+		"Deletable"		"0"
+		"Copyable"		"0"
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/observation_room_256x128_1.vmf"
+				"EntityCount"		"13"
+				"BrushCount"		"8"
+				"BrushSideCount"	"48"
+			}
+		}
+
+		"TargetName"		"observationroom"
+		"Offset"		"64 64 64"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+			"Voxel"
+			{
+				"Pos"		"0 1 0"
+				"Surface"
+				{
+					"Normal"	"0 0 1"
+				}
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Volume"
+			{
+				"Pos1"		"1 -1 0"
+				"Pos2"		"-1 2 -1"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_POINT_LIGHT"
+
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"			"instances/p2editor_clean/point_light.vmf"
+				"EntityCount"	"1"
+			}
+		}
+
+		"TargetName"		"plight"
+		"Offset"		"64 64 64"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_INDICATOR_TOGGLE"
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"		"0"
+		}
+		"IndicatorName"
+		{
+			"DefaultValue"		""
+			"Index"		"1"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"			"instances/p2editor_clean/indicator_toggle.vmf"
+				"EntityCount"	"5"
+			}
+		}
+
+		"TargetName"		"it"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:indicator_on_rl;Trigger"
+				"Deactivate"		"instance:indicator_off_rl;Trigger"
+			}
+		}
+		"Offset"		"64 64 64"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_INDICATOR_PANEL"
+	"Properties"
+	{
+		"IsTimer"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"TimerDelay"
+		{
+			"DefaultValue"		"3"
+			"Index"		"2"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/indicator_panel.vmf"
+				"EntityCount"		"9"
+				"BrushCount"		"2"
+				"BrushSideCount"	"12"
+			}
+		}
+
+		"TargetName"		"ip"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:indicator_on_rl;Trigger"
+				"Deactivate"	"instance:indicator_off_rl;Trigger"
+			}
+		}
+		"Offset"		"64 64 64"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_INDICATOR_PANEL_TIMER"
+	"Properties"
+	{
+		"IsTimer"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"TimerDelay"
+		{
+			"DefaultValue"		"3"
+			"Index"		"2"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/indicator_panel.vmf"
+				"EntityCount"		"9"
+				"BrushCount"		"2"
+				"BrushSideCount"	"12"
+			}
+		}
+
+		"TargetName"		"ip"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:indicator_timer_start_rl;Trigger"
+			}
+		}
+		"Offset"		"64 64 64"
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_PLACEMENT_HELPER"
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"				"1"
+		}
+		"StartEnabled"
+		{
+			"DefaultValue"		"1"
+			"Index"				"2"
+		}
+		"HelperRadius"
+		{
+			"DefaultValue"		"64"
+			"Index"				"3"
+		}
+		"UseHelperAngles"
+		{
+			"DefaultValue"		"0"
+			"Index"				"4"
+		}
+		"ForcePlacement"
+		{
+			"DefaultValue"		"0"
+			"Index"				"5"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"			"instances/p2editor_clean/placement_helper.vmf"
+				"EntityCount"	"8"
+			}
+		}
+
+		"TargetName"		"ph"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"	"instance:counter;Subtract"
+			}
+		}
+		"Offset"		"64 64 64"
+	}
+}
+"Item"
+{
+	"Type"			"ITEM_DROPPER_CUBE"
+	"ItemClass"		"ItemCubeDropper"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"		"PORTAL2_PuzzleEditor_Item_cube_dropper"
+			"Model"
+			{
+				"ModelName"			"dropper.3ds"
+				"TextureName"		"dropper.png"
+			}
+			"Animations"
+			{
+					"ANIM_IDLE"					"0"
+					"ANIM_EDITING_ACTIVATE"		"1"
+					"ANIM_EDITING_DEACTIVATE"	"2"
+					"ANIM_DISAPPEAR"			"3"
+					"ANIM_REAPPEAR"				"4"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+		"InvalidSurface"		"WALL FLOOR"
+	}
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"		"1"
+		}
+		"CubeType"
+		{
+			"DefaultValue"		"0"
+			"Index"		"2"
+		}
+		"AutoRespawn"
+		{
+			"DefaultValue"		"0"
+			"Index"		"3"
+		}
+		"AutoDrop"
+		{
+			"DefaultValue"		"0"
+			"Index"		"4"
+		}
+		"DropperEnabled"
+		{
+			"DefaultValue"		"1"
+			"Index"		"0"
+		}
+		"ItemFallStraightDown"
+		{
+			"DefaultValue"		"1"
+			"Index"		"5"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/item_dropper.vmf"
+				"EntityCount"		"35"
+				"BrushCount"		"21"
+				"BrushSideCount"	"162"
+			}
+		}
+
+		"TargetName"		"cd"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"		"instance:counter;Subtract"
+			}
+			"CONNECTION_BOX_DROPPER"
+			{
+				"Activate"		"instance:cube_dropper_autorespawn_relay;Trigger"
+			}
+		}
+		"Outputs"
+		{
+			"CONNECTION_BOX_DROPPER"
+			{
+				"Activate"		"instance:cube_dropper_drop_relay;OnTrigger"
+			}
+		}
+		"Offset"		"64 64 64"
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+		"EmbeddedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+		"ConnectionPoints"
+		{
+			// left
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 3 0"
+				"SignageOffset"		"-2 2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"  "0"
+			}
+
+			// right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 3 0"
+				"SignageOffset"		"9 2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 4 0"
+				"SignageOffset"		"9 5 0"
+				"Priority"  "0"
+			}
+
+			// up
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"3 -1 0"
+				"SignageOffset"		"2 -2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"4 -1 0"
+				"SignageOffset"		"5 -2 0"
+				"Priority"  "0"
+			}
+
+			// down
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"3 8 0"
+				"SignageOffset"		"2 9 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"4 8 0"
+				"SignageOffset"		"5 9 0"
+				"Priority"  "0"
+			}
+		}
+	}
+}
+"Item"
+{
+	"Type"		"ITEM_DROPPER_PAINT"
+	"ItemClass"		"ItemPaintDropper"
+	"Editor"
+	{
+		"SubType"
+		{
+			"Name"			"PORTAL2_PuzzleEditor_Item_gel_dropper"
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_blue.3ds"
+				"TextureName"		"paint_dropper_blue.png"
+			}
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_orange.3ds"
+				"TextureName"		"paint_dropper_orange.png"
+			}
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_white.3ds"
+				"TextureName"		"paint_dropper_white.png"
+			}
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_water.3ds"
+				"TextureName"		"paint_dropper_water.png"
+			}
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_grey.3ds"
+				"TextureName"		"paint_dropper_grey.png"
+			}
+			"Model"
+			{
+				"ModelName"			"paint_dropper_editor_purple.3ds"
+				"TextureName"		"paint_dropper_purple.png"
+			}
+		}
+		"MovementHandle"		"HANDLE_NONE"
+	}
+	"Properties"
+	{
+		"ConnectionCount"
+		{
+			"DefaultValue"		"0"
+			"Index"				"1"
+		}
+		"StartEnabled"
+		{
+			"DefaultValue"		"1"
+			"Index"				"3"
+		}
+		"PaintType"
+		{
+			"DefaultValue"		"4"
+			"Index"				"2"
+		}
+		"PaintExportType"
+		{
+			"DefaultValue"		"5"
+			"Index"				"2"
+		}
+		"PaintFlowType"
+		{
+			"DefaultValue"		"1"
+			"Index"				"0"
+		}
+		"DropperEnabled"
+		{
+			"DefaultValue"		"1"
+			"Index"				"0"
+		}
+		"AllowStreak"
+		{
+			"DefaultValue"		"1"
+			"Index"				"0"
+		}
+	}
+	"Exporting"
+	{
+		"Instances"
+		{
+			"0"
+			{
+				"Name"				"instances/p2editor_clean/paint_dropper.vmf"
+				"EntityCount"		"10"
+				"BrushCount"		"2"
+				"BrushSideCount"	"44"
+			}
+			"1"
+			{
+				"Name"				"instances/p2editor_clean/paint_dropper_bomb.vmf"
+				"EntityCount"		"12"
+				"BrushCount"		"3"
+				"BrushSideCount"	"66"
+			}
+		}
+
+		"TargetName"		"pd"
+		"Inputs"
+		{
+			"CONNECTION_STANDARD"
+			{
+				"Activate"		"instance:counter;Add"
+				"Deactivate"		"instance:counter;Subtract"
+			}
+		}
+		"OccupiedVoxels"
+		{
+			"Voxel"
+			{
+				"Pos"		"0 0 0"
+			}
+		}
+//		"EmbeddedVoxels"
+//		{
+//			"Voxel"
+//			{
+//				"Pos"		"0 0 0"
+//			}
+//		}
+//		"EmbedFace"
+//		{
+//			"Solid"
+//			{
+//				"Center"		"64 64 128"
+//				"Dimensions"	"128 128 4"
+//				"Grid"			"4x4"
+//			}
+//		}
+		"ConnectionPoints"
+		{
+			// left
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 3 0"
+				"SignageOffset"		"-2 2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"1 0 0"
+				"Pos"				"-1 4 0"
+				"SignageOffset"		"-2 5 0"
+				"Priority"  "0"
+			}
+
+			// right
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 3 0"
+				"SignageOffset"		"9 2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"-1 0 0"
+				"Pos"				"8 4 0"
+				"SignageOffset"		"9 5 0"
+				"Priority"  "0"
+			}
+
+			// up
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"3 -1 0"
+				"SignageOffset"		"2 -2 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"0 1 0"
+				"Pos"				"4 -1 0"
+				"SignageOffset"		"5 -2 0"
+				"Priority"  "0"
+			}
+
+			// down
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"3 8 0"
+				"SignageOffset"		"2 9 0"
+				"Priority"  "0"
+			}
+			"Point"
+			{
+				"Dir"				"0 -1 0"
+				"Pos"				"4 8 0"
+				"SignageOffset"		"5 9 0"
+				"Priority"  "0"
+			}
+		}
+
+		"Offset"		"64 64 64"
+	}
+}
+
+"Renderables"
+{
+	"Item"
+	{
+		"Type"		"ErrorState"
+		"Model"		"error_state.3ds"
+
+		"Animations"
+		{
+			"ANIM_ICON_SHOW"		"1"
+			"ANIM_ICON_IDLE"		"2"
+			"ANIM_ICON_HIDE"		"3"
+		}
+	}
+	"Item"
+	{
+		"Type"		"ConnectionHeartSolid"
+		"Model"		"heart.3ds"
+
+		"Animations"
+		{
+			"ANIM_ICON_SHOW"				"2"
+			"ANIM_ICON_IDLE"				"0"
+			"ANIM_ICON_HEART_BREAK"			"1"
+			"ANIM_ICON_HIDE"				"3"
+			"ANIM_ICON_HEART_SUCCESS"		"4"
+			"ANIM_ICON_HEART_HAPPY_IDLE"	"5"
+		}
+	}
+}

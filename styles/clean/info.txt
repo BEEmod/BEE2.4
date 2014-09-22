@@ -1,0 +1,47 @@
+@Style
+"Name"          "Clean"
+"Author"        "Carl Kenner, Valve"
+"Comment"       "Portal 2 Clean style, like after GLaDOS has been awoken and finished cleaning the facility, or in a parallel world where it was never destroyed. Similar to the default PeTI style, but with more variety of wall panels, reflection gel, paint fizzlers, automatic security cameras, and automatic thumbnails when publishing."
+"WhiteFloor"    "tile/white_floor_tile002a"
+"WhiteCeiling"  "tile/white_floor_tile002a"
+"WhiteCeiling"  "tile/white_wall_tile003c"
+"WhiteCeiling"  "tile/white_wall_tile003c"
+
+"WhiteWall"  "tile/white_wall_tile003a"
+"WhiteWall"  "tile/white_wall_tile003l"
+"WhiteWall"  "tile/white_wall_tile003a"
+"WhiteWall"  "tile/white_wall_tile003l"
+"WhiteWall"  "tile/white_wall_tile003c"
+"WhiteWall"  "tile/white_wall_tile003i"
+
+"BlackFloor"  "metal/black_floor_metal_001a"
+"BlackCeiling"  "metal/black_ceiling_metal_001a"
+"BlackCeiling"  "metal/black_wall_metal_002a"
+"BlackCeiling"  "metal/black_wall_metal_002b"
+"BlackWall"  "metal/black_wall_metal_002c" //1x1
+"BlackWall"  "metal/black_wall_metal_002e" //2x1
+"BlackWall"  "metal/black_wall_metal_002e" //2x1
+"BlackWall"  "metal/black_wall_metal_002a" //2x2
+"BlackWall"  "metal/black_wall_metal_002b" //4x4
+
+
+"FixGlass"              "0" // should be 1
+"FixPortalBump"         "0"
+"GooIsHole"             "0"
+"RandomBlackWallScale"  "0"
+"RotateEdge"            "0"
+"FizzlerScanline"       "1"
+"RunBspZip"             "1"
+"UseScreenshot"         "1"
+"ReverseFizzlerInstance" "instances/p2editor_clean/paint_fizzler_model.vmf"
+"ReverseFizzlerEntity"   "trigger_paint_cleanser"
+"ReverseFizzlerLeft"     "tools/toolstrigger"
+"ReverseFizzlerCenter"   "tools/toolstrigger"
+"ReverseFizzlerRight"    "tools/toolstrigger"
+"ReverseFizzler1x1"      "tools/toolstrigger"
+
+"Default-Voice"		"GLaDOS"
+"Default-Music" 	"CTC_RAND"
+"Default-Sky"   	"sky_black"
+"Default-3D_Sky" 	"None"
+@EndStyle

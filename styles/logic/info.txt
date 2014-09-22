@@ -1,0 +1,6 @@
+@Style
+"Name"          "Logic"
+"Author"        "-"
+"Comment"       "Common base for other styles to inherit from."
+"HideStyle"		"1"
+@EndStyle
