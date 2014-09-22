@@ -1,9 +1,12 @@
-from tkinter import * # ui library
+import property_parser
 import UI
 
 #Loading commands, will load/reload the items/styles/palettes/etc
 def load_settings():
-  pass
+  global settings
+  with open("bin/config.cfg", "r") as f:
+    settings=property_parser.parse(f)
+  print(settings)
 
 def load_palettes():
   pass
@@ -24,4 +27,6 @@ def savePal(name):
   # TODO: actually load
   load_palettes() # reload to make it show up
 
+#load_settings()
+load_palettes()
 UI.initMain() # create all windows
