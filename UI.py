@@ -23,7 +23,7 @@ testImg  = [ # test palette images,remove when item loading done
           ('Sphere Button',        'ITEM_BUTTON',                     2, png.loadIcon('ball_socket')),
           ('Pedestal Button',      'ITEM_PEDESTAL_BUTTON',            0, png.loadIcon('pedestal_button')),
           ('Stairs',               'ITEM_STAIRS',                     0, png.loadIcon('stairs')),
-          ('Flip Panel',           'ITEM_FLIP_PANEL',                 0, png.loadIcon('flipper')),
+          ('Flip Panel',           'ITEM_FLIP_PANEL',                 0, png.loadIcon('panel_flip')),
           ('Faith Plate',          'ITEM_CATAPULT',                   0, png.loadIcon('faithplate')),
           ('Track Platform',       'ITEM_TRACK_PLATFORM',             0, png.loadIcon('arm_motionplatform')),
           ('Deadly Goo',           'ITEM_GOO',                        0, png.loadIcon('goo')),
