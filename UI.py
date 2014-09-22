@@ -164,16 +164,15 @@ def showDrag(e):
   "Start dragging a palette item."
   global drag_isPre,drag_item
   drag_item=e.widget
-  drag_isPre=False
   setDispName(drag_item.dispName)
-  toRem=[]
-  for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
-    if item.key==drag_item.key and item.subKey==drag_item.subKey:
-      item.place_forget()
-      toRem.append(i)
-      drag_isPre=True
-  for i in reversed(toRem):
-    del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enmerate()
+  
+  pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
+    pal_picked[pos_x+pos_y*4].place_forget()
+    del pal_picked[pos_x+pos_y*4]
+    drag_isPre=True
+  else:
+    drag_isPre=False
   dragWin.deiconify()
   dragWin.lift(win)
   dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
@@ -191,8 +190,11 @@ def hideDrag(e):
   dragWin.grab_release()
   clearDispName(None)
   UI['pre_sel_line'].place_forget()
+  
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   ind=pos_x+pos_y*4
+  clearFromPal(drag_item) # wipe duplicates off the palette first
+  
   if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
     newItem=copyItem(drag_item,frames['preview'])
     if ind>=len(pal_picked):
@@ -201,9 +203,7 @@ def hideDrag(e):
       pal_picked.insert(ind,newItem)
     if len(pal_picked) > 32: # delete the item - it's fallen off the palette
         pal_picked.pop().place_forget()
-    flowPreview()
-  elif drag_isPre:
-    flowPreview()
+  flowPreview() # always refresh
 
 def moveDrag(e):
   "Update the position of dragged items as they move around."
@@ -220,6 +220,30 @@ def moveDrag(e):
       dragWin.configure(cursor='no')
     UI['pre_sel_line'].place_forget()
 
+def fastDrag(e):
+  "When shift-clicking an item will be immediately moved to the palette or deleted from it."
+  pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  clearFromPal(e.widget)
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane? 
+    e.widget.place_forget() # remove the clicked item
+  else: # over the picker
+    if len(pal_picked) < 32: # can't copy if there isn't room
+        newItem=copyItem(e.widget,frames['preview'])
+        pal_picked.append(newItem)
+  flowPreview()
+    
+def clearFromPal(target):   
+  "Remove any items matching the passed label from the palette, to prevent adding two copies."
+  toRem=[]
+  found=False
+  for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
+    if item.key==target.key and item.subKey==target.subKey:
+      item.place_forget()
+      toRem.append(i)
+      found=True
+  for i in reversed(toRem):
+    del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enmerate()
+  return found
 def createItem(name, key, sub, img, frame):
   "Create a label to show an item onscreen."
   lbl=ttk.Label(frame, image=img)
@@ -229,6 +253,7 @@ def createItem(name, key, sub, img, frame):
   lbl.dispName=name
   lbl.bind("<Button-3>",showProps)
   lbl.bind("<Button-1>", showDrag)
+  lbl.bind("<Shift-Button-1>", fastDrag)
   lbl.bind("<Enter>", lambda e, n=name: setDispName(n))
   lbl.bind("<Leave>", clearDispName)
   return lbl
