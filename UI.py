@@ -78,6 +78,7 @@ PalEntry_TempText="New Palette>"
 PalEntry = StringVar(value=PalEntry_TempText)
 selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
+shouldSnap=True
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
@@ -126,23 +127,27 @@ def clearDispName(e):
 
 def showProps(e):
   print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
-  propWin.deiconify()
-  propWin.lift(win)
-  loc_x=e.widget.winfo_rootx() + propWin.winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
+  windows['props'].deiconify()
+  windows['props'].vis=True
+  windows['props'].lift(win)
+  loc_x=e.widget.winfo_rootx() + windows['props'].winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
 #The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
-  loc_y=e.widget.winfo_rooty() + propWin.winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
+  loc_y=e.widget.winfo_rooty() + windows['props'].winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
   if loc_x<15: # adjust to fit inside the screen, + small boundry to not obstruct taskbars, menus etc
     loc_x=0
   if loc_y<45:
     loc_y=0
-  if loc_x > propWin.winfo_screenwidth()-propWin.winfo_reqwidth()-15:
-    loc_x=propWin.winfo_screenwidth()-propWin.winfo_reqwidth()-15
-  if loc_y > propWin.winfo_screenheight()-propWin.winfo_reqheight()-45:
-    loc_y=propWin.winfo_screenheight()-propWin.winfo_reqheight()-45
-  propWin.geometry('+'+str(loc_x)+'+'+str(loc_y))
+  if loc_x > windows['props'].winfo_screenwidth()-windows['props'].winfo_reqwidth()-15:
+    loc_x=windows['props'].winfo_screenwidth()-windows['props'].winfo_reqwidth()-15
+  if loc_y > windows['props'].winfo_screenheight()-windows['props'].winfo_reqheight()-45:
+    loc_y=windows['props'].winfo_screenheight()-windows['props'].winfo_reqheight()-45
+  windows['props'].geometry('+'+str(loc_x)+'+'+str(loc_y))
+  windows['props'].relX=loc_x-win.winfo_x()
+  windows['props'].relY=loc_y-win.winfo_y()
 
 def hideProps(e):
-  propWin.withdraw()
+  windows['props'].withdraw()
+  windows['props'].vis=False
 
 def showItemProps():
   itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], hideItemProps)
@@ -318,9 +323,21 @@ def hideWin(name):
   windows[name].vis=False
   UI['tool_win_'+name].state(['!pressed'])
   
-def snapWin(window):
+def snapWin(name):
   "Callback for window movement, allows it to snap to the edge of the main window."
-  pass
+  if shouldSnap:
+    windows[name].relX=windows[name].winfo_x()-win.winfo_x()
+    windows[name].relY=windows[name].winfo_y()-win.winfo_y()
+    windows[name].update_idletasks()
+
+def moveMain(e):
+  "When the main window moves, sub-windows should move with it."
+  shouldSnap=False
+  for name in('pal','style','opt', 'props'):
+    if windows[name].vis:
+      windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
+  win.focus()
+  shouldSnap=True
 
 def menu_newPal():
   newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
@@ -602,15 +619,14 @@ def initFilter(f):
   FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
 
 def initProperties(win):
-  global propWin
-  propWin=Toplevel(win)
-  propWin.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
-  propWin.resizable(False, False)
-  propWin.transient(master=win)
-  propWin.withdraw() # starts hidden
+  windows['props']=Toplevel(win)
+  windows['props'].overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
+  windows['props'].resizable(False, False)
+  windows['props'].transient(master=win)
+  windows['props'].withdraw() # starts hidden
 
 
-  f=ttk.Frame(propWin, relief="raised", borderwidth="4")
+  f=ttk.Frame(windows['props'], relief="raised", borderwidth="4")
   f.grid(row=0, column=0)
 
   ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
@@ -822,6 +838,13 @@ def initMain():
   xpos = '+' + str(min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
   windows['opt'].geometry(xpos + str(win.winfo_rooty()-40))
   windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
+
+  print(windows['style'].bbox(),windows['style'].wm_geometry())
+  
+  win.bind("<Configure>",moveMain)
+  windows['style'].bind("<Configure>", lambda e: snapWin('style'))
+  windows['opt'].  bind("<Configure>",   lambda e: snapWin('opt')) 
+  windows['pal'].  bind("<Configure>",   lambda e: snapWin('pal'))
 
   win.mainloop()
 
