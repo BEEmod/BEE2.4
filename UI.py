@@ -515,7 +515,7 @@ def initPreview(f):
   UI['pre_sel_line'].imgsave=selImg
 
   for i in range(0,32):
-    img=testImg[0]#random.choice(testImg)
+    img=random.choice(testImg)
     pal_picked.append(createItem(img[0], img[1], img[2], img[3], frames['preview']))
   flowPreview()
 
