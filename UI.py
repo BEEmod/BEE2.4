@@ -301,21 +301,26 @@ def save():
   else:
     savePal(pal) # overwrite it
 
-def toggleWin(button, window):
-  if window.vis:
-    window.vis=False
-    window.withdraw()
-    UI['tool_win_'+button].state(['!pressed'])
+def toggleWin(name):
+  if windows[name].vis:
+    windows[name].vis=False
+    windows[name].withdraw()
+    UI['tool_win_'+name].state(['!pressed'])
   else:
-    window.vis=True
-    window.deiconify()
+    windows[name].vis=True
+    windows[name].deiconify()
     win.focus() # return focus back to main window so it doesn't flicker between if you press the various buttons
-    UI['tool_win_'+button].state(['pressed'])
+    UI['tool_win_'+name].state(['pressed'])
 
-def hideWin(button, window):
-  window.withdraw()
-  window.vis=False
-  UI['tool_win_'+button].state(['!pressed'])
+def hideWin(name):
+  "Hide a window, effectively closes it without deleting the contents"
+  windows[name].withdraw()
+  windows[name].vis=False
+  UI['tool_win_'+name].state(['!pressed'])
+  
+def snapWin(window):
+  "Callback for window movement, allows it to snap to the edge of the main window."
+  pass
 
 def menu_newPal():
   newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
@@ -474,23 +479,12 @@ def initStyleOpt(f):
 
 def initTool(f):
   "Creates the small toolbar above the icons that allows toggling subwindows."
-  UI['tool_win_pal']=ttk.Button(f, command=lambda:toggleWin('pal',windows['palette']), style='BG.TButton')
-  UI['tool_win_pal'].img = png.loadPng('icons/win_pal')
-  UI['tool_win_pal']['image'] = UI['tool_win_pal'].img
-  UI['tool_win_pal'].state(["pressed"])
-  UI['tool_win_pal'].grid(row=0, column=0, padx=(5,2))
-
-  UI['tool_win_opt']=ttk.Button(f, command=lambda:toggleWin('opt',windows['option']), style='BG.TButton')
-  UI['tool_win_opt'].img = png.loadPng('icons/win_opt')
-  UI['tool_win_opt']['image'] = UI['tool_win_opt'].img
-  UI['tool_win_opt'].state(["pressed"])
-  UI['tool_win_opt'].grid(row=0, column=1, padx=2)
-
-  UI['tool_win_style']=ttk.Button(f, command=lambda:toggleWin('style',windows['styleOpt']), style='BG.TButton')
-  UI['tool_win_style'].img = png.loadPng('icons/win_style')
-  UI['tool_win_style']['image'] = UI['tool_win_style'].img
-  UI['tool_win_style'].state(["pressed"])
-  UI['tool_win_style'].grid(row=0, column=2, padx=2)
+  for i,name in enumerate(('pal','opt','style')):
+    UI['tool_win_'+name]=ttk.Button(f, command=lambda n=name:toggleWin(n), style='BG.TButton')
+    UI['tool_win_'+name].img = png.loadPng('icons/win_'+name)
+    UI['tool_win_'+name]['image'] = UI['tool_win_'+name].img
+    UI['tool_win_'+name].state(["pressed"])
+    UI['tool_win_'+name].grid(row=0, column=i, padx=(5,2))
 
 def flowPreview():
   "Position all the preview icons based on the array. Run to refresh if items are moved around."
@@ -766,45 +760,45 @@ def initMain():
 
   frames['filter'].lift()
 
-  windows['palette']=Toplevel(win)
-  windows['palette'].transient(master=win)
-  windows['palette'].resizable(False, True)
-  windows['palette'].title("Palettes")
-  windows['palette'].iconbitmap(r'BEE2.ico')
-  windows['palette'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal', windows['palette']))
-  windows['palette'].vis=True
-  initPalette(windows['palette'])
+  windows['pal']=Toplevel(win)
+  windows['pal'].transient(master=win)
+  windows['pal'].resizable(False, True)
+  windows['pal'].title("Palettes")
+  windows['pal'].iconbitmap(r'BEE2.ico')
+  windows['pal'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal'))
+  windows['pal'].vis=True
+  initPalette(windows['pal'])
 
-  windows['option']=Toplevel(win)
-  windows['option'].transient(master=win)
-  windows['option'].resizable(True, False)
-  windows['option'].title("Options")
-  windows['option'].iconbitmap(r'BEE2.ico')
-  windows['option'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt', windows['option']))
-  windows['option'].vis=True
-  initOption(windows['option'])
+  windows['opt']=Toplevel(win)
+  windows['opt'].transient(master=win)
+  windows['opt'].resizable(True, False)
+  windows['opt'].title("Options")
+  windows['opt'].iconbitmap(r'BEE2.ico')
+  windows['opt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt'))
+  windows['opt'].vis=True
+  initOption(windows['opt'])
 
-  windows['styleOpt']=Toplevel(win)
-  windows['styleOpt'].transient(master=win)
-  windows['styleOpt'].resizable(False, True)
-  windows['styleOpt'].title("Style Properties")
-  windows['styleOpt'].iconbitmap(r'BEE2.ico')
-  windows['styleOpt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style', windows['styleOpt']))
-  windows['styleOpt'].vis=True
-  initStyleOpt(windows['styleOpt'])
+  windows['style']=Toplevel(win)
+  windows['style'].transient(master=win)
+  windows['style'].resizable(False, True)
+  windows['style'].title("Style Properties")
+  windows['style'].iconbitmap(r'BEE2.ico')
+  windows['style'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style'))
+  windows['style'].vis=True
+  initStyleOpt(windows['style'])
 
   win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
   win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
   win.bind("<Button-5>", lambda e: pal_canvas.yview_scroll(-1, "units"))
 
-  windows['styleOpt'].bind("<MouseWheel>", lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
-  windows['styleOpt'].bind("<Button-4>", lambda e: UI['style_can'].yview_scroll(1, "units")) # needed for linux
-  windows['styleOpt'].bind("<Button-5>", lambda e: UI['style_can'].yview_scroll(-1, "units"))
+  windows['style'].bind("<MouseWheel>", lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
+  windows['style'].bind("<Button-4>", lambda e: UI['style_can'].yview_scroll(1, "units")) # needed for linux
+  windows['style'].bind("<Button-5>", lambda e: UI['style_can'].yview_scroll(-1, "units"))
   
   win.bind("<Button-1>",hideProps)
-  windows['styleOpt'].bind("<Button-1>",hideProps)
-  windows['option'].bind("<Button-1>",hideProps) 
-  windows['palette'].bind("<Button-1>",hideProps)
+  windows['style'].bind("<Button-1>",hideProps)
+  windows['opt'].bind("<Button-1>",hideProps) 
+  windows['pal'].bind("<Button-1>",hideProps)
 
   initProperties(win)
   initDragIcon(win)
@@ -813,21 +807,21 @@ def initMain():
   win.deiconify() # show it once we've loaded everything
 
   win.update_idletasks()
-  windows['styleOpt'].update_idletasks()
-  windows['option'].update_idletasks()
-  windows['palette'].update_idletasks()
+  windows['style'].update_idletasks()
+  windows['opt'].update_idletasks()
+  windows['pal'].update_idletasks()
 
   # move windows around to make it look nice on startup
-  if(win.winfo_rootx() < windows['palette'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
-    win.geometry('+' + str(windows['palette'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
+  if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
+    win.geometry('+' + str(windows['pal'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
   else:
     win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
   win.update_idletasks()
-  windows['palette'].geometry( str(windows['palette'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) +
-    '+' + str(win.winfo_rootx()-windows['palette'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
-  xpos = '+' + str(min(win.winfo_screenwidth() - windows['styleOpt'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
-  windows['option'].geometry(xpos + str(win.winfo_rooty()-40))
-  windows['styleOpt'].geometry(xpos + str(win.winfo_rooty()+windows['option'].winfo_reqheight()+50))
+  windows['pal'].geometry( str(windows['pal'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) +
+    '+' + str(win.winfo_rootx()-windows['pal'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
+  xpos = '+' + str(min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
+  windows['opt'].geometry(xpos + str(win.winfo_rooty()-40))
+  windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
 
   win.mainloop()
 
