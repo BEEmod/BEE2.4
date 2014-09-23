@@ -379,16 +379,17 @@ def initPalette(f):
   UI['newBox'].bind("<FocusIn>", pal_remTempText)
   UI['newBox'].bind("<FocusOut>", pal_addTempText)
   ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
+  ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, column=0)
 
 def initOption(f):
+  f.columnconfigure(0,weight=1)
   ttk.Button(f, width=10, text="Save...", command=save).grid(row=0, column=0)
   ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1, column=0)
   ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))
 
-  ttk.Label(f, text="Properties").grid(row=3,column=0)
-  ttk.Separator(f, orient=HORIZONTAL).grid(row=4, column=0, sticky="EW", pady=5)
-  props=ttk.Frame(f)
-  props.grid(row=5, column=0)
+  props=ttk.LabelFrame(f, text="Properties")
+  props.columnconfigure(1,weight=1)
+  props.grid(row=3, column=0, sticky="EW")
 
   ttk.Label(props, text="Style: ").grid(row=0, column=0)
   UIStyle=ttk.Combobox(props, values=styleText)
@@ -396,10 +397,11 @@ def initOption(f):
   UIStyle.grid(row=0, column=1, columnspan=2, sticky="EW")
 
   ttk.Label(props, text="Music: ").grid(row=1, column=0)
-  UIMusic=ttk.Combobox(props, values = musicText)
-  UIMusic.grid(row=1, column=1)
-  UIMusic.current(0)
+  UI['opt_music']=ttk.Combobox(props, values = musicText)
+  UI['opt_music'].grid(row=1, column=1, sticky="EW")
+  UI['opt_music'].current(0)
   ttk.Button(props, text=">", command=demoMusic, width='4pt').grid(row=1,column=2)
+  ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=1,column=3, sticky="NS")
 
   ttk.Label(props, text="Voice: ").grid(row=2, column=0)
   UIVoice=ttk.Combobox(props, values=voiceText)
@@ -775,7 +777,7 @@ def initMain():
 
   windows['option']=Toplevel(win)
   windows['option'].transient(master=win)
-  windows['option'].resizable(False, False)
+  windows['option'].resizable(True, False)
   windows['option'].title("Options")
   windows['option'].iconbitmap(r'BEE2.ico')
   windows['option'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt', windows['option']))
