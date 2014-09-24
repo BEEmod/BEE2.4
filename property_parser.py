@@ -24,7 +24,7 @@ class Property:
   def __init__(self, name = None, value = ""):
     self.name = name
     self.value = value
-    
+
   @staticmethod
   def parse(file_contents):
     '''Returns list of Property objects parsed from given text'''
@@ -34,7 +34,7 @@ class Property:
     for line in file_contents:
       line_num += 1
       values = open_properties[-1].value
-      freshline = __clean_line__(line)
+      freshline = Property.__clean_line__(line)
       if freshline:
         if freshline.startswith('"'):
           line_contents = str.split(freshline, '"')
@@ -59,24 +59,25 @@ class Property:
     if len(open_properties) > 1:
         raise ValueError("End of text reached with remaining open sections.")
     return open_properties[0].value
-
-def __clean_line__(dirty_line):
-  line = dirty_line.strip()
-  if line.startswith("\\\\") or line.startswith("//"):
-    line = ""
-  # TODO: Actually strip comments off of the end of all lines
-  return line
-  
-def to_strings(self):
-  '''Returns a string list representation of what the property appears as in the file.'''
-  out_val = ['"' + self.name + '"']
-  
-  if self.value is []: 
-    out_val.append('{')
-    for property in self.value:
-      for line in property.to_string():
-        out_val.append('\t' + line)
-    out_val.append('}')
-  else:
-    out_val[0] += ' "' + self.value + '"'
-  return out_val
+    
+  @staticmethod
+  def __clean_line__(dirty_line):
+    line = dirty_line.strip()
+    if line.startswith("\\\\") or line.startswith("//"):
+      line = ""
+    # TODO: Actually strip comments off of the end of all lines
+    return line
+    
+  def to_strings(self):
+    '''Returns a string list representation of what the property appears as in the file.'''
+    out_val = ['{0}{1}{2}'.format('"', self.name, '"')]
+    
+    if self.value is []: 
+      out_val.append('{')
+      for property in self.value:
+        for line in property.to_string():
+          out_val.append('\t' + line)
+      out_val.append('}')
+    else:
+      out_val[0] += ' "' + self.value + '"'
+    return out_val
