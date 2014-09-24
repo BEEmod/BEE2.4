@@ -9,13 +9,14 @@ import math
 import webbrowser
 
 import itemPropWin
+import pygame # using this for audio
 
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
 
-
+pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
 
 testImg  = [ # test palette images,remove when item loading done
           ('Weighted Button',      'ITEM_BUTTON',                     0, png.loadIcon('portal_button')),
@@ -53,6 +54,16 @@ testImg  = [ # test palette images,remove when item loading done
           ('Glass',                'ITEM_BARRIER',                    0, png.loadIcon('glass')),
           ('Observation Room',     'ITEM_SECONDARY_OBSERVATION_ROOM', 0, png.loadIcon('observation_room')),
           ('Angled Panel',         'ITEM_ANGLED_PANEL',               0, png.loadIcon('panel_flap'))]
+          
+sounds = { 'select'     : pygame.mixer.Sound(file='sounds/rollover.wav'),
+           'add'        : pygame.mixer.Sound(file='sounds/increment.wav'),
+           'config'     : pygame.mixer.Sound(file='sounds/reconfig.wav'),
+           'subtract'   : pygame.mixer.Sound(file='sounds/decrement.wav'),
+           'connect'    : pygame.mixer.Sound(file='sounds/connection_made.wav'),
+           'disconnect' : pygame.mixer.Sound(file='sounds/connection_destroyed.wav'),
+           'expand'     : pygame.mixer.Sound(file='sounds/extrude.wav'),
+           'delete'     : pygame.mixer.Sound(file='sounds/collapse.wav'),
+           'contract'   : pygame.mixer.Sound(file='sounds/carve.wav')}
 
 win.iconbitmap(r'BEE2.ico')# set the window icon
 
@@ -79,6 +90,7 @@ PalEntry = StringVar(value=PalEntry_TempText)
 selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 shouldSnap=True
+muted = IntVar(value=0)
 
 # UI vars, TODO: most should be generated on startup
 palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
@@ -100,8 +112,12 @@ styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', False),
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these five should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
                 ('UnlockMandatory','Unlock Default Items', False),
-                ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
+                ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
 
+def playSound(name):
+  if muted.get() == 0:
+    sounds[name].play()
+                
 def demoMusic():
   messagebox.showinfo(message='This would play the track selected for a few seconds.')
 
@@ -126,7 +142,7 @@ def clearDispName(e):
   UI['pre_disp_name'].configure(text='')
 
 def showProps(e):
-  print("Showing properties at: " + str(e.x_root) + ', ' + str(e.y_root))
+  playSound('expand')
   windows['props'].deiconify()
   windows['props'].vis=True
   windows['props'].lift(win)
@@ -146,8 +162,10 @@ def showProps(e):
   windows['props'].relY=loc_y-win.winfo_y()
 
 def hideProps(e):
-  windows['props'].withdraw()
-  windows['props'].vis=False
+  if windows['props'].vis: 
+    playSound('contract')
+    windows['props'].withdraw()
+    windows['props'].vis=False
 
 def showItemProps():
   itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], hideItemProps)
@@ -157,24 +175,27 @@ def hideItemProps(vals):
 
 def convScrToGrid(x,y):
   "Returns the location of the item hovered over on the preview pane."
-  return ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65,
+  return ((x-UI['pre_bg_img'].winfo_rootx()-8)//65,
          (y-UI['pre_bg_img'].winfo_rooty()-32)//65)
 
 def convScrToPos(x,y):
   "Returns the index of the item hovered over on the preview pane."
   return ((y-UI['pre_bg_img'].winfo_rooty()-32)//65)*4 +\
-         ((x-UI['pre_bg_img'].winfo_rootx()- 4)//65)
+         ((x-UI['pre_bg_img'].winfo_rootx()-8)//65)
 
 def showDrag(e):
   "Start dragging a palette item."
   global drag_isPre,drag_item
   drag_item=e.widget
   setDispName(drag_item.dispName)
+  playSound('config')
   
-  pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
-  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
-    pal_picked[pos_x+pos_y*4].place_forget()
-    del pal_picked[pos_x+pos_y*4]
+  #pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  
+  if e.widget.is_pre: # is the cursor over the preview pane?
+    ind=e.widget.pre_x+e.widget.pre_y*4
+    pal_picked[ind].place_forget()
+    del pal_picked[ind]
     drag_isPre=True
   else:
     drag_isPre=False
@@ -195,12 +216,13 @@ def hideDrag(e):
   dragWin.grab_release()
   clearDispName(None)
   UI['pre_sel_line'].place_forget()
+  playSound('config')
   
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   ind=pos_x+pos_y*4
   clearFromPal(drag_item) # wipe duplicates off the palette first
   
-  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8: # is the cursor over the preview pane?
     newItem=copyItem(drag_item,frames['preview'])
     if ind>=len(pal_picked):
       pal_picked.append(newItem)
@@ -208,6 +230,8 @@ def hideDrag(e):
       pal_picked.insert(ind,newItem)
     if len(pal_picked) > 32: # delete the item - it's fallen off the palette
         pal_picked.pop().place_forget()
+  else: # drop the item
+    playSound('delete')
   flowPreview() # always refresh
 
 def moveDrag(e):
@@ -268,7 +292,7 @@ def copyItem(item, frame):
 
 def setPal_listbox(e):
   global selectedPalette
-  selectedPalette = UI['palette'].curselection()[0]
+  selectedPalette = int(UI['palette'].curselection()[0])
   selectedPalette_radio.set(selectedPalette)
   setPalette()
 
@@ -325,6 +349,7 @@ def hideWin(name):
   
 def snapWin(name):
   "Callback for window movement, allows it to snap to the edge of the main window."
+  # TODO: Actually snap to edges of main window
   if shouldSnap:
     windows[name].relX=windows[name].winfo_x()-win.winfo_x()
     windows[name].relY=windows[name].winfo_y()-win.winfo_y()
@@ -334,8 +359,7 @@ def moveMain(e):
   "When the main window moves, sub-windows should move with it."
   shouldSnap=False
   for name in('pal','style','opt', 'props'):
-    if windows[name].vis:
-      windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
+    windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
   win.focus()
   shouldSnap=True
 
@@ -348,10 +372,12 @@ def newPal_textbox(e):
 def filterExpand(e):
   frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
   frames['filter']['borderwidth']=4
+  playSound('expand')
 
 def filterContract(e):
   frames['filter_expanded'].grid_remove()
   frames['filter']['borderwidth']=0
+  playSound('contract')
 
 def updateFilters():
   # First update the 'all' checkboxes to make half-selected if not fully selected.
@@ -506,8 +532,9 @@ def initTool(f):
 def flowPreview():
   "Position all the preview icons based on the array. Run to refresh if items are moved around."
   for i,item in enumerate(pal_picked):
-    item.gr_x=i%4
-    item.gr_y=i//4 # these can be referred to to figure out where it is
+    item.pre_x=i%4
+    item.pre_y=i//4 # these can be referred to to figure out where it is
+    item.is_pre=True
     item.place(x=(i%4*65+4),y=(i//4*65+32))
   UI['pre_sel_line'].lift()
 
@@ -570,6 +597,7 @@ def flowPicker(e):
   pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
   frmScroll['height']=(math.ceil(itemNum/width)*65+2)
   for i,item in enumerate(pal_items):
+      item.is_pre=False
       item.place(x=((i%width) *65+1),y=((i//width)*65+1))
 
   # this adds extra blank items on the end to finish the grid nicely.
@@ -623,6 +651,9 @@ def initProperties(win):
   windows['props'].overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
   windows['props'].resizable(False, False)
   windows['props'].transient(master=win)
+  windows['props'].vis=False
+  windows['props'].relX=0
+  windows['props'].relY=0
   windows['props'].withdraw() # starts hidden
 
 
@@ -710,6 +741,7 @@ def initMenuBar(win):
     val+=1
 
   menuFile.add_separator()
+  menuFile.add_checkbutton(label="Mute Sounds", variable=muted)
   menuFile.add_command(label="Quit", command=win.destroy)
   menuPal=Menu(bar)
 
@@ -838,8 +870,6 @@ def initMain():
   xpos = '+' + str(min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
   windows['opt'].geometry(xpos + str(win.winfo_rooty()-40))
   windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
-
-  print(windows['style'].bbox(),windows['style'].wm_geometry())
   
   win.bind("<Configure>",moveMain)
   windows['style'].bind("<Configure>", lambda e: snapWin('style'))
@@ -850,3 +880,4 @@ def initMain():
 
 if __name__ == '__main__': # load the window if directly executing this file
   initMain()
+  
