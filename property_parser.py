@@ -1,29 +1,40 @@
 '''
- Property: class
-# - Represents Property found in property files, like those used by valve.
-# name: string 
-# - Name of the section or property
-# value: string || Property[]
-# -  Value is single string when Property is in-line, Property array when Property is section
-# parse: string[] => Property[]
-# - Returns list of Property objects parsed from given text
+Property: class
+- Represents Property found in property files, like those used by valve.
+name: string 
+- Name of the section or property.
+value: string || Property[]
+-  Value is single string when Property is in-line, Property array when Property is section.
+parse: string[] => Property[]
+- Returns a list of Property objects parsed from given text.
+to_strings: => string
+- Returns a string list representation of what the property appears as in the file.
 '''
+
+# TODO: Add comment support. Read in, and export comments.
+# Single comments should appear as properties with the name of \\
+# A new member level property called 'comment' should be added when a comment is tacked onto the end of a line
+# Comments on bracketed lines should be separated into their own comment properties
+
+
 import re
 
 class Property:
+  '''Represents Property found in property files, like those used by valve.'''
   def __init__(self, name = None, value = ""):
     self.name = name
     self.value = value
     
   @staticmethod
   def parse(file_contents):
+    '''Returns list of Property objects parsed from given text'''
     open_properties = [Property(None, [])]
     values = None
     line_num = 0
     for line in file_contents:
       line_num += 1
       values = open_properties[-1].value
-      freshline = clean_line(line)
+      freshline = __clean_line__(line)
       if freshline:
         if freshline.startswith('"'):
           line_contents = str.split(freshline, '"')
@@ -49,7 +60,7 @@ class Property:
         raise ValueError("End of text reached with remaining open sections.")
     return open_properties[0].value
 
-def clean_line(dirty_line):
+def __clean_line__(dirty_line):
   line = dirty_line.strip()
   if line.startswith("\\\\") or line.startswith("//"):
     line = ""
@@ -57,6 +68,7 @@ def clean_line(dirty_line):
   return line
   
 def to_strings(self):
+  '''Returns a string list representation of what the property appears as in the file.'''
   out_val = ['"' + self.name + '"']
   
   if self.value is []: 
