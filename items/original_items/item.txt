@@ -1,0 +1,3869 @@
+	"Item"
+	{
+		"ItemClass"		"ItemPedestalButton"
+		"Type"			"ITEM_BUTTON_PEDESTAL"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_pedestal_button"
+				"Model"
+				{
+					"ModelName"		"switch.3ds"
+					"TextureName"	"buttonpedestal.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_pedestal_button"
+					"Image"			"palette/pedestal_button.png"
+					"Position"		"0 0 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceButton"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandButton"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseButton"
+					"SOUND_DELETED"					"P2Editor.RemoveButton"
+				}
+			}
+			"MovementHandle"	"HANDLE_4_DIRECTIONS"
+		}
+		"Properties"
+		{
+			"TimerDelay"
+			{
+				"DefaultValue"	"3"
+				"Index"			"1"
+			}
+			"TimerSound"
+			{
+				"DefaultValue"	"0"
+				"Index"			"2"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/pedestal_button.vmf"
+					"EntityCount"		"7"
+					"BrushCount"		"1"
+					"BrushSideCount"	"6"
+				}
+			}
+
+			"TargetName"		"button"
+			"Outputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:relay_activated;OnTrigger"
+					"Deactivate"	"instance:relay_deactivated;OnTrigger"
+				}
+			}
+
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+						"Pos"		"0 1 0"
+					}
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+						"Pos"		"0 2 0"
+					}
+
+					"Surface"
+					{
+						"Normal"	"1 0 0"
+						"Pos"		"0 1 0"
+					}
+					"Surface"
+					{
+						"Normal"	"1 0 0"
+						"Pos"		"0 2 0"
+					}
+					"Surface"
+					{
+						"Normal"	"1 0 0"
+						"Pos"		"0 1 1"
+					}
+					"Surface"
+					{
+						"Normal"	"1 0 0"
+						"Pos"		"0 2 1"
+					}
+				}
+			}
+
+			"ConnectionPoints"
+			{
+				// outside voxel
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 6 0"
+					"SignageOffset"		"-2 7 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 2 0"
+					"SignageOffset"		"-2 3 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 0 0"
+					"SignageOffset"		"-2 1 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+
+				// sides
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"0 -1 0"
+					"SignageOffset"		"1 -2 0"
+					"Priority"  "1"
+					"GroupID"	"1"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"0 8 0"
+					"SignageOffset"		"1 9 0"
+					"Priority"  "1"
+					"GroupID"	"2"
+				}
+
+				// inside voxel
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"2 6 0"
+					"SignageOffset"		"3 7 0"
+					"Priority"  "2"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"2 4 0"
+					"SignageOffset"		"3 5 0"
+					"Priority"  "2"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"2 2 0"
+					"SignageOffset"		"3 3 0"
+					"Priority"  "2"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"2 0 0"
+					"SignageOffset"		"3 1 0"
+					"Priority"  "2"
+					"GroupID"	"3"
+				}
+			}
+
+			"Offset"	"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"ItemClass"	"ItemButtonFloor"
+		"Type"		"ITEM_BUTTON_FLOOR"
+		"Editor"
+		{
+			"SubTypeProperty"		"ButtonType"
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_portal_button"
+				"Model"
+				{
+					"ModelName"		"buttonweight.3ds"
+					"TextureName"	"buttonweight.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_portal_button"
+					"Image"			"palette/portal_button.png"
+					"Position"		"1 0 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceButton"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandButton"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseButton"
+					"SOUND_DELETED"					"P2Editor.RemoveButton"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_cube_button"
+				"Model"
+				{
+					"ModelName"		"buttoncube.3ds"
+					"TextureName"	"button_cube.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_cube_button"
+					"Image"			"palette/box_socket.png"
+					"Position"		"2 0 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceButton"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandButton"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseButton"
+					"SOUND_DELETED"					"P2Editor.RemoveButton"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_sphere_button"
+				"Model"
+				{
+					"ModelName"		"buttonball.3ds"
+					"TextureName"	"button_ball.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_sphere_button"
+					"Image"			"palette/ball_socket.png"
+					"Position"		"3 0 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceButton"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandButton"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseButton"
+					"SOUND_DELETED"					"P2Editor.RemoveButton"
+				}
+			}
+			"MovementHandle"	"HANDLE_NONE"
+		}
+		"Properties"
+		{
+			"ButtonType"
+			{
+				"DefaultValue"	"0"
+				"Index"			"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/floor_button_white_intact.vmf"
+					"EntityCount"		"3"
+					"BrushCount"		"41"
+					"BrushSideCount"	"286"
+				}
+				"1"
+				{
+					"Name"				"instances/p2editor/floor_button_black_intact.vmf"
+					"EntityCount"		"3"
+					"BrushCount"		"41"
+					"BrushSideCount"	"286"
+				}
+				"2"
+				{
+					"Name"				"instances/p2editor/floor_cube_button_white.vmf"
+					"EntityCount"		"4"
+					"BrushCount"		"12"
+					"BrushSideCount"	"88"
+				}
+				"3"
+				{
+					"Name"				"instances/p2editor/floor_cube_button_black.vmf"
+					"EntityCount"		"4"
+					"BrushCount"		"12"
+					"BrushSideCount"	"88"
+				}
+				"4"
+				{
+					"Name"				"instances/p2editor/floor_ball_button_white.vmf"
+					"EntityCount"		"4"
+					"BrushCount"		"18"
+					"BrushSideCount"	"152"
+				}
+				"5"
+				{
+					"Name"				"instances/p2editor/floor_ball_button_black.vmf"
+					"EntityCount"		"4"
+					"BrushCount"		"18"
+					"BrushSideCount"	"152"
+				}
+			}
+
+			"TargetName"		"button"
+			"Outputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:button;OnPressed"
+					"Deactivate"	"instance:button;OnUnPressed"
+				}
+			}
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+			"Offset"	"64 64 64"
+		}
+	}
+ 	"Item"
+	{
+		"Type"			"ITEM_CUBE"
+		"ItemClass"		"ItemCube"
+		"Editor"
+		{
+			"SubTypeProperty"		"CubeType"
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_weighted_cube"
+				"Model"
+				{
+					"ModelName"		"cube.3ds"
+					"TextureName"	"cube.png"
+				}
+				"Model"
+				{
+					"ModelName"		"cube_falling.3ds"
+					"TextureName"	"cube.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_weighted_cube"
+					"Image"		"palette/cube.png"
+					"Position"	"0 1 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceCube"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandCube"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseCube"
+					"SOUND_DELETED"					"P2Editor.RemoveCube"
+				}
+				"Animations"
+				{
+					"ANIM_IDLE"							"0"
+					"ANIM_EDITING_ACTIVATE"				"2"
+					"ANIM_EDITING_DEACTIVATE"			"3"
+					"ANIM_FALLING_IDLE"					"1"
+					"ANIM_FALLING_EDITING_ACTIVATE"		"4"
+					"ANIM_FALLING_EDITING_DEACTIVATE"	"5"
+					"ANIM_FALLING_TO_GROUND"			"7"
+					"ANIM_GROUND_TO_FALLING"			"9"
+					"ANIM_FALLING_TO_GROUND_EDITING"	"6"
+					"ANIM_GROUND_TO_FALLING_EDITING"	"8"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_companion_cube"
+				"Model"
+				{
+					"ModelName"		"cubecompanion.3ds"
+					"TextureName"	"cube_companion.png"
+				}
+				"Model"
+				{
+					"ModelName"		"companion_cube_falling.3ds"
+					"TextureName"	"cube_companion.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_companion_cube"
+					"Image"		"palette/companion_cube.png"
+					"Position"	"1 1 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceCube"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandCube"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseCube"
+					"SOUND_DELETED"					"P2Editor.RemoveCube"
+				}
+				"Animations"
+				{
+					"ANIM_IDLE"							"0"
+					"ANIM_EDITING_ACTIVATE"				"2"
+					"ANIM_EDITING_DEACTIVATE"			"3"
+					"ANIM_FALLING_IDLE"					"1"
+					"ANIM_FALLING_EDITING_ACTIVATE"		"4"
+					"ANIM_FALLING_EDITING_DEACTIVATE"	"5"
+					"ANIM_FALLING_TO_GROUND"			"7"
+					"ANIM_GROUND_TO_FALLING"			"9"
+					"ANIM_FALLING_TO_GROUND_EDITING"	"6"
+					"ANIM_GROUND_TO_FALLING_EDITING"	"8"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_reflection_cube"
+				"Model"
+				{
+					"ModelName"		"cubelaser.3ds"
+					"TextureName"	"cuberedirection.png"
+				}
+				"Model"
+				{
+					"ModelName"		"laser_cube_falling.3ds"
+					"TextureName"	"cuberedirection.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_reflection_cube"
+					"Image"		"palette/reflection_cube.png"
+					"Position"	"3 4 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceCube"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandCube"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseCube"
+					"SOUND_DELETED"					"P2Editor.RemoveCube"
+				}
+				"Animations"
+				{
+					"ANIM_IDLE"							"0"
+					"ANIM_EDITING_ACTIVATE"				"2"
+					"ANIM_EDITING_DEACTIVATE"			"3"
+					"ANIM_FALLING_IDLE"					"1"
+					"ANIM_FALLING_EDITING_ACTIVATE"		"4"
+					"ANIM_FALLING_EDITING_DEACTIVATE"	"5"
+					"ANIM_FALLING_TO_GROUND"			"7"
+					"ANIM_GROUND_TO_FALLING"			"9"
+					"ANIM_FALLING_TO_GROUND_EDITING"	"6"
+					"ANIM_GROUND_TO_FALLING_EDITING"	"8"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_sphere"
+				"Model"
+				{
+					"ModelName"		"cubesphere.3ds"
+					"TextureName"	"cubesphere.png"
+				}
+				"Model"
+				{
+					"ModelName"		"cubesphere_falling.3ds"
+					"TextureName"	"cubesphere.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_sphere"
+					"Image"		"palette/edgeless_safety_cube.png"
+					"Position"	"2 1 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceCube"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandCube"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseCube"
+					"SOUND_DELETED"					"P2Editor.RemoveCube"
+				}
+				"Animations"
+				{
+					"ANIM_IDLE"							"0"
+					"ANIM_EDITING_ACTIVATE"				"2"
+					"ANIM_EDITING_DEACTIVATE"			"3"
+					"ANIM_FALLING_IDLE"					"1"
+					"ANIM_FALLING_EDITING_ACTIVATE"		"4"
+					"ANIM_FALLING_EDITING_DEACTIVATE"	"5"
+					"ANIM_FALLING_TO_GROUND"			"7"
+					"ANIM_GROUND_TO_FALLING"			"9"
+					"ANIM_FALLING_TO_GROUND_EDITING"	"6"
+					"ANIM_GROUND_TO_FALLING_EDITING"	"8"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_franken_cube"
+				"Model"
+				{
+					"ModelName"		"frankenturret.3ds"
+					"TextureName"	"cubesphere.png"
+				}
+				"Model"
+				{
+					"ModelName"		"frankenturret_falling.3ds"
+					"TextureName"	"cubesphere.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_franken_cube"
+					"Image"		"palette/frankenturret.png"
+					"Position"	"3 1 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceCube"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandCube"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseCube"
+					"SOUND_DELETED"					"P2Editor.RemoveCube"
+				}
+				"Animations"
+				{
+					"ANIM_IDLE"							"0"
+					"ANIM_EDITING_ACTIVATE"				"2"
+					"ANIM_EDITING_DEACTIVATE"			"3"
+					"ANIM_FALLING_IDLE"					"1"
+					"ANIM_FALLING_EDITING_ACTIVATE"		"4"
+					"ANIM_FALLING_EDITING_DEACTIVATE"	"5"
+					"ANIM_FALLING_TO_GROUND"			"7"
+					"ANIM_GROUND_TO_FALLING"			"9"
+					"ANIM_FALLING_TO_GROUND_EDITING"	"6"
+					"ANIM_GROUND_TO_FALLING_EDITING"	"8"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+			"InvalidSurface"		"CEILING WALL"
+			"CanAnchorOnBarriers"	"1"
+			"CanAnchorOnGoo"		"1"
+		}
+		"Properties"
+		{
+			"CubeType"
+			{
+				"DefaultValue"	"0"
+				"Index"			"0"
+			}
+			"AutoRespawn"
+			{
+				"DefaultValue"	"1"
+				"Index"			"0"
+			}
+			"AutoDrop"
+			{
+				"DefaultValue"	"1"
+				"Index"			"0"
+			}
+			"DropperEnabled"
+			{
+				"DefaultValue"	"1"
+				"Index"			"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"			"instances/p2editor/cube_standard.vmf"
+					"EntityCount"	"4"
+				}
+				"1"
+				{
+					"Name"			"instances/p2editor/cube_companion.vmf"
+					"EntityCount"	"4"
+				}
+				"2"
+				{
+					"Name"			"instances/p2editor/cube_reflection.vmf"
+					"EntityCount"	"4"
+				}
+				"3"
+				{
+					"Name"			"instances/p2editor/cube_sphere.vmf"
+					"EntityCount"	"4"
+				}
+				"4"
+				{
+					"Name"			"instances/p2editor/cube_monster.vmf"
+					"EntityCount"	"4"
+				}
+			}
+
+			"TargetName"		"cube"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"				"0 0 0"
+					"CollideType"		"COLLIDE_PHYSICS"
+					"CollideAgainst"	"COLLIDE_PHYSICS"
+
+					"Surface"
+					{
+						"Pos"		"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 0"
+					}
+
+					"Surface"
+					{
+						"Pos"		"1 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 1"
+					}
+				}
+			}
+			"Offset"	"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_TBEAM"
+		"ItemClass"		"ItemTBeam"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_tractor_beam"
+				"Model"
+				{
+					"ModelName"			"tbeam.3ds"
+					"TextureName"		"tbeam2.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_tractor_beam"
+					"Image"			"palette/tbeam.png"
+					"Position"		"0 2 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"		"0"
+				"Index"		"1"
+			}
+			"ConnectionCountPolarity"
+			{
+				"DefaultValue"		"0"
+				"Index"		"2"
+			}
+			"StartEnabled"
+			{
+				"DefaultValue"		"1"
+				"Index"		"3"
+			}
+			"StartReversed"
+			{
+				"DefaultValue"		"0"
+				"Index"		"4"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/tbeam.vmf"
+					"EntityCount"		"9"
+					"BrushCount"		"3"
+					"BrushSideCount"	"22"
+				}
+				"1"
+				{
+					"Name"				"instances/p2editor/tbeam_frame_white.vmf"
+					"EntityCount"		"1"
+					"BrushCount"		"12"
+					"BrushSideCount"	"100"
+				}
+				"2"
+				{
+					"Name"				"instances/p2editor/tbeam_frame_black.vmf"
+					"EntityCount"		"1"
+					"BrushCount"		"12"
+					"BrushSideCount"	"100"
+				}
+			}
+
+			"TargetName"		"tbeam"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+				"CONNECTION_TBEAM_POLARITY"
+				{
+					"Activate"		"instance:counter_polarity;Add"
+					"Deactivate"	"instance:counter_polarity;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_CATAPULT"
+		"ItemClass"		"ItemCatapult"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_faith_plate"
+				"Model"
+				{
+					"ModelName"		"faithplate.3ds"
+					"TextureName"		"faithplate.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_faith_plate"
+					"Image"		"palette/faithplate.png"
+					"Position"	"1 2 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_CATAPULT"
+			"InvalidSurface"		"CEILING"
+		}
+		"Properties"
+		{
+			"CatapultSpeed"
+			{
+				"DefaultValue"		"500"
+				"Index"		"1"
+			}
+			"TargetName"
+			{
+				"DefualtValue"		"target"
+				"Index"		"2"
+			}
+			"VerticalAlignment"
+			{
+				"DefaultValue"		"0"
+				"Index"		"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/faith_plate_floor.vmf"
+					"EntityCount"		"8"
+					"BrushCount"		"3"
+					"BrushSideCount"	"22"
+				}
+			}
+
+			"TargetName"		"catapult"
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"CollideType"		"COLLIDE_SOLID"
+					"CollideAgainst"	"COLLIDE_SOLID COLLIDE_GLASS COLLIDE_GRATING COLLIDE_ANTLINES"
+
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			
+			"EmbedFace"
+			{
+				"Solid"
+				{
+					"Center"		"64 16 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"64 112 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+			}
+			"Overlay"
+			{
+				"Material"		"signage/signage_overlay_arrow"
+				"Center"		"16 16 0"
+				"Dimensions"	"32 32 0"
+				"Rotation"		"0"
+			}
+			"Overlay"
+			{
+				"Material"		"signage/signage_overlay_catapult1"
+				"Center"		"112 16 0"
+				"Dimensions"	"32 32 0"
+				"Rotation"		"180"
+			}
+			"Overlay"
+			{
+				"Material"		"signage/signage_overlay_catapult2"
+				"Center"		"112 112 0"
+				"Dimensions"	"32 32 0"
+				"Rotation"		"180"
+			}
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_LIGHT_BRIDGE"
+		"ItemClass"		"ItemLightBridge"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_light_bridge"
+				"Model"
+				{
+					"ModelName"			"bridge.3ds"
+					"TextureName"		"lightbridgeemitter.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_light_bridge"
+					"Image"			"palette/hard_light_emitter.png"
+					"Position"		"2 2 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_6_POSITIONS"
+			"DesiredFacing"			"DESIRES_UP"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"		"0"
+				"Index"		"1"
+			}
+			"StartEnabled"
+			{
+				"DefaultValue"		"1"
+				"Index"		"2"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"			"instances/p2editor/bridge.vmf"
+					"EntityCount"	"5"
+				}
+			}
+
+			"TargetName"		"bridge"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"		"instance:counter;Subtract"
+				}
+			}
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 0 0"
+					"SignageOffset"		"1 1 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 2 0"
+					"SignageOffset"		"1 3 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 4 0"
+					"SignageOffset"		"1 5 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 6 0"
+					"SignageOffset"		"1 7 0"
+					"Priority"  "1"
+				}
+
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 0 0"
+					"SignageOffset"		"6 1 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 2 0"
+					"SignageOffset"		"6 3 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 4 0"
+					"SignageOffset"		"6 5 0"
+					"Priority"  "1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 6 0"
+					"SignageOffset"		"6 7 0"
+					"Priority"  "1"
+				}
+
+				// top
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"4 -2 0"
+					"Priority"	"0"
+				}
+
+				// bottom
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"4 9 0"
+					"Priority"	"0"
+				}
+			}
+			"Offset"		"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_BARRIER_HAZARD"
+		"ItemClass"	"ItemBarrierHazard"
+		"Editor"
+		{
+			"SubTypeProperty"	"HazardType"
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_fizzler"
+				"Model"
+				{
+					"ModelName"		"fizzler.3ds"
+					"TextureName"		"fizzler.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_fizzler"
+					"Image"			"palette/fizzler.png"
+					"Position"		"0 3 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"SubType"
+			{
+				"Name"				"PORTAL2_PuzzleEditor_Item_laser_field"
+				"Model"
+				{
+					"ModelName"		"laserfield.3ds"
+					"TextureName"		"fizzler.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_laser_field"
+					"Image"			"palette/deathfield.png"
+					"Position"		"0 6 0"
+				}
+			}
+			"MovementHandle"	"HANDLE_6_POSITIONS"
+			"DesiredFacing"		"DESIRES_HORIZONTAL"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"	"0"
+				"Index"			"1"
+			}
+			"StartEnabled"
+			{
+				"DefaultValue"	"1"
+				"Index"			"2"
+			}
+			"HazardType"
+			{
+				"DefaultValue"	"0"
+				"Index"			"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"			"instances/p2editor/barrier_hazard_base.vmf"
+					"EntityCount"	"5"
+				}
+				"1"
+				{
+					"Name"			"instances/p2editor/barrier_hazard_model.vmf"
+					"EntityCount"	"5"
+				}
+			}
+
+			"TargetName"	"barrierhazard"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+				"CONNECTION_HAZARD_MODEL"
+				{
+					"Activate"		"instance:hazard_model_open_rl;Trigger"
+					"Deactivate"	"instance:hazard_model_close_rl;Trigger"
+				}
+				"CONNECTION_HAZARD_BRUSH"
+				{
+					"Activate"		"Enable"
+					"Deactivate"	"Disable"
+				}
+			}
+			"Outputs"
+			{
+				"CONNECTION_HAZARD"
+				{
+					"Activate"		"instance:branch_toggle;OnTrue"
+					"Deactivate"	"instance:branch_toggle;OnFalse"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 0 0"
+					"SignageOffset"		"1 1 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 2 0"
+					"SignageOffset"		"1 3 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 4 0"
+					"SignageOffset"		"1 5 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"2 6 0"
+					"SignageOffset"		"1 7 0"
+					"Priority"	"0"
+				}
+
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 0 0"
+					"SignageOffset"		"6 1 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 2 0"
+					"SignageOffset"		"6 3 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 4 0"
+					"SignageOffset"		"6 5 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"5 6 0"
+					"SignageOffset"		"6 7 0"
+					"Priority"	"0"
+				}
+			}
+			"Offset"	"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"Type"			"ITEM_BARRIER"
+		"ItemClass"		"ItemBarrier"
+		"Editor"
+		{
+			"SubTypeProperty"		"BarrierType"
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_glass"
+				"Model"
+				{
+					"ModelName"		"glass_handle.3ds"
+					"TextureName"	"glassitem.png"
+				}
+				"Palette"
+				{
+					"Tooltip"		"PORTAL2_PuzzleEditor_Palette_glass"
+					"Image"			"palette/glass.png"
+					"Position"		"1 3 0"
+				}
+			}
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_grating"
+				"Model"
+				{
+					"ModelName"		"glass_handle.3ds"
+					"TextureName"	"glassitem.png"
+				}
+			}
+			"MovementHandle"		"HANDLE_4_DIRECTIONS"
+			"OccupiesVoxel"		"0"
+		}
+		"Properties"
+		{
+			"BarrierType"
+			{
+				"DefaultValue"	"0"
+				"Index"			"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/glass_128x128.vmf"
+					"EntityCount"		"1"
+					"BrushCount"		"2"
+					"BrushSideCount"	"12"
+				}
+				"1"
+				{
+					"Name"				"instances/p2editor/glass_frame_left_corner.vmf"
+					"EntityCount"		"2"
+				}
+				"2"
+				{
+					"Name"				"instances/p2editor/glass_frame_left_straight.vmf"
+					"EntityCount"		"1"
+				}
+				"3"
+				{
+					"Name"				"instances/p2editor/glass_frame_left_short.vmf"
+					"EntityCount"		"1"
+				}
+				"4"
+				{
+					"Name"				"instances/p2editor/glass_frame_left_convex_corner.vmf"
+					"EntityCount"		"1"
+				}
+				"5"
+				{
+					"Name"				"instances/p2editor/glass_frame_right_corner.vmf"
+					"EntityCount"		"2"
+				}
+				"6"
+				{
+					"Name"				"instances/p2editor/glass_frame_right_straight.vmf"
+					"EntityCount"		"1"
+				}
+				"7"
+				{
+					"Name"				"instances/p2editor/glass_frame_right_short.vmf"
+					"EntityCount"		"1"
+				}
+				"8"
+				{
+					"Name"			"instances/p2editor/glass_frame_right_convex_corner.vmf"
+					"EntityCount"	"1"
+				}
+			}
+
+			"TargetName"		"target"
+			"Offset"		"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_PISTON_PLATFORM"
+		"ItemClass"		"ItemPistonPlatform"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_piston_platform"
+				"Model"
+				{
+					"ModelName"		"piston_lift_grate.3ds"
+					"TextureName"	"pistonlift.png"
+				}
+				"Model"
+				{
+					"ModelName"		"piston_lift_section01.3ds"
+					"TextureName"	"pistonlift.png"
+				}
+				"Model"
+				{
+					"ModelName"		"piston_lift_section02.3ds"
+					"TextureName"	"pistonlift.png"
+				}
+				"Model"
+				{
+					"ModelName"		"piston_lift_section03.3ds"
+					"TextureName"	"pistonlift.png"
+				}
+				"Model"
+				{
+					"ModelName"		"piston_lift_top.3ds"
+					"TextureName"	"motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"		"destination_target_outline.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"		"piston_lift_tube.3ds"
+					"TextureName"	"motionplatform.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_piston_platform"
+					"Image"		"palette/arm_paneltop.png"
+					"Position"	"2 3 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+		}
+		"Properties"
+		{
+			"BottomLevel"
+			{
+				"DefaultValue"		"0"
+				"Index"		"1"
+			}
+			"TopLevel"
+			{
+				"DefaultValue"		"1"
+				"Index"		"2"
+			}
+			"StartUp"
+			{
+				"DefaultValue"		"0"
+				"Index"		"3"
+			}
+			"ConnectionCount"
+			{
+				"DefaultValue"		"0"
+				"Index"		"4"
+			}
+			"AutoTrigger"
+			{
+				"DefaultValue"		"1"
+				"Index"		"5"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/lift_standalone.vmf"
+					"EntityCount"		"46"
+					"BrushCount"		"15"
+					"BrushSideCount"	"106"
+				}
+			}
+
+			"TargetName"		"pistonlift"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"		"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+				"Voxel"
+				{
+					"Pos"		"0 0 -1"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+  	"Item"
+	{
+		"Type"		"ITEM_RAIL_PLATFORM"
+		"ItemClass"	"ItemRailPlatform"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_track_platform"
+				"Model"
+				{
+					"ModelName"			"arm_motionplatform.3ds"
+					"TextureName"		"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"			"arm_motionplatform_rail.3ds"
+					"TextureName"		"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"			"arm_motionplatform_rail_inwater.3ds"
+					"TextureName"		"arm_motionplatform.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_track_platform"
+					"Image"		"palette/arm_motionplatform.png"
+					"Position"	"3 3 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_4_DIRECTIONS"
+			"DesiredFacing"			"DESIRES_DOWN"
+		}
+		"Properties"
+		{
+			"Oscillate"
+			{
+				"DefaultValue"		"1"
+				"Index"		"0"
+			}
+			"ConnectionCount"
+			{
+				"DefaultValue"		"0"
+				"Index"		"1"
+			}
+			"TravelDistance"
+			{
+				"DefaultValue"		"0"
+				"Index"		"2"
+			}
+			"Speed"
+			{
+				"DefaultValue"		"100"
+				"Index"		"3"
+			}
+			"TravelDirection"
+			{
+				"DefaultValue"		"0"
+				"Index"		"4"
+			}
+			"StartingPosition"
+			{
+				"DefaultValue"		"0"
+				"Index"		"5"
+			}
+			"StartActive"
+			{
+				"DefaultValue"		"1"
+				"Index"		"6"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/lift_track_bottom_grate.vmf"
+					"EntityCount"		"2"
+					"BrushCount"		"4"
+					"BrushSideCount"	"24"
+				}
+				"1"
+				{
+					"Name"				"instances/p2editor/lift_track_bottom.vmf"
+					"EntityCount"		"2"
+					"BrushCount"		"6"
+					"BrushSideCount"	"46"
+				}
+				"2"
+				{
+					"Name"				"instances/p2editor/lift_track_middle.vmf"
+					"EntityCount"		"2"
+					"BrushCount"		"5"
+					"BrushSideCount"	"34"
+				}
+				"3"
+				{
+					"Name"				"instances/p2editor/lift_track_top.vmf"
+					"EntityCount"		"2"
+					"BrushCount"		"6"
+					"BrushSideCount"	"46"
+				}
+				"4"
+				{
+					"Name"				"instances/p2editor/lift_platform.vmf"
+					"EntityCount"		"8"
+					"BrushCount"		"4"
+					"BrushSideCount"	"31"
+				}
+				"5"
+				{
+					"Name"				"instances/p2editor/lift_platform_oscillate.vmf"
+					"EntityCount"		"13"
+					"BrushCount"		"4"
+					"BrushSideCount"	"31"
+				}
+				"6"
+				{
+					"Name"				"instances/p2editor/lift_track_single.vmf"
+					"EntityCount"		"2"
+					"BrushCount"		"6"
+					"BrushSideCount"	"52"
+				}
+			}
+
+			"TargetName"		"raillift"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"		"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+		}
+	}
+
+ 	"Item"
+	{
+		"Type"		"ITEM_LASER_EMITTER_CENTER"
+		"ItemClass"		"ItemLaserEmitter"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_laser_emitter"
+				"Model"
+				{
+					"ModelName"		"laseremitc.3ds"
+					"TextureName"		"laser_models.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_laser_emitter"
+					"Image"		"palette/laser_emitter.png"
+					"Position"	"0 4 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_5_POSITIONS"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"		"0"
+				"Index"		"1"
+			}
+			"StartEnabled"
+			{
+				"DefaultValue"		"1"
+				"Index"		"2"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/laser_emitter_center.vmf"
+					"EntityCount"		"7"
+					"BrushCount"		"5"
+					"BrushSideCount"	"34"
+				}
+			}
+
+			"TargetName"		"laseremit"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"		"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Pos"	"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 2 0"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+
+			"EmbedFace"
+			{
+				"Solid"
+				{
+					"Center"		"64 16 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"64 112 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"16 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"112 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+			}
+
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 3 0"
+					"SignageOffset"		"0 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 4 0"
+					"SignageOffset"		"0 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 3 0"
+					"SignageOffset"		"7 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 4 0"
+					"SignageOffset"		"7 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 1 0"
+					"SignageOffset"		"2 0 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 1 0"
+					"SignageOffset"		"5 0 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 6 0"
+					"SignageOffset"		"2 7 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 6 0"
+					"SignageOffset"		"5 7 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+
+	"Item"
+	{
+		"Type"		"ITEM_LASER_CATCHER_CENTER"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_laser_catcher"
+				"Model"
+				{
+					"ModelName"		"laserrecc.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_laser_catcher"
+					"Image"		"palette/laser_catcher.png"
+					"Position"	"1 4 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_5_POSITIONS"
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/laser_catcher_center.vmf"
+					"EntityCount"		"3"
+					"BrushCount"		"5"
+					"BrushSideCount"	"34"
+				}
+			}
+
+			"TargetName"		"lasercatch"
+			"Outputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:laser_catcher;OnPowered"
+					"Deactivate"		"instance:laser_catcher;OnUnpowered"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Pos"	"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 2 0"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"EmbedFace"
+			{
+				"Solid"
+				{
+					"Center"	"64 16 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"	"64 112 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"	"16 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"	"112 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 3 0"
+					"SignageOffset"		"0 2 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 4 0"
+					"SignageOffset"		"0 5 0"
+					"Priority"	"0"
+				}
+
+
+				// left
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 3 0"
+					"SignageOffset"		"7 2 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 4 0"
+					"SignageOffset"		"7 5 0"
+					"Priority"	"0"
+				}
+
+
+				// top
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 1 0"
+					"SignageOffset"		"2 0 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 1 0"
+					"SignageOffset"		"5 0 0"
+					"Priority"	"0"
+				}
+
+
+				// bottom
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 6 0"
+					"SignageOffset"		"2 7 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 6 0"
+					"SignageOffset"		"5 7 0"
+					"Priority"	"0"
+				}
+			}
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_LASER_RELAY_CENTER"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_laser_relay"
+				"Model"
+				{
+					"ModelName"		"laserrelayc.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_laser_relay"
+					"Image"		"palette/laser_receptacle.png"
+					"Position"	"2 4 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"Animations"
+			{
+				"ANIM_IDLE"		"0"
+				"ANIM_EDITING_ACTIVATE"	"1"
+				"ANIM_EDITING_DEACTIVATE" "2"
+			}
+			"MovementHandle"	"HANDLE_5_POSITIONS"
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/laser_relay_center.vmf"
+					"EntityCount"		"3"
+					"BrushCount"		"5"
+					"BrushSideCount"	"34"
+				}
+			}
+
+			"TargetName"		"laserrelay"
+			"Outputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:relay;OnPowered"
+					"Deactivate"		"instance:relay;OnUnpowered"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Pos"	"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"	"2 2 0"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"EmbedFace"
+			{
+				"Solid"
+				{
+					"Center"		"64 16 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"64 112 128"
+					"Dimensions"	"128 32 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"16 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+				"Solid"
+				{
+					"Center"		"112 64 128"
+					"Dimensions"	"32 64 4"
+					"Grid"			"4x4"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 3 0"
+					"SignageOffset"		"0 2 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"1 4 0"
+					"SignageOffset"		"0 5 0"
+					"Priority"	"0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 3 0"
+					"SignageOffset"		"7 2 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"6 4 0"
+					"SignageOffset"		"7 5 0"
+					"Priority"	"0"
+				}
+
+				// bottom
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 6 0"
+					"SignageOffset"		"2 7 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 6 0"
+					"SignageOffset"		"5 7 0"
+					"Priority"	"0"
+				}
+
+				// top
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 1 0"
+					"SignageOffset"		"2 0 0"
+					"Priority"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 1 0"
+					"SignageOffset"		"5 0 0"
+					"Priority"	"0"
+				}
+			}
+		}
+	}
+   	"Item"
+	{
+		"Type"		"ITEM_PANEL_CLEAR"
+		"ItemClass"	"ItemAngledPanel"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_clear_panel"
+				"Model"
+				{
+					"ModelName"	"arm4_gls_90deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_60deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_45deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_30deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_90deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_60deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_45deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_gls_30deg.3ds"
+					"TextureName"	"arm_motionplatform.png"
+				}
+				"Model"
+				{
+					"ModelName"	"airlock_ghost_90deg.3ds"
+					"TextureName"	"arm_undeployed_glass.png"
+				}
+				"Model"
+				{
+					"ModelName"	"airlock_ghost_60deg.3ds"
+					"TextureName"	"arm_undeployed_glass.png"
+				}
+				"Model"
+				{
+					"ModelName"	"airlock_ghost_45deg.3ds"
+					"TextureName"	"arm_undeployed_glass.png"
+				}
+				"Model"
+				{
+					"ModelName"	"airlock_ghost_30deg.3ds"
+					"TextureName"	"arm_undeployed_glass.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_clear_panel"
+					"Image"		"palette/airlock.png"
+					"Position"	"0 5 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"	"HANDLE_4_DIRECTIONS"
+			"DesiredFacing"		"DESIRES_DOWN"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"	"0"
+				"Index"			"1"
+			}
+			"StartDeployed"
+			{
+				"DefaultValue"	"1"
+				"Index"			"2"
+			}
+			"Portalable"
+			{
+				"DefaultValue"	"1"
+				"Index"			"0"
+			}
+			"AngledPanelType"
+			{
+				"DefaultValue"	"2"
+				"Index"			"0"
+			}
+			"AngledPanelAnimation"
+			{
+				"DefaultValue"	"ramp_45_deg_open"
+				"Index"			"3"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/panel_clear.vmf"
+					"EntityCount"		"13"
+					"BrushCount"		"5"
+					"BrushSideCount"	"39"
+				}
+			}
+
+			"TargetName"		"angledClearPanel"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_SOLID"
+					"CollideAgainst"	"COLLIDE_SOLID COLLIDE_PHYSICS"
+						
+					"Pos"		"0 0 0"
+				}
+
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_NOTHING"
+					"CollideAgainst"	"COLLIDE_ANTLINES"
+
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+		
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+	"Item"
+	{
+		"Type"	"ITEM_PANEL_ANGLED"
+		"ItemClass"	"ItemAngledPanel"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_angled_panel"
+				"Model"
+				{
+					"ModelName"	"arm4_white_90deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_white_60deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_white_45deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_white_30deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_blk_90deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_blk_60deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_blk_45deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_blk_30deg.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_ghost_90deg.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_ghost_60deg.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_ghost_45deg.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_ghost_30deg.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_angled_panel"
+					"Image"		"palette/panel_flap.png"
+					"Position"	"1 5 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"	"HANDLE_4_DIRECTIONS"
+			"DesiredFacing"		"DESIRES_DOWN"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"	"0"
+				"Index"			"1"
+			}
+			"StartDeployed"
+			{
+				"DefaultValue"	"1"
+				"Index"			"2"
+			}
+			"Portalable"
+			{
+				"DefaultValue"	"1"
+				"Index"			"0"
+			}
+			"AngledPanelType"
+			{
+				"DefaultValue"	"2"
+				"Index"			"0"
+			}
+			"AngledPanelAnimation"
+			{
+				"DefaultValue"	"ramp_45_deg_open"
+				"Index"			"3"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/panel_nobrush.vmf"
+					"EntityCount"		"12"
+					"BrushCount"		"5"
+					"BrushSideCount"	"39"
+				}
+			}
+
+			"TargetName"		"angledPanel"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_SOLID"
+					"CollideAgainst"	"COLLIDE_SOLID COLLIDE_PHYSICS"
+						
+					"Pos"		"0 0 0"
+				}
+
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_NOTHING"
+					"CollideAgainst"	"COLLIDE_ANTLINES"
+
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+		
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+   	"Item"
+	{
+		"Type"		"ITEM_PANEL_FLIP"
+		"ItemClass"	"ItemPanelFlip"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_flip_panel"
+				"Model"
+				{
+					"ModelName"	"panel_flip.3ds"
+					"TextureName"	"laser_models.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_flip_panel"
+					"Image"		"palette/panel_flip.png"
+					"Position"	"2 5 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"	"HANDLE_NONE"
+			"DesiredFacing"		"DESIRES_HORIZONTAL"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"	"0"
+				"Index"			"1"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/panel_flip.vmf"
+					"EntityCount"		"10"
+					"BrushCount"		"7"
+					"BrushSideCount"	"54"
+				}
+			}
+
+			"TargetName"		"flipPanel"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+
+					"Surface"
+					{
+						"Pos"	"0 0 0"
+					}
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+					"Surface"
+					{
+						"Normal"	"0 0 -1"
+					}
+					"Surface"
+					{
+						"Normal"	"0 1 0"
+					}
+					"Surface"
+					{
+						"Normal"	"0 -1 0"
+					}
+					"Surface"
+					{
+						"Normal"	"1 0 0"
+					}
+					"Surface"
+					{
+						"Normal"	"-1 0 0"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 3 0"
+					"SignageOffset"		"-2 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 3 0"
+					"SignageOffset"		"9 2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"8 4 0"
+					"SignageOffset"		"9 5 0"
+					"Priority"  "0"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"3 -1 0"
+					"SignageOffset"		"2 -2 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "0"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"3 8 0"
+					"SignageOffset"		"2 9 0"
+					"Priority"  "0"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "0"
+				}
+			}
+		}
+	}
+ 	"Item"
+	{
+		"Type"		"ITEM_PANEL_STAIRS"
+		"ItemClass"	"ItemStairs"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_stairs"
+				"Model"
+				{
+					"ModelName"	"stairs.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Model"
+				{
+					"ModelName"	"arm4_ghost_stairs_up.3ds"
+					"TextureName"	"arm_4panel.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_stairs"
+					"Image"		"palette/stairs.png"
+					"Position"	"3 2 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"	"HANDLE_4_DIRECTIONS"
+		}
+		"Properties"
+		{
+			"ConnectionCount"
+			{
+				"DefaultValue"	"0"
+				"Index"			"1"
+			}
+			"StartDeployed"
+			{
+				"DefaultValue"	"1"
+				"Index"			"2"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/stairs.vmf"
+					"EntityCount"		"13"
+					"BrushCount"		"7"
+					"BrushSideCount"	"56"
+				}
+			}
+
+			"TargetName"		"stairs"
+			"Inputs"
+			{
+				"CONNECTION_STANDARD"
+				{
+					"Activate"		"instance:counter;Add"
+					"Deactivate"	"instance:counter;Subtract"
+				}
+			}
+			"Offset"		"64 64 64"
+
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_SOLID"
+					"CollideAgainst"	"COLLIDE_SOLID COLLIDE_PHYSICS"
+					"Pos"			"0 0 0"
+
+					// First step
+					"Surface"
+					{
+						"Pos"		"0 0 0"
+					}
+					"Surface"
+					{
+						"Pos"		"0 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"0 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"0 3 0"
+					}
+
+					"Surface"
+					{
+						"Pos"		"1 0 0"
+					}
+					"Surface"
+					{
+						"Pos"		"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"1 3 0"
+					}
+
+					//Second Step bottom layer
+					"Surface"
+					{
+						"Pos"		"2 0 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 3 0"
+					}
+
+					"Surface"
+					{
+						"Pos"		"3 0 0"
+					}
+					"Surface"
+					{
+						"Pos"		"3 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"3 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"3 3 0"
+					}
+
+					//Second Step second layer
+					"Surface"
+					{
+						"Pos"		"2 0 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 3 1"
+					}
+
+					"Surface"
+					{
+						"Pos"		"3 0 1"
+					}
+					"Surface"
+					{
+						"Pos"		"3 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"3 2 1"
+					}
+					"Surface"
+					{
+						"Pos"		"3 3 1"
+					}
+				}
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_SOLID"
+					"CollideAgainst"	"COLLIDE_SOLID COLLIDE_PHYSICS"
+					"Pos"				"1 0 0"
+				}
+
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_NOTHING"
+					"CollideAgainst"	"COLLIDE_ANTLINES"
+					"Pos"				"0 0 0"
+					
+					"Surface"
+					{
+						"Normal"		"0 0 1"
+					}
+				}
+				"Voxel"
+				{
+					"CollideType"		"COLLIDE_NOTHING"
+					"CollideAgainst"	"COLLIDE_ANTLINES"
+					"Pos"				"1 0 0"
+					
+					"Surface"
+					{
+						"Normal"		"0 0 1"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+				}
+				"Voxel"
+				{
+					"Pos"		"1 0 0"
+				}
+			}
+			"ConnectionPoints"
+			{
+				// left
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 0 0"
+					"SignageOffset"		"-2 1 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 2 0"
+					"SignageOffset"		"-2 3 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 4 0"
+					"SignageOffset"		"-2 5 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+				"Point"
+				{
+					"Dir"				"1 0 0"
+					"Pos"				"-1 6 0"
+					"SignageOffset"		"-2 7 0"
+					"Priority"  "0"
+					"GroupID"	"0"
+				}
+
+				// right
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"16 0 0"
+					"SignageOffset"		"17 1 0"
+					"Priority"  "2"
+					"GroupID"	"1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"16 2 0"
+					"SignageOffset"		"17 3 0"
+					"Priority"  "2"
+					"GroupID"	"1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"16 4 0"
+					"SignageOffset"		"17 5 0"
+					"Priority"  "2"
+					"GroupID"	"1"
+				}
+				"Point"
+				{
+					"Dir"				"-1 0 0"
+					"Pos"				"16 6 0"
+					"SignageOffset"		"17 7 0"
+					"Priority"  "2"
+					"GroupID"	"1"
+				}
+
+				// up
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"0 -1 0"
+					"SignageOffset"		"1 -2 0"
+					"Priority"  "1"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"2 -1 0"
+					"SignageOffset"		"3 -2 0"
+					"Priority"  "2"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"4 -1 0"
+					"SignageOffset"		"5 -2 0"
+					"Priority"  "3"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"6 -1 0"
+					"SignageOffset"		"7 -2 0"
+					"Priority"  "4"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"8 -1 0"
+					"SignageOffset"		"9 -2 0"
+					"Priority"  "4"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"10 -1 0"
+					"SignageOffset"		"11 -2 0"
+					"Priority"  "4"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"12 -1 0"
+					"SignageOffset"		"13 -2 0"
+					"Priority"  "4"
+					"GroupID"	"2"
+				}
+				"Point"
+				{
+					"Dir"				"0 1 0"
+					"Pos"				"14 -1 0"
+					"SignageOffset"		"15 -2 0"
+					"Priority"  "4"
+					"GroupID"	"2"
+				}
+
+				// down
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"0 8 0"
+					"SignageOffset"		"1 9 0"
+					"Priority"  "1"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"2 8 0"
+					"SignageOffset"		"3 9 0"
+					"Priority"  "2"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"4 8 0"
+					"SignageOffset"		"5 9 0"
+					"Priority"  "3"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"6 8 0"
+					"SignageOffset"		"7 9 0"
+					"Priority"  "4"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"8 8 0"
+					"SignageOffset"		"9 9 0"
+					"Priority"  "4"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"10 8 0"
+					"SignageOffset"		"11 9 0"
+					"Priority"  "4"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"12 8 0"
+					"SignageOffset"		"13 9 0"
+					"Priority"  "4"
+					"GroupID"	"3"
+				}
+				"Point"
+				{
+					"Dir"				"0 -1 0"
+					"Pos"				"14 8 0"
+					"SignageOffset"		"15 9 0"
+					"Priority"  "4"
+					"GroupID"	"3"
+				}
+			}
+		}
+	}
+ 	"Item"
+	{
+		"Type"		"ITEM_TURRET"
+		"ItemClass"	"ItemTurret"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_turret"
+				"Model"
+				{
+					"ModelName"		"sentry.3ds"
+					"TextureName"		"sentryturret.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_turret"
+					"Image"		"palette/turret.png"
+					"Position"	"1 6 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceTurret"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandTurret"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseTurret"
+					"SOUND_DELETED"					"P2Editor.RemoveTurret"
+				}
+			}
+			"MovementHandle"		"HANDLE_36_DIRECTIONS"
+			"InvalidSurface"		"CEILING WALL"
+			"CanAnchorOnBarriers"		"1"
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"			"instances/p2editor/turret.vmf"
+					"EntityCount"	"3"
+				}
+			}
+
+			"TargetName"		"turret"
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"				"0 0 0"
+					"CollideType"		"COLLIDE_PHYSICS"
+					"CollideAgainst"	"COLLIDE_PHYSICS"
+
+					"Surface"
+					{
+						"Pos"		"1 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 0"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 0"
+					}
+
+					"Surface"
+					{
+						"Pos"		"1 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 1"
+					}
+				}	
+			}
+		}
+	}
+	"Item"
+	{
+		"Type"		"ITEM_GOO"
+		"ItemClass"	"ItemGoo"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_goo"
+				"Model"
+				{
+					"ModelName"		"goo_man.3ds"
+					"TextureName"		"goo_man.png"
+				}
+				"Model"
+				{
+					"ModelName"		"goo_man_water.3ds"
+					"TextureName"		"goo_man_water.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_goo"
+					"Image"		"palette/goo.png"
+					"Position"	"2 6 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+			"DesiredFacing"		"DESIRES_UP"
+		}
+		"Exporting"
+		{
+			"TargetName"		"goo"
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"				"0 0 0"
+					"CollideType"		"COLLIDE_NOTHING"
+					"CollideAgainst"	"COLLIDE_NOTHING"
+
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+		}
+	}
+ 	"Item"
+	{
+		"Type"		"ITEM_LIGHT_PANEL"
+		"ItemClass"	"itemlightstrip"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"			"PORTAL2_PuzzleEditor_Item_light_strip"
+				"Model"
+				{
+					"ModelName"			"light_strip.3ds"
+					"TextureName"		"fizzler.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_light_strip"
+					"Image"		"palette/light_panel.png"
+					"Position"	"3 6 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"        "HANDLE_8_POSITIONS"
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/light_strip.vmf"
+					"EntityCount"		"4"
+					"BrushCount"		"2"
+					"BrushSideCount"	"12"
+				}
+			}
+
+			"TargetName"		"lightstrip"
+			"Offset"	"64 64 64"
+		}
+	}
+	"Item"
+	{
+		"Type"			"ITEM_PAINT_SPLAT"
+		"ItemClass"		"ItemPaintSplat"
+		"Editor"
+		{
+			"SubTypeProperty"	"PaintType"
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_paint_bounce"
+				"Model"
+				{
+					"ModelName"			"paint_splatter_blue.3ds"
+					"TextureName"		"paint_dropper_blue.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_paint_bounce"
+					"Image"		"palette/paintsplat_bounce.png"
+					"Position"	"0 7 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.Gel_Placement"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandPaint"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapsePaint"
+					"SOUND_DELETED"					"P2Editor.RemovePaint"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_paint_speed"
+				"Model"
+				{
+					"ModelName"			"paint_splatter_orange.3ds"
+					"TextureName"		"paint_dropper_orange.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_paint_speed"
+					"Image"		"palette/paintsplat_speed.png"
+					"Position"	"1 7 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.Gel_Placement"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandPaint"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapsePaint"
+					"SOUND_DELETED"					"P2Editor.RemovePaint"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_paint_portal"
+				"Model"
+				{
+					"ModelName"			"paint_splatter_white.3ds"
+					"TextureName"		"paint_dropper_white.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_paint_portal"
+					"Image"		"palette/paintsplat_portal.png"
+					"Position"	"2 7 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.Gel_Placement"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandPaint"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapsePaint"
+					"SOUND_DELETED"					"P2Editor.RemovePaint"
+				}
+			}
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_paint_water"
+				"Model"
+				{
+					"ModelName"			"paint_splatter_water.3ds"
+					"TextureName"		"paint_dropper_water.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_paint_water"
+					"Image"		"palette/paintsplat_water.png"
+					"Position"	"3 7 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.Gel_Placement"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandPaint"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapsePaint"
+					"SOUND_DELETED"					"P2Editor.RemovePaint"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+			"CanAnchorOnGoo"		"1"
+		}
+		"Properties"
+		{
+			"StartEnabled"
+			{
+				"DefaultValue"		"1"
+				"Index"				"0"
+			}
+			"PaintType"
+			{
+				"DefaultValue"		"0"
+				"Index"				"0"
+			}
+			"PaintExportType"
+			{
+				"DefaultValue"		"0"
+				"Index"				"1"
+			}
+			"PaintFlowType"
+			{
+				"DefaultValue"		"1"
+				"Index"				"0"
+			}
+			"DropperEnabled"
+			{
+				"DefaultValue"		"1"
+				"Index"				"0"
+			}
+			"AllowStreak"
+			{
+				"DefaultValue"		"1"
+				"Index"				"0"
+			}
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"			"instances/p2editor/paint_splat.vmf"
+					"EntityCount"	"2"
+				}
+			}
+
+			"TargetName"		"paintsplat"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Pos"		"1 1 0"
+						"Normal"	"0 0 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 1 0"
+						"Normal"	"0 0 1"
+					}
+					"Surface"
+					{
+						"Pos"		"1 2 0"
+						"Normal"	"0 0 1"
+					}
+					"Surface"
+					{
+						"Pos"		"2 2 0"
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"Offset"		"64 64 64"
+		}
+	}
+
+	"Item"
+	{
+		"Type"		"ITEM_SECONDARY_OBSERVATION_ROOM"
+		"Editor"
+		{
+			"SubType"
+			{
+				"Name"		"PORTAL2_PuzzleEditor_Item_observation_room"
+				"Model"
+				{
+					"ModelName"		"observation_office_1x1.3ds"
+					"TextureName"		"observationroom.png"
+				}
+				"Palette"
+				{
+					"Tooltip"	"PORTAL2_PuzzleEditor_Palette_observation_room"
+					"Image"		"palette/observation_room.png"
+					"Position"	"3 5 0"
+				}
+				"Sounds"
+				{
+					"SOUND_CREATED"					"P2Editor.PlaceOther"
+					"SOUND_EDITING_ACTIVATE"		"P2Editor.ExpandOther"
+					"SOUND_EDITING_DEACTIVATE"		"P2Editor.CollapseOther"
+					"SOUND_DELETED"					"P2Editor.RemoveOther"
+				}
+			}
+			"MovementHandle"		"HANDLE_NONE"
+			"InvalidSurface"		"CEILING FLOOR"
+			"DesiredFacing"			"DESIRES_UP"
+		}
+		"Exporting"
+		{
+			"Instances"
+			{
+				"0"
+				{
+					"Name"				"instances/p2editor/observation_room_128x128_1.vmf"
+					"EntityCount"		"5"
+					"BrushCount"		"9"
+					"BrushSideCount"	"54"
+				}
+			}
+
+			"TargetName"		"secondaryobservationroom"
+			"Offset"		"64 64 64"
+			"OccupiedVoxels"
+			{
+				"Voxel"
+				{
+					"Pos"		"0 0 0"
+					"Surface"
+					{
+						"Normal"	"0 0 1"
+					}
+				}
+			}
+			"EmbeddedVoxels"
+			{
+				"Volume"
+				{
+					"Pos1"		"1 -1 0"
+					"Pos2"		"-1 1 -1"
+				}
+			}
+		}
+	}

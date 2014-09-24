@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
-# tkinter-png - example of using tkinter and pypng to display pngs (albeit reduced quality)
-# in nothing but pure python. Can use RGBA images, but alpha is opaque or transparent only.
-# v0.75 - Example code and module seperated out, speed optimisation of the convert function
-
 from array import *
 from tkinter import *
 import png
+import os.path
+
+# tkinter-png - example of using tkinter and pypng to display pngs (albeit reduced quality)
+# in nothing but pure python. Can use RGBA images, but alpha is opaque or transparent only.
+# v0.75 - Example code and module seperated out, speed optimisation of the convert function
 
 ## tkinter hacking section ##
 
@@ -69,7 +69,7 @@ class PngImageTk(object):
     self.pixeldata = list(self.pixels) #pixeldata has each row of the image as an array
     self.x = 0
     self.y = 0
-    self.image = PhotoImage(width=self.w, height=self.h) #use photoimage as temporary oject to write to canvas
+    self.image = PhotoImage(width=self.w, height=self.h) #use photoimage as temporary object to write to canvas
 
   # Print meta data for image
   def __str__(self):
@@ -133,3 +133,31 @@ class PngImageTk(object):
     if alphapixels:
       for item in alphapixels:
         transSet(item[0],item[1], "True")
+
+# BEE2 png handlers
+
+def loadPng(path):
+    "Loads in and converts a png for use in TKinter."
+    path="images/"+path+".png"
+    if not os.path.isfile(path):
+      print("ERROR: \"" + path + "\" does not exist!")
+      return img_error
+    tmp=PngImageTk(path)
+    print("Loading \""+path+"\"")
+    tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
+    return tmp.image
+
+def loadSpr(name):
+  "load in the property icons and automatically double the dimensions"
+  ico=loadPng('icons/'+name)
+  return ico.zoom(2)
+
+def loadIcon(name): 
+  "load in a palette icon, ensuring the correct size"
+  name= "pal_test/" + name
+  img=loadPng(name)
+  if img.width() != 64 or img.height() != 64:
+    print("ERROR: \"" + name + "\" is not 64x64!")
+    return img_error
+  else:
+    return img

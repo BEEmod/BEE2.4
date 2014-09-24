@@ -1,0 +1,25 @@
+// Syntax: 
+// "Music"
+// {
+//		"Key"		"SONG_UNIQUE_ID"
+//		"Name"		"Song Name"
+//		"File"		"music.soundscript.or.raw.file"
+//		"Pack"		"sounds/music/path/to/cust/sound.wav"
+//		"Pack"		"sounds/music/path/to/second/cust/sound.wav"
+//		"Pack"		"scripts/custom_soundscript.txt"
+//		"Preview"	"demo/short_demo.wav"
+//		"StyleVar"	"VariableName"
+//	}
+// If file or pack == "" (Default) they won't be used, for file that = no music at all.
+// If two zips have the same key the two entries will be merged.
+
+"StyledTracks"
+{
+	"Music"
+	{
+		"Key"	"SPECIAL_NONE"
+		"Name"	"[None]"
+		"File"	""
+		"Pack"	""
+	}
+}

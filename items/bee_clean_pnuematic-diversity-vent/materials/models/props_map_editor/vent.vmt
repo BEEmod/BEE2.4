@@ -1,0 +1,18 @@
+VertexLitGeneric
+{
+$basetexture "models\props_map_editor/vent"
+$bumpmap "Metal/vent_normal"
+"%keywords" portal
+$surfaceprop metal
+$envmap "metal/black_wall_envmap_002a"
+hdr
+{
+$envmap "metal/black_wall_envmap_002a_hdr"
+}
+$envmapcontrast 1
+$envmapsaturation .2
+$envmaptint "[.4 .4 .4 ]"
+$normalmapalphaenvmapmask 1
+$envmaplightscale .6
+"%noportal" 1
+}

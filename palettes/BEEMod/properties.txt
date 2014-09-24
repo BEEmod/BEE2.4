@@ -1,0 +1,5 @@
+"Name" "BEEMod"
+"Style" "[Default]"
+"Skybox" "[Default]"
+"Music" "[Default]"
+"Voice" "[Default]"
