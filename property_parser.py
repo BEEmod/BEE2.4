@@ -1,4 +1,5 @@
-# Property: class
+'''
+ Property: class
 # - Represents Property found in property files, like those used by valve.
 # name: string 
 # - Name of the section or property
@@ -6,7 +7,7 @@
 # -  Value is single string when Property is in-line, Property array when Property is section
 # parse: string[] => Property[]
 # - Returns list of Property objects parsed from given text
-
+'''
 import re
 
 class Property:
