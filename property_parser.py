@@ -18,7 +18,6 @@ to_strings: => string
 
 
 import re
-
 import utils
 
 class Property:
@@ -64,6 +63,32 @@ class Property:
             raise ValueError("End of text reached with remaining open sections.")
             
         return open_properties[0].value
+        
+    def find_all(self, key_path):
+        run_on = []
+        values = []
+        depth = key_path.count('"')
+        keys = key_path.split('"', 1)
+        print ('====keys')
+        print (keys[0])
+        if depth >0:
+            print(keys[1])
+        
+        if isinstance(self, list):
+            run_on = self
+        elif isinstance(self, Property):
+            run_on.append(self)
+        for prop in run_on:
+            if not isinstance(prop, Property):
+                raise ValueError("Cannot find_all on a value that is not a Property")
+            print('{}'.format('keys[0] = ', keys[0]))
+            if prop.name.casefold() == keys[0].casefold():
+                if depth > 0:
+                    if isinstance(prop.value, list):
+                        values.extend(Property.find_all(prop.value,keys[1]))
+                else:
+                    values.append(prop)
+        return values
     
     def __str__(self):
         return '\n'.join(self.to_strings())
