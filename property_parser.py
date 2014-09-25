@@ -72,7 +72,7 @@ class Property:
         '''Returns a list of strings that represents the property as it appears in the file.'''
         out_val = ['"{}"'.format(self.name)]
     
-        if instanceof(self.value, list):
+        if isinstance(self.value, list):
             out_val.append('{')
             out_val.extend(['\t'+line for property in self.value for line in property.to_strings()])
             out_val.append('}')

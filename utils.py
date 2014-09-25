@@ -1,4 +1,4 @@
-def __clean_line__(dirty_line):
+def clean_line(dirty_line):
     line = dirty_line.strip()
     if line.startswith("\\\\") or line.startswith("//"):
         line = ""
