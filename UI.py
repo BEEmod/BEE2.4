@@ -63,6 +63,7 @@ sounds = { 'select'     : pygame.mixer.Sound(file='sounds/rollover.wav'),
            'disconnect' : pygame.mixer.Sound(file='sounds/connection_destroyed.wav'),
            'expand'     : pygame.mixer.Sound(file='sounds/extrude.wav'),
            'delete'     : pygame.mixer.Sound(file='sounds/collapse.wav'),
+           'error'     : pygame.mixer.Sound(file='sounds/error.wav'),
            'contract'   : pygame.mixer.Sound(file='sounds/carve.wav')}
 
 win.iconbitmap(r'BEE2.ico')# set the window icon
@@ -74,7 +75,8 @@ pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
 drag_item=-1 # the item currently being moved
 drag_orig_pos=-1
-drag_isPre=False # are we dragging a palette item?
+drag_onPal=False # are we dragging a palette item?
+drag_passedPal=False # has the cursor passed over the palette
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
@@ -115,6 +117,8 @@ styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)]
 
 def playSound(name):
+  """Play a sound effect stored in the sounds{} dict."""
+  # If we ever want to use a different library for sounds, just edit this, all sound calls should route through here.
   if muted.get() == 0:
     sounds[name].play()
                 
@@ -168,9 +172,11 @@ def hideProps(e):
     windows['props'].vis=False
 
 def showItemProps():
-  itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], hideItemProps)
+  playSound('expand')
+  itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], "ItemNameHere") # TODO: add real values for first/last args
 
 def hideItemProps(vals):
+  playSound('contract')
   print(vals)
 
 def convScrToGrid(x,y):
@@ -185,20 +191,19 @@ def convScrToPos(x,y):
 
 def showDrag(e):
   "Start dragging a palette item."
-  global drag_isPre,drag_item
+  global drag_onPal,drag_item, drag_passedPal
   drag_item=e.widget
   setDispName(drag_item.dispName)
   playSound('config')
-  
-  #pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
+  drag_passedPal=False
   
   if e.widget.is_pre: # is the cursor over the preview pane?
     ind=e.widget.pre_x+e.widget.pre_y*4
     pal_picked[ind].place_forget()
     del pal_picked[ind]
-    drag_isPre=True
+    drag_onPal=True
   else:
-    drag_isPre=False
+    drag_onPal=itemOnPal(e.widget)
   dragWin.deiconify()
   dragWin.lift(win)
   dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
@@ -220,30 +225,34 @@ def hideDrag(e):
   
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   ind=pos_x+pos_y*4
-  clearFromPal(drag_item) # wipe duplicates off the palette first
   
-  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8: # is the cursor over the preview pane?
-    newItem=copyItem(drag_item,frames['preview'])
-    if ind>=len(pal_picked):
-      pal_picked.append(newItem)
-    else:
-      pal_picked.insert(ind,newItem)
-    if len(pal_picked) > 32: # delete the item - it's fallen off the palette
-        pal_picked.pop().place_forget()
-  else: # drop the item
-    playSound('delete')
-  flowPreview() # always refresh
+  if drag_passedPal: #this prevents a single click on the picker from clearing items off the palette
+    clearFromPal(drag_item) # wipe duplicates off the palette first
+    
+    if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8: # is the cursor over the preview pane?
+      newItem=copyItem(drag_item,frames['preview'])
+      if ind>=len(pal_picked):
+        pal_picked.append(newItem)
+      else:
+        pal_picked.insert(ind,newItem)
+      if len(pal_picked) > 32: # delete the item - it's fallen off the palette
+          pal_picked.pop().place_forget()
+    else: # drop the item
+      playSound('delete')
+    flowPreview() # always refresh
 
 def moveDrag(e):
   "Update the position of dragged items as they move around."
+  global drag_passedPal
   setDispName(drag_item.dispName)
   dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
+    drag_passedPal=True
     dragWin.configure(cursor='plus')
     UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
   else:
-    if drag_isPre:
+    if drag_onPal and drag_passedPal:
       dragWin.configure(cursor='x_cursor')
     else:
       dragWin.configure(cursor='no')
@@ -253,12 +262,16 @@ def fastDrag(e):
   "When shift-clicking an item will be immediately moved to the palette or deleted from it."
   pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
   clearFromPal(e.widget)
-  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane? 
+  if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
+    playSound('delete')
     e.widget.place_forget() # remove the clicked item
   else: # over the picker
     if len(pal_picked) < 32: # can't copy if there isn't room
-        newItem=copyItem(e.widget,frames['preview'])
-        pal_picked.append(newItem)
+      playSound('config')
+      newItem=copyItem(e.widget,frames['preview'])
+      pal_picked.append(newItem)
+    else:
+      playSound('error')
   flowPreview()
     
 def clearFromPal(target):   
@@ -273,6 +286,13 @@ def clearFromPal(target):
   for i in reversed(toRem):
     del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enmerate()
   return found
+
+def itemOnPal(target):  
+  for i,item in enumerate(pal_picked): 
+    if item.key==target.key and item.subKey==target.subKey:
+      return True
+  return False
+  
 def createItem(name, key, sub, img, frame):
   "Create a label to show an item onscreen."
   lbl=ttk.Label(frame, image=img)
@@ -341,6 +361,7 @@ def save():
     savePal(pal) # overwrite it
 
 def toggleWin(name):
+  playSound('config')
   if windows[name].vis:
     windows[name].vis=False
     windows[name].withdraw()
@@ -353,6 +374,7 @@ def toggleWin(name):
 
 def hideWin(name):
   "Hide a window, effectively closes it without deleting the contents"
+  playSound('config')
   windows[name].withdraw()
   windows[name].vis=False
   UI['tool_win_'+name].state(['!pressed'])
@@ -821,7 +843,7 @@ def initMain():
   windows['pal']=Toplevel(win)
   windows['pal'].transient(master=win)
   windows['pal'].resizable(False, True)
-  windows['pal'].title("Palettes")
+  windows['pal'].title("BEE2 - Palettes")
   windows['pal'].iconbitmap(r'BEE2.ico')
   windows['pal'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal'))
   windows['pal'].vis=True
@@ -830,7 +852,7 @@ def initMain():
   windows['opt']=Toplevel(win)
   windows['opt'].transient(master=win)
   windows['opt'].resizable(True, False)
-  windows['opt'].title("Options")
+  windows['opt'].title("BEE2 - Options")
   windows['opt'].iconbitmap(r'BEE2.ico')
   windows['opt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt'))
   windows['opt'].vis=True
@@ -839,7 +861,7 @@ def initMain():
   windows['style']=Toplevel(win)
   windows['style'].transient(master=win)
   windows['style'].resizable(False, True)
-  windows['style'].title("Style Properties")
+  windows['style'].title("BEE2 - Style Properties")
   windows['style'].iconbitmap(r'BEE2.ico')
   windows['style'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style'))
   windows['style'].vis=True

@@ -11,7 +11,7 @@ props = { # all valid properties in editoritems, Valve probably isn't going to r
   'startactive'             : ('checkbox', 'Start Active'),
   'startopen'               : ('checkbox', 'Start Open'),
   'startlocked'             : ('checkbox', 'Start Locked'),
-  'timerdelay'              : ('timerDel', 'Delay'),
+  'timerdelay'              : ('timerDel', 'Delay \n(0=infinite)'),
   'dropperenabled'          : ('checkbox', 'Dropper Enabled'),
   'autodrop'                : ('checkbox', 'Auto Drop'),
   'autorespawn'             : ('checkbox', 'Auto Respawn'),
@@ -41,7 +41,7 @@ props = { # all valid properties in editoritems, Valve probably isn't going to r
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
 prop_pos_special= ['toplevel', 'bottomlevel', 'angledpanelanimation', 'paintflowtype', 'timerdelay']
-prop_pos = ['allowstreak', 'startenabled', 'startreversed', 'startdeployed', 'startactive', 'startopen', 'startlocked', 'dropperenabled', 'autodrop', 'autorespawn', 'oscillate']
+prop_pos = ['allowstreak', 'startenabled', 'startreversed', 'startdeployed', 'startopen', 'startlocked', 'startactive','oscillate', 'dropperenabled', 'autodrop', 'autorespawn']
 
 widgets={} # holds the checkbox or other item used to manipulate the box
 labels={} # holds the descriptive labels for each property 
@@ -115,7 +115,7 @@ def exit():
   for key in props.keys():
     if key in propList:
       if props[key][0] == 'checkbox' or props[key][0]=='railLift':
-          out[key]=(values[key].get()==1)
+          out[key]=(values[key].get())
       elif props[key][0] == 'pistPlat':
           out[key]=values[key]
           out['startup']=values['startup']
@@ -128,15 +128,16 @@ def init(tk, cback):
   callback=cback
   global win
   win=Toplevel(tk)
+  win.title("BEE2")
   win.resizable(False, False)
-  win.title("Default Properties")
   win.iconbitmap(r'BEE2.ico')
   win.protocol("WM_DELETE_WINDOW", exit)
   win.withdraw()
-  
   labels['noOptions']=ttk.Label(win, text='No Properties avalible!')
   widgets['saveButton']=ttk.Button(win, text='Save', command=exit)
-
+  widgets['titleLabel']=ttk.Label(win, text='')
+  widgets['titleLabel'].grid(row=0, column=0, columnspan=6)
+  
   for key in props.keys():
       labels[key]=ttk.Label(win, text=props[key][1]+':')
       if props[key][0] == 'checkbox':
@@ -171,17 +172,18 @@ def init(tk, cback):
   values['startup']=defaults['startup']
   
   
-def open(usedProps, parent, cback):
+def open(usedProps, parent, itemName):
+  widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
   global propList
   propList=usedProps
   win.transient(master=parent)
   for i,key in enumerate(propList):
     propList[i]=key.casefold()
-  spec_row=0
+  spec_row=1
   for key in prop_pos_special:
     if key in propList:
       labels[key].grid( row=spec_row, column=0,   sticky=E, padx=2, pady=5)
-      widgets[key].grid(row=spec_row, column=1, sticky="EW", padx=2, pady=5, columnspan=10)
+      widgets[key].grid(row=spec_row, column=1, sticky="EW", padx=2, pady=5, columnspan=6)
       spec_row+=1
     else:
       labels[key].grid_remove()
@@ -189,19 +191,25 @@ def open(usedProps, parent, cback):
   ind=0
   for key in prop_pos:
     if key in propList:
-      labels[key].grid( row=ind%5+spec_row, column=(ind//5)*2,   sticky=E, padx=2, pady=5)
-      widgets[key].grid(row=ind%5+spec_row, column=(ind//5)*2+1, sticky="EW", padx=2, pady=5)
+      labels[key].grid( row=(ind//3)+spec_row, column=(ind%3)*2,   sticky=E, padx=2, pady=5)
+      widgets[key].grid(row=(ind//3)+spec_row, column=(ind%3)*2+1, sticky="EW", padx=2, pady=5)
       ind+=1
     else:
       labels[key].grid_remove()
       widgets[key].grid_remove()
   if ind+spec_row==0:
-    labels['noOptions'].grid(row=0, column=0, columnspan=10)
+    labels['noOptions'].grid(row=0, column=0, columnspan=6)
     ind=1
   else:
     labels['noOptions'].grid_remove()
-  widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=11, sticky="EW")
+  widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=7, sticky="EW")
   win.deiconify()
   win.lift(parent)
   win.grab_set()
   win.geometry('+'+str(parent.winfo_rootx()-30)+'+'+str(parent.winfo_rooty()-win.winfo_reqheight()-30))
+
+if __name__ == '__main__': # load the window if directly executing this file
+  root=Tk()
+  root.geometry("+250+250")
+  init(root,print)
+  open(prop_pos+prop_pos_special,root, "TestItemWithEveryProp") 
