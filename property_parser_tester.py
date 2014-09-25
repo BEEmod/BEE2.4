@@ -7,7 +7,7 @@ def ex1():
   with open(fileName) as f:
     for line in f:
       fileContents.append(f)
-  properties = Property.parse(fileContents)
+  properties = property_parser.Property.parse(fileContents)
   return properties
   
 # Example 2: Write property data back to a file
