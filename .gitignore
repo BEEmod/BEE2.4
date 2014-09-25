@@ -42,3 +42,6 @@ Icon
 *.log
 *.prt
 *.filelist.txt
+
+# Ignore dev output
+property_parser_tester_output.txt
