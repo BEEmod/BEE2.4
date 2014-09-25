@@ -21,3 +21,6 @@ def ex2(properties):
 # Call examples
 properties = ex1()
 ex2(properties)
+
+#exporting = Property.find_all(properties, 'Item"Exporting')
+points = Property.find_all(properties, 'Item"Exporting"ConnectionPoints"Point')
