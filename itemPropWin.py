@@ -205,7 +205,3 @@ def open(usedProps, parent, cback):
   win.lift(parent)
   win.grab_set()
   win.geometry('+'+str(parent.winfo_rootx()-30)+'+'+str(parent.winfo_rooty()-win.winfo_reqheight()-30))
-  
-
-#init(Tk())
-#open(widgets.keys())

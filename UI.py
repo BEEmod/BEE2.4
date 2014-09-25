@@ -310,13 +310,23 @@ def pal_remTempText(e):
 def pal_addTempText(e):
   if PalEntry.get() == "":
     PalEntry.set(PalEntry_TempText)
+    
+def showMoreInfo(url):
+  try:
+    webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
+  except webbrowser.Error:
+    if messagebox.askyesno(icon="error", title="BEE2 - Error", message="Failed to open a web browser. Do you wish for the URL to be copied to the clipboard instead?", detail="'" + str(url) + "'", parent=windows['props']):
+      print("saving " +url+ "to clipboard")
+      win.clipboard_clear()
+      win.clipboard_append(url)
+  hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
 
 def saveAs():
   name=""
   while True:
     name=simpledialog.askstring("BEE2 - Save Palette", "Enter a name:")
     if name in paletteReadOnly:
-      messagebox.showinfo(message='The palette \"'+name+'\" cannot be overwritten. Choose another name.')
+      messagebox.showinfo(icon="error", title="BEE2", message='The palette \"'+name+'\" cannot be overwritten. Choose another name.')
     elif name == None:
       return
     else:
@@ -703,7 +713,7 @@ def initProperties(win):
   UI['prop_desc'].insert("end", "Big pressure buttons activated by players or cubes. Cube buttons are only activated by cubes, sphere buttons only by spheres.")
   UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
 
-  UI['prop_more']=ttk.Button(f, text="More Info>>", command=lambda: webbrowser.open('https://developer.valvesoftware.com/wiki/Portal_2_Puzzle_Maker/Button', new=2, autoraise=True))
+  UI['prop_more']=ttk.Button(f, text="More Info>>", command=lambda u='https://developer.valvesoftware.com/wiki/Portal_2_Puzzle_Maker/Button': showMoreInfo(u))
   UI['prop_more'].grid(row=6, column=2, sticky=E)
 
   UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)

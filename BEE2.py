@@ -14,7 +14,7 @@ def load_palettes():
 def load_styles():
   pass
   
-def load_items():
+def load_items(): 
   pass
 
 
