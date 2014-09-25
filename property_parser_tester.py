@@ -1,13 +1,12 @@
-import property_parser
+from property_parser import Property
 
 # Example 1: Create a list of properties from data file.
 def ex1():
     fileName = 'property_parser_tester_item.txt'
     fileContents = []
     with open(fileName) as f:
-        for line in f:
-            fileContents.append(f)
-    properties = property_parser.Property.parse(fileContents)
+        fileContents = f.readlines()
+    properties = Property.parse(fileContents)
     return properties
   
 # Example 2: Write property data back to a file
