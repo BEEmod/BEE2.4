@@ -22,7 +22,7 @@ import re
 import utils
 
 class Property:
-  '''Represents Property found in property files, like those used by Valve.'''
+    '''Represents Property found in property files, like those used by Valve.'''
     def __init__(self, name = None, value = ""):
         self.name = name
         self.value = value
