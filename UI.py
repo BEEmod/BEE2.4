@@ -4,19 +4,20 @@ from tkinter import font, messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
 import tkinter_png as png # png library for TKinter
+import pygame # using this for audio
 import random
 import math
 import webbrowser
 
+from property_parser import Property
 import itemPropWin
-import pygame # using this for audio
 
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
 
-pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
+pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024) # buffer must be power of 2, higher means less choppy audio but a longer time to start
 
 testImg  = [ # test palette images,remove when item loading done
             ('Weighted Button',      'ITEM_BUTTON',                     0, png.loadIcon('portal_button')),

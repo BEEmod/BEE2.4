@@ -24,3 +24,6 @@ ex2(properties)
 
 #exporting = Property.find_all(properties, 'Item"Exporting')
 points = Property.find_all(properties, 'Item"Exporting"ConnectionPoints"Point')
+
+for i,p in enumerate(points):
+    print("["+str(i)+"]"+str(p))
