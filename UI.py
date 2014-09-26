@@ -746,8 +746,9 @@ def initProperties(win):
     UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
     UI['prop_itemProps'].grid(row=6, column=1)
 
-    UI['prop_alternate']=ttk.Checkbutton(f, text="Use Recessed Button")
-    UI['prop_alternate'].grid(row=6, column=0, sticky=W)
+    UI['prop_variant']=ttk.Combobox(f, values=("Recessed","Compat (On Top)"))
+    UI['prop_variant'].current(0)
+    UI['prop_variant'].grid(row=6, column=0, sticky=W)
 
 
 def initDragIcon(win):
