@@ -40,6 +40,8 @@ props = { # all valid properties in editoritems, Valve probably isn't going to r
   }
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
+
+# order of the different properties, 'special' are the larger controls like sliders or dropdown boxes
 prop_pos_special= ['toplevel', 'bottomlevel', 'angledpanelanimation', 'paintflowtype', 'timerdelay']
 prop_pos = ['allowstreak', 'startenabled', 'startreversed', 'startdeployed', 'startopen', 'startlocked', 'startactive','oscillate', 'dropperenabled', 'autodrop', 'autorespawn']
 
@@ -136,7 +138,11 @@ def init(tk, cback):
     labels['noOptions']=ttk.Label(win, text='No Properties avalible!')
     widgets['saveButton']=ttk.Button(win, text='Save', command=exit)
     widgets['titleLabel']=ttk.Label(win, text='')
-    widgets['titleLabel'].grid(row=0, column=0, columnspan=6)
+    widgets['titleLabel'].grid(row=0, column=0, columnspan=9)
+    
+    widgets['div_1']=ttk.Separator(win, orient="vertical")
+    widgets['div_2']=ttk.Separator(win, orient="vertical")
+    widgets['div_h']=ttk.Separator(win, orient="horizontal")
 
     for key in props.keys():
         labels[key]=ttk.Label(win, text=props[key][1]+':')
@@ -183,26 +189,39 @@ def open(usedProps, parent, itemName):
     for key in prop_pos_special:
         if key in propList:
             labels[key].grid( row=spec_row, column=0,   sticky=E, padx=2, pady=5)
-            widgets[key].grid(row=spec_row, column=1, sticky="EW", padx=2, pady=5, columnspan=6)
+            widgets[key].grid(row=spec_row, column=1, sticky="EW", padx=2, pady=5, columnspan=9)
             spec_row+=1
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
+    if spec_row>1: # if we have a 'special' prop, add the divider between the types
+        widgets['div_h'].grid(row=spec_row+1, column=0, columnspan=9, sticky="EW")
+        spec_row+=2
+    else:
+        widgets['div_h'].grid_remove()
     ind=0
     for key in prop_pos:
         if key in propList:
-            labels[key].grid( row=(ind//3)+spec_row, column=(ind%3)*2,   sticky=E, padx=2, pady=5)
-            widgets[key].grid(row=(ind//3)+spec_row, column=(ind%3)*2+1, sticky="EW", padx=2, pady=5)
+            labels[key].grid( row=(ind//3)+spec_row, column=(ind%3)*3,   sticky=E, padx=2, pady=5)
+            widgets[key].grid(row=(ind//3)+spec_row, column=(ind%3)*3+1, sticky="EW", padx=2, pady=5)
             ind+=1
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
+    if ind>1: # is there more than 1 checkbox? (adds left divider)
+        widgets['div_1'].grid(row=spec_row, column=2, sticky="NS", rowspan=(ind//3)+1)
+    else:  
+        widgets['div_1'].grid_remove()
+    if ind>2: # are there more than 2 checkboxes? (adds right divider)
+        widgets['div_2'].grid(row=spec_row, column=5, sticky="NS", rowspan=(ind//3)+1)
+    else:  
+        widgets['div_2'].grid_remove()
     if ind+spec_row==0:
-        labels['noOptions'].grid(row=0, column=0, columnspan=6)
+        labels['noOptions'].grid(row=0, column=0, columnspan=9)
         ind=1
     else:
         labels['noOptions'].grid_remove()
-    widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=7, sticky="EW")
+    widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=9, sticky="EW")
     win.deiconify()
     win.lift(parent)
     win.grab_set()
