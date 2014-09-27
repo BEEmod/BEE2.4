@@ -12,7 +12,7 @@ to_strings: => string
 '''
 
 # TODO: Add comment support. Read in, and export comments.
-# Single comments should appear as properties with the name of \\
+# Single comments should appear as properties with the name of //
 # A new member level property called 'comment' should be added when a comment is tacked onto the end of a line
 # Comments on bracketed lines should be separated into their own comment properties
 
@@ -52,10 +52,10 @@ class Property:
                     
                     values[-1].value = []
                     open_properties.append(values[-1])
-                elif(freshline.startswith('}')):
+                elif freshline.startswith('}'):
                     open_properties.pop()
                 else:
-                    raise ValueError("Unexpected beginning character. Line " + str(line_num) + ".")
+                    raise ValueError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".")
                     
             if not open_properties:
                 raise ValueError("Too many closing brackets. Line " + str(line_num) + ".")

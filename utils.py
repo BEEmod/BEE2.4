@@ -1,4 +1,6 @@
 def clean_line(dirty_line):
+    if isinstance(dirty_line, bytes):
+        dirty_line=dirty_line.decode()
     line = dirty_line.strip()
     if line.startswith("\\\\") or line.startswith("//"):
         line = ""
