@@ -1,15 +1,30 @@
-import property_parser
+from property_parser import Property
+import paletteLoader
 import UI
+import utils
 
 #Loading commands, will load/reload the items/styles/palettes/etc
 def load_settings():
   global settings
+  settings={}
   with open("bin/config.cfg", "r") as f:
-    settings=property_parser.parse(f)
-  print(settings)
+    prop=Property.parse(f)
+  settings['pal_dir']=Property.find_all(prop, 'directories"palettes')
+  if settings['pal_dir']:
+    settings['pal_dir']=settings['pal_dir'][0].value
+    
+  settings['item_dir']=Property.find_all(prop, 'directories"items')
+  if settings['item_dir']:
+    settings['item_dir']=settings['item_dir'][0].value
+     
+  settings['style_dir']=Property.find_all(prop, 'directories"styles')
+  if settings['style_dir']:
+    settings['style_dir']=settings['style_dir'][0].value
+
 
 def load_palettes():
-  pass
+  pal=paletteLoader.loadAll(settings['pal_dir'])
+  UI.palLoad(pal)
 
 def load_styles():
   pass
@@ -18,15 +33,8 @@ def load_items():
   pass
 
 
-def newPal(name): # TODO: make a new palette based on a name
-  print("Make palette:",name)
-  pass
-    
-def savePal(name):
-  print('We should save the palette as ' + name)
-  # TODO: actually load
-  load_palettes() # reload to make it show up
-
-#load_settings()
+load_settings()
 load_palettes()
+
 UI.initMain() # create all windows
+UI.event_loop()

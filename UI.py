@@ -10,6 +10,7 @@ import math
 import webbrowser
 
 from property_parser import Property
+from paletteLoader import Palette
 import itemPropWin
 
 win=Tk()
@@ -75,6 +76,7 @@ win.iconbitmap(r'BEE2.ico')# set the window icon
 windows={}
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
+menus={} # The menu items for the main window
 pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
 drag_item=-1 # the item currently being moved
@@ -99,9 +101,8 @@ shouldSnap=True
 muted = IntVar(value=0)
 
 # UI vars, TODO: most should be generated on startup
-palettes=('Portal 2','Empty','Palette 1', 'Portal 2 Collapsed')
 paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
-paletteText = StringVar(value=palettes)
+palettes=[]
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
@@ -129,6 +130,25 @@ def playSound(name):
 
 def demoMusic():
     messagebox.showinfo(message='This would play the track selected for a few seconds.')
+    
+def palLoad(data): # load all given palettes
+    global palettes
+    print("loading data!")
+    palettes=sorted(data,key=Palette.getName) # sort by name
+
+def loadPalUI():
+    "Update the UI to show the correct palettes."
+    print(palettes)
+    UI['palette'].delete(0, END)
+    for i,pal in enumerate(palettes):
+        print(pal.name)
+        UI['palette'].insert(i,pal.name)
+    if menus['pal'].item_len>0:
+        menus['pal'].delete(3, menus['pal'].item_len)
+    menus['pal'].item_len=0
+    for val,pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
+        menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
+        menus['pal'].item_len+=1
 
 def setGame():
     global selectedGame
@@ -137,7 +157,7 @@ def setGame():
     win.title('BEE2 - '+gamesDisplay[selectedGame])
 
 def setPalette():
-    print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette])
+    print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
     # TODO: Update the listbox/menu to match, and reload the new palette.
 
 def setStyleOpt(key):
@@ -449,7 +469,7 @@ def initPalette(f):
     palFrame.columnconfigure(0, weight=1)
     f.rowconfigure(0, weight=1)
 
-    UI['palette']=Listbox(palFrame, listvariable=paletteText, width=10)
+    UI['palette']=Listbox(palFrame, width=10)
     UI['palette'].grid(row=0,column=0, sticky="NSEW")
     UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
     UI['palette'].selection_set(0)
@@ -767,30 +787,28 @@ def initMenuBar(win):
     win['menu']=bar
     win.option_add('*tearOff', False) #Suppress ability to make each menu a separate window - weird old TK behaviour
 
-    menuFile=Menu(bar, name='apple') #Name is used to make this the special 'BEE2' menu item on Mac
-    bar.add_cascade(menu=menuFile, label='File')
-    menuFile.add_command(label="Export")
-    menuFile.add_command(label="Find Game")
-    menuFile.add_command(label="Remove Game")
-    menuFile.add_separator()
+    menus['file']=Menu(bar, name='apple') #Name is used to make this the special 'BEE2' menu item on Mac
+    bar.add_cascade(menu=menus['file'], label='File')
+    menus['file'].add_command(label="Export")
+    menus['file'].add_command(label="Find Game")
+    menus['file'].add_command(label="Remove Game")
+    menus['file'].add_separator()
     val=0
     for name in gamesDisplay: # Add a set of options to pick the palette into the menu system
-        menuFile.add_radiobutton(label=name, variable=selectedGame_radio, value=val, command=setGame)
+        menus['file'].add_radiobutton(label=name, variable=selectedGame_radio, value=val, command=setGame)
         val+=1
 
-    menuFile.add_separator()
-    menuFile.add_checkbutton(label="Mute Sounds", variable=muted)
-    menuFile.add_command(label="Quit", command=win.destroy)
-    menuPal=Menu(bar)
+    menus['file'].add_separator()
+    menus['file'].add_checkbutton(label="Mute Sounds", variable=muted)
+    menus['file'].add_command(label="Quit", command=win.destroy)
+    menus['pal']=Menu(bar)
 
-    bar.add_cascade(menu=menuPal, label='Palette')
-    menuPal.add_command(label='New...', command=menu_newPal)
-    menuPal.add_command(label='Clear')
-    menuPal.add_separator()
-    val=0
-    for name in palettes: # Add a set of options to pick the palette into the menu system
-        menuPal.add_radiobutton(label=name, variable=selectedPalette_radio, value=val, command=setPal_radio)
-        val+=1
+    bar.add_cascade(menu=menus['pal'], label='Palette')
+    menus['pal'].add_command(label='New...', command=menu_newPal)
+    menus['pal'].add_command(label='Clear')
+    menus['pal'].add_separator()
+    menus['pal'].item_len=0 # custom attr used to decide how many items to remove when reloading the menu buttons
+    
 
     menuHelp=Menu(bar, name='help') # Name for Mac-specific stuff
     bar.add_cascade(menu=menuHelp, label='Help')
@@ -914,6 +932,8 @@ def initMain():
     windows['opt'].  bind("<Configure>",   lambda e: snapWin('opt'))
     windows['pal'].  bind("<Configure>",   lambda e: snapWin('pal'))
 
+    loadPalUI()
+def event_loop():
     win.mainloop()
 
 if __name__ == '__main__': # load the window if directly executing this file

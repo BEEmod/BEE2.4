@@ -6,15 +6,18 @@ from property_parser import Property
 import utils
 
 class Palette:
-    def __init__(name, rows, options):
+    def __init__(self, name, pos, options):
         self.opt=options
         self.name=name
-        self.rows=rows
+        self.pos=pos
+    def getName(self):
+        return self.name
+    def __str__(self):
+        return self.name
 
 def loadAll(dir):
     "Scan and read in all palettes in the specified directory."
     dir=os.path.join(os.getcwd(),dir)
-    print(dir)
     contents=os.listdir(dir) # this is both files and dirs
     palettes=[]
     for name in contents:
@@ -24,8 +27,8 @@ def loadAll(dir):
             with zipfile.ZipFile(name, 'r') as zip:
                 if 'positions.txt' in zip.namelist() and 'properties.txt' in zip.namelist(): # Is it valid?
                     pal=parse(zip.open('positions.txt', 'r'),zip.open('properties.txt', 'r'))
-                        if pal:
-                            palettes.append(pal)
+                    if pal!=False:
+                        palettes.append(pal)
                 else:
                     print("ERROR: Bad palette file '"+name+"'!")
         elif os.path.isdir(name)==1:
@@ -33,40 +36,31 @@ def loadAll(dir):
                 with open(os.path.join(name,'positions.txt'), 'r') as pos:
                     with open(os.path.join(name,'properties.txt'), 'r') as prop:
                         pal=parse(pos,prop)
-                        if pal:
+                        if pal!=False:
                             palettes.append(pal)
     return palettes
     
 def parse(posfile, propfile):
     "Parse through the given palette file to get all data."
     props=Property.parse(propfile)
-    name=props.find_all("Name")
+    name=Property.find_all(props, "Name")
     if len(name)==1:
-        name=name[0]
+        name=name[0].value
     else:
         print("Palettes may only have 1 name!")
         return False
-    rows=[]
+    pos=[]
     for dirty_line in posfile:
         line=utils.clean_line(dirty_line)
         if line:
             if line.startswith('"'):
                 val=line.split('",')
                 if len(val)==2:
-                    rows.append([val[0][1:],int(val[1].strip())])
+                    pos.append([val[0][1:],int(val[1].strip())])
                 else:
                     print("Malformed row '"+line+"'!")
                     return False
-
-    
-def readKey(prop, key, default):
-    val=prop.find_all(key)
-    if len(val)==0:
-        return default
-    if len(val)==1:
-        return val[0]
-    if len(val)>1:
-        return val
+    return Palette(name, pos, [])
     
     
 if __name__ == '__main__':

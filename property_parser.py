@@ -89,7 +89,7 @@ class Property:
                 else:
                     values.append(prop)
         return values
-    
+        
     def __str__(self):
         return '\n'.join(self.to_strings())
     
