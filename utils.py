@@ -8,7 +8,7 @@ def clean_line(dirty_line):
     # TODO: Actually strip comments off of the end of all lines
     return line
     
-def is_identifier(name, forbidden='{} "\''):
+def is_identifier(name, forbidden='{}\'"'):
     "Check to see if any forbidden characters are part of a canidate name."
     for t in name:
         if t in forbidden:

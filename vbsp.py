@@ -17,7 +17,7 @@ def load_instances():
     instances=[]
     ents=Property.find_all(map,'entity')
     for item in ents:
-        print(Property.find_all(ents, 'classname'))
+        print(Property.find_all(ents, 'targetname'))
        
 load_map()
 load_instances()
