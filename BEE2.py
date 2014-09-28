@@ -7,7 +7,7 @@ import utils
 def load_settings():
   global settings
   settings={}
-  with open("bin/config.cfg", "r") as f:
+  with open("config/config.cfg", "r") as f:
     prop=Property.parse(f)
   settings['pal_dir']=Property.find_all(prop, 'directories"palettes')
   if settings['pal_dir']:
