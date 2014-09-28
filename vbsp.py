@@ -50,8 +50,10 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "effects/laserplane"                 : "laserField",
     "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
     }
-ANTLINE_STRAIGHT = "signage/indicator_lights/indicator_lights_floor"
-ANTLINE_CORNER   = "signage/indicator_lights/indicator_lights_corner_floor" # these need to be handled seperately to accomadate the scale-changing
+ANTLINES = {
+    "signage/indicator_lights/indicator_lights_floor" : "antline",
+    "signage/indicator_lights/indicator_lights_corner_floor" : "antlineCorner"
+    } # these need to be handled seperately to accomadate the scale-changing
 
 def load_settings():
     global settings
@@ -68,10 +70,15 @@ def load_settings():
     for mat in TEX_VALVE.keys() : # add the default to the config if not present already
         if not TEX_VALVE[mat] in settings:
             settings[TEX_VALVE[mat]]=[mat]
+    for mat in ANTLINES.keys() : 
+        if not ANTLINES[mat] in settings:
+            settings[ANTLINES[mat]]=[mat]
     
 def load_map():
     global map
-    path = "preview_test.vmf"
+    path = sys.argv
+    print(path)
+    path="preview_test.vmf"
     #path="F:\SteamLibrary\SteamApps\common\Portal 2\sdk_content\maps\preview.vmf"
     with open(path, "r") as file:
         map=Property.parse(file)
@@ -114,14 +121,37 @@ def change_brush():
                 mat.value = random.choice(settings[TEX_VALVE[mat.value.casefold()].casefold()])
             else:
                 print("Unknown tex: "+mat.value)
-                
+    
+def change_overlays():
+    "Alter the overlays."
+    for over in overlays:
+        mat=Property.find_all(over, 'entity"material')
+        if len(mat)==1:
+            mat=mat[0]
+            if mat.value.casefold() in TEX_VALVE: # should we convert it?
+                mat.value = random.choice(settings[TEX_VALVE[mat.value.casefold()].casefold()])
+            elif mat.value.casefold() in ANTLINES:
+                angle = Property.find_all(over, 'entity"angles')
+                if len(angle)==1:
+                    angle=angle[0].value.split(" ") # get the three parts
+                    #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
+                new_tex = random.choice(settings[ANTLINES[mat.value.casefold()].casefold()]).split("|")
+                if len(new_tex)==2:
+                    if len(Property.find_all(over, 'entity"endu')) == 1: # rescale antlines if needed
+                        Property.find_all(over, 'entity"endu')[0].value=new_tex[0]
+                    mat.value=new_tex[1]
+                else:
+                    mat.value=new_tex
+    
 def save():
     out = []
+    print("Exporting...")
     for p in map:
         for s in p.to_strings():
             out.append(s + '\n')
-    with open('preview_styled.vmf', 'w') as f:
+    with open("F:\SteamLibrary\SteamApps\common\Portal 2\sdk_content\maps\styled\preview.vmf", 'w') as f:
         f.writelines(out)
+    print("Complete!")
         
-for func in (load_settings, load_map, load_entities, change_brush, save):
+for func in (load_settings, load_map, load_entities, change_brush, change_overlays, save):
     func()
