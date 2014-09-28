@@ -9,6 +9,7 @@ Desktop.ini
 $RECYCLE.BIN/
 
 __pycache__/
+build/
 
 # Windows Installer files
 *.cab
