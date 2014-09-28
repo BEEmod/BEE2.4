@@ -38,7 +38,7 @@ class Property:
             if freshline:
                 if freshline.startswith('"'): # data string
                     line_contents = freshline.split('"')
-                    name = line_contents[1]
+                    name = line_contents[1].casefold()
                     if not utils.is_identifier(name):
                         raise ValueError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
@@ -46,7 +46,7 @@ class Property:
                     except IndexError:
                         value = None
                         
-                    values.append(Property(name, value))
+                    values.append(Property(name.casefold(), value))
                 elif utils.is_identifier(freshline): # handle name bare on one line, will need a brace on the nex line
                     values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
@@ -72,9 +72,9 @@ class Property:
         values = []
         depth = key_path.count('"')
         keys = key_path.split('"', 1)
-        print ('====keys')
-        if depth >0:
-            print(keys[1])
+        #print ('====keys')
+        #if depth >0:
+            #print(keys[1])
         
         if isinstance(self, list):
             run_on = self
@@ -83,7 +83,7 @@ class Property:
         for prop in run_on:
             if not isinstance(prop, Property):
                 raise ValueError("Cannot find_all on a value that is not a Property")
-            print('{}'.format('keys[0] = ', keys[0]))
+            #print('{}'.format('keys[0] = ', keys[0]))
             if prop.name.casefold() == keys[0].casefold():
                 if depth > 0:
                     if isinstance(prop.value, list):
