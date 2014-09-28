@@ -36,16 +36,19 @@ class Property:
             values = open_properties[-1].value
             freshline = utils.clean_line(line)
             if freshline:
-                if freshline.startswith('"'):
+                if freshline.startswith('"'): # data string
                     line_contents = freshline.split('"')
                     name = line_contents[1]
-                    
+                    if not utils.is_identifier(name):
+                        raise ValueError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
                         value = line_contents[3]
                     except IndexError:
                         value = None
                         
                     values.append(Property(name, value))
+                elif utils.is_identifier(freshline): # handle name bare on one line, will need a brace on the nex line
+                    values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
                     if values[-1].value:
                         raise ValueError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
@@ -70,7 +73,6 @@ class Property:
         depth = key_path.count('"')
         keys = key_path.split('"', 1)
         print ('====keys')
-        print (keys[0])
         if depth >0:
             print(keys[1])
         
