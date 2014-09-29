@@ -38,7 +38,7 @@ class Property:
             if freshline:
                 if freshline.startswith('"'): # data string
                     line_contents = freshline.split('"')
-                    name = line_contents[1].casefold()
+                    name = line_contents[1]
                     if not utils.is_identifier(name):
                         raise ValueError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
@@ -46,7 +46,7 @@ class Property:
                     except IndexError:
                         value = None
                         
-                    values.append(Property(name.casefold(), value))
+                    values.append(Property(name, value))
                 elif utils.is_identifier(freshline): # handle name bare on one line, will need a brace on the nex line
                     values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
