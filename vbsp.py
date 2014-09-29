@@ -166,10 +166,15 @@ def change_brush():
     print("Editing Brushes...")
     sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
     for face in sides:
-        mat=Property.find_all(face, 'side"material')
+        mat=Property.find_all(face, 'side"material')   
         if len(mat)==1:
             alter_mat(mat[0])
-    
+            if mat[0].value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
+                plane=Property.find_all(face, 'side"plane')[0]
+                pos=plane.value.split(" ")
+                for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
+                    pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
+                plane.value = " ".join(pos)
 def change_overlays():
     "Alter the overlays."
     print("Editing Overlays...")
