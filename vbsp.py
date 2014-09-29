@@ -27,14 +27,14 @@ HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
     "metal/black_floor_metal_001c"       : "blackfloor",
     "tile/white_floor_tile002a"          : "whitefloor",
-    "tile/white_wall_tile003f"           : "whitewall_4",
     "tile/white_wall_tile003a"           : "whitewall",
     "tile/white_wall_tile003h"           : "whitewall",
-    "tile/white_wall_tile003c"           : "whitewall_2",
+    "tile/white_wall_tile003c"           : "white_2",
+    "tile/white_wall_tile003f"           : "white_4",
     "metal/black_wall_metal_002c"        : "blackwall",
     "metal/black_wall_metal_002e"        : "blackwall",
-    "metal/black_wall_metal_002a"        : "blackwall_2",
-    "metal/black_wall_metal_002b"        : "blackwall_4",
+    "metal/black_wall_metal_002a"        : "black_2",
+    "metal/black_wall_metal_002b"        : "black_4",
     "anim_wp/framework/backpanels_cheap" : "behind",
     "plastic/plasticwall004a"            : "pedestalside",
     "anim_wp/framework/squarebeams"      : "edge",
@@ -77,6 +77,7 @@ DEFAULTS = {
     "fizzler_scanline"        : 1,
     "force_fizz_reflect"      : 0,
     "force_brush_reflect"     : 0,
+    "remove_exit_signs"       : 0,
     }
     
 fizzler_angle_fix = {
@@ -89,7 +90,7 @@ fizzler_angle_fix = {
     "-90 180 0" : "90 0 0",
     "0 -90 -90" : "0 90 90"
     }
-    
+print(sys.argv)
     
 def alter_mat(prop):
     if prop.value.casefold() in TEX_VALVE: # should we convert it?
@@ -172,6 +173,7 @@ def change_brush():
 def change_overlays():
     "Alter the overlays."
     print("Editing Overlays...")
+    to_rem=[]
     for over in overlays:
         mat=Property.find_all(over, 'entity"material')
         if len(mat)==1:
@@ -189,6 +191,11 @@ def change_overlays():
                     mat.value=new_tex[1]
                 else:
                     mat.value=new_tex
+        if (over.targname in ("exitdoor_stickman","exitdoor_arrow")) and (settings["remove_exit_signs"][0]=="1"):
+            to_rem.append(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
+    for rem in to_rem:
+        map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
+    del to_rem
     
 def change_trig():
     "Check the triggers and fizzlers."
