@@ -1,17 +1,8 @@
 from cx_Freeze import setup, Executable
-
-# Dependencies are automatically detected, but it might need
-# fine tuning.
-buildOptions = dict(packages = [], excludes = [])
-
-base = 'Console'
-
-executables = [
-    Executable('F:\\Git\\BEE2.4\\vbsp.py', base=base, targetName = 'vbsp.exe')
-]
-
+# need to get the verson from http://www.lfd.uci.edu/~gohlke/pythonlibs/#cx_freeze for it to work with python 3.4 atm (as of 29/09/14)
 setup(name='VBSP',
       version = '0.1',
       description = 'BEE2 VBSP replacement',
-      options = dict(build_exe = buildOptions),
-      executables = executables)
+      executables = [Executable('vbsp.py', base='Console')])
+      
+input()
