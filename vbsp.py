@@ -79,6 +79,17 @@ DEFAULTS = {
     "force_brush_reflect"     : 0,
     }
     
+fizzler_angle_fix = {
+    "0 0 -90"   : "0 180 90",
+    "-90 -90 0" : "90 90 0",
+    "0 0 90"    : "0 180 -90",
+    "90 -90 0"  : "-90 90 0",
+    "90 180 0"  : "-90 0 0",
+    "0 90 -90"  : "0 -90 90",
+    "-90 180 0" : "90 0 0",
+    "0 -90 -90" : "0 90 90"
+    }
+    
     
 def alter_mat(prop):
     if prop.value.casefold() in TEX_VALVE: # should we convert it?
@@ -229,6 +240,11 @@ def fix_inst():
                 name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
             else:
                 name.value = inst.targname.split("_modelEnd")[0] + "_modelEnd" 
+            # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
+            angles=Property.find_all(inst, 'entity"angles')[0]
+            if angles.value in fizzler_angle_fix.keys():
+                angles.value=fizzler_angle_fix[angles.value]
+
                 
 def save():
     out = []
