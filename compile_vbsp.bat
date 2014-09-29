@@ -1,0 +1,1 @@
+python compile_vbsp.py build
