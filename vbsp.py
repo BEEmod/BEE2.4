@@ -62,6 +62,7 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "effects/fizzler_center"             : "fizzlercenter",
     "effects/fizzler"                    : "fizzlershort",
     "effects/laserplane"                 : "laserfield",
+    "sky"                                : "sky_black",
     "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
     }
 WHITE_PAN = ["tile/white_wall_tile003a", 
@@ -94,6 +95,7 @@ DEFAULTS = {
     "force_fizz_reflect"      : 0,
     "force_brush_reflect"     : 0,
     "remove_exit_signs"       : 0,
+    "force_paint"             : 0
     }
     
 fizzler_angle_fix = {
@@ -169,7 +171,6 @@ def load_entities():
             triggers.append(item)
         elif item.cls in ("func_brush" , "func_door_rotating"):
             f_brushes.append(item)
-            print("Class: "+item.cls)
         else:
             other_ents.append(item)
     
@@ -180,13 +181,13 @@ def change_brush():
     for face in sides:
         mat=Property.find_all(face, 'side"material')   
         if len(mat)==1:
-            alter_mat(mat[0])
             if mat[0].value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
                 plane=Property.find_all(face, 'side"plane')[0]
                 pos=plane.value.split(" ")
                 for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
                     pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
                 plane.value = " ".join(pos)
+            alter_mat(mat[0])
 def change_overlays():
     "Alter the overlays."
     print("Editing Overlays...")
@@ -235,7 +236,6 @@ def change_func_brush():
     for brush in f_brushes:
         sides=Property.find_all(brush, 'entity"solid"side"material')
         for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
-            print("Mat is: "+ mat.value.casefold())
             if mat.value.casefold() == "anim_wp/framework/squarebeams" and "edge_special" in settings:
                 mat.value = random.choice(settings["edge_special"])
             elif mat.value.casefold() in WHITE_PAN and "white_special" in settings:
@@ -264,9 +264,9 @@ def change_ents():
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
+    print("Editing Instances...")
     for inst in instances:
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
-            print(inst.targname)
             name=Property.find_all(inst, 'entity"targetname')[0]
             if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
@@ -276,7 +276,26 @@ def fix_inst():
             angles=Property.find_all(inst, 'entity"angles')[0]
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
+ 
 
+def fix_worldspawn():
+    "Adjust some properties on WorldSpawn."
+    print("Editing WorldSpawn")
+    root=Property.find_all(map, 'world')
+    if len(root)==1:
+        root=root[0]
+        has_paint = Property.find_all(root, 'world"paintinmap')
+        print(has_paint)
+        if len(has_paint) == 1:
+            if has_paint[0].value == "0":
+                has_paint[0].value = settings["force_paint"][0]
+        else:
+            root.value.append(Property("has_paint", settings["force_paint"][0]))
+        sky = Property.find_all(root, 'world"skyname')
+        if len(sky) == 1:
+            sky[0].value = random.choice(settings["sky"]) # allow random sky to be chosen
+        else:
+            root.value.append(Property("skyname", random.choice(settings["sky"])))
                 
 def save():
     out = []
@@ -308,7 +327,14 @@ print("Map path is " + path)
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     print("PeTI map detected! (has Entity Limit of 1750)")
     load_map(path)
-    for func in (load_settings, load_entities, change_brush, change_overlays, change_trig, change_func_brush, change_ents, fix_inst, save):
+    progs = [
+             load_settings, load_entities, 
+             change_brush, change_overlays, 
+             change_trig, change_func_brush, 
+             change_ents, fix_inst, 
+             fix_worldspawn, save
+            ]
+    for func in progs:
         func()
     run_vbsp(new_args, new_path, path)
 else:
