@@ -29,6 +29,8 @@ HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
     "metal/black_floor_metal_001c"       : "blackfloor",
     "tile/white_floor_tile002a"          : "whitefloor",
+    "metal/black_floor_metal_001c"       : "blackceiling",
+    "tile/white_floor_tile002a"          : "whiteceiling",
     "tile/white_wall_tile003a"           : "whitewall",
     "tile/white_wall_tile003h"           : "whitewall",
     "tile/white_wall_tile003c"           : "white_2",
@@ -64,11 +66,11 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "effects/laserplane"                 : "laserfield",
     "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
     }
-WHITE_PAN = ["tile/white_wall_tile003a", 
+WHITE_PAN = ["tile/white_floor_tile002a",
+             "tile/white_wall_tile003a", 
              "tile/white_wall_tile003h", 
              "tile/white_wall_tile003c", 
-             "tile/white_wall_tile003f", 
-             "tile/white_floor_tile002a"
+             "tile/white_wall_tile003f"
             ]
 BLACK_PAN = [
              "metal/black_floor_metal_001c", 
@@ -190,12 +192,33 @@ def change_brush():
                 for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
                     pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
                 plane.value = " ".join(pos)
+                
             if mat[0].value.casefold()=="glass/glasswindow007a_less_shiny":
                 for val in (Property.find_all(face, 'side"uaxis'),Property.find_all(face, 'side"vaxis')):
                     if len(val)==1:
                         split=val[0].value.split(" ")
-                        split[4] = settings["glass_scale"][0]
+                        split[-1] = settings["glass_scale"][0]
                         val[0].value=" ".join(split)
+            
+            is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
+            if mat[0].value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_wall_tile003f"):
+                # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
+                verts = Property.find_all(face, 'side"plane')[0].value[1:-1].split(") (") # break into 3 groups of 3d vertexes
+                for i,v in enumerate(verts):
+                    verts[i]=v.split(" ")
+                # y-val for first if < last if ceiling
+                side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
+                type = "black" if mat[0].value.casefold() in BLACK_PAN else "white"
+                is_blackceil = (type+side == "blackceiling")
+                mat[0].value = random.choice(settings[type+side])
+                
+            if (mat[0].value.casefold() in BLACK_PAN[1:] or is_blackceil) and settings["random_blackwall_scale"][0] == "1":
+                scale= random.choice(("0.25", "0.5", "1"))
+                for val in (Property.find_all(face, 'side"uaxis'),Property.find_all(face, 'side"vaxis')):
+                    if len(val)==1:
+                        split=val[0].value.split(" ")
+                        split[-1] = scale
+                        val[0].value=" ".join(split)    
             alter_mat(mat[0])
             
 def change_overlays():
