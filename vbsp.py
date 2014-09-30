@@ -115,7 +115,9 @@ fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=o
     "-90 180 0" : "90 0 0",
     "-90 -90 0" : "90 90 0",
     }
-    
+ 
+max_ent_id = 1 # maximum known entity id, so we know what we can set new ents to be.
+   
 def log(text):
     print(text, flush=True)
     
@@ -155,11 +157,13 @@ def load_map(path):
 
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
+    global max_ent_id
     log("Scanning Entities...")
     ents=Property.find_all(map,'entity')
     for item in ents:
         name=Property.find_all(item, 'entity"targetname')
         cls=Property.find_all(item, 'entity"classname')
+        id=Property.find_all(item, 'entity"id')
         if len(cls)==1:
             item.cls=cls[0].value
         else:
@@ -169,7 +173,9 @@ def load_entities():
             item.targname=name[0].value
         else:
             item.targname=""
-        
+        if int(id[0].value):
+            max_ent_id = max(max_ent_id,int(id[0].value))
+        print("ID = " + str(max_ent_id))
         if item.cls=="func_instance":
             instances.append(item)
         elif item.cls=="info_overlay":
@@ -303,6 +309,7 @@ def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
     log("Editing Instances...")
     for inst in instances:
+        file=Property.find_all(inst, 'entity"file')
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
             name=Property.find_all(inst, 'entity"targetname')[0]
             if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
@@ -317,14 +324,22 @@ def fix_inst():
                 var = Property.find_all(inst, 'entity"replace' + i)
                 if len(var) == 1 and "$skin" in var[0].value:
                     if settings['change_fizz_inst'][0]=="1":
-                        file = Property.find_all(inst, 'entity"file') 
                         # switch to alternate instances depending on what type of fizzler, to massively save ents
-                        if "$skin 0" in var[0].value and len(file)==1:
-                            file[0].value = file[0].value[:-4] + "_fizz.vmf"
-                        if "$skin 2" in var[0].value and len(file)==1:
+                        if "$skin 0" in var[0].value and len(file)==1 and "barrier_hazard_model" in file[0].value:
+                            file[0].value = file[0].value[:-4] + "_fizz.vmf" 
+                        # we don't want to do it to custom ones though
+                        if "$skin 2" in var[0].value and len(file)==1 and "barrier_hazard_model" in file[0].value:
                             file[0].value = file[0].value[:-4] + "_las.vmf"
                     break
- 
+        if len(file) == 1:
+            if "ccflag_paint_fizz" in file[0].value:
+                # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
+                for trig in triggers:
+                    if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
+                        Property.find_all(trig, 'entity"classname')[0].value = "trigger_paint_cleanser"
+                        sides=Property.find_all(trig, 'entity"solid"side"material')
+                        for mat in sides:
+                            mat.value = "tools/toolstrigger"
 
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
@@ -344,7 +359,34 @@ def fix_worldspawn():
             sky[0].value = random.choice(settings["sky"]) # allow random sky to be chosen
         else:
             root.value.append(Property("skyname", random.choice(settings["sky"])))
-            
+
+def add_extra_ents():
+    "Add our various extra instances to enable some features."
+    global max_ent_id
+    inst_types = {
+                    "global" : [-8192, "0 0"],
+                    "skybox" : [ 5632, "0 0"], 
+                    "other"  : [-5888, "-3072 0"],
+                    "voice"  : [-8192, "0 512"]
+                 }
+    for type in inst_types.keys():
+        if "inst_"+type in settings:
+            max_ent_id = max_ent_id + 1
+            for inst in settings["inst_"+type]:
+                opt = inst.split("|")
+                if len(opt)== 2:
+                    inst_types[type][0] += int(opt[0])
+                    keys = [
+                             Property("id", str(max_ent_id)),
+                             Property("classname", "func_instance"),
+                             Property("targetname", "inst_"+str(max_ent_id)),
+                             Property("file", opt[1]),
+                             Property("angles", "0 0 0"),
+                             Property("origin", str(inst_types[type][0]) + " " + inst_types[type][1])
+                           ]
+                    new_inst = Property("entity", keys)
+                    map.append(new_inst)
+          
 def save():
     out = []
     log("Saving New Map...")
@@ -378,11 +420,12 @@ log("Map path is " + path)
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     log("PeTI map detected! (has Entity Limit of 1750)")
     load_map(path)
+    max_ent_id=-1
     progs = [
              load_settings, load_entities, 
+             fix_inst, change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
-             change_ents, fix_inst, 
              fix_worldspawn, save
             ]
     for func in progs:
