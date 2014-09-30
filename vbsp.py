@@ -19,11 +19,12 @@ other_ents=[] # anything else, including some logic_autos, func_brush, trigger_m
 CONN_SEP = chr(27) # non-printing char VMFs use to sepearte parts of outputs.
 
 HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
-         "glass"      : 0,
-         "goo"        : 0,
-         "grating"    : 0,
-         "fizzler"    : 0,
-         "laserfield" : 0
+         "glass"   : 0,
+         "goo"     : 0,
+         "grating" : 0,
+         "fizzler" : 0,
+         "laser"   : 0,
+         "deadly"  : 0, # also if laserfield exists
          }
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
@@ -102,15 +103,17 @@ DEFAULTS = {
     "glass_scale"             : "0.15",
     }
     
-fizzler_angle_fix = {
+fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
     "0 0 -90"   : "0 180 90",
-    "-90 -90 0" : "90 90 0",
-    "0 0 90"    : "0 180 -90",
-    "90 -90 0"  : "-90 90 0",
-    "90 180 0"  : "-90 0 0",
+    "0 0 180"   : "0 180 180",
+    "0 90 0"    : "0 -90 0",
     "0 90 -90"  : "0 -90 90",
+    "0 180 -90" : "0 0 90",
+    "0 -90 -90" : "0 90 90",
+    "90 180 0"  : "-90 0 0",
+    "90 -90 0"  : "-90 90 0",
     "-90 180 0" : "90 0 0",
-    "0 -90 -90" : "0 90 90"
+    "-90 -90 0" : "90 90 0",
     }
     
 def log(text):
@@ -341,7 +344,7 @@ def fix_worldspawn():
             sky[0].value = random.choice(settings["sky"]) # allow random sky to be chosen
         else:
             root.value.append(Property("skyname", random.choice(settings["sky"])))
-                
+            
 def save():
     out = []
     log("Saving New Map...")
