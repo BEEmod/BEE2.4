@@ -97,6 +97,7 @@ DEFAULTS = {
     "force_brush_reflect"     : 0,
     "remove_exit_signs"       : 0,
     "force_paint"             : 0,
+    "change_fizz_inst"        : 0,
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
     }
@@ -201,7 +202,7 @@ def change_brush():
                         val[0].value=" ".join(split)
             
             is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
-            if mat[0].value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_wall_tile003f"):
+            if mat[0].value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
                 # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
                 verts = Property.find_all(face, 'side"plane')[0].value[1:-1].split(") (") # break into 3 groups of 3d vertexes
                 for i,v in enumerate(verts):
@@ -309,6 +310,17 @@ def fix_inst():
             angles=Property.find_all(inst, 'entity"angles')[0]
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
+            for i in ("00", "01", "02", "03", "04", "05", "06", "07", "08" ,"09", "10", "11", "12", "13", "14", "15", "16"):
+                var = Property.find_all(inst, 'entity"replace' + i)
+                if len(var) == 1 and "$skin" in var[0].value:
+                    if settings['change_fizz_inst'][0]=="1":
+                        file = Property.find_all(inst, 'entity"file') 
+                        # switch to alternate instances depending on what type of fizzler, to massively save ents
+                        if "$skin 0" in var[0].value and len(file)==1:
+                            file[0].value = file[0].value[:-4] + "_fizz.vmf"
+                        if "$skin 2" in var[0].value and len(file)==1:
+                            file[0].value = file[0].value[:-4] + "_las.vmf"
+                    break
  
 
 def fix_worldspawn():
