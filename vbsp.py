@@ -62,7 +62,6 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "effects/fizzler_center"             : "fizzlercenter",
     "effects/fizzler"                    : "fizzlershort",
     "effects/laserplane"                 : "laserfield",
-    "sky"                                : "sky_black",
     "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
     }
 WHITE_PAN = ["tile/white_wall_tile003a", 
@@ -95,7 +94,8 @@ DEFAULTS = {
     "force_fizz_reflect"      : 0,
     "force_brush_reflect"     : 0,
     "remove_exit_signs"       : 0,
-    "force_paint"             : 0
+    "force_paint"             : 0,
+    "sky"                     : "sky_black",
     }
     
 fizzler_angle_fix = {
@@ -109,6 +109,9 @@ fizzler_angle_fix = {
     "0 -90 -90" : "0 90 90"
     }
     
+def log(text):
+    print(text, flush=True)
+    
 def alter_mat(prop):
     if prop.value.casefold() in TEX_VALVE: # should we convert it?
         prop.value = random.choice(settings[TEX_VALVE[prop.value.casefold()].casefold()])
@@ -117,7 +120,7 @@ def load_settings():
     global settings
     with open("vbsp_config.cfg", "r") as config: # this should be outputted when editoritems is exported, so we don't have to trawl through editoritems to find our settings.
         conf=Property.parse(config)
-    print("Settings Loaded!")
+    log("Settings Loaded!")
     settings = {}
     for item in conf: # convert properties into simpler dictionary
         if item.name.casefold() in settings:
@@ -136,17 +139,16 @@ def load_settings():
     for mat in ANTLINES.keys() : 
         if not ANTLINES[mat] in settings:
             settings[ANTLINES[mat]]=[mat]
-    
 def load_map(path):
     global map
     with open(path, "r") as file:
-        print("Parsing Map...")
+        log("Parsing Map...")
         map=Property.parse(file)
     
 
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
-    print("Scanning Entities...")
+    log("Scanning Entities...")
     ents=Property.find_all(map,'entity')
     for item in ents:
         name=Property.find_all(item, 'entity"targetname')
@@ -154,7 +156,7 @@ def load_entities():
         if len(cls)==1:
             item.cls=cls[0].value
         else:
-            print("Error - entity missing class, skipping!")
+            log("Error - entity missing class, skipping!")
             continue
         if len(name)==1:
             item.targname=name[0].value
@@ -176,7 +178,7 @@ def load_entities():
     
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
-    print("Editing Brushes...")
+    log("Editing Brushes...")
     sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
     for face in sides:
         mat=Property.find_all(face, 'side"material')   
@@ -190,7 +192,7 @@ def change_brush():
             alter_mat(mat[0])
 def change_overlays():
     "Alter the overlays."
-    print("Editing Overlays...")
+    log("Editing Overlays...")
     to_rem=[]
     for over in overlays:
         mat=Property.find_all(over, 'entity"material')
@@ -217,7 +219,7 @@ def change_overlays():
     
 def change_trig():
     "Check the triggers and fizzlers."
-    print("Editing Triggers...")
+    log("Editing Triggers...")
     for trig in triggers:
         if trig.cls=="trigger_portal_cleanser":
             sides=Property.find_all(trig, 'entity"solid"side"material')
@@ -232,7 +234,7 @@ def change_trig():
 
 def change_func_brush():
     "Edit func_brushes."
-    print("Editing Brush Entities...")
+    log("Editing Brush Entities...")
     for brush in f_brushes:
         sides=Property.find_all(brush, 'entity"solid"side"material')
         for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
@@ -253,7 +255,7 @@ def change_func_brush():
             
 def change_ents():
     "Edit misc entities."
-    print("Editing Other Entities...")
+    log("Editing Other Entities...")
     to_rem=[] # entities to delete
     for ent in other_ents:
         if ent.cls == "info_lighting" and (settings["remove_info_lighting"][0]=="1"):
@@ -264,7 +266,7 @@ def change_ents():
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
-    print("Editing Instances...")
+    log("Editing Instances...")
     for inst in instances:
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
             name=Property.find_all(inst, 'entity"targetname')[0]
@@ -280,12 +282,12 @@ def fix_inst():
 
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
-    print("Editing WorldSpawn")
+    log("Editing WorldSpawn")
     root=Property.find_all(map, 'world')
     if len(root)==1:
         root=root[0]
         has_paint = Property.find_all(root, 'world"paintinmap')
-        print(has_paint)
+        log(has_paint)
         if len(has_paint) == 1:
             if has_paint[0].value == "0":
                 has_paint[0].value = settings["force_paint"][0]
@@ -299,19 +301,22 @@ def fix_worldspawn():
                 
 def save():
     out = []
-    print("Saving New Map...")
+    log("Saving New Map...")
     for p in map:
         for s in p.to_strings():
             out.append(s + '\n')
     with open("F:\SteamLibrary\SteamApps\common\Portal 2\sdk_content\maps\styled\preview.vmf", 'w') as f:
         f.writelines(out)
-    print("Complete!")
+    log("Complete!")
     
 def run_vbsp(args, compile_loc, target):
     "Execute the original VBSP, copying files around so it works correctly."
     # TODO: Get the ingame VBSP progress bar to work right. Probably involves making sure P2 gets the VBSP console output.
-    subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    log("Calling original VBSP...")
+    shutil.copy(target.replace(".vmf",".log"), compile_loc.replace(".vmf",".log"))
+    subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=None, stderr=subprocess.PIPE, shell=True)
     shutil.copy(compile_loc.replace(".vmf",".bsp"), target.replace(".vmf",".bsp"))
+    shutil.copy(compile_loc.replace(".vmf",".log"), target.replace(".vmf",".log"))
     shutil.copy(compile_loc.replace(".vmf",".prt"), target.replace(".vmf",".prt")) # copy over the real files so vvis/vrad can read them
     
 args = " ".join(sys.argv)
@@ -323,9 +328,9 @@ for i,a in enumerate(new_args):
         new_args[i] = a.replace("sdk_content\\maps/","sdk_content/maps/styled/",1)
         new_path=new_args[i]
         path=a
-print("Map path is " + path)
+log("Map path is " + path)
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
-    print("PeTI map detected! (has Entity Limit of 1750)")
+    log("PeTI map detected! (has Entity Limit of 1750)")
     load_map(path)
     progs = [
              load_settings, load_entities, 
@@ -338,5 +343,5 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
         func()
     run_vbsp(new_args, new_path, path)
 else:
-    print("Hammer map detected! skipping conversion..")
+    log("Hammer map detected! skipping conversion..")
     run_vbsp(sys.argv[1:], path, path)
