@@ -96,6 +96,7 @@ DEFAULTS = {
     "remove_exit_signs"       : 0,
     "force_paint"             : 0,
     "sky"                     : "sky_black",
+    "glass_scale"             : "0.15",
     }
     
 fizzler_angle_fix = {
@@ -189,7 +190,14 @@ def change_brush():
                 for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
                     pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
                 plane.value = " ".join(pos)
+            if mat[0].value.casefold()=="glass/glasswindow007a_less_shiny":
+                for val in (Property.find_all(face, 'side"uaxis'),Property.find_all(face, 'side"vaxis')):
+                    if len(val)==1:
+                        split=val[0].value.split(" ")
+                        split[4] = settings["glass_scale"][0]
+                        val[0].value=" ".join(split)
             alter_mat(mat[0])
+            
 def change_overlays():
     "Alter the overlays."
     log("Editing Overlays...")
