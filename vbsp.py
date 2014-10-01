@@ -101,7 +101,11 @@ DEFAULTS = {
     "force_paint"             : 0,
     "change_fizz_inst"        : 0,
     "sky"                     : "sky_black",
-    "glass_scale"             : "0.15",
+    "glass_scale"             : "0.15",    
+    "blackfloor"              : "metal/black_floor_metal_001c", # add these to make sure they overide if none specified
+    "whitefloor"              : "tile/white_floor_tile002a",
+    "antline"                 : "0.25|signage/indicator_lights/indicator_lights_floor",
+    "antlinecorner"           : "1|signage/indicator_lights/indicator_lights_corner_floor"
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -150,6 +154,14 @@ def add_output(entity, output, target, input, params="", delay="0", times="-1"):
     log("adding output :" + out.value)
     conn.value.append(out)
 
+def find_key(ent, key):
+    "Safely get a subkey from an instance (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
+    result = Property.find_all(ent, ent.name + '"' + key)
+    if len(result) == 1:
+        return result[0]
+    else:
+        raise ValueError("No key " + key + "!")
+
 def load_settings():
     global settings
     with open("vbsp_config.cfg", "r") as config: # this should be outputted when editoritems is exported, so we don't have to trawl through editoritems to find our settings.
@@ -169,6 +181,7 @@ def load_settings():
     for mat in TEX_VALVE.keys() :
         if not TEX_VALVE[mat] in settings:
             settings[TEX_VALVE[mat]]=[str(mat)]
+            print(mat)
             
     for mat in ANTLINES.keys() : 
         if not ANTLINES[mat] in settings:
@@ -188,7 +201,7 @@ def load_entities():
     for item in ents:
         name=Property.find_all(item, 'entity"targetname')
         cls=Property.find_all(item, 'entity"classname')
-        id=Property.find_all(item, 'entity"id')
+        id=find_key(item, 'id')
         if len(cls)==1:
             item.cls=cls[0].value
         else:
@@ -198,8 +211,8 @@ def load_entities():
             item.targname=name[0].value
         else:
             item.targname=""
-        if int(id[0].value):
-            max_ent_id = max(max_ent_id,int(id[0].value))
+        if int(id.value):
+            max_ent_id = max(max_ent_id,int(id.value))
         if item.cls=="func_instance":
             instances.append(item)
         elif item.cls=="info_overlay":
@@ -218,64 +231,57 @@ def change_brush():
     log("Editing Brushes...")
     sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
     for face in sides:
-        mat=Property.find_all(face, 'side"material')   
-        if len(mat)==1:
-            if mat[0].value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
-                plane=Property.find_all(face, 'side"plane')[0]
-                pos=plane.value.split(" ")
-                for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
-                    pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
-                plane.value = " ".join(pos)
-                
-            if mat[0].value.casefold()=="glass/glasswindow007a_less_shiny":
-                for val in (Property.find_all(face, 'side"uaxis'),Property.find_all(face, 'side"vaxis')):
-                    if len(val)==1:
-                        split=val[0].value.split(" ")
-                        split[-1] = settings["glass_scale"][0]
-                        val[0].value=" ".join(split)
+        mat=find_key(face, 'material')   
+        if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
+            plane=find_key(face,'plane')
+            pos=plane.value.split(" ")
+            for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
+                pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
+            plane.value = " ".join(pos)
             
-            is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
-            if mat[0].value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
-                # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-                verts = Property.find_all(face, 'side"plane')[0].value[1:-1].split(") (") # break into 3 groups of 3d vertexes
-                for i,v in enumerate(verts):
-                    verts[i]=v.split(" ")
-                # y-val for first if < last if ceiling
-                side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
-                type = "black" if mat[0].value.casefold() in BLACK_PAN else "white"
-                is_blackceil = (type+side == "blackceiling")
-                mat[0].value = random.choice(settings[type+side])
-                
-            if (mat[0].value.casefold() in BLACK_PAN[1:] or is_blackceil) and settings["random_blackwall_scale"][0] == "1":
-                scale= random.choice(("0.25", "0.5", "1"))
-                for val in (Property.find_all(face, 'side"uaxis'),Property.find_all(face, 'side"vaxis')):
-                    if len(val)==1:
-                        split=val[0].value.split(" ")
-                        split[-1] = scale
-                        val[0].value=" ".join(split)    
-            alter_mat(mat[0])
+        if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
+            for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
+                split=val.value.split(" ")
+                split[-1] = settings["glass_scale"][0]
+                val.value=" ".join(split)
+        
+        is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
+        if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
+            # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
+            verts = find_key(face, 'plane').value[1:-1].split(") (") # break into 3 groups of 3d vertexes
+            for i,v in enumerate(verts):
+                verts[i]=v.split(" ")
+            # y-val for first if < last if ceiling
+            side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
+            type = "black" if mat.value.casefold() in BLACK_PAN else "white"
+            is_blackceil = (type+side == "blackceiling")
+            mat.value = random.choice(settings[type+side])
+            
+        if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and settings["random_blackwall_scale"][0] == "1":
+            scale= random.choice(("0.25", "0.5", "1"))
+            for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
+                if len(val)==1:
+                    split=val[0].value.split(" ")
+                    split[-1] = scale
+                    val[0].value=" ".join(split)    
+        alter_mat(mat)
             
 def change_overlays():
     "Alter the overlays."
     log("Editing Overlays...")
     to_rem=[]
     for over in overlays:
-        mat=Property.find_all(over, 'entity"material')
-        if len(mat)==1:
-            mat=mat[0]
-            alter_mat(mat)
-            if mat.value.casefold() in ANTLINES:
-                angle = Property.find_all(over, 'entity"angles')
-                if len(angle)==1:
-                    angle=angle[0].value.split(" ") # get the three parts
-                    #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
-                new_tex = random.choice(settings[ANTLINES[mat.value.casefold()].casefold()]).split("|")
-                if len(new_tex)==2:
-                    if len(Property.find_all(over, 'entity"endu')) == 1: # rescale antlines if needed
-                        Property.find_all(over, 'entity"endu')[0].value=new_tex[0]
-                    mat.value=new_tex[1]
-                else:
-                    mat.value=new_tex
+        mat=find_key(over, 'material')
+        alter_mat(mat)
+        if mat.value.casefold() in ANTLINES:
+            angle = find_key(over, 'angles').value.split(" ") # get the three parts
+            #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
+            new_tex = random.choice(settings[ANTLINES[mat.value.casefold()].casefold()]).split("|")
+            if len(new_tex)==2:
+                find_key(over, 'endu').value=new_tex[0] # rescale antlines if needed
+                mat.value=new_tex[1]
+            else:
+                mat.value=new_tex
         if (over.targname in ("exitdoor_stickman","exitdoor_arrow")) and (settings["remove_exit_signs"][0]=="1"):
             to_rem.append(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
     for rem in to_rem:
@@ -290,12 +296,8 @@ def change_trig():
             sides=Property.find_all(trig, 'entity"solid"side"material')
             for mat in sides:
                 alter_mat(mat)
-            use_scanline = Property.find_all(trig, 'entity"useScanline')
-            if len(use_scanline) == 1:
-                use_scanline[0].value = settings["fizzler_scanline"][0]
-            fast_ref = Property.find_all(trig, 'entity"drawInFastReflection')
-            if len(fast_ref) == 1:
-                fast_ref[0].value = settings["force_fizz_reflect"][0]
+            find_key(trig, 'useScanline').value = settings["fizzler_scanline"][0]
+            find_key(trig, 'drawInFastReflection').value = settings["force_fizz_reflect"][0]
 
 def change_func_brush():
     "Edit func_brushes."
@@ -387,7 +389,7 @@ def fix_inst():
                     out_pos = Property.find_all(in_out, 'entity"origin')[0].value
                     out_angle=Property.find_all(in_out, 'entity"angles')
                     if len(out_angle)==1 and pos == out_pos and angle==out_angle[0].value:
-                        add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1")
+                        add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
                         add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
             elif "ccflag_death_fizz" in file[0].value:
                 for trig in triggers:
@@ -404,6 +406,7 @@ def fix_inst():
                         for mat in sides:
                             mat.value = "tools/toolstrigger"
                         Property.find_all(new_trig, 'entity"classname')[0].value = "trigger_hurt"
+                        flags=Property.find_all(trig, 'entity"spawnflags')[0].value="1"
                         prop=Property.find_all(new_trig, 'entity"usescanline')[0]
                         prop.name="damage"
                         prop.value="100000"
