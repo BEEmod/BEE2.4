@@ -15,8 +15,8 @@ f_brushes=[] # Func_brushes
 detail=[]
 triggers=[]
 other_ents=[] # anything else, including some logic_autos, func_brush, trigger_multiple, trigger_hurt, trigger_portal_cleanser, etc
-
-CONN_SEP = chr(27) # non-printing char VMFs use to sepearte parts of outputs.
+unique_counter=0 # counter for instances to ensure unique targetnames
+max_ent_id = 1 # maximum known entity id, so we know what we can set new ents to be.
 
 HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
          "glass"   : 0,
@@ -64,6 +64,7 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "effects/fizzler_r"                  : "fizzlerright",
     "effects/fizzler_center"             : "fizzlercenter",
     "effects/fizzler"                    : "fizzlershort",
+    "BEE2/fizz/lp/death_field_clean_"    : "lp_death_field", # + short/left/right/center
     "effects/laserplane"                 : "laserfield",
     "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
     }
@@ -115,8 +116,19 @@ fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=o
     "-90 180 0" : "90 0 0",
     "-90 -90 0" : "90 90 0",
     }
+
+DEATH_FIZZLER_SUFFIX = {
+    "effects/fizzler_center" : "center",
+    "effects/fizzler_l"      : "left",
+    "effects/fizzler_r"      : "right",
+    "effects/fizzler"        : "short"
+    }
  
-max_ent_id = 1 # maximum known entity id, so we know what we can set new ents to be.
+def unique_id():
+    "Return a unique prefix so we ensure instances don't overlap if making them."
+    global unique_counter
+    unique_counter+=1
+    return str(unique_counter)
    
 def log(text):
     print(text, flush=True)
@@ -124,6 +136,19 @@ def log(text):
 def alter_mat(prop):
     if prop.value.casefold() in TEX_VALVE: # should we convert it?
         prop.value = random.choice(settings[TEX_VALVE[prop.value.casefold()].casefold()])
+
+def add_output(entity, output, target, input, params="", delay="0", times="-1"):
+    "Add a new output to an entity with the given values, generating a connections part if needed."
+    conn = Property.find_all(entity, 'entity"connections')
+    if len(conn) == 0:
+        conn = Property("connections", [])
+        entity.value.append(conn)
+    else:
+        conn = conn[0]
+    out=Property(output, chr(27).join((target, input, params, delay, times)))
+    # character 27 (which is the ASCII escape control character) is the delimiter for VMF outputs. 
+    log("adding output :" + out.value)
+    conn.value.append(out)
 
 def load_settings():
     global settings
@@ -175,7 +200,6 @@ def load_entities():
             item.targname=""
         if int(id[0].value):
             max_ent_id = max(max_ent_id,int(id[0].value))
-        print("ID = " + str(max_ent_id))
         if item.cls=="func_instance":
             instances.append(item)
         elif item.cls=="info_overlay":
@@ -331,6 +355,8 @@ def fix_inst():
                         if "$skin 2" in var[0].value and len(file)==1 and "barrier_hazard_model" in file[0].value:
                             file[0].value = file[0].value[:-4] + "_las.vmf"
                     break
+            if len(file) == 1 and "ccflag_comball" in file[0].value:
+                name.value = inst.targname.split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
         if len(file) == 1:
             if "ccflag_paint_fizz" in file[0].value:
                 # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
@@ -340,7 +366,39 @@ def fix_inst():
                         sides=Property.find_all(trig, 'entity"solid"side"material')
                         for mat in sides:
                             mat.value = "tools/toolstrigger"
+            elif "ccflag_comball_base" in file[0].value:
+                for trig in triggers:
+                    if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                        Property.find_all(trig, 'entity"classname')[0].value = "trigger_multiple"
+                        sides=Property.find_all(trig, 'entity"solid"side"material')
+                        for mat in sides:
+                            mat.value = "tools/toolstrigger"
+                        trig.value.append(Property("filtername", "@filter_pellet"))
+                        trig.value.append(Property("wait", "0.1"))
+                        flags=Property.find_all(trig, 'entity"spawnflags')
+                        if len(flags) == 1:
+                            flags[0].value="72"
+                        add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
+                        # generate the output that triggers the pellet logic.
+                        Property.find_all(trig, 'entity"targetname')[0].value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
+                pos = Property.find_all(inst, 'entity"origin')[0].value
+                angle=Property.find_all(inst, 'entity"angles')[0].value
+                for in_out in instances: # find the instance to use for output
+                    out_pos = Property.find_all(in_out, 'entity"origin')[0].value
+                    out_angle=Property.find_all(in_out, 'entity"angles')
+                    if len(out_angle)==1 and pos == out_pos and angle==out_angle[0].value:
+                        add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1")
+                        add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
+            elif "ccflag_death_fizz" in file[0].value:
+                for trig in triggers:
+                    if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                        sides=Property.find_all(trig, 'entity"solid"side"material')
+                        for mat in sides:
+                            if mat.value.casefold() in DEATH_FIZZLER_SUFFIX.keys():
+                                mat.value = settings["lp_death_field"][0] + DEATH_FIZZLER_SUFFIX[mat.value.casefold()]
 
+                        
+                        
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     log("Editing WorldSpawn")
@@ -421,6 +479,7 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     log("PeTI map detected! (has Entity Limit of 1750)")
     load_map(path)
     max_ent_id=-1
+    unique_counter=0
     progs = [
              load_settings, load_entities, 
              fix_inst, change_ents, add_extra_ents,
