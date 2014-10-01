@@ -396,7 +396,22 @@ def fix_inst():
                         for mat in sides:
                             if mat.value.casefold() in DEATH_FIZZLER_SUFFIX.keys():
                                 mat.value = settings["lp_death_field"][0] + DEATH_FIZZLER_SUFFIX[mat.value.casefold()]
-
+                        trig_src = []
+                        for l in trig.to_strings():
+                            trig_src.append(l + "\n")
+                        new_trig = Property.parse(trig_src) # get a duplicate of the trigger by serialising and deserialising
+                        sides=Property.find_all(new_trig, 'entity"solid"side"material')
+                        for mat in sides:
+                            mat.value = "tools/toolstrigger"
+                        Property.find_all(new_trig, 'entity"classname')[0].value = "trigger_hurt"
+                        prop=Property.find_all(new_trig, 'entity"usescanline')[0]
+                        prop.name="damage"
+                        prop.value="100000"
+                        
+                        prop=Property.find_all(new_trig, 'entity"visible')[0]
+                        prop.name="damagetype"
+                        prop.value="1024"
+                        map.append(new_trig[0])
                         
                         
 def fix_worldspawn():
