@@ -359,6 +359,8 @@ def fix_inst():
                     break
             if len(file) == 1 and "ccflag_comball" in file[0].value:
                 name.value = inst.targname.split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
+            if len(file) == 1 and "ccflag_death_fizz_model" in file[0].value:
+                name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
         if len(file) == 1:
             if "ccflag_paint_fizz" in file[0].value:
                 # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
@@ -368,7 +370,7 @@ def fix_inst():
                         sides=Property.find_all(trig, 'entity"solid"side"material')
                         for mat in sides:
                             mat.value = "tools/toolstrigger"
-            elif "ccflag_comball_base" in file[0].value:
+            elif "ccflag_comball_base" in file[0].value: # Rexaura Flux Fields
                 for trig in triggers:
                     if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
                         Property.find_all(trig, 'entity"classname')[0].value = "trigger_multiple"
@@ -383,38 +385,52 @@ def fix_inst():
                         add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
                         # generate the output that triggers the pellet logic.
                         Property.find_all(trig, 'entity"targetname')[0].value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
-                pos = Property.find_all(inst, 'entity"origin')[0].value
-                angle=Property.find_all(inst, 'entity"angles')[0].value
+                pos = find_key(inst, 'origin').value
+                angle=find_key(inst, 'angles').value
                 for in_out in instances: # find the instance to use for output
                     out_pos = Property.find_all(in_out, 'entity"origin')[0].value
                     out_angle=Property.find_all(in_out, 'entity"angles')
                     if len(out_angle)==1 and pos == out_pos and angle==out_angle[0].value:
                         add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
                         add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
-            elif "ccflag_death_fizz" in file[0].value:
+            elif "ccflag_death_fizz_base" in file[0].value: # LP's Death Fizzler
                 for trig in triggers:
                     if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                        trig_src = []
+                        for l in trig.to_strings():
+                            trig_src.append(l + "\n")
                         sides=Property.find_all(trig, 'entity"solid"side"material')
                         for mat in sides:
                             if mat.value.casefold() in DEATH_FIZZLER_SUFFIX.keys():
                                 mat.value = settings["lp_death_field"][0] + DEATH_FIZZLER_SUFFIX[mat.value.casefold()]
-                        trig_src = []
-                        for l in trig.to_strings():
-                            trig_src.append(l + "\n")
-                        new_trig = Property.parse(trig_src) # get a duplicate of the trigger by serialising and deserialising
-                        sides=Property.find_all(new_trig, 'entity"solid"side"material')
+                        find_key(trig, 'targetname').value = inst.targname + "-fizz_red"
+                        find_key(trig, 'spawnflags').value = "0"
+                        
+                        new_trig = Property.parse(trig_src)[0] # get a duplicate of the trigger by serialising and deserialising
+                        find_key(new_trig, 'targetname').value = inst.targname + "-fizz_blue"
+                        find_key(new_trig, 'spawnflags').value = "9"
+                        map.append(new_trig)
+                        
+                        hurt = Property.parse(trig_src)[0]
+                        sides=Property.find_all(hurt, 'entity"solid"side"material')
                         for mat in sides:
                             mat.value = "tools/toolstrigger"
-                        Property.find_all(new_trig, 'entity"classname')[0].value = "trigger_hurt"
-                        flags=Property.find_all(trig, 'entity"spawnflags')[0].value="1"
-                        prop=Property.find_all(new_trig, 'entity"usescanline')[0]
+                        find_key(hurt, 'classname').value = "trigger_hurt"
+                        find_key(hurt, 'targetname').value = inst.targname + "-hurt"
+                        find_key(trig, 'spawnflags').value="1"
+                        
+                        prop=Property.find_all(hurt, 'entity"usescanline')[0]
                         prop.name="damage"
                         prop.value="100000"
                         
-                        prop=Property.find_all(new_trig, 'entity"visible')[0]
+                        prop=Property.find_all(hurt, 'entity"visible')[0]
                         prop.name="damagetype"
                         prop.value="1024"
-                        map.append(new_trig[0])
+                        
+                        hurt.value.append(Property('nodmgforce', '1'))
+                        map.append(hurt)
+                        
+                      
                         
                         
 def fix_worldspawn():
