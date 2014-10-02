@@ -8,6 +8,13 @@ import random
 from property_parser import Property
 import utils
 
+# COMPILER FLAGS (used as part of instance filename)
+# ccflag_comball
+# ccflag_comball_base
+# ccflag_paint_fizz
+# ccflag_death_fizz_base
+# ccflag_panel_clear
+
 instances=[] # All instances
 overlays=[]
 brushes=[] # All world and func_detail brushes generated
@@ -105,7 +112,8 @@ DEFAULTS = {
     "blackfloor"              : "metal/black_floor_metal_001c", # add these to make sure they overide if none specified
     "whitefloor"              : "tile/white_floor_tile002a",
     "antline"                 : "0.25|signage/indicator_lights/indicator_lights_floor",
-    "antlinecorner"           : "1|signage/indicator_lights/indicator_lights_corner_floor"
+    "antlinecorner"           : "1|signage/indicator_lights/indicator_lights_corner_floor",
+    "static_pan_inst"         : "",
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -127,6 +135,9 @@ DEATH_FIZZLER_SUFFIX = {
     "effects/fizzler_r"      : "right",
     "effects/fizzler"        : "short"
     }
+    
+FIXUP_KEYS = ["01", "02", "03", "04", "05", "06", "07", "08" ,"09", "10", "11", "12", "13", "14", "15", "16"]
+    # $replace01, $replace02
  
 def unique_id():
     "Return a unique prefix so we ensure instances don't overlap if making them."
@@ -302,23 +313,62 @@ def change_trig():
 def change_func_brush():
     "Edit func_brushes."
     log("Editing Brush Entities...")
+    to_rem=[]
     for brush in f_brushes:
         sides=Property.find_all(brush, 'entity"solid"side"material')
+        type=""
         for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
             if mat.value.casefold() == "anim_wp/framework/squarebeams" and "edge_special" in settings:
                 mat.value = random.choice(settings["edge_special"])
-            elif mat.value.casefold() in WHITE_PAN and "white_special" in settings:
-                mat.value = random.choice(settings["white_special"])
-            elif mat.value.casefold() in BLACK_PAN and "black_special" in settings:
-                mat.value = random.choice(settings["black_special"])
+            elif mat.value.casefold() in WHITE_PAN:
+                type="white"
+                if "white_special" in settings:
+                    mat.value = random.choice(settings["white_special"])
+            elif mat.value.casefold() in BLACK_PAN:
+                type="black"
+                if "black_special" in settings:
+                    mat.value = random.choice(settings["black_special"])
             else:
                 alter_mat(mat) # for gratings, laserfields and some others
-            
+        parent=Property.find_all(brush, 'entity"parentname')
+        if brush.cls=="func_brush" and len(parent) == 1 and"-model_arms" in parent[0].value: # is this the angled panel?:
+            targ=parent[0].value.split("-model_arms")[0]
+            for inst in instances:
+                if inst.targname == targ:
+                    if make_static_pan(inst, type):
+                        to_rem.append(brush) # delete the brush, we don't want it
+                    break
         fast_ref = Property.find_all(brush, 'entity"drawInFastReflection')
         if len(fast_ref) == 1:
             fast_ref[0].value = settings["force_brush_reflect"][0]
         else:
             brush.value.append(Property("drawinfastreflection", settings["force_brush_reflect"][0]))
+    for item in to_rem:
+        map.remove(item)
+    del to_rem
+    
+def make_static_pan(ent, type):
+    "Convert a regular panel into a static version, to save entities and improve lighting."
+    if settings["static_pan_inst"][0] == "":
+        return False # no conversion allowed!
+    angle="er"
+    is_static=False
+    is_flush=False
+    for i in FIXUP_KEYS:
+        var = Property.find_all(ent, 'entity"replace' + i)
+        if(len(var)==1):
+            if var[0].value == "$connectioncount 0":
+                is_static=True
+            if var[0].value == "$start_deployed 0":
+                is_flush=True
+            if "$animation" in var[0].value:
+                angle = var[0].value[16:18] # the number in "$animation ramp_45_deg_open"
+    if not is_static:
+        return False
+    if is_flush:
+        angle="00" # different instance flat with the wall
+    find_key(ent, "file").value = settings["static_pan_inst"][0] + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
+    return True
             
 def change_ents():
     "Edit misc entities."
@@ -346,7 +396,7 @@ def fix_inst():
             angles=Property.find_all(inst, 'entity"angles')[0]
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
-            for i in ("00", "01", "02", "03", "04", "05", "06", "07", "08" ,"09", "10", "11", "12", "13", "14", "15", "16"):
+            for i in FIXUP_KEYS:
                 var = Property.find_all(inst, 'entity"replace' + i)
                 if len(var) == 1 and "$skin" in var[0].value:
                     if settings['change_fizz_inst'][0]=="1":
@@ -429,9 +479,8 @@ def fix_inst():
                         
                         hurt.value.append(Property('nodmgforce', '1'))
                         map.append(hurt)
-                        
-                      
-                        
+            elif "ccflag_panel_clear" in file[0].value:
+                make_static_pan(inst, "glass") # white/black are identified based on brush                        
                         
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
