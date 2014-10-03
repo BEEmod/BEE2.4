@@ -139,6 +139,8 @@ DEATH_FIZZLER_SUFFIX = {
 FIXUP_KEYS = ["01", "02", "03", "04", "05", "06", "07", "08" ,"09", "10", "11", "12", "13", "14", "15", "16"]
     # $replace01, $replace02
  
+###### UTIL functions #####
+ 
 def unique_id():
     "Return a unique prefix so we ensure instances don't overlap if making them."
     global unique_counter
@@ -165,13 +167,49 @@ def add_output(entity, output, target, input, params="", delay="0", times="-1"):
     log("adding output :" + out.value)
     conn.value.append(out)
 
+def split_plane(plane):
+    "Extract the plane from a brush into an array."
+    # Plane looks like "(575 0 128) (575 768 128) (575 768 256)"
+    verts = plane.value[1:-1].split(") (") # break into 3 groups of 3d vertexes
+    for i,v in enumerate(verts):
+        verts[i]=v.split(" ")
+    return verts
+
+def join_plane(verts):
+    "Join the verts back into the proper string."
+    plane=""
+    for vert in verts:
+        plane += ("(" + " ".join(vert) + ") ")
+    return plane[:-1] # take off the last space
+    
+def get_bbox(planes):
+    "Generate the highest and lowest points these planes form."
+    bbox_max=[]
+    bbox_min=[]
+    preset=True
+    for pl in planes:
+        verts=split_plane(pl)
+        if preset:
+            preset=False
+            bbox_max=[int(x)-9999 for x in verts[0][:]]
+            bbox_min=[int(x)+9999 for x in verts[0][:]]
+        for v in verts:
+            for i in range(0,3):
+                bbox_max[i] = max(int(v[i]), bbox_max[i])
+                bbox_min[i] = min(int(v[i]), bbox_min[i])
+    return bbox_max, bbox_min
+
 def find_key(ent, key):
     "Safely get a subkey from an instance (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
     result = Property.find_all(ent, ent.name + '"' + key)
     if len(result) == 1:
         return result[0]
+    elif len(result) == 0:
+        raise ValueError('No key "' + key + '"!')
     else:
-        raise ValueError("No key " + key + "!")
+        raise ValueError('Duplicate keys "' + key + '"!')
+
+##### MAIN functions ######
 
 def load_settings():
     global settings
@@ -192,17 +230,16 @@ def load_settings():
     for mat in TEX_VALVE.keys() :
         if not TEX_VALVE[mat] in settings:
             settings[TEX_VALVE[mat]]=[str(mat)]
-            print(mat)
             
     for mat in ANTLINES.keys() : 
         if not ANTLINES[mat] in settings:
             settings[ANTLINES[mat]]=[mat]
+            
 def load_map(path):
     global map
     with open(path, "r") as file:
         log("Parsing Map...")
         map=Property.parse(file)
-    
 
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
@@ -245,10 +282,11 @@ def change_brush():
         mat=find_key(face, 'material')   
         if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
             plane=find_key(face,'plane')
-            pos=plane.value.split(" ")
-            for i in (2,5,8): # these are the z index, but with an extra paranthesis - pos[2] = "96)", for examp
-                pos[i]= str((int(pos[i][:-1])-96)) + ".1)" #split off the ), subtract 95.9 to make the brush 0.1 units thick, then add back the )
-            plane.value = " ".join(pos)
+            verts=split_plane(plane)
+            for v in verts:
+                v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
+                # we do the decimal with strings to ensure it adds floats precisely
+            plane.value=join_plane(verts)
             
         if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
             for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
@@ -259,9 +297,7 @@ def change_brush():
         is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
         if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
             # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-            verts = find_key(face, 'plane').value[1:-1].split(") (") # break into 3 groups of 3d vertexes
-            for i,v in enumerate(verts):
-                verts[i]=v.split(" ")
+            verts = split_plane(find_key(face,'plane'))
             # y-val for first if < last if ceiling
             side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
             type = "black" if mat.value.casefold() in BLACK_PAN else "white"
@@ -446,6 +482,11 @@ def fix_inst():
             elif "ccflag_death_fizz_base" in file[0].value: # LP's Death Fizzler
                 for trig in triggers:
                     if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                        # The Death Fizzler has 4 brushes:
+                        # - trigger_portal_cleanser with standard fizzler texture for fizzler-only mode (-fizz_blue)
+                        # - trigger_portal_cleanser with death fizzler texture  for both mode (-fizz_red)
+                        # - trigger_hurt for deathfield mode (-hurt)
+                        # - func_brush for the deathfield-only mode (-brush)
                         trig_src = []
                         for l in trig.to_strings():
                             trig_src.append(l + "\n")
@@ -454,7 +495,7 @@ def fix_inst():
                             if mat.value.casefold() in DEATH_FIZZLER_SUFFIX.keys():
                                 mat.value = settings["lp_death_field"][0] + DEATH_FIZZLER_SUFFIX[mat.value.casefold()]
                         find_key(trig, 'targetname').value = inst.targname + "-fizz_red"
-                        find_key(trig, 'spawnflags').value = "0"
+                        find_key(trig, 'spawnflags').value = "9"
                         
                         new_trig = Property.parse(trig_src)[0] # get a duplicate of the trigger by serialising and deserialising
                         find_key(new_trig, 'targetname').value = inst.targname + "-fizz_blue"
@@ -463,25 +504,114 @@ def fix_inst():
                         
                         hurt = Property.parse(trig_src)[0]
                         sides=Property.find_all(hurt, 'entity"solid"side"material')
+                        is_short = False # (if true we can shortcut for the brush)
                         for mat in sides:
+                            if mat.value.casefold() == "effects/fizzler":
+                                is_short=True
                             mat.value = "tools/toolstrigger"
                         find_key(hurt, 'classname').value = "trigger_hurt"
                         find_key(hurt, 'targetname').value = inst.targname + "-hurt"
-                        find_key(trig, 'spawnflags').value="1"
+                        find_key(hurt, 'spawnflags').value="1"
                         
-                        prop=Property.find_all(hurt, 'entity"usescanline')[0]
+                        prop=find_key(hurt, 'usescanline')
                         prop.name="damage"
                         prop.value="100000"
                         
-                        prop=Property.find_all(hurt, 'entity"visible')[0]
+                        prop=find_key(hurt, 'visible')
                         prop.name="damagetype"
                         prop.value="1024"
                         
                         hurt.value.append(Property('nodmgforce', '1'))
                         map.append(hurt)
+                        
+                        brush = Property.parse(trig_src)[0]
+                        find_key(brush, 'targetname').value = inst.targname + "-brush"
+                        find_key(brush, 'classname').value = 'func_brush'
+                        find_key(brush, 'spawnflags').value = "1"
+                        
+                        prop=find_key(brush, 'visible')
+                        prop.name="solidity"
+                        prop.value="1"
+                        
+                        prop=find_key(brush, 'usescanline')
+                        prop.name="renderfx"
+                        prop.value="14"
+                        brush.value.append(Property('drawinfastreflection', "1"))
+                        
+                        if is_short:
+                            sides=Property.find_all(brush, 'entity"solid"side')
+                            for side in sides:
+                                mat=find_key(side,'material')
+                                if "effects/fizzler" in mat.value.casefold():
+                                    mat.value="effects/laserplane"
+                                alter_mat(mat) # convert to the styled version
+                                
+                                uaxis = find_key(side, 'uaxis').value.split(" ")
+                                vaxis = find_key(side, 'vaxis').value.split(" ")
+                                # the format is like "[1 0 0 -393.4] 0.25"
+                                uaxis[3]="0" + "]"
+                                uaxis[4]="0.25"
+                                vaxis[4]="0.25"
+                                find_key(side, 'uaxis').value = " ".join(uaxis)
+                                find_key(side, 'vaxis').value = " ".join(vaxis)
+                        else:
+                            # We need to stretch the brush to get rid of the side sections.
+                            # This is the same as moving all the solids to match the bounding box.
+                            
+                            # get the origin, used to figure out if a point should be max or min
+                            origin=[int(v) for v in find_key(brush,'origin').value.split(' ')]
+                            planes=Property.find_all(brush, 'entity"solid"side"plane')
+                            bbox_max,bbox_min=get_bbox(planes)
+                            for pl in planes:
+                                verts=split_plane(pl)
+                                for v in verts:
+                                    for i in range(0,3): #x,y,z
+                                        if int(v[i]) > origin[i]:
+                                            v[i]=str(bbox_max[i])
+                                        else:
+                                            v[i]=str(bbox_min[i])
+                                pl.value=join_plane(verts)
+                            solids=Property.find_all(brush, 'entity"solid')
+                            
+                            sides=Property.find_all(solids[1],'solid"side')
+                            for side in sides:
+                                mat=find_key(side, 'material')
+                                if mat.value.casefold() == "effects/fizzler_center":
+                                    mat.value="effects/laserplane"
+                                alter_mat(mat) # convert to the styled version
+                                bounds_max,bounds_min=get_bbox(Property.find_all(side,'side"plane'))
+                                dimensions = [0,0,0]
+                                for i,g in enumerate(dimensions):
+                                    dimensions[i] = bounds_max[i] - bounds_min[i]
+                                if 2 in dimensions: # The front/back won't have this dimension
+                                    mat.value="tools/toolsnodraw"
+                                else:
+                                    uaxis=find_key(side, 'uaxis').value.split(" ")
+                                    vaxis=find_key(side, 'vaxis').value.split(" ")
+                                    # the format is like "[1 0 0 -393.4] 0.25"
+                                    size=0
+                                    offset=0
+                                    for i,w in enumerate(dimensions):
+                                        if int(w)>size:
+                                            size=int(w)
+                                            offset=int(bounds_min[i])
+                                    print(size)
+                                    print(uaxis[3], size)
+                                    uaxis[3]=str(512/size * -offset) + "]" # texture offset to fit properly
+                                    uaxis[4]=str(size/512) # scaling
+                                    vaxis[4]="0.25" # widthwise it's always the same
+                                    find_key(side, 'uaxis').value = " ".join(uaxis)
+                                    find_key(side, 'vaxis').value = " ".join(vaxis)
+                                
+                            brush.value.remove(solids[2])
+                            brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
+                            del solids
+                        map.append(brush)
             elif "ccflag_panel_clear" in file[0].value:
                 make_static_pan(inst, "glass") # white/black are identified based on brush                        
                         
+    #crash()
+    
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     log("Editing WorldSpawn")
