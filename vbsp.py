@@ -35,46 +35,43 @@ HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
          }
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
-    "metal/black_floor_metal_001c"       : "blackfloor",
-    "tile/white_floor_tile002a"          : "whitefloor",
-    "metal/black_floor_metal_001c"       : "blackceiling",
-    "tile/white_floor_tile002a"          : "whiteceiling",
-    "tile/white_wall_tile003a"           : "whitewall",
-    "tile/white_wall_tile003h"           : "whitewall",
-    "tile/white_wall_tile003c"           : "white_2",
-    "tile/white_wall_tile003f"           : "white_4",
-    "metal/black_wall_metal_002c"        : "blackwall",
-    "metal/black_wall_metal_002e"        : "blackwall",
-    "metal/black_wall_metal_002a"        : "black_2",
-    "metal/black_wall_metal_002b"        : "black_4",
-    "anim_wp/framework/backpanels_cheap" : "behind",
-    "plastic/plasticwall004a"            : "pedestalside",
-    "anim_wp/framework/squarebeams"      : "edge",
-    "signage/signage_exit"               : "signexit",
-    "signage/signage_overlay_arrow"      : "signarrow",
-    "signage/signage_overlay_catapult1"  : "signcatapultfling",
-    "signage/signage_overlay_catapult2"  : "signcatapultland",
-    "signage/shape01"                    : "shapedot",
-    "signage/shape02"                    : "shapemoon",
-    "signage/shape03"                    : "shapetriangle",
-    "signage/shape04"                    : "shapecross",
-    "signage/shape05"                    : "shapesquare",
-    "signage/signage_shape_circle"       : "shapecircle",
-    "signage/signage_shape_sine"         : "shapesine",
-    "signage/signage_shape_slash"        : "shapeslash",
-    "signage/signage_shape_star"         : "shapestar",
-    "signage/signage_shape_wavy"         : "shapewavy",
-    "nature/toxicslime_a2_bridge_intro"  : "goo",
-    "glass/glasswindow007a_less_shiny"   : "glass",
-    "metal/metalgrate018"                : "grating",
-    "effects/fizzler_l"                  : "fizzlerleft",
-    "effects/fizzler_r"                  : "fizzlerright",
-    "effects/fizzler_center"             : "fizzlercenter",
-    "effects/fizzler"                    : "fizzlershort",
-    "BEE2/fizz/lp/death_field_clean_"    : "lp_death_field", # + short/left/right/center
-    "effects/laserplane"                 : "laserfield",
-    "tools/toolsnodraw"                  : "nodraw" # Don't know why someone would want to change this, but anyway...
+    #"metal/black_floor_metal_001c"       : "black.floor",
+    #"tile/white_floor_tile002a"          : "white.floor",
+    #"metal/black_floor_metal_001c"       : "black.ceiling",
+    #"tile/white_floor_tile002a"          : "white.ceiling",
+    "tile/white_wall_tile003a"           : "white.wall",
+    "tile/white_wall_tile003h"           : "white.wall",
+    "tile/white_wall_tile003c"           : "white.2x2",
+    "tile/white_wall_tile003f"           : "white.4x4",
+    "metal/black_wall_metal_002c"        : "black.wall",
+    "metal/black_wall_metal_002e"        : "black.wall",
+    "metal/black_wall_metal_002a"        : "black.2x2",
+    "metal/black_wall_metal_002b"        : "black.4x4",
+    "anim_wp/framework/backpanels_cheap" : "overlay.behind",
+    "plastic/plasticwall004a"            : "overlay.pedestalside",
+    "anim_wp/framework/squarebeams"      : "overlay.edge",
+    "signage/signage_exit"               : "overlay.exit",
+    "signage/signage_overlay_arrow"      : "overlay.arrow",
+    "signage/signage_overlay_catapult1"  : "overlay.catapultfling",
+    "signage/signage_overlay_catapult2"  : "overlay.catapultland",
+    "signage/shape01"                    : "overlay.dot",
+    "signage/shape02"                    : "overlay.moon",
+    "signage/shape03"                    : "overlay.triangle",
+    "signage/shape04"                    : "overlay.cross",
+    "signage/shape05"                    : "overlay.square",
+    "signage/signage_shape_circle"       : "overlay.circle",
+    "signage/signage_shape_sine"         : "overlay.sine",
+    "signage/signage_shape_slash"        : "overlay.slash",
+    "signage/signage_shape_star"         : "overlay.star",
+    "signage/signage_shape_wavy"         : "overlay.wavy",
+    "nature/toxicslime_a2_bridge_intro"  : "special.goo",
+    "glass/glasswindow007a_less_shiny"   : "special.glass",
+    "metal/metalgrate018"                : "special.grating",
+    "BEE2/fizz/lp/death_field_clean_"    : "special.lp_death_field", # + short/left/right/center
+    "effects/laserplane"                 : "special.laserfield",
+    "sky_black"                          : "special.sky",
     }
+    
 WHITE_PAN = ["tile/white_floor_tile002a",
              "tile/white_wall_tile003a", 
              "tile/white_wall_tile003h", 
@@ -92,28 +89,23 @@ BLACK_PAN = [
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlineCorner"
-    } # these need to be handled seperately to accomadate the scale-changing
+    } # these need to be handled seperately to accomedate the scale-changing
 
 DEFAULTS = {
-    "bottomless_pit"          : 0,
-    "remove_info_lighting"    : 0,
-    "fix_glass"               : 0,
-    "random_black_wall_scale" : 0,
-    "use_screenshot"          : 0,
-    "run_bsp_zip"             : 0,
-    "fizzler_scanline"        : 1,
-    "force_fizz_reflect"      : 0,
-    "force_brush_reflect"     : 0,
-    "remove_exit_signs"       : 0,
-    "force_paint"             : 0,
-    "change_fizz_inst"        : 0,
+    "bottomless_pit"          : "0",
+    "remove_info_lighting"    : "0",
+    "fix_glass"               : "0",
+    "fix_portal_bump"         : "0",
+    "random_blackwall_scale" : "0",
+    "use_screenshot"          : "0",
+    "run_bsp_zip"             : "0",
+    "force_fizz_reflect"      : "0",
+    "force_brush_reflect"     : "0",
+    "remove_exit_signs"       : "0",
+    "force_paint"             : "0",
     "sky"                     : "sky_black",
-    "glass_scale"             : "0.15",    
-    "blackfloor"              : "metal/black_floor_metal_001c", # add these to make sure they overide if none specified
-    "whitefloor"              : "tile/white_floor_tile002a",
-    "antline"                 : "0.25|signage/indicator_lights/indicator_lights_floor",
-    "antlinecorner"           : "1|signage/indicator_lights/indicator_lights_corner_floor",
-    "static_pan_inst"         : "",
+    "glass_scale"             : "0.15",
+    "static_pan"              : ""
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -129,15 +121,16 @@ fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=o
     "-90 -90 0" : "90 90 0",
     }
 
-DEATH_FIZZLER_SUFFIX = {
+TEX_FIZZLER = {
     "effects/fizzler_center" : "center",
     "effects/fizzler_l"      : "left",
     "effects/fizzler_r"      : "right",
-    "effects/fizzler"        : "short"
+    "effects/fizzler"        : "short",
+    "0"                      : "scanline"
     }
     
-FIXUP_KEYS = ["01", "02", "03", "04", "05", "06", "07", "08" ,"09", "10", "11", "12", "13", "14", "15", "16"]
-    # $replace01, $replace02
+FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
+    # $replace01, $replace02,
  
 ###### UTIL functions #####
  
@@ -149,10 +142,20 @@ def unique_id():
    
 def log(text):
     print(text, flush=True)
+        
+def get_opt(name):
+    return settings['options'][name]
+
+def get_tex(name):
+    if name in settings['textures']:
+        return random.choice(settings['textures'][name])
+    else:
+        raise ValueError('No texture "' + name + '"!')
     
 def alter_mat(prop):
-    if prop.value.casefold() in TEX_VALVE: # should we convert it?
-        prop.value = random.choice(settings[TEX_VALVE[prop.value.casefold()].casefold()])
+    mat=prop.value.casefold()
+    if mat in TEX_VALVE: # should we convert it?
+        prop.value = get_tex(TEX_VALVE[mat])
 
 def add_output(entity, output, target, input, params="", delay="0", times="-1"):
     "Add a new output to an entity with the given values, generating a connections part if needed."
@@ -199,13 +202,16 @@ def get_bbox(planes):
                 bbox_min[i] = min(int(v[i]), bbox_min[i])
     return bbox_max, bbox_min
 
-def find_key(ent, key):
+def find_key(ent, key, norm=None):
     "Safely get a subkey from an instance (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
     result = Property.find_all(ent, ent.name + '"' + key)
     if len(result) == 1:
         return result[0]
     elif len(result) == 0:
-        raise ValueError('No key "' + key + '"!')
+        if norm==None:
+            raise ValueError('No key "' + key + '"!')
+        else:
+            return norm
     else:
         raise ValueError('Duplicate keys "' + key + '"!')
 
@@ -215,26 +221,56 @@ def load_settings():
     global settings
     with open("vbsp_config.cfg", "r") as config: # this should be outputted when editoritems is exported, so we don't have to trawl through editoritems to find our settings.
         conf=Property.parse(config)
-    log("Settings Loaded!")
-    settings = {}
-    for item in conf: # convert properties into simpler dictionary
-        if item.name.casefold() in settings:
-            settings[item.name.casefold()].append(item.value)
+    settings = {"textures"      : {},
+                "fizzler"       : {},
+                "cust_fizzlers" : [],
+                "options"       : {},
+                "deathfield"    : {},
+                "instances"     : {}
+                }
+    tex_defaults = list(TEX_VALVE.items()) + [
+        ("metal/black_floor_metal_001c", "black.floor" ),
+        ("tile/white_floor_tile002a",    "white.floor"),
+        ("metal/black_floor_metal_001c", "black.ceiling"),
+        ("tile/white_floor_tile002a",    "white.ceiling")
+        ] # These have the same item so we can't store this in the regular dictionary.
+    for item,key in tex_defaults: # collect textures from config
+        cat, name = key.split(".")
+        value = [prop.value for prop in Property.find_all(config, 'textures"' + cat + '"' + name)]
+        if len(value)==0:
+            settings['textures'][key] = [item]
         else:
-            settings[item.name.casefold()]=[item.value] # all values are a list of the different ones used
+            settings['textures'][key] = value
+            
+    for key in DEFAULTS.keys(): # get misc options
+        value = Property.find_all(config, 'options"' + key)
+        if len(value)==0:
+            settings['options'][key] = DEFAULTS[key]
+        else:
+            settings['options'][key] = value[0].value
     
-    for opt in DEFAULTS.keys() :  # add the default to the config if not present already
-        if not opt in settings:
-            settings[opt]=[str(DEFAULTS[opt])] 
-            
-    for mat in TEX_VALVE.keys() :
-        if not TEX_VALVE[mat] in settings:
-            settings[TEX_VALVE[mat]]=[str(mat)]
-            
-    for mat in ANTLINES.keys() : 
-        if not ANTLINES[mat] in settings:
-            settings[ANTLINES[mat]]=[mat]
-            
+    for item,key in TEX_FIZZLER.items():
+        value = Property.find_all(config, 'fizzler"' + key)
+        if len(value)==0:
+            settings['fizzler'][key] = item
+        else:
+            settings['fizzler'][key] = value[0].value
+           
+    cust_fizzlers = Property.find_all(config, 'cust_fizzlers')
+    for fizz in cust_fizzlers:
+        if len(Property.find_all(fizz, 'cust_fizzlers"flag')) == 1:
+            flag = find_key(fizz, 'flag')
+            if flag in settings['cust_fizzler']:
+                raise ValueError('Two Fizzlers with same flag!!')
+            data= {}
+            data['left']     = find_key(fizz, 'left', 'tools/toolstrigger'),
+            data['right']    = find_key(fizz, 'right', 'tools/toolstrigger'),
+            data['center']   = find_key(fizz, 'center', 'tools/toolstrigger'),
+            data['short']    = find_key(fizz, 'short', 'tools/toolstrigger'),
+            data['scanline'] = find_key(fizz, 'scanline', settings['fizzler']['scanline'])
+            cust_fizzlers[flag] = data
+    log("Settings Loaded!")
+    
 def load_map(path):
     global map
     with open(path, "r") as file:
@@ -280,7 +316,7 @@ def change_brush():
     sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
     for face in sides:
         mat=find_key(face, 'material')   
-        if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (settings["bottomless_pit"][0]=="1"):
+        if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
             plane=find_key(face,'plane')
             verts=split_plane(plane)
             for v in verts:
@@ -291,7 +327,7 @@ def change_brush():
         if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
             for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
                 split=val.value.split(" ")
-                split[-1] = settings["glass_scale"][0]
+                split[-1] = get_opt("glass_scale") # apply the glass scaling option
                 val.value=" ".join(split)
         
         is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
@@ -300,12 +336,12 @@ def change_brush():
             verts = split_plane(find_key(face,'plane'))
             # y-val for first if < last if ceiling
             side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
-            type = "black" if mat.value.casefold() in BLACK_PAN else "white"
-            is_blackceil = (type+side == "blackceiling")
-            mat.value = random.choice(settings[type+side])
+            type = "black." if mat.value.casefold() in BLACK_PAN else "white."
+            is_blackceil = (type+side == "black.ceiling")
+            mat.value = get_tex(type+side)
             
-        if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and settings["random_blackwall_scale"][0] == "1":
-            scale= random.choice(("0.25", "0.5", "1"))
+        if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+            scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
             for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
                 if len(val)==1:
                     split=val[0].value.split(" ")
@@ -329,7 +365,7 @@ def change_overlays():
                 mat.value=new_tex[1]
             else:
                 mat.value=new_tex
-        if (over.targname in ("exitdoor_stickman","exitdoor_arrow")) and (settings["remove_exit_signs"][0]=="1"):
+        if (over.targname in ("exitdoor_stickman","exitdoor_arrow")) and (get_opt("remove_exit_signs") =="1"):
             to_rem.append(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
     for rem in to_rem:
         map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
@@ -343,8 +379,8 @@ def change_trig():
             sides=Property.find_all(trig, 'entity"solid"side"material')
             for mat in sides:
                 alter_mat(mat)
-            find_key(trig, 'useScanline').value = settings["fizzler_scanline"][0]
-            find_key(trig, 'drawInFastReflection').value = settings["force_fizz_reflect"][0]
+            find_key(trig, 'useScanline').value = options["fizzler"]["scanline"]
+            find_key(trig, 'drawInFastReflection').value = get_opt("force_fizz_reflect")
 
 def change_func_brush():
     "Edit func_brushes."
@@ -354,16 +390,16 @@ def change_func_brush():
         sides=Property.find_all(brush, 'entity"solid"side"material')
         type=""
         for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
-            if mat.value.casefold() == "anim_wp/framework/squarebeams" and "edge_special" in settings:
-                mat.value = random.choice(settings["edge_special"])
+            if mat.value.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
+                mat.value = get_tex("special.edge")
             elif mat.value.casefold() in WHITE_PAN:
                 type="white"
-                if "white_special" in settings:
-                    mat.value = random.choice(settings["white_special"])
+                if "special.white" in settings['textures']:
+                    mat.value = get_tex("special.white")
             elif mat.value.casefold() in BLACK_PAN:
                 type="black"
-                if "black_special" in settings:
-                    mat.value = random.choice(settings["black_special"])
+                if "special.black" in settings['textures']:
+                    mat.value = get_tex("special.black")
             else:
                 alter_mat(mat) # for gratings, laserfields and some others
         parent=Property.find_all(brush, 'entity"parentname')
@@ -376,7 +412,7 @@ def change_func_brush():
                     break
         fast_ref = Property.find_all(brush, 'entity"drawInFastReflection')
         if len(fast_ref) == 1:
-            fast_ref[0].value = settings["force_brush_reflect"][0]
+            fast_ref[0].value = get_opt("force_brush_reflect")
         else:
             brush.value.append(Property("drawinfastreflection", settings["force_brush_reflect"][0]))
     for item in to_rem:
@@ -385,13 +421,13 @@ def change_func_brush():
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
-    if settings["static_pan_inst"][0] == "":
+    if get_opt("static_pan") == "":
         return False # no conversion allowed!
     angle="er"
     is_static=False
     is_flush=False
     for i in FIXUP_KEYS:
-        var = Property.find_all(ent, 'entity"replace' + i)
+        var = Property.find_all(ent, 'entity"' + i)
         if(len(var)==1):
             if var[0].value == "$connectioncount 0":
                 is_static=True
@@ -403,7 +439,7 @@ def make_static_pan(ent, type):
         return False
     if is_flush:
         angle="00" # different instance flat with the wall
-    find_key(ent, "file").value = settings["static_pan_inst"][0] + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
+    find_key(ent, "file").value = get_opt("static_pan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
     return True
             
 def change_ents():
@@ -433,9 +469,9 @@ def fix_inst():
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
             for i in FIXUP_KEYS:
-                var = Property.find_all(inst, 'entity"replace' + i)
+                var = Property.find_all(inst, 'entity"' + i)
                 if len(var) == 1 and "$skin" in var[0].value:
-                    if settings['change_fizz_inst'][0]=="1":
+                    if settings['fizzler']['splitInstances']=="1":
                         # switch to alternate instances depending on what type of fizzler, to massively save ents
                         if "$skin 0" in var[0].value and len(file)==1 and "barrier_hazard_model" in file[0].value:
                             file[0].value = file[0].value[:-4] + "_fizz.vmf" 
@@ -492,8 +528,8 @@ def fix_inst():
                             trig_src.append(l + "\n")
                         sides=Property.find_all(trig, 'entity"solid"side"material')
                         for mat in sides:
-                            if mat.value.casefold() in DEATH_FIZZLER_SUFFIX.keys():
-                                mat.value = settings["lp_death_field"][0] + DEATH_FIZZLER_SUFFIX[mat.value.casefold()]
+                            if mat.value.casefold() in TEX_FIZZLER.keys():
+                                mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
                         find_key(trig, 'targetname').value = inst.targname + "-fizz_red"
                         find_key(trig, 'spawnflags').value = "9"
                         
@@ -622,14 +658,14 @@ def fix_worldspawn():
         log(has_paint)
         if len(has_paint) == 1:
             if has_paint[0].value == "0":
-                has_paint[0].value = settings["force_paint"][0]
+                has_paint[0].value = get_opt("force_paint")
         else:
-            root.value.append(Property("has_paint", settings["force_paint"][0]))
+            root.value.append(Property("has_paint", get_opt("force_paint")))
         sky = Property.find_all(root, 'world"skyname')
         if len(sky) == 1:
-            sky[0].value = random.choice(settings["sky"]) # allow random sky to be chosen
+            sky[0].value = get_tex("special.sky") # allow random sky to be chosen
         else:
-            root.value.append(Property("skyname", random.choice(settings["sky"])))
+            root.value.append(Property("skyname", get_tex("special.sky")))
 
 def add_extra_ents():
     "Add our various extra instances to enable some features."
@@ -641,9 +677,9 @@ def add_extra_ents():
                     "voice"  : [-8192, "0 512"]
                  }
     for type in inst_types.keys():
-        if "inst_"+type in settings:
+        if type in settings['instances']:
             max_ent_id = max_ent_id + 1
-            for inst in settings["inst_"+type]:
+            for inst in get_inst(type):
                 opt = inst.split("|")
                 if len(opt)== 2:
                     inst_types[type][0] += int(opt[0])
@@ -695,7 +731,7 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     unique_counter=0
     progs = [
              load_settings, load_entities, 
-             fix_inst, change_ents, add_extra_ents,
+             fix_inst, change_ents, #add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
              fix_worldspawn, save
