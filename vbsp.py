@@ -21,7 +21,7 @@ brushes=[] # All world and func_detail brushes generated
 f_brushes=[] # Func_brushes
 detail=[]
 triggers=[]
-other_ents=[] # anything else, including some logic_autos, func_brush, trigger_multiple, trigger_hurt, trigger_portal_cleanser, etc
+other_ents=[] # anything else, including some logic_autos, info_lighting, overlays, etc
 unique_counter=0 # counter for instances to ensure unique targetnames
 max_ent_id = 1 # maximum known entity id, so we know what we can set new ents to be.
 
@@ -153,9 +153,17 @@ def get_tex(name):
         raise ValueError('No texture "' + name + '"!')
     
 def alter_mat(prop):
+    global to_pack
     mat=prop.value.casefold()
     if mat in TEX_VALVE: # should we convert it?
         prop.value = get_tex(TEX_VALVE[mat])
+        if get_opt("run_bsp_zip") == "1":
+            for key in list(to_pack_mat.keys()):
+                # need to be list to decouple and allow deleting from original dict
+                if key == mat:
+                    log('Adding "' + key + '" to pack list!')
+                    to_pack += to_pack_mat[key] # add all the commands to the list
+                    #del to_pack_mat[key]
         return True
     else:
         return False
@@ -275,6 +283,27 @@ def load_settings():
             data['short']    = find_key(fizz, 'short', 'tools/toolstrigger'),
             data['scanline'] = find_key(fizz, 'scanline', settings['fizzler']['scanline'])
             cust_fizzlers[flag] = data
+    pack_commands = Property.find_all(conf, 'packer')
+    for pack in pack_commands:
+        f_list=pack.value
+        for cmd in f_list:
+            if cmd.name.casefold()=="add":
+                to_pack.append(cmd.value)
+            if cmd.name.casefold()=="add_list":
+                to_pack.append("|list|" + cmd.value)
+            elif cmd.name.casefold()=="add_if":
+                inst = Property.find_all(cmd, 'add_if"flag')
+                mat = Property.find_all(cmd, 'add_if"mat')
+                vals = [prop.value for prop in Property.find_all(cmd, 'add_if"add')]
+                vals += ["|list|" + prop.value for prop in Property.find_all(cmd, 'add_if"add_list')]
+                print(vals)
+                if (len(inst)==1 or len(mat)==1) and len(vals)>0:
+                    if len(inst)==1:
+                        to_pack_inst[inst[0].value] = vals
+                    if len(mat)==1:
+                        to_pack_mat[mat[0].value.casefold()] = vals
+    print("To Pack:" + str(to_pack))
+    print("Inst:" + str(to_pack_inst))
     log("Settings Loaded!")
     
 def load_map(path):
@@ -501,6 +530,7 @@ def change_ents():
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
+    global to_pack
     log("Editing Instances...")
     for inst in instances:
         file=Property.find_all(inst, 'entity"file')
@@ -530,6 +560,11 @@ def fix_inst():
             if len(file) == 1 and "ccflag_death_fizz_model" in file[0].value:
                 name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
         if len(file) == 1:
+            for key in list(to_pack_inst.keys()): # do we need to pack files?
+                # need to be list to decouple and allow deleting from original dict
+                if key in file[0].value:
+                    to_pack += to_pack_inst[key] # add all the commands to the list
+                    del to_pack_inst[key]
             if "ccflag_paint_fizz" in file[0].value:
                 # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
                 for trig in triggers:
@@ -739,27 +774,87 @@ def add_extra_ents():
                            ]
                     new_inst = Property("entity", keys)
                     map.append(new_inst)
-          
+                    
+def make_packlist():
+    "Create the required packer file for BSPzip to use."
+    pack_file = new_path[:-4] + ".filelist.txt"
+    folders=get_valid_folders()
+    log("Creating Pack list...")
+    print(to_pack)
+    with open(pack_file, 'w') as fil:
+        for item in to_pack:
+            if item.startswith("|list|"):
+                item = os.path.join(os.getcwd(),"pack_lists",item[6:])
+                print('Opening "' + item + '"!')
+                if os.path.isfile(item):
+                    with open(item, 'r') as lst:
+                        for line in lst:
+                            line=line.strip() # get rid of carriage returns etc
+                            log("Adding " + line)
+                            full=expand_source_name(line, folders)
+                            if full:
+                                fil.write(line + "\n")
+                                fil.write(full + "\n")
+                else:
+                    log("Error: File not found, skipping...")
+            else:
+                full=expand_source_name(item, folders)
+                if full:
+                    fil.write(item + "\n")
+                    fil.write(full + "\n")
+    log("Done!")
+                
+def get_valid_folders():
+    "Look through our game path to find folders in order of priority"
+    dlc_count = 1
+    priority = ["portal2"]
+    print(os.path.join(root, "portal2_dlc" + str(dlc_count)))
+    while os.path.isdir(os.path.join(root, "portal2_dlc" + str(dlc_count))):
+        priority.append("portal2_dlc" + str(dlc_count))
+        dlc_count+=1
+    if os.path.isdir(os.path.join(root, "update")):
+        priority.append("update")
+    blacklist = ("bin", "Soundtrack", "sdk_tools", "sdk_content") # files are definitely not here
+    all_folders = [f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f)) and f not in priority and f not in blacklist]
+    in_order = [x for x in reversed(priority)] + all_folders
+    return in_order
+    
+def expand_source_name(file, folders):
+    "Determine the full path for an item with a truncated path."
+    for f in folders:
+        poss=os.path.normpath(os.path.join(root, f, file))
+        print(poss)
+        if os.path.isfile(poss):
+            return poss
+    print( file + " not found!")
+    return False
+    
 def save():
+    "Save the modified map back to the correct location."
     out = []
     log("Saving New Map...")
     for p in map:
         for s in p.to_strings():
             out.append(s + '\n')
-    with open("F:\SteamLibrary\SteamApps\common\Portal 2\sdk_content\maps\styled\preview.vmf", 'w') as f:
+    with open(new_path, 'w') as f:
         f.writelines(out)
     log("Complete!")
     
 def run_vbsp(args, compile_loc, target):
     "Execute the original VBSP, copying files around so it works correctly."
-    # TODO: Get the ingame VBSP progress bar to work right. Probably involves making sure P2 gets the VBSP console output.
     log("Calling original VBSP...")
     shutil.copy(target.replace(".vmf",".log"), compile_loc.replace(".vmf",".log"))
     subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=None, stderr=subprocess.PIPE, shell=True)
     shutil.copy(compile_loc.replace(".vmf",".bsp"), target.replace(".vmf",".bsp"))
     shutil.copy(compile_loc.replace(".vmf",".log"), target.replace(".vmf",".log"))
     shutil.copy(compile_loc.replace(".vmf",".prt"), target.replace(".vmf",".prt")) # copy over the real files so vvis/vrad can read them
-    
+
+# MAIN
+to_pack = [] # the file path for any items that we should be packing
+to_pack_inst = {} # items to pack for a specific instance
+to_pack_mat = {} # files to pack if material is used (by VBSP_styles only)
+
+root = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
 new_args=sys.argv[1:]
 new_path=""
@@ -770,14 +865,15 @@ for i,a in enumerate(new_args):
         new_path=new_args[i]
         path=a
 log("Map path is " + path)
+load_settings()
+load_map(path)
+load_entities()
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     log("PeTI map detected! (has Entity Limit of 1750)")
-    load_map(path)
     max_ent_id=-1
     unique_counter=0
     progs = [
-             load_settings, load_entities, 
-             fix_inst, change_ents, #add_extra_ents,
+             fix_inst, change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
              fix_worldspawn, save
@@ -785,6 +881,8 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     for func in progs:
         func()
     run_vbsp(new_args, new_path, path)
+    if get_opt('run_bsp_zip') == "1":
+        make_packlist()
 else:
     log("Hammer map detected! skipping conversion..")
     run_vbsp(sys.argv[1:], path, path)
