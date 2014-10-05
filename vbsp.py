@@ -39,37 +39,37 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     #"tile/white_floor_tile002a"          : "white.floor",
     #"metal/black_floor_metal_001c"       : "black.ceiling",
     #"tile/white_floor_tile002a"          : "white.ceiling",
-    "tile/white_wall_tile003a"           : "white.wall",
-    "tile/white_wall_tile003h"           : "white.wall",
-    "tile/white_wall_tile003c"           : "white.2x2",
-    "tile/white_wall_tile003f"           : "white.4x4",
-    "metal/black_wall_metal_002c"        : "black.wall",
-    "metal/black_wall_metal_002e"        : "black.wall",
-    "metal/black_wall_metal_002a"        : "black.2x2",
-    "metal/black_wall_metal_002b"        : "black.4x4",
-    "anim_wp/framework/backpanels_cheap" : "overlay.behind",
-    "plastic/plasticwall004a"            : "overlay.pedestalside",
-    "anim_wp/framework/squarebeams"      : "overlay.edge",
-    "signage/signage_exit"               : "overlay.exit",
-    "signage/signage_overlay_arrow"      : "overlay.arrow",
-    "signage/signage_overlay_catapult1"  : "overlay.catapultfling",
-    "signage/signage_overlay_catapult2"  : "overlay.catapultland",
-    "signage/shape01"                    : "overlay.dot",
-    "signage/shape02"                    : "overlay.moon",
-    "signage/shape03"                    : "overlay.triangle",
-    "signage/shape04"                    : "overlay.cross",
-    "signage/shape05"                    : "overlay.square",
-    "signage/signage_shape_circle"       : "overlay.circle",
-    "signage/signage_shape_sine"         : "overlay.sine",
-    "signage/signage_shape_slash"        : "overlay.slash",
-    "signage/signage_shape_star"         : "overlay.star",
-    "signage/signage_shape_wavy"         : "overlay.wavy",
-    "nature/toxicslime_a2_bridge_intro"  : "special.goo",
-    "glass/glasswindow007a_less_shiny"   : "special.glass",
-    "metal/metalgrate018"                : "special.grating",
-    "BEE2/fizz/lp/death_field_clean_"    : "special.lp_death_field", # + short/left/right/center
-    "effects/laserplane"                 : "special.laserfield",
-    "sky_black"                          : "special.sky",
+    "tile/white_wall_tile003a"                               : "white.wall",
+    "tile/white_wall_tile003h"                               : "white.wall",
+    "tile/white_wall_tile003c"                               : "white.2x2",
+    "tile/white_wall_tile003f"                               : "white.4x4",
+    "metal/black_wall_metal_002c"                            : "black.wall",
+    "metal/black_wall_metal_002e"                            : "black.wall",
+    "metal/black_wall_metal_002a"                            : "black.2x2",
+    "metal/black_wall_metal_002b"                            : "black.4x4",
+    "signage/signage_exit"                                   : "overlay.exit",
+    "signage/signage_overlay_arrow"                          : "overlay.arrow",
+    "signage/signage_overlay_catapult1"                      : "overlay.catapultfling",
+    "signage/signage_overlay_catapult2"                      : "overlay.catapultland",
+    "signage/shape01"                                        : "overlay.dot",
+    "signage/shape02"                                        : "overlay.moon",
+    "signage/shape03"                                        : "overlay.triangle",
+    "signage/shape04"                                        : "overlay.cross",
+    "signage/shape05"                                        : "overlay.square",
+    "signage/signage_shape_circle"                           : "overlay.circle",
+    "signage/signage_shape_sine"                             : "overlay.sine",
+    "signage/signage_shape_slash"                            : "overlay.slash",
+    "signage/signage_shape_star"                             : "overlay.star",
+    "signage/signage_shape_wavy"                             : "overlay.wavy",
+    "anim_wp/framework/backpanels_cheap"                     : "special.behind",
+    "plastic/plasticwall004a"                                : "special.pedestalside",
+    "anim_wp/framework/squarebeams"                          : "special.edge",
+    "nature/toxicslime_a2_bridge_intro"                      : "special.goo",
+    "glass/glasswindow007a_less_shiny"                       : "special.glass",
+    "metal/metalgrate018"                                    : "special.grating",
+    "BEE2/fizz/lp/death_field_clean_"                        : "special.lp_death_field", # + short/left/right/center
+    "effects/laserplane"                                     : "special.laserfield",
+    "sky_black"                                              : "special.sky",
     }
     
 WHITE_PAN = ["tile/white_floor_tile002a",
@@ -88,7 +88,7 @@ BLACK_PAN = [
 
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
-    "signage/indicator_lights/indicator_lights_corner_floor" : "antlineCorner"
+    "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     } # these need to be handled seperately to accomedate the scale-changing
 
 DEFAULTS = {
@@ -105,7 +105,7 @@ DEFAULTS = {
     "force_paint"             : "0",
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
-    "static_pan"              : ""
+    "staticPan"               : "NONE"
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -156,6 +156,9 @@ def alter_mat(prop):
     mat=prop.value.casefold()
     if mat in TEX_VALVE: # should we convert it?
         prop.value = get_tex(TEX_VALVE[mat])
+        return True
+    else:
+        return False
 
 def add_output(entity, output, target, input, params="", delay="0", times="-1"):
     "Add a new output to an entity with the given values, generating a connections part if needed."
@@ -232,31 +235,34 @@ def load_settings():
         ("metal/black_floor_metal_001c", "black.floor" ),
         ("tile/white_floor_tile002a",    "white.floor"),
         ("metal/black_floor_metal_001c", "black.ceiling"),
-        ("tile/white_floor_tile002a",    "white.ceiling")
-        ] # These have the same item so we can't store this in the regular dictionary.
+        ("tile/white_floor_tile002a",    "white.ceiling"),
+        # These have the same item so we can't store this in the regular dictionary.
+        ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
+        ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
+        ] # And these have the extra scale information
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in Property.find_all(config, 'textures"' + cat + '"' + name)]
+        value = [prop.value for prop in Property.find_all(conf, 'textures"' + cat + '"' + name)]
         if len(value)==0:
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
             
     for key in DEFAULTS.keys(): # get misc options
-        value = Property.find_all(config, 'options"' + key)
+        value = Property.find_all(conf, 'options"' + key)
         if len(value)==0:
             settings['options'][key] = DEFAULTS[key]
         else:
             settings['options'][key] = value[0].value
     
     for item,key in TEX_FIZZLER.items():
-        value = Property.find_all(config, 'fizzler"' + key)
+        value = Property.find_all(conf, 'fizzler"' + key)
         if len(value)==0:
             settings['fizzler'][key] = item
         else:
             settings['fizzler'][key] = value[0].value
            
-    cust_fizzlers = Property.find_all(config, 'cust_fizzlers')
+    cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
     for fizz in cust_fizzlers:
         if len(Property.find_all(fizz, 'cust_fizzlers"flag')) == 1:
             flag = find_key(fizz, 'flag')
@@ -359,7 +365,8 @@ def change_overlays():
         if mat.value.casefold() in ANTLINES:
             angle = find_key(over, 'angles').value.split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
-            new_tex = random.choice(settings[ANTLINES[mat.value.casefold()].casefold()]).split("|")
+            new_tex = get_tex('overlay.'+ANTLINES[mat.value.casefold()]).split("|")
+            print(new_tex)
             if len(new_tex)==2:
                 find_key(over, 'endu').value=new_tex[0] # rescale antlines if needed
                 mat.value=new_tex[1]
@@ -396,10 +403,14 @@ def change_func_brush():
                 type="white"
                 if "special.white" in settings['textures']:
                     mat.value = get_tex("special.white")
+                elif not alter_mat(mat):
+                    mat.value = get_tex("white.wall")
             elif mat.value.casefold() in BLACK_PAN:
                 type="black"
                 if "special.black" in settings['textures']:
                     mat.value = get_tex("special.black")
+                elif not alter_mat(mat):
+                    mat.value = get_tex("black.wall")
             else:
                 alter_mat(mat) # for gratings, laserfields and some others
         parent=Property.find_all(brush, 'entity"parentname')
@@ -421,7 +432,7 @@ def change_func_brush():
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
-    if get_opt("static_pan") == "":
+    if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
     angle="er"
     is_static=False
@@ -429,17 +440,18 @@ def make_static_pan(ent, type):
     for i in FIXUP_KEYS:
         var = Property.find_all(ent, 'entity"' + i)
         if(len(var)==1):
+            print(type, var[0].value)
             if var[0].value == "$connectioncount 0":
                 is_static=True
-            if var[0].value == "$start_deployed 0":
+            if "$start_deployed 0" in var[0].value:
                 is_flush=True
             if "$animation" in var[0].value:
                 angle = var[0].value[16:18] # the number in "$animation ramp_45_deg_open"
+    if is_flush:
+        angle = "00" # different instance flat with the wall
     if not is_static:
         return False
-    if is_flush:
-        angle="00" # different instance flat with the wall
-    find_key(ent, "file").value = get_opt("static_pan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
+    find_key(ent, "file").value = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
     return True
             
 def change_ents():
@@ -447,7 +459,7 @@ def change_ents():
     log("Editing Other Entities...")
     to_rem=[] # entities to delete
     for ent in other_ents:
-        if ent.cls == "info_lighting" and (settings["remove_info_lighting"][0]=="1"):
+        if ent.cls == "info_lighting" and (get_opt("remove_info_lighting")=="1"):
             to_rem.append(ent) # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
     for rem in to_rem:
         map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
@@ -645,8 +657,6 @@ def fix_inst():
                         map.append(brush)
             elif "ccflag_panel_clear" in file[0].value:
                 make_static_pan(inst, "glass") # white/black are identified based on brush                        
-                        
-    #crash()
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
