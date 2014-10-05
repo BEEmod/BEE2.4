@@ -453,6 +453,40 @@ def make_static_pan(ent, type):
         return False
     find_key(ent, "file").value = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
     return True
+    
+def make_static_pist(ent):
+    "Convert a regular piston into a static version, to save entities and improve lighting."
+    if get_opt("staticPan") == "NONE":
+        return False # no conversion allowed!
+    print("Trying to make static...")
+    is_static=False
+    auto_move=True
+    top_pos=0
+    bottom_pos=0
+    start_pos = -1
+    for i in FIXUP_KEYS:
+        var = Property.find_all(ent, 'entity"' + i)
+        if(len(var)==1):
+            print("Piston property: ", var[0].value)
+            if var[0].value == "$connectioncount 0":
+                is_static=True
+            if var[0].value == "$disable_autodrop 0":
+                auto_move=False
+            if "$start_up" in var[0].value:
+                start_pos=var[0].value[-1:]
+            if "$top_level" in var[0].value:
+                top_pos = var[0].value[-1:]
+            if "$bottom_level" in var[0].value:
+                bottom_pos = var[0].value[-1:]
+    if not is_static or auto_move: # can it move?
+        if int(bottom_pos) > 0:
+            # The piston doesn't go fully down, use alt instances.
+            file=find_key(ent, "file")
+            file.value = file.value[:-4] + "_" + bottom_pos + ".vmf"
+    else: # we are static
+        find_key(ent, "file").value = get_opt("staticPan") + "pist_" + (top_pos if start_pos=="1" else bottom_pos) + ".vmf" 
+        # something like "static_pan/pist_3.vmf"
+    return True
             
 def change_ents():
     "Edit misc entities."
@@ -656,7 +690,9 @@ def fix_inst():
                             del solids
                         map.append(brush)
             elif "ccflag_panel_clear" in file[0].value:
-                make_static_pan(inst, "glass") # white/black are identified based on brush                        
+                make_static_pan(inst, "glass") # white/black are identified based on brush
+            elif "ccflag_pist_plat" in file[0].value:
+                make_static_pist(inst) #try to convert to static piston
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
