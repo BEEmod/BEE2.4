@@ -774,10 +774,40 @@ def add_extra_ents():
                            ]
                     new_inst = Property("entity", keys)
                     map.append(new_inst)
+
+def hammer_pack_scan():
+    "Look through entities to see if any packer commands exist, and add if needed."
+    global to_pack
+    to_pack=[] # We aren't using the ones found in vbsp_config
+    log("Searching for packer commands...")
+    comments = Property.find_all(map, 'entity"editor"comments')
+    for com in comments:
+        if "packer_" in com.value:
+            parts = com.value.split()
+            last_op = -1 # 1=item, 2=file
+            print(parts)
+            for frag in parts:
+                if frag.endswith("packer_additem:"): # space between command and file
+                    last_op = 1
+                elif frag.endswith("packer_addfile:"):
+                    last_op = 2
+                elif "packer_additem:" in frag: # has no space between command and file
+                    last_op = -1
+                    to_pack.append(frag.split("packer_additem:")[1])
+                elif "packer_addfile:" in frag:
+                    last_op = -1
+                    to_pack.append("|list|" + frag.split("packer_addfile:")[1])
+                else: # the file by itself
+                    if last_op == 1:
+                        to_pack.append(frag)
+                    elif last_op == 2:
+                        to_pack.append("|list|" + frag)
+    print(to_pack)
+                
                     
-def make_packlist():
+def make_packlist(vmf_path):
     "Create the required packer file for BSPzip to use."
-    pack_file = new_path[:-4] + ".filelist.txt"
+    pack_file = vmf_path[:-4] + ".filelist.txt"
     folders=get_valid_folders()
     log("Creating Pack list...")
     print(to_pack)
@@ -808,7 +838,6 @@ def get_valid_folders():
     "Look through our game path to find folders in order of priority"
     dlc_count = 1
     priority = ["portal2"]
-    print(os.path.join(root, "portal2_dlc" + str(dlc_count)))
     while os.path.isdir(os.path.join(root, "portal2_dlc" + str(dlc_count))):
         priority.append("portal2_dlc" + str(dlc_count))
         dlc_count+=1
@@ -823,10 +852,9 @@ def expand_source_name(file, folders):
     "Determine the full path for an item with a truncated path."
     for f in folders:
         poss=os.path.normpath(os.path.join(root, f, file))
-        print(poss)
         if os.path.isfile(poss):
             return poss
-    print( file + " not found!")
+    log( file + " not found!")
     return False
     
 def save():
@@ -840,14 +868,16 @@ def save():
         f.writelines(out)
     log("Complete!")
     
-def run_vbsp(args, compile_loc, target):
+def run_vbsp(args, do_swap):
     "Execute the original VBSP, copying files around so it works correctly."
     log("Calling original VBSP...")
-    shutil.copy(target.replace(".vmf",".log"), compile_loc.replace(".vmf",".log"))
+    if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
+        shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
     subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=None, stderr=subprocess.PIPE, shell=True)
-    shutil.copy(compile_loc.replace(".vmf",".bsp"), target.replace(".vmf",".bsp"))
-    shutil.copy(compile_loc.replace(".vmf",".log"), target.replace(".vmf",".log"))
-    shutil.copy(compile_loc.replace(".vmf",".prt"), target.replace(".vmf",".prt")) # copy over the real files so vvis/vrad can read them
+    if do_swap: # copy over the real files so vvis/vrad can read them
+        shutil.copy(new_path.replace(".vmf",".bsp"), target.replace(".vmf",".bsp"))
+        shutil.copy(new_path.replace(".vmf",".log"), target.replace(".vmf",".log"))
+        shutil.copy(new_path.replace(".vmf",".prt"), target.replace(".vmf",".prt")) 
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing
@@ -860,29 +890,37 @@ new_args=sys.argv[1:]
 new_path=""
 path=""
 for i,a in enumerate(new_args):
-    if "sdk_content\\maps/" in a:
-        new_args[i] = a.replace("sdk_content\\maps/","sdk_content/maps/styled/",1)
+    fixed_a = os.path.normpath(a)
+    if "sdk_content\\maps\\" in fixed_a:
+        new_args[i] = fixed_a.replace("sdk_content\\maps\\","sdk_content\\maps\\styled\\",1)
         new_path=new_args[i]
         path=a
 log("Map path is " + path)
+if path == "":
+    raise valueError("No map passed!")
+if not path.endswith(".vmf"):
+    path += ".vmf"
+    new_path += ".vmf"
 load_settings()
 load_map(path)
-load_entities()
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     log("PeTI map detected! (has Entity Limit of 1750)")
     max_ent_id=-1
     unique_counter=0
     progs = [
-             fix_inst, change_ents, add_extra_ents,
+             load_entities, fix_inst, 
+             change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
              fix_worldspawn, save
             ]
     for func in progs:
         func()
-    run_vbsp(new_args, new_path, path)
+    run_vbsp(new_args, True)
     if get_opt('run_bsp_zip') == "1":
-        make_packlist()
+        make_packlist(new_path)
 else:
     log("Hammer map detected! skipping conversion..")
-    run_vbsp(sys.argv[1:], path, path)
+    run_vbsp(sys.argv[1:], False)
+    hammer_pack_scan()
+    make_packlist(path)
