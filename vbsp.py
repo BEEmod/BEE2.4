@@ -139,10 +139,10 @@ def unique_id():
     global unique_counter
     unique_counter+=1
     return str(unique_counter)
-   
+ 
 def log(text):
-    print(text, flush=True)
-        
+    print(text, flush=True)     
+    
 def get_opt(name):
     return settings['options'][name]
 
@@ -150,7 +150,7 @@ def get_tex(name):
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
     else:
-        raise ValueError('No texture "' + name + '"!')
+        raise Exception('No texture "' + name + '"!')
     
 def alter_mat(prop):
     global to_pack
@@ -220,11 +220,11 @@ def find_key(ent, key, norm=None):
         return result[0]
     elif len(result) == 0:
         if norm==None:
-            raise ValueError('No key "' + key + '"!')
+            raise Exception('No key "' + key + '"!')
         else:
             return norm
     else:
-        raise ValueError('Duplicate keys "' + key + '"!')
+        raise Exception('Duplicate keys "' + key + '"!')
 
 ##### MAIN functions ######
 
@@ -275,7 +275,7 @@ def load_settings():
         if len(Property.find_all(fizz, 'cust_fizzlers"flag')) == 1:
             flag = find_key(fizz, 'flag')
             if flag in settings['cust_fizzler']:
-                raise ValueError('Two Fizzlers with same flag!!')
+                raise Exception('Two Fizzlers with same flag!!')
             data= {}
             data['left']     = find_key(fizz, 'left', 'tools/toolstrigger'),
             data['right']    = find_key(fizz, 'right', 'tools/toolstrigger'),
@@ -811,6 +811,7 @@ def make_packlist(vmf_path):
     folders=get_valid_folders()
     log("Creating Pack list...")
     print(to_pack)
+    has_items = False
     with open(pack_file, 'w') as fil:
         for item in to_pack:
             if item.startswith("|list|"):
@@ -825,6 +826,7 @@ def make_packlist(vmf_path):
                             if full:
                                 fil.write(line + "\n")
                                 fil.write(full + "\n")
+                                has_items = True
                 else:
                     log("Error: File not found, skipping...")
             else:
@@ -832,6 +834,10 @@ def make_packlist(vmf_path):
                 if full:
                     fil.write(item + "\n")
                     fil.write(full + "\n")
+                    has_items = True
+    if not has_items:
+        log("No packed files!")
+        os.remove(pack_file) # delete it if we aren't storing anything
     log("Done!")
                 
 def get_valid_folders():
@@ -897,7 +903,7 @@ for i,a in enumerate(new_args):
         path=a
 log("Map path is " + path)
 if path == "":
-    raise valueError("No map passed!")
+    raise Exception("No map passed!")
 if not path.endswith(".vmf"):
     path += ".vmf"
     new_path += ".vmf"
@@ -919,6 +925,9 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     run_vbsp(new_args, True)
     if get_opt('run_bsp_zip') == "1":
         make_packlist(new_path)
+    else:
+        to_pack=[]
+        make_packlist(new_path) # write nothing to file, making it blank
 else:
     log("Hammer map detected! skipping conversion..")
     run_vbsp(sys.argv[1:], False)
