@@ -7,6 +7,7 @@ import random
 
 from property_parser import Property
 import utils
+from utils import find_key # we use this everywhere!
 
 # COMPILER FLAGS (used as part of instance filename)
 # ccflag_comball
@@ -128,9 +129,6 @@ TEX_FIZZLER = {
     "effects/fizzler"        : "short",
     "0"                      : "scanline"
     }
-    
-FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
-    # $replace01, $replace02, ..., $replace15, $replace16
  
 ###### UTIL functions #####
  
@@ -139,9 +137,6 @@ def unique_id():
     global unique_counter
     unique_counter+=1
     return str(unique_counter)
- 
-def log(text):
-    print(text, flush=True)     
     
 def get_opt(name):
     return settings['options'][name]
@@ -160,69 +155,6 @@ def alter_mat(prop):
         return True
     else:
         return False
-
-def add_output(entity, output, target, input, params="", delay="0", times="-1"):
-    "Add a new output to an entity with the given values, generating a connections part if needed."
-    conn = Property.find_all(entity, 'entity"connections')
-    if len(conn) == 0:
-        conn = Property("connections", [])
-        entity.value.append(conn)
-    else:
-        conn = conn[0]
-    out=Property(output, chr(27).join((target, input, params, delay, times)))
-    # character 27 (which is the ASCII escape control character) is the delimiter for VMF outputs. 
-    log("adding output :" + out.value)
-    conn.value.append(out)
-
-def split_plane(plane):
-    "Extract the plane from a brush into an array."
-    # Plane looks like "(575 0 128) (575 768 128) (575 768 256)"
-    verts = plane.value[1:-1].split(") (") # break into 3 groups of 3d vertexes
-    for i,v in enumerate(verts):
-        verts[i]=v.split(" ")
-    return verts
-
-def join_plane(verts):
-    "Join the verts back into the proper string."
-    plane=""
-    for vert in verts:
-        plane += ("(" + " ".join(vert) + ") ")
-    return plane[:-1] # take off the last space
-    
-def get_bbox(planes):
-    "Generate the highest and lowest points these planes form."
-    bbox_max=[]
-    bbox_min=[]
-    preset=True
-    for pl in planes:
-        verts=split_plane(pl)
-        if preset:
-            preset=False
-            bbox_max=[int(x)-99999 for x in verts[0][:]]
-            bbox_min=[int(x)+99999 for x in verts[0][:]]
-        for v in verts:
-            for i in range(0,3):
-                bbox_max[i] = max(int(v[i]), bbox_max[i])
-                bbox_min[i] = min(int(v[i]), bbox_min[i])
-    return bbox_max, bbox_min
-
-def get_fixup(inst):
-    "Generate a list of all fixup keys for this item."
-    vals = [find_key(inst, fix, "") for fix in FIXUP_KEYS] # loop through and get each replace key
-    return [f.value for f in vals if not f.value==""] # return only set values, without the property wrapper
-
-def find_key(ent, key, norm=None):
-    "Safely get a subkey from an instance (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
-    result = Property.find_all(ent, ent.name + '"' + key)
-    if len(result) == 1:
-        return result[0]
-    elif len(result) == 0:
-        if norm==None:
-            raise Exception('No key "' + key + '"!')
-        else:
-            return Property(name=key, value=norm) # We were given a default, pretend that was in the original property list
-    else:
-        raise Exception('Duplicate keys "' + key + '"!')
 
 ##### MAIN functions ######
 
@@ -307,17 +239,17 @@ def load_settings():
         if len(flags) > 0 and len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
             settings['conditions'].append(con)
-    log("Settings Loaded!")
+    utils.con_log("Settings Loaded!")
     
 def load_map(path):
     global map
     with open(path, "r") as file:
-        log("Parsing Map...")
+        utils.con_log("Parsing Map...")
         map=Property.parse(file)
 
 def check_conditions():
     "Check all the global conditions, like style vars."
-    log("Checking global conditions...")
+    utils.con_log("Checking global conditions...")
     cond_rem = []
     for cond in settings['conditions']:
         to_rem = []
@@ -340,7 +272,7 @@ def check_conditions():
     for r in cond_rem:
         settings['conditions'].remove(r)
     del cond_rem
-    log("Done!")
+    utils.con_log("Done!")
     
 def satisfy_condition(cond):
     "Try to satisfy this condition, and edit the loaded settings if needed."
@@ -375,7 +307,7 @@ def process_packer(f_list):
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     global max_ent_id
-    log("Scanning Entities...")
+    utils.con_log("Scanning Entities...")
     ents=Property.find_all(map,'entity')
     for item in ents:
         item.targname = find_key(item, 'targetname', "").value
@@ -384,7 +316,7 @@ def load_entities():
         if len(cls)==1:
             item.cls=cls[0].value
         else:
-            log("Error - entity missing class, skipping!")
+            utils.con_log("Error - entity missing class, skipping!")
             continue
         if int(id.value):
             max_ent_id = max(max_ent_id,int(id.value))
@@ -465,17 +397,17 @@ def scan_mats():
 
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
-    log("Editing Brushes...")
+    utils.con_log("Editing Brushes...")
     sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
     for face in sides:
         mat=find_key(face, 'material')   
         if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
             plane=find_key(face,'plane')
-            verts=split_plane(plane)
+            verts=utils.split_plane(plane)
             for v in verts:
                 v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
                 # we do the decimal with strings to ensure it adds floats precisely
-            plane.value=join_plane(verts)
+            plane.value=utils.join_plane(verts)
             
         if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
             for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
@@ -486,7 +418,7 @@ def change_brush():
         is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
         if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
             # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-            verts = split_plane(find_key(face,'plane'))
+            verts = utils.split_plane(find_key(face,'plane'))
             # y-val for first if < last if ceiling
             side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
             type = "black." if mat.value.casefold() in BLACK_PAN else "white."
@@ -504,7 +436,7 @@ def change_brush():
             
 def change_overlays():
     "Alter the overlays."
-    log("Editing Overlays...")
+    utils.con_log("Editing Overlays...")
     to_rem=[]
     for over in overlays:
         mat=find_key(over, 'material')
@@ -527,7 +459,7 @@ def change_overlays():
     
 def change_trig():
     "Check the triggers and fizzlers."
-    log("Editing Triggers...")
+    utils.con_log("Editing Triggers...")
     for trig in triggers:
         if trig.cls=="trigger_portal_cleanser":
             sides=Property.find_all(trig, 'entity"solid"side"material')
@@ -538,7 +470,7 @@ def change_trig():
 
 def change_func_brush():
     "Edit func_brushes."
-    log("Editing Brush Entities...")
+    utils.con_log("Editing Brush Entities...")
     to_rem=[]
     for brush in f_brushes:
         sides=Property.find_all(brush, 'entity"solid"side"material')
@@ -584,7 +516,7 @@ def make_static_pan(ent, type):
     angle="er"
     is_static=False
     is_flush=False
-    for var in get_fixup(ent):
+    for var in utils.get_fixup(ent):
         print(type, var)
         if var == "$connectioncount 0":
             is_static=True
@@ -609,7 +541,7 @@ def make_static_pist(ent):
     top_pos=0
     bottom_pos=0
     start_pos = -1
-    for var in get_fixup(ent):
+    for var in utils.get_fixup(ent):
         if var == "$connectioncount 0":
             is_static=True
         if var == "$disable_autodrop 0":
@@ -632,7 +564,7 @@ def make_static_pist(ent):
             
 def change_ents():
     "Edit misc entities."
-    log("Editing Other Entities...")
+    utils.con_log("Editing Other Entities...")
     to_rem=[] # entities to delete
     for ent in other_ents:
         if ent.cls == "info_lighting" and (get_opt("remove_info_lighting")=="1"):
@@ -644,7 +576,7 @@ def change_ents():
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
     global to_pack
-    log("Editing Instances...")
+    utils.con_log("Editing Instances...")
     for inst in instances:
         file=Property.find_all(inst, 'entity"file')
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
@@ -693,7 +625,7 @@ def fix_inst():
                         flags=Property.find_all(trig, 'entity"spawnflags')
                         if len(flags) == 1:
                             flags[0].value="72"
-                        add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
+                        utils.add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
                         # generate the output that triggers the pellet logic.
                         Property.find_all(trig, 'entity"targetname')[0].value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
                 pos = find_key(inst, 'origin').value
@@ -702,8 +634,8 @@ def fix_inst():
                     out_pos = Property.find_all(in_out, 'entity"origin')[0].value
                     out_angle=Property.find_all(in_out, 'entity"angles')
                     if len(out_angle)==1 and pos == out_pos and angle==out_angle[0].value:
-                        add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
-                        add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
+                        utils.add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
+                        utils.add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
             elif "ccflag_death_fizz_base" in file[0].value: # LP's Death Fizzler
                 for trig in triggers:
                     if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
@@ -786,16 +718,16 @@ def fix_inst():
                             # get the origin, used to figure out if a point should be max or min
                             origin=[int(v) for v in find_key(brush,'origin').value.split(' ')]
                             planes=Property.find_all(brush, 'entity"solid"side"plane')
-                            bbox_max,bbox_min=get_bbox(planes)
+                            bbox_max,bbox_min=utils.get_bbox(planes)
                             for pl in planes:
-                                verts=split_plane(pl)
+                                verts=utils.split_plane(pl)
                                 for v in verts:
                                     for i in range(0,3): #x,y,z
                                         if int(v[i]) > origin[i]:
                                             v[i]=str(bbox_max[i])
                                         else:
                                             v[i]=str(bbox_min[i])
-                                pl.value=join_plane(verts)
+                                pl.value=utils.join_plane(verts)
                             solids=Property.find_all(brush, 'entity"solid')
                             
                             sides=Property.find_all(solids[1],'solid"side')
@@ -804,7 +736,7 @@ def fix_inst():
                                 if mat.value.casefold() == "effects/fizzler_center":
                                     mat.value="effects/laserplane"
                                 alter_mat(mat) # convert to the styled version
-                                bounds_max,bounds_min=get_bbox(Property.find_all(side,'side"plane'))
+                                bounds_max,bounds_min=utils.get_bbox(Property.find_all(side,'side"plane'))
                                 dimensions = [0,0,0]
                                 for i,g in enumerate(dimensions):
                                     dimensions[i] = bounds_max[i] - bounds_min[i]
@@ -839,12 +771,12 @@ def fix_inst():
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
-    log("Editing WorldSpawn")
+    utils.con_log("Editing WorldSpawn")
     root=Property.find_all(map, 'world')
     if len(root)==1:
         root=root[0]
         has_paint = Property.find_all(root, 'world"paintinmap')
-        log(has_paint)
+        utils.con_log(has_paint)
         if len(has_paint) == 1:
             if has_paint[0].value == "0":
                 has_paint[0].value = get_opt("force_paint")
@@ -887,7 +819,7 @@ def hammer_pack_scan():
     "Look through entities to see if any packer commands exist, and add if needed."
     global to_pack
     to_pack=[] # We aren't using the ones found in vbsp_config
-    log("Searching for packer commands...")
+    utils.con_log("Searching for packer commands...")
     comments = Property.find_all(map, 'entity"editor"comments')
     for com in comments:
         if "packer_" in com.value:
@@ -917,7 +849,7 @@ def make_packlist(vmf_path):
     "Create the required packer file for BSPzip to use."
     pack_file = vmf_path[:-4] + ".filelist.txt"
     folders=get_valid_folders()
-    log("Creating Pack list...")
+    utils.con_log("Creating Pack list...")
     print(to_pack)
     has_items = False
     with open(pack_file, 'w') as fil:
@@ -929,26 +861,26 @@ def make_packlist(vmf_path):
                     with open(item, 'r') as lst:
                         for line in lst:
                             line=line.strip() # get rid of carriage returns etc
-                            log("Adding " + line)
+                            utils.con_log("Adding " + line)
                             full=expand_source_name(line, folders)
                             if full:
                                 fil.write(line + "\n")
                                 fil.write(full + "\n")
                                 has_items = True
                 else:
-                    log("Error: File not found, skipping...")
+                    utils.con_log("Error: File not found, skipping...")
             else:
                 full=expand_source_name(item, folders)
                 if full:
                     fil.write(item + "\n")
                     fil.write(full + "\n")
                     has_items = True
-        log(has_items)
-        log(fil)
+        utils.con_log(has_items)
+        utils.con_log(fil)
     if not has_items:
-        log("No packed files!")
+        utils.con_log("No packed files!")
         os.remove(pack_file) # delete it if we aren't storing anything
-    log("Done!")
+    utils.con_log("Done!")
                 
 def get_valid_folders():
     "Look through our game path to find folders in order of priority"
@@ -970,23 +902,23 @@ def expand_source_name(file, folders):
         poss=os.path.normpath(os.path.join(root, f, file))
         if os.path.isfile(poss):
             return poss
-    log( file + " not found!")
+    utils.con_log( file + " not found!")
     return False
     
 def save():
     "Save the modified map back to the correct location."
     out = []
-    log("Saving New Map...")
+    utils.con_log("Saving New Map...")
     for p in map:
         for s in p.to_strings():
             out.append(s + '\n')
     with open(new_path, 'w') as f:
         f.writelines(out)
-    log("Complete!")
+    utils.con_log("Complete!")
     
 def run_vbsp(args, do_swap):
     "Execute the original VBSP, copying files around so it works correctly."
-    log("Calling original VBSP...")
+    utils.con_log("Calling original VBSP...")
     if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
         shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
     subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -1011,12 +943,12 @@ for i,a in enumerate(new_args):
         new_path=new_args[i]
         path=a
 
-log("BEE2 VBSP hook initiallised. Loading settings...")
+utils.con_log("BEE2 VBSP hook initiallised. Loading settings...")
 
 load_settings()
 check_conditions()
 
-log("Map path is " + path)
+utils.con_log("Map path is " + path)
 if path == "":
     raise Exception("No map passed!")
 if not path.endswith(".vmf"):
@@ -1024,7 +956,7 @@ if not path.endswith(".vmf"):
     new_path += ".vmf"
 load_map(path)
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
-    log("PeTI map detected! (has Entity Limit of 1750)")
+    utils.con_log("PeTI map detected! (has Entity Limit of 1750)")
     max_ent_id=-1
     unique_counter=0
     progs = [
@@ -1039,8 +971,8 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     run_vbsp(new_args, True)
     make_packlist(path) # VRAD will access the original BSP location
 else:
-    log("Hammer map detected! skipping conversion..")
+    utils.con_log("Hammer map detected! skipping conversion..")
     run_vbsp(sys.argv[1:], False)
     hammer_pack_scan()
     make_packlist(path)
-log("BEE2 VBSP hook finished!")
+utils.con_log("BEE2 VBSP hook finished!")

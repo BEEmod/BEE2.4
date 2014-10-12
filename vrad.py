@@ -7,9 +7,6 @@ import random
 
 from property_parser import Property
 import utils
-
-def log(text):
-    print(text, flush=True)
     
 def quote(txt):
     return '"' + txt + '"'
@@ -18,10 +15,10 @@ def run_vrad(args):
     "Execute the original VRAD."
     args = [('"' + x + '"' if " " in x else x) for x in args]
     arg = '"' + os.path.normpath(os.path.join(os.getcwd(),"vrad_original")) + '" ' + " ".join(args)
-    log("Calling original VRAD...")
-    log(arg)
+    utils.con_log("Calling original VRAD...")
+    utils.con_log(arg)
     subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
-    log("Done!")   
+    utils.con_log("Done!")   
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing
@@ -53,7 +50,7 @@ new_args = ['-bounce', '2', '-noextra'] + new_args
 # Fast args: -bounce 2 -noextra -game $gamedir $path\$file
 # Final args: -both -final -staticproplighting -StaticPropPolys -textureshadows  -game $gamedir $path\$file
 
-log("Map path is " + path)
+utils.con_log("Map path is " + path)
 if path == "":
     raise Exception("No map passed!")
     
@@ -61,16 +58,16 @@ if not path.endswith(".bsp"):
     path += ".bsp"
 
 if os.path.basename(path) == "preview.bsp": # Is this a PeTI map?
-    log("PeTI map detected! (is named preview.vmf)")
+    utils.con_log("PeTI map detected! (is named preview.vmf)")
     run_vrad(new_args)
 else:
-    log("Hammer map detected! Not forcing cheap lighting..")
+    utils.con_log("Hammer map detected! Not forcing cheap lighting..")
     run_vrad(sys.argv[1:])
     
 pack_file = path[:-4] + '.filelist.txt'
 
 if os.path.isfile(pack_file):
-    log("Pack list found, packing files!")
+    utils.con_log("Pack list found, packing files!")
     arg_bits = [quote(os.path.normpath(os.path.join(os.getcwd(),"bspzip"))),
             "-addlist",
             quote(path),
@@ -80,9 +77,9 @@ if os.path.isfile(pack_file):
             quote(game_dir),
           ]
     arg = " ".join(arg_bits)
-    log(arg)
+    utils.con_log(arg)
     subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
-    log("Packing complete!")
+    utils.con_log("Packing complete!")
 else:
-    log("No items to pack!")
-log("BEE2 VRAD hook finished!")
+    utils.con_log("No items to pack!")
+utils.con_log("BEE2 VRAD hook finished!")

@@ -18,7 +18,6 @@ to_strings: => string
 
 
 import re
-import utils
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
@@ -107,3 +106,5 @@ class Property:
             out_val[0] += ' "' + self.value + '"'
             
         return out_val
+
+import utils
