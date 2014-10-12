@@ -96,9 +96,9 @@ DEFAULTS = {
     "remove_info_lighting"    : "0",
     "fix_glass"               : "0",
     "fix_portal_bump"         : "0",
-    "random_blackwall_scale" : "0",
+    "random_blackwall_scale"  : "0",
+    "no_mid_voices"           : "0",
     "use_screenshot"          : "0",
-    "run_bsp_zip"             : "0",
     "force_fizz_reflect"      : "0",
     "force_brush_reflect"     : "0",
     "remove_exit_signs"       : "0",
@@ -130,7 +130,7 @@ TEX_FIZZLER = {
     }
     
 FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
-    # $replace01, $replace02,
+    # $replace01, $replace02, ..., $replace15, $replace16
  
 ###### UTIL functions #####
  
@@ -157,13 +157,6 @@ def alter_mat(prop):
     mat=prop.value.casefold()
     if mat in TEX_VALVE: # should we convert it?
         prop.value = get_tex(TEX_VALVE[mat])
-        if get_opt("run_bsp_zip") == "1":
-            for key in list(to_pack_mat.keys()):
-                # need to be list to decouple and allow deleting from original dict
-                if key == mat:
-                    log('Adding "' + key + '" to pack list!')
-                    to_pack += to_pack_mat[key] # add all the commands to the list
-                    #del to_pack_mat[key]
         return True
     else:
         return False
@@ -205,13 +198,18 @@ def get_bbox(planes):
         verts=split_plane(pl)
         if preset:
             preset=False
-            bbox_max=[int(x)-9999 for x in verts[0][:]]
-            bbox_min=[int(x)+9999 for x in verts[0][:]]
+            bbox_max=[int(x)-99999 for x in verts[0][:]]
+            bbox_min=[int(x)+99999 for x in verts[0][:]]
         for v in verts:
             for i in range(0,3):
                 bbox_max[i] = max(int(v[i]), bbox_max[i])
                 bbox_min[i] = min(int(v[i]), bbox_min[i])
     return bbox_max, bbox_min
+
+def get_fixup(inst):
+    "Generate a list of all fixup keys for this item."
+    vals = [find_key(inst, fix, "") for fix in FIXUP_KEYS] # loop through and get each replace key
+    return [f.value for f in vals if not f.value==""] # return only set values, without the property wrapper
 
 def find_key(ent, key, norm=None):
     "Safely get a subkey from an instance (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
@@ -222,7 +220,7 @@ def find_key(ent, key, norm=None):
         if norm==None:
             raise Exception('No key "' + key + '"!')
         else:
-            return norm
+            return Property(name=key, value=norm) # We were given a default, pretend that was in the original property list
     else:
         raise Exception('Duplicate keys "' + key + '"!')
 
@@ -230,14 +228,21 @@ def find_key(ent, key, norm=None):
 
 def load_settings():
     global settings
-    with open("vbsp_config.cfg", "r") as config: # this should be outputted when editoritems is exported, so we don't have to trawl through editoritems to find our settings.
-        conf=Property.parse(config)
+    if os.path.isfile("vbsp_config.cfg"): # do we have a config file?
+        with open("vbsp_config.cfg", "r") as config: 
+            conf=Property.parse(config)
+    else:
+        conf = [] # All the property.find_all commands will fail, and we will use the defaults.
+        
     settings = {"textures"      : {},
                 "fizzler"       : {},
-                "cust_fizzlers" : [],
                 "options"       : {},
                 "deathfield"    : {},
-                "instances"     : {}
+                "instances"     : {},
+                
+                "cust_fizzlers" : [],
+                "conditions"    : [],
+                "change_inst"   : [],
                 }
     tex_defaults = list(TEX_VALVE.items()) + [
         ("metal/black_floor_metal_001c", "black.floor" ),
@@ -247,7 +252,7 @@ def load_settings():
         # These have the same item so we can't store this in the regular dictionary.
         ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
         ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
-        ] # And these have the extra scale information
+        ] # And these have the extra scale information, which isn't in the maps.
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
         value = [prop.value for prop in Property.find_all(conf, 'textures"' + cat + '"' + name)]
@@ -283,27 +288,25 @@ def load_settings():
             data['short']    = find_key(fizz, 'short', 'tools/toolstrigger'),
             data['scanline'] = find_key(fizz, 'scanline', settings['fizzler']['scanline'])
             cust_fizzlers[flag] = data
+            
     pack_commands = Property.find_all(conf, 'packer')
     for pack in pack_commands:
-        f_list=pack.value
-        for cmd in f_list:
-            if cmd.name.casefold()=="add":
-                to_pack.append(cmd.value)
-            if cmd.name.casefold()=="add_list":
-                to_pack.append("|list|" + cmd.value)
-            elif cmd.name.casefold()=="add_if":
-                inst = Property.find_all(cmd, 'add_if"flag')
-                mat = Property.find_all(cmd, 'add_if"mat')
-                vals = [prop.value for prop in Property.find_all(cmd, 'add_if"add')]
-                vals += ["|list|" + prop.value for prop in Property.find_all(cmd, 'add_if"add_list')]
-                print(vals)
-                if (len(inst)==1 or len(mat)==1) and len(vals)>0:
-                    if len(inst)==1:
-                        to_pack_inst[inst[0].value] = vals
-                    if len(mat)==1:
-                        to_pack_mat[mat[0].value.casefold()] = vals
-    print("To Pack:" + str(to_pack))
-    print("Inst:" + str(to_pack_inst))
+        process_packer(pack.value)
+    
+    conditions = Property.find_all(conf, 'conditions"condition')
+    for cond in conditions:
+        type = find_key(cond, 'type', "").value.upper()
+        if type not in ("AND", "OR"):
+            type = "AND"
+        flags = []
+        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview"):
+            flags += Property.find_all(cond, 'condition"'+f)
+        results = []
+        for val in Property.find_all(cond, 'condition"result'):
+            results.extend(val.value) # join multiple ones together
+        if len(flags) > 0 and len(results) > 0: # is it valid?
+            con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
+            settings['conditions'].append(con)
     log("Settings Loaded!")
     
 def load_map(path):
@@ -312,13 +315,70 @@ def load_map(path):
         log("Parsing Map...")
         map=Property.parse(file)
 
+def check_conditions():
+    "Check all the global conditions, like style vars."
+    log("Checking global conditions...")
+    cond_rem = []
+    for cond in settings['conditions']:
+        to_rem = []
+        for flag in cond['flags']:
+            if flag.name.casefold() in ("ifstyletrue", "ifstylefalse"):
+                var = flag.value.casefold()
+                if var in DEFAULTS.keys(): # is it a valid var?
+                    if (get_opt(var) == "1" and flag.name.casefold().endswith("true")):
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                    elif (get_opt(var) == "0" and flag.name.casefold().endswith("false")):
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+        for r in to_rem:
+            cond['flags'].remove(r)
+            cond['has_sat'] = True
+        if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
+                cond_rem.append(cond)
+        del to_rem
+    for r in cond_rem:
+        settings['conditions'].remove(r)
+    del cond_rem
+    log("Done!")
+    
+def satisfy_condition(cond):
+    "Try to satisfy this condition, and edit the loaded settings if needed."
+    sat = False
+    if cond['type'] == "AND":
+        sat = len(cond['flags']) == 0
+    elif cond['type'] == "OR":
+        sat = cond['has_sat']
+    if sat:
+        for res in cond['results']:
+            if res.name.casefold() == "changeinstance":
+                settings['change_inst'].append(res)
+            elif res.name.casefold() == "packer":
+                process_packer(res.value)
+            elif res.name.casefold() == "addglobal":
+                settings['instance'].append(res)
+            elif res.name.casefold() == "styleopt":
+                for opt in res.value:
+                    if opt.name.casefold() in settings['options']:
+                        settings['options'][opt.name.casefold()] = opt.value
+    return sat
+    
+def process_packer(f_list):
+    "Read packer commands from settings."
+    for cmd in f_list:
+        if cmd.name.casefold()=="add":
+            to_pack.append(cmd.value)
+        if cmd.name.casefold()=="add_list":
+            to_pack.append("|list|" + cmd.value)
+    
+        
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     global max_ent_id
     log("Scanning Entities...")
     ents=Property.find_all(map,'entity')
     for item in ents:
-        name=Property.find_all(item, 'entity"targetname')
+        item.targname = find_key(item, 'targetname', "").value
         cls=Property.find_all(item, 'entity"classname')
         id=find_key(item, 'id')
         if len(cls)==1:
@@ -326,14 +386,46 @@ def load_entities():
         else:
             log("Error - entity missing class, skipping!")
             continue
-        if len(name)==1:
-            item.targname=name[0].value
-        else:
-            item.targname=""
         if int(id.value):
             max_ent_id = max(max_ent_id,int(id.value))
         if item.cls=="func_instance":
+            item.file = find_key(item, 'file', "").value
             instances.append(item)
+            cond_rem = []
+            for cond in settings['conditions']: # check if it satisfies any conditions
+                to_rem = []
+                for flag in cond['flags']:
+                    if flag.name.casefold() == "instflag":
+                        if flag.value in item.file:
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                    elif flag.name.casefold() == "instfile":
+                        if flag.value == item.file:
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                    elif flag.name.casefold() == "ifMode":
+                        if item.file == get_opt("coopexitfile") and flag.value.casefold() == "coop":
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                        if item.file == get_opt("spexitfile") and flag.value.casefold() == "sp":
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                    elif flag.name.casefold() == "ifPreview":
+                        if item.file == get_opt("coopexitfile") and flag.value.casefold() == "coop":
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                        if item.file == get_opt("spexitfile") and flag.value.casefold() == "sp":
+                            if flag not in to_rem:
+                                to_rem.append(flag)
+                for r in to_rem:
+                    cond['flags'].remove(r)
+                    cond['has_sat'] = True
+                if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
+                    cond_rem.append(cond)
+                del to_rem
+            for r in cond_rem:
+                settings['conditions'].remove(r)
+            del cond_rem
         elif item.cls=="info_overlay":
             overlays.append(item)
         elif item.cls=="func_detail":
@@ -344,7 +436,33 @@ def load_entities():
             f_brushes.append(item)
         else:
             other_ents.append(item)
-    
+
+def scan_mats():
+    "Scan through all materials to check if they any defined conditions."
+    all_mats = Property.find_all(map, 'world"solid"side"material') + Property.find_all(map, 'entity"solid"side"material')
+    used = []
+    for mat in all_mats:
+        if mat.value not in used: # we don't want to check a material twice
+            used.append(mat) 
+    cond_rem = []
+    for cond in settings['conditions']:
+        to_rem = []
+        for flag in cond['flags']:
+            if flag.name.casefold() == "ifmat":
+                for mat in used:
+                    if mat.value.casefold() == flag.value.casefold():
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+        for r in to_rem:
+            cond['flags'].remove(r)
+            cond['has_sat'] = True
+        if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
+            cond_rem.append(cond)
+        del to_rem
+    for r in cond_rem:
+        settings['conditions'].remove(r)
+    del cond_rem
+
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     log("Editing Brushes...")
@@ -466,16 +584,14 @@ def make_static_pan(ent, type):
     angle="er"
     is_static=False
     is_flush=False
-    for i in FIXUP_KEYS:
-        var = Property.find_all(ent, 'entity"' + i)
-        if(len(var)==1):
-            print(type, var[0].value)
-            if var[0].value == "$connectioncount 0":
-                is_static=True
-            if "$start_deployed 0" in var[0].value:
-                is_flush=True
-            if "$animation" in var[0].value:
-                angle = var[0].value[16:18] # the number in "$animation ramp_45_deg_open"
+    for var in get_fixup(ent):
+        print(type, var)
+        if var == "$connectioncount 0":
+            is_static=True
+        if "$start_deployed 0" in var:
+            is_flush=True
+        if "$animation" in var:
+            angle = var[16:18] # the number in "$animation ramp_45_deg_open"
     if is_flush:
         angle = "00" # different instance flat with the wall
     if not is_static:
@@ -493,20 +609,17 @@ def make_static_pist(ent):
     top_pos=0
     bottom_pos=0
     start_pos = -1
-    for i in FIXUP_KEYS:
-        var = Property.find_all(ent, 'entity"' + i)
-        if(len(var)==1):
-            print("Piston property: ", var[0].value)
-            if var[0].value == "$connectioncount 0":
-                is_static=True
-            if var[0].value == "$disable_autodrop 0":
-                auto_move=False
-            if "$start_up" in var[0].value:
-                start_pos=var[0].value[-1:]
-            if "$top_level" in var[0].value:
-                top_pos = var[0].value[-1:]
-            if "$bottom_level" in var[0].value:
-                bottom_pos = var[0].value[-1:]
+    for var in get_fixup(ent):
+        if var == "$connectioncount 0":
+            is_static=True
+        if var == "$disable_autodrop 0":
+            auto_move=False
+        if "$start_up" in var:
+            start_pos=var[-1:]
+        if "$top_level" in var:
+            top_pos = var[-1:]
+        if "$bottom_level" in var:
+            bottom_pos = var[-1:]
     if not is_static or auto_move: # can it move?
         if int(bottom_pos) > 0:
             # The piston doesn't go fully down, use alt instances.
@@ -560,11 +673,6 @@ def fix_inst():
             if len(file) == 1 and "ccflag_death_fizz_model" in file[0].value:
                 name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
         if len(file) == 1:
-            for key in list(to_pack_inst.keys()): # do we need to pack files?
-                # need to be list to decouple and allow deleting from original dict
-                if key in file[0].value:
-                    to_pack += to_pack_inst[key] # add all the commands to the list
-                    del to_pack_inst[key]
             if "ccflag_paint_fizz" in file[0].value:
                 # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
                 for trig in triggers:
@@ -835,6 +943,8 @@ def make_packlist(vmf_path):
                     fil.write(item + "\n")
                     fil.write(full + "\n")
                     has_items = True
+        log(has_items)
+        log(fil)
     if not has_items:
         log("No packed files!")
         os.remove(pack_file) # delete it if we aren't storing anything
@@ -879,16 +989,15 @@ def run_vbsp(args, do_swap):
     log("Calling original VBSP...")
     if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
         shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
-    subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=None, stderr=subprocess.PIPE, shell=True)
+    subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if do_swap: # copy over the real files so vvis/vrad can read them
-        shutil.copy(new_path.replace(".vmf",".bsp"), target.replace(".vmf",".bsp"))
-        shutil.copy(new_path.replace(".vmf",".log"), target.replace(".vmf",".log"))
-        shutil.copy(new_path.replace(".vmf",".prt"), target.replace(".vmf",".prt")) 
+        shutil.copy(new_path.replace(".vmf",".bsp"), path.replace(".vmf",".bsp"))
+        shutil.copy(new_path.replace(".vmf",".log"), path.replace(".vmf",".log"))
+        shutil.copy(new_path.replace(".vmf",".prt"), path.replace(".vmf",".prt")) 
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing
-to_pack_inst = {} # items to pack for a specific instance
-to_pack_mat = {} # files to pack if material is used (by VBSP_styles only)
+conditions = {} # All conditions that should be checked to see if they match
 
 root = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
@@ -901,20 +1010,25 @@ for i,a in enumerate(new_args):
         new_args[i] = fixed_a.replace("sdk_content\\maps\\","sdk_content\\maps\\styled\\",1)
         new_path=new_args[i]
         path=a
+
+log("BEE2 VBSP hook initiallised. Loading settings...")
+
+load_settings()
+check_conditions()
+
 log("Map path is " + path)
 if path == "":
     raise Exception("No map passed!")
 if not path.endswith(".vmf"):
     path += ".vmf"
     new_path += ".vmf"
-load_settings()
 load_map(path)
 if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     log("PeTI map detected! (has Entity Limit of 1750)")
     max_ent_id=-1
     unique_counter=0
     progs = [
-             load_entities, fix_inst, 
+             load_entities, scan_mats, fix_inst, 
              change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
@@ -923,13 +1037,10 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
     for func in progs:
         func()
     run_vbsp(new_args, True)
-    if get_opt('run_bsp_zip') == "1":
-        make_packlist(new_path)
-    else:
-        to_pack=[]
-        make_packlist(new_path) # write nothing to file, making it blank
+    make_packlist(path) # VRAD will access the original BSP location
 else:
     log("Hammer map detected! skipping conversion..")
     run_vbsp(sys.argv[1:], False)
     hammer_pack_scan()
     make_packlist(path)
+log("BEE2 VBSP hook finished!")
