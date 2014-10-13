@@ -171,6 +171,7 @@ def load_settings():
                 "options"       : {},
                 "deathfield"    : {},
                 "instances"     : {},
+                "variants"      : {},
                 
                 "cust_fizzlers" : [],
                 "conditions"    : [],
@@ -239,6 +240,8 @@ def load_settings():
         if len(flags) > 0 and len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
             settings['conditions'].append(con)
+    variants = Property.find_all(conf, 'variants"variant')
+    process_variants(variants)
     utils.con_log("Settings Loaded!")
     
 def load_map(path):
@@ -287,6 +290,8 @@ def satisfy_condition(cond):
                 settings['change_inst'].append(res)
             elif res.name.casefold() == "packer":
                 process_packer(res.value)
+            elif res.name.casefold() == "variant":
+                process_variant(res.value)
             elif res.name.casefold() == "addglobal":
                 settings['instance'].append(res)
             elif res.name.casefold() == "styleopt":
@@ -302,7 +307,33 @@ def process_packer(f_list):
             to_pack.append(cmd.value)
         if cmd.name.casefold()=="add_list":
             to_pack.append("|list|" + cmd.value)
-    
+            
+def process_variants(vars):
+    "Read variant commands from settings."
+    for var in vars:
+        inst = find_key(var, 'base', '').value
+        count = find_key(var, 'number', '').value
+        if not inst == "" and count.isdecimal():
+            count = int(count)
+            weight = find_key(var, 'weights', '').value
+            if weight == '' or ',' not in weight:
+                print('Invalid weight for "' + inst +'"!')
+                weight = [str(i) for i in range(1,count + 1)]
+            else:
+                vals=weight.split(',')
+                weight=[]
+                if len(vals) == count:
+                    for i,val in enumerate(vals):
+                        if val.isdecimal():
+                            weight.extend([str(i+1) for tmp in range(1,int(val)+1)]) # repeat the index the correct number of times
+                        else:
+                            break
+                if len(weight) == 0:
+                    print('Failed parsing weight for "' + inst +'"!')
+                    weight = [str(i) for i in range(1,count + 1)]
+            # random.choice(weight) will now give an index with the correct probabilities.
+            settings['variants'][inst] = weight
+            
         
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
@@ -768,6 +799,10 @@ def fix_inst():
                 make_static_pan(inst, "glass") # white/black are identified based on brush
             elif "ccflag_pist_plat" in file[0].value:
                 make_static_pist(inst) #try to convert to static piston
+            if file[0].value in settings['variants']:
+                weight = settings['variants'][file[0].value]
+                file[0].value = file[0].value[:-4] + "_var" + random.choice(weight) + ".vmf"
+                # add _var4 or so to the instance name
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
