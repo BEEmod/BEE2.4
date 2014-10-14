@@ -105,7 +105,8 @@ DEFAULTS = {
     "force_paint"             : "0",
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
-    "staticPan"               : "NONE"
+    "staticPan"               : "NONE",
+    "clearPanelFile"            : "instances/p2editor/panel_clear.vmf"
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -138,7 +139,7 @@ def unique_id():
     return str(unique_counter)
     
 def get_opt(name):
-    return settings['options'][name]
+    return settings['options'][name.casefold()]
 
 def get_tex(name):
     if name in settings['textures']:
@@ -187,19 +188,20 @@ def load_settings():
         ] # And these have the extra scale information, which isn't in the maps.
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in conf.find_all('textures', cat, name)]
+        value = [prop.value for prop in Property.find_all(conf, 'textures', cat, name)]
         if len(value)==0:
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
-            
-    for key in DEFAULTS: # get misc options
-        settings['options'][key] = conf.find_key(key, DEFAULTS[key])
-    
-    for item,key in TEX_FIZZLER.items():
-        settings['options'][key] = conf.find_key(key, item)
-           
-    cust_fizzlers = conf.find_all('cust_fizzlers')
+    opts = Property.find_all(conf, 'options')
+    for options in opts:
+        for key in DEFAULTS: # get misc options
+            print(key, DEFAULTS[key])
+            settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
+        
+        for item,key in TEX_FIZZLER.items():
+            settings['options'][key.casefold()] = Property.find_key(options, key, item).value
+        cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
     for fizz in cust_fizzlers:
         flag = fizz.find_key('flag')
         if flag in settings['cust_fizzler']:
@@ -211,12 +213,10 @@ def load_settings():
         data['short']    = fizz.find_key('short', 'tools/toolstrigger'),
         data['scanline'] = fizz.find_key('scanline', settings['fizzler']['scanline'])
         cust_fizzlers[flag] = data
-            
-    pack_commands = conf.find_all('packer')
+    pack_commands = Property.find_all(conf, 'packer')
     for pack in pack_commands:
         process_packer(pack.value)
-    
-    conditions = conf.find_all('conditions', 'condition')
+    conditions = Property.find_all(conf, 'conditions', 'condition')
     for cond in conditions:
         type = cond.find_key('type', '').value.upper()
         if type not in ("AND", "OR"):
@@ -230,7 +230,7 @@ def load_settings():
         if len(flags) > 0 and len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
             settings['conditions'].append(con)
-    variants = conf.find_all('variants', 'variant')
+    variants = Property.find_all(conf, 'variants', 'variant')
     process_variants(variants)
     utils.con_log("Settings Loaded!")
     
@@ -307,7 +307,7 @@ def process_variants(vars):
             count = int(count)
             weight = var.find_key('weights', '').value
             if weight == '' or ',' not in weight:
-                print('Invalid weight for "' + inst +'"!')
+                utils.con_log('Invalid weight for "' + inst +'"!')
                 weight = [str(i) for i in range(1,count + 1)]
             else:
                 vals=weight.split(',')
@@ -319,7 +319,7 @@ def process_variants(vars):
                         else:
                             break
                 if len(weight) == 0:
-                    print('Failed parsing weight for "' + inst +'"!')
+                    utils.con_log('Failed parsing weight for "' + inst +'"!')
                     weight = [str(i) for i in range(1,count + 1)]
             # random.choice(weight) will now give an index with the correct probabilities.
             settings['variants'][inst] = weight
@@ -329,12 +329,12 @@ def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     global max_ent_id
     utils.con_log("Scanning Entities...")
-    ents=map.find_all('entity')
+    ents=Property.find_all(map,'entity')
     for item in ents:
         item.targname = item.find_key('targetname', "").value
-        cls=item.find_key('entity', '')
+        item.cls=item.find_key('classname', '').value
         id=item.find_key('id', '-1')
-        if cls == '':
+        if item.cls == '':
             utils.con_log("Error - entity missing class, skipping!")
             continue
         if id.value.isnumeric():
@@ -390,7 +390,7 @@ def load_entities():
 
 def scan_mats():
     "Scan through all materials to check if they any defined conditions."
-    all_mats = map.find_all('world', 'solid', 'side', 'material') + map.find_all('entity', 'solid', 'side', 'material')
+    all_mats = Property.find_all(map, 'world', 'solid', 'side', 'material') + Property.find_all(map, 'entity', 'solid', 'side', 'material')
     used = []
     for mat in all_mats:
         if mat.value not in used: # we don't want to check a material twice
@@ -417,11 +417,11 @@ def scan_mats():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    sides=map.find_all('world', 'solid', 'side') + detail.find_all('entity', 'solid', 'side')
+    sides=Property.find_all(map, 'world', 'solid', 'side') + Property.find_all(detail, 'entity', 'solid', 'side')
     for face in sides:
-        mat=find_key(face, 'material')   
+        mat=face.find_key('material')   
         if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
-            plane=find_key(face,'plane')
+            plane=face.find_key('plane')
             verts=utils.split_plane(plane)
             for v in verts:
                 v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
@@ -429,7 +429,7 @@ def change_brush():
             plane.value=utils.join_plane(verts)
             
         if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
-            for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
+            for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
                 split=val.value.split(" ")
                 split[-1] = get_opt("glass_scale") # apply the glass scaling option
                 val.value=" ".join(split)
@@ -437,7 +437,7 @@ def change_brush():
         is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
         if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
             # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-            verts = utils.split_plane(find_key(face,'plane'))
+            verts = utils.split_plane(face.find_key('plane'))
             # y-val for first if < last if ceiling
             side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
             type = "black." if mat.value.casefold() in BLACK_PAN else "white."
@@ -460,10 +460,9 @@ def change_overlays():
         mat=over.find_key('material')
         alter_mat(mat)
         if mat.value.casefold() in ANTLINES:
-            angle = find_key(over, 'angles').value.split(" ") # get the three parts
+            angle = over.find_key('angles').value.split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
             new_tex = get_tex('overlay.'+ANTLINES[mat.value.casefold()]).split("|")
-            print(new_tex)
             if len(new_tex)==2:
                 over.find_key('endu').value=new_tex[0] # rescale antlines if needed
                 mat.value=new_tex[1]
@@ -621,7 +620,7 @@ def fix_inst():
                 name.value = inst.targname.split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
             if "ccflag_death_fizz_model" in file.value:
                 name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
-        if "ccflag_paint_fizz" in file.value:
+        elif "ccflag_paint_fizz" in file.value:
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
@@ -767,11 +766,11 @@ def fix_inst():
                         brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
                         del solids
                     map.append(brush)
-        elif "ccflag_panel_clear" in file.value:
+        if file.value == get_opt("clearPanelFile"):
             make_static_pan(inst, "glass") # white/black are identified based on brush
-        elif "ccflag_pist_plat" in file.value:
+        if "ccflag_pist_plat" in file.value:
             make_static_pist(inst) #try to convert to static piston
-        if file,value in settings['variants']:
+        if file.value in settings['variants']:
             weight = settings['variants'][file.value]
             file.value = file.value[:-4] + "_var" + random.choice(weight) + ".vmf"
             # add _var4 or so to the instance name
@@ -779,13 +778,15 @@ def fix_inst():
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     utils.con_log("Editing WorldSpawn")
-    root=map.find_key('world')
+    root=Property.find_key(map, 'world')
     try:
         has_paint = root.find_key('paintinmap')
         if has_paint.value == "0":
             has_paint.value = get_opt("force_paint")
     except KeyValError:
-        root.value.append(Property("has_paint", get_opt("force_paint")))
+        has_paint=Property("paintinmap", get_opt("force_paint"))
+        root.value.append(has_paint)
+    
     try:
         sky = root.find_key('skyname', None)
         sky.value = get_tex("special.sky") # allow random sky to be chosen
@@ -824,7 +825,7 @@ def hammer_pack_scan():
     global to_pack
     to_pack=[] # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
-    comments = map.find_all('entity', 'editor', 'comments')
+    comments = Property.find_all(map, 'entity', 'editor', 'comments')
     for com in comments:
         if "packer_" in com.value:
             parts = com.value.split()
@@ -854,7 +855,6 @@ def make_packlist(vmf_path):
     pack_file = vmf_path[:-4] + ".filelist.txt"
     folders=get_valid_folders()
     utils.con_log("Creating Pack list...")
-    print(to_pack)
     has_items = False
     with open(pack_file, 'w') as fil:
         for item in to_pack:
@@ -879,8 +879,6 @@ def make_packlist(vmf_path):
                     fil.write(item + "\n")
                     fil.write(full + "\n")
                     has_items = True
-        utils.con_log(has_items)
-        utils.con_log(fil)
     if not has_items:
         utils.con_log("No packed files!")
         os.remove(pack_file) # delete it if we aren't storing anything
@@ -922,14 +920,22 @@ def save():
     
 def run_vbsp(args, do_swap):
     "Execute the original VBSP, copying files around so it works correctly."
-    utils.con_log("Calling original VBSP...")
     if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
         shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
-    subprocess.call([os.path.join(os.getcwd(),"vbsp_original")] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    args = [('"' + x + '"' if " " in x else x) for x in args] # put quotes around args which contain spaces
+    arg = '"' + os.path.normpath(os.path.join(os.getcwd(),"vbsp_original")) + '" ' + " ".join(args)
+    utils.con_log("Calling original VBSP...")
+    utils.con_log(arg)
+    code=subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
+    if code==0:
+        utils.con_log("Done!")
+    else:
+        utils.con_log("VBSP failed! (" + str(code) + ")")
+        sys.exit(code)
     if do_swap: # copy over the real files so vvis/vrad can read them
-        shutil.copy(new_path.replace(".vmf",".bsp"), path.replace(".vmf",".bsp"))
-        shutil.copy(new_path.replace(".vmf",".log"), path.replace(".vmf",".log"))
-        shutil.copy(new_path.replace(".vmf",".prt"), path.replace(".vmf",".prt")) 
+        for exp in (".bsp", ".log", ".prt"):
+            if os.path.isfile(new_path.replace(".vmf", exp)):
+                shutil.copy(new_path.replace(".vmf", exp), path.replace(".vmf", exp))
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing

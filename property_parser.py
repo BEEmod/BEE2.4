@@ -81,44 +81,48 @@ class Property:
             
         return open_properties[0].value
         
-    def find_all(self, *keys) -> "List of matching Property objects":
+    def find_all(self: "list or Property", *keys) -> "List of matching Property objects":
         "Search through a tree to obtain all properties that match a particular path."
         run_on = []
         values = []
         depth = len(keys)
         if depth == 0:
             raise ValueError("Cannot find_all without commands!")
-
         if isinstance(self, list):
             run_on = self
         elif isinstance(self, Property):
             run_on.append(self)
-            if not self.name == keys[0]: # Add our name to the beginning if not present (otherwise this always fails)
-                return Property.find_all(run_on[0], *([self.name] + keys))
+            if not self.name == keys[0] and len(run_on)==1: # Add our name to the beginning if not present (otherwise this always fails)
+                return Property.find_all(run_on[0], *((self.name,) + keys))
+                
         for prop in run_on:
             if not isinstance(prop, Property):
                 raise ValueError("Cannot find_all on a value that is not a Property!")
-            if prop.name.casefold() == keys[0].casefold():
-                if depth > 0:
+            if prop.name is not None and prop.name.casefold() == keys[0].casefold():
+                if depth > 1:
                     if isinstance(prop.value, list):
                         values.extend(Property.find_all(prop.value, *keys[1:]))
                 else:
                     values.append(prop)
         return values
         
-    def find_key(self, key: str, def_: str=None) -> "Property":
-        "Obtain the value of the child Property with a name, with an optional default value. "
-        result = Property.find_all(ent, ent.name, key)
-        if len(result) == 1:
-            return result[0]
-        elif len(result) == 0:
-            if def_==None:
-                raise NoKeyError('No key "' + key + '"!')
-            else:
-                return Property(name=key, value=norm) 
-                # We were given a default, pretend that was in the original property list so code works
+    def find_key(self: "list or Property", key, def_=None) -> "Property":
+        "Obtain the value of the child Property with a name, with an optional default value."
+        run_on = []
+        if isinstance(self, list):
+            run_on = self
+        elif isinstance(self, Property):
+            run_on=self.value
+        key=key.casefold()
+            
+        for prop in reversed(run_on):
+            if prop.name is not None and prop.name.casefold() == key:
+                return prop
+        if def_==None:
+            raise NoKeyError('No key "' + key + '"!')
         else:
-            return result[-1]
+            return Property(name=key, value=def_) 
+            # We were given a default, pretend that was in the original property list so code works
         
     def __str__(self):
         return '\n'.join(self.to_strings())
@@ -127,7 +131,6 @@ class Property:
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
         out_val = ['"{}"'.format(self.name)]
-    
         if isinstance(self.value, list):
             out_val.append('{')
             out_val.extend(['\t'+line for property in self.value for line in property.to_strings()])

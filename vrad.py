@@ -12,12 +12,16 @@ def quote(txt):
 
 def run_vrad(args):
     "Execute the original VRAD."
-    args = [('"' + x + '"' if " " in x else x) for x in args]
+    args = [('"' + x + '"' if " " in x else x) for x in args] # put quotes around args which contain spaces
     arg = '"' + os.path.normpath(os.path.join(os.getcwd(),"vrad_original")) + '" ' + " ".join(args)
     utils.con_log("Calling original VRAD...")
     utils.con_log(arg)
-    subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
-    utils.con_log("Done!")   
+    code=subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
+    if code==0:
+        utils.con_log("Done!")
+    else:
+        utils.con_log("VRAD failed! (" + str(code) + ")")
+        sys.exit(code)
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing
