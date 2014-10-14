@@ -5,9 +5,8 @@ import subprocess
 import shutil
 import random
 
-from property_parser import Property
+from property_parser import Property, KeyValError, NoKeyError
 import utils
-from utils import find_key # we use this everywhere!
 
 # COMPILER FLAGS (used as part of instance filename)
 # ccflag_comball
@@ -164,7 +163,7 @@ def load_settings():
         with open("vbsp_config.cfg", "r") as config: 
             conf=Property.parse(config)
     else:
-        conf = [] # All the property.find_all commands will fail, and we will use the defaults.
+        conf = [] # All the find_all commands will fail, and we will use the defaults.
         
     settings = {"textures"      : {},
                 "fizzler"       : {},
@@ -188,59 +187,50 @@ def load_settings():
         ] # And these have the extra scale information, which isn't in the maps.
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in Property.find_all(conf, 'textures"' + cat + '"' + name)]
+        value = [prop.value for prop in conf.find_all('textures', cat, name)]
         if len(value)==0:
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
             
-    for key in DEFAULTS.keys(): # get misc options
-        value = Property.find_all(conf, 'options"' + key)
-        if len(value)==0:
-            settings['options'][key] = DEFAULTS[key]
-        else:
-            settings['options'][key] = value[0].value
+    for key in DEFAULTS: # get misc options
+        settings['options'][key] = conf.find_key(key, DEFAULTS[key])
     
     for item,key in TEX_FIZZLER.items():
-        value = Property.find_all(conf, 'fizzler"' + key)
-        if len(value)==0:
-            settings['fizzler'][key] = item
-        else:
-            settings['fizzler'][key] = value[0].value
+        settings['options'][key] = conf.find_key(key, item)
            
-    cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
+    cust_fizzlers = conf.find_all('cust_fizzlers')
     for fizz in cust_fizzlers:
-        if len(Property.find_all(fizz, 'cust_fizzlers"flag')) == 1:
-            flag = find_key(fizz, 'flag')
-            if flag in settings['cust_fizzler']:
-                raise Exception('Two Fizzlers with same flag!!')
-            data= {}
-            data['left']     = find_key(fizz, 'left', 'tools/toolstrigger'),
-            data['right']    = find_key(fizz, 'right', 'tools/toolstrigger'),
-            data['center']   = find_key(fizz, 'center', 'tools/toolstrigger'),
-            data['short']    = find_key(fizz, 'short', 'tools/toolstrigger'),
-            data['scanline'] = find_key(fizz, 'scanline', settings['fizzler']['scanline'])
-            cust_fizzlers[flag] = data
+        flag = fizz.find_key('flag')
+        if flag in settings['cust_fizzler']:
+            raise Exception('Two Fizzlers with same flag!!')
+        data= {}
+        data['left']     = fizz.find_key('left', 'tools/toolstrigger'),
+        data['right']    = fizz.find_key('right', 'tools/toolstrigger'),
+        data['center']   = fizz.find_key('center', 'tools/toolstrigger'),
+        data['short']    = fizz.find_key('short', 'tools/toolstrigger'),
+        data['scanline'] = fizz.find_key('scanline', settings['fizzler']['scanline'])
+        cust_fizzlers[flag] = data
             
-    pack_commands = Property.find_all(conf, 'packer')
+    pack_commands = conf.find_all('packer')
     for pack in pack_commands:
         process_packer(pack.value)
     
-    conditions = Property.find_all(conf, 'conditions"condition')
+    conditions = conf.find_all('conditions', 'condition')
     for cond in conditions:
-        type = find_key(cond, 'type', "").value.upper()
+        type = cond.find_key('type', '').value.upper()
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
         for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview"):
-            flags += Property.find_all(cond, 'condition"'+f)
+            flags += cond.find_all('condition', f)
         results = []
-        for val in Property.find_all(cond, 'condition"result'):
+        for val in cond.find_all('condition', 'result'):
             results.extend(val.value) # join multiple ones together
         if len(flags) > 0 and len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
             settings['conditions'].append(con)
-    variants = Property.find_all(conf, 'variants"variant')
+    variants = conf.find_all('variants', 'variant')
     process_variants(variants)
     utils.con_log("Settings Loaded!")
     
@@ -311,11 +301,11 @@ def process_packer(f_list):
 def process_variants(vars):
     "Read variant commands from settings."
     for var in vars:
-        inst = find_key(var, 'base', '').value
-        count = find_key(var, 'number', '').value
+        inst = var.find_key('base', '').value
+        count = var.find_key('number', '').value
         if not inst == "" and count.isdecimal():
             count = int(count)
-            weight = find_key(var, 'weights', '').value
+            weight = var.find_key('weights', '').value
             if weight == '' or ',' not in weight:
                 print('Invalid weight for "' + inst +'"!')
                 weight = [str(i) for i in range(1,count + 1)]
@@ -339,20 +329,18 @@ def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     global max_ent_id
     utils.con_log("Scanning Entities...")
-    ents=Property.find_all(map,'entity')
+    ents=map.find_all('entity')
     for item in ents:
-        item.targname = find_key(item, 'targetname', "").value
-        cls=Property.find_all(item, 'entity"classname')
-        id=find_key(item, 'id')
-        if len(cls)==1:
-            item.cls=cls[0].value
-        else:
+        item.targname = item.find_key('targetname', "").value
+        cls=item.find_key('entity', '')
+        id=item.find_key('id', '-1')
+        if cls == '':
             utils.con_log("Error - entity missing class, skipping!")
             continue
-        if int(id.value):
+        if id.value.isnumeric():
             max_ent_id = max(max_ent_id,int(id.value))
         if item.cls=="func_instance":
-            item.file = find_key(item, 'file', "").value
+            item.file = item.find_key('file', "").value
             instances.append(item)
             cond_rem = []
             for cond in settings['conditions']: # check if it satisfies any conditions
@@ -402,7 +390,7 @@ def load_entities():
 
 def scan_mats():
     "Scan through all materials to check if they any defined conditions."
-    all_mats = Property.find_all(map, 'world"solid"side"material') + Property.find_all(map, 'entity"solid"side"material')
+    all_mats = map.find_all('world', 'solid', 'side', 'material') + map.find_all('entity', 'solid', 'side', 'material')
     used = []
     for mat in all_mats:
         if mat.value not in used: # we don't want to check a material twice
@@ -429,7 +417,7 @@ def scan_mats():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    sides=Property.find_all(map, 'world"solid"side') + Property.find_all(detail, 'entity"solid"side')
+    sides=map.find_all('world', 'solid', 'side') + detail.find_all('entity', 'solid', 'side')
     for face in sides:
         mat=find_key(face, 'material')   
         if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
@@ -458,11 +446,10 @@ def change_brush():
             
         if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
             scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
-            for val in (find_key(face, 'uaxis'),find_key(face, 'vaxis')):
-                if len(val)==1:
-                    split=val[0].value.split(" ")
-                    split[-1] = scale
-                    val[0].value=" ".join(split)    
+            for val in (face.find_key('uaxis'),face.find_key('vaxis')):
+                split=val.value.split(" ")
+                split[-1] = scale
+                val.value=" ".join(split)    
         alter_mat(mat)
             
 def change_overlays():
@@ -470,7 +457,7 @@ def change_overlays():
     utils.con_log("Editing Overlays...")
     to_rem=[]
     for over in overlays:
-        mat=find_key(over, 'material')
+        mat=over.find_key('material')
         alter_mat(mat)
         if mat.value.casefold() in ANTLINES:
             angle = find_key(over, 'angles').value.split(" ") # get the three parts
@@ -478,7 +465,7 @@ def change_overlays():
             new_tex = get_tex('overlay.'+ANTLINES[mat.value.casefold()]).split("|")
             print(new_tex)
             if len(new_tex)==2:
-                find_key(over, 'endu').value=new_tex[0] # rescale antlines if needed
+                over.find_key('endu').value=new_tex[0] # rescale antlines if needed
                 mat.value=new_tex[1]
             else:
                 mat.value=new_tex
@@ -493,7 +480,7 @@ def change_trig():
     utils.con_log("Editing Triggers...")
     for trig in triggers:
         if trig.cls=="trigger_portal_cleanser":
-            sides=Property.find_all(trig, 'entity"solid"side"material')
+            sides=trig.find_all('entity', 'solid', 'side', 'material')
             for mat in sides:
                 alter_mat(mat)
             find_key(trig, 'useScanline').value = options["fizzler"]["scanline"]
@@ -504,7 +491,7 @@ def change_func_brush():
     utils.con_log("Editing Brush Entities...")
     to_rem=[]
     for brush in f_brushes:
-        sides=Property.find_all(brush, 'entity"solid"side"material')
+        sides=brush.find_all('entity', 'solid', 'side', 'material')
         type=""
         for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
             if mat.value.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
@@ -523,19 +510,20 @@ def change_func_brush():
                     mat.value = get_tex("black.wall")
             else:
                 alter_mat(mat) # for gratings, laserfields and some others
-        parent=Property.find_all(brush, 'entity"parentname')
-        if brush.cls=="func_brush" and len(parent) == 1 and"-model_arms" in parent[0].value: # is this the angled panel?:
-            targ=parent[0].value.split("-model_arms")[0]
+        parent=brush.find_key('parentname', '')
+        if brush.cls=="func_brush" and"-model_arms" in parent.value: # is this the angled panel?:
+            targ=parent.value.split("-model_arms")[0]
             for inst in instances:
                 if inst.targname == targ:
                     if make_static_pan(inst, type):
                         to_rem.append(brush) # delete the brush, we don't want it
                     break
-        fast_ref = Property.find_all(brush, 'entity"drawInFastReflection')
-        if len(fast_ref) == 1:
-            fast_ref[0].value = get_opt("force_brush_reflect")
-        else:
-            brush.value.append(Property("drawinfastreflection", settings["force_brush_reflect"][0]))
+        try:
+            fast_ref = brush.find_key('drawInFastReflection')
+            fast_ref.value = get_opt("force_brush_reflect")
+        except:
+            brush.value.append(Property("drawinfastreflection", get_opt("force_brush_reflect")))
+            
     for item in to_rem:
         map.remove(item)
     del to_rem
@@ -558,7 +546,7 @@ def make_static_pan(ent, type):
         angle = "00" # different instance flat with the wall
     if not is_static:
         return False
-    find_key(ent, "file").value = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
+    ent.find_key("file").value = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
     return True
     
 def make_static_pist(ent):
@@ -588,7 +576,7 @@ def make_static_pist(ent):
             file=find_key(ent, "file")
             file.value = file.value[:-4] + "_" + bottom_pos + ".vmf"
     else: # we are static
-        find_key(ent, "file").value = get_opt("staticPan") + "pist_" + (top_pos if start_pos=="1" else bottom_pos) + ".vmf" 
+        ent.find_key("file").value = get_opt("staticPan") + "pist_" + (top_pos if start_pos=="1" else bottom_pos) + ".vmf" 
         # something like "static_pan/pist_3.vmf"
     return True
             
@@ -608,15 +596,15 @@ def fix_inst():
     global to_pack
     utils.con_log("Editing Instances...")
     for inst in instances:
-        file=find_key(inst, 'file', '')
+        file=inst.find_key('file', '')
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
-            name=Property.find_all(inst, 'entity"targetname')[0]
+            name=inst.find_key(inst, 'targetname')[0]
             if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
             else:
                 name.value = inst.targname.split("_modelEnd")[0] + "_modelEnd" 
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
-            angles=Property.find_all(inst, 'entity"angles')[0]
+            angles=inst.find_key(inst, 'angles')
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
             for var in utils.get_fixup(inst):
@@ -637,31 +625,29 @@ def fix_inst():
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
-                    Property.find_all(trig, 'entity"classname')[0].value = "trigger_paint_cleanser"
-                    sides=Property.find_all(trig, 'entity"solid"side"material')
+                    trig.find_key('classname').value = "trigger_paint_cleanser"
+                    sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
         elif "ccflag_comball_base" in file.value: # Rexaura Flux Fields
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
-                    Property.find_all(trig, 'entity"classname')[0].value = "trigger_multiple"
-                    sides=Property.find_all(trig, 'entity"solid"side"material')
+                    trig.find_key(trig, 'classname').value = "trigger_multiple"
+                    sides=trig.find_all(trig, 'entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
                     trig.value.append(Property("filtername", "@filter_pellet"))
                     trig.value.append(Property("wait", "0.1"))
-                    flags=Property.find_all(trig, 'entity"spawnflags')
-                    if len(flags) == 1:
-                        flags[0].value="72"
+                    trig.find_key('spawnflags').value="72"
                     utils.add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
                     # generate the output that triggers the pellet logic.
-                    Property.find_all(trig, 'entity"targetname')[0].value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
-            pos = find_key(inst, 'origin').value
-            angle=find_key(inst, 'angles').value
+                    trig.find_key('entity', 'targetname').value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
+            pos = inst.find_key('origin', '').value
+            angle=inst.find_key('angles', '').value
             for in_out in instances: # find the instance to use for output
-                out_pos = Property.find_all(in_out, 'entity"origin')[0].value
-                out_angle=Property.find_all(in_out, 'entity"angles')
-                if len(out_angle)==1 and pos == out_pos and angle==out_angle[0].value:
+                out_pos = in_out.find_key('origin').value
+                out_angles=in_out.find_key('angles').value
+                if pos == out_pos and angle==out_angle:
                     utils.add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
                     utils.add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
         elif "ccflag_death_fizz_base" in file.value: # LP's Death Fizzler
@@ -675,76 +661,66 @@ def fix_inst():
                     trig_src = []
                     for l in trig.to_strings():
                         trig_src.append(l + "\n")
-                    sides=Property.find_all(trig, 'entity"solid"side"material')
+                    sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         if mat.value.casefold() in TEX_FIZZLER.keys():
                             mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
-                    find_key(trig, 'targetname').value = inst.targname + "-fizz_red"
-                    find_key(trig, 'spawnflags').value = "9"
+                    trig.find_key('targetname').value = inst.targname + "-fizz_red"
+                    trig.find_key('spawnflags').value = "9"
                     
                     new_trig = Property.parse(trig_src)[0] # get a duplicate of the trigger by serialising and deserialising
-                    find_key(new_trig, 'targetname').value = inst.targname + "-fizz_blue"
-                    find_key(new_trig, 'spawnflags').value = "9"
+                    new_trig.find_key('targetname').value = inst.targname + "-fizz_blue"
+                    new_trig.find_key('spawnflags').value = "9"
                     map.append(new_trig)
                     
                     hurt = Property.parse(trig_src)[0]
-                    sides=Property.find_all(hurt, 'entity"solid"side"material')
+                    sides=hurt.find_all('entity', 'solid', 'side', 'material')
                     is_short = False # (if true we can shortcut for the brush)
                     for mat in sides:
                         if mat.value.casefold() == "effects/fizzler":
                             is_short=True
                         mat.value = "tools/toolstrigger"
-                    find_key(hurt, 'classname').value = "trigger_hurt"
-                    find_key(hurt, 'targetname').value = inst.targname + "-hurt"
-                    find_key(hurt, 'spawnflags').value="1"
-                    
-                    prop=find_key(hurt, 'usescanline')
-                    prop.name="damage"
-                    prop.value="100000"
-                    
-                    prop=find_key(hurt, 'visible')
-                    prop.name="damagetype"
-                    prop.value="1024"
+                        
+                    hurt.find_key('classname').value = "trigger_hurt"
+                    hurt.find_key('targetname').value = inst.targname + "-hurt"
+                    hurt.find_key('spawnflags').value="1"
+                    hurt.find_key('usescanline').edit(name= 'damage', value= '100000')
+                    hurt.find_key('visible').edit(name= 'damagetype', value= '1024')
                     
                     hurt.value.append(Property('nodmgforce', '1'))
                     map.append(hurt)
                     
                     brush = Property.parse(trig_src)[0]
-                    find_key(brush, 'targetname').value = inst.targname + "-brush"
-                    find_key(brush, 'classname').value = 'func_brush'
-                    find_key(brush, 'spawnflags').value = "1"
+                    brush.find_key('targetname').value = inst.targname + "-brush"
+                    brush.find_key('classname').value = 'func_brush'
+                    brush.find_key('spawnflags').value = "1" 
+                    brush.find_key('visible').edit(name = 'solidity', value= '1')
+                    brush.find_key('usescanline').edit(name = 'renderfx', value='14')
                     
-                    prop=find_key(brush, 'visible')
-                    prop.name="solidity"
-                    prop.value="1"
-                    
-                    prop=find_key(brush, 'usescanline')
-                    prop.name="renderfx"
-                    prop.value="14"
                     brush.value.append(Property('drawinfastreflection', "1"))
                     
                     if is_short:
-                        sides=Property.find_all(brush, 'entity"solid"side')
+                        sides=brush.find_all('entity', 'solid', 'side')
                         for side in sides:
-                            mat=find_key(side,'material')
+                            mat=side.find_key('material')
                             if "effects/fizzler" in mat.value.casefold():
                                 mat.value="effects/laserplane"
                             alter_mat(mat) # convert to the styled version
                             
-                            uaxis = find_key(side, 'uaxis').value.split(" ")
-                            vaxis = find_key(side, 'vaxis').value.split(" ")
+                            uaxis = side.find_key('uaxis').value.split(" ")
+                            vaxis = side.find_key('vaxis').value.split(" ")
                             # the format is like "[1 0 0 -393.4] 0.25"
                             uaxis[3]="0]"
                             uaxis[4]="0.25"
                             vaxis[4]="0.25"
-                            find_key(side, 'uaxis').value = " ".join(uaxis)
-                            find_key(side, 'vaxis').value = " ".join(vaxis)
+                            side.find_key('uaxis').value = " ".join(uaxis)
+                            side.find_key('vaxis').value = " ".join(vaxis)
                     else:
                         # We need to stretch the brush to get rid of the side sections.
                         # This is the same as moving all the solids to match the bounding box.
                         # first get the origin, used to figure out if a point should be max or min
-                        origin=[int(v) for v in find_key(brush,'origin').value.split(' ')]
-                        planes=Property.find_all(brush, 'entity"solid"side"plane')
+                        origin=[int(v) for v in brush.find_key('origin').value.split(' ')]
+                        planes=brush.find_all('entity', 'solid', 'side', 'plane')
                         bbox_max,bbox_min=utils.get_bbox(planes)
                         for pl in planes:
                             verts=utils.split_plane(pl)
@@ -755,23 +731,23 @@ def fix_inst():
                                     else:
                                         v[i]=str(bbox_min[i])
                             pl.value=utils.join_plane(verts)
-                        solids=Property.find_all(brush, 'entity"solid')
+                        solids=brush.find_all('solid')
                         
-                        sides=Property.find_all(solids[1],'solid"side')
+                        sides=solids[1].find_all('side')
                         for side in sides:
-                            mat=find_key(side, 'material')
+                            mat=side.find_key('material')
                             if mat.value.casefold() == "effects/fizzler_center":
                                 mat.value="effects/laserplane"
                             alter_mat(mat) # convert to the styled version
-                            bounds_max,bounds_min=utils.get_bbox(Property.find_all(side,'side"plane'))
+                            bounds_max,bounds_min=utils.get_bbox(side.find_all('plane'))
                             dimensions = [0,0,0]
                             for i,g in enumerate(dimensions):
                                 dimensions[i] = bounds_max[i] - bounds_min[i]
                             if 2 in dimensions: # The front/back won't have this dimension
                                 mat.value="tools/toolsnodraw"
                             else:
-                                uaxis=find_key(side, 'uaxis').value.split(" ")
-                                vaxis=find_key(side, 'vaxis').value.split(" ")
+                                uaxis=side.find_key('uaxis').value.split(" ")
+                                vaxis=side.find_key('vaxis').value.split(" ")
                                 # the format is like "[1 0 0 -393.4] 0.25"
                                 size=0
                                 offset=0
@@ -784,8 +760,8 @@ def fix_inst():
                                 uaxis[3]=str(512/size * -offset) + "]" # texture offset to fit properly
                                 uaxis[4]=str(size/512) # scaling
                                 vaxis[4]="0.25" # widthwise it's always the same
-                                find_key(side, 'uaxis').value = " ".join(uaxis)
-                                find_key(side, 'vaxis').value = " ".join(vaxis)
+                                side.find_key('uaxis').value = " ".join(uaxis)
+                                side.find_key('vaxis').value = " ".join(vaxis)
                             
                         brush.value.remove(solids[2])
                         brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
@@ -803,21 +779,18 @@ def fix_inst():
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     utils.con_log("Editing WorldSpawn")
-    root=Property.find_all(map, 'world')
-    if len(root)==1:
-        root=root[0]
-        has_paint = Property.find_all(root, 'world"paintinmap')
-        utils.con_log(has_paint)
-        if len(has_paint) == 1:
-            if has_paint[0].value == "0":
-                has_paint[0].value = get_opt("force_paint")
-        else:
-            root.value.append(Property("has_paint", get_opt("force_paint")))
-        sky = Property.find_all(root, 'world"skyname')
-        if len(sky) == 1:
-            sky[0].value = get_tex("special.sky") # allow random sky to be chosen
-        else:
-            root.value.append(Property("skyname", get_tex("special.sky")))
+    root=map.find_key('world')
+    try:
+        has_paint = root.find_key('paintinmap')
+        if has_paint.value == "0":
+            has_paint.value = get_opt("force_paint")
+    except KeyValError:
+        root.value.append(Property("has_paint", get_opt("force_paint")))
+    try:
+        sky = root.find_key('skyname', None)
+        sky.value = get_tex("special.sky") # allow random sky to be chosen
+    except KeyValError: 
+        root.value.append(Property("skyname", get_tex("special.sky")))
 
 def add_extra_ents():
     "Add our various extra instances to enable some features."
@@ -851,7 +824,7 @@ def hammer_pack_scan():
     global to_pack
     to_pack=[] # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
-    comments = Property.find_all(map, 'entity"editor"comments')
+    comments = map.find_all('entity', 'editor', 'comments')
     for com in comments:
         if "packer_" in com.value:
             parts = com.value.split()

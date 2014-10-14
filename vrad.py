@@ -5,7 +5,6 @@ import subprocess
 import shutil
 import random
 
-from property_parser import Property
 import utils
     
 def quote(txt):

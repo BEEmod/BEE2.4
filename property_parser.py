@@ -18,6 +18,15 @@ to_strings: => string
 
 
 import re
+__all__ = ["KeyValError", "NoKeyError", "Property"]
+
+class KeyValError(Exception):
+    "An error that occured when parsing a Valve KeyValues file."
+    pass
+    
+class NoKeyError(Exception):
+    "Raised if a key is not found when searching from find_key."
+    pass
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
@@ -25,8 +34,14 @@ class Property:
         self.name = name
         self.value = value
 
+    def edit(self, name=None, value=None):
+        if name is not None:
+            self.name = name
+        if value is not None:
+            self.value = value
+        
     @staticmethod
-    def parse(file_contents):
+    def parse(file_contents) -> "List of Property objects":
         '''Returns list of Property objects parsed from given text'''
         open_properties = [Property(None, [])]
         values = None
@@ -39,7 +54,7 @@ class Property:
                     line_contents = freshline.split('"')
                     name = line_contents[1]
                     if not utils.is_identifier(name):
-                        raise ValueError("Invalid name " + name + ". Line " + str(line_num) + ".")
+                        raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
                         value = line_contents[3]
                     except IndexError:
@@ -50,49 +65,64 @@ class Property:
                     values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
                     if values[-1].value:
-                        raise ValueError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
+                        raise KeyValError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
                     
                     values[-1].value = []
                     open_properties.append(values[-1])
                 elif freshline.startswith('}'):
                     open_properties.pop()
                 else:
-                    raise ValueError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".")
+                    raise KeyValError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".")
                     
             if not open_properties:
-                raise ValueError("Too many closing brackets. Line " + str(line_num) + ".")
+                raise KeyValError("Too many closing brackets. Line " + str(line_num) + ".")
         if len(open_properties) > 1:
-            raise ValueError("End of text reached with remaining open sections.")
+            raise KeyValError("End of text reached with remaining open sections.")
             
         return open_properties[0].value
         
-    def find_all(self, key_path):
+    def find_all(self, *keys) -> "List of matching Property objects":
+        "Search through a tree to obtain all properties that match a particular path."
         run_on = []
         values = []
-        depth = key_path.count('"')
-        keys = key_path.split('"', 1)
-        #print ('====keys')
-        #if depth >0:
-            #print(keys[1])
-        
+        depth = len(keys)
+        if depth == 0:
+            raise ValueError("Cannot find_all without commands!")
+
         if isinstance(self, list):
             run_on = self
         elif isinstance(self, Property):
             run_on.append(self)
+            if not self.name == keys[0]: # Add our name to the beginning if not present (otherwise this always fails)
+                return Property.find_all(run_on[0], *([self.name] + keys))
         for prop in run_on:
             if not isinstance(prop, Property):
-                raise ValueError("Cannot find_all on a value that is not a Property")
-            #print('{}'.format('keys[0] = ', keys[0]))
+                raise ValueError("Cannot find_all on a value that is not a Property!")
             if prop.name.casefold() == keys[0].casefold():
                 if depth > 0:
                     if isinstance(prop.value, list):
-                        values.extend(Property.find_all(prop.value,keys[1]))
+                        values.extend(Property.find_all(prop.value, *keys[1:]))
                 else:
                     values.append(prop)
         return values
         
+    def find_key(self, key: str, def_: str=None) -> "Property":
+        "Obtain the value of the child Property with a name, with an optional default value. "
+        result = Property.find_all(ent, ent.name, key)
+        if len(result) == 1:
+            return result[0]
+        elif len(result) == 0:
+            if def_==None:
+                raise NoKeyError('No key "' + key + '"!')
+            else:
+                return Property(name=key, value=norm) 
+                # We were given a default, pretend that was in the original property list so code works
+        else:
+            return result[-1]
+        
     def __str__(self):
         return '\n'.join(self.to_strings())
+        
     
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''

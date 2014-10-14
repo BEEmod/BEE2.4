@@ -20,24 +20,11 @@ def is_identifier(name, forbidden='{}\'"'):
 def con_log(text):
     print(text, flush=True) 
 
-def find_key(ent, key, norm=None):
-    "Safely get a subkey from an entity (not lists of multiple). If it fails, throw an exception to crash the compiler safely."
-    result = Property.find_all(ent, ent.name + '"' + key)
-    if len(result) == 1:
-        return result[0]
-    elif len(result) == 0:
-        if norm==None:
-            raise Exception('No key "' + key + '"!')
-        else:
-            return Property(name=key, value=norm) # We were given a default, pretend that was in the original property list
-    else:
-        raise Exception('Duplicate keys "' + key + '"!')
-
 # VMF specific        
 
 def add_output(entity, output, target, input, params="", delay="0", times="-1"):
     "Add a new output to an entity with the given values, generating a connections part if needed."
-    conn = Property.find_all(entity, 'entity"connections')
+    conn = entity.find_all('entity', 'connections')
     if len(conn) == 0:
         conn = Property("connections", [])
         entity.value.append(conn)
@@ -85,5 +72,5 @@ _FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) f
     
 def get_fixup(inst):
     "Generate a list of all fixup keys for this item."
-    vals = [find_key(inst, fix, "") for fix in _FIXUP_KEYS] # loop through and get each replace key
+    vals = [inst.find_key(fix, "") for fix in _FIXUP_KEYS] # loop through and get each replace key
     return [f.value for f in vals if not f.value==""] # return only set values, without the property wrapper
