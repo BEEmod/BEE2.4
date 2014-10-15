@@ -85,6 +85,16 @@ BLACK_PAN = [
              "metal/black_wall_metal_002a", 
              "metal/black_wall_metal_002b"
             ]
+            
+WALLS = [
+             "tile/white_wall_tile003a", 
+             "tile/white_wall_tile003h", 
+             "tile/white_wall_tile003c", 
+             "metal/black_wall_metal_002c", 
+             "metal/black_wall_metal_002e", 
+             "metal/black_wall_metal_002a", 
+             "metal/black_wall_metal_002b"
+        ]
 
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
@@ -106,7 +116,11 @@ DEFAULTS = {
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
-    "clearPanelFile"            : "instances/p2editor/panel_clear.vmf"
+    "clearPanelFile"          : "instances/p2editor/panel_clear.vmf",
+    "clump_wall_tex"          : "0",
+    "clump_size"              : "4",
+    "clump_width"             : "2",
+    "clump_number"            : "6",
     }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -182,6 +196,10 @@ def load_settings():
         ("tile/white_floor_tile002a",    "white.floor"),
         ("metal/black_floor_metal_001c", "black.ceiling"),
         ("tile/white_floor_tile002a",    "white.ceiling"),
+        ("",                             "special.white"),
+        ("",                             "special.black"),
+        ("",                             "special.white_gap"),
+        ("",                             "special.black_gap"),
         # These have the same item so we can't store this in the regular dictionary.
         ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
         ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
@@ -427,31 +445,118 @@ def change_brush():
                 v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
                 # we do the decimal with strings to ensure it adds floats precisely
             plane.value=utils.join_plane(verts)
-            
         if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
             for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
                 split=val.value.split(" ")
                 split[-1] = get_opt("glass_scale") # apply the glass scaling option
                 val.value=" ".join(split)
+    if (get_opt("clump_wall_tex") == "1" and 
+          get_opt("clump_size").isnumeric() and 
+          get_opt("clump_width").isnumeric() and 
+          get_opt("clump_number").isnumeric()):
+        clump_walls(sides)
+    else:
+        random_walls(sides)
         
-        is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
-        if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
-            # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-            verts = utils.split_plane(face.find_key('plane'))
-            # y-val for first if < last if ceiling
-            side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
-            type = "black." if mat.value.casefold() in BLACK_PAN else "white."
-            is_blackceil = (type+side == "black.ceiling")
-            mat.value = get_tex(type+side)
-            
-        if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
-            scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
-            for val in (face.find_key('uaxis'),face.find_key('vaxis')):
-                split=val.value.split(" ")
-                split[-1] = scale
-                val.value=" ".join(split)    
+
+def random_walls(sides):
+    "The original wall style, with completely randomised walls."
+    for face in sides:
+        mat=face.find_key('material')   
+        is_blackceil = roof_tex(face, mat)
+    if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+        scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
+        for val in (face.find_key('uaxis'),face.find_key('vaxis')):
+            split=val.value.split(" ")
+            split[-1] = scale
+            val.value=" ".join(split)    
+    alter_mat(mat)
+    
+def clump_walls(sides):
+    "A wall style where textures are used in small groups near each other, clumped together."
+    walls = {}
+    for face in sides: # first build a list of all textures and their locations...
+        mat=face.find_key('material')
+        if mat.value.casefold() in WALLS:
+            size_max,size_min = utils.get_bbox((face.find_key('plane'),))
+            origin = [0, 0, 0]
+            for i in range(3):
+                origin[i] = (size_min[i] + size_max[i])/2
+            origin = tuple(origin)
+            if mat.value in WHITE_PAN: # placeholder to indicate these can be replaced.
+                mat.value = "WHITE"
+            elif mat.value in BLACK_PAN:
+                mat.value = "BLACK"
+            if origin in walls:
+                # The only time two textures will be in the same place is if they are covering each other - delete them both.
+                mat.value = "tools/toolsnodraw"
+                walls[origin].value = "tools/toolsnodraw"
+                del walls[origin]
+            else:
+                walls[origin] = mat
+        else:
+            roof_tex(face, mat)
+                
+    todo_walls = len(walls) # number of walls un-edited
+    clump_size = int(get_opt("clump_size"))
+    clump_wid = int(get_opt("clump_width"))
+    clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
+    wall_pos = list(walls.keys())
+    for i in range(clump_numb):
+        pos = random.choice(wall_pos)
+        type = walls[pos].value
+        if type == "WHITE" or type=="BLACK":
+            pos_min = [0,0,0]
+            pos_max = [0,0,0]
+            direction = random.randint(0,2) # these are long strips extended in one direction
+            for i in range(3): 
+                if i == direction:
+                    pos_min[i] = pos[i] - random.randint(0, clump_size) * 128
+                    pos_max[i] = pos[i] + random.randint(0, clump_size) * 128
+                else:
+                    pos_min[i] = pos[i] - random.randint(0, clump_wid) * 128
+                    pos_max[i] = pos[i] + random.randint(0, clump_wid) * 128
+                
+            tex = get_tex("white.wall" if type=="WHITE" else "black.wall")
+            #print("Adding clump from ", pos_min, "to", pos_max, "with tex:", tex)
+            for x in range(pos_min[0], pos_max[0], 128):
+                for y in range(pos_min[1], pos_max[1], 128):
+                    for z in range(pos_min[2], pos_max[2]):
+                        if (x,y,z) in walls:
+                            mat = walls[x,y,z]
+                            if mat.value == type:
+                                mat.value = tex
+    
+    for mat in walls.values():   
+        if mat.value =="WHITE":
+        # we missed these ones!
+            if not get_tex("special.white_gap") == "":
+                mat.value = get_tex("special.white_gap")
+            else:
+                    mat.value = get_tex("white.wall")
+        elif mat.value == "BLACK":
+            if not get_tex("special.black_gap") == "":
+                    mat.value = get_tex("special.black_gap")
+            else:
+                    mat.value = get_tex("black.wall")
+        else:
+            alter_mat(mat)
+    
+def roof_tex(face, mat):
+    "Determine if a texture is on the roof or if it's on the floor, and apply textures appropriately."
+    is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
+    if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
+        # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
+        verts = utils.split_plane(face.find_key('plane'))
+        # y-val for first if < last if ceiling
+        side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
+        type = "black." if mat.value.casefold() in BLACK_PAN else "white."
+        mat.value = get_tex(type+side)
+        return (type+side == "black.ceiling")
+    else:
         alter_mat(mat)
-            
+        return False
+    
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
@@ -497,13 +602,13 @@ def change_func_brush():
                 mat.value = get_tex("special.edge")
             elif mat.value.casefold() in WHITE_PAN:
                 type="white"
-                if "special.white" in settings['textures']:
+                if not get_tex("special.white") == "":
                     mat.value = get_tex("special.white")
                 elif not alter_mat(mat):
                     mat.value = get_tex("white.wall")
             elif mat.value.casefold() in BLACK_PAN:
                 type="black"
-                if "special.black" in settings['textures']:
+                if not get_tex("special.black") == "":
                     mat.value = get_tex("special.black")
                 elif not alter_mat(mat):
                     mat.value = get_tex("black.wall")
