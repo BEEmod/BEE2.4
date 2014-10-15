@@ -218,7 +218,7 @@ def load_settings():
             settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
         
         for item,key in TEX_FIZZLER.items():
-            settings['options'][key.casefold()] = Property.find_key(options, key, item).value
+            settings['fizzler'][key.casefold()] = Property.find_key(options, key, item).value
         cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
     for fizz in cust_fizzlers:
         flag = fizz.find_key('flag')
@@ -511,11 +511,11 @@ def clump_walls(sides):
             direction = random.randint(0,2) # these are long strips extended in one direction
             for i in range(3): 
                 if i == direction:
-                    pos_min[i] = pos[i] - random.randint(0, clump_size) * 128
-                    pos_max[i] = pos[i] + random.randint(0, clump_size) * 128
+                    pos_min[i] = int(pos[i] - random.randint(0, clump_size) * 128)
+                    pos_max[i] = int(pos[i] + random.randint(0, clump_size) * 128)
                 else:
-                    pos_min[i] = pos[i] - random.randint(0, clump_wid) * 128
-                    pos_max[i] = pos[i] + random.randint(0, clump_wid) * 128
+                    pos_min[i] = int(pos[i] - random.randint(0, clump_wid) * 128)
+                    pos_max[i] = int(pos[i] + random.randint(0, clump_wid) * 128)
                 
             tex = get_tex("white.wall" if type=="WHITE" else "black.wall")
             #print("Adding clump from ", pos_min, "to", pos_max, "with tex:", tex)
@@ -587,8 +587,9 @@ def change_trig():
             sides=trig.find_all('entity', 'solid', 'side', 'material')
             for mat in sides:
                 alter_mat(mat)
-            find_key(trig, 'useScanline').value = options["fizzler"]["scanline"]
-            find_key(trig, 'drawInFastReflection').value = get_opt("force_fizz_reflect")
+            print(settings['fizzler'])
+            trig.find_key('useScanline').value = settings["fizzler"]["scanline"]
+            trig.find_key('drawInFastReflection').value = get_opt("force_fizz_reflect")
 
 def change_func_brush():
     "Edit func_brushes."
@@ -702,13 +703,13 @@ def fix_inst():
     for inst in instances:
         file=inst.find_key('file', '')
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
-            name=inst.find_key(inst, 'targetname')[0]
+            name=inst.find_key('targetname')
             if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
             else:
                 name.value = inst.targname.split("_modelEnd")[0] + "_modelEnd" 
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
-            angles=inst.find_key(inst, 'angles')
+            angles=inst.find_key('angles')
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
             for var in utils.get_fixup(inst):
@@ -736,7 +737,7 @@ def fix_inst():
         elif "ccflag_comball_base" in file.value: # Rexaura Flux Fields
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
-                    trig.find_key(trig, 'classname').value = "trigger_multiple"
+                    trig.find_key('classname').value = "trigger_multiple"
                     sides=trig.find_all(trig, 'entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
@@ -745,7 +746,7 @@ def fix_inst():
                     trig.find_key('spawnflags').value="72"
                     utils.add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
                     # generate the output that triggers the pellet logic.
-                    trig.find_key('entity', 'targetname').value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
+                    trig.find_key('targetname').value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
             pos = inst.find_key('origin', '').value
             angle=inst.find_key('angles', '').value
             for in_out in instances: # find the instance to use for output
