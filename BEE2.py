@@ -9,18 +9,11 @@ def load_settings():
   settings={}
   with open("config/config.cfg", "r") as f:
     prop=Property.parse(f)
-  settings['pal_dir']=Property.find_all(prop, 'directories"palettes')
-  if settings['pal_dir']:
-    settings['pal_dir']=settings['pal_dir'][0].value
-    
-  settings['item_dir']=Property.find_all(prop, 'directories"items')
-  if settings['item_dir']:
-    settings['item_dir']=settings['item_dir'][0].value
-     
-  settings['style_dir']=Property.find_all(prop, 'directories"styles')
-  if settings['style_dir']:
-    settings['style_dir']=settings['style_dir'][0].value
-
+  dirs = Property.find_key(prop, 'directories')
+  
+  settings['pal_dir']=dirs.find_key('palettes', 'palettes\\').value
+  settings['item_dir']=dirs.find_key('items', 'items\\').value
+  settings['style_dir']=dirs.find_key('styles', 'styles\\').value
 
 def load_palettes():
   pal=paletteLoader.loadAll(settings['pal_dir'])
