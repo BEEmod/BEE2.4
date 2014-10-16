@@ -33,6 +33,7 @@ class Property:
     def __init__(self, name = None, value = ""):
         self.name = name
         self.value = value
+        self.valid = True
 
     def edit(self, name=None, value=None):
         if name is not None:
@@ -123,21 +124,42 @@ class Property:
         else:
             return Property(name=key, value=def_) 
             # We were given a default, pretend that was in the original property list so code works
-        
+    
+    def copy(self):
+        "Deep copy this Property tree and return it."
+        if isinstance(self.value, list):
+            new_children = [] # we need to duplicate children...
+            for child in self.value:
+                new_children.append(child.copy()) # so recurse
+            return Property(self.name, new_children)
+        else:
+            return Property(self.name, self.value)
+            
+    def make_invalid(self):
+        "Soft delete this property tree, so it does not appear in any output."
+        self.valid = False
+        self.value = "" # Dump this if it exists
+        self.name = None
+    
     def __str__(self):
-        return '\n'.join(self.to_strings())
-        
+        if self.valid:
+            return '\n'.join(self.to_strings())
+        else:
+            return ""
     
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
-        out_val = ['"{}"'.format(self.name)]
-        if isinstance(self.value, list):
-            out_val.append('{')
-            out_val.extend(['\t'+line for property in self.value for line in property.to_strings()])
-            out_val.append('}')
+        if self.valid:
+            out_val = ['"{}"'.format(self.name)]
+            if isinstance(self.value, list):
+                out_val.append('{')
+                out_val.extend(['\t'+line for property in self.value for line in property.to_strings() if property.valid==True])
+                out_val.append('}')
+            else:
+                out_val[0] += ' "' + self.value + '"'
+                
+            return out_val
         else:
-            out_val[0] += ' "' + self.value + '"'
-            
-        return out_val
+            return [""]
 
 import utils

@@ -17,8 +17,8 @@ def is_identifier(name, forbidden='{}\'"'):
             return False
     return True
     
-def con_log(text):
-    print(text, flush=True) 
+def con_log(*text):
+    print(*text, flush=True) 
 
 # VMF specific        
 

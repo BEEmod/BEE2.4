@@ -67,7 +67,6 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "nature/toxicslime_a2_bridge_intro"                      : "special.goo",
     "glass/glasswindow007a_less_shiny"                       : "special.glass",
     "metal/metalgrate018"                                    : "special.grating",
-    "BEE2/fizz/lp/death_field_clean_"                        : "special.lp_death_field", # + short/left/right/center
     "effects/laserplane"                                     : "special.laserfield",
     "sky_black"                                              : "special.sky",
     }
@@ -141,7 +140,7 @@ TEX_FIZZLER = {
     "effects/fizzler_l"      : "left",
     "effects/fizzler_r"      : "right",
     "effects/fizzler"        : "short",
-    "0"                      : "scanline"
+    "0"                      : "scanline",
     }
  
 ###### UTIL functions #####
@@ -167,6 +166,8 @@ def alter_mat(prop):
     if mat in TEX_VALVE: # should we convert it?
         prop.value = get_tex(TEX_VALVE[mat])
         return True
+    elif mat in TEX_FIZZLER:
+        prop.value = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
 
@@ -180,17 +181,20 @@ def load_settings():
     else:
         conf = [] # All the find_all commands will fail, and we will use the defaults.
         
-    settings = {"textures"      : {},
-                "fizzler"       : {},
-                "options"       : {},
-                "deathfield"    : {},
-                "instances"     : {},
-                "variants"      : {},
+    settings = {"textures"           : {},
+                "fizzler"            : {},
+                "options"            : {},
+                "deathfield"         : {},
+                "instances"          : {},
+                "variants"           : {},
                 
-                "cust_fizzlers" : [],
-                "conditions"    : [],
-                "change_inst"   : [],
+                "cust_fizzlers"      : [],
+                "conditions"         : [],
+                "change_inst"        : [],
+                "overlay_inst"       : [],
+                "overlay_inst_flags" : [],
                 }
+                
     tex_defaults = list(TEX_VALVE.items()) + [
         ("metal/black_floor_metal_001c", "black.floor" ),
         ("tile/white_floor_tile002a",    "white.floor"),
@@ -204,6 +208,7 @@ def load_settings():
         ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
         ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
         ] # And these have the extra scale information, which isn't in the maps.
+        
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
         value = [prop.value for prop in Property.find_all(conf, 'textures', cat, name)]
@@ -211,15 +216,19 @@ def load_settings():
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
+            
     opts = Property.find_all(conf, 'options')
     for options in opts:
         for key in DEFAULTS: # get misc options
-            print(key, DEFAULTS[key])
             settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
-        
+     
+    fizz_opts = Property.find_all(conf, 'fizzler')
+    for fizz_opt in fizz_opts:
         for item,key in TEX_FIZZLER.items():
-            settings['fizzler'][key.casefold()] = Property.find_key(options, key, item).value
-        cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
+            settings['fizzler'][key] = Property.find_key(fizz_opt, key, item).value
+            
+    cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
+        
     for fizz in cust_fizzlers:
         flag = fizz.find_key('flag')
         if flag in settings['cust_fizzler']:
@@ -231,9 +240,22 @@ def load_settings():
         data['short']    = fizz.find_key('short', 'tools/toolstrigger'),
         data['scanline'] = fizz.find_key('scanline', settings['fizzler']['scanline'])
         cust_fizzlers[flag] = data
+        
+    deathfield = Property.find_key(conf, "deathfield", [])
+    settings['deathfield']['left']     = deathfield.find_key('left', 'BEE2/fizz/lp/death_field_clean_left').value
+    settings['deathfield']['right']    = deathfield.find_key('right', 'BEE2/fizz/lp/death_field_clean_right').value
+    settings['deathfield']['center']   = deathfield.find_key('center', 'BEE2/fizz/lp/death_field_clean_center').value
+    settings['deathfield']['short']    = deathfield.find_key('short', 'BEE2/fizz/lp/death_field_clean_short').value
+    wid = deathfield.find_key('texwidth', 'blah').value
+    if not wid.isdecimal():
+        wid = '512'
+    settings['deathfield']['texwidth'] = int(wid)
+    settings['deathfield']['scanline'] = deathfield.find_key('scanline', settings['fizzler']['scanline']).value
+        
     pack_commands = Property.find_all(conf, 'packer')
     for pack in pack_commands:
         process_packer(pack.value)
+        
     conditions = Property.find_all(conf, 'conditions', 'condition')
     for cond in conditions:
         type = cond.find_key('type', '').value.upper()
@@ -248,8 +270,12 @@ def load_settings():
         if len(flags) > 0 and len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
             settings['conditions'].append(con)
-    variants = Property.find_all(conf, 'variants', 'variant')
-    process_variants(variants)
+
+    process_variants(Property.find_all(conf, 'variants', 'variant'))
+   
+    process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
+    print(settings['overlay_inst'])
+    
     utils.con_log("Settings Loaded!")
     
 def load_map(path):
@@ -257,6 +283,7 @@ def load_map(path):
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
         map=Property.parse(file)
+    utils.con_log("Parsing complete!")
 
 def check_conditions():
     "Check all the global conditions, like style vars."
@@ -302,11 +329,22 @@ def satisfy_condition(cond):
                 process_variant(res.value)
             elif res.name.casefold() == "addglobal":
                 settings['instance'].append(res)
+            elif res.name.casefold() == "overlayinstance":
+                process_inst_overlay([res.value,])
             elif res.name.casefold() == "styleopt":
                 for opt in res.value:
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
     return sat
+    
+def process_inst_overlay(lst):
+    for inst in lst:
+        try:
+            flag = inst.find_key("flag").value
+            settings['overlay_inst'].append((flag,inst.find_key("file").value, inst.find_key("name", "").value))
+        except KeyValError:
+            util.con_log('Invalid instance overlay command detected!')
+            continue # ignore this one
     
 def process_packer(f_list):
     "Read packer commands from settings."
@@ -587,7 +625,6 @@ def change_trig():
             sides=trig.find_all('entity', 'solid', 'side', 'material')
             for mat in sides:
                 alter_mat(mat)
-            print(settings['fizzler'])
             trig.find_key('useScanline').value = settings["fizzler"]["scanline"]
             trig.find_key('drawInFastReflection').value = get_opt("force_fizz_reflect")
 
@@ -758,120 +795,7 @@ def fix_inst():
         elif "ccflag_death_fizz_base" in file.value: # LP's Death Fizzler
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
-                    # The Death Fizzler has 4 brushes:
-                    # - trigger_portal_cleanser with standard fizzler texture for fizzler-only mode (-fizz_blue)
-                    # - trigger_portal_cleanser with death fizzler texture  for both mode (-fizz_red)
-                    # - trigger_hurt for deathfield mode (-hurt)
-                    # - func_brush for the deathfield-only mode (-brush)
-                    trig_src = []
-                    for l in trig.to_strings():
-                        trig_src.append(l + "\n")
-                    sides=trig.find_all('entity', 'solid', 'side', 'material')
-                    for mat in sides:
-                        if mat.value.casefold() in TEX_FIZZLER.keys():
-                            mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
-                    trig.find_key('targetname').value = inst.targname + "-fizz_red"
-                    trig.find_key('spawnflags').value = "9"
-                    
-                    new_trig = Property.parse(trig_src)[0] # get a duplicate of the trigger by serialising and deserialising
-                    new_trig.find_key('targetname').value = inst.targname + "-fizz_blue"
-                    new_trig.find_key('spawnflags').value = "9"
-                    map.append(new_trig)
-                    
-                    hurt = Property.parse(trig_src)[0]
-                    sides=hurt.find_all('entity', 'solid', 'side', 'material')
-                    is_short = False # (if true we can shortcut for the brush)
-                    for mat in sides:
-                        if mat.value.casefold() == "effects/fizzler":
-                            is_short=True
-                        mat.value = "tools/toolstrigger"
-                        
-                    hurt.find_key('classname').value = "trigger_hurt"
-                    hurt.find_key('targetname').value = inst.targname + "-hurt"
-                    hurt.find_key('spawnflags').value="1"
-                    hurt.find_key('usescanline').edit(name= 'damage', value= '100000')
-                    hurt.find_key('visible').edit(name= 'damagetype', value= '1024')
-                    
-                    hurt.value.append(Property('nodmgforce', '1'))
-                    map.append(hurt)
-                    
-                    brush = Property.parse(trig_src)[0]
-                    brush.find_key('targetname').value = inst.targname + "-brush"
-                    brush.find_key('classname').value = 'func_brush'
-                    brush.find_key('spawnflags').value = "1" 
-                    brush.find_key('visible').edit(name = 'solidity', value= '1')
-                    brush.find_key('usescanline').edit(name = 'renderfx', value='14')
-                    
-                    brush.value.append(Property('drawinfastreflection', "1"))
-                    
-                    if is_short:
-                        sides=brush.find_all('entity', 'solid', 'side')
-                        for side in sides:
-                            mat=side.find_key('material')
-                            if "effects/fizzler" in mat.value.casefold():
-                                mat.value="effects/laserplane"
-                            alter_mat(mat) # convert to the styled version
-                            
-                            uaxis = side.find_key('uaxis').value.split(" ")
-                            vaxis = side.find_key('vaxis').value.split(" ")
-                            # the format is like "[1 0 0 -393.4] 0.25"
-                            uaxis[3]="0]"
-                            uaxis[4]="0.25"
-                            vaxis[4]="0.25"
-                            side.find_key('uaxis').value = " ".join(uaxis)
-                            side.find_key('vaxis').value = " ".join(vaxis)
-                    else:
-                        # We need to stretch the brush to get rid of the side sections.
-                        # This is the same as moving all the solids to match the bounding box.
-                        # first get the origin, used to figure out if a point should be max or min
-                        origin=[int(v) for v in brush.find_key('origin').value.split(' ')]
-                        planes=brush.find_all('entity', 'solid', 'side', 'plane')
-                        bbox_max,bbox_min=utils.get_bbox(planes)
-                        for pl in planes:
-                            verts=utils.split_plane(pl)
-                            for v in verts:
-                                for i in range(0,3): #x,y,z
-                                    if int(v[i]) > origin[i]:
-                                        v[i]=str(bbox_max[i])
-                                    else:
-                                        v[i]=str(bbox_min[i])
-                            pl.value=utils.join_plane(verts)
-                        solids=brush.find_all('solid')
-                        
-                        sides=solids[1].find_all('side')
-                        for side in sides:
-                            mat=side.find_key('material')
-                            if mat.value.casefold() == "effects/fizzler_center":
-                                mat.value="effects/laserplane"
-                            alter_mat(mat) # convert to the styled version
-                            bounds_max,bounds_min=utils.get_bbox(side.find_all('plane'))
-                            dimensions = [0,0,0]
-                            for i,g in enumerate(dimensions):
-                                dimensions[i] = bounds_max[i] - bounds_min[i]
-                            if 2 in dimensions: # The front/back won't have this dimension
-                                mat.value="tools/toolsnodraw"
-                            else:
-                                uaxis=side.find_key('uaxis').value.split(" ")
-                                vaxis=side.find_key('vaxis').value.split(" ")
-                                # the format is like "[1 0 0 -393.4] 0.25"
-                                size=0
-                                offset=0
-                                for i,w in enumerate(dimensions):
-                                    if int(w)>size:
-                                        size=int(w)
-                                        offset=int(bounds_min[i])
-                                print(size)
-                                print(uaxis[3], size)
-                                uaxis[3]=str(512/size * -offset) + "]" # texture offset to fit properly
-                                uaxis[4]=str(size/512) # scaling
-                                vaxis[4]="0.25" # widthwise it's always the same
-                                side.find_key('uaxis').value = " ".join(uaxis)
-                                side.find_key('vaxis').value = " ".join(vaxis)
-                            
-                        brush.value.remove(solids[2])
-                        brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
-                        del solids
-                    map.append(brush)
+                    death_fizzler_change(inst, trig)
         if file.value == get_opt("clearPanelFile"):
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if "ccflag_pist_plat" in file.value:
@@ -880,6 +804,148 @@ def fix_inst():
             weight = settings['variants'][file.value]
             file.value = file.value[:-4] + "_var" + random.choice(weight) + ".vmf"
             # add _var4 or so to the instance name
+        check_overlay(file, inst)
+
+def death_fizzler_change(inst, trig):
+    "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
+    # The Death Fizzler has 4 brushes:
+    # - trigger_portal_cleanser with standard fizzler texture for fizzler-only mode (-fizz_blue)
+    new_trig = trig.copy()
+    # - trigger_portal_cleanser with death fizzler texture  for both mode (-fizz_red)
+  # trig = trig
+    # - trigger_hurt for deathfield mode (-hurt)
+    hurt = trig.copy()
+    # - func_brush for the deathfield-only mode (-brush)
+    brush = trig.copy() # we need three new brushes!
+    
+    sides=trig.find_all('entity', 'solid', 'side', 'material')
+    for mat in sides:
+        if mat.value.casefold() in TEX_FIZZLER.keys(): #is this not nodraw?
+            # convert to death fizzler textures
+            mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
+    trig.find_key('targetname').value = inst.targname + "-fizz_red"
+    trig.find_key('spawnflags').value = "9" # clients + physics objects
+    
+    new_trig.find_key('targetname').value = inst.targname + "-fizz_blue"
+    new_trig.find_key('spawnflags').value = "9" # clients + physics objects
+    map.append(new_trig)
+    
+    # Create the trigger_hurt
+    sides=hurt.find_all('entity', 'solid', 'side', 'material')
+    is_short = False # if true we can shortcut for the brush
+    for mat in sides:
+        if mat.value.casefold() == "effects/fizzler":
+            is_short=True
+        mat.value = "tools/toolstrigger"
+        
+    hurt.find_key('classname').value = "trigger_hurt"
+    hurt.find_key('targetname').value = inst.targname + "-hurt"
+    hurt.find_key('spawnflags').value="1" # clients only
+    # reuse these keys
+    hurt.find_key('usescanline').edit(name= 'damage', value= '100000')
+    hurt.find_key('visible').edit(name= 'damagetype', value= '1024')
+    
+    hurt.value.append(Property('nodmgforce', '1'))
+    map.append(hurt)
+    
+    brush.find_key('targetname').value = inst.targname + "-brush"
+    brush.find_key('classname').value = 'func_brush'
+    brush.find_key('spawnflags').value = "2"  # ignore player +USE
+    brush.find_key('visible').edit(name = 'solidity', value= '1')
+    brush.find_key('usescanline').edit(name = 'renderfx', value='14')
+    
+    brush.value.append(Property('drawinfastreflection', "1"))
+    
+    if is_short:
+        sides=brush.find_all('entity', 'solid', 'side')
+        for side in sides:
+            mat=side.find_key('material')
+            if "effects/fizzler" in mat.value.casefold():
+                mat.value="effects/laserplane"
+            alter_mat(mat) # convert to the styled version
+            
+            uaxis = side.find_key('uaxis').value.split(" ")
+            vaxis = side.find_key('vaxis').value.split(" ")
+            # the format is like "[1 0 0 -393.4] 0.25"
+            uaxis[3]="0]"
+            uaxis[4]="0.25"
+            vaxis[4]="0.25"
+            side.find_key('uaxis').value = " ".join(uaxis)
+            side.find_key('vaxis').value = " ".join(vaxis)
+    else:
+        # We need to stretch the brush to get rid of the side sections.
+        # This is the same as moving all the solids to match the bounding box.
+        # first get the origin, used to figure out if a point should be max or min
+        origin=[int(v) for v in brush.find_key('origin').value.split(' ')]
+        planes=brush.find_all('entity', 'solid', 'side', 'plane')
+        bbox_max,bbox_min=utils.get_bbox(planes)
+        for pl in planes:
+            verts=utils.split_plane(pl)
+            for v in verts:
+                for i in range(0,3): #x,y,z
+                    if int(v[i]) > origin[i]:
+                        v[i]=str(bbox_max[i])
+                    else:
+                        v[i]=str(bbox_min[i])
+            pl.value=utils.join_plane(verts)
+            
+        solids=brush.find_all('solid')
+        
+        tex_width = settings['deathfield']['texwidth']
+        sides=solids[1].find_all('side')
+        for side in sides:
+            mat=side.find_key('material')
+            if mat.value.casefold() == "effects/fizzler_center":
+                mat.value="effects/laserplane"
+            alter_mat(mat) # convert to the styled version
+            bounds_max,bounds_min=utils.get_bbox(side.find_all('plane'))
+            dimensions = [0,0,0]
+            for i,g in enumerate(dimensions):
+                dimensions[i] = bounds_max[i] - bounds_min[i]
+            if 2 in dimensions: # The front/back won't have this dimension
+                mat.value="tools/toolsnodraw"
+            else:
+                uaxis=side.find_key('uaxis').value.split(" ")
+                vaxis=side.find_key('vaxis').value.split(" ")
+                # the format is like "[1 0 0 -393.4] 0.25"
+                size=0
+                offset=0
+                for i,w in enumerate(dimensions):
+                    if int(w)>size:
+                        size=int(w)
+                        offset=int(bounds_min[i])
+                print(size)
+                print(uaxis[3], size)
+                uaxis[3]=str(tex_width/size * -offset) + "]" # texture offset to fit properly
+                uaxis[4]=str(size/tex_width) # scaling
+                vaxis[3]="256]"
+                vaxis[4]="0.25" # widthwise it's always the same
+                side.find_key('uaxis').value = " ".join(uaxis)
+                side.find_key('vaxis').value = " ".join(vaxis)
+            
+        brush.value.remove(solids[2])
+        brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
+        del solids
+    map.append(brush)
+        
+def check_overlay(file, inst):
+    "Check to see if an instance should have other instances overlayed on it."
+    global max_ent_id
+    for key in settings['overlay_inst']:
+        if key[0] in file.value:
+            max_ent_id += 1
+            # Use the original instance's name if not given a unique one
+            name = inst.targname if key[2] == "" else key[2] + str(max_ent_id)
+            keys = [
+                     Property("id", str(max_ent_id)),
+                     Property("classname", "func_instance"),
+                     Property("targetname", name),
+                     Property("file", key[1]),
+                     inst.find_key("angles", "0 0 0").copy(),
+                     inst.find_key("origin").copy()
+                   ]
+            new_inst = Property("entity", keys)
+            map.append(new_inst)
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
