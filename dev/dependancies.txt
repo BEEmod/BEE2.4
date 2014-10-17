@@ -1,0 +1,10 @@
+The Python version used is Python 3.4
+
+To run the BEE2 client you'll need PyGame:
+http://www.lfd.uci.edu/~gohlke/pythonlibs/#pygame
+
+To compile vbsp and vrad you'll need cx_freeze:
+http://www.lfd.uci.edu/~gohlke/pythonlibs/#cx_freeze
+To compile run "compile_vbsp_vrad.py" with an argument of "-build".
+The files will be in build/. 
+VBSP also reqiures a copy of vbsp_config.cfg in the bin/ folder as well, with the originals named vbsp_original and vrad_original. Leave VVIS alone.
