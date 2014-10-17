@@ -513,14 +513,23 @@ def random_walls(sides):
 def clump_walls(sides):
     "A wall style where textures are used in small groups near each other, clumped together."
     walls = {}
+    others = {} # we keep a list for the others, so we can nodraw them if needed
     for face in sides: # first build a list of all textures and their locations...
         mat=face.find_key('material')
+        if mat.value in ('glass/glasswindow007a_less_shiny', 
+                         'metal/metalgrate018', 
+                         'anim_wp/framework/squarebeams',
+                         'tools/toolsnodraw'):
+            # These textures aren't always on grid, ignore them..
+            alter_mat(mat)
+            continue
+        print(mat.value)
+        size_max,size_min = utils.get_bbox((face.find_key('plane'),))
+        origin = [0, 0, 0]
+        for i in range(3):
+            origin[i] = (size_min[i] + size_max[i])/2
+        origin = tuple(origin)
         if mat.value.casefold() in WALLS:
-            size_max,size_min = utils.get_bbox((face.find_key('plane'),))
-            origin = [0, 0, 0]
-            for i in range(3):
-                origin[i] = (size_min[i] + size_max[i])/2
-            origin = tuple(origin)
             if mat.value in WHITE_PAN: # placeholder to indicate these can be replaced.
                 mat.value = "WHITE"
             elif mat.value in BLACK_PAN:
@@ -533,6 +542,13 @@ def clump_walls(sides):
             else:
                 walls[origin] = mat
         else:
+            if origin in others:
+                # The only time two textures will be in the same place is if they are covering each other - delete them both.
+                mat.value = "tools/toolsnodraw"
+                others[origin].value = "tools/toolsnodraw"
+                del others[origin]
+            else:
+                others[origin] = mat
             roof_tex(face, mat)
                 
     todo_walls = len(walls) # number of walls un-edited

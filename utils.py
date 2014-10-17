@@ -59,12 +59,12 @@ def get_bbox(planes):
         verts=split_plane(pl)
         if preset:
             preset=False
-            bbox_max=[int(x)-99999 for x in verts[0][:]]
-            bbox_min=[int(x)+99999 for x in verts[0][:]]
+            bbox_max=[int(x.split('.')[0])-99999 for x in verts[0][:]]
+            bbox_min=[int(x.split('.')[0])+99999 for x in verts[0][:]]
         for v in verts:
             for i in range(0,3):
-                bbox_max[i] = max(int(v[i]), bbox_max[i])
-                bbox_min[i] = min(int(v[i]), bbox_min[i])
+                bbox_max[i] = max(int(v[i].split('.')[0]), bbox_max[i])
+                bbox_min[i] = min(int(v[i].split('.')[0]), bbox_min[i])
     return bbox_max, bbox_min
 
 _FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
