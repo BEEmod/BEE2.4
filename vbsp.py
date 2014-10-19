@@ -116,6 +116,7 @@ DEFAULTS = {
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
     "clearPanelFile"          : "instances/p2editor/panel_clear.vmf",
+    "fizzmodelfile"           : "instances/p2editor/barrier_hazard_model.vmf",
     "clump_wall_tex"          : "0",
     "clump_size"              : "4",
     "clump_width"             : "2",
@@ -140,7 +141,11 @@ TEX_FIZZLER = {
     "effects/fizzler_l"      : "left",
     "effects/fizzler_r"      : "right",
     "effects/fizzler"        : "short",
-    "0"                      : "scanline",
+    }
+    
+FIZZ_OPTIONS = {
+    "scanline"       : "0",
+    "splitinstances" : "0",
     }
  
 ###### UTIL functions #####
@@ -225,6 +230,9 @@ def load_settings():
     fizz_opts = Property.find_all(conf, 'fizzler')
     for fizz_opt in fizz_opts:
         for item,key in TEX_FIZZLER.items():
+            settings['fizzler'][key] = Property.find_key(fizz_opt, key, item).value
+            
+        for key,item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = Property.find_key(fizz_opt, key, item).value
             
     cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
@@ -523,7 +531,6 @@ def clump_walls(sides):
             # These textures aren't always on grid, ignore them..
             alter_mat(mat)
             continue
-        print(mat.value)
         size_max,size_min = utils.get_bbox((face.find_key('plane'),))
         origin = [0, 0, 0]
         for i in range(3):
@@ -755,24 +762,28 @@ def fix_inst():
     utils.con_log("Editing Instances...")
     for inst in instances:
         file=inst.find_key('file', '')
+        print(inst.targname)
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
             name=inst.find_key('targetname')
             if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
             else:
                 name.value = inst.targname.split("_modelEnd")[0] + "_modelEnd" 
+            inst.targname = name.value
+            
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
             angles=inst.find_key('angles')
             if angles.value in fizzler_angle_fix.keys():
                 angles.value=fizzler_angle_fix[angles.value]
+                
             for var in utils.get_fixup(inst):
-                if len(var) == 1 and "$skin" in var:
-                    if settings['fizzler']['splitInstances']=="1":
+                if "$skin" in var:
+                    if settings['fizzler']['splitinstances']=="1":
                         # switch to alternate instances depending on what type of fizzler, to massively save ents
-                        if "$skin 0" in var and "barrier_hazard_model" in file.value:
+                        if "$skin 0" in var and get_opt("fizzmodelfile") in file.value:
                             file.value = file.value[:-4] + "_fizz.vmf" 
                         # we don't want to do it to custom ones though
-                        if "$skin 2" in var and "barrier_hazard_model" in file.value:
+                        if "$skin 2" in var and get_opt("fizzmodelfile") in file.value:
                             file.value = file.value[:-4] + "_las.vmf"
                     break
             if "ccflag_comball" in file.value:
