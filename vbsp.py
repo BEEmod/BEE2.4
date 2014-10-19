@@ -6,6 +6,7 @@ import shutil
 import random
 
 from property_parser import Property, KeyValError, NoKeyError
+import vmfLib as VMF
 import utils
 
 # COMPILER FLAGS (used as part of instance filename)
