@@ -5,7 +5,7 @@ from collections import defaultdict
 from property_parser import Property, KeyValError, NoKeyError
 import utils
 
-class VMF(object):
+class VMF:
     '''
     Represents a VMF file, and holds counters for various IDs used. Has functions for searching
     for specific entities or brushes, and converts to/from a property_parser tree.
@@ -28,7 +28,7 @@ class VMF(object):
             if id not in list:
                 list.insert(id)
                 return id
-class Solid(object):
+class Solid:
     "A single brush, as a world brushes and brush entities."
     def __init__(self, map, des_id = -1, planes = None):
         self.map = map
@@ -41,7 +41,7 @@ class Solid(object):
     def parse(tree):
         "Parse a Property tree into a Solid object."
         pass
-class Side(object):
+class Side:
     "A brush face."
     def __init__(self, map, planes = [(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt = {}):
         self.map = maps
@@ -70,14 +70,46 @@ class Side(object):
     
 class Entity(Property):
     "Either a point or brush entity."
-    def __init__(self, map):
-        pass
-    def load(self, tree):
+    def __init__(self, map, keys = None, id=-1, outputs = None, solids = None):
+        self.map = map
+        self.keys = {} if keys is None else keys
+        self.outputs = outputs
+        self.solids = solids
+    def load(self, map, tree_list):
         "Parse a property tree into an Entity object."
-        pass
+        id = -1
+        solids = None
+        keys = {}
+        outputs = []
+        for item in tree_list:
+            if item.name == "id" and item.value.isnumeric():
+                id = item.value
+            elif item.name == "solid":
+                solids = Solid.parse(item)
+            elif item.name == "connections" and item.has_children():
+                for out in item.value:
+                    outputs.append(Output.parse(item))
+            else:
+                keys[item.name] = item.value
+        return Entity(self, map, keys = keys, id = id, solids = solids)
     
 class Instance(Entity):
     "A special type of entity, these have some perculiarities with $replace values."
-    pass
     def __init__(self, map):
-        self.map = map
+        Entity.__init__(self, map)
+        
+class Output:
+    "An output from this item pointing to another."
+    def __init__(self, out, targ, inp, param, delay = 0.0, times = -1)
+        self.output = out
+        self.target = target
+        self.input = inp
+        self.params = param
+        self.delay = delay
+        self.times = times
+        
+    def parse(self, tree):
+        pass
+    def export(self):
+        return '"' + self.output + '" "' + chr(27).join(
+        (self.target, self.input, self.params, str(self.delay), str(self.times))) + '"'
