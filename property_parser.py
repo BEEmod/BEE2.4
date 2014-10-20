@@ -30,6 +30,7 @@ class NoKeyError(Exception):
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
+    __slots__ = ('name', 'value', 'valid') # Helps decrease memory footprint with lots of Property values.
     def __init__(self, name = None, value = ""):
         self.name = name
         self.value = value
@@ -140,13 +141,96 @@ class Property:
         self.valid = False
         self.value = "" # Dump this if it exists
         self.name = None
+        
+    def __eq__(self,other):
+            if isinstance(other, Property):
+                return (self.name.casefold() == other.name.casefold() and self.value == other.value)
+            else:
+                return self.value == other # Just compare values
+                
+    def __len__(self):
+        if self.valid:
+            if self.has_children():
+                return len(self.value)
+            else:
+                return 1
+        else:
+            return 0
+                
     
+    def __iter__(self):
+        "Iterate through the value list, or loop once through the single value."
+        if self.has_children():
+            for item in self.value:
+                yield item
+        else:
+            yield self.value
+    
+    def __getitem__(self, index):
+        "Allow indexing the children directly."
+        if self.has_children():
+            return self.value[index]
+        elif index == 0:
+            return self.value
+        else:
+            raise IndexError
+            
+    def __setitem__(self, index, value):
+        "Allow indexing the children directly."
+        if self.has_children():
+            self.value[index] = value
+        elif index == 0:
+            self.value = value
+        else:
+            raise IndexError
+            
+    def _delitem__(self, index):
+        if self.has_children():
+            del self.value[index]
+                
+    def __add__(self, other):
+        "Allow appending other properties to this one."
+        if self.has_children():
+            copy = self.copy()
+            if isinstance(other, Property):
+                copy.value.append(other) # we want to add the other property tree to our own, not its values.
+            else: # assume a list/iteratable thing
+                copy.value += other # add the values to ours.
+            return copy
+            
+        else:
+            return NotImplemented
+    
+    def __iadd__(self, other):
+        "Allow appending other properties to this one. This is the += op, where it does not copy the object."
+        if self.has_children():
+            if isinstance(other, Property):
+                self.value.append(other)
+            else:
+                self.value += other
+            return self
+        else:
+            return NotImplemented
+  
+    def append(self, val):
+        "Append the passed property to the list of items."
+        if isinstance(val, Property):
+            if self.has_children():
+                self.value.append(val)
+            else:
+                self.value=[self.value, val]
+        else:
+            return NotImplemented
+            
+    def has_children(self):
+        "Does this have child properties?"
+        return isinstance(self.value, list)
+        
     def __str__(self):
         if self.valid:
             return '\n'.join(self.to_strings())
         else:
             return ""
-    
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
         if self.valid:
@@ -163,3 +247,5 @@ class Property:
             return [""]
 
 import utils
+
+p = Property("Name", [Property("Thing", "12")])
