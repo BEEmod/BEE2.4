@@ -33,9 +33,11 @@ Front End:
 * Display exporting palette preview
 
 VBSP Pre-Compiler:
-* (Using Stylechangers vbsp) -> On call
-* Call modular compiler operations
+* ~~(Using Stylechangers vbsp) -> On call~~
+* ~~Call modular compiler operations~~
+* See issue #6
 
 VRAD Pre-Compiler:
-* Run Stylechanger's VRAD
-  - that runs PackBSP for us
+* ~~Run Stylechanger's VRAD~~
+  - ~~that runs PackBSP for us~~
+* Use PackRat to pack files, this is cross-platform.
