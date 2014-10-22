@@ -5,6 +5,12 @@ from collections import defaultdict
 from property_parser import Property, KeyValError, NoKeyError
 import utils
 
+_ID_types = {
+    'brush' : 'solid_id', 
+    'face'  : 'face_id', 
+    'ent'   : 'ent_id'
+    }
+
 class VMF:
     '''
     Represents a VMF file, and holds counters for various IDs used. Has functions for searching
@@ -21,12 +27,19 @@ class VMF:
         pass
     pass
     
-    def get_id(ids):
+    def get_id(ids, desired=-1):
         "Get an unused ID of a type."
-        list.sort() # Need it in ascending order
-        for id in xrange(0, list[-1]+1):
-            if id not in list:
-                list.insert(id)
+        if ids not in _ID_types:
+            raise ValueError('Invalid ID type!')
+        list_ = self.__dict__[_ID_types[ids]]
+        if desired !=-1 and desired not in list_:
+            list_.insert(id)
+            return id
+        # Need it in ascending order
+        list_.sort()
+        for id in xrange(0, list_[-1]+1):
+            if id not in list_:
+                list_.insert(id)
                 return id
 class Solid:
     "A single brush, as a world brushes and brush entities."
@@ -75,6 +88,7 @@ class Entity(Property):
         self.keys = {} if keys is None else keys
         self.outputs = outputs
         self.solids = solids
+        self.id = map.get_id('ent', desired = id)
     def load(self, map, tree_list):
         "Parse a property tree into an Entity object."
         id = -1
@@ -93,6 +107,11 @@ class Entity(Property):
                 keys[item.name] = item.value
         return Entity(self, map, keys = keys, id = id, solids = solids)
     
+    def remove(self):
+        "Remove this entity from the map."
+        self.map.entities.remove(self)
+        self.map.ent_id.remove(self.id)
+    
 class Instance(Entity):
     "A special type of entity, these have some perculiarities with $replace values."
     def __init__(self, map):
@@ -100,16 +119,102 @@ class Instance(Entity):
         
 class Output:
     "An output from this item pointing to another."
-    def __init__(self, out, targ, inp, param, delay = 0.0, times = -1)
+    __slots__ = ('output', 'inst_out', 'target', 'input', 'inst_in', 'params', 'delay', 'times', 'sep')
+    def __init__(self,
+                 out,
+                 targ,
+                 inp,
+                 param = '',
+                 delay = 0.0,
+                 times = -1,
+                 inst_out = None,
+                 inst_in = None,
+                 comma_sep = False):
         self.output = out
-        self.target = target
+        self.inst_out = inst_out
+        self.target = targ
         self.input = inp
+        self.inst_in = inst_in
         self.params = param
         self.delay = delay
         self.times = times
+        self.sep = ',' if comma_sep else chr(27)
+    def parse(prop):
+        if ',' in prop.value:
+            sep = True
+            vals = prop.value.split(',')
+        else:
+            sep = False
+            vals = prop.value.split(chr(27))
+        if len(vals) == 5:
+            if prop.name.startswith('instance:'):
+                out = prop.name.split(';')
+                inst_out = inp[1]
+                inp = inp[0][9:]
+            else:
+                inst_out = None
+                out = prop.name
+                
+            if vals[1].startswith('instance:'):
+                inp = vals[1].split(';')
+                inst_inp = inp[1]
+                inp = inp[0][9:]
+            else:
+                inst_inp = None
+                inp = vals[1]
+            return Output(
+                out, 
+                vals[0], 
+                inp, 
+                param = vals[2], 
+                delay = float(vals[3]), 
+                times=int(vals[4]), 
+                inst_out = inst_out, 
+                inst_in = inst_inp, 
+                comma_sep = sep)
+                
+    def exp_out(self):
+        if self.inst_out:
+            return 'instance:' + self.inst_out + ';' + self.output
+        else:
+            return self.output
+            
+    def exp_in(self):
+        if self.inst_in:
+            return 'instance:' + self.inst_in + ';' + self.input
+        else:
+            return self.input
+            
+    def __str__(self):
+        st = "<Output> "
+        if self.inst_out:
+            st += self.inst_out + ":" 
+        st += self.output + " -> " + self.target
+        if self.inst_in:
+            st += "-" + self.inst_in
+        st += " -> " + self.input
         
-    def parse(self, tree):
-        pass
+        if self.params and not self.inst_in:
+            st += " (" + self.params + ")"
+        if self.delay != 0:
+            st += " after " + str(self.delay) + " seconds"
+        if self.times != -1:
+            st += " once" if self.times==1 else (" " + str(self.times) + " times")
+            st += " only"
+        return st
+        
     def export(self):
-        return '"' + self.output + '" "' + chr(27).join(
-        (self.target, self.input, self.params, str(self.delay), str(self.times))) + '"'
+        if self.inst_out:
+            out = 'instance:' + self.inst_out + ';' + self.output
+        else:
+            out = self.output
+            
+        if self.inst_in:
+            params = self.params
+            inp = 'instance:' + self.inst_in + ';' + self.input
+        else:
+            inp = self.input
+            params = self.params
+            
+        return '"' + out + '" "' + self.sep.join(
+        (self.target, inp, self.params, str(self.delay), str(self.times))) + '"'
