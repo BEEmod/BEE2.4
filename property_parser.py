@@ -18,7 +18,13 @@ to_strings: => string
 
 
 import re
+
 __all__ = ["KeyValError", "NoKeyError", "Property"]
+
+replace_chars = {
+    '\\n' : '\n',
+    '\\t' : '\t',
+    }
 
 class KeyValError(Exception):
     "An error that occured when parsing a Valve KeyValues file."
@@ -58,6 +64,8 @@ class Property:
                         raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
                         value = line_contents[3]
+                        for orig, new in replace_chars.items():
+                            value=value.replace(orig, new)
                     except IndexError:
                         value = None
                         
