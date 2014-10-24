@@ -65,7 +65,7 @@ class selWin:
         self.prop_frm.grid(row=0, column=1, sticky="NSEW")
         
         self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=64, height=64)
-        self.prop_icon_frm.grid(row=0, column=0, columnspan=3)
+        self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
         
         self.prop_icon = ttk.Label(self.prop_icon_frm)
         self.prop_icon.img = png.loadIcon('faithplate_128')
@@ -73,12 +73,12 @@ class selWin:
         self.prop_icon.grid(row=0, column = 0)
         
         self.prop_name = ttk.Label(self.prop_frm, text="Item")
-        self.prop_name.grid(row=1, column = 0, columnspan=3)
+        self.prop_name.grid(row=1, column = 0, columnspan=4)
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
-        self.prop_author.grid(row=2, column = 0, columnspan=3)
+        self.prop_author.grid(row=2, column = 0, columnspan=4)
         
         self.prop_desc_frm = ttk.Frame(self.prop_frm, relief="sunken")
-        self.prop_desc_frm.grid(row=4, column=0, columnspan=3, sticky="NSEW")
+        self.prop_desc_frm.grid(row=4, column=0, columnspan=4, sticky="NSEW")
         self.prop_desc_frm.rowconfigure(0, weight=1)
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
@@ -93,13 +93,14 @@ class selWin:
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
         
         self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command = lambda obj=self: obj.reset_sel())
-        self.prop_reset.grid(row=5, column=0, columnspan=3, sticky = "EW", padx=8, pady=(8,1))
+        self.prop_reset.grid(row=5, column=0, columnspan=4, sticky = "EW", padx=8, pady=(8,1))
         
         self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command = lambda obj=self: obj.confirm())
         self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command = lambda obj=self: obj.exit())
         
         self.prop_ok.grid(row=6, column=0, padx=(8,16))
         self.prop_cancel.grid(row=6, column=2, padx=(16,8))
+        ttk.Sizegrip(self.prop_frm).grid(row=6, column=3, sticky="SE")
         
 
     def open(self, parent, title, suggested = "", selected = ""):
@@ -115,6 +116,8 @@ class selWin:
 
 if __name__ == '__main__': # load the window if directly executing this file
     root=Tk()
+    lbl = ttk.Label(root, text="I am a demo window.")
+    lbl.grid()
     png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
     root.geometry("+250+250")
     lst = [
