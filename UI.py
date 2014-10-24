@@ -71,7 +71,7 @@ sounds = {
           'contract'   : pygame.mixer.Sound(file='sounds/carve.wav')
          }
 
-win.iconbitmap(r'BEE2.ico')# set the window icon
+win.iconbitmap('BEE2.ico')# set the window icon
 
 windows={}
 frames={} #Holds frames that we need to deal with later
@@ -865,7 +865,7 @@ def initMain():
     windows['pal'].transient(master=win)
     windows['pal'].resizable(False, True)
     windows['pal'].title("BEE2 - Palettes")
-    windows['pal'].iconbitmap(r'BEE2.ico')
+    windows['pal'].iconbitmap('BEE2.ico')
     windows['pal'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal'))
     windows['pal'].vis=True
     initPalette(windows['pal'])
@@ -874,7 +874,7 @@ def initMain():
     windows['opt'].transient(master=win)
     windows['opt'].resizable(True, False)
     windows['opt'].title("BEE2 - Options")
-    windows['opt'].iconbitmap(r'BEE2.ico')
+    windows['opt'].iconbitmap('BEE2.ico')
     windows['opt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt'))
     windows['opt'].vis=True
     initOption(windows['opt'])
@@ -883,7 +883,7 @@ def initMain():
     windows['style'].transient(master=win)
     windows['style'].resizable(False, True)
     windows['style'].title("BEE2 - Style Properties")
-    windows['style'].iconbitmap(r'BEE2.ico')
+    windows['style'].iconbitmap('BEE2.ico')
     windows['style'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style'))
     windows['style'].vis=True
     initStyleOpt(windows['style'])
