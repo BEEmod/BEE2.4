@@ -23,47 +23,69 @@ class VMF:
         self.entities = [] if entities is None else entities
         self.brushes = [] if brushes is None else brushes
         self.spawn = Entity(self, []) if spawn is None else spawn
+        
+    def add_brush(self, item):
+        self.brushes.append(item)
+        
+    def add_ent(self, item):
+        self.entities.append(item)
+        
+    def add_brushes(self, item):
+        for i in item:
+            self.add_brush(i)
+        
+    def add_ents(self, item):
+        for i in item:
+            self.add_ent(i)
+    
+    @staticmethod
     def parse(tree):
         "Convert a property_parser tree into VMF classes."
+        if not isinstance(tree, list):
+            # if not a tree, try to read the file
+            with open(tree, "r") as file:
+                tree = Property.parse(file)
+        map = VMF()
         ents = []
-        entities = Property.find_all(tree, 'Entity')
-        for ent in entities:
-            ents.append(Entity.parse(ent))
+        map.entities = [Entity.parse(map, ent) for ent in Property.find_all(tree, 'Entity')]
         
-        world_spawn = Property.find_key(tree, 'World', None)
-        brush_tree = Property.find_key(world_spawn, 'solid', None)
-        brushes = [Solid.parse(b) for b in brush_tree]
+        map_spawn = Property.find_key(tree, 'World', None)
+        if map_spawn is None:
+            map_spawn = Property("entity", [])
+            
+        brush_tree = Property.find_key(map_spawn, 'solid', None)
+        map.brushes = [Solid.parse(map, b) for b in brush_tree]
         if brush_tree.value is not None:
-            world.spawn.value.remove(brush_tree)
-        
-        return VMF(spawn = None, entities = ents, brushes=brushes)
+           map_spawn.value.remove(brush_tree)
+        map.spawn = Entity(map, map_spawn)
+        return map
     pass
     
-    def get_id(ids, desired=-1):
+    def get_id(self, ids, desired=-1):
         "Get an unused ID of a type."
         if ids not in _ID_types:
             raise ValueError('Invalid ID type!')
         list_ = self.__dict__[_ID_types[ids]]
-        if desired !=-1 and desired not in list_:
-            list_.insert(id)
-            return id
+        if len(list_)==0 or desired not in list_ :
+            if desired==-1:
+                desired = 1
+            list_.append(desired)
+            return desired
         # Need it in ascending order
         list_.sort()
-        for id in xrange(0, list_[-1]+1):
+        for id in range(0, list_[-1]+1):
             if id not in list_:
-                list_.insert(id)
+                list_.append(id)
                 return id
 class Solid:
     "A single brush, as a world brushes and brush entities."
     def __init__(self, map, des_id = -1, planes = None):
         self.map = map
         self.sides = [] if sides is None else sides
-        if des_id == -1 or des_id in map.solid_id:
-            self.id = map.get_id(map.solid_id)
-        else:
-            self.id = des_id
+        self.id = map.get_id('brush', map.solid_id)   
         
-    def parse(tree):
+    @staticmethod    
+    def parse(map, tree):
         "Parse a Property tree into a Solid object."
         pass
 
@@ -80,8 +102,9 @@ class Side:
         self.smoothing = defaultdict(lambda: False)
         for i,val in reversed(enumerate(smooth)):
             self.smoothing[i] = (val=='1')
-        
-    def parse(tree):
+            
+    @staticmethod    
+    def parse(map, tree):
         "Parse the property tree into a Side object."
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
         planes = plane.value[1:-1].split(") (")
@@ -94,7 +117,7 @@ class Side:
         if not len(planes) == 3:
             raise ValueError("Wrong number of solid planes in '" + plane + "'!")
     
-class Entity(Property):
+class Entity():
     "Either a point or brush entity."
     def __init__(self, map, keys = None, id=-1, outputs = None, solids = None):
         self.map = map
@@ -102,7 +125,9 @@ class Entity(Property):
         self.outputs = outputs
         self.solids = solids
         self.id = map.get_id('ent', desired = id)
-    def load(self, map, tree_list):
+        
+    @staticmethod
+    def parse(map, tree_list):
         "Parse a property tree into an Entity object."
         id = -1
         solids = None
@@ -112,18 +137,29 @@ class Entity(Property):
             if item.name == "id" and item.value.isnumeric():
                 id = item.value
             elif item.name == "solid":
-                solids = Solid.parse(item)
+                solids = Solid.parse(map, item)
             elif item.name == "connections" and item.has_children():
-                for out in item.value:
-                    outputs.append(Output.parse(item))
+                for out in item:
+                    outputs.append(Output.parse(out))
             else:
                 keys[item.name] = item.value
-        return Entity(self, map, keys = keys, id = id, solids = solids)
+        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs)
+        
     
     def remove(self):
         "Remove this entity from the map."
         self.map.entities.remove(self)
         self.map.ent_id.remove(self.id)
+        
+    def __str__(self):
+        st ="<Entity>: \n{\n"
+        for k,v in self.keys.items():
+            if not isinstance(v, list):
+                st+="\t " + k + ' = "' + v + '"\n'
+        for out in self.outputs:
+            st+='\t' + str(out) +'\n'
+        st += "}\n"
+        return st
         
 class Instance(Entity):
     "A special type of entity, these have some perculiarities with $replace values."
@@ -153,6 +189,7 @@ class Output:
         self.times = times
         self.sep = ',' if comma_sep else chr(27)
     
+    @staticmethod
     def parse(prop):
         if ',' in prop.value:
             sep = True
@@ -163,8 +200,8 @@ class Output:
         if len(vals) == 5:
             if prop.name.startswith('instance:'):
                 out = prop.name.split(';')
-                inst_out = inp[1]
-                inp = inp[0][9:]
+                inst_out = out[1]
+                out = out[0][9:]
             else:
                 inst_out = None
                 out = prop.name
@@ -232,3 +269,12 @@ class Output:
             
         return '"' + out + '" "' + self.sep.join(
         (self.target, inp, self.params, str(self.delay), str(self.times))) + '"'
+        
+if __name__ == '__main__':
+    map = VMF.parse('test.vmf')
+    
+for i,ent in enumerate(map.entities):
+    print(str(i) + "--------------------------------------------")
+    if i<20:
+        print(ent)
+    
