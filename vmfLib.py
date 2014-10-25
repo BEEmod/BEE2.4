@@ -16,15 +16,27 @@ class VMF:
     Represents a VMF file, and holds counters for various IDs used. Has functions for searching
     for specific entities or brushes, and converts to/from a property_parser tree.
     '''
-    def __init__(self, spawn = None, entities = None):
+    def __init__(self, spawn = None, entities = None, brushes = None):
         self.solid_id = [] # All occupied solid ids
         self.face_id = []
         self.ent_id = []
         self.entities = [] if entities is None else entities
+        self.brushes = [] if brushes is None else brushes
         self.spawn = Entity(self, []) if spawn is None else spawn
     def parse(tree):
         "Convert a property_parser tree into VMF classes."
-        pass
+        ents = []
+        entities = Property.find_all(tree, 'Entity')
+        for ent in entities:
+            ents.append(Entity.parse(ent))
+        
+        world_spawn = Property.find_key(tree, 'World', None)
+        brush_tree = Property.find_key(world_spawn, 'solid', None)
+        brushes = [Solid.parse(b) for b in brush_tree]
+        if brush_tree.value is not None:
+            world.spawn.value.remove(brush_tree)
+        
+        return VMF(spawn = None, entities = ents, brushes=brushes)
     pass
     
     def get_id(ids, desired=-1):
@@ -54,6 +66,7 @@ class Solid:
     def parse(tree):
         "Parse a Property tree into a Solid object."
         pass
+
 class Side:
     "A brush face."
     def __init__(self, map, planes = [(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt = {}):
@@ -111,7 +124,7 @@ class Entity(Property):
         "Remove this entity from the map."
         self.map.entities.remove(self)
         self.map.ent_id.remove(self.id)
-    
+        
 class Instance(Entity):
     "A special type of entity, these have some perculiarities with $replace values."
     def __init__(self, map):
@@ -136,9 +149,10 @@ class Output:
         self.input = inp
         self.inst_in = inst_in
         self.params = param
-        self.delay = delay
+        self.delay = delay 
         self.times = times
         self.sep = ',' if comma_sep else chr(27)
+    
     def parse(prop):
         if ',' in prop.value:
             sep = True
