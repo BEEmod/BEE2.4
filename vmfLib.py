@@ -49,15 +49,16 @@ class VMF:
         ents = []
         map.entities = [Entity.parse(map, ent) for ent in Property.find_all(tree, 'Entity')]
         
-        map_spawn = Property.find_key(tree, 'World', None)
+        map_spawn = Property.find_key(tree, 'world', None)
         if map_spawn is None:
-            map_spawn = Property("entity", [])
+            map_spawn = Property("world", [])
             
-        brush_tree = Property.find_key(map_spawn, 'solid', None)
-        map.brushes = [Solid.parse(map, b) for b in brush_tree]
-        if brush_tree.value is not None:
-           map_spawn.value.remove(brush_tree)
-        map.spawn = Entity(map, map_spawn)
+        map.spawn = Entity.parse(map, map_spawn)
+        print(map.spawn)
+        if map.spawn.solids is not None:
+           map.brushes = map.spawn.solids
+           # Wipe this from the ent, so we don't have two copies
+           map.spawn.solids = None 
         return map
     pass
     
@@ -79,35 +80,57 @@ class VMF:
                 return id
 class Solid:
     "A single brush, as a world brushes and brush entities."
-    def __init__(self, map, des_id = -1, planes = None):
+    def __init__(self, map, des_id = -1, sides = None):
         self.map = map
         self.sides = [] if sides is None else sides
-        self.id = map.get_id('brush', map.solid_id)   
+        self.id = map.get_id('brush', des_id)   
         
     @staticmethod    
     def parse(map, tree):
         "Parse a Property tree into a Solid object."
-        pass
+        id = tree.find_key("id", -1).value
+        try: 
+            id = int(id)
+        except TypeError:
+            id = -1
+        sides = []
+        for side in tree.find_all("side"):
+            sides.append(Side.parse(map, side))
+        return Solid(map, des_id = id, sides=sides)
+    
+    def __str__(self):
+        st = "<solid:" + str(self.id) + ">\n{\n"
+        for s in self.sides:
+            st += str(s) + "\n"
+        st += "}"
+        return st
 
 class Side:
     "A brush face."
     def __init__(self, map, planes = [(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt = {}):
-        self.map = maps
-        self.planes = []
-        for i in planes:
-            self.planes[i]=dict(x=planes[0], y=planes[1], z=planes[2])
-        self.lightmap = opt.get("lightmap", 16),
-        smooth = str(bin(opt.get("smoothing", 0))).split("0b")[1][::-1]
-        # convert to binary and back to get the digits individually, and then produce a list.
-        self.smoothing = defaultdict(lambda: False)
-        for i,val in reversed(enumerate(smooth)):
-            self.smoothing[i] = (val=='1')
+        self.map = map
+        self.planes = [0,0,0]
+        for i,pln in enumerate(planes):
+            self.planes[i]=dict(x=pln[0], y=pln[1], z=pln[2])
+        self.lightmap = opt.get("lightmap", 16)
+        try: 
+            self.lightmap = int(self.lightmap)
+        except TypeError:
+            self.lightmap = 16
+        try:
+            self.smooth = bin(opt.get("smoothing", 0))
+        except TypeError:
+            self.smooth = bin(0)
+
+        self.mat = opt.get("material", "")
+        self.ham_rot = opt.get("rotation" , "0")
             
     @staticmethod    
     def parse(map, tree):
         "Parse the property tree into a Side object."
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
-        planes = plane.value[1:-1].split(") (")
+        verts = tree.find_key("plane", "(0 0 0) (0 0 0) (0 0 0)").value[1:-1].split(") (")
+        planes = [0,0,0]
         for i,v in enumerate(verts):
             verts = v.split(" ")
             if len(verts) == 3:
@@ -116,7 +139,21 @@ class Side:
                 raise ValueError("Invalid planes in '" + plane + "'!")
         if not len(planes) == 3:
             raise ValueError("Wrong number of solid planes in '" + plane + "'!")
-    
+        opt = { 
+            'material' : tree.find_key('material', '').value,
+            'uaxis' : tree.find_key('uaxis', '[0 1  0 0] 0.25').value,
+            'vaxis' : tree.find_key('vaxis', '[0 0 -1 0] 0.25').value,
+            'rotation' : tree.find_key('rotation', '0').value,
+            'lightmap' : tree.find_key('lightmapscale', '0').value,
+            'smoothing' : tree.find_key('smoothing_groups', '0').value,
+            }
+        return Side(map, planes=planes, opt = opt)
+        
+    def __str__(self):
+        st = "\tmat = " + self.mat
+        st += "\n\trotation = " + self.ham_rot + '\n'
+        st += '\tplane: ' + ", ".join([("(" + str(p['x']) + " " + str(p['y']) + " " + str(p['z']) + ")") for p in self.planes]) + '\n'
+        return st
 class Entity():
     "Either a point or brush entity."
     def __init__(self, map, keys = None, id=-1, outputs = None, solids = None):
@@ -130,14 +167,14 @@ class Entity():
     def parse(map, tree_list):
         "Parse a property tree into an Entity object."
         id = -1
-        solids = None
+        solids = []
         keys = {}
         outputs = []
         for item in tree_list:
             if item.name == "id" and item.value.isnumeric():
                 id = item.value
             elif item.name == "solid":
-                solids = Solid.parse(map, item)
+                solids.append(Solid.parse(map, item))
             elif item.name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
@@ -250,8 +287,8 @@ class Output:
         if self.delay != 0:
             st += " after " + str(self.delay) + " seconds"
         if self.times != -1:
-            st += " once" if self.times==1 else (" " + str(self.times) + " times")
-            st += " only"
+            st += " (once" if self.times==1 else (" (" + str(self.times) + " times")
+            st += " only)"
         return st
         
     def export(self):
@@ -273,8 +310,8 @@ class Output:
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
     
-for i,ent in enumerate(map.entities):
-    print(str(i) + "--------------------------------------------")
+for i,brush in enumerate(map.brushes):
+    #print(str(i) + "--------------------------------------------")
     if i<20:
-        print(ent)
+        print(brush)
     
