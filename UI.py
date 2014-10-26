@@ -4,7 +4,6 @@ from tkinter import font, messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
 import tkinter_png as png # png library for TKinter
-import pygame # using this for audio
 import random
 import math
 import webbrowser
@@ -12,13 +11,13 @@ import webbrowser
 from property_parser import Property
 from paletteLoader import Palette
 import itemPropWin
+import sound as snd
 
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
 
-pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024) # buffer must be power of 2, higher means less choppy audio but a longer time to start
 
 testImg  = [ # test palette images,remove when item loading done
             ('Weighted Button',      'ITEM_BUTTON',                     0, png.loadIcon('portal_button')),
@@ -57,19 +56,6 @@ testImg  = [ # test palette images,remove when item loading done
             ('Observation Room',     'ITEM_SECONDARY_OBSERVATION_ROOM', 0, png.loadIcon('observation_room')),
             ('Angled Panel',         'ITEM_ANGLED_PANEL',               0, png.loadIcon('panel_flap'))
            ]
-
-sounds = {
-          'select'     : pygame.mixer.Sound(file='sounds/rollover.wav'),
-          'add'        : pygame.mixer.Sound(file='sounds/increment.wav'),
-          'config'     : pygame.mixer.Sound(file='sounds/reconfig.wav'),
-          'subtract'   : pygame.mixer.Sound(file='sounds/decrement.wav'),
-          'connect'    : pygame.mixer.Sound(file='sounds/connection_made.wav'),
-          'disconnect' : pygame.mixer.Sound(file='sounds/connection_destroyed.wav'),
-          'expand'     : pygame.mixer.Sound(file='sounds/extrude.wav'),
-          'delete'     : pygame.mixer.Sound(file='sounds/collapse.wav'),
-          'error'     : pygame.mixer.Sound(file='sounds/error.wav'),
-          'contract'   : pygame.mixer.Sound(file='sounds/carve.wav')
-         }
 
 win.iconbitmap('BEE2.ico')# set the window icon
 
@@ -131,12 +117,6 @@ styleOptOther= [
                 ('OverEntryPuzzles', 'Have entry/exit puzzles', True)
                ]
 
-def playSound(name):
-    """Play a sound effect stored in the sounds{} dict."""
-    # If we ever want to use a different library for sounds, just edit this, all sound calls should route through here.
-    if muted.get() == 0:
-        sounds[name].play()
-
 def demoMusic():
     messagebox.showinfo(message='This would play the track selected for a few seconds.')
     
@@ -180,7 +160,7 @@ def clearDispName(e):
     UI['pre_disp_name'].configure(text='')
 
 def showProps(e):
-    playSound('expand')
+    snd.fx('expand')
     windows['props'].deiconify()
     windows['props'].vis=True
     windows['props'].lift(win)
@@ -201,16 +181,16 @@ def showProps(e):
 
 def hideProps(e):
     if windows['props'].vis:
-        playSound('contract')
+        snd.fx('contract')
         windows['props'].withdraw()
         windows['props'].vis=False
 
 def showItemProps():
-    playSound('expand')
+    snd.fx('expand')
     itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], "ItemNameHere") # TODO: add real values for first/last args
 
 def hideItemProps(vals):
-    playSound('contract')
+    snd.fx('contract')
     print(vals)
 
 def convScrToGrid(x,y):
@@ -228,7 +208,7 @@ def showDrag(e):
     global drag_onPal,drag_item, drag_passedPal
     drag_item=e.widget
     setDispName(drag_item.dispName)
-    playSound('config')
+    snd.fx('config')
     drag_passedPal=False
 
     if e.widget.is_pre: # is the cursor over the preview pane?
@@ -255,7 +235,7 @@ def hideDrag(e):
     dragWin.grab_release()
     clearDispName(None)
     UI['pre_sel_line'].place_forget()
-    playSound('config')
+    snd.fx('config')
 
     pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
     ind=pos_x+pos_y*4
@@ -272,7 +252,7 @@ def hideDrag(e):
             if len(pal_picked) > 32: # delete the item - it's fallen off the palette
                 pal_picked.pop().place_forget()
         else: # drop the item
-            playSound('delete')
+            snd.fx('delete')
         flowPreview() # always refresh
 
 def moveDrag(e):
@@ -297,15 +277,15 @@ def fastDrag(e):
     pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
     clearFromPal(e.widget)
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
-        playSound('delete')
+        snd.fx('delete')
         e.widget.place_forget() # remove the clicked item
     else: # over the picker
         if len(pal_picked) < 32: # can't copy if there isn't room
-            playSound('config')
+            snd.fx('config')
             newItem=copyItem(e.widget,frames['preview'])
             pal_picked.append(newItem)
         else:
-            playSound('error')
+            snd.fx('error')
     flowPreview()
 
 def clearFromPal(target):
@@ -395,7 +375,7 @@ def save():
         savePal(pal) # overwrite it
 
 def toggleWin(name):
-    playSound('config')
+    snd.fx('config')
     if windows[name].vis:
         windows[name].vis=False
         windows[name].withdraw()
@@ -408,7 +388,7 @@ def toggleWin(name):
 
 def hideWin(name):
     "Hide a window, effectively closes it without deleting the contents"
-    playSound('config')
+    snd.fx('config')
     windows[name].withdraw()
     windows[name].vis=False
     UI['tool_win_'+name].state(['!pressed'])
@@ -438,12 +418,12 @@ def newPal_textbox(e):
 def filterExpand(e):
     frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
     frames['filter']['borderwidth']=4
-    playSound('expand')
+    snd.fx('expand')
 
 def filterContract(e):
     frames['filter_expanded'].grid_remove()
     frames['filter']['borderwidth']=0
-    playSound('contract')
+    snd.fx('contract')
 
 def updateFilters():
     # First update the 'all' checkboxes to make half-selected if not fully selected.
@@ -796,7 +776,8 @@ def initMenuBar(win):
         val+=1
 
     menus['file'].add_separator()
-    menus['file'].add_checkbutton(label="Mute Sounds", variable=muted)
+    if snd.initiallised:
+        menus['file'].add_checkbutton(label="Mute Sounds", variable=muted, command=lambda: snd.setMute(muted.get()))
     menus['file'].add_command(label="Quit", command=win.destroy)
     menus['pal']=Menu(bar)
 
