@@ -83,9 +83,9 @@ class vec:
     
     def __init__(self, x = 0, y=0, z=0):
         # use this to let us set these, but not others
-        object.__setattr__(self,'x', x)
-        object.__setattr__(self,'y', y)
-        object.__setattr__(self,'z', z)
+        object.__setattr__(self,'x', float(x))
+        object.__setattr__(self,'y', float(y))
+        object.__setattr__(self,'z', float(z))
         
     def copy(self):
         return vec(self.x, self.y, self.z)
@@ -142,14 +142,64 @@ class vec:
             
     def __eq__(self, other):
         if isinstance(other, vec):
-            return other.x==self.x and other.y==self.y and other.z==self.z
-        
-    def __len__(self):
-        "Length gives the magnitude."
+            return other.x == self.x and other.y==self.y and other.z == self.z
+        elif isinstance(other, tuple):
+            return self.x == other[0] and self.y == other[1] and self.z == other[2]
+        else:
+            try:
+                return self.mag() == float(other)
+            except ValueError:
+                return NotImplemented
+                
+    def __lt__(self, other):
+        if isinstance(other, vec):
+            return self.x < other.x and self.y < other.y and self.z < other.z
+        elif isinstance(other, tuple):
+            return self.x < other[0] and self.y < other[1] and self.z < other[2]
+        else:
+            try:
+                return self.mag() < float(other)
+            except ValueError:
+                return NotImplemented
+                
+    def __le__(self, other):
+        if isinstance(other, vec):
+            return self.x <= other.x and self.y <= other.y and self.z <= other.z
+        elif isinstance(other, tuple):
+            return self.x <= other[0] and self.y <= other[1] and self.z <= other[2]
+        else:
+            try:
+                return self.mag() <= float(other)
+            except ValueError:
+                return NotImplemented
+                
+    def __gt__(self, other):
+        if isinstance(other, vec):
+            return self.x>other.x and self.y.other.y and self.z<other.z
+        elif isinstance(other, tuple):
+            return self.x>other[0] and self.y>other[1] and self.z>other[2]
+        else:
+            try:
+                return self.mag() > float(other)
+            except ValueError:
+                return NotImplemented    
+
+                
+    def mag(self):
         if self.z == 0:
             return math.sqrt(self.x**2+self.y**2)
         else:
             return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+            
+    def __len__(self):
+        "Length gives the magnitude."
+        return int(self.mag())
+            
+    def __str__(self):
+        if self.z == 0:
+            return "(" + str(self.x) + ", " + str(self.y) + ")"
+        else:
+            return "(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
             
     def __iter__(self):
         "Allow iterating through the dimensions."
@@ -197,7 +247,7 @@ class vec:
         return vec(a.y*b.z - a.z*b.y,
                    a.z*b.x - a.x*b.z,
                    a.x*b.y - a.y*b.x)
-    mag = __len__
+    len = mag
     mag_sq = len_sq
     __iadd__ = __add__
     __isub__ = __sub__
