@@ -78,6 +78,23 @@ class VMF:
             if id not in list_:
                 list_.append(id)
                 return id
+                
+    def find_ent(self, vals = {}, tags = {}):
+        "Return a list of entities with the given keyvalue values, and with keyvalues containing the tags."
+        if len(vals) == 0 and len(tags) == 0:
+            return self.entities[:]
+        else:
+            ret = []
+            for ent in self.entities:
+                for key,value in vals.items():
+                    print(ent[key], value)
+                    if not ent.has_key(key) or ent[key] != value:
+                        continue # It failed!        
+                for key,value in vals.items():
+                    if not ent.has_key(key) or value not in ent[key]:
+                        continue # It failed!
+                ret.append(ent)
+            return ret
 class Solid:
     "A single brush, as a world brushes and brush entities."
     def __init__(self, map, des_id = -1, sides = None):
@@ -181,7 +198,6 @@ class Entity():
             else:
                 keys[item.name] = item.value
         return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs)
-        
     
     def remove(self):
         "Remove this entity from the map."
@@ -197,6 +213,15 @@ class Entity():
             st+='\t' + str(out) +'\n'
         st += "}\n"
         return st
+        
+    def __getitem__(self, key, default = None):
+        if key in self.keys:
+            return self.keys[key]
+        else:
+            return default
+        
+    def has_key(self, key):
+        return key in self.keys
         
 class Instance(Entity):
     "A special type of entity, these have some perculiarities with $replace values."
