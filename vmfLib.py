@@ -116,6 +116,7 @@ class Solid:
         return Solid(map, des_id = id, sides=sides)
     
     def __str__(self):
+        "Return a description of our data."
         st = "<solid:" + str(self.id) + ">\n{\n"
         for s in self.sides:
             st += str(s) + "\n"
@@ -169,7 +170,10 @@ class Side:
     def __str__(self):
         st = "\tmat = " + self.mat
         st += "\n\trotation = " + self.ham_rot + '\n'
-        st += '\tplane: ' + ", ".join([("(" + str(p['x']) + " " + str(p['y']) + " " + str(p['z']) + ")") for p in self.planes]) + '\n'
+        pl_str = [("(" + str(p['x']) 
+                 + " " + str(p['y']) 
+                 + " " + str(p['z']) + ")") for p in self.planes]
+        st += '\tplane: ' + ", ".join(pl_str) + '\n'
         return st
 class Entity():
     "Either a point or brush entity."
@@ -230,7 +234,9 @@ class Instance(Entity):
         
 class Output:
     "An output from this item pointing to another."
-    __slots__ = ('output', 'inst_out', 'target', 'input', 'inst_in', 'params', 'delay', 'times', 'sep')
+    __slots__ = ('output', 'inst_out', 'target', 
+                 'input', 'inst_in', 'params', 'delay', 
+                 'times', 'sep')
     def __init__(self,
                  out,
                  targ,
@@ -253,6 +259,7 @@ class Output:
     
     @staticmethod
     def parse(prop):
+        "Convert the VMF Property into an Output object."
         if ',' in prop.value:
             sep = True
             vals = prop.value.split(',')
@@ -317,6 +324,7 @@ class Output:
         return st
         
     def export(self):
+        "Generate the text required to define this output in the VMF."
         if self.inst_out:
             out = 'instance:' + self.inst_out + ';' + self.output
         else:
@@ -336,7 +344,6 @@ if __name__ == '__main__':
     map = VMF.parse('test.vmf')
     
 for i,brush in enumerate(map.brushes):
-    #print(str(i) + "--------------------------------------------")
     if i<20:
         print(brush)
     
