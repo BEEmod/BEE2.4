@@ -45,5 +45,5 @@ Icon
 *.filelist.txt
 
 # Ignore dev output
-property_parser_tester_output.txt
+test_out.vmf
 preview_styled.vmf
