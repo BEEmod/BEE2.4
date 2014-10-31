@@ -202,13 +202,14 @@ class Solid:
             sides.append(Side.parse(map, side))
         return Solid(map, des_id = id, sides=sides)
         
-    def export(self, buffer):
+    def export(self, buffer, ind = ''):
         "Generate the strings needed to define this brush."
-        buffer.write('\tsolid\n\t{\n')
-        buffer.write('\t\t\t"id" "' + str(self.id) + '"\n')
+        buffer.write(ind + 'solid\n')
+        buffer.write(ind + '{\n')
+        buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         for s in self.sides:
-            s.export(buffer)
-        buffer.write('\t\t}\n')
+            s.export(buffer, ind + '\t')
+        buffer.write(ind + '}\n')
     
     def __str__(self):
         "Return a description of our data."
@@ -270,19 +271,20 @@ class Side:
                 " " + str(plane['x']) +
                 " " + str(plane['x']) + ")")
         
-    def export(self, buffer):
+    def export(self, buffer, ind = ''):
         "Return the text required to define this side."
-        buffer.write('\t\tside\n\t\t{\n')
-        buffer.write('\t\t\t"id" "' + str(self.id) + '"\n')
+        buffer.write(ind + 'side\n')
+        buffer.write(ind + '{\n')
+        buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         pl_str = [self.make_vec(p) for p in self.planes]
-        buffer.write('\t\t\t"plane" "' + ' '.join(pl_str) + '"\n')
-        buffer.write('\t\t\t\"material" "' + self.mat + '"\n')
-        buffer.write('\t\t\t\"uaxis" "' + self.uaxis + '"\n')
-        buffer.write('\t\t\t\"vaxis" "' + self.vaxis + '"\n')
-        buffer.write('\t\t\t\"rotation" "' + str(self.ham_rot) + '"\n')
-        buffer.write('\t\t\t\"lightmapscale" "' + str(self.lightmap) + '"\n')
-        buffer.write('\t\t\t\"smoothing_groups" "' + str(self.smooth) + '"\n')
-        buffer.write('\t\t}\n')
+        buffer.write(ind + '"plane" "' + ' '.join(pl_str) + '"\n')
+        buffer.write(ind + '\t"material" "' + self.mat + '"\n')
+        buffer.write(ind + '\t"uaxis" "' + self.uaxis + '"\n')
+        buffer.write(ind + '\t"vaxis" "' + self.vaxis + '"\n')
+        buffer.write(ind + '\t"rotation" "' + str(self.ham_rot) + '"\n')
+        buffer.write(ind + '\t"lightmapscale" "' + str(self.lightmap) + '"\n')
+        buffer.write(ind + '\t"smoothing_groups" "' + str(self.smooth) + '"\n')
+        buffer.write(ind + '}\n')
  
     def __str__(self):
         st = "\tmat = " + self.mat
@@ -293,12 +295,13 @@ class Side:
         
 class Entity():
     "Either a point or brush entity."
-    def __init__(self, map, keys = None, id=-1, outputs = None, solids = None):
+    def __init__(self, map, keys = None, id=-1, outputs = None, solids = None, editor = None):
         self.map = map
         self.keys = {} if keys is None else keys
         self.outputs = outputs
         self.solids = solids
         self.id = map.get_id('ent', desired = id)
+        self.editor = {'visgroup' : []} if editor is None else editor
         
     @staticmethod
     def parse(map, tree_list):
@@ -307,6 +310,7 @@ class Entity():
         solids = []
         keys = {}
         outputs = []
+        editor = { 'visgroup' : []}
         for item in tree_list:
             if item.name == "id" and item.value.isnumeric():
                 id = item.value
@@ -315,23 +319,70 @@ class Entity():
             elif item.name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
+            elif item.name == "editor" and item.has_children():
+                for v in item:
+                    if v.name in ("visgroupshown", "visgroupautoshown"):
+                        editor[v.name] = conv_bool(v.value, default=True)
+                    elif v.name == 'color' and ' ' in v.value:
+                        editor['color'] = v.value
+                    elif v.name == 'logicalpos' and v.value.startswith('[') and v.value.endswith(']'):
+                        editor['logicalpos'] = v.value
+                    elif v.name == 'comments':
+                        editor['comments'] = v.value
+                    elif v.name == 'group':
+                        editor[v.name] = conv_int(v.value, default = -1)
+                        if editor[v.name] == -1:
+                            del editor[v.name]
+                    elif v.name == 'visgroupid':
+                        val = conv_int(v.value, default = -1)
+                        if val:
+                            editor['visgroup'].append(val)
             else:
                 keys[item.name] = item.value
-        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs)
+        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs, editor=editor)
     
     def is_brush(self):
         return len(self.solids) > 0
     
-    def export(self, buffer, ent_name = 'Entity'):
+    def export(self, buffer, ent_name = 'Entity', ind=''):
         "Return the strings needed to create this entity."
-        buffer.write(ent_name + '\n{\n')
-        buffer.write('\t"id" "' + str(self.id) + '"\n')
+        buffer.write(ind + ent_name + '\n')
+        buffer.write(ind + '{\n')
+        buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         for key in sorted(self.keys.keys()):
-            buffer.write('\t"' + key + '" "' + str(self.keys[key]) + '"\n')
+            buffer.write(ind + '\t"' + key + '" "' + str(self.keys[key]) + '"\n')
         if self.is_brush():
             for s in self.solids:
-                s.export(buffer)       
-        buffer.write('}\n')
+                s.export(buffer, ind=ind+'\t')       
+        if len(self.outputs) > 0:
+            buffer.write(ind + '\tconnections\n')
+            buffer.write(ind + '\t{\n')
+            for o in self.outputs:
+                o.export(buffer, ind=ind+'\t\t')
+            buffer.write(ind + '\t}\n')
+            
+        buffer.write(ind + '\teditor\n')
+        buffer.write(ind + '\t{\n')
+        if 'color' in self.editor:
+            buffer.write(ind + '\t\t"color" "' + 
+                self.editor['color'] + '"\n')
+        if 'groupid' in self.editor:
+            buffer.write(ind + '\t\t"groupid" "' + 
+                self.editor['groupid'] + '"\n')
+        if 'visgroup' in self.editor:
+            for id in self.editor['visgroup']:
+                buffer.write(ind + '\t\t"groupid" "' + id + '"\n')
+        for key in ('visgroupshown', 'visgroupautoshown'):
+            if key in self.editor:
+                buffer.write(ind + '\t\t"' + key + '" "' + 
+                    bool_to_str(self.editor[key]) + '"\n')
+        for key in ('logicalpos','comments'):
+            if key in self.editor:
+                buffer.write(ind + '\t\t"' + key + '" "' + 
+                    self.editor[key] + '"\n')
+        buffer.write(ind + '\t}\n')
+        
+        buffer.write(ind + '}\n')
         
     def remove(self):
         "Remove this entity from the map."
@@ -448,12 +499,12 @@ class Output:
             st += " only)"
         return st
         
-    def export(self, buffer):
+    def export(self, buffer, ind = ''):
         "Generate the text required to define this output in the VMF."
         if self.inst_out:
-            buffer.write('"instance:' + self.inst_out + ';' + self.output)
+            buffer.write(ind + '"instance:' + self.inst_out + ';' + self.output)
         else:
-            buffer.write('"' + self.output)
+            buffer.write(ind + '"' + self.output)
             
         if self.inst_in:
             params = self.params
