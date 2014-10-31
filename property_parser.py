@@ -283,5 +283,3 @@ class Property:
             return [""]
 
 import utils
-
-p = Property("Name", [Property("Thing", "12")])
