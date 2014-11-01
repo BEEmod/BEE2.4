@@ -239,11 +239,13 @@ class VMF:
                 for key,value in vals.items():
                     print(ent[key], value)
                     if not ent.has_key(key) or ent[key] != value:
-                        continue # It failed!        
-                for key,value in vals.items():
-                    if not ent.has_key(key) or value not in ent[key]:
-                        continue # It failed!
-                ret.append(ent)
+                        break
+                else: # passed through without breaks
+                    for key,value in tags.items():
+                        if not ent.has_key(key) or value not in ent[key]:
+                            break
+                    else:
+                        ret.append(ent)
             return ret
             
 class Camera:
@@ -677,7 +679,10 @@ class Output:
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
-    print('saving...')
-    with open('test_out.vmf', 'w') as file:
-        map.export(file)
+    ents = map.find_ent(vals = {'classname':'info_overlay'})
+    for e in ents:
+        print(e)
+    #print('saving...')
+    #with open('test_out.vmf', 'w') as file:
+    #    map.export(file)
     print('done!')
