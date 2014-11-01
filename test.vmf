@@ -32458,20 +32458,23 @@ entity
 		"logicalpos" "[0 0]"
 	}
 }
-entity
+hidden
 {
-	"id" "61850"
-	"classname" "func_instance"
-	"angles" "0 0 0"
-	"file" "instances/p2editor_old/point_light.vmf"
-	"targetname" "plight410861"
-	"origin" "576 576 64"
-	editor
+	entity
 	{
-		"color" "220 30 220"
-		"visgroupshown" "1"
-		"visgroupautoshown" "1"
-		"logicalpos" "[0 0]"
+		"id" "61850"
+		"classname" "func_instance"
+		"angles" "0 0 0"
+		"file" "instances/p2editor_old/point_light.vmf"
+		"targetname" "plight410861"
+		"origin" "576 576 64"
+		editor
+		{
+			"color" "220 30 220"
+			"visgroupshown" "1"
+			"visgroupautoshown" "1"
+			"logicalpos" "[0 0]"
+		}
 	}
 }
 entity
@@ -32813,11 +32816,15 @@ cameras
 	"activecamera" "0"
 	camera
 	{
-		"position" "[-176 64 0]"
-		"look" "[-176 128 0]"
+		"position" "[753.332 314.402 377.344]"
+		"look" "[725.91 352.146 333.533]"
 	}
 }
 cordons
 {
 	"active" "0"
+}
+quickhide
+{
+	"count" "3"
 }

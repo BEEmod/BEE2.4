@@ -52,17 +52,15 @@ class VMF:
             spawn=None,
             entities=None,
             brushes=None,
-            hidden_entities=None,
-            hidden_brushes=None,
-            cameras=None):
+            cameras=None, 
+            visgroups=None):
         self.solid_id = [] # All occupied solid ids
         self.face_id = []
         self.ent_id = []
         self.entities = [] if entities is None else entities
-        self.hidden_entities = [] if entities is None else entities
         self.brushes = [] if brushes is None else brushes
-        self.hidden_brushes = [] if hidden_brushes is None else hidden_brushes
         self.cameras = [] if cameras is None else cameras
+        self.visgroups = [] if visgroups is None else visgroups
         
         self.spawn = Entity(self, []) if spawn is None else spawn
         self.spawn.solids = self.brushes
@@ -83,6 +81,7 @@ class VMF:
         self.show_logic_grid = conv_bool(map_info.get('showlogicalgrid', '_'), False)
         self.grid_spacing = conv_int(map_info.get('gridspacing', '_'), 64)
         self.active_cam = conv_int(map_info.get('active_cam', '_'), -1)
+        self.quickhide_count = conv_int(map_info.get('quickhide', '_'), -1)
         
     def add_brush(self, item):
         self.brushes.append(item)
@@ -128,6 +127,7 @@ class VMF:
         
         cam_props = Property.find_key(tree, 'cameras', [])
         map_info['active_cam']  = cam_props.find_key('activecamera', -1).value
+        map_info['quickhide'] = Property.find_key(tree, 'quickhide', []).find_key('count', '_').value
             
         map = VMF(map_info = map_info)
         cams = []
@@ -136,13 +136,17 @@ class VMF:
                 cams.append(Camera.parse(map, c))
         
         ents = []
-        map.entities = [Entity.parse(map, ent) for ent in Property.find_all(tree, 'Entity')]
+        map.entities = [Entity.parse(map, ent, hidden=False) for ent in Property.find_all(tree, 'Entity')]
+        # find hidden entities
+        map.entities.extend([Entity.parse(map, ent[0], hidden=True) for ent in Property.find_all(tree, 'hidden') if len(ent)==1])
+        
         
         map_spawn = Property.find_key(tree, 'world', None)
-        if map_spawn is None:
+        if map_spawn is None:
+            # Generate a fake default to parse through
             map_spawn = Property("world", [])
-            
         map.spawn = Entity.parse(map, map_spawn)
+        
         print(map.spawn)
         if map.spawn.solids is not None:
            map.brushes = map.spawn.solids
@@ -197,6 +201,11 @@ class VMF:
         for cam in self.cameras:
             cam.export(file, '\t')
         file.write('}\n')
+        
+        if self.quickhide_count > 0:
+            file.write('quickhide\n{\n')
+            file.write('\t"count" "' + str(self.quickhide_count) + '"\n')
+            file.write('}\n')
             
         if ret_string:
             string = file.getvalue()
@@ -420,16 +429,25 @@ class Side:
         
 class Entity():
     "Either a point or brush entity."
-    def __init__(self, map, keys = None, id=-1, outputs = None, solids = None, editor = None):
+    def __init__(
+            self, 
+            map, 
+            keys = None, 
+            id=-1, 
+            outputs=None, 
+            solids=None, 
+            editor=None, 
+            hidden=False):
         self.map = map
         self.keys = {} if keys is None else keys
         self.outputs = outputs
         self.solids = [] if solids is None else solids
         self.id = map.get_id('ent', desired = id)
+        self.hidden = hidden
         self.editor = {'visgroup' : []} if editor is None else editor
         
     @staticmethod
-    def parse(map, tree_list):
+    def parse(map, tree_list, hidden=False):
         "Parse a property tree into an Entity object."
         id = -1
         solids = []
@@ -464,13 +482,18 @@ class Entity():
                             editor['visgroup'].append(val)
             else:
                 keys[item.name] = item.value
-        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs, editor=editor)
+        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs, editor=editor, hidden=hidden)
     
     def is_brush(self):
         return len(self.solids) > 0
     
     def export(self, buffer, ent_name = 'entity', ind=''):
         "Return the strings needed to create this entity."
+        
+        if self.hidden:
+            buffer.write(ind + 'hidden\n' + ind + '{\n')
+            ind = ind + '\t'
+        
         buffer.write(ind + ent_name + '\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -508,6 +531,8 @@ class Entity():
         buffer.write(ind + '\t}\n')
         
         buffer.write(ind + '}\n')
+        if self.hidden:
+            buffer.write(ind[:-1] + '}\n')
         
     def remove(self):
         "Remove this entity from the map."
