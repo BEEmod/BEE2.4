@@ -6,7 +6,8 @@ import shutil
 import random
 
 from property_parser import Property, KeyValError, NoKeyError
-import vmfLib as VMF
+from utils import Vec
+import vmfLib as VLib
 import utils
 
 # COMPILER FLAGS (used as part of instance filename)
@@ -24,16 +25,6 @@ detail=[]
 triggers=[]
 other_ents=[] # anything else, including some logic_autos, info_lighting, overlays, etc
 unique_counter=0 # counter for instances to ensure unique targetnames
-max_ent_id = 1 # maximum known entity id, so we know what we can set new ents to be.
-
-HAS_MAT={ # autodetect these and add to a logic_auto to notify the voices of it
-         "glass"   : 0,
-         "goo"     : 0,
-         "grating" : 0,
-         "fizzler" : 0,
-         "laser"   : 0,
-         "deadly"  : 0, # also if laserfield exists
-         }
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
     #"metal/black_floor_metal_001c"       : "black.floor",
@@ -255,10 +246,8 @@ def load_settings():
     settings['deathfield']['right']    = deathfield.find_key('right', 'BEE2/fizz/lp/death_field_clean_right').value
     settings['deathfield']['center']   = deathfield.find_key('center', 'BEE2/fizz/lp/death_field_clean_center').value
     settings['deathfield']['short']    = deathfield.find_key('short', 'BEE2/fizz/lp/death_field_clean_short').value
-    wid = deathfield.find_key('texwidth', 'blah').value
-    if not wid.isdecimal():
-        wid = '512'
-    settings['deathfield']['texwidth'] = int(wid)
+    wid = deathfield.find_key('texwidth', '_').value
+    settings['deathfield']['texwidth'] = VLib.conv_int(wid, 512)
     settings['deathfield']['scanline'] = deathfield.find_key('scanline', settings['fizzler']['scanline']).value
         
     pack_commands = Property.find_all(conf, 'packer')
@@ -291,7 +280,7 @@ def load_map(path):
     global map
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
-        map=Property.parse(file)
+        map=VLib.VMF.parse(Property.parse(file))
     utils.con_log("Parsing complete!")
 
 def check_conditions():
@@ -392,66 +381,50 @@ def process_variants(vars):
         
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
-    global max_ent_id
     utils.con_log("Scanning Entities...")
-    ents=Property.find_all(map,'entity')
-    for item in ents:
-        item.targname = item.find_key('targetname', "").value
-        item.cls=item.find_key('classname', '').value
-        id=item.find_key('id', '-1')
-        if item.cls == '':
-            utils.con_log("Error - entity missing class, skipping!")
-            continue
-        if id.value.isnumeric():
-            max_ent_id = max(max_ent_id,int(id.value))
-        if item.cls=="func_instance":
-            item.file = item.find_key('file', "").value
-            instances.append(item)
-            cond_rem = []
-            for cond in settings['conditions']: # check if it satisfies any conditions
-                to_rem = []
-                for flag in cond['flags']:
-                    if flag.name.casefold() == "instflag":
-                        if flag.value in item.file:
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                    elif flag.name.casefold() == "instfile":
-                        if flag.value == item.file:
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                    elif flag.name.casefold() == "ifMode":
-                        if item.file == get_opt("coopexitfile") and flag.value.casefold() == "coop":
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                        if item.file == get_opt("spexitfile") and flag.value.casefold() == "sp":
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                    elif flag.name.casefold() == "ifPreview":
-                        if item.file == get_opt("coopexitfile") and flag.value.casefold() == "coop":
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                        if item.file == get_opt("spexitfile") and flag.value.casefold() == "sp":
-                            if flag not in to_rem:
-                                to_rem.append(flag)
-                for r in to_rem:
-                    cond['flags'].remove(r)
-                    cond['has_sat'] = True
-                if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
-                    cond_rem.append(cond)
-                del to_rem
-            for r in cond_rem:
-                settings['conditions'].remove(r)
-            del cond_rem
-        elif item.cls=="info_overlay":
-            overlays.append(item)
-        elif item.cls=="func_detail":
-            detail.append(item)
-        elif item.cls in ("trigger_portal_cleanser", "trigger_hurt", "trigger_multiple"):
-            triggers.append(item)
-        elif item.cls in ("func_brush" , "func_door_rotating"):
-            f_brushes.append(item)
-        else:
-            other_ents.append(item)
+
+    utils.con_log('- Instances')
+    instances = map.find_ent({'classname':'func_instance'})
+    triggers = map.find_ent(tags = {'classname' : 'trigger_'})
+    f_brush = (map.find_ent({'classname':'func_brush'}) +
+               map.find_ent({'classname':'func_rotating'}))
+    
+    for item in instances:
+        cond_rem = []
+        for cond in settings['conditions']: # check if it satisfies any conditions
+            to_rem = []
+            for flag in cond['flags']:
+                if flag.name.casefold() == "instflag":
+                    if flag.value in item['file']:
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                elif flag.name.casefold() == "instfile":
+                    if flag.value == item['file']:
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                elif flag.name.casefold() == "ifMode":
+                    if item['file'] == get_opt("coopexitfile") and flag.value.casefold() == "coop":
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                    if item['file'] == get_opt("spexitfile") and flag.value.casefold() == "sp":
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                elif flag.name.casefold() == "ifPreview":
+                    if item['file'] == get_opt("coopexitfile") and flag.value.casefold() == "coop":
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+                    if item['file'] == get_opt("spexitfile") and flag.value.casefold() == "sp":
+                        if flag not in to_rem:
+                            to_rem.append(flag)
+            for r in to_rem:
+                cond['flags'].remove(r)
+                cond['has_sat'] = True
+            if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
+                cond_rem.append(cond)
+            del to_rem
+        for r in cond_rem:
+            settings['conditions'].remove(r)
+        del cond_rem
 
 def scan_mats():
     "Scan through all materials to check if they any defined conditions."
@@ -482,17 +455,16 @@ def scan_mats():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    sides=Property.find_all(map, 'world', 'solid', 'side') + Property.find_all(detail, 'entity', 'solid', 'side')
-    for face in sides:
-        mat=face.find_key('material')   
-        if mat.value.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
+    solids=map.brushes + [e.solids for e in map.find_ent({'classname':'func_detail'})]
+    for face in solids:
+        if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
             plane=face.find_key('plane')
             verts=utils.split_plane(plane)
             for v in verts:
                 v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
                 # we do the decimal with strings to ensure it adds floats precisely
             plane.value=utils.join_plane(verts)
-        if mat.value.casefold()=="glass/glasswindow007a_less_shiny":
+        if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
             for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
                 split=val.value.split(" ")
                 split[-1] = get_opt("glass_scale") # apply the glass scaling option
@@ -501,7 +473,7 @@ def change_brush():
           get_opt("clump_size").isnumeric() and 
           get_opt("clump_width").isnumeric() and 
           get_opt("clump_number").isnumeric()):
-        clump_walls(sides)
+        clump_walls(solids)
     else:
         random_walls(sides)
         
@@ -509,9 +481,8 @@ def change_brush():
 def random_walls(sides):
     "The original wall style, with completely randomised walls."
     for face in sides:
-        mat=face.find_key('material')   
-        is_blackceil = roof_tex(face, mat)
-    if (mat.value.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+        is_blackceil = roof_tex(face, face.mat)
+    if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
         scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
         for val in (face.find_key('uaxis'),face.find_key('vaxis')):
             split=val.value.split(" ")
@@ -525,18 +496,14 @@ def clump_walls(sides):
     others = {} # we keep a list for the others, so we can nodraw them if needed
     for face in sides: # first build a list of all textures and their locations...
         mat=face.find_key('material')
-        if mat.value in ('glass/glasswindow007a_less_shiny', 
+        if face.mat in ('glass/glasswindow007a_less_shiny', 
                          'metal/metalgrate018', 
                          'anim_wp/framework/squarebeams',
                          'tools/toolsnodraw'):
             # These textures aren't always on grid, ignore them..
-            alter_mat(mat)
+            alter_mat(face)
             continue
-        size_max,size_min = utils.get_bbox((face.find_key('plane'),))
-        origin = [0, 0, 0]
-        for i in range(3):
-            origin[i] = (size_min[i] + size_max[i])/2
-        origin = tuple(origin)
+        origin = face.get_origin().as_tuple()
         if mat.value.casefold() in WALLS:
             if mat.value in WHITE_PAN: # placeholder to indicate these can be replaced.
                 mat.value = "WHITE"
@@ -589,41 +556,41 @@ def clump_walls(sides):
                             if mat.value == type:
                                 mat.value = tex
     
-    for mat in walls.values():   
-        if mat.value =="WHITE":
+    for face in walls.values():   
+        if face.mat =="WHITE":
         # we missed these ones!
             if not get_tex("special.white_gap") == "":
-                mat.value = get_tex("special.white_gap")
+                face.mat = get_tex("special.white_gap")
             else:
-                    mat.value = get_tex("white.wall")
-        elif mat.value == "BLACK":
+                    face.mat = get_tex("white.wall")
+        elif face.mat == "BLACK":
             if not get_tex("special.black_gap") == "":
-                    mat.value = get_tex("special.black_gap")
+                    face.mat = get_tex("special.black_gap")
             else:
-                    mat.value = get_tex("black.wall")
+                    face.mat = get_tex("black.wall")
         else:
-            alter_mat(mat)
+            alter_mat(face)
     
-def roof_tex(face, mat):
+def roof_tex(face):
     "Determine if a texture is on the roof or if it's on the floor, and apply textures appropriately."
     is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
-    if mat.value.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
+    if face.mat.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
         # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-        verts = utils.split_plane(face.find_key('plane'))
+        verts = utils.split_plane(face.planes)
         # y-val for first if < last if ceiling
         side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
-        type = "black." if mat.value.casefold() in BLACK_PAN else "white."
-        mat.value = get_tex(type+side)
+        type = "black." if face.mat.casefold() in BLACK_PAN else "white."
+        face.mat = get_tex(type+side)
         return (type+side == "black.ceiling")
     else:
-        alter_mat(mat)
+        alter_mat(face)
         return False
     
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
     to_rem=[]
-    for over in overlays:
+    for over in map.find_ent({'classname':'info_overlay'}):
         mat=over.find_key('material')
         alter_mat(mat)
         if mat.value.casefold() in ANTLINES:
@@ -762,7 +729,6 @@ def fix_inst():
     global to_pack
     utils.con_log("Editing Instances...")
     for inst in instances:
-        file=inst.find_key('file', '')
         print(inst.targname)
         if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
             name=inst.find_key('targetname')
@@ -781,17 +747,17 @@ def fix_inst():
                 if "$skin" in var:
                     if settings['fizzler']['splitinstances']=="1":
                         # switch to alternate instances depending on what type of fizzler, to massively save ents
-                        if "$skin 0" in var and get_opt("fizzmodelfile") in file.value:
-                            file.value = file.value[:-4] + "_fizz.vmf" 
+                        if "$skin 0" in var and get_opt("fizzmodelfile") in inst['file']:
+                            inst['file'] = inst['file'][:-4] + "_fizz.vmf" 
                         # we don't want to do it to custom ones though
-                        if "$skin 2" in var and get_opt("fizzmodelfile") in file.value:
-                            file.value = file.value[:-4] + "_las.vmf"
+                        if "$skin 2" in var and get_opt("fizzmodelfile") in inst['file']:
+                            inst['file'] = inst['file'][:-4] + "_las.vmf"
                     break
-            if "ccflag_comball" in file.value:
+            if "ccflag_comball" in inst['file']:
                 name.value = inst.targname.split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
-            if "ccflag_death_fizz_model" in file.value:
+            if "ccflag_death_fizz_model" in inst['file']:
                 name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
-        elif "ccflag_paint_fizz" in file.value:
+        elif "ccflag_paint_fizz" in inst['file']:
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
@@ -799,7 +765,7 @@ def fix_inst():
                     sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
-        elif "ccflag_comball_base" in file.value: # Rexaura Flux Fields
+        elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
                     trig.find_key('classname').value = "trigger_multiple"
@@ -820,19 +786,19 @@ def fix_inst():
                 if pos == out_pos and angle==out_angle:
                     utils.add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
                     utils.add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
-        elif "ccflag_death_fizz_base" in file.value: # LP's Death Fizzler
+        elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
             for trig in triggers:
                 if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
                     death_fizzler_change(inst, trig)
-        if file.value == get_opt("clearPanelFile"):
+        if inst['file'] == get_opt("clearPanelFile"):
             make_static_pan(inst, "glass") # white/black are identified based on brush
-        if "ccflag_pist_plat" in file.value:
+        if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
-        if file.value in settings['variants']:
-            weight = settings['variants'][file.value]
-            file.value = file.value[:-4] + "_var" + random.choice(weight) + ".vmf"
+        if inst['file'] in settings['variants']:
+            weight = settings['variants'][inst['file']]
+            inst['file'] = inst['file'][:-4] + "_var" + random.choice(weight) + ".vmf"
             # add _var4 or so to the instance name
-        check_overlay(file, inst)
+        check_overlay(inst)
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
@@ -956,46 +922,31 @@ def death_fizzler_change(inst, trig):
         del solids
     map.append(brush)
         
-def check_overlay(file, inst):
+def check_overlay(inst):
     "Check to see if an instance should have other instances overlayed on it."
-    global max_ent_id
     for key in settings['overlay_inst']:
-        if key[0] in file.value:
-            max_ent_id += 1
+        if key[0] in inst['file']:
             # Use the original instance's name if not given a unique one
             name = inst.targname if key[2] == "" else key[2] + str(max_ent_id)
-            keys = [
-                     Property("id", str(max_ent_id)),
-                     Property("classname", "func_instance"),
-                     Property("targetname", name),
-                     Property("file", key[1]),
-                     inst.find_key("angles", "0 0 0").copy(),
-                     inst.find_key("origin").copy()
-                   ]
-            new_inst = Property("entity", keys)
-            map.append(new_inst)
+            new_inst = Entity(map, keys={
+                'classname' : 'func_instance',
+                'targetname' : name,
+                'file' : key[1],
+                'angles' : inst.get('angles', '0 0 0'),
+                'origin' : inst['origin']
+                })
+            map.add_ent(new_inst)
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     utils.con_log("Editing WorldSpawn")
-    root=Property.find_key(map, 'world')
-    try:
-        has_paint = root.find_key('paintinmap')
-        if has_paint.value == "0":
-            has_paint.value = get_opt("force_paint")
-    except KeyValError:
-        has_paint=Property("paintinmap", get_opt("force_paint"))
-        root.value.append(has_paint)
+    if map.spawn['paintinmap'] != '1':
+        # if PeTI thinks there should be paint, don't touch it
+        map.spawn['paintinmap'] = get_opt('force_paint')
+    map.spawn['skyname'] = get_tex("special.sky")
     
-    try:
-        sky = root.find_key('skyname', None)
-        sky.value = get_tex("special.sky") # allow random sky to be chosen
-    except KeyValError: 
-        root.value.append(Property("skyname", get_tex("special.sky")))
-
 def add_extra_ents():
     "Add our various extra instances to enable some features."
-    global max_ent_id
     inst_types = {
                     "global" : [-8192, "0 0"],
                     "skybox" : [ 5632, "0 0"], 
@@ -1009,15 +960,14 @@ def add_extra_ents():
                 opt = inst.split("|")
                 if len(opt)== 2:
                     inst_types[type][0] += int(opt[0])
-                    keys = [
-                             Property("id", str(max_ent_id)),
-                             Property("classname", "func_instance"),
-                             Property("targetname", "inst_"+str(max_ent_id)),
-                             Property("file", opt[1]),
-                             Property("angles", "0 0 0"),
-                             Property("origin", str(inst_types[type][0]) + " " + inst_types[type][1])
-                           ]
-                    new_inst = Property("entity", keys)
+                    new_inst = Entity(map, keys={
+                             "id" : str(max_ent_id),
+                             "classname" : "func_instance",
+                             "targetname" : ("inst_"+str(max_ent_id)),
+                             "file" : opt[1],
+                             "angles" : "0 0 0",
+                             "origin" : (str(inst_types[type][0]) + " " + inst_types[type][1])
+                           })
                     map.append(new_inst)
 
 def hammer_pack_scan():
@@ -1052,7 +1002,7 @@ def hammer_pack_scan():
                     
 def make_packlist(vmf_path):
     "Create the required packer file for BSPzip to use."
-    pack_file = vmf_path[:-4] + ".filelist.txt"
+    pack_file = vmf_path[:-4] + "['file']list.txt"
     folders=get_valid_folders()
     utils.con_log("Creating Pack list...")
     has_items = False
@@ -1111,11 +1061,8 @@ def save():
     "Save the modified map back to the correct location."
     out = []
     utils.con_log("Saving New Map...")
-    for p in map:
-        for s in p.to_strings():
-            out.append(s + '\n')
     with open(new_path, 'w') as f:
-        f.writelines(out)
+        map.export(file=f, inc_version=True) 
     utils.con_log("Complete!")
     
 def run_vbsp(args, do_swap):
@@ -1181,7 +1128,7 @@ if '-force_peti' in args or '-force_hammer' in args:
 else:
     # If we don't get the special -force args, check for the entity 
     # limit to determine if we should convert
-    is_hammer = "-entity_limit 1750" in args
+    is_hammer = "-entity_limit 1750" not in args
 if is_hammer: 
     utils.con_log("Hammer map detected! skipping conversion..")
     run_vbsp(old_args, False)
@@ -1192,7 +1139,7 @@ else:
     max_ent_id=-1
     unique_counter=0
     progs = [
-             load_entities, scan_mats, fix_inst, 
+             load_entities, fix_inst, 
              change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
