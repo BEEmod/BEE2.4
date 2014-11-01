@@ -31,8 +31,9 @@ to_pack_mat = {} # files to pack if material is used (by VBSP_styles only)
 root = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
 new_args=sys.argv[1:]
+old_args=sys.argv[1:]
 path=""
-print(sys.argv)
+
 game_dir = ""
 next_is_game = False
 for a in list(new_args):
@@ -46,7 +47,12 @@ for a in list(new_args):
     elif a == "-game":
         next_is_game = True
     elif a.casefold() in ("-both", "-final", "-staticproplighting", "-staticproppolys", "-textureshadows"):
+        # remove final parameters from the modified arguments
         new_args.remove(a)
+    elif a in ('-force_peti', '-force_hammer'):
+        # we need to strip these out, otherwise VBSP will get confused
+        new_args.remove(a)
+        old_args.remove(a)
 
 new_args = ['-bounce', '2', '-noextra'] + new_args
 
@@ -59,13 +65,25 @@ if path == "":
     
 if not path.endswith(".bsp"):
     path += ".bsp"
-
-if os.path.basename(path) == "preview.bsp": # Is this a PeTI map?
-    utils.con_log("PeTI map detected! (is named preview.vmf)")
+    
+if '-force_peti' in args or '-force_hammer' in args:
+    # we have override command!
+    if '-force_peti' in args:
+        utils.con_log('OVERRIDE: Applying cheap lighting!')
+        is_peti = True
+    else:
+        utils.con_log('OVERRIDE: Preserving args!')
+        is_peti = False
+else:
+    # If we don't get the special -force args, check for the name 
+    # equalling preview to determine if we should convert
+    is_peti = os.path.basename(path) == "preview.bsp"
+if is_peti:
+    utils.con_log("PeTI map detected!")
     run_vrad(new_args)
 else:
     utils.con_log("Hammer map detected! Not forcing cheap lighting..")
-    run_vrad(sys.argv[1:])
+    run_vrad(old_args)
     
 pack_file = path[:-4] + '.filelist.txt'
 

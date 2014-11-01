@@ -1144,6 +1144,7 @@ conditions = {} # All conditions that should be checked to see if they match
 root = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
 new_args=sys.argv[1:]
+old_args=sys.argv[1:]
 new_path=""
 path=""
 for i,a in enumerate(new_args):
@@ -1152,6 +1153,10 @@ for i,a in enumerate(new_args):
         new_args[i] = fixed_a.replace("sdk_content\\maps\\","sdk_content\\maps\\styled\\",1)
         new_path=new_args[i]
         path=a
+    # we need to strip these out, otherwise VBSP will get confused
+    if a == '-force_peti' or a == '-force_hammer':
+        new_args[i] = ''
+        old_args[i] = ''
 
 utils.con_log("BEE2 VBSP hook initiallised. Loading settings...")
 
@@ -1165,8 +1170,25 @@ if not path.endswith(".vmf"):
     path += ".vmf"
     new_path += ".vmf"
 load_map(path)
-if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
-    utils.con_log("PeTI map detected! (has Entity Limit of 1750)")
+if '-force_peti' in args or '-force_hammer' in args:
+    # we have override command!
+    if '-force_peti' in args:
+        utils.con_log('OVERRIDE: Attempting to convert!')
+        is_hammer = False
+    else:
+        utils.con_log('OVERRIDE: Abandoning conversion!')
+        is_hammer = True
+else:
+    # If we don't get the special -force args, check for the entity 
+    # limit to determine if we should convert
+    is_hammer = "-entity_limit 1750" in args
+if is_hammer: 
+    utils.con_log("Hammer map detected! skipping conversion..")
+    run_vbsp(old_args, False)
+    hammer_pack_scan()
+    make_packlist(path)
+else:
+    utils.con_log("PeTI map detected!")
     max_ent_id=-1
     unique_counter=0
     progs = [
@@ -1177,12 +1199,8 @@ if "-entity_limit 1750" in args: # PTI adds this, we know it's a map to convert!
              fix_worldspawn, save
             ]
     for func in progs:
-        func()
+        func() # run all these in order
     run_vbsp(new_args, True)
     make_packlist(path) # VRAD will access the original BSP location
-else:
-    utils.con_log("Hammer map detected! skipping conversion..")
-    run_vbsp(sys.argv[1:], False)
-    hammer_pack_scan()
-    make_packlist(path)
+    
 utils.con_log("BEE2 VBSP hook finished!")
