@@ -5,6 +5,7 @@ from collections import defaultdict
 import io
 
 from property_parser import Property, KeyValError, NoKeyError
+from utils import Vec
 import utils
 
 CURRENT_HAMMER_VERSION = 400
@@ -146,8 +147,7 @@ class VMF:
             # Generate a fake default to parse through
             map_spawn = Property("world", [])
         map.spawn = Entity.parse(map, map_spawn)
-        
-        print(map.spawn)
+
         if map.spawn.solids is not None:
            map.brushes = map.spawn.solids
         return map
@@ -232,12 +232,11 @@ class VMF:
     def find_ent(self, vals = {}, tags = {}):
         "Return a list of entities with the given keyvalue values, and with keyvalues containing the tags."
         if len(vals) == 0 and len(tags) == 0:
-            return self.entities[:]
+            return self.entities[:] # skip to just returning the whole thing
         else:
             ret = []
             for ent in self.entities:
                 for key,value in vals.items():
-                    print(ent[key], value)
                     if not ent.has_key(key) or ent[key] != value:
                         break
                 else: # passed through without breaks
@@ -353,6 +352,31 @@ class Solid:
             st += str(s) + "\n"
         st += "}"
         return st
+        
+    def __iter__(self):
+        for s in self.sides:
+            yield s
+        
+    def get_bbox(self):
+        "Generate the highest and lowest points these planes form."
+        bbox_max=Vec()
+        bbox_min=Vec()
+        preset=True
+        for side in self.sides:
+            if preset:
+                preset=False
+                bbox_max=[int(x.floor())-99999 for x in side.planes[0]]
+                bbox_min=[int(x.floor())+99999 for x in side.planes[0]]
+            for v in side.planes:
+                for i in ('x','y','z'):
+                    bbox_max[i] = max(int(v.planes[i].floor()), bbox_max[i])
+                    bbox_min[i] = min(int(v.planes[i].floor()), bbox_min[i])
+        return bbox_max, bbox_min
+        
+    def get_origin():
+        size_min, size_max = self.get_bbox()
+        origin = (size_min + size_max) / 2
+        return origin
 
 class Side:
     "A brush face."
@@ -361,7 +385,7 @@ class Side:
         self.planes = [0,0,0]
         self.id = map.get_id('face', des_id)
         for i,pln in enumerate(planes):
-            self.planes[i]=dict(x=pln[0], y=pln[1], z=pln[2])
+            self.planes[i]=Vec(x=[0], y=pln[1], z=pln[2])
         self.lightmap = opt.get("lightmap", 16)
         try: 
             self.lightmap = int(self.lightmap)
@@ -387,7 +411,7 @@ class Side:
         for i,v in enumerate(verts):
             verts = v.split(" ")
             if len(verts) == 3:
-                planes[i]=verts
+                planes[i]=[float(v) for v in verts]
             else:
                 raise ValueError("Invalid planes in '" + plane + "'!")
         if not len(planes) == 3:
@@ -679,9 +703,9 @@ class Output:
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
-    ents = map.find_ent(vals = {'classname':'info_overlay'})
-    for e in ents:
-        print(e)
+    print(map.brushes[0].get_bbox())
+        
+    
     #print('saving...')
     #with open('test_out.vmf', 'w') as file:
     #    map.export(file)
