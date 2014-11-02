@@ -90,6 +90,9 @@ class VMF:
     def add_ent(self, item):
         self.entities.append(item)
         
+    def remove_ent(self, item):
+        self.entities.remove(item)
+        
     def add_brushes(self, item):
         for i in item:
             self.add_brush(i)
@@ -359,24 +362,29 @@ class Solid:
         
     def get_bbox(self):
         "Generate the highest and lowest points these planes form."
-        bbox_max=Vec()
-        bbox_min=Vec()
-        preset=True
+        bbox_max=[None, None, None]
+        bbox_min=[None, None, None]
         for side in self.sides:
-            if preset:
-                preset=False
-                bbox_max=[int(x.floor())-99999 for x in side.planes[0]]
-                bbox_min=[int(x.floor())+99999 for x in side.planes[0]]
             for v in side.planes:
-                for i in ('x','y','z'):
-                    bbox_max[i] = max(int(v.planes[i].floor()), bbox_max[i])
-                    bbox_min[i] = min(int(v.planes[i].floor()), bbox_min[i])
-        return bbox_max, bbox_min
+                for i in range(3):
+                    if bbox_max[i] is None:
+                        bbox_max[i] = v[i]
+                    if bbox_min[i] is None:
+                        bbox_min[i] = v[i]
+                    bbox_max[i] = max(int(v[i]), bbox_max[i])
+                    bbox_min[i] = min(int(v[i]), bbox_min[i])
+        bbox_max = Vec(bbox_max[0],bbox_max[1],bbox_max[2])
+        bbox_min = Vec(bbox_min[0],bbox_min[1],bbox_min[2])
+        return bbox_min, bbox_max
         
-    def get_origin():
+    def get_origin(self):
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
         return origin
+        
+    def __del__(self):
+        "Forget this solid's ID when the object is destroyed."
+        self.map.solid_id.remove(self.id)
 
 class Side:
     "A brush face."
@@ -385,7 +393,7 @@ class Side:
         self.planes = [0,0,0]
         self.id = map.get_id('face', des_id)
         for i,pln in enumerate(planes):
-            self.planes[i]=Vec(x=[0], y=pln[1], z=pln[2])
+            self.planes[i]=Vec(x=pln[0], y=pln[1], z=pln[2])
         self.lightmap = opt.get("lightmap", 16)
         try: 
             self.lightmap = int(self.lightmap)
@@ -452,6 +460,10 @@ class Side:
         pl_str = [self.make_vec(p) for p in self.planes]
         st += '\tplane: ' + ", ".join(pl_str) + '\n'
         return st
+        
+    def __del__(self):
+        "Forget this side's ID when the object is destroyed."
+        self.map.face_id.remove(self.id)
         
 class Entity():
     "Either a point or brush entity."
@@ -593,6 +605,10 @@ class Entity():
     def has_key(self, key):
         return key in self.keys
         
+    def __del__(self):
+        "Forget this entity's ID when the object is destroyed."
+        self.map.ent_id.remove(self.id)
+        
 class Output:
     "An output from this item pointing to another."
     __slots__ = ('output', 'inst_out', 'target', 
@@ -703,8 +719,11 @@ class Output:
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
-    print(map.brushes[0].get_bbox())
-        
+    for br in map.brushes:
+        if br.id == 59535:
+            for s in br.sides:
+                print(*[str(p) for p in s.planes])
+            print(br.get_origin())
     
     #print('saving...')
     #with open('test_out.vmf', 'w') as file:
