@@ -386,8 +386,6 @@ def load_entities():
     utils.con_log('- Instances')
     instances = map.find_ent({'classname':'func_instance'})
     triggers = map.find_ent(tags = {'classname' : 'trigger_'})
-    f_brush = (map.find_ent({'classname':'func_brush'}) +
-               map.find_ent({'classname':'func_rotating'}))
     
     for item in instances:
         cond_rem = []
@@ -469,10 +467,14 @@ def change_brush():
                     # we do the decimal with strings to ensure it adds floats precisely
                 plane.value=utils.join_plane(verts)
             if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
-                for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
-                    split=val.value.split(" ")
-                    split[-1] = get_opt("glass_scale") # apply the glass scaling option
-                    val.value=" ".join(split)
+                split=face.uaxis.split(" ")
+                split[-1] = get_opt("glass_scale") # apply the glass scaling option
+                face.uaxis=" ".join(split)
+                
+                split=face.vaxis.split(" ")
+                split[-1] = get_opt("glass_scale") # apply the glass scaling option
+                face.vaxis=" ".join(split)
+                
     if (get_opt("clump_wall_tex") == "1" and 
           get_opt("clump_size").isnumeric() and 
           get_opt("clump_width").isnumeric() and 
@@ -521,7 +523,7 @@ def clump_walls(solids):
                     walls[origin].mat = "tools/toolsnodraw"
                     del walls[origin]
                 else:
-                    walls[origin] = mat
+                    walls[origin] = face
             else:
                 if origin in others:
                     # The only time two textures will be in the same place is if they are covering each other - delete them both.
@@ -529,7 +531,7 @@ def clump_walls(solids):
                     others[origin].mat = "tools/toolsnodraw"
                     del others[origin]
                 else:
-                    others[origin] = mat
+                    others[origin] = face
                 roof_tex(face)
                 
     todo_walls = len(walls) # number of walls un-edited
@@ -582,9 +584,8 @@ def roof_tex(face):
     is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
     if face.mat.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
         # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-        verts = face.split_planes()
         # y-val for first if < last if ceiling
-        side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
+        side = "ceiling" if int(face.planes[0]['y']) < int(face.planes[2]['y']) else "floor"
         type = "black." if face.mat.casefold() in BLACK_PAN else "white."
         face.mat = get_tex(type+side)
         return (type+side == "black.ceiling")
@@ -596,7 +597,8 @@ def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
     for over in map.find_ent({'classname':'info_overlay'}):
-        alter_mat(over)
+        if over['material'].casefold() in TEX_VALVE:
+            over['material'] = get_tex(TEX_VALVE[over['material'].casefold()])
         if over['material'].casefold() in ANTLINES:
             angle = over['angles'].split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
@@ -607,13 +609,13 @@ def change_overlays():
             else:
                 over['material']=new_tex
         if (over['targetname'] in ("exitdoor_stickman","exitdoor_arrow")) and (get_opt("remove_exit_signs") =="1"):
-            map.remove_ent(rem) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
+            map.remove_ent(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
     
 def change_trig():
     "Check the triggers and fizzlers."
     utils.con_log("Editing Triggers...")
     for trig in triggers:
-        if trig.cls=="trigger_portal_cleanser":
+        if trig['classname']=="trigger_portal_cleanser":
             sides=trig.find_all('entity', 'solid', 'side', 'material')
             for mat in sides:
                 alter_mat(mat)
@@ -623,64 +625,53 @@ def change_trig():
 def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
-    to_rem=[]
+    f_brushes = (map.find_ent({'classname':'func_brush'}) +
+               map.find_ent({'classname':'func_rotating'}))
     for brush in f_brushes:
-        sides=brush.find_all('entity', 'solid', 'side', 'material')
-        type=""
-        for mat in sides: # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
-            if mat.value.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
-                mat.value = get_tex("special.edge")
-            elif mat.value.casefold() in WHITE_PAN:
-                type="white"
-                if not get_tex("special.white") == "":
-                    mat.value = get_tex("special.white")
-                elif not alter_mat(mat):
-                    mat.value = get_tex("white.wall")
-            elif mat.value.casefold() in BLACK_PAN:
-                type="black"
-                if not get_tex("special.black") == "":
-                    mat.value = get_tex("special.black")
-                elif not alter_mat(mat):
-                    mat.value = get_tex("black.wall")
-            else:
-                alter_mat(mat) # for gratings, laserfields and some others
-        parent=brush.find_key('parentname', '')
-        if brush.cls=="func_brush" and"-model_arms" in parent.value: # is this the angled panel?:
-            targ=parent.value.split("-model_arms")[0]
-            for inst in instances:
-                if inst.targname == targ:
-                    if make_static_pan(inst, type):
-                        to_rem.append(brush) # delete the brush, we don't want it
-                    break
-        try:
-            fast_ref = brush.find_key('drawInFastReflection')
-            fast_ref.value = get_opt("force_brush_reflect")
-        except:
-            brush.value.append(Property("drawinfastreflection", get_opt("force_brush_reflect")))
-            
-    for item in to_rem:
-        map.remove(item)
-    del to_rem
+        brush['drawInFastReflection'] = get_opt("force_brush_reflect")
+        parent = brush['parentname']
+        if parent is None:
+            parent = ''
+        type="" 
+        # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
+        for solid in brush.solids: # this should usually only loop once
+            for side in solid:
+                if side.mat.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
+                    side.mat = get_tex("special.edge")
+                elif side.mat.casefold() in WHITE_PAN:
+                    type="white"
+                    if not get_tex("special.white") == "":
+                        side.mat = get_tex("special.white")
+                    elif not alter_mat(side):
+                        side.mat = get_tex("white.wall")
+                elif side.mat.casefold() in BLACK_PAN:
+                    type="black"
+                    if not get_tex("special.black") == "":
+                        side.mat = get_tex("special.black")
+                    elif not alter_mat(side):
+                        side.mat = get_tex("black.wall")
+                else:
+                    alter_mat(side) # for gratings, laserfields and some others
+            if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
+                targ=parent.split("-model_arms")[0]
+                inst = map.find_ent({'classname':'func_instance', 'targetname':targ})
+                for ins in inst:
+                    if make_static_pan(ins, type):
+                        map.remove_brush(brush) # delete the brush, we don't want it if we made a static one
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
-    angle="er"
-    is_static=False
-    is_flush=False
-    for var in utils.get_fixup(ent):
-        if var == "$connectioncount 0":
-            is_static=True
-        if "$start_deployed 0" in var:
-            is_flush=True
-        if "$animation" in var:
-            angle = var[16:18] # the number in "$animation ramp_45_deg_open"
-    if is_flush:
+    angle="00"
+    if ent.get_fixup('animation') is not None:
+        # the 16:18 is the number in "ramp_45_deg_open"
+        angle = ent.get_fixup('animation')[16:18] 
+    if ent.get_fixup('start_deployed') == "0":
         angle = "00" # different instance flat with the wall
-    if not is_static:
+    if ent.get_fixup('connectioncount') != "0":
         return False
-    ent.find_key("file").value = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
+    ent["file"] = get_opt("staticPan") + angle + "_" + type + ".vmf" # something like "static_pan/45_white.vmf"
     return True
     
 def make_static_pist(ent):
@@ -719,7 +710,7 @@ def change_ents():
     utils.con_log("Editing Other Entities...")
     to_rem=[] # entities to delete
     for ent in other_ents:
-        if ent.cls == "info_lighting" and (get_opt("remove_info_lighting")=="1"):
+        if ent['classname'] == "info_lighting" and (get_opt("remove_info_lighting")=="1"):
             to_rem.append(ent) # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
     for rem in to_rem:
         map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
@@ -730,14 +721,13 @@ def fix_inst():
     global to_pack
     utils.con_log("Editing Instances...")
     for inst in instances:
-        print(inst.targname)
-        if "_modelStart" in inst.targname or "_modelEnd" in inst.targname:
+        if "_modelStart" in inst['targetname'] or "_modelEnd" in inst['targetname']:
             name=inst.find_key('targetname')
-            if "_modelStart" in inst.targname: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
-                name.value = inst.targname.split("_modelStart")[0] + "_modelStart" 
+            if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
+                name.value = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
             else:
-                name.value = inst.targname.split("_modelEnd")[0] + "_modelEnd" 
-            inst.targname = name.value
+                name.value = inst['targetname'].split("_modelEnd")[0] + "_modelEnd" 
+            inst['targetname'] = name.value
             
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
             angles=inst.find_key('angles')
@@ -755,20 +745,20 @@ def fix_inst():
                             inst['file'] = inst['file'][:-4] + "_las.vmf"
                     break
             if "ccflag_comball" in inst['file']:
-                name.value = inst.targname.split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
+                name.value = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
             if "ccflag_death_fizz_model" in inst['file']:
-                name.value = inst.targname.split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
+                name.value = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
         elif "ccflag_paint_fizz" in inst['file']:
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
-                if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
+                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
                     trig.find_key('classname').value = "trigger_paint_cleanser"
                     sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
             for trig in triggers:
-                if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
                     trig.find_key('classname').value = "trigger_multiple"
                     sides=trig.find_all(trig, 'entity', 'solid', 'side', 'material')
                     for mat in sides:
@@ -776,20 +766,20 @@ def fix_inst():
                     trig.value.append(Property("filtername", "@filter_pellet"))
                     trig.value.append(Property("wait", "0.1"))
                     trig.find_key('spawnflags').value="72"
-                    utils.add_output(trig, "OnStartTouch", inst.targname+"-branch_toggle", "FireUser1")
+                    utils.add_output(trig, "OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1")
                     # generate the output that triggers the pellet logic.
-                    trig.find_key('targetname').value = inst.targname + "-trigger" # get rid of the _, allowing direct control from the instance.
+                    trig.find_key('targetname').value = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
             pos = inst.find_key('origin', '').value
             angle=inst.find_key('angles', '').value
             for in_out in instances: # find the instance to use for output
                 out_pos = in_out.find_key('origin').value
                 out_angles=in_out.find_key('angles').value
                 if pos == out_pos and angle==out_angle:
-                    utils.add_output(inst, "instance:out;OnUser1", in_out.targname, "instance:in;FireUser1") # add ouptuts to the output proxy instance
-                    utils.add_output(inst, "instance:out;OnUser2", in_out.targname, "instance:in;FireUser2")
+                    utils.add_output(inst, "instance:out;OnUser1", in_out['targetname'], "instance:in;FireUser1") # add ouptuts to the output proxy instance
+                    utils.add_output(inst, "instance:out;OnUser2", in_out['targetname'], "instance:in;FireUser2")
         elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
             for trig in triggers:
-                if trig.cls=="trigger_portal_cleanser" and trig.targname == inst.targname + "_brush": 
+                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
                     death_fizzler_change(inst, trig)
         if inst['file'] == get_opt("clearPanelFile"):
             make_static_pan(inst, "glass") # white/black are identified based on brush
@@ -818,10 +808,10 @@ def death_fizzler_change(inst, trig):
         if mat.value.casefold() in TEX_FIZZLER.keys(): #is this not nodraw?
             # convert to death fizzler textures
             mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
-    trig.find_key('targetname').value = inst.targname + "-fizz_red"
+    trig.find_key('targetname').value = inst['targetname'] + "-fizz_red"
     trig.find_key('spawnflags').value = "9" # clients + physics objects
     
-    new_trig.find_key('targetname').value = inst.targname + "-fizz_blue"
+    new_trig.find_key('targetname').value = inst['targetname'] + "-fizz_blue"
     new_trig.find_key('spawnflags').value = "9" # clients + physics objects
     map.append(new_trig)
     
@@ -834,7 +824,7 @@ def death_fizzler_change(inst, trig):
         mat.value = "tools/toolstrigger"
         
     hurt.find_key('classname').value = "trigger_hurt"
-    hurt.find_key('targetname').value = inst.targname + "-hurt"
+    hurt.find_key('targetname').value = inst['targetname'] + "-hurt"
     hurt.find_key('spawnflags').value="1" # clients only
     # reuse these keys
     hurt.find_key('usescanline').edit(name= 'damage', value= '100000')
@@ -843,7 +833,7 @@ def death_fizzler_change(inst, trig):
     hurt.value.append(Property('nodmgforce', '1'))
     map.append(hurt)
     
-    brush.find_key('targetname').value = inst.targname + "-brush"
+    brush.find_key('targetname').value = inst['targetname'] + "-brush"
     brush.find_key('classname').value = 'func_brush'
     brush.find_key('spawnflags').value = "2"  # ignore player +USE
     brush.find_key('visible').edit(name = 'solidity', value= '1')
@@ -928,7 +918,7 @@ def check_overlay(inst):
     for key in settings['overlay_inst']:
         if key[0] in inst['file']:
             # Use the original instance's name if not given a unique one
-            name = inst.targname if key[2] == "" else key[2] + str(max_ent_id)
+            name = inst['targetname'] if key[2] == "" else key[2] + str(max_ent_id)
             new_inst = Entity(map, keys={
                 'classname' : 'func_instance',
                 'targetname' : name,
