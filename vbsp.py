@@ -159,12 +159,12 @@ def get_tex(name):
     
 def alter_mat(prop):
     global to_pack
-    mat=prop.value.casefold()
+    mat=prop.mat.casefold()
     if mat in TEX_VALVE: # should we convert it?
-        prop.value = get_tex(TEX_VALVE[mat])
+        prop.mat = get_tex(TEX_VALVE[mat])
         return True
     elif mat in TEX_FIZZLER:
-        prop.value = settings['fizzler'][TEX_FIZZLER[mat]]
+        prop.mat = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
 
@@ -455,76 +455,82 @@ def scan_mats():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    solids=map.brushes + [e.solids for e in map.find_ent({'classname':'func_detail'})]
-    for face in solids:
-        if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
-            plane=face.find_key('plane')
-            verts=utils.split_plane(plane)
-            for v in verts:
-                v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
-                # we do the decimal with strings to ensure it adds floats precisely
-            plane.value=utils.join_plane(verts)
-        if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
-            for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
-                split=val.value.split(" ")
-                split[-1] = get_opt("glass_scale") # apply the glass scaling option
-                val.value=" ".join(split)
+    solids=map.brushes[:]
+    for e in [e.solids for e in map.find_ent({'classname':'func_detail'})]:
+        solids.extend(e)
+    print(solids)
+    for solid in solids:
+        for face in solid:
+            if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
+                plane=face.find_key('plane')
+                verts=utils.split_plane(plane)
+                for v in verts:
+                    v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
+                    # we do the decimal with strings to ensure it adds floats precisely
+                plane.value=utils.join_plane(verts)
+            if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
+                for val in (face.find_key( 'uaxis'),face.find_key('vaxis')):
+                    split=val.value.split(" ")
+                    split[-1] = get_opt("glass_scale") # apply the glass scaling option
+                    val.value=" ".join(split)
     if (get_opt("clump_wall_tex") == "1" and 
           get_opt("clump_size").isnumeric() and 
           get_opt("clump_width").isnumeric() and 
           get_opt("clump_number").isnumeric()):
         clump_walls(solids)
     else:
-        random_walls(sides)
+        random_walls(solids)
         
 
-def random_walls(sides):
+def random_walls(solids):
     "The original wall style, with completely randomised walls."
-    for face in sides:
-        is_blackceil = roof_tex(face, face.mat)
-    if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
-        scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
-        for val in (face.find_key('uaxis'),face.find_key('vaxis')):
-            split=val.value.split(" ")
-            split[-1] = scale
-            val.value=" ".join(split)    
-    alter_mat(mat)
+    for solid in solids:
+        for face in solid:
+            is_blackceil = roof_tex(face, face.mat)
+            if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+                scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
+                for val in (face.find_key('uaxis'),face.find_key('vaxis')):
+                    split=val.value.split(" ")
+                    split[-1] = scale
+                    val.value=" ".join(split)    
+            alter_mat(mat)
     
-def clump_walls(sides):
+def clump_walls(solids):
     "A wall style where textures are used in small groups near each other, clumped together."
     walls = {}
     others = {} # we keep a list for the others, so we can nodraw them if needed
-    for face in sides: # first build a list of all textures and their locations...
-        mat=face.find_key('material')
-        if face.mat in ('glass/glasswindow007a_less_shiny', 
-                         'metal/metalgrate018', 
-                         'anim_wp/framework/squarebeams',
-                         'tools/toolsnodraw'):
-            # These textures aren't always on grid, ignore them..
-            alter_mat(face)
-            continue
-        origin = face.get_origin().as_tuple()
-        if mat.value.casefold() in WALLS:
-            if mat.value in WHITE_PAN: # placeholder to indicate these can be replaced.
-                mat.value = "WHITE"
-            elif mat.value in BLACK_PAN:
-                mat.value = "BLACK"
-            if origin in walls:
-                # The only time two textures will be in the same place is if they are covering each other - delete them both.
-                mat.value = "tools/toolsnodraw"
-                walls[origin].value = "tools/toolsnodraw"
-                del walls[origin]
+    for solid in solids:
+        for face in solid: # first build a list of all textures and their locations...
+            mat=face.mat.casefold()
+            if face.mat in ('glass/glasswindow007a_less_shiny', 
+                             'metal/metalgrate018', 
+                             'anim_wp/framework/squarebeams',
+                             'tools/toolsnodraw'):
+                # These textures aren't always on grid, ignore them..
+                alter_mat(face)
+                continue
+            origin = face.get_origin().as_tuple()
+            if mat in WALLS:
+                if mat in WHITE_PAN: # placeholder to indicate these can be replaced.
+                    face.mat = "WHITE"
+                elif mat in BLACK_PAN:
+                    face.mat = "BLACK"
+                if origin in walls:
+                    # The only time two textures will be in the same place is if they are covering each other - nodraw them both and ignore them
+                    face.mat  = "tools/toolsnodraw"
+                    walls[origin].mat = "tools/toolsnodraw"
+                    del walls[origin]
+                else:
+                    walls[origin] = mat
             else:
-                walls[origin] = mat
-        else:
-            if origin in others:
-                # The only time two textures will be in the same place is if they are covering each other - delete them both.
-                mat.value = "tools/toolsnodraw"
-                others[origin].value = "tools/toolsnodraw"
-                del others[origin]
-            else:
-                others[origin] = mat
-            roof_tex(face, mat)
+                if origin in others:
+                    # The only time two textures will be in the same place is if they are covering each other - delete them both.
+                    face.mat = "tools/toolsnodraw"
+                    others[origin].mat = "tools/toolsnodraw"
+                    del others[origin]
+                else:
+                    others[origin] = mat
+                roof_tex(face)
                 
     todo_walls = len(walls) # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -533,7 +539,7 @@ def clump_walls(sides):
     wall_pos = list(walls.keys())
     for i in range(clump_numb):
         pos = random.choice(wall_pos)
-        type = walls[pos].value
+        type = walls[pos].mat
         if type == "WHITE" or type=="BLACK":
             pos_min = [0,0,0]
             pos_max = [0,0,0]
@@ -552,9 +558,9 @@ def clump_walls(sides):
                 for y in range(pos_min[1], pos_max[1], 128):
                     for z in range(pos_min[2], pos_max[2]):
                         if (x,y,z) in walls:
-                            mat = walls[x,y,z]
-                            if mat.value == type:
-                                mat.value = tex
+                            side = walls[x,y,z]
+                            if side.mat == type:
+                                side.mat = tex
     
     for face in walls.values():   
         if face.mat =="WHITE":
@@ -576,7 +582,7 @@ def roof_tex(face):
     is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
     if face.mat.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
         # The roof/ceiling texture are identical, we need to examine the planes to figure out the orientation!
-        verts = utils.split_plane(face.planes)
+        verts = face.split_planes()
         # y-val for first if < last if ceiling
         side = "ceiling" if int(verts[0][1]) < int(verts[2][1]) else "floor"
         type = "black." if face.mat.casefold() in BLACK_PAN else "white."
@@ -589,24 +595,19 @@ def roof_tex(face):
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
-    to_rem=[]
     for over in map.find_ent({'classname':'info_overlay'}):
-        mat=over.find_key('material')
-        alter_mat(mat)
-        if mat.value.casefold() in ANTLINES:
-            angle = over.find_key('angles').value.split(" ") # get the three parts
+        alter_mat(over)
+        if over['material'].casefold() in ANTLINES:
+            angle = over['angles'].split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
-            new_tex = get_tex('overlay.'+ANTLINES[mat.value.casefold()]).split("|")
+            new_tex = get_tex('overlay.'+ANTLINES[over['material'].casefold()]).split("|")
             if len(new_tex)==2:
-                over.find_key('endu').value=new_tex[0] # rescale antlines if needed
-                mat.value=new_tex[1]
+                over['endu']=new_tex[0] # rescale antlines if needed
+                over['material']=new_tex[1]
             else:
-                mat.value=new_tex
-        if (over.targname in ("exitdoor_stickman","exitdoor_arrow")) and (get_opt("remove_exit_signs") =="1"):
-            to_rem.append(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
-    for rem in to_rem:
-        map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
-    del to_rem
+                over['material']=new_tex
+        if (over['targetname'] in ("exitdoor_stickman","exitdoor_arrow")) and (get_opt("remove_exit_signs") =="1"):
+            map.remove_ent(rem) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
     
 def change_trig():
     "Check the triggers and fizzlers."
