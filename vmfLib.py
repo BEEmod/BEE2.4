@@ -360,31 +360,22 @@ class Solid:
         for s in self.sides:
             yield s
         
-    def get_bbox(self):
-        "Generate the highest and lowest points these planes form."
-        bbox_max=[None, None, None]
-        bbox_min=[None, None, None]
-        for side in self.sides:
-            for v in side.planes:
-                for i in range(3):
-                    if bbox_max[i] is None:
-                        bbox_max[i] = v[i]
-                    if bbox_min[i] is None:
-                        bbox_min[i] = v[i]
-                    bbox_max[i] = max(int(v[i]), bbox_max[i])
-                    bbox_min[i] = min(int(v[i]), bbox_min[i])
-        bbox_max = Vec(bbox_max[0],bbox_max[1],bbox_max[2])
-        bbox_min = Vec(bbox_min[0],bbox_min[1],bbox_min[2])
-        return bbox_min, bbox_max
-        
-    def get_origin(self):
-        size_min, size_max = self.get_bbox()
-        origin = (size_min + size_max) / 2
-        return origin
-        
     def __del__(self):
         "Forget this solid's ID when the object is destroyed."
         self.map.solid_id.remove(self.id)
+        
+    def get_bbox(self):
+        "Get two vectors representing the space this brush takes up."
+        bbox_min, bbox_max = self.sides[0].get_bbox()
+        for s in self.sides[1:]:
+            side_min, side_max = s.get_bbox()
+            bbox_max.max(side_max)
+            bbox_min.min(side_min)
+        return bbox_min, bbox_max
+        
+    def get_origin(self):
+        bbox_min, bbox_max = self.get_bbox()
+        return (bbox_min+bbox_max)/2
 
 class Side:
     "A brush face."
@@ -464,6 +455,20 @@ class Side:
     def __del__(self):
         "Forget this side's ID when the object is destroyed."
         self.map.face_id.remove(self.id)
+        
+    def get_bbox(self):
+        "Generate the highest and lowest points these planes form."
+        bbox_max=self.planes[0].copy()
+        bbox_min=self.planes[0].copy()
+        for v in self.planes[1:]:
+            bbox_max.max(v)
+            bbox_min.min(v)
+        return bbox_min, bbox_max
+        
+    def get_origin(self):
+        size_min, size_max = self.get_bbox()
+        origin = (size_min + size_max) / 2
+        return origin    
         
 class Entity():
     "Either a point or brush entity."
@@ -723,7 +728,7 @@ if __name__ == '__main__':
         if br.id == 59535:
             for s in br.sides:
                 print(*[str(p) for p in s.planes])
-            print(br.get_origin())
+                print(s.get_origin())
     
     #print('saving...')
     #with open('test_out.vmf', 'w') as file:

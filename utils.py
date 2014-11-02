@@ -198,6 +198,24 @@ class Vec:
             except ValueError:
                 return NotImplemented    
 
+    def max(self, other):
+        "Set this vector's values to be the maximum between ourself and the other vector."
+        if self.x > other.x:
+            self.x = other.x
+        if self.y > other.y:
+            self.y = other.y
+        if self.z > other.z:
+            self.z = other.z
+            
+            
+    def min(self, other):
+        "Set this vector's values to be the minimum between ourself and the other vector."
+        if self.x < other.x:
+            self.x = other.x
+        if self.y < other.y:
+            self.y = other.y
+        if self.z < other.z:
+            self.z = other.z
                 
     def mag(self):
         if self.z == 0:
