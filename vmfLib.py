@@ -18,6 +18,9 @@ _ID_types = {
     'ent'   : 'ent_id'
     }
     
+_FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
+    # $replace01, $replace02, ..., $replace15, $replace16
+    
 def conv_int(str, default = 0):
     '''Converts a string to an integer, using a default if the string is unparsable.'''
     if str.isnumeric():
@@ -476,6 +479,7 @@ class Entity():
             self, 
             map, 
             keys = None, 
+            fixup = None,
             id=-1, 
             outputs=None, 
             solids=None, 
@@ -483,6 +487,7 @@ class Entity():
             hidden=False):
         self.map = map
         self.keys = {} if keys is None else keys
+        self._fixup = {} if fixup is None else fixup
         self.outputs = outputs
         self.solids = [] if solids is None else solids
         self.id = map.get_id('ent', desired = id)
@@ -497,6 +502,7 @@ class Entity():
         keys = {}
         outputs = []
         editor = { 'visgroup' : []}
+        fixup = {}
         for item in tree_list:
             if item.name == "id" and item.value.isnumeric():
                 id = item.value
@@ -519,13 +525,24 @@ class Entity():
                         editor[v.name] = conv_int(v.value, default = -1)
                         if editor[v.name] == -1:
                             del editor[v.name]
+                    elif v.name in REPLACE_KEYS:
+                        vals = v.value.split(" ",1)
+                        fixup[vals[0][1:]] = (vals[1], v.name[-2:])
                     elif v.name == 'visgroupid':
                         val = conv_int(v.value, default = -1)
                         if val:
                             editor['visgroup'].append(val)
             else:
                 keys[item.name] = item.value
-        return Entity(map, keys = keys, id = id, solids = solids, outputs=outputs, editor=editor, hidden=hidden)
+        return Entity(
+            map, 
+            keys=keys, 
+            id=id,
+            solids=solids,
+            outputs=outputs,
+            editor=editor, 
+            hidden=hidden, 
+            fixup=fixup)
     
     def is_brush(self):
         return len(self.solids) > 0
@@ -542,6 +559,9 @@ class Entity():
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         for key in sorted(self.keys.keys()):
             buffer.write(ind + '\t"' + key + '" "' + str(self.keys[key]) + '"\n')
+        if len(self._fixup) > 0:
+            for val in enumerate(sorted(self._fixup.items(), key=lambda x: x[1][1])):
+                buffer.write(ind + '\t"replace' + val[1][1] + '" "$' + val[0] + " " + val[1][0] + '"\n')
         if self.is_brush():
             for s in self.solids:
                 s.export(buffer, ind=ind+'\t')       
@@ -605,6 +625,30 @@ class Entity():
         if key in self.keys:
             del self.keys[key]
             
+    def get_fixup(self, var):
+        if var in self._fixup:
+            return self._fixup[var][0] # don't return the index
+        else:
+            return None
+     
+    def set_fixup(self, var, val):
+        if var not in self._fixup:
+            max = 0
+            for i in self._fixup.values():
+                if int(i[1]) > max:
+                    max = int(i[1])
+            if max <9:
+                max = "0" + str(max)
+            else:
+                max = str(max)
+            self._fixup[var] = (val, max)
+        else:
+            self._fixup[var] = (val, self._fixup[var][1])
+            
+    def rem_fixup(self, var):
+        if var in self._fixup:
+            del self._fixup[var]
+            
     get = __getitem__
             
     def has_key(self, key):
@@ -651,16 +695,16 @@ class Output:
         if len(vals) == 5:
             if prop.name.startswith('instance:'):
                 out = prop.name.split(';')
-                inst_out = out[1]
-                out = out[0][9:]
+                inst_out = out[0][9:]
+                out = out[1]
             else:
                 inst_out = None
                 out = prop.name
                 
             if vals[1].startswith('instance:'):
                 inp = vals[1].split(';')
-                inst_inp = inp[1]
-                inp = inp[0][9:]
+                inst_inp = inp[0][9:]
+                inp = inp[1]
             else:
                 inst_inp = None
                 inp = vals[1]
@@ -707,11 +751,8 @@ class Output:
         
     def export(self, buffer, ind = ''):
         "Generate the text required to define this output in the VMF."
-        if self.inst_out:
-            buffer.write(ind + '"instance:' + self.inst_out + ';' + self.output)
-        else:
-            buffer.write(ind + '"' + self.output)
-            
+        buffer.write(ind + '"' + self.exp_out())
+        
         if self.inst_in:
             params = self.params
             inp = 'instance:' + self.inst_in + ';' + self.input

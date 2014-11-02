@@ -24,26 +24,6 @@ def con_log(*text):
 
 # VMF specific        
 
-def add_output(entity, output, target, input, params="", delay="0", times="-1"):
-    "Add a new output to an entity with the given values, generating a connections part if needed."
-    conn = entity.find_all('entity', 'connections')
-    if len(conn) == 0:
-        conn = Property("connections", [])
-        entity.value.append(conn)
-    else:
-        conn = conn[0]
-    out=Property(output, chr(27).join((target, input, params, delay, times)))
-    # character 27 (which is the ASCII escape control character) is the delimiter for VMF outputs. 
-    log("adding output :" + out.value)
-    conn.value.append(out)
-
-_FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
-    # $replace01, $replace02, ..., $replace15, $replace16
-    
-def get_fixup(inst):
-    "Generate a list of all fixup keys for this item."
-    vals = [inst.find_key(fix, "") for fix in _FIXUP_KEYS] # loop through and get each replace key
-    return [f.value for f in vals if not f.value==""] # return only set values, without the property wrapper
 
 class Vec:
     "A 3D Vector. This has most standard Vector functions."
