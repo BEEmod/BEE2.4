@@ -669,29 +669,16 @@ def make_static_pist(ent):
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
     print("Trying to make static...")
-    is_static=False
-    auto_move=True
-    top_pos=0
-    bottom_pos=0
-    start_pos = -1
-    for var in utils.get_fixup(ent):
-        if var == "$connectioncount 0":
-            is_static=True
-        if var == "$disable_autodrop 0":
-            auto_move=False
-        if "$start_up" in var:
-            start_pos=var[-1:]
-        if "$top_level" in var:
-            top_pos = var[-1:]
-        if "$bottom_level" in var:
-            bottom_pos = var[-1:]
-    if not is_static or auto_move: # can it move?
+    bottom_pos=ent.get_fixup('bottom_level', '-1')
+    print(ent._fixup)
+    if ent.get_fixup('connectioncount') != "0" or ent.get_fixup('disable_autodrop') != "0": # can it move?
         if int(bottom_pos) > 0:
             # The piston doesn't go fully down, use alt instances.
-            file=find_key(ent, "file")
-            file.value = file.value[:-4] + "_" + bottom_pos + ".vmf"
+            ent['file'] = ent['file'][:-4] + "_" + bottom_pos + ".vmf"
     else: # we are static
-        ent.find_key("file").value = get_opt("staticPan") + "pist_" + (top_pos if start_pos=="1" else bottom_pos) + ".vmf" 
+        ent['file'] = (get_opt("staticPan") + "pist_"
+            + (ent.get_fixup('top_level') if ent.get_fixup('start_up')=="1" else bottom_pos)
+            + ".vmf" )
         # something like "static_pan/pist_3.vmf"
     return True
             
@@ -781,52 +768,50 @@ def fix_inst():
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
     # The Death Fizzler has 4 brushes:
-    # - trigger_portal_cleanser with standard fizzler texture for fizzler-only mode (-fizz_blue)
+    # new_trig - trigger_portal_cleanser with standard fizzler texture for fizzler-only mode (-fizz_blue)
+    #trig - trigger_portal_cleanser with death fizzler texture  for both mode (-fizz_red)
+    #hurt - trigger_hurt for deathfield mode (-hurt)
+    #brush - func_brush for the deathfield-only mode (-brush)
+    
     new_trig = trig.copy()
-    # - trigger_portal_cleanser with death fizzler texture  for both mode (-fizz_red)
-  # trig = trig
-    # - trigger_hurt for deathfield mode (-hurt)
     hurt = trig.copy()
-    # - func_brush for the deathfield-only mode (-brush)
-    brush = trig.copy() # we need three new brushes!
+    brush = trig.copy()
+    map.add_ent(new_trig)
+    map.add_ent(hurt)
+    map.add_ent(brush)
     
-    sides=trig.find_all('entity', 'solid', 'side', 'material')
-    for mat in sides:
-        if mat.value.casefold() in TEX_FIZZLER.keys(): #is this not nodraw?
-            # convert to death fizzler textures
-            mat.value = settings["deathfield"][TEX_FIZZLER[mat.value.casefold()]]
-    trig.find_key('targetname').value = inst['targetname'] + "-fizz_red"
-    trig.find_key('spawnflags').value = "9" # clients + physics objects
+    for solid in trig.solids:
+        for side in solids:
+            if side.mat.casefold() in TEX_FIZZLER: #is this not nodraw?
+                # convert to death fizzler textures
+                side.mat = settings["deathfield"][TEX_FIZZLER[side.mat.casefold()]]
+    trig['targetname'] = inst['targetname'] + "-fizz_red"
+    trig['spawnflags'] = "9" # clients + physics objects
     
-    new_trig.find_key('targetname').value = inst['targetname'] + "-fizz_blue"
-    new_trig.find_key('spawnflags').value = "9" # clients + physics objects
-    map.append(new_trig)
+    new_trig['targetname'] = inst['targetname'] + "-fizz_blue"
+    new_trig['spawnflags'] = "9" # clients + physics objects
     
     # Create the trigger_hurt
-    sides=hurt.find_all('entity', 'solid', 'side', 'material')
     is_short = False # if true we can shortcut for the brush
-    for mat in sides:
-        if mat.value.casefold() == "effects/fizzler":
-            is_short=True
-        mat.value = "tools/toolstrigger"
+    for solid in trig.solids:
+        for side in solids:
+            if side.mat.casefold() == "effects/fizzler":
+                is_short=True
+            side.mat = "tools/toolstrigger"
         
-    hurt.find_key('classname').value = "trigger_hurt"
-    hurt.find_key('targetname').value = inst['targetname'] + "-hurt"
-    hurt.find_key('spawnflags').value="1" # clients only
-    # reuse these keys
-    hurt.find_key('usescanline').edit(name= 'damage', value= '100000')
-    hurt.find_key('visible').edit(name= 'damagetype', value= '1024')
+    hurt['classname'] = "trigger_hurt"
+    hurt['targetname'] = inst['targetname'] + "-hurt"
+    hurt['spawnflags']="1" # clients only
+    hurt['damage'] = '100000'
+    hurt['damagetype'] ='1024'
+    hurt['nodmgforce'] = '1'
     
-    hurt.value.append(Property('nodmgforce', '1'))
-    map.append(hurt)
-    
-    brush.find_key('targetname').value = inst['targetname'] + "-brush"
-    brush.find_key('classname').value = 'func_brush'
-    brush.find_key('spawnflags').value = "2"  # ignore player +USE
-    brush.find_key('visible').edit(name = 'solidity', value= '1')
-    brush.find_key('usescanline').edit(name = 'renderfx', value='14')
-    
-    brush.value.append(Property('drawinfastreflection', "1"))
+    brush['targetname'] = inst['targetname'] + "-brush"
+    brush['classname'] = 'func_brush'
+    brush['spawnflags'] = "2"  # ignore player +USE
+    brush['solidity'] = '1' # not solid
+    brush['renderfx'] = '14' # constant glow
+    brush['drawinfastreflection'] ='1'
     
     if is_short:
         sides=brush.find_all('entity', 'solid', 'side')
@@ -836,8 +821,8 @@ def death_fizzler_change(inst, trig):
                 mat.value="effects/laserplane"
             alter_mat(mat) # convert to the styled version
             
-            uaxis = side.find_key('uaxis').value.split(" ")
-            vaxis = side.find_key('vaxis').value.split(" ")
+            uaxis = side.uaxis.split(" ")
+            vaxis = side.vaxis.split(" ")
             # the format is like "[1 0 0 -393.4] 0.25"
             uaxis[3]="0]"
             uaxis[4]="0.25"
@@ -898,7 +883,7 @@ def death_fizzler_change(inst, trig):
         brush.value.remove(solids[2])
         brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
         del solids
-    map.append(brush)
+    
         
 def check_overlay(inst):
     "Check to see if an instance should have other instances overlayed on it."
