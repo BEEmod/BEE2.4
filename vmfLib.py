@@ -299,12 +299,23 @@ class Camera:
         buffer.write(ind + '}\n')
             
 class Solid:
-    "A single brush, as a world brushes and brush entities."
+    "A single brush, serving as both world brushes and brush entities."
     def __init__(self, map, des_id=-1, sides=None, editor=None):
         self.map = map
         self.sides = [] if sides is None else sides
         self.id = map.get_id('brush', des_id)
         self.editor = {} if editor is None else editor
+    
+    def copy(self, des_id=-1):
+        "Duplicate this brush."
+        editor = {}
+        for key in ('color','groupid','visgroupshown', 'visgroupautoshown'):
+            if key in self.editor:
+                editor[key] = self.editor[key]
+        if 'visgroup' in self.editor:
+            editor['visgroup'] = self.editor['visgroup'][:]
+        sides = [s.copy() for s in self.sides]
+        return Solid(map, des_id=des_id, sides=sides, editor=editor)
         
     @staticmethod    
     def parse(map, tree):
@@ -401,17 +412,9 @@ class Side:
         for i,pln in enumerate(planes):
             self.planes[i]=Vec(x=pln[0], y=pln[1], z=pln[2])
         self.lightmap = opt.get("lightmap", 16)
-        try: 
-            self.lightmap = int(self.lightmap)
-        except TypeError:
-            self.lightmap = 16
-        try:
-            self.smooth = opt.get("smoothing", 0)
-        except TypeError:
-            self.smooth = bin(0)
-
+        self.smooth = opt.get("smoothing", 0)
         self.mat = opt.get("material", "")
-        self.ham_rot = opt.get("rotation" , "0")
+        self.ham_rot = opt.get("rotation" , 0)
         self.uaxis = opt.get("uaxis", "[0 1 0 0] 0.25")
         self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
             
@@ -439,6 +442,19 @@ class Side:
             'smoothing' : conv_int(tree.find_key('smoothing_groups', '0').value, 0),
             }
         return Side(map, planes=planes, opt = opt, des_id = id)
+        
+    def copy(self, des_id=-1):
+        "Duplicate this brush side."
+        planes = [p.as_tuple() for p in self.planes]
+        opt = {
+            'material' : self.mat
+            'rotation' : self.ham_rot,
+            'uaxis' : self.uaxis,
+            'vaxis' : self.vaxis,
+            'smoothing' : self.smooth,
+            'lightmap' : self.lightmap,
+            }
+        return Side(map, planes=planes, opt=opt, des_id=des_id)
         
     def make_vec(self, plane):
         return ("(" + str(plane['x']) +
@@ -506,6 +522,35 @@ class Entity():
         self.hidden = hidden
         self.editor = {'visgroup' : []} if editor is None else editor
         
+    def copy(self, des_id=-1):
+        "Duplicate this entity entirely."
+        new_keys = {}
+        new_fixup = {}
+        new_editor = {}
+        for key, value in self.keys.items():
+            new_keys[key] = value
+            
+        for key, value in self._fixup.items():
+            new_fixup[key] = (value[0],value[1])
+            
+        for key, value in self.editor.items():
+            if key != 'visgroup':
+                new_editor[key] = value
+        new_editor['visgroup'] = self.editor['visgroup'][:]
+        
+        new_solids = [s.copy() for s in self.solids]
+        outs = [o.copy() for o in self.outputs]
+        
+        return Entity(
+            map=self.map,
+            keys=new_keys,
+            fixup=new_fixup,
+            id=des_id,
+            outputs=outs,
+            solids=new_solids,
+            editor=new_editor,
+            hidden=self.hidden)
+        
     @staticmethod
     def parse(map, tree_list, hidden=False):
         "Parse a property tree into an Entity object."
@@ -516,8 +561,12 @@ class Entity():
         editor = { 'visgroup' : []}
         fixup = {}
         for item in tree_list:
+            item.name = item.name.casefold()
             if item.name == "id" and item.value.isnumeric():
                 id = item.value
+            elif item.name in _FIXUP_KEYS:
+                vals = item.value.split(" ",1)
+                fixup[vals[0][1:]] = (vals[1], item.name[-2:])
             elif item.name == "solid":
                 solids.append(Solid.parse(map, item))
             elif item.name == "connections" and item.has_children():
@@ -537,9 +586,6 @@ class Entity():
                         editor[v.name] = conv_int(v.value, default = -1)
                         if editor[v.name] == -1:
                             del editor[v.name]
-                    elif v.name in REPLACE_KEYS:
-                        vals = v.value.split(" ",1)
-                        fixup[vals[0][1:]] = (vals[1], v.name[-2:])
                     elif v.name == 'visgroupid':
                         val = conv_int(v.value, default = -1)
                         if val:
@@ -572,7 +618,9 @@ class Entity():
         for key in sorted(self.keys.keys()):
             buffer.write(ind + '\t"' + key + '" "' + str(self.keys[key]) + '"\n')
         if len(self._fixup) > 0:
-            for val in enumerate(sorted(self._fixup.items(), key=lambda x: x[1][1])):
+            for val in sorted(self._fixup.items(), key=lambda x: x[1][1]):
+            # we end up with (key, (val, index)) and we want to sort by the index
+                print(val)
                 buffer.write(ind + '\t"replace' + val[1][1] + '" "$' + val[0] + " " + val[1][0] + '"\n')
         if self.is_brush():
             for s in self.solids:
@@ -637,13 +685,15 @@ class Entity():
         if key in self.keys:
             del self.keys[key]
             
-    def get_fixup(self, var):
+    def get_fixup(self, var, default=None):
+        "Get the value of an instance $replace variable."
         if var in self._fixup:
             return self._fixup[var][0] # don't return the index
         else:
-            return None
+            return default
      
     def set_fixup(self, var, val):
+        "Set the value of an instance $replace variable, creating it if needed."
         if var not in self._fixup:
             max = 0
             for i in self._fixup.values():
@@ -658,6 +708,7 @@ class Entity():
             self._fixup[var] = (val, self._fixup[var][1])
             
     def rem_fixup(self, var):
+        "Delete a instance $replace variable."
         if var in self._fixup:
             del self._fixup[var]
             
@@ -774,6 +825,18 @@ class Output:
             
         buffer.write('" "' + self.sep.join(
         (self.target, inp, self.params, str(self.delay), str(self.times))) + '"\n')
+        
+    def copy(self):
+        "Duplicate this output object."
+        return Outputs(
+            self.output, 
+            self.target, 
+            self.input, 
+            param=self.params, 
+            times=self.times,
+            inst_out=self.inst_out,
+            inst_in=self.inst_in,
+            comma_sep = (self.sep == ','))
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
