@@ -60,7 +60,7 @@ class Vec:
     def __add__(self,other):
         "+ operation. This works on numbers (adds to all axes), or other Vectors (adds to just our one)."
         if isinstance(other, Vec):
-            return Vec(self.x+other.x, self.y+other.y)
+            return Vec(self.x+other.x, self.y+other.y, self.z+other.z)
         else:
             return Vec(self.x+other, self.y+other,self.z+other)
             
@@ -69,7 +69,7 @@ class Vec:
     def __sub__(self,other):
         "- operation. This works on numbers (adds to all axes), or other Vectors (adds to just our one)."
         if isinstance(other, Vec):
-            return Vec(self.x-other.x, self.y-other.y)
+            return Vec(self.x-other.x, self.y-other.y, self.y+other.y, self.z+other.z)
         else:
             return Vec(self.x-other, self.y-other)
             
@@ -215,11 +215,15 @@ class Vec:
         else:
             return "(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
             
+    def __repr__(self):
+        "Code required to reproduce this vector."
+        return "Vec(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
+            
     def __iter__(self):
         "Allow iterating through the dimensions."
         yield self.x
         yield self.y
-        yield sely.z
+        yield self.z
         
     def __getitem__(self, ind):
         "Allow referencing by index instead of name if desired."
