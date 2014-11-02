@@ -4,6 +4,7 @@ import sys
 import subprocess
 import shutil
 import random
+import itertools
 
 from property_parser import Property, KeyValError, NoKeyError
 from utils import Vec
@@ -17,13 +18,6 @@ import utils
 # ccflag_death_fizz_base
 # ccflag_panel_clear
 
-instances=[] # All instances
-overlays=[]
-brushes=[] # All world and func_detail brushes generated
-f_brushes=[] # Func_brushes
-detail=[]
-triggers=[]
-other_ents=[] # anything else, including some logic_autos, info_lighting, overlays, etc
 unique_counter=0 # counter for instances to ensure unique targetnames
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
@@ -272,7 +266,6 @@ def load_settings():
     process_variants(Property.find_all(conf, 'variants', 'variant'))
    
     process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
-    print(settings['overlay_inst'])
     
     utils.con_log("Settings Loaded!")
     
@@ -382,12 +375,8 @@ def process_variants(vars):
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     utils.con_log("Scanning Entities...")
-
-    utils.con_log('- Instances')
-    instances = map.find_ent({'classname':'func_instance'})
-    triggers = map.find_ent(tags = {'classname' : 'trigger_'})
     
-    for item in instances:
+    for item in map.iter_ents({'classname':'func_instance'}):
         cond_rem = []
         for cond in settings['conditions']: # check if it satisfies any conditions
             to_rem = []
@@ -454,9 +443,8 @@ def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
     solids=map.brushes[:]
-    for e in [e.solids for e in map.find_ent({'classname':'func_detail'})]:
+    for e in [e.solids for e in map.find_ents({'classname':'func_detail'})]:
         solids.extend(e)
-    print(solids)
     for solid in solids:
         for face in solid:
             if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
@@ -488,14 +476,17 @@ def random_walls(solids):
     "The original wall style, with completely randomised walls."
     for solid in solids:
         for face in solid:
-            is_blackceil = roof_tex(face, face.mat)
+            is_blackceil = roof_tex(face)
             if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
                 scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
-                for val in (face.find_key('uaxis'),face.find_key('vaxis')):
-                    split=val.value.split(" ")
-                    split[-1] = scale
-                    val.value=" ".join(split)    
-            alter_mat(mat)
+                split=face.uaxis.split(" ")
+                split[-1] = scale
+                face.uaxis=" ".join(split)  
+                
+                split=face.vaxis.split(" ")
+                split[-1] = scale
+                face.vaxis=" ".join(split)   
+            alter_mat(face)
     
 def clump_walls(solids):
     "A wall style where textures are used in small groups near each other, clumped together."
@@ -555,7 +546,7 @@ def clump_walls(solids):
                     pos_max[i] = int(pos[i] + random.randint(0, clump_wid) * 128)
                 
             tex = get_tex("white.wall" if type=="WHITE" else "black.wall")
-            #print("Adding clump from ", pos_min, "to", pos_max, "with tex:", tex)
+            #utils.con_log("Adding clump from ", pos_min, "to", pos_max, "with tex:", tex)
             for x in range(pos_min[0], pos_max[0], 128):
                 for y in range(pos_min[1], pos_max[1], 128):
                     for z in range(pos_min[2], pos_max[2]):
@@ -596,7 +587,7 @@ def roof_tex(face):
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
-    for over in map.find_ent({'classname':'info_overlay'}):
+    for over in map.iter_ents({'classname':'info_overlay'}):
         if over['material'].casefold() in TEX_VALVE:
             over['material'] = get_tex(TEX_VALVE[over['material'].casefold()])
         if over['material'].casefold() in ANTLINES:
@@ -614,19 +605,18 @@ def change_overlays():
 def change_trig():
     "Check the triggers and fizzlers."
     utils.con_log("Editing Triggers...")
-    for trig in triggers:
-        if trig['classname']=="trigger_portal_cleanser":
-            sides=trig.find_all('entity', 'solid', 'side', 'material')
-            for mat in sides:
-                alter_mat(mat)
-            trig.find_key('useScanline').value = settings["fizzler"]["scanline"]
-            trig.find_key('drawInFastReflection').value = get_opt("force_fizz_reflect")
+    for trig in map.iter_ents({'classname':'trigger_portal_cleanser'}):
+        for solid in trig.solids:
+            for side in solid:
+                alter_mat(side)
+        trig['useScanline'] = settings["fizzler"]["scanline"]
+        trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
 def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
-    f_brushes = (map.find_ent({'classname':'func_brush'}) +
-               map.find_ent({'classname':'func_rotating'}))
+    f_brushes = (map.find_ents({'classname':'func_brush'}) +
+               map.find_ents({'classname':'func_rotating'}))
     for brush in f_brushes:
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname']
@@ -654,7 +644,7 @@ def change_func_brush():
                     alter_mat(side) # for gratings, laserfields and some others
             if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
                 targ=parent.split("-model_arms")[0]
-                inst = map.find_ent({'classname':'func_instance', 'targetname':targ})
+                inst = map.find_ents({'classname':'func_instance', 'targetname':targ})
                 for ins in inst:
                     if make_static_pan(ins, type):
                         map.remove_brush(brush) # delete the brush, we don't want it if we made a static one
@@ -708,31 +698,28 @@ def make_static_pist(ent):
 def change_ents():
     "Edit misc entities."
     utils.con_log("Editing Other Entities...")
-    to_rem=[] # entities to delete
-    for ent in other_ents:
-        if ent['classname'] == "info_lighting" and (get_opt("remove_info_lighting")=="1"):
-            to_rem.append(ent) # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
-    for rem in to_rem:
-        map.remove(rem) # need to delete it from the map's list tree for it to not be outputted
-    del to_rem
+    if get_opt("remove_info_lighting") == "1":
+        # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
+        for ent in map.iter_ents({'classname' : 'info_lighting'}):
+            ent.remove()
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models."
     global to_pack
     utils.con_log("Editing Instances...")
-    for inst in instances:
-        if "_modelStart" in inst['targetname'] or "_modelEnd" in inst['targetname']:
-            name=inst.find_key('targetname')
+    print(settings['variants'])
+    for inst in map.iter_ents({'classname':'func_instance'}):
+        print(inst['file'])
+        if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
             if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
-                name.value = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
+                inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
             else:
-                name.value = inst['targetname'].split("_modelEnd")[0] + "_modelEnd" 
-            inst['targetname'] = name.value
+                inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
             
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
             angles=inst.find_key('angles')
-            if angles.value in fizzler_angle_fix.keys():
-                angles.value=fizzler_angle_fix[angles.value]
+            if inst['angles'] in fizzler_angle_fix.keys():
+                inst['angles'] =fizzler_angle_fix[angles.value]
                 
             for var in utils.get_fixup(inst):
                 if "$skin" in var:
@@ -745,14 +732,14 @@ def fix_inst():
                             inst['file'] = inst['file'][:-4] + "_las.vmf"
                     break
             if "ccflag_comball" in inst['file']:
-                name.value = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
+                inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
             if "ccflag_death_fizz_model" in inst['file']:
-                name.value = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
+                inst['targetname'] = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
         elif "ccflag_paint_fizz" in inst['file']:
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
-                    trig.find_key('classname').value = "trigger_paint_cleanser"
+                    trig['classname'].value = "trigger_paint_cleanser"
                     sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"

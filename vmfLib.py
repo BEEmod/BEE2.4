@@ -235,7 +235,7 @@ class VMF:
                 list_.append(id)
                 return id
                 
-    def find_ent(self, vals = {}, tags = {}):
+    def find_ents(self, vals = {}, tags = {}):
         "Return a list of entities with the given keyvalue values, and with keyvalues containing the tags."
         if len(vals) == 0 and len(tags) == 0:
             return self.entities[:] # skip to just returning the whole thing
@@ -253,6 +253,18 @@ class VMF:
                         ret.append(ent)
             return ret
             
+    def iter_ents(self, vals = {}, tags = {}):
+        "Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags."
+        for ent in self.entities:
+            for key,value in vals.items():
+                if not ent.has_key(key) or ent[key] != value:
+                    break
+            else: # passed through without breaks
+                for key,value in tags.items():
+                    if not ent.has_key(key) or value not in ent[key]:
+                        break
+                else:
+                    yield ent    
 class Camera:
     def __init__(self, map, pos, targ):
         self.pos = pos
