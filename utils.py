@@ -30,9 +30,14 @@ class Vec:
     __slots__ = ('x', 'y', 'z')
     
     def __init__(self, x = 0, y=0, z=0):
-        self.x = x
-        self.y = y
-        self.z = z
+        if isinstance(x, tuple) or isinstance(x, list):
+            self.x = x[0]
+            self.y = x[1]
+            self.z = x[2]
+        else:
+            self.x = x
+            self.y = y
+            self.z = z
         
     def copy(self):
         return Vec(self.x, self.y, self.z)

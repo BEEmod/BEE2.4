@@ -818,7 +818,7 @@ def death_fizzler_change(inst, trig):
         for side in sides:
             mat=side.find_key('material')
             if "effects/fizzler" in mat.value.casefold():
-                mat.value="effects/laserplane"
+                mat.value=get_tex('special.laserfield')
             alter_mat(mat) # convert to the styled version
             
             uaxis = side.uaxis.split(" ")
@@ -833,37 +833,32 @@ def death_fizzler_change(inst, trig):
         # We need to stretch the brush to get rid of the side sections.
         # This is the same as moving all the solids to match the bounding box.
         # first get the origin, used to figure out if a point should be max or min
-        origin=[int(v) for v in brush.find_key('origin').value.split(' ')]
-        planes=brush.find_all('entity', 'solid', 'side', 'plane')
-        bbox_max,bbox_min=utils.get_bbox(planes)
-        for pl in planes:
-            verts=utils.split_plane(pl)
-            for v in verts:
-                for i in range(0,3): #x,y,z
-                    if int(v[i]) > origin[i]:
-                        v[i]=str(bbox_max[i])
-                    else:
-                        v[i]=str(bbox_min[i])
-            pl.value=utils.join_plane(verts)
-            
-        solids=brush.find_all('solid')
+        origin=Vec(*[int(v) for v in brush['origin'].split(' ')])
+        bbox_max,bbox_min=brush.get_bbox()
+        for solid in trig.solids:
+            for side in solids:
+                for v in side.planes:
+                    for i in range(3): #x,y,z
+                        if int(v[i]) > origin[i]:
+                            v[i]=str(bbox_max[i])
+                        else:
+                            v[i]=str(bbox_min[i])
         
         tex_width = settings['deathfield']['texwidth']
-        sides=solids[1].find_all('side')
+        sides=brush.solids[1].find_all('side')
         for side in sides:
-            mat=side.find_key('material')
-            if mat.value.casefold() == "effects/fizzler_center":
-                mat.value="effects/laserplane"
+            if side.mat.casefold() == "effects/fizzler_center":
+                side.mat=get_tex('special.laserfield')
             alter_mat(mat) # convert to the styled version
-            bounds_max,bounds_min=utils.get_bbox(side.find_all('plane'))
+            bounds_max,bounds_min=side.get_bbox()
             dimensions = [0,0,0]
-            for i,g in enumerate(dimensions):
+            for i in range(3):
                 dimensions[i] = bounds_max[i] - bounds_min[i]
             if 2 in dimensions: # The front/back won't have this dimension
                 mat.value="tools/toolsnodraw"
             else:
-                uaxis=side.find_key('uaxis').value.split(" ")
-                vaxis=side.find_key('vaxis').value.split(" ")
+                uaxis=side['uaxis'].split(" ")
+                vaxis=side['vaxis'].split(" ")
                 # the format is like "[1 0 0 -393.4] 0.25"
                 size=0
                 offset=0

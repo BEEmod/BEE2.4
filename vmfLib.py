@@ -721,6 +721,27 @@ class Entity():
         "Forget this entity's ID when the object is destroyed."
         self.map.ent_id.remove(self.id)
         
+    def get_bbox(self):
+        "Get two vectors representing the space this entity takes up."
+        if self.is_brush()
+            bbox_min, bbox_max = self.solids[0].get_bbox()
+            for s in self.solids[1:]:
+                side_min, side_max = s.get_bbox()
+                bbox_max.max(side_max)
+                bbox_min.min(side_min)
+            return bbox_min, bbox_max
+        else:
+            origin = self.get_origin()
+            # the bounding box is 0x0 large for a point ent basically
+            return origin, origin.copy()
+        
+    def get_origin(self):
+        if self.is_brush():
+            bbox_min, bbox_max = self.get_bbox()
+            return (bbox_min+bbox_max)/2
+        else:
+            return Vec(self['origin'].split(" "))
+        
 class Output:
     "An output from this item pointing to another."
     __slots__ = ('output', 'inst_out', 'target', 
