@@ -434,6 +434,16 @@ class Solid:
     def get_origin(self):
         bbox_min, bbox_max = self.get_bbox()
         return (bbox_min+bbox_max)/2
+        
+    def translate(self, diff):
+        '''Move this side by the specified vector. 
+        
+        - This does not translate textures as well.
+        - A tuple can be passed in instead if desired.
+        '''
+        "Move this brush by the specified vector. A tuple can be passed instead if desired."
+        for s in self.sides:
+            s.translate(diff)
 
 class Side:
     "A brush face."
@@ -579,6 +589,15 @@ class Side:
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
         return origin
+        
+    def translate(self, diff):
+        '''Move this side by the specified vector. 
+        
+        - This does not translate textures as well.
+        - A tuple can be passed in instead if desired.
+        '''
+        for p in self.planes:
+            p += diff
         
 class Entity():
     "Either a point or brush entity."
@@ -939,6 +958,10 @@ class Output:
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
+    print('moving')
+    vec= Vec(0.5, 0, 32)
+    for br in map.brushes:
+        br.translate(vec)
     print('saving...')
     with open('test_out.vmf', 'w') as file:
         map.export(file)
