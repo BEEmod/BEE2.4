@@ -78,9 +78,10 @@ def conv_vec(str, x=0, y=0, z=0):
             return Vec(x,y,z)
 
 class VMF:
-    '''
-    Represents a VMF file, and holds counters for various IDs used. Has functions for searching
-    for specific entities or brushes, and converts to/from a property_parser tree.
+    '''Represents a VMF file, and holds counters for various IDs used. 
+    
+    Has functions for searching for specific entities or brushes, and 
+    converts to/from a property_parser tree.
     '''
     def __init__(
             self, 
@@ -138,7 +139,7 @@ class VMF:
     
     @staticmethod
     def parse(tree):
-        "Convert a property_parser tree into VMF classes."
+        '''Convert a property_parser tree into VMF classes.'''
         if not isinstance(tree, list):
             # if not a tree, try to read the file
             with open(tree, "r") as file:
@@ -251,7 +252,7 @@ class VMF:
             return string
     
     def get_id(self, ids, desired=-1):
-        "Get an unused ID of a type."
+        '''Get an unused ID of a type. Used by entities, solids and brush sides to keep their IDs valid.'''
         if ids not in _ID_types:
             raise ValueError('Invalid ID type!')
         list_ = self.__dict__[_ID_types[ids]]
@@ -268,7 +269,7 @@ class VMF:
                 return id
                 
     def find_ents(self, vals = {}, tags = {}):
-        "Return a list of entities with the given keyvalue values, and with keyvalues containing the tags."
+        '''Return a list of entities with the given keyvalue values, and with keyvalues containing the tags.'''
         if len(vals) == 0 and len(tags) == 0:
             return self.entities[:] # skip to just returning the whole thing
         else:
@@ -286,7 +287,7 @@ class VMF:
             return ret
             
     def iter_ents(self, vals = {}, tags = {}):
-        "Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags."
+        '''Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags.'''
         for ent in self.entities:
             for key,value in vals.items():
                 if not ent.has_key(key) or ent[key] != value:
@@ -305,29 +306,44 @@ class Camera:
         map.cameras.append(self)
         
     def targ_ent(self, ent):
+        '''Point the camera at an entity.'''
         if ent['origin']:
-            self.target = ent['origin']
+            self.target = conv_vec(ent['origin'], 0,0,0)
         
     def is_active(self):
+        '''Is this camera in use?'''
         return map.active_cam == map.cameras.index(self)+1
         
     def set_active(self):
+        '''Set this to be the map's active camera'''
         map.active_cam = map.cameras.index(self) + 1
         
     def set_inactive_all(self):
+        '''Disable all cameras in this map.'''
         map.active_cam = -1
         
     @staticmethod
     def parse(map, tree):
-        pos = tree.find_key('position', '[0 0 0]').value
-        targ = tree.find_key('look', '[0 64 0]').value
+        '''Read a camera from a property_parser tree.'''
+        pos = conv_vec(tree.find_key('position', '_').value), 0,0,0)
+        targ = conv_vec(tree.find_key('look', '_').value), 0,64,0)
         return Camera(map, pos, targ)
+    
+    def copy(self):
+        '''Duplicate this camera object.'''
+        return Camera(self.map, self.pos.copy(), self.target.copy())
+    
+    def remove(self):
+        '''Delete this camera from the map.'''
+        map.cameras.remove(self)
+        if self.is_active():
+            self.set_inactive()
         
     def export(self, buffer, ind=''):
         buffer.write(ind + 'camera\n')
         buffer.write(ind + '{\n')
-        buffer.write(ind + '\t"position" "' + self.pos + '"\n')
-        buffer.write(ind + '\t"look" "' + self.target + '"\n')
+        buffer.write(ind + '\t"position" "[' + self.pos.koin(' ') + ']"\n')
+        buffer.write(ind + '\t"look" "[' + self.target.join(' ') + ']"\n')
         buffer.write(ind + '}\n')
             
 class Solid:
@@ -407,7 +423,7 @@ class Solid:
         buffer.write(ind + '}\n')
     
     def __str__(self):
-        "Return a description of our data."
+        '''Return a user-friendly description of our data.'''
         st = "<solid:" + str(self.id) + ">\n{\n"
         for s in self.sides:
             st += str(s) + "\n"
@@ -419,11 +435,11 @@ class Solid:
             yield s
         
     def __del__(self):
-        "Forget this solid's ID when the object is destroyed."
+        '''Forget this solid's ID when the object is destroyed.'''
         self.map.solid_id.remove(self.id)
         
     def get_bbox(self):
-        "Get two vectors representing the space this brush takes up."
+        '''Get two vectors representing the space this brush takes up.'''
         bbox_min, bbox_max = self.sides[0].get_bbox()
         for s in self.sides[1:]:
             side_min, side_max = s.get_bbox()
@@ -432,6 +448,7 @@ class Solid:
         return bbox_min, bbox_max
         
     def get_origin(self):
+        '''Calculates a vector representing the exact center of this brush.'''
         bbox_min, bbox_max = self.get_bbox()
         return (bbox_min+bbox_max)/2
         
@@ -586,6 +603,7 @@ class Side:
         return bbox_min, bbox_max
         
     def get_origin(self):
+        '''Calculates a vector representing the exact center of this plane.'''
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
         return origin
@@ -805,7 +823,7 @@ class Entity():
             self._fixup[var] = (val, self._fixup[var][1])
             
     def rem_fixup(self, var):
-        "Delete a instance $replace variable."
+        '''Delete a instance $replace variable.'''
         if var in self._fixup:
             del self._fixup[var]
             
@@ -815,11 +833,11 @@ class Entity():
         return key in self.keys
         
     def __del__(self):
-        "Forget this entity's ID when the object is destroyed."
+        '''Forget this entity's ID when the object is destroyed.'''
         self.map.ent_id.remove(self.id)
         
     def get_bbox(self):
-        "Get two vectors representing the space this entity takes up."
+        '''Get two vectors representing the space this entity takes up.'''
         if self.is_brush():
             bbox_min, bbox_max = self.solids[0].get_bbox()
             for s in self.solids[1:]:
@@ -913,6 +931,7 @@ class Output:
             return self.input
             
     def __str__(self):
+        '''Generate a user-friendly representation of this output.'''
         st = "<Output> "
         if self.inst_out:
             st += self.inst_out + ":" 
@@ -931,7 +950,7 @@ class Output:
         return st
         
     def export(self, buffer, ind = ''):
-        "Generate the text required to define this output in the VMF."
+        '''Generate the text required to define this output in the VMF.'''
         buffer.write(ind + '"' + self.exp_out())
         
         if self.inst_in:
@@ -945,7 +964,7 @@ class Output:
         (self.target, inp, self.params, str(self.delay), str(self.times))) + '"\n')
         
     def copy(self):
-        "Duplicate this output object."
+        '''Duplicate this output object.'''
         return Outputs(
             self.output, 
             self.target, 
