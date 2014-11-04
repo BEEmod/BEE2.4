@@ -21,17 +21,35 @@ _ID_types = {
 _FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
     # $replace01, $replace02, ..., $replace15, $replace16
     
-def conv_int(str, default = 0):
+_DISP_ROWS = ('normals','distances','offsets','offset_normals','alphas','triangle_tags')
+    # all the rows that displacements have, in the form 
+    # "row0" "???"
+    # "row1" "???"
+    # etc
+    
+def conv_int(str, default=0):
     '''Converts a string to an integer, using a default if the string is unparsable.'''
-    if str.isnumeric():
+    try:
         return int(str)
-    else:
-        return default
+    except ValueError:
+        return int(default)
         
-def conv_bool(str, default = False):
+def conv_float(str, default=0):
+    '''Converts a string to an float, using a default if the string is unparsable.'''
+    try:
+        return float(str)
+    except ValueError:
+        return float(default)
+        
+def conv_bool(str, default=False):
     '''Converts a string to a boolean, using a default if the string is unparsable.'''
-    if str.isnumeric():
-        return bool(int(str))
+    if isinstance(str, bool): # True, False
+        return str
+    elif str.isnumeric(): # 0,1
+        try:
+            return bool(int(str))
+        except ValueError:
+            return default
     elif str.casefold() == 'false':
         return False
     elif str.casefold() == 'true':
@@ -44,6 +62,20 @@ def bool_to_str(bool):
         return '1'
     else:
         return '0'
+        
+def conv_vec(str, x=0, y=0, z=0):
+    ''' Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
+    parts = str.split(' ')
+    if len(parts) == 3:
+        # strip off the brackets if present
+        if parts[0][0] in ('(','{','[', '<'):
+            parts[0] = parts[0][1:]
+        if parts[2][-1] in (')','}',']', '>'):
+            parts[2] = parts[2][:-1]
+        try:
+            return Vec(float(parts[0]),float(parts[1]),float(parts[2]))
+        except ValueError:
+            return Vec(x,y,z)
 
 class VMF:
     '''
@@ -226,13 +258,13 @@ class VMF:
         if len(list_)==0 or desired not in list_ :
             if desired==-1:
                 desired = 1
-            list_.append(desired)
+            list_.append(int(desired))
             return desired
         # Need it in ascending order
         list_.sort()
         for id in range(0, list_[-1]+1):
             if id not in list_:
-                list_.append(id)
+                list_.append(int(id))
                 return id
                 
     def find_ents(self, vals = {}, tags = {}):
@@ -405,7 +437,7 @@ class Solid:
 
 class Side:
     "A brush face."
-    def __init__(self, map, planes=[(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt={}, des_id=-1):
+    def __init__(self, map, planes=[(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt={}, des_id=-1, disp_data={}):
         self.map = map
         self.planes = [0,0,0]
         self.id = map.get_id('face', des_id)
@@ -417,6 +449,19 @@ class Side:
         self.ham_rot = opt.get("rotation" , 0)
         self.uaxis = opt.get("uaxis", "[0 1 0 0] 0.25")
         self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
+        if len(disp_data) > 0:
+            self.disp_power = conv_int(disp_data.get('power', '_'), 4)
+            self.disp_pos = conv_vec(disp_data.get('pos', '_'), 0,0,0)
+            self.disp_flags = conv_int(disp_data.get('flags', '_'), 0)
+            self.disp_elev = conv_float(disp_data.get('elevation', '_'), 0)
+            self.disp_is_subdiv = conv_bool(disp_data.get('subdiv', '_'), False)
+            self.disp_allowed_verts = disp_data.get('allowed_verts', {})
+            self.disp_data = {}
+            for v in _DISP_ROWS:
+                self.disp_data[v] = disp_data.get(v, [])
+            self.is_disp = True
+        else:
+            self.is_disp = False
             
     @staticmethod    
     def parse(map, tree):
@@ -441,13 +486,29 @@ class Side:
             'lightmap' : conv_int(tree.find_key('lightmapscale', '16').value, 16),
             'smoothing' : conv_int(tree.find_key('smoothing_groups', '0').value, 0),
             }
-        return Side(map, planes=planes, opt = opt, des_id = id)
+        disp_tree = tree.find_key('dispinfo', [])
+        disp_data = {}
+        if len(disp_tree) > 0:
+            disp_data['power'] = disp_tree.find_key('power', '4').value
+            disp_data['pos'] = disp_tree.find_key('startposition', '4').value
+            disp_data['flags'] = disp_tree.find_key('flags', '0').value
+            disp_data['elevation'] = disp_tree.find_key('elevation', '0').value
+            disp_data['subdiv'] = disp_tree.find_key('subdiv', '0').value
+            disp_data['allowed_verts'] = {}
+            for prop in disp_tree.find_key('allowed_verts', []):
+                disp_data['allowed_verts'][prop.name] = prop.value
+            for v in _DISP_ROWS:
+                rows = disp_tree.find_key(v, []).value
+                if len(rows) > 0:
+                    rows.sort(key=lambda x: conv_int(x.name[3:],0))
+                    disp_data[v] = [v.value for v in rows]
+        return Side(map, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
         
     def copy(self, des_id=-1):
         "Duplicate this brush side."
         planes = [p.as_tuple() for p in self.planes]
         opt = {
-            'material' : self.mat
+            'material' : self.mat,
             'rotation' : self.ham_rot,
             'uaxis' : self.uaxis,
             'vaxis' : self.vaxis,
@@ -456,17 +517,12 @@ class Side:
             }
         return Side(map, planes=planes, opt=opt, des_id=des_id)
         
-    def make_vec(self, plane):
-        return ("(" + str(plane['x']) +
-                " " + str(plane['y']) +
-                " " + str(plane['z']) + ")")
-        
     def export(self, buffer, ind = ''):
         "Return the text required to define this side."
         buffer.write(ind + 'side\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
-        pl_str = [self.make_vec(p) for p in self.planes]
+        pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
         buffer.write(ind + '\t"plane" "' + ' '.join(pl_str) + '"\n')
         buffer.write(ind + '\t"material" "' + self.mat + '"\n')
         buffer.write(ind + '\t"uaxis" "' + self.uaxis + '"\n')
@@ -474,12 +530,35 @@ class Side:
         buffer.write(ind + '\t"rotation" "' + str(self.ham_rot) + '"\n')
         buffer.write(ind + '\t"lightmapscale" "' + str(self.lightmap) + '"\n')
         buffer.write(ind + '\t"smoothing_groups" "' + str(self.smooth) + '"\n')
+        if self.is_disp:
+            buffer.write(ind + '\tdispinfo\n')
+            buffer.write(ind + '\t{\n')
+            
+            buffer.write(ind + '\t\t"power" "' + str(self.disp_power) + '"\n')
+            buffer.write(ind + '\t\t"startposition" "[' + self.disp_pos.join(' ') + ']"\n')
+            buffer.write(ind + '\t\t"flags" "' + str(self.disp_flags) + '"\n')
+            buffer.write(ind + '\t\t"elevation" "' + str(self.disp_elev) + '"\n')
+            buffer.write(ind + '\t\t"subdiv" "' + bool_to_str(self.disp_is_subdiv) + '"\n')
+            for v in _DISP_ROWS:
+                if len(self.disp_data[v]) > 0:
+                    buffer.write(ind + '\t\t' + v + '\n')
+                    buffer.write(ind + '\t\t{\n')
+                    for i, data in enumerate(self.disp_data[v]):
+                        buffer.write(ind + '\t\t\t"row' + str(i) + '" "' + data + '"\n')
+                    buffer.write(ind + '\t\t}\n')
+            if len(self.disp_allowed_verts) > 0:
+                buffer.write(ind + '\t\tallowed_verts\n')
+                buffer.write(ind + '\t\t{\n')
+                for k,v in self.disp_allowed_verts.items():
+                    buffer.write(ind + '\t\t\t"' + k + '" "' + v + '"\n')
+                buffer.write(ind + '\t\t}\n')
+            buffer.write(ind + '\t}\n')
         buffer.write(ind + '}\n')
  
     def __str__(self):
         st = "\tmat = " + self.mat
         st += "\n\trotation = " + self.ham_rot + '\n'
-        pl_str = [self.make_vec(p) for p in self.planes]
+        pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
         st += '\tplane: ' + ", ".join(pl_str) + '\n'
         return st
         
@@ -499,7 +578,7 @@ class Side:
     def get_origin(self):
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
-        return origin    
+        return origin
         
 class Entity():
     "Either a point or brush entity."
@@ -619,8 +698,7 @@ class Entity():
             buffer.write(ind + '\t"' + key + '" "' + str(self.keys[key]) + '"\n')
         if len(self._fixup) > 0:
             for val in sorted(self._fixup.items(), key=lambda x: x[1][1]):
-            # we end up with (key, (val, index)) and we want to sort by the index
-                print(val)
+                # we end up with (key, (val, index)) and we want to sort by the index
                 buffer.write(ind + '\t"replace' + val[1][1] + '" "$' + val[0] + " " + val[1][0] + '"\n')
         if self.is_brush():
             for s in self.solids:
@@ -723,7 +801,7 @@ class Entity():
         
     def get_bbox(self):
         "Get two vectors representing the space this entity takes up."
-        if self.is_brush()
+        if self.is_brush():
             bbox_min, bbox_max = self.solids[0].get_bbox()
             for s in self.solids[1:]:
                 side_min, side_max = s.get_bbox()
@@ -861,13 +939,7 @@ class Output:
         
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
-    for br in map.brushes:
-        if br.id == 59535:
-            for s in br.sides:
-                print(*[str(p) for p in s.planes])
-                print(s.get_origin())
-    
-    #print('saving...')
-    #with open('test_out.vmf', 'w') as file:
-    #    map.export(file)
+    print('saving...')
+    with open('test_out.vmf', 'w') as file:
+        map.export(file)
     print('done!')

@@ -31,13 +31,13 @@ class Vec:
     
     def __init__(self, x = 0, y=0, z=0):
         if isinstance(x, tuple) or isinstance(x, list):
-            self.x = x[0]
-            self.y = x[1]
-            self.z = x[2]
+            self.x = float(x[0])
+            self.y = float(x[1])
+            self.z = float(x[2])
         else:
-            self.x = x
-            self.y = y
-            self.z = z
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
         
     def copy(self):
         return Vec(self.x, self.y, self.z)
@@ -211,16 +211,35 @@ class Vec:
     def __len__(self):
         "Length gives the magnitude."
         return int(self.mag())
+        
+    def join(self, delim=', '):
+        "Return a string with all numbers joined by the passed delimiter."
+        if self.x.is_integer():
+            x = int(self.x)
+        else:
+            x = self.x
+        if self.y.is_integer():
+            y = int(self.y)
+        else:
+            y = self.y
+        if self.z.is_integer():
+            z = int(self.z)
+        else:
+            z = self.z
+        # convert to int to strip off .0 at end if whole number
+        return str(x) + delim + str(y) + delim + str(z)
             
     def __str__(self):
+        "Return a user-friendly representation of this vector."
         if self.z == 0:
             return "(" + str(self.x) + ", " + str(self.y) + ")"
         else:
-            return "(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
+            return "(" + self.join() + ")"
+            
             
     def __repr__(self):
         "Code required to reproduce this vector."
-        return "Vec(" + str(self.x) + ", " + str(self.y) + ", " + str(self.z) + ")"
+        return "Vec(" + self.join() + ")"
             
     def __iter__(self):
         "Allow iterating through the dimensions."
@@ -242,11 +261,11 @@ class Vec:
     def __setitem__(self, ind, val):
         "Allow referencing by index instead of name if desired."
         if ind == 0 or ind == "x":
-            self.x = val
+            self.x = float(val)
         elif ind == 1 or ind == "y":
-            self.y = val
+            self.y = float(val)
         elif ind == 2 or ind == "z":
-            self.y = val
+            self.y = float(val)
         else:
             return NotImplemented
             
