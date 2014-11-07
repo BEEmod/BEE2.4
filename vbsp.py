@@ -673,7 +673,7 @@ def change_ents():
             ent.remove()
 
 def fix_inst():
-    "Fix some different bugs with instances, especially fizzler models."
+    "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
     global to_pack
     utils.con_log("Editing Instances...")
     print(settings['variants'])
@@ -708,26 +708,28 @@ def fix_inst():
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
                     trig['classname'] = "trigger_paint_cleanser"
-                    sides=trig.find_all('entity', 'solid', 'side', 'material')
-                    for mat in sides:
-                        mat.value = "tools/toolstrigger"
+                    for solid in trig.solids:
+                        for side in solid:
+                            side.mat = "tools/toolstrigger"
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
-            for trig in triggers:
-                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
-                    trig['classname'] = "trigger_multiple"
-                    sides=trig.find_all(trig, 'entity', 'solid', 'side', 'material')
-                    for mat in sides:
-                        mat.value = "tools/toolstrigger"
-                    trig["filtername" = "@filter_pellet"
-                    trig["wait"] = "0.1"
-                    trig['spawnflags'] = "72"
-                    trig.add_out(VMF.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
-                    # generate the output that triggers the pellet logic.
-                    trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
-            for in_out in map.iter_ents({'classname':'func_instance'}, {'targetname':'ccflag_comball_output'}): # find the instance to use for output
-                if inst['origin'] == in_out['origin'] and inst['angles']==in_out['angles']:
-                    inst.outputs.extend(in_out.outputs) # move the outputs to the flux field instead.
-                    in_out.remove() # and delete the unneeded instance
+            for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
+                # find the triggers that match this entity and mod them
+                trig['classname'] = "trigger_multiple"
+                for side in trig.sides():
+                    side.mat = "tools/toolstrigger"
+                trig["filtername"] = "@filter_pellet"
+                trig["wait"] = "0.1"
+                trig['spawnflags'] = "72" # Physics Objects and 'Everything'
+                trig.add_out(VLib.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
+                # generate the output that triggers the pellet logic.
+                trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
+            inst.outputs.clear() # all the original ones are junk, delete them!
+            for in_out in map.iter_ents(
+                   vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
+                   tags={'file':'ccflag_comball_out'}):
+                # find the instance to use for output and add the commands to trigger its logic
+                inst.add_out(VLib.Output("OnUser1", in_out['targetname'], "FireUser1", inst_in='in', inst_out='out'))
+                inst.add_out(VLib.Output("OnUser2", in_out['targetname'], "FireUser2", inst_in='in', inst_out='out'))
         elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
@@ -771,7 +773,7 @@ def death_fizzler_change(inst, trig):
     # Create the trigger_hurt
     is_short = False # if true we can shortcut for the brush
     for solid in trig.solids:
-        for side in solids:
+        for side in solid:
             if side.mat.casefold() == "effects/fizzler":
                 is_short=True
             side.mat = "tools/toolstrigger"

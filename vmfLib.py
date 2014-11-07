@@ -774,6 +774,13 @@ class Entity():
         if self.hidden:
             buffer.write(ind[:-1] + '}\n')
             
+    def sides(self):
+        '''Iterate through all our brush sides.'''
+        if self.is_brush():
+            for solid in self.solids:
+                for face in solid:
+                    yield face
+            
     def add_out(self, output):
         "Add the output to our list."
         self.outputs.append(output)
