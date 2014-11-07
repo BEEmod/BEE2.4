@@ -588,9 +588,8 @@ def change_trig():
     "Check the triggers and fizzlers."
     utils.con_log("Editing Triggers...")
     for trig in map.iter_ents({'classname':'trigger_portal_cleanser'}):
-        for solid in trig.solids:
-            for side in solid:
-                alter_mat(side)
+        for side in trig.sides():
+            alter_mat(side)
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
@@ -606,30 +605,29 @@ def change_func_brush():
             parent = ''
         type="" 
         # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
-        for solid in brush.solids: # this should usually only loop once
-            for side in solid:
-                if side.mat.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
-                    side.mat = get_tex("special.edge")
-                elif side.mat.casefold() in WHITE_PAN:
-                    type="white"
-                    if not get_tex("special.white") == "":
-                        side.mat = get_tex("special.white")
-                    elif not alter_mat(side):
-                        side.mat = get_tex("white.wall")
-                elif side.mat.casefold() in BLACK_PAN:
-                    type="black"
-                    if not get_tex("special.black") == "":
-                        side.mat = get_tex("special.black")
-                    elif not alter_mat(side):
-                        side.mat = get_tex("black.wall")
-                else:
-                    alter_mat(side) # for gratings, laserfields and some others
-            if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
-                targ=parent.split("-model_arms")[0]
-                inst = map.find_ents({'classname':'func_instance', 'targetname':targ})
-                for ins in inst:
-                    if make_static_pan(ins, type):
-                        map.remove_brush(brush) # delete the brush, we don't want it if we made a static one
+        for side in brush.sides():
+            if side.mat.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
+                side.mat = get_tex("special.edge")
+            elif side.mat.casefold() in WHITE_PAN:
+                type="white"
+                if not get_tex("special.white") == "":
+                    side.mat = get_tex("special.white")
+                elif not alter_mat(side):
+                    side.mat = get_tex("white.wall")
+            elif side.mat.casefold() in BLACK_PAN:
+                type="black"
+                if not get_tex("special.black") == "":
+                    side.mat = get_tex("special.black")
+                elif not alter_mat(side):
+                    side.mat = get_tex("black.wall")
+            else:
+                alter_mat(side) # for gratings, laserfields and some others
+        if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
+            targ=parent.split("-model_arms")[0]
+            inst = map.find_ents({'classname':'func_instance', 'targetname':targ})
+            for ins in inst:
+                if make_static_pan(ins, type):
+                    map.remove_brush(brush) # delete the brush, we don't want it if we made a static one
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
@@ -708,9 +706,8 @@ def fix_inst():
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
                     trig['classname'] = "trigger_paint_cleanser"
-                    for solid in trig.solids:
-                        for side in solid:
-                            side.mat = "tools/toolstrigger"
+                    for side in trig.sides():
+                        side.mat = "tools/toolstrigger"
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
             for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
                 # find the triggers that match this entity and mod them
@@ -759,11 +756,10 @@ def death_fizzler_change(inst, trig):
     map.add_ent(hurt)
     map.add_ent(brush)
     
-    for solid in trig.solids:
-        for side in solids:
-            if side.mat.casefold() in TEX_FIZZLER: #is this not nodraw?
-                # convert to death fizzler textures
-                side.mat = settings["deathfield"][TEX_FIZZLER[side.mat.casefold()]]
+    for side in trig.sides():
+        if side.mat.casefold() in TEX_FIZZLER: #is this not nodraw?
+            # convert to death fizzler textures
+            side.mat = settings["deathfield"][TEX_FIZZLER[side.mat.casefold()]]
     trig['targetname'] = inst['targetname'] + "-fizz_red"
     trig['spawnflags'] = "9" # clients + physics objects
     
@@ -772,11 +768,10 @@ def death_fizzler_change(inst, trig):
     
     # Create the trigger_hurt
     is_short = False # if true we can shortcut for the brush
-    for solid in trig.solids:
-        for side in solid:
-            if side.mat.casefold() == "effects/fizzler":
-                is_short=True
-            side.mat = "tools/toolstrigger"
+    for side in trig.sides():
+        if side.mat.casefold() == "effects/fizzler":
+            is_short=True
+        side.mat = "tools/toolstrigger"
         
     hurt['classname'] = "trigger_hurt"
     hurt['targetname'] = inst['targetname'] + "-hurt"
@@ -814,18 +809,16 @@ def death_fizzler_change(inst, trig):
         # first get the origin, used to figure out if a point should be max or min
         origin=Vec(*[int(v) for v in brush['origin'].split(' ')])
         bbox_max,bbox_min=brush.get_bbox()
-        for solid in trig.solids:
-            for side in solids:
-                for v in side.planes:
-                    for i in range(3): #x,y,z
-                        if int(v[i]) > origin[i]:
-                            v[i]=str(bbox_max[i])
-                        else:
-                            v[i]=str(bbox_min[i])
+        for side in trig.sides():
+            for v in side.planes:
+                for i in range(3): #x,y,z
+                    if int(v[i]) > origin[i]:
+                        v[i]=str(bbox_max[i])
+                    else:
+                        v[i]=str(bbox_min[i])
         
         tex_width = settings['deathfield']['texwidth']
-        sides=brush.solids[1].find_all('side')
-        for side in sides:
+        for side in brush.solids[1].sides:
             if side.mat.casefold() == "effects/fizzler_center":
                 side.mat=get_tex('special.laserfield')
             alter_mat(mat) # convert to the styled version
