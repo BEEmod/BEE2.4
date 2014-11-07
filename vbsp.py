@@ -11,51 +11,60 @@ from utils import Vec
 import vmfLib as VLib
 import utils
 
-# COMPILER FLAGS (used as part of instance filename)
-# ccflag_comball
-# ccflag_comball_base
-# ccflag_paint_fizz
-# ccflag_death_fizz_base
-# ccflag_panel_clear
-
 unique_counter=0 # counter for instances to ensure unique targetnames
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
-    #"metal/black_floor_metal_001c"       : "black.floor",
-    #"tile/white_floor_tile002a"          : "white.floor",
-    #"metal/black_floor_metal_001c"       : "black.ceiling",
-    #"tile/white_floor_tile002a"          : "white.ceiling",
-    "tile/white_wall_tile003a"                               : "white.wall",
-    "tile/white_wall_tile003h"                               : "white.wall",
-    "tile/white_wall_tile003c"                               : "white.2x2",
-    "tile/white_wall_tile003f"                               : "white.4x4",
-    "metal/black_wall_metal_002c"                            : "black.wall",
-    "metal/black_wall_metal_002e"                            : "black.wall",
-    "metal/black_wall_metal_002a"                            : "black.2x2",
-    "metal/black_wall_metal_002b"                            : "black.4x4",
-    "signage/signage_exit"                                   : "overlay.exit",
-    "signage/signage_overlay_arrow"                          : "overlay.arrow",
-    "signage/signage_overlay_catapult1"                      : "overlay.catapultfling",
-    "signage/signage_overlay_catapult2"                      : "overlay.catapultland",
-    "signage/shape01"                                        : "overlay.dot",
-    "signage/shape02"                                        : "overlay.moon",
-    "signage/shape03"                                        : "overlay.triangle",
-    "signage/shape04"                                        : "overlay.cross",
-    "signage/shape05"                                        : "overlay.square",
-    "signage/signage_shape_circle"                           : "overlay.circle",
-    "signage/signage_shape_sine"                             : "overlay.sine",
-    "signage/signage_shape_slash"                            : "overlay.slash",
-    "signage/signage_shape_star"                             : "overlay.star",
-    "signage/signage_shape_wavy"                             : "overlay.wavy",
-    "anim_wp/framework/backpanels_cheap"                     : "special.behind",
-    "plastic/plasticwall004a"                                : "special.pedestalside",
-    "anim_wp/framework/squarebeams"                          : "special.edge",
-    "nature/toxicslime_a2_bridge_intro"                      : "special.goo",
-    "glass/glasswindow007a_less_shiny"                       : "special.glass",
-    "metal/metalgrate018"                                    : "special.grating",
-    "effects/laserplane"                                     : "special.laserfield",
-    "sky_black"                                              : "special.sky",
+    #"metal/black_floor_metal_001c"      : "black.floor",
+    #"tile/white_floor_tile002a"         : "white.floor",
+    #"metal/black_floor_metal_001c"      : "black.ceiling",
+    #"tile/white_floor_tile002a"         : "white.ceiling",
+    "tile/white_wall_tile003a"           : "white.wall",
+    "tile/white_wall_tile003h"           : "white.wall",
+    "tile/white_wall_tile003c"           : "white.2x2",
+    "tile/white_wall_tile003f"           : "white.4x4",
+    "metal/black_wall_metal_002c"        : "black.wall",
+    "metal/black_wall_metal_002e"        : "black.wall",
+    "metal/black_wall_metal_002a"        : "black.2x2",
+    "metal/black_wall_metal_002b"        : "black.4x4",
+    "signage/signage_exit"               : "overlay.exit",
+    "signage/signage_overlay_arrow"      : "overlay.arrow",
+    "signage/signage_overlay_catapult1"  : "overlay.catapultfling",
+    "signage/signage_overlay_catapult2"  : "overlay.catapultland",
+    "signage/shape01"                    : "overlay.dot",
+    "signage/shape02"                    : "overlay.moon",
+    "signage/shape03"                    : "overlay.triangle",
+    "signage/shape04"                    : "overlay.cross",
+    "signage/shape05"                    : "overlay.square",
+    "signage/signage_shape_circle"       : "overlay.circle",
+    "signage/signage_shape_sine"         : "overlay.sine",
+    "signage/signage_shape_slash"        : "overlay.slash",
+    "signage/signage_shape_star"         : "overlay.star",
+    "signage/signage_shape_wavy"         : "overlay.wavy",
+    "anim_wp/framework/backpanels_cheap" : "special.behind",
+    "plastic/plasticwall004a"            : "special.pedestalside",
+    "anim_wp/framework/squarebeams"      : "special.edge",
+    "nature/toxicslime_a2_bridge_intro"  : "special.goo",
+    "glass/glasswindow007a_less_shiny"   : "special.glass",
+    "metal/metalgrate018"                : "special.grating",
+    "effects/laserplane"                 : "special.laserfield",
+    "sky_black"                          : "special.sky",
     }
+    
+TEX_DEFAULTS = [ # extra default replacements we need to specially handle
+        # These have the same item so we can't store this in the regular dictionary.
+        ("metal/black_floor_metal_001c", "black.floor" ),
+        ("tile/white_floor_tile002a",    "white.floor"),
+        ("metal/black_floor_metal_001c", "black.ceiling"),
+        ("tile/white_floor_tile002a",    "white.ceiling"),
+        ("",                             "special.white"),
+        ("",                             "special.black"),
+        ("",                             "special.white_gap"),
+        ("",                             "special.black_gap"),
+        
+        # And these have the extra scale information, which isn't in the maps.
+        ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
+        ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
+        ] 
     
 WHITE_PAN = ["tile/white_floor_tile002a",
              "tile/white_wall_tile003a", 
@@ -84,7 +93,7 @@ WALLS = [
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
-    } # these need to be handled seperately to accomedate the scale-changing
+    } # these need to be handled separately to accommodate the scale-changing
 
 DEFAULTS = {
     "bottomless_pit"          : "0",
@@ -119,7 +128,7 @@ fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=o
     "90 180 0"  : "-90 0 0",
     "90 -90 0"  : "-90 90 0",
     "-90 180 0" : "90 0 0",
-    "-90 -90 0" : "90 90 0",
+    "-90 -90 0" : "90 90 0"
     }
 
 TEX_FIZZLER = {
@@ -152,7 +161,6 @@ def get_tex(name):
         raise Exception('No texture "' + name + '"!')
     
 def alter_mat(prop):
-    global to_pack
     mat=prop.mat.casefold()
     if mat in TEX_VALVE: # should we convert it?
         prop.mat = get_tex(TEX_VALVE[mat])
@@ -186,19 +194,7 @@ def load_settings():
                 "overlay_inst_flags" : [],
                 }
                 
-    tex_defaults = list(TEX_VALVE.items()) + [
-        ("metal/black_floor_metal_001c", "black.floor" ),
-        ("tile/white_floor_tile002a",    "white.floor"),
-        ("metal/black_floor_metal_001c", "black.ceiling"),
-        ("tile/white_floor_tile002a",    "white.ceiling"),
-        ("",                             "special.white"),
-        ("",                             "special.black"),
-        ("",                             "special.white_gap"),
-        ("",                             "special.black_gap"),
-        # These have the same item so we can't store this in the regular dictionary.
-        ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
-        ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
-        ] # And these have the extra scale information, which isn't in the maps.
+    tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
         
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
@@ -254,13 +250,13 @@ def load_settings():
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
-        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview"):
+        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview", "file"):
             flags += cond.find_all('condition', f)
         results = []
         for val in cond.find_all('condition', 'result'):
             results.extend(val.value) # join multiple ones together
         if len(flags) > 0 and len(results) > 0: # is it valid?
-            con = {"flags" : flags, "results" : results, "has_sat" : False, "type": type}
+            con = {"flags" : flags, "results" : results, "type": type}
             settings['conditions'].append(con)
 
     process_variants(Property.find_all(conf, 'variants', 'variant'))
@@ -377,7 +373,6 @@ def load_entities():
     utils.con_log("Scanning Entities...")
     
     for item in map.iter_ents({'classname':'func_instance'}):
-        cond_rem = []
         for cond in settings['conditions']: # check if it satisfies any conditions
             to_rem = []
             for flag in cond['flags']:
@@ -405,13 +400,7 @@ def load_entities():
                             to_rem.append(flag)
             for r in to_rem:
                 cond['flags'].remove(r)
-                cond['has_sat'] = True
-            if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
-                cond_rem.append(cond)
             del to_rem
-        for r in cond_rem:
-            settings['conditions'].remove(r)
-        del cond_rem
 
 def scan_mats():
     "Scan through all materials to check if they any defined conditions."
@@ -420,7 +409,6 @@ def scan_mats():
     for mat in all_mats:
         if mat.value not in used: # we don't want to check a material twice
             used.append(mat) 
-    cond_rem = []
     for cond in settings['conditions']:
         to_rem = []
         for flag in cond['flags']:
@@ -431,13 +419,7 @@ def scan_mats():
                             to_rem.append(flag)
         for r in to_rem:
             cond['flags'].remove(r)
-            cond['has_sat'] = True
-        if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
-            cond_rem.append(cond)
         del to_rem
-    for r in cond_rem:
-        settings['conditions'].remove(r)
-    del cond_rem
 
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
@@ -704,20 +686,19 @@ def fix_inst():
                 inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
             
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
-            angles=inst.find_key('angles')
             if inst['angles'] in fizzler_angle_fix.keys():
-                inst['angles'] =fizzler_angle_fix[angles.value]
+                inst['angles'] =fizzler_angle_fix[inst['angles']]
                 
-            for var in utils.get_fixup(inst):
-                if "$skin" in var:
-                    if settings['fizzler']['splitinstances']=="1":
-                        # switch to alternate instances depending on what type of fizzler, to massively save ents
-                        if "$skin 0" in var and get_opt("fizzmodelfile") in inst['file']:
-                            inst['file'] = inst['file'][:-4] + "_fizz.vmf" 
-                        # we don't want to do it to custom ones though
-                        if "$skin 2" in var and get_opt("fizzmodelfile") in inst['file']:
-                            inst['file'] = inst['file'][:-4] + "_las.vmf"
-                    break
+            
+            if settings['fizzler']['splitinstances']=="1" and get_opt("fizzmodelfile") in inst['file']:
+                skin = inst.get_fixup('skin')
+                # switch to alternate instances depending on what type of fizzler, to massively save ents
+                # we don't want to do it to custom ones though
+                if skin == '0' :
+                    inst['file'] = inst['file'][:-4] + "_fizz.vmf" 
+                if skin == '2':
+                    inst['file'] = inst['file'][:-4] + "_las.vmf"
+                    
             if "ccflag_comball" in inst['file']:
                 inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
             if "ccflag_death_fizz_model" in inst['file']:
@@ -726,31 +707,27 @@ def fix_inst():
             # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
-                    trig['classname'].value = "trigger_paint_cleanser"
+                    trig['classname'] = "trigger_paint_cleanser"
                     sides=trig.find_all('entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
-                    trig.find_key('classname').value = "trigger_multiple"
+                    trig['classname'] = "trigger_multiple"
                     sides=trig.find_all(trig, 'entity', 'solid', 'side', 'material')
                     for mat in sides:
                         mat.value = "tools/toolstrigger"
-                    trig.value.append(Property("filtername", "@filter_pellet"))
-                    trig.value.append(Property("wait", "0.1"))
-                    trig.find_key('spawnflags').value="72"
-                    utils.add_output(trig, "OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1")
+                    trig["filtername" = "@filter_pellet"
+                    trig["wait"] = "0.1"
+                    trig['spawnflags'] = "72"
+                    trig.add_out(VMF.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
                     # generate the output that triggers the pellet logic.
-                    trig.find_key('targetname').value = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
-            pos = inst.find_key('origin', '').value
-            angle=inst.find_key('angles', '').value
-            for in_out in instances: # find the instance to use for output
-                out_pos = in_out.find_key('origin').value
-                out_angles=in_out.find_key('angles').value
-                if pos == out_pos and angle==out_angle:
-                    utils.add_output(inst, "instance:out;OnUser1", in_out['targetname'], "instance:in;FireUser1") # add ouptuts to the output proxy instance
-                    utils.add_output(inst, "instance:out;OnUser2", in_out['targetname'], "instance:in;FireUser2")
+                    trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
+            for in_out in map.iter_ents({'classname':'func_instance'}, {'targetname':'ccflag_comball_output'}): # find the instance to use for output
+                if inst['origin'] == in_out['origin'] and inst['angles']==in_out['angles']:
+                    inst.outputs.extend(in_out.outputs) # move the outputs to the flux field instead.
+                    in_out.remove() # and delete the unneeded instance
         elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
