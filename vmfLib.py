@@ -325,8 +325,8 @@ class Camera:
     @staticmethod
     def parse(map, tree):
         '''Read a camera from a property_parser tree.'''
-        pos = conv_vec(tree.find_key('position', '_').value), 0,0,0)
-        targ = conv_vec(tree.find_key('look', '_').value), 0,64,0)
+        pos = conv_vec(tree.find_key('position', '_').value, 0,0,0)
+        targ = conv_vec(tree.find_key('look', '_').value, 0,64,0)
         return Camera(map, pos, targ)
     
     def copy(self):
@@ -342,7 +342,7 @@ class Camera:
     def export(self, buffer, ind=''):
         buffer.write(ind + 'camera\n')
         buffer.write(ind + '{\n')
-        buffer.write(ind + '\t"position" "[' + self.pos.koin(' ') + ']"\n')
+        buffer.write(ind + '\t"position" "[' + self.pos.join(' ') + ']"\n')
         buffer.write(ind + '\t"look" "[' + self.target.join(' ') + ']"\n')
         buffer.write(ind + '}\n')
             
@@ -436,7 +436,8 @@ class Solid:
         
     def __del__(self):
         '''Forget this solid's ID when the object is destroyed.'''
-        self.map.solid_id.remove(self.id)
+        if self.id in self.map.solid_id:
+            self.map.solid_id.remove(self.id)
         
     def get_bbox(self):
         '''Get two vectors representing the space this brush takes up.'''
@@ -591,7 +592,8 @@ class Side:
         
     def __del__(self):
         "Forget this side's ID when the object is destroyed."
-        self.map.face_id.remove(self.id)
+        if self.id in self.map.face_id:
+            self.map.face_id.remove(self.id)
         
     def get_bbox(self):
         "Generate the highest and lowest points these planes form."
@@ -632,7 +634,7 @@ class Entity():
         self.map = map
         self.keys = {} if keys is None else keys
         self._fixup = {} if fixup is None else fixup
-        self.outputs = outputs
+        self.outputs = [] if outputs is None else outputs
         self.solids = [] if solids is None else solids
         self.id = map.get_id('ent', desired = id)
         self.hidden = hidden
@@ -771,6 +773,10 @@ class Entity():
         buffer.write(ind + '}\n')
         if self.hidden:
             buffer.write(ind[:-1] + '}\n')
+            
+    def add_out(self, output):
+        "Add the output to our list."
+        self.outputs.append(output)
         
     def remove(self):
         "Remove this entity from the map."
@@ -834,7 +840,8 @@ class Entity():
         
     def __del__(self):
         '''Forget this entity's ID when the object is destroyed.'''
-        self.map.ent_id.remove(self.id)
+        if self.id in self.map.ent_id:
+            self.map.ent_id.remove(self.id)
         
     def get_bbox(self):
         '''Get two vectors representing the space this entity takes up.'''
@@ -978,9 +985,9 @@ class Output:
 if __name__ == '__main__':
     map = VMF.parse('test.vmf')
     print('moving')
-    vec= Vec(0.5, 0, 32)
-    for br in map.brushes:
-        br.translate(vec)
+    #vec= Vec(0.5, 0, 32)
+    #for br in map.brushes:
+    #    br.translate(vec)
     print('saving...')
     with open('test_out.vmf', 'w') as file:
         map.export(file)
