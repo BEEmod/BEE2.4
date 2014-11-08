@@ -210,13 +210,16 @@ def load_settings():
             settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
      
     fizz_opts = Property.find_all(conf, 'fizzler')
+    for item,key in TEX_FIZZLER.items():
+        settings['fizzler'][key] = item
+    for key,item in FIZZ_OPTIONS.items():
+        settings['fizzler'][key] = item
     for fizz_opt in fizz_opts:
         for item,key in TEX_FIZZLER.items():
-            settings['fizzler'][key] = Property.find_key(fizz_opt, key, item).value
+            settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
             
         for key,item in FIZZ_OPTIONS.items():
-            settings['fizzler'][key] = Property.find_key(fizz_opt, key, item).value
-            
+            settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
     cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
         
     for fizz in cust_fizzlers:
