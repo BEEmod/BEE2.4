@@ -64,7 +64,7 @@ def bool_to_str(bool):
         return '0'
         
 def conv_vec(str, x=0, y=0, z=0):
-    ''' Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
+    '''Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
     parts = str.split(' ')
     if len(parts) == 3:
         # strip off the brackets if present
@@ -347,7 +347,7 @@ class Camera:
         buffer.write(ind + '}\n')
             
 class Solid:
-    "A single brush, serving as both world brushes and brush entities."
+    '''A single brush, serving as both world brushes and brush entities.'''
     def __init__(self, map, des_id=-1, sides=None, editor=None):
         self.map = map
         self.sides = [] if sides is None else sides
@@ -355,7 +355,7 @@ class Solid:
         self.editor = {} if editor is None else editor
     
     def copy(self, des_id=-1):
-        "Duplicate this brush."
+        '''Duplicate this brush.'''
         editor = {}
         for key in ('color','groupid','visgroupshown', 'visgroupautoshown'):
             if key in self.editor:
@@ -367,7 +367,7 @@ class Solid:
         
     @staticmethod    
     def parse(map, tree):
-        "Parse a Property tree into a Solid object."
+        '''Parse a Property tree into a Solid object.'''
         id = conv_int(tree.find_key("id", '-1').value)
         try: 
             id = int(id)
@@ -396,7 +396,7 @@ class Solid:
         return Solid(map, des_id = id, sides=sides, editor = editor)
         
     def export(self, buffer, ind = ''):
-        "Generate the strings needed to define this brush."
+        '''Generate the strings needed to define this brush.'''
         buffer.write(ind + 'solid\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -493,7 +493,7 @@ class Side:
             
     @staticmethod    
     def parse(map, tree):
-        "Parse the property tree into a Side object."
+        '''Parse the property tree into a Side object.'''
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
         verts = tree.find_key("plane", "(0 0 0) (0 0 0) (0 0 0)").value[1:-1].split(") (")
         id = conv_int(tree.find_key("id", '-1').value)
@@ -533,7 +533,7 @@ class Side:
         return Side(map, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
         
     def copy(self, des_id=-1):
-        "Duplicate this brush side."
+        '''Duplicate this brush side.'''
         planes = [p.as_tuple() for p in self.planes]
         opt = {
             'material' : self.mat,
@@ -546,7 +546,7 @@ class Side:
         return Side(map, planes=planes, opt=opt, des_id=des_id)
         
     def export(self, buffer, ind = ''):
-        "Return the text required to define this side."
+        '''Generate the strings required to define this side in a VMF.'''
         buffer.write(ind + 'side\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -584,6 +584,7 @@ class Side:
         buffer.write(ind + '}\n')
  
     def __str__(self):
+        '''Dump a user-friendly representation of the side.'''
         st = "\tmat = " + self.mat
         st += "\n\trotation = " + self.ham_rot + '\n'
         pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
@@ -591,12 +592,12 @@ class Side:
         return st
         
     def __del__(self):
-        "Forget this side's ID when the object is destroyed."
+        '''Forget this side's ID when the object is destroyed.'''
         if self.id in self.map.face_id:
             self.map.face_id.remove(self.id)
         
     def get_bbox(self):
-        "Generate the highest and lowest points these planes form."
+        '''Generate the highest and lowest points these planes form.'''
         bbox_max=self.planes[0].copy()
         bbox_min=self.planes[0].copy()
         for v in self.planes[1:]:
@@ -620,7 +621,16 @@ class Side:
             p += diff
         
 class Entity():
-    "Either a point or brush entity."
+    '''A representation of either a point or brush entity.
+    
+    Creation:
+    Entity(args) for a brand-new Entity
+    Entity.parse(property) if reading from a VMF file
+    ent.copy() to duplicate an existing entity
+    
+    Supports [] operations to read and write keyvalues.
+    If reading instance $replace values use get_fixup(), set_fixup() and del_fixup().
+    '''
     def __init__(
             self, 
             map, 
@@ -641,7 +651,7 @@ class Entity():
         self.editor = {'visgroup' : []} if editor is None else editor
         
     def copy(self, des_id=-1):
-        "Duplicate this entity entirely."
+        '''Duplicate this entity entirely, including solids and outputs.'''
         new_keys = {}
         new_fixup = {}
         new_editor = {}
@@ -671,7 +681,7 @@ class Entity():
         
     @staticmethod
     def parse(map, tree_list, hidden=False):
-        "Parse a property tree into an Entity object."
+        '''Parse a property tree into an Entity object.'''
         id = -1
         solids = []
         keys = {}
@@ -721,10 +731,11 @@ class Entity():
             fixup=fixup)
     
     def is_brush(self):
+        '''Is this Entity a brush entity?'''
         return len(self.solids) > 0
     
     def export(self, buffer, ent_name = 'entity', ind=''):
-        "Return the strings needed to create this entity."
+        '''Generate the strings needed to create this entity.'''
         
         if self.hidden:
             buffer.write(ind + 'hidden\n' + ind + '{\n')
@@ -786,11 +797,18 @@ class Entity():
         self.outputs.append(output)
         
     def remove(self):
-        "Remove this entity from the map."
+        '''Remove this entity from the map. 
+        
+        Useful if it is required to delete an entity while looping, as
+        this will still keep the object intact. Ensure any lists are 
+        also deleted so the object will be garbage-collected.
+        '''
         self.map.entities.remove(self)
-        self.map.ent_id.remove(self.id)
+        if self.id in self.map.ent_id:
+            self.map.ent_id.remove(self.id)
         
     def __str__(self):
+        '''Dump a user-friendly representation of the entity.'''
         st ="<Entity>: \n{\n"
         for k,v in self.keys.items():
             if not isinstance(v, list):
@@ -801,27 +819,49 @@ class Entity():
         return st
         
     def __getitem__(self, key, default = None):
-        if key in self.keys:
-            return self.keys[key]
+        '''Allow using [] syntax to search for keyvalues.
+        
+        - This will return None instead of KeyError if the value is not found.
+        - It ignores case-matching, but will use the first given version of a key.
+        - If used via Entity.get() the default argument is available.
+        '''
+        key = key.casefold()
+        for k in self.keys:
+            if k.casefold() == key:
+                return self.keys[k]
         else:
             return default
             
     def __setitem__(self, key, val):
-        self.keys[key] = val
+        '''Allow using [] syntax to save a keyvalue.
+        
+        - It is case-insensitive, so it will overwrite a key which only differs by case
+        '''
+        key_fold = key.casefold()
+        for k in self.keys:
+            if k.casefold() == key_fold:
+                # Check case-insensitively for this key first
+                self.keys[k] = val
+                break
+        else:
+            self.keys[key] = val
         
     def __delitem__(self, key):
-        if key in self.keys:
-            del self.keys[key]
+        key = key.casefold()
+        for k in self.keys:
+            if k.casefold() == key:
+                del self.keys[k]
+                break
             
     def get_fixup(self, var, default=None):
-        "Get the value of an instance $replace variable."
+        '''Get the value of an instance $replace variable.'''
         if var in self._fixup:
             return self._fixup[var][0] # don't return the index
         else:
             return default
      
     def set_fixup(self, var, val):
-        "Set the value of an instance $replace variable, creating it if needed."
+        '''Set the value of an instance $replace variable, creating it if needed.'''
         if var not in self._fixup:
             max = 0
             for i in self._fixup.values():
@@ -843,7 +883,13 @@ class Entity():
     get = __getitem__
             
     def has_key(self, key):
-        return key in self.keys
+        '''Determine if a value exists for the given key.'''
+        key = key.casefold()
+        for k in self.keys:
+            if k.casefold() == key:
+                return True
+        else:
+            return False
         
     def __del__(self):
         '''Forget this entity's ID when the object is destroyed.'''
@@ -865,6 +911,7 @@ class Entity():
             return origin, origin.copy()
         
     def get_origin(self):
+        '''Return a vector representing the center of this entity's brushes.'''
         if self.is_brush():
             bbox_min, bbox_max = self.get_bbox()
             return (bbox_min+bbox_max)/2
@@ -872,7 +919,7 @@ class Entity():
             return Vec(self['origin'].split(" "))
         
 class Output:
-    "An output from this item pointing to another."
+    '''An output from one entity pointing to another.'''
     __slots__ = ('output', 'inst_out', 'target', 
                  'input', 'inst_in', 'params', 'delay', 
                  'times', 'sep')
