@@ -374,7 +374,6 @@ def process_variants(vars):
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     utils.con_log("Scanning Entities...")
-    
     for item in map.iter_ents({'classname':'func_instance'}):
         for cond in settings['conditions']: # check if it satisfies any conditions
             to_rem = []
@@ -405,32 +404,10 @@ def load_entities():
                 cond['flags'].remove(r)
             del to_rem
 
-def scan_mats():
-    "Scan through all materials to check if they any defined conditions."
-    all_mats = Property.find_all(map, 'world', 'solid', 'side', 'material') + Property.find_all(map, 'entity', 'solid', 'side', 'material')
-    used = []
-    for mat in all_mats:
-        if mat.value not in used: # we don't want to check a material twice
-            used.append(mat) 
-    for cond in settings['conditions']:
-        to_rem = []
-        for flag in cond['flags']:
-            if flag.name.casefold() == "ifmat":
-                for mat in used:
-                    if mat.value.casefold() == flag.value.casefold():
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-        for r in to_rem:
-            cond['flags'].remove(r)
-        del to_rem
-
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    solids=map.brushes[:]
-    for e in [e.solids for e in map.find_ents({'classname':'func_detail'})]:
-        solids.extend(e)
-    for solid in solids:
+    for solid in map.iter_wbrushes(solid=True, detail=True):
         for face in solid:
             if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
                 plane=face.find_key('plane')
@@ -452,14 +429,15 @@ def change_brush():
           get_opt("clump_size").isnumeric() and 
           get_opt("clump_width").isnumeric() and 
           get_opt("clump_number").isnumeric()):
-        clump_walls(solids)
+          # Check this algorithm has all its arguements
+        clump_walls()
     else:
-        random_walls(solids)
+        random_walls()
         
 
-def random_walls(solids):
+def random_walls():
     "The original wall style, with completely randomised walls."
-    for solid in solids:
+    for solid in map.iter_wbrushes(solid=True, detail=True):
         for face in solid:
             is_blackceil = roof_tex(face)
             if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
@@ -473,11 +451,11 @@ def random_walls(solids):
                 face.vaxis=" ".join(split)   
             alter_mat(face)
     
-def clump_walls(solids):
+def clump_walls():
     "A wall style where textures are used in small groups near each other, clumped together."
     walls = {}
     others = {} # we keep a list for the others, so we can nodraw them if needed
-    for solid in solids:
+    for solid in map.iter_wbrushes(solid=True, detail=True):
         for face in solid: # first build a list of all textures and their locations...
             mat=face.mat.casefold()
             if face.mat in ('glass/glasswindow007a_less_shiny', 

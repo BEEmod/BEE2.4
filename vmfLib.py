@@ -268,23 +268,15 @@ class VMF:
                 list_.append(int(id))
                 return id
                 
-    def find_ents(self, vals = {}, tags = {}):
-        '''Return a list of entities with the given keyvalue values, and with keyvalues containing the tags.'''
-        if len(vals) == 0 and len(tags) == 0:
-            return self.entities[:] # skip to just returning the whole thing
-        else:
-            ret = []
-            for ent in self.entities:
-                for key,value in vals.items():
-                    if not ent.has_key(key) or ent[key] != value:
-                        break
-                else: # passed through without breaks
-                    for key,value in tags.items():
-                        if not ent.has_key(key) or value not in ent[key]:
-                            break
-                    else:
-                        ret.append(ent)
-            return ret
+    def iter_wbrushes(self, world=True, detail=True):
+        '''Iterate through all world and detail solids in the map.'''
+        if world:
+            for br in map.brushes:
+                yield br
+        if detail:
+            for ent in map.iter_ents({'classname':'func_detail'}):
+                for solid in ent:
+                    yield solid
             
     def iter_ents(self, vals = {}, tags = {}):
         '''Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags.'''
@@ -297,7 +289,36 @@ class VMF:
                     if not ent.has_key(key) or value not in ent[key]:
                         break
                 else:
-                    yield ent    
+                    yield ent
+    
+    def iter_inputs(self, name):
+        '''Loop through all Outputs which target the named entity.
+        
+        - Allows using * at beginning/end
+        '''
+        wild_start = name[:1]=='*'
+        wild_end = name[-1:]=='*'
+        if wild_start:
+            name = name[1:]
+        if wild_end:
+            name = name[:-1]
+        for ent in self.entities:
+            for out in ent.outputs:
+                if wild_start:
+                    if wild_end:
+                        if name in out.target: # blah-target-blah
+                            yield out
+                    else:
+                        if out.target.endswith(name): # target-blah
+                            yield out
+                else:
+                    if wild_end:
+                        if out.target.startswith(name): # blah-target
+                            yield out
+                    else:
+                        if out.target == name: # target
+                            yield out
+                
 class Camera:
     def __init__(self, map, pos, targ):
         self.pos = pos
