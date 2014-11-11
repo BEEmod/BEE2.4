@@ -407,7 +407,7 @@ def load_entities():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
-    for solid in map.iter_wbrushes(solid=True, detail=True):
+    for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
             if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
                 plane=face.find_key('plane')
@@ -437,7 +437,7 @@ def change_brush():
 
 def random_walls():
     "The original wall style, with completely randomised walls."
-    for solid in map.iter_wbrushes(solid=True, detail=True):
+    for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
             is_blackceil = roof_tex(face)
             if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
@@ -455,7 +455,7 @@ def clump_walls():
     "A wall style where textures are used in small groups near each other, clumped together."
     walls = {}
     others = {} # we keep a list for the others, so we can nodraw them if needed
-    for solid in map.iter_wbrushes(solid=True, detail=True):
+    for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid: # first build a list of all textures and their locations...
             mat=face.mat.casefold()
             if face.mat in ('glass/glasswindow007a_less_shiny', 
@@ -577,9 +577,8 @@ def change_trig():
 def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
-    f_brushes = (map.find_ents({'classname':'func_brush'}) +
-               map.find_ents({'classname':'func_rotating'}))
-    for brush in f_brushes:
+    for brush in itertools.chain(map.iter_ents({'classname':'func_brush'}),
+                                 map.iter_ents({'classname':'func_rotating'})):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname']
         if parent is None:
@@ -605,10 +604,9 @@ def change_func_brush():
                 alter_mat(side) # for gratings, laserfields and some others
         if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
             targ=parent.split("-model_arms")[0]
-            inst = map.find_ents({'classname':'func_instance', 'targetname':targ})
-            for ins in inst:
+            for ins in map.iter_ents({'classname':'func_instance', 'targetname':targ}):
                 if make_static_pan(ins, type):
-                    map.remove_brush(brush) # delete the brush, we don't want it if we made a static one
+                    map.remove_ent(brush) # delete the brush, we don't want it if we made a static one
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
@@ -617,7 +615,9 @@ def make_static_pan(ent, type):
     angle="00"
     if ent.get_fixup('animation') is not None:
         # the 16:18 is the number in "ramp_45_deg_open"
-        angle = ent.get_fixup('animation')[16:18] 
+        angle = ent.get_fixup('animation')
+        print(angle)
+        angle = angle[5:7]
     if ent.get_fixup('start_deployed') == "0":
         angle = "00" # different instance flat with the wall
     if ent.get_fixup('connectioncount') != "0":

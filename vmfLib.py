@@ -123,11 +123,15 @@ class VMF:
     def add_brush(self, item):
         self.brushes.append(item)
         
+    def remove_brush(self, item):
+        self.brushes.remove(item)
+        
     def add_ent(self, item):
         self.entities.append(item)
         
     def remove_ent(self, item):
         self.entities.remove(item)
+        
         
     def add_brushes(self, item):
         for i in item:
@@ -271,11 +275,11 @@ class VMF:
     def iter_wbrushes(self, world=True, detail=True):
         '''Iterate through all world and detail solids in the map.'''
         if world:
-            for br in map.brushes:
+            for br in self.brushes:
                 yield br
         if detail:
-            for ent in map.iter_ents({'classname':'func_detail'}):
-                for solid in ent:
+            for ent in self.iter_ents({'classname':'func_detail'}):
+                for solid in ent.solids:
                     yield solid
             
     def iter_ents(self, vals = {}, tags = {}):
