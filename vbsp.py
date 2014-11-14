@@ -142,6 +142,17 @@ FIZZ_OPTIONS = {
     "scanline"       : "0",
     "splitinstances" : "0",
     }
+    
+settings = {"textures"           : {},
+            "fizzler"            : {},
+            "options"            : {},
+            "deathfield"         : {},
+            "instances"          : {},
+            "style_vars"          : {},
+            
+            "cust_fizzlers"      : [],
+            "conditions"         : [],
+            }
  
 ###### UTIL functions #####
  
@@ -179,20 +190,6 @@ def load_settings():
             conf=Property.parse(config)
     else:
         conf = [] # All the find_all commands will fail, and we will use the defaults.
-        
-    settings = {"textures"           : {},
-                "fizzler"            : {},
-                "options"            : {},
-                "deathfield"         : {},
-                "instances"          : {},
-                "variants"           : {},
-                
-                "cust_fizzlers"      : [],
-                "conditions"         : [],
-                "change_inst"        : [],
-                "overlay_inst"       : [],
-                "overlay_inst_flags" : [],
-                }
                 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
         
@@ -247,22 +244,20 @@ def load_settings():
     for pack in pack_commands:
         process_packer(pack.value)
         
-    conditions = Property.find_all(conf, 'conditions', 'condition')
+    conditions = Property.find_all(conf, 'commands', 'condition')
     for cond in conditions:
         type = cond.find_key('type', '').value.upper()
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
-        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview", "file"):
+        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview", "instance", "StyleVar"):
             flags += cond.find_all('condition', f)
         results = []
         for val in cond.find_all('condition', 'result'):
             results.extend(val.value) # join multiple ones together
-        if len(flags) > 0 and len(results) > 0: # is it valid?
+        if len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "type": type}
             settings['conditions'].append(con)
-
-    process_variants(Property.find_all(conf, 'variants', 'variant'))
    
     process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
     
@@ -278,50 +273,92 @@ def load_map(path):
 def check_conditions():
     "Check all the global conditions, like style vars."
     utils.con_log("Checking global conditions...")
-    cond_rem = []
-    for cond in settings['conditions']:
+    false_ent = VLib.Entity(map, id=999999999) # create a fake entity to apply file-changing commands to
+    for cond in settings['conditions'][:]:
         to_rem = []
-        for flag in cond['flags']:
+        for flag in cond['flags'][:]:
             if flag.name.casefold() in ("ifstyletrue", "ifstylefalse"):
                 var = flag.value.casefold()
                 if var in DEFAULTS.keys(): # is it a valid var?
                     if (get_opt(var) == "1" and flag.name.casefold().endswith("true")):
-                        if flag not in to_rem:
-                            to_rem.append(flag)
+                        cond['flags'].remove(flag)
                     elif (get_opt(var) == "0" and flag.name.casefold().endswith("false")):
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-        for r in to_rem:
-            cond['flags'].remove(r)
-            cond['has_sat'] = True
-        if len(to_rem) > 0 and satisfy_condition(cond): # see if it's satisfied
-                cond_rem.append(cond)
-        del to_rem
-    for r in cond_rem:
-        settings['conditions'].remove(r)
-    del cond_rem
+                        cond['flags'].remove(flag)
+        
+        for res in cond['results']:
+            if res.name.casefold() == 'variant':
+                res.value = variant_weight(res)
+        satisfy_condition(cond, false_ent)
     utils.con_log("Done!")
     
-def satisfy_condition(cond):
+def satisfy_condition(cond, inst):
     "Try to satisfy this condition, and edit the loaded settings if needed."
-    sat = False
-    if cond['type'] == "AND":
-        sat = len(cond['flags']) == 0
-    elif cond['type'] == "OR":
-        sat = cond['has_sat']
+    isAnd = cond['type'].casefold() == 'and'
+    sat = isAnd
+    for flag in cond['flags']:
+        subres = False
+        name = flag.name.casefold()
+        if name == 'instance':
+            subres = inst['file'] == flag.value
+        if name == 'instflag':
+            subres = flag.value in inst['file']
+        elif name == 'stylevar':
+            subres = settings['styleVars'].get(flag.value.casefold(), False)
+        elif name == 'ifstyletrue' or 'ifstylefalse':
+            subres = False
+        if isAnd:
+            sat = sat and subres
+        else:
+            sat = sat or subres
+    if len(cond['flags']) == 0:
+        sat = True # Always satisfy this!
+    print(sat, cond['flags'])   
     if sat:
-        for res in cond['results']:
-            if res.name.casefold() == "changeinstance":
-                settings['change_inst'].append(res)
-            elif res.name.casefold() == "packer":
+        print('NEED TO SATISFY!')
+        print(cond['results'])
+        for res in cond['results'][:]:
+            name = flag.name.casefold()
+            if name == "changeinstance":
+                # Set the file to a value
+                inst['file'] = res.value
+            elif name == "packer":
                 process_packer(res.value)
-            elif res.name.casefold() == "variant":
-                process_variant(res.value)
-            elif res.name.casefold() == "addglobal":
-                settings['instance'].append(res)
-            elif res.name.casefold() == "overlayinstance":
-                process_inst_overlay([res.value,])
-            elif res.name.casefold() == "styleopt":
+            elif name == 'suffix':
+                # Add the specified suffix to the filename
+                inst['file'] = inst['file'][:-4] + res.value + '.vmf'
+            elif name == "variant":
+                # add _var4 or so to the instance name
+                inst['file'] = inst['file'][:-4] + "_var" + random.choice(res.value) + ".vmf"
+            elif name == "addglobal":
+                # Add one instance in a location, but only once
+                new_inst = Entity(map, keys={
+                             "classname" : "func_instance",
+                             "targetname" : res.find_key('name', '').value,
+                             "file" : res.find_key('file', '').value,
+                             "angles" : "0 0 0",
+                             "origin" : res.find_key('position', '').value
+                           })
+                if new_inst['targetname'] == '':
+                    new_inst['targetname'] = "inst_"+str(unique_id())
+                map.add_ent(new_inst)
+                cond['results'].remove(res)
+            elif name == "addoverlay": 
+                # Add another instance on top of this one
+                new_inst = Entity(map, keys={
+                             "classname" : "func_instance",
+                             "targetname" : inst['targetname'],
+                             "file" : res.find_key('file', '').value,
+                             "angles" : inst['angles'],
+                             "origin" : inst['origin']
+                           })
+                map.add_ent(new_inst)
+            elif name == "styleVar":
+                for opt in res.value:
+                    if opt.name.casefold() == 'setTrue':
+                        settings['style_vars'][opt.value] = True
+                    elif opt.name.casefold() == 'setFalse':
+                        settings['style_vars'][opt.value] = False
+            elif name == "styleopt":
                 for opt in res.value:
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
@@ -344,32 +381,32 @@ def process_packer(f_list):
         if cmd.name.casefold()=="add_list":
             to_pack.append("|list|" + cmd.value)
             
-def process_variants(vars):
-    "Read variant commands from settings."
-    for var in vars:
-        inst = var.find_key('base', '').value
-        count = var.find_key('number', '').value
-        if not inst == "" and count.isdecimal():
-            count = int(count)
-            weight = var.find_key('weights', '').value
-            if weight == '' or ',' not in weight:
-                utils.con_log('Invalid weight for "' + inst +'"!')
+def variant_weight(vars):
+    "Read variant commands from settings and create the weight list."
+    inst = var.find_key('base', '').value
+    count = var.find_key('number', '').value
+    if count.isdecimal():
+        count = int(count)
+        weight = var.find_key('weights', '').value
+        if weight == '' or ',' not in weight:
+            utils.con_log('Invalid weight! (' + weight + ')')
+            weight = [str(i) for i in range(1,count + 1)]
+        else:
+            vals=weight.split(',')
+            weight=[]
+            if len(vals) == count:
+                for i,val in enumerate(vals):
+                    if val.isdecimal():
+                        weight.extend([str(i+1) for tmp in range(1,int(val)+1)]) # repeat the index the correct number of times
+                    else:
+                        break
+            if len(weight) == 0:
+                utils.con_log('Failed parsing weight! (' + weight + ')')
                 weight = [str(i) for i in range(1,count + 1)]
-            else:
-                vals=weight.split(',')
-                weight=[]
-                if len(vals) == count:
-                    for i,val in enumerate(vals):
-                        if val.isdecimal():
-                            weight.extend([str(i+1) for tmp in range(1,int(val)+1)]) # repeat the index the correct number of times
-                        else:
-                            break
-                if len(weight) == 0:
-                    utils.con_log('Failed parsing weight for "' + inst +'"!')
-                    weight = [str(i) for i in range(1,count + 1)]
-            # random.choice(weight) will now give an index with the correct probabilities.
-            settings['variants'][inst] = weight
-            
+        # random.choice(weight) will now give an index with the correct probabilities.
+        return weight
+    else:
+        return [''] # This won't append anything to the file
         
 def load_entities():
     "Read through all the entities and sort to different lists based on classname"
@@ -614,10 +651,8 @@ def make_static_pan(ent, type):
         return False # no conversion allowed!
     angle="00"
     if ent.get_fixup('animation') is not None:
-        # the 16:18 is the number in "ramp_45_deg_open"
-        angle = ent.get_fixup('animation')
-        print(angle)
-        angle = angle[5:7]
+        # the 5:7 is the number in "ramp_45_deg_open"
+        angle = ent.get_fixup('animation')[5:7]
     if ent.get_fixup('start_deployed') == "0":
         angle = "00" # different instance flat with the wall
     if ent.get_fixup('connectioncount') != "0":
@@ -655,7 +690,6 @@ def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
     global to_pack
     utils.con_log("Editing Instances...")
-    print(settings['variants'])
     for inst in map.iter_ents({'classname':'func_instance'}):
         print(inst['file'])
         if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
@@ -716,11 +750,8 @@ def fix_inst():
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
-        if inst['file'] in settings['variants']:
-            weight = settings['variants'][inst['file']]
-            inst['file'] = inst['file'][:-4] + "_var" + random.choice(weight) + ".vmf"
-            # add _var4 or so to the instance name
-        check_overlay(inst)
+        for cond in settings['conditions']:
+            satisfy_condition(inst)
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
@@ -831,22 +862,6 @@ def death_fizzler_change(inst, trig):
         brush.value.remove(solids[2])
         brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid
         del solids
-    
-        
-def check_overlay(inst):
-    "Check to see if an instance should have other instances overlayed on it."
-    for key in settings['overlay_inst']:
-        if key[0] in inst['file']:
-            # Use the original instance's name if not given a unique one
-            name = inst['targetname'] if key[2] == "" else key[2] + str(max_ent_id)
-            new_inst = Entity(map, keys={
-                'classname' : 'func_instance',
-                'targetname' : name,
-                'file' : key[1],
-                'angles' : inst.get('angles', '0 0 0'),
-                'origin' : inst['origin']
-                })
-            map.add_ent(new_inst)
     
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
@@ -1018,8 +1033,7 @@ for i,a in enumerate(new_args):
 
 utils.con_log("BEE2 VBSP hook initiallised. Loading settings...")
 
-load_settings()
-check_conditions()
+
 
 utils.con_log("Map path is " + path)
 if path == "":
@@ -1027,7 +1041,11 @@ if path == "":
 if not path.endswith(".vmf"):
     path += ".vmf"
     new_path += ".vmf"
+
+load_settings()   
 load_map(path)
+check_conditions()
+
 if '-force_peti' in args or '-force_hammer' in args:
     # we have override command!
     if '-force_peti' in args:
