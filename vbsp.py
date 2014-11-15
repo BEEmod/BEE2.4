@@ -317,7 +317,6 @@ def satisfy_condition(cond, inst):
             sat = sat or subres
     if len(cond['flags']) == 0:
         sat = True # Always satisfy this! 
-    print(cond['flags'], sat)
     if sat:
         for res in cond['results'][:]:
             name = res.name.casefold()
@@ -327,6 +326,7 @@ def satisfy_condition(cond, inst):
                 inst['file'] = res.value
             elif name == "packer":
                 process_packer(res.value)
+                cond['results'].remove(res)
             elif name == 'suffix':
                 # Add the specified suffix to the filename
                 inst['file'] += res.value
@@ -346,6 +346,7 @@ def satisfy_condition(cond, inst):
                 inst['file'] += "_var" + random.choice(res.value)
             elif name == "addglobal":
                 # Add one instance in a location, but only once
+                print(res)
                 new_inst = VLib.Entity(map, keys={
                              "classname" : "func_instance",
                              "targetname" : res.find_key('name', '').value,
@@ -378,6 +379,9 @@ def satisfy_condition(cond, inst):
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
             inst['file'] += '.vmf'
+        print(cond['results'])
+        if len(cond['results']) == 0:
+            settings['conditions'].remove(cond)
     return sat
     
 def process_inst_overlay(lst):
@@ -428,7 +432,7 @@ def load_entities():
     "Read through all the entities and sort to different lists based on classname"
     utils.con_log("Scanning Entities...")
     for item in map.iter_ents({'classname':'func_instance'}):
-        for cond in settings['conditions']: # check if it satisfies any conditions
+        for cond in settings['conditions'][:]: # check if it satisfies any conditions
             to_rem = []
             for flag in cond['flags']:
                 if flag.name.casefold() == "instflag":
@@ -707,7 +711,6 @@ def fix_inst():
     global to_pack
     utils.con_log("Editing Instances...")
     for inst in map.iter_ents({'classname':'func_instance'}):
-        print(inst['file'])
         if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
             if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
@@ -766,7 +769,7 @@ def fix_inst():
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
-        for cond in settings['conditions']:
+        for cond in settings['conditions'][:]:
             satisfy_condition(cond, inst)
 
 def death_fizzler_change(inst, trig):
