@@ -288,11 +288,25 @@ def check_conditions():
         for res in cond['results']:
             if res.name.casefold() == 'variant':
                 res.value = variant_weight(res)
+            elif res.name.casefold() == 'custantline':
+                res.value = {
+                    'instance' : res.find_key('instance', '').value,
+                    'antline' : [p.value for p in res.find_all('straight')],
+                    'antlinecorner' : [p.value for p in res.find_all('corner')],
+                    'outputs' : res.find_all('output')
+                    }
+                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) ==0:
+                    cond['results'].remove(res) # invalid
+        if len(cond['results']) == 0:
+            settings['conditions'].remove(cond)
         satisfy_condition(cond, false_ent)
     utils.con_log("Done!")
     
 def satisfy_condition(cond, inst):
-    "Try to satisfy this condition, and edit the loaded settings if needed."
+    '''Try to satisfy this condition. 
+    
+    This may delete the condition from the settings list, so iterate using a copy only.
+    '''
     isAnd = cond['type'].casefold() == 'and'
     sat = isAnd
     for flag in cond['flags']:
@@ -346,7 +360,6 @@ def satisfy_condition(cond, inst):
                 inst['file'] += "_var" + random.choice(res.value)
             elif name == "addglobal":
                 # Add one instance in a location, but only once
-                print(res)
                 new_inst = VLib.Entity(map, keys={
                              "classname" : "func_instance",
                              "targetname" : res.find_key('name', '').value,
@@ -368,6 +381,27 @@ def satisfy_condition(cond, inst):
                              "origin" : inst['origin']
                            })
                 map.add_ent(new_inst)
+            elif name == "custantline":
+                over_name ='@' + inst['targetname'] + '_indicator'
+                for over in map.iter_ents({
+                        'classname' : 'info_overlay', 
+                        'targetname' : over_name}):
+                    new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
+                    set_antline_mat(over, new_tex)
+                if res.value['instance'] != '': # allow replacing the indicator_toggle instance
+                    for toggle in map.iter_ents({'classname' : 'func_instance'}):
+                        if toggle.get_fixup('indicator_name', '') == over_name:
+                            toggle['file'] = res.value['instance']
+                            for o in res.value['outputs']:
+                                # Allow adding extra outputs to customly trigger the toggle
+                                print('toggle',toggle['targetname'])
+                                inst.add_out(VLib.Output(
+                                    o.find_key('output','').value,
+                                    toggle['targetname', ''],
+                                    o.find_key('input','').value, 
+                                    inst_in=o.find_key('targ_in','').value, 
+                                    inst_out=o.find_key('targ_out','').value))
+                    
             elif name == "styleVar":
                 for opt in res.value:
                     if opt.name.casefold() == 'setTrue':
@@ -379,7 +413,6 @@ def satisfy_condition(cond, inst):
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
             inst['file'] += '.vmf'
-        print(cond['results'])
         if len(cond['results']) == 0:
             settings['conditions'].remove(cond)
     return sat
@@ -603,6 +636,19 @@ def roof_tex(face):
     else:
         alter_mat(face)
         return False
+       
+def set_antline_mat(over,mat):
+    mat=mat.split('|')
+    if len(mat)==2:
+        over['endu']=mat[0] # rescale antlines if needed
+        over['material']=mat[1]
+    elif len(mat)==3:
+        over['endu']=mat[0]
+        over['material']=mat[1]
+        if mat[2] == 'static':
+            over['targetname'] = '' # if the antline doesn't have frames, allow it to be static.
+    else:
+        over['material']=mat
     
 def change_overlays():
     "Alter the overlays."
@@ -613,14 +659,13 @@ def change_overlays():
         if over['material'].casefold() in ANTLINES:
             angle = over['angles'].split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
-            new_tex = get_tex('overlay.'+ANTLINES[over['material'].casefold()]).split("|")
-            if len(new_tex)==2:
-                over['endu']=new_tex[0] # rescale antlines if needed
-                over['material']=new_tex[1]
+            new_tex = get_tex('overlay.'+ANTLINES[over['material'].casefold()])
+            set_antline_mat(over, new_tex)
+        if (over['targetname'] in ("exitdoor_stickman","exitdoor_arrow")) :
+            if get_opt("remove_exit_signs") =="1":
+                map.remove_ent(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
             else:
-                over['material']=new_tex
-        if (over['targetname'] in ("exitdoor_stickman","exitdoor_arrow")) and (get_opt("remove_exit_signs") =="1"):
-            map.remove_ent(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
+                over['targetname'] = '' # blank the targetname, so we don't get the info_overlay_accessors
     
 def change_trig():
     "Check the triggers and fizzlers."
