@@ -765,16 +765,6 @@ def fix_inst():
             # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
             if inst['angles'] in fizzler_angle_fix.keys():
                 inst['angles'] =fizzler_angle_fix[inst['angles']]
-                
-            
-            if settings['fizzler']['splitinstances']=="1" and get_opt("fizzmodelfile") in inst['file']:
-                skin = inst.get_fixup('skin')
-                # switch to alternate instances depending on what type of fizzler, to massively save ents
-                # we don't want to do it to custom ones though
-                if skin == '0' :
-                    inst['file'] = inst['file'][:-4] + "_fizz.vmf" 
-                if skin == '2':
-                    inst['file'] = inst['file'][:-4] + "_las.vmf"
                     
             if "ccflag_comball" in inst['file']:
                 inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
