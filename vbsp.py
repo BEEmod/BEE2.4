@@ -140,7 +140,6 @@ TEX_FIZZLER = {
     
 FIZZ_OPTIONS = {
     "scanline"       : "0",
-    "splitinstances" : "0",
     }
     
 settings = {"textures"           : {},
@@ -1066,7 +1065,6 @@ def run_vbsp(args, do_swap):
 
 # MAIN
 to_pack = [] # the file path for any items that we should be packing
-conditions = {} # All conditions that should be checked to see if they match
 
 root = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
