@@ -244,16 +244,16 @@ def load_settings():
     for pack in pack_commands:
         process_packer(pack.value)
         
-    conditions = Property.find_all(conf, 'commands', 'condition')
+    conditions = Property.find_all(conf, 'conditions', 'condition')
     for cond in conditions:
         type = cond.find_key('type', '').value.upper()
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
         for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview", "instance", "StyleVar"):
-            flags += cond.find_all('condition', f)
+            flags += cond.find_all(f)
         results = []
-        for val in cond.find_all('condition', 'result'):
+        for val in cond.find_all('result'):
             results.extend(val.value) # join multiple ones together
         if len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "type": type}
@@ -300,10 +300,15 @@ def satisfy_condition(cond, inst):
         name = flag.name.casefold()
         if name == 'instance':
             subres = inst['file'] == flag.value
-        if name == 'instflag':
+        elif name == 'instflag':
             subres = flag.value in inst['file']
-        elif name == 'stylevar':
+        elif name == 'instvar':
+            bits = flag.value.split(' ')
+            subres = inst.get_fixup(bits[0]) == bits[1]
+        elif name == 'stylevartrue':
             subres = settings['styleVars'].get(flag.value.casefold(), False)
+        elif name == 'stylevarfalse':
+            subres = settings['styleVars'].get(flag.value.casefold(), True)
         elif name == 'ifstyletrue' or 'ifstylefalse':
             subres = False
         if isAnd:
@@ -311,13 +316,12 @@ def satisfy_condition(cond, inst):
         else:
             sat = sat or subres
     if len(cond['flags']) == 0:
-        sat = True # Always satisfy this!
-    print(sat, cond['flags'])   
+        sat = True # Always satisfy this! 
+    print(cond['flags'], sat)
     if sat:
-        print('NEED TO SATISFY!')
-        print(cond['results'])
         for res in cond['results'][:]:
-            name = flag.name.casefold()
+            name = res.name.casefold()
+            inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
             if name == "changeinstance":
                 # Set the file to a value
                 inst['file'] = res.value
@@ -325,13 +329,24 @@ def satisfy_condition(cond, inst):
                 process_packer(res.value)
             elif name == 'suffix':
                 # Add the specified suffix to the filename
-                inst['file'] = inst['file'][:-4] + res.value + '.vmf'
+                inst['file'] += res.value
+            elif name == 'instvar':
+                if res.has_children():
+                    val = inst.get_fixup(res.find_key('variable', '').value)
+                    for rep in res: # lookup the number to determine the appending value
+                        if rep.name.casefold() == 'variable':
+                            continue
+                        if rep.name == val:
+                            inst['file'] += '_' + rep.value
+                            break
+                else: # append the value         
+                    inst['file'] += '_' + inst.get_fixup(res.value, '')
             elif name == "variant":
                 # add _var4 or so to the instance name
-                inst['file'] = inst['file'][:-4] + "_var" + random.choice(res.value) + ".vmf"
+                inst['file'] += "_var" + random.choice(res.value)
             elif name == "addglobal":
                 # Add one instance in a location, but only once
-                new_inst = Entity(map, keys={
+                new_inst = VLib.Entity(map, keys={
                              "classname" : "func_instance",
                              "targetname" : res.find_key('name', '').value,
                              "file" : res.find_key('file', '').value,
@@ -344,7 +359,7 @@ def satisfy_condition(cond, inst):
                 cond['results'].remove(res)
             elif name == "addoverlay": 
                 # Add another instance on top of this one
-                new_inst = Entity(map, keys={
+                new_inst = VLib.Entity(map, keys={
                              "classname" : "func_instance",
                              "targetname" : inst['targetname'],
                              "file" : res.find_key('file', '').value,
@@ -362,6 +377,7 @@ def satisfy_condition(cond, inst):
                 for opt in res.value:
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
+            inst['file'] += '.vmf'
     return sat
     
 def process_inst_overlay(lst):
@@ -381,7 +397,7 @@ def process_packer(f_list):
         if cmd.name.casefold()=="add_list":
             to_pack.append("|list|" + cmd.value)
             
-def variant_weight(vars):
+def variant_weight(var):
     "Read variant commands from settings and create the weight list."
     inst = var.find_key('base', '').value
     count = var.find_key('number', '').value
@@ -751,7 +767,7 @@ def fix_inst():
         if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
         for cond in settings['conditions']:
-            satisfy_condition(inst)
+            satisfy_condition(cond, inst)
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
