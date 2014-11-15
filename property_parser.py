@@ -270,6 +270,9 @@ class Property:
         "Does this have child properties?"
         return isinstance(self.value, list)
         
+    def __repr__(self):
+        return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
+        
     def __str__(self):
         if self.valid:
             return '\n'.join(self.to_strings())

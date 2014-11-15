@@ -849,7 +849,11 @@ class Entity():
         - This will return None instead of KeyError if the value is not found.
         - It ignores case-matching, but will use the first given version of a key.
         - If used via Entity.get() the default argument is available.
+        - A tuple can be passed for the default to be set, inside the [] syntax.
         '''
+        if isinstance(key, tuple):
+            default = key[1]
+            key = key[0]
         key = key.casefold()
         for k in self.keys:
             if k.casefold() == key:
