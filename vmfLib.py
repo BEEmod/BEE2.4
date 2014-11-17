@@ -490,6 +490,8 @@ class Solid:
 
 class Side:
     "A brush face."
+    __slots__ = ('map', 'planes', 'id', 'lightmap', 'smooth', 'mat', 'ham_rot', 'uaxis', 'vaxis', 
+                 'disp_power', 'disp_pos', 'disp_flags', 'disp_elev', 'disp_is_subdiv', 'disp_allowed_verts', 'disp_data', 'is_disp')
     def __init__(self, map, planes=[(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt={}, des_id=-1, disp_data={}):
         self.map = map
         self.planes = [0,0,0]

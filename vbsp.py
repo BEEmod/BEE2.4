@@ -681,33 +681,36 @@ def change_func_brush():
     for brush in itertools.chain(map.iter_ents({'classname':'func_brush'}),
                                  map.iter_ents({'classname':'func_rotating'})):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
-        parent = brush['parentname']
-        if parent is None:
-            parent = ''
+        parent = brush['parentname', '']
         type="" 
         # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
+        top_side = None
         for side in brush.sides():
             if side.mat.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
                 side.mat = get_tex("special.edge")
             elif side.mat.casefold() in WHITE_PAN:
                 type="white"
+                top_side=side
                 if not get_tex("special.white") == "":
                     side.mat = get_tex("special.white")
                 elif not alter_mat(side):
                     side.mat = get_tex("white.wall")
             elif side.mat.casefold() in BLACK_PAN:
                 type="black"
+                top_side=side
                 if not get_tex("special.black") == "":
                     side.mat = get_tex("special.black")
                 elif not alter_mat(side):
                     side.mat = get_tex("black.wall")
             else:
                 alter_mat(side) # for gratings, laserfields and some others
-        if brush['classname']=="func_brush" and "-model_arms" in parent: # is this an angled panel?:
-            targ=parent.split("-model_arms")[0]
+        if "-model_arms" in parent: # is this an angled panel?:
+            targ='-'.join(parent.split("-")[:-1]) # strip only the model_arms off the end
             for ins in map.iter_ents({'classname':'func_instance', 'targetname':targ}):
                 if make_static_pan(ins, type):
                     map.remove_ent(brush) # delete the brush, we don't want it if we made a static one
+                else:
+                    brush['targetname']=brush['targetname'].replace('_panel_top', '-brush')
     
 def make_static_pan(ent, type):
     "Convert a regular panel into a static version, to save entities and improve lighting."
@@ -749,6 +752,11 @@ def change_ents():
         # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
         for ent in map.iter_ents({'classname' : 'info_lighting'}):
             ent.remove()
+    for auto in map.iter_ents({'classname':'logic_auto'}):
+        # remove all the logic_autos that set attachments, we can replicate this in the instance
+        for out in auto.outputs:
+            if 'panel_top' in out.target:
+                map.remove_ent(auto)
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
