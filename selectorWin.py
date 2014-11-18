@@ -29,20 +29,29 @@ class selWin:
         "Quit and cancel."
         self.win.grab_release()
         self.win.withdraw()
-        self.callback(None)
+        self.callback(self.orig_selected.name)
         
     def confirm(self):
         "Quit and return the newly-selected item."
         self.win.grab_release()
         self.win.withdraw()
-        if self.item_list[self.selected] == self.noneItem:
+        if self.selected == self.noneItem:
             self.callback(None)
         else:
-            self.callback(self.item_list[self.selected].name)
+            self.callback(self.selected.name)
+            
+    def reset_sel(self):
+        if self.suggested is not None:
+            self.sel_item(self.suggested)
         
     def sel_item(self, item):
-        self.prop_author['text'] = item.longName
-        self.prop_name['text'] = item.author
+        self.prop_name['text'] = item.longName
+        if item.author == '':
+            self.prop_author['text'] = ''
+        elif ',' in item.author:
+            self.prop_author['text'] = 'Authors: ' + item.author
+        else:
+            self.prop_author['text'] = 'Author: ' + item.author
         self.prop_icon['image'] = item.icon
         
         self.prop_desc['state']="normal"
@@ -50,29 +59,41 @@ class selWin:
         self.prop_desc.insert("end", item.desc) 
         self.prop_desc['state']="disabled"
         
-        self.item_list[self.selected].button.state(('!alternate',))
-        
-        self.selected = self.item_list.index(item)
+        self.selected.button.state(('!alternate',))
+        self.selected = item
         item.button.state(('alternate',))
+        
+        if self.suggested is None or self.selected == self.suggested:
+            self.prop_reset.state(('disabled',))
+        else:
+            self.prop_reset.state(('!disabled',))
     
     def flow_items(self, e):
         self.pal_frame.update_idletasks()
         self.pal_frame['width']=self.wid_canvas.winfo_width()
+        self.prop_name['wraplength'] = self.prop_desc.winfo_width()
         width=(self.wid_canvas.winfo_width()-10) // 80
         if width <1:
             width=1 # we got way too small, prevent division by zero
         itemNum=len(self.item_list)
-        self.wid_canvas['scrollregion'] = (0, 0, width*80, math.ceil(itemNum/width)*100+2)
-        self.pal_frame['height']=(math.ceil(itemNum/width)*100+2)
+        self.wid_canvas['scrollregion'] = (0, 0, width*80, math.ceil(itemNum/width)*115+20)
+        self.pal_frame['height']=(math.ceil(itemNum/width)*115+20)
         for i,item in enumerate(self.item_list):
-            item.button.place(x=((i%width) *80+1),y=((i//width)*100+1))
+            if item == self.suggested:
+                self.sugg_lbl.place(x=((i%width) *80+1),y=((i//width)*115))
+                self.sugg_lbl['width'] = item.button.winfo_width()
+            item.button.place(x=((i%width) *80+1),y=((i//width)*115+20))
             item.button.lift()
 
-    def __init__(self, tk, lst, cback):
+    def __init__(self, tk, lst, cback, has_none=True, none_desc='Do not add anything.'):
         self.callback=cback
-        self.noneItem = Item('NONE','<None>')
+        self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = png.loadPng('none')
-        self.item_list = [self.noneItem] + lst
+        self.suggested = None
+        if has_none:
+            self.item_list = [self.noneItem] + lst
+        else:
+            self.item_list = lst
         self.win=Toplevel(tk)
         self.win.title("BEE2")
         self.win.resizable(True, True)
@@ -88,7 +109,7 @@ class selWin:
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
         
-        self.wid_canvas = Canvas(shim)
+        self.wid_canvas = Canvas(shim, highlightthickness=0)
         self.wid_canvas.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
 
         self.pal_frame=ttk.Frame(self.wid_canvas) # add another frame inside to place labels on
@@ -97,6 +118,8 @@ class selWin:
         self.wid_scroll = ttk.Scrollbar(shim, orient=VERTICAL, command=self.wid_canvas.yview)
         self.wid_scroll.grid(row=0, column=1, sticky="NS")
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
+        
+        self.sugg_lbl = ttk.LabelFrame(self.pal_frame, text="Suggested", labelanchor=N, height=50)
         
         self.prop_frm = ttk.Frame(self.win, borderwidth=4, relief='raised')
         self.prop_frm.grid(row=0, column=1, sticky="NSEW")
@@ -109,7 +132,7 @@ class selWin:
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column = 0)
         
-        self.prop_name = ttk.Label(self.prop_frm, text="Item")
+        self.prop_name = ttk.Label(self.prop_frm, text="Item", justify=CENTER, font=("Helvetica", 12, "bold"))
         self.prop_name.grid(row=1, column = 0, columnspan=4)
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
         self.prop_author.grid(row=2, column = 0, columnspan=4)
@@ -139,32 +162,49 @@ class selWin:
         ttk.Sizegrip(self.prop_frm).grid(row=6, column=3, sticky="SE")
         
         for item in self.item_list:
-            item.button = ttk.Button(self.pal_frame, text=item.shortName, image=item.icon, compound='top')
+            if item==self.noneItem:
+                item.button = ttk.Button(self.pal_frame, image=item.icon)
+            else:
+                item.button = ttk.Button(self.pal_frame, text=item.shortName, image=item.icon, compound='top')
             item.win = self.win
             item.button.bind("<Button-1>",lambda e, s=self, i=item: s.sel_item(i))
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>",lambda e, s=self: s.flow_items(e))
         
 
-    def open(self, parent, title, suggested = "", selected = ""):
+    def open(self, parent, title, suggested='', selected=''):
         self.win.title("BEE2 - " + title)
         self.win.transient(master=parent)
-        self.selected = 0
+        self.selected = self.item_list[0]
+        self.suggested = None
+        for item in self.item_list:
+            if item.name == suggested:
+                self.suggested=item
+            if item.name == suggested:
+                self.selected=item
+        self.orig_selected = self.selected
         self.parent = parent
         
         self.win.deiconify()
         self.win.lift(parent)
         self.win.grab_set()
         self.win.geometry('+'+str(parent.winfo_rootx()-30)+'+'+str(parent.winfo_rooty()-self.win.winfo_reqheight()-30))
-        self.sel_item(self.item_list[self.selected])
+        self.sel_item(self.selected)
 
-if __name__ == '__main__': # load the window if directly executing this file
+if __name__ == '__main__': # test the window if directly executing this file
     root=Tk()
     lbl = ttk.Label(root, text="I am a demo window.")
     lbl.grid()
     png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
     root.geometry("+500+500")
     lst = [
+        Item(
+            "SKY_BLACK", 
+            "Black", 
+            longName = "Darkness", 
+            icon = "faithplate_128",
+            author = "Valve",
+            desc = 'Pure black darkness. Nothing to see here.'),
         Item(
             "SKY_BTS", 
             "BTS", 
@@ -174,17 +214,11 @@ if __name__ == '__main__': # load the window if directly executing this file
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
                    'carrying objects throughout the facility. Abandoned offices can '
-                   'often be found here.'),
-        Item(
-            "SKY_BLACK", 
-            "Black", 
-            longName = "Darkness", 
-            icon = "faithplate_128",
-            author = "Valve",
-            desc = 'Pure black darkness. Nothing to see here.')
+                   'often be found here.')
           ]
+        
     def done(x):
         print(x)
         root.withdraw()
-    window = selWin(root, lst, done)
-    window.open(root, "Skybox", suggested = "NONE")
+    window = selWin(root, lst, print, has_none=True, none_desc='Pure blackness. Nothing to see here.')
+    window.open(root, "Skybox", suggested = "SKY_BLACK", selected="SKY_BTS")
