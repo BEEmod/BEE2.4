@@ -646,6 +646,10 @@ class Side:
         '''
         for p in self.planes:
             p += diff
+    
+    def plane_desc(self):
+        '''Return a string which describes this face, for use in texture randomisation.'''
+        return self.planes[0].join(' ') + self.planes[1].join(' ') + self.planes[2].join(' ')
         
 class Entity():
     '''A representation of either a point or brush entity.

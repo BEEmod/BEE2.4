@@ -66,7 +66,8 @@ TEX_DEFAULTS = [ # extra default replacements we need to specially handle
         ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
         ] 
     
-WHITE_PAN = ["tile/white_floor_tile002a",
+WHITE_PAN = [
+             "tile/white_floor_tile002a",
              "tile/white_wall_tile003a", 
              "tile/white_wall_tile003h", 
              "tile/white_wall_tile003c", 
@@ -111,7 +112,7 @@ DEFAULTS = {
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
     "clearPanelFile"          : "instances/p2editor/panel_clear.vmf",
-    "fizzmodelfile"           : "instances/p2editor/barrier_hazard_model.vmf",
+    "ambLightFile"            : "instances/p2editor/point_light.vmf",
     "clump_wall_tex"          : "0",
     "clump_size"              : "4",
     "clump_width"             : "2",
@@ -170,8 +171,11 @@ def get_tex(name):
     else:
         raise Exception('No texture "' + name + '"!')
     
-def alter_mat(prop):
+def alter_mat(prop, seed=None):
+    "Randomise the texture used for a face, based on configured textures."
     mat=prop.mat.casefold()
+    if seed:
+        random.seed(seed)
     if mat in TEX_VALVE: # should we convert it?
         prop.mat = get_tex(TEX_VALVE[mat])
         return True
@@ -269,7 +273,7 @@ def load_map(path):
         map=VLib.VMF.parse(Property.parse(file))
     utils.con_log("Parsing complete!")
 
-def check_conditions():
+def check_glob_conditions():
     "Check all the global conditions, like style vars."
     utils.con_log("Checking global conditions...")
     false_ent = VLib.Entity(map, id=999999999) # create a fake entity to apply file-changing commands to
@@ -356,6 +360,12 @@ def satisfy_condition(cond, inst):
                     inst['file'] += '_' + inst.get_fixup(res.value, '')
             elif name == "variant":
                 # add _var4 or so to the instance name
+                if inst['targetname', ''] == '':
+                    # some instances don't get names, so use the global seed instead
+                    # for stuff like elevators, the origin is constant so we can't just use that
+                    random.seed(map_seed + inst['origin'] + inst['angles'])
+                else:
+                    random.seed(inst['targetname'])
                 inst['file'] += "_var" + random.choice(res.value)
             elif name == "addglobal":
                 # Add one instance in a location, but only once
@@ -385,6 +395,7 @@ def satisfy_condition(cond, inst):
                 for over in map.iter_ents({
                         'classname' : 'info_overlay', 
                         'targetname' : over_name}):
+                    random.seed(over['origin'])
                     new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
                     set_antline_mat(over, new_tex)
                 if res.value['instance'] != '': # allow replacing the indicator_toggle instance
@@ -493,6 +504,14 @@ def load_entities():
                 cond['flags'].remove(r)
             del to_rem
 
+def calc_rand_seed():
+    '''Use the ambient light entities to create a map seed, so textures remain the same.'''
+    lst = [inst['targetname'] for inst in map.iter_ents({'classname':'func_instance', 'file':get_opt("ambLightFile")})]
+    if len(lst) == 0:
+        return 'SEED'
+    else:
+        return '|'.join(lst)
+
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
@@ -530,6 +549,7 @@ def random_walls():
         for face in solid:
             is_blackceil = roof_tex(face)
             if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+                random.seed(face.plane_desc() + '_SCALE_VAL')
                 scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
                 split=face.uaxis.split(" ")
                 split[-1] = scale
@@ -537,8 +557,8 @@ def random_walls():
                 
                 split=face.vaxis.split(" ")
                 split[-1] = scale
-                face.vaxis=" ".join(split)   
-            alter_mat(face)
+                face.vaxis=" ".join(split)
+            alter_mat(face, face.plane_desc())
     
 def clump_walls():
     "A wall style where textures are used in small groups near each other, clumped together."
@@ -575,17 +595,22 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
-                roof_tex(face)
+                    random.seed(origin)
+                    roof_tex(face)
                 
     todo_walls = len(walls) # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
     clump_wid = int(get_opt("clump_width"))
     clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
-    wall_pos = list(walls.keys())
+    wall_pos = list(walls.keys()).sort()
+    
+    random.seed(map_seed)
     for i in range(clump_numb):
         pos = random.choice(wall_pos)
         type = walls[pos].mat
+        state=random.getstate() # keep using the map_seed for the clumps
         if type == "WHITE" or type=="BLACK":
+            random.seed(pos)
             pos_min = [0,0,0]
             pos_max = [0,0,0]
             direction = random.randint(0,2) # these are long strips extended in one direction
@@ -606,8 +631,10 @@ def clump_walls():
                             side = walls[x,y,z]
                             if side.mat == type:
                                 side.mat = tex
+        random.setstate(state)
     
-    for face in walls.values():   
+    for pos, face in walls.items():   
+        random.seed(pos)
         if face.mat =="WHITE":
         # we missed these ones!
             if not get_tex("special.white_gap") == "":
@@ -620,9 +647,9 @@ def clump_walls():
             else:
                     face.mat = get_tex("black.wall")
         else:
-            alter_mat(face)
+            alter_mat(face, seed=pos)
     
-def roof_tex(face):
+def roof_tex(face, seed):
     "Determine if a texture is on the roof or if it's on the floor, and apply textures appropriately."
     is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
     if face.mat.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
@@ -1103,8 +1130,6 @@ if not path.endswith(".vmf"):
     new_path += ".vmf"
 
 load_settings()   
-load_map(path)
-check_conditions()
 
 if '-force_peti' in args or '-force_hammer' in args:
     # we have override command!
@@ -1121,14 +1146,17 @@ else:
 if is_hammer: 
     utils.con_log("Hammer map detected! skipping conversion..")
     run_vbsp(old_args, False)
-    hammer_pack_scan()
     make_packlist(path)
 else:
     utils.con_log("PeTI map detected!")
-    max_ent_id=-1
     unique_counter=0
+    
+    load_map(path)
+    
+    map_seed = calc_rand_seed()
+    print('SEED = ' + map_seed)
     progs = [
-             load_entities, fix_inst, 
+             check_glob_conditions, load_entities, fix_inst, 
              change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
