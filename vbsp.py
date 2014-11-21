@@ -111,13 +111,26 @@ DEFAULTS = {
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
-    "clearPanelFile"          : "instances/p2editor/panel_clear.vmf",
-    "ambLightFile"            : "instances/p2editor/point_light.vmf",
     "clump_wall_tex"          : "0",
     "clump_size"              : "4",
     "clump_width"             : "2",
     "clump_number"            : "6",
     }
+
+# These instances have to be specially handled / we want to identify them
+# The corridors are used as a startsWith match, others are exact only
+inst_file = {
+    "coopExit"    : "instances/p2editor/coop_exit.vmf",
+	"coopEntry"   : "instances/p2editor/door_entrance_coop_1.vmf",
+	"spExit"      : "instances/p2editor/elevator_exit.vmf",
+	"spEntry"     : "instances/p2editor/elevator_entrance.vmf",
+    "spExitCorr"  : "instances/p2editor/door_exit_",
+    "spEntryCorr" : "instances/p2editor/door_entrance_",
+    "coopCorr"    : "instances/p2editor/door_exit_coop_",
+    "clearPanel"  : "instances/p2editor/panel_clear.vmf",
+    "ambLight"    : "instances/p2editor/point_light.vmf",
+    "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf"
+}
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
     "0 0 -90"   : "0 180 90",
@@ -221,7 +234,11 @@ def load_settings():
         for key,item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
     cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
-        
+    
+    for prop in Property.find_all(conf, 'instancefiles'):
+        for key,val in inst_file.items():
+            inst_file[key] = prop.find_key(key, val).value
+    
     for fizz in cust_fizzlers:
         flag = fizz.find_key('flag')
         if flag in settings['cust_fizzler']:
@@ -263,7 +280,6 @@ def load_settings():
             settings['conditions'].append(con)
    
     process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
-    
     utils.con_log("Settings Loaded!")
     
 def load_map(path):
@@ -276,17 +292,45 @@ def load_map(path):
 def check_glob_conditions():
     "Check all the global conditions, like style vars."
     utils.con_log("Checking global conditions...")
+    
+    game_mode = 'ERR'
+    is_preview = 'ERR'
+    for item in map.iter_ents({'classname':'func_instance'}):
+        if item['file'] == inst_file['coopExit']:
+            game_mode = 'COOP'
+        elif item['file'] == inst_file['spExit']:
+            game_mode = 'SP'
+        elif (item['file'] == inst_file['spEntry'] or 
+             item['file'].startswith(inst_file['coopCorr'])):
+            is_preview = item.get_fixup('no_player_start') == '0'
+        if is_preview != 'ERR' and game_mode != 'ERR':
+            break # found everything
+            
+    utils.con_log("Game Mode: " + game_mode)
+    utils.con_log("Is Preview: " + str(is_preview))
+            
     false_ent = VLib.Entity(map, id=999999999) # create a fake entity to apply file-changing commands to
+    
     for cond in settings['conditions'][:]:
         to_rem = []
         for flag in cond['flags'][:]:
-            if flag.name.casefold() in ("ifstyletrue", "ifstylefalse"):
-                var = flag.value.casefold()
-                if var in DEFAULTS.keys(): # is it a valid var?
-                    if (get_opt(var) == "1" and flag.name.casefold().endswith("true")):
+            name = flag.name.casefold()
+            val = flag.value.casefold()
+            if name in ("ifstyletrue", "ifstylefalse"):
+                if val in DEFAULTS.keys(): # is it a valid var?
+                    if (get_opt(val) == "1" and name.endswith("true")):
                         cond['flags'].remove(flag)
-                    elif (get_opt(var) == "0" and flag.name.casefold().endswith("false")):
+                    elif (get_opt(val) == "0" and name.endswith("false")):
                         cond['flags'].remove(flag)
+            elif name == "ifmode":
+                if game_mode=='COOP' and val == "coop":
+                    cond['flags'].remove(flag)
+                if game_mode=='SP' and val == "sp":
+                    cond['flags'].remove(flag)
+            elif name == "ifpreview" and is_preview is True:
+                cond['flags'].remove(flag)
+            elif name == "ifnotpreview" and is_preview is False:
+                cond['flags'].remove(flag)
         
         for res in cond['results']:
             if res.name.casefold() == 'variant':
@@ -326,8 +370,7 @@ def satisfy_condition(cond, inst):
             subres = settings['styleVars'].get(flag.value.casefold(), False)
         elif name == 'stylevarfalse':
             subres = settings['styleVars'].get(flag.value.casefold(), True)
-        elif name == 'ifstyletrue' or 'ifstylefalse':
-            subres = False
+
         if isAnd:
             sat = sat and subres
         else:
@@ -352,7 +395,7 @@ def satisfy_condition(cond, inst):
                     val = inst.get_fixup(res.find_key('variable', '').value)
                     for rep in res: # lookup the number to determine the appending value
                         if rep.name.casefold() == 'variable':
-                            continue
+                            continue # this isn't a lookup command!
                         if rep.name == val:
                             inst['file'] += '_' + rep.value
                             break
@@ -470,43 +513,10 @@ def variant_weight(var):
         return weight
     else:
         return [''] # This won't append anything to the file
-        
-def load_entities():
-    "Read through all the entities and sort to different lists based on classname"
-    utils.con_log("Scanning Entities...")
-    for item in map.iter_ents({'classname':'func_instance'}):
-        for cond in settings['conditions'][:]: # check if it satisfies any conditions
-            to_rem = []
-            for flag in cond['flags']:
-                if flag.name.casefold() == "instflag":
-                    if flag.value in item['file']:
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-                elif flag.name.casefold() == "instfile":
-                    if flag.value == item['file']:
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-                elif flag.name.casefold() == "ifMode":
-                    if item['file'] == get_opt("coopexitfile") and flag.value.casefold() == "coop":
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-                    if item['file'] == get_opt("spexitfile") and flag.value.casefold() == "sp":
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-                elif flag.name.casefold() == "ifPreview":
-                    if item['file'] == get_opt("coopexitfile") and flag.value.casefold() == "coop":
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-                    if item['file'] == get_opt("spexitfile") and flag.value.casefold() == "sp":
-                        if flag not in to_rem:
-                            to_rem.append(flag)
-            for r in to_rem:
-                cond['flags'].remove(r)
-            del to_rem
 
 def calc_rand_seed():
     '''Use the ambient light entities to create a map seed, so textures remain the same.'''
-    lst = [inst['targetname'] for inst in map.iter_ents({'classname':'func_instance', 'file':get_opt("ambLightFile")})]
+    lst = [inst['targetname'] for inst in map.iter_ents({'classname':'func_instance', 'file':inst_file['ambLight']})]
     if len(lst) == 0:
         return 'SEED'
     else:
@@ -649,7 +659,7 @@ def clump_walls():
         else:
             alter_mat(face, seed=pos)
     
-def roof_tex(face, seed):
+def roof_tex(face):
     "Determine if a texture is on the roof or if it's on the floor, and apply textures appropriately."
     is_blackceil=False # we only want to change size of black ceilings, not floor so use this flag
     if face.mat.casefold() in ("metal/black_floor_metal_001c",  "tile/white_floor_tile002a"):
@@ -691,7 +701,7 @@ def change_overlays():
             if get_opt("remove_exit_signs") =="1":
                 map.remove_ent(over) # some have instance-based ones, remove the originals if needed to ensure it looks nice.
             else:
-                over['targetname'] = '' # blank the targetname, so we don't get the info_overlay_accessors
+                del over['targetname'] # blank the targetname, so we don't get the info_overlay_accessors
     
 def change_trig():
     "Check the triggers and fizzlers."
@@ -834,7 +844,7 @@ def fix_inst():
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
                     death_fizzler_change(inst, trig)
-        if inst['file'] == get_opt("clearPanelFile"):
+        if inst['file'] == inst_file['clearPanel']:
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
@@ -1154,9 +1164,8 @@ else:
     load_map(path)
     
     map_seed = calc_rand_seed()
-    print('SEED = ' + map_seed)
     progs = [
-             check_glob_conditions, load_entities, fix_inst, 
+             check_glob_conditions, fix_inst, 
              change_ents, add_extra_ents,
              change_brush, change_overlays, 
              change_trig, change_func_brush, 
