@@ -270,7 +270,9 @@ def load_settings():
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
-        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", "ifStyleFalse", "ifMode", "ifPreview", "instance", "StyleVar"):
+        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", 
+                  "ifStyleFalse", "ifMode", "ifPreview", "instance", 
+                  "StyleVar", "instVar"):
             flags += cond.find_all(f)
         results = []
         for val in cond.find_all('result'):
@@ -331,7 +333,6 @@ def check_glob_conditions():
                 cond['flags'].remove(flag)
             elif name == "ifnotpreview" and is_preview is False:
                 cond['flags'].remove(flag)
-        
         for res in cond['results']:
             if res.name.casefold() == 'variant':
                 res.value = variant_weight(res)

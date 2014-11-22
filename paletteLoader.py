@@ -23,7 +23,7 @@ def loadAll(dir):
     for name in contents:
         print("Loading '"+name+"'")
         name=os.path.join(dir,name)
-        if name.endswith('.zip'): #zipfile.is_zipfile(name):
+        if name.endswith('.zip'):
             with zipfile.ZipFile(name, 'r') as zip:
                 if 'positions.txt' in zip.namelist() and 'properties.txt' in zip.namelist(): # Is it valid?
                     pal=parse(zip.open('positions.txt', 'r'),zip.open('properties.txt', 'r'))
