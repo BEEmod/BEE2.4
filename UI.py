@@ -233,11 +233,15 @@ styleOptOther= [
 def demoMusic():
     messagebox.showinfo(message='This would play the track selected for a few seconds.')
     
-def palLoad(data): # load all given palettes
+def load_palette(data):
     global palettes
     print("loading data!")
     palettes=sorted(data,key=Palette.getName) # sort by name
-
+    
+def load_packages(data):
+    pass
+    
+    
 def loadPalUI():
     "Update the UI to show the correct palettes."
     print(palettes)
