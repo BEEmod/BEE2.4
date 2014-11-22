@@ -1,4 +1,0 @@
-"Authors" "Valve"
-"Description" "The set of original Portal 2 Items."
-"url" "https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker"
-"Styles" "Original Portal 2"

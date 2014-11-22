@@ -1,4 +1,0 @@
-"Authors" "BenVlodgi, Rantis"
-"Description" "Sucks anything except the player inside, even through portals"
-"url" ""
-"Styles" "Clean"
