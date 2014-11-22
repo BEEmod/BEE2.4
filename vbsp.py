@@ -342,7 +342,7 @@ def check_glob_conditions():
                     'antlinecorner' : [p.value for p in res.find_all('corner')],
                     'outputs' : res.find_all('output')
                     }
-                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) ==0:
+                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
                     cond['results'].remove(res) # invalid
         if len(cond['results']) == 0:
             settings['conditions'].remove(cond)

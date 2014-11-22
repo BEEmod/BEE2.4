@@ -11,6 +11,8 @@ import webbrowser
 from property_parser import Property
 from paletteLoader import Palette
 import itemPropWin
+from selectorWin import selWin
+from selectorWin import Item as selWinItem
 import sound as snd
 
 win=Tk()
@@ -90,10 +92,121 @@ muted = IntVar(value=0) # Is the sound fx muted?
 paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
 palettes=[]
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
+
+skybox_list = [
+    selWinItem(
+        "SKY_BLACK", 
+        "Black", 
+        longName = "Darkness", 
+        icon = "faithplate_128",
+        author = "Valve",
+        desc = 'Pure black darkness. Nothing to see here.'),
+    selWinItem(
+        "SKY_OVERGROWN",
+        "Sunlight",
+        longName = "Overgrown Sunlight",
+        author = "Valve",
+        desc = 'Sunlight peaking through crevices in the ground. Mostly pure white.'),
+    selWinItem(
+        "SKY_WHEATLEY",
+        'Fire',
+        longName = 'Reactor Fires',
+        author = 'Valve',
+        desc = 'An orange glow from the malfunctioning reactor core '
+               'beginning to self-destruct. Seen in the last few '
+               'Wheatley maps.'),
+    selWinItem(
+        "SKY_BTS", 
+        "BTS", 
+        longName="Behind The Scenes - Factory", 
+        icon= "faithplate_128",
+        author="TeamSpen210",
+        desc='The dark constuction and office areas of Aperture. Catwalks '
+             'extend between different buildings, with vactubes and cranes '
+             'carrying objects throughout the facility. Abandoned offices can '
+             'often be found here.')
+    ]
+      
+voice_list = [
+    selWinItem(
+        "VOICE_CAVE_50",
+        "50s Cave",
+        longName="1950s Cave",
+        icon="observation_room",
+        author="Carl Kenner, TeamSpen210",
+        desc="Cave"),
+    selWinItem(
+        "VOICE_CAVE_60",
+        "60s Cave",
+        longName="1960s Cave",
+        icon="observation_room",
+        author="Carl Kenner, TeamSpen210",
+        desc="Cave"),
+    selWinItem(
+        "VOICE_CAVE_70",
+        "70s Cave",
+        longName="1960s Cave",
+        icon="observation_room",
+        author="Carl Kenner, TeamSpen210",
+        desc="Cave"),
+    selWinItem(
+        "VOICE_CAVE_80",
+        "80s Cave",
+        longName="1980s Cave",
+        icon="observation_room",
+        author="Carl Kenner, TeamSpen210",
+        desc="Cave"),
+    ]
+    
+music_list = [
+    selWinItem(
+        "MUSIC_PETI",
+        "Random PeTI",
+        longName="Random PeTI (Robot Waiting Room)",
+        icon="observation_room",
+        author="Valve",
+        desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
+    selWinItem(
+        "MUSIC_A3_1",
+        "50s Chamber",
+        longName="You are Not Part of the Control Group",
+        icon="paintsplat_bounce",
+        author="Valve",
+        desc="Cave"),
+    selWinItem(
+        "MUSIC_A1",
+        "Future Starter",
+        longName="Future Starts With You",
+        icon="fixed_portal_door",
+        author="Valve",
+        desc="Cave"),
+    ]
+    
+goo_list = [   
+    selWinItem(
+        "GOO_NORM",
+        "Regular",
+        icon="goo",
+        author="Valve",
+        desc="The standard normal Toxic Goo."),
+        
+    selWinItem(
+        "GOO_NORM",
+        "Overgrown",
+        icon="goo",
+        author="Valve",
+        desc="A version of goo which is more reflective, and less polluted."),
+    ]
+    
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
-gooText = ('[Default]','[Bottomless Pit]','Regular', 'Overgrown', 'Portal 1')
+
+skybox_win = selWin(win, skybox_list, title='Skyboxes', has_none=False)
+voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
+music_win = selWin(win, music_list, title='Background Music', has_none=True, none_desc='Add no music to the map at all.')
+goo_win = selWin(win, goo_list, title='Goo Appearence', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
+
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
 tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
@@ -484,6 +597,7 @@ def initOption(f):
     props=ttk.LabelFrame(f, text="Properties")
     props.columnconfigure(1,weight=1)
     props.grid(row=3, column=0, sticky="EW")
+    ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=1,column=3, sticky="NS")
 
     ttk.Label(props, text="Style: ").grid(row=0, column=0)
     UIStyle=ttk.Combobox(props, values=styleText)
@@ -491,27 +605,16 @@ def initOption(f):
     UIStyle.grid(row=0, column=1, columnspan=2, sticky="EW")
 
     ttk.Label(props, text="Music: ").grid(row=1, column=0)
-    UI['opt_music']=ttk.Combobox(props, values = musicText)
-    UI['opt_music'].grid(row=1, column=1, sticky="EW")
-    UI['opt_music'].current(0)
+    music_win.init_display(props, row=1, column=1)
     ttk.Button(props, text=">", command=demoMusic, width='4pt').grid(row=1,column=2)
-    ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=1,column=3, sticky="NS")
 
     ttk.Label(props, text="Voice: ").grid(row=2, column=0)
-    UIVoice=ttk.Combobox(props, values=voiceText)
-    UIVoice.current(0)
-    UIVoice.grid(row=2, column=1, columnspan=2, sticky="EW")
-
     ttk.Label(props, text="Skybox: ").grid(row=3, column=0)
-    UISky=ttk.Combobox(props, values=skyboxText)
-    UISky.current(0)
-    UISky.grid(row=3, column=1, columnspan=2, sticky="EW")
-
-
     ttk.Label(props, text="Goo: ").grid(row=4, column=0)
-    UI['goo']=ttk.Combobox(props, values=gooText)
-    UI['goo'].current(0)
-    UI['goo'].grid(row=4, column=1, columnspan=2, sticky="EW")
+    
+    voice_win.init_display(props, row=2, column=1, colspan=2)
+    skybox_win.init_display(props, row=3, column=1, colspan=2)
+    goo_win.init_display(props, row=4, column=1, colspan=2)
 
 def initStyleOpt(f):
     global styleCheck, styleOptVars
