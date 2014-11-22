@@ -46,6 +46,7 @@ class selWin:
         self.win.resizable(True, True)
         self.win.iconbitmap('BEE2.ico')
         self.win.protocol("WM_DELETE_WINDOW", lambda s=self: s.exit())
+        self.win.bind("<Escape>",lambda e, s=self: s.exit())
         
         self.wid = {}
         shim = ttk.Frame(self.win, relief="sunken")
