@@ -454,16 +454,15 @@ def satisfy_condition(cond, inst):
                 if res.find_key("decConCount", '0').value == '1':
                     # decrease ConnectionCount on the ents, 
                     # so they can still process normal inputs
-                    for inst in map.iter_ents({'classname' : 'func_instance'}):
-                        if inst['targetname'] in done and inst.has_fixup('connectioncount'):
+                    for con_inst in map.iter_ents({'classname' : 'func_instance'}):
+                        if con_inst['targetname'] in done and con_inst.has_fixup('connectioncount'):
                             try:
-                                val = int(inst.get_fixup('connectioncount'))
-                                inst.set_fixup('connectioncount', str(val-1))
+                                val = int(con_inst.get_fixup('connectioncount'))
+                                con_inst.set_fixup('connectioncount', str(val-1))
                             except ValueError:
                                 # skip if it's invalid
-                                utils.con_log(inst['targetname'] + ' has invalid ConnectionCount!')
+                                utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
             elif name == "custantline":
-                print("CUST")
                 # customise the output antline texture, toggle instances
                 # allow adding extra outputs between the instance and the toggle
                 over_name ='@' + inst['targetname'] + '_indicator'
@@ -839,58 +838,57 @@ def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
     global to_pack
     utils.con_log("Editing Instances...")
-    for inst in map.entities[:]:
-        if inst['classname'] == 'func_instance':
-            if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
-                if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
-                    inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
-                else:
-                    inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
-                
-                # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
-                if inst['angles'] in fizzler_angle_fix.keys():
-                    inst['angles'] =fizzler_angle_fix[inst['angles']]
-                        
-                if "ccflag_comball" in inst['file']:
-                    inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
-                if "ccflag_death_fizz_model" in inst['file']:
-                    inst['targetname'] = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
-            elif "ccflag_paint_fizz" in inst['file']:
-                # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
-                for trig in triggers:
-                    if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
-                        trig['classname'] = "trigger_paint_cleanser"
-                        for side in trig.sides():
-                            side.mat = "tools/toolstrigger"
-            elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
-                for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
-                    # find the triggers that match this entity and mod them
-                    trig['classname'] = "trigger_multiple"
+    for inst in map.iter_ents({'classname':'func_instance'}):
+        if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
+            if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
+                inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
+            else:
+                inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
+            
+            # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
+            if inst['angles'] in fizzler_angle_fix.keys():
+                inst['angles'] =fizzler_angle_fix[inst['angles']]
+                    
+            if "ccflag_comball" in inst['file']:
+                inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
+            if "ccflag_death_fizz_model" in inst['file']:
+                inst['targetname'] = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
+        elif "ccflag_paint_fizz" in inst['file']:
+            # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
+            for trig in triggers:
+                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
+                    trig['classname'] = "trigger_paint_cleanser"
                     for side in trig.sides():
                         side.mat = "tools/toolstrigger"
-                    trig["filtername"] = "@filter_pellet"
-                    trig["wait"] = "0.1"
-                    trig['spawnflags'] = "72" # Physics Objects and 'Everything'
-                    trig.add_out(VLib.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
-                    # generate the output that triggers the pellet logic.
-                    trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
-                inst.outputs.clear() # all the original ones are junk, delete them!
-                for in_out in map.iter_ents(
-                       vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
-                       tags={'file':'ccflag_comball_out'}):
-                    # find the instance to use for output and add the commands to trigger its logic
-                    inst.add_out(VLib.Output("OnUser1", in_out['targetname'], "FireUser1", inst_in='in', inst_out='out'))
-                    inst.add_out(VLib.Output("OnUser2", in_out['targetname'], "FireUser2", inst_in='in', inst_out='out'))
-            elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
-                for trig in triggers:
-                    if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
-                        death_fizzler_change(inst, trig)
-            if inst['file'] == inst_file['clearPanel']:
-                make_static_pan(inst, "glass") # white/black are identified based on brush
-            if "ccflag_pist_plat" in inst['file']:
-                make_static_pist(inst) #try to convert to static piston
-            for cond in settings['conditions'][:]:
-                satisfy_condition(cond, inst)
+        elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
+            for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
+                # find the triggers that match this entity and mod them
+                trig['classname'] = "trigger_multiple"
+                for side in trig.sides():
+                    side.mat = "tools/toolstrigger"
+                trig["filtername"] = "@filter_pellet"
+                trig["wait"] = "0.1"
+                trig['spawnflags'] = "72" # Physics Objects and 'Everything'
+                trig.add_out(VLib.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
+                # generate the output that triggers the pellet logic.
+                trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
+            inst.outputs.clear() # all the original ones are junk, delete them!
+            for in_out in map.iter_ents(
+                   vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
+                   tags={'file':'ccflag_comball_out'}):
+                # find the instance to use for output and add the commands to trigger its logic
+                inst.add_out(VLib.Output("OnUser1", in_out['targetname'], "FireUser1", inst_in='in', inst_out='out'))
+                inst.add_out(VLib.Output("OnUser2", in_out['targetname'], "FireUser2", inst_in='in', inst_out='out'))
+        elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
+            for trig in triggers:
+                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
+                    death_fizzler_change(inst, trig)
+        if inst['file'] == inst_file['clearPanel']:
+            make_static_pan(inst, "glass") # white/black are identified based on brush
+        if "ccflag_pist_plat" in inst['file']:
+            make_static_pist(inst) #try to convert to static piston
+        for cond in settings['conditions'][:]:
+            satisfy_condition(cond, inst)
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
