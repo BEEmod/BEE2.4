@@ -129,7 +129,10 @@ inst_file = {
     "coopCorr"    : "instances/p2editor/door_exit_coop_",
     "clearPanel"  : "instances/p2editor/panel_clear.vmf",
     "ambLight"    : "instances/p2editor/point_light.vmf",
-    "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf"
+    "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf",
+    "indPanCheck" : "instances/p2editor/indicator_panel.vmf",
+    "indPanTimer" : "instances/p2editor/indicator_panel.vmf" 
+    # although unused, editoritems allows having different instances for toggle/timer panels
 }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -297,7 +300,7 @@ def check_glob_conditions():
     
     game_mode = 'ERR'
     is_preview = 'ERR'
-    for item in map.iter_ents({'classname':'func_instance'}):
+    for item in map.iter_ents(classname='func_instance'):
         if item['file'] == inst_file['coopExit']:
             game_mode = 'COOP'
         elif item['file'] == inst_file['spExit']:
@@ -438,7 +441,7 @@ def satisfy_condition(cond, inst):
                 # Add an additional output to the instance with any values
                 # Always points to the targeted item.
                 over_name ='@' + inst['targetname'] + '_indicator'
-                for toggle in map.iter_ents({'classname' : 'func_instance'}):
+                for toggle in map.iter_ents(classname='func_instance'):
                     if toggle.get_fixup('indicator_name', '') == over_name:
                         toggle_name = toggle['targetname']
                         break
@@ -446,35 +449,44 @@ def satisfy_condition(cond, inst):
                     toggle_name = '' # we want to ignore the toggle instance, if it exists
                 targets = [o.target for o in inst.outputs if o.target != toggle_name]
                 done = []
+                
+                kill_signs = res.find_key("remIndSign", '0').value == '1'
+                dec_con_count = res.find_key("decConCount", '0').value == '1'
+                if kill_signs or dec_con_count:
+                    for con_inst in map.iter_ents(classname='func_instance'):
+                        if con_inst['targetname'] in targets:
+                            if kill_signs and (con_inst['file'] == inst_file['indPanTimer'] or
+                                               con_inst['file'] == inst_file['indPanCheck']):
+                                map.remove_ent(con_inst)
+                            if dec_con_count and con_inst.has_fixup('connectioncount'):
+                            # decrease ConnectionCount on the ents, 
+                            # so they can still process normal inputs
+                                try:
+                                    val = int(con_inst.get_fixup('connectioncount'))
+                                    con_inst.set_fixup('connectioncount', str(val-1))
+                                except ValueError:
+                                    # skip if it's invalid
+                                    utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
                 for targ in targets:
                     if targ not in done:
                         for out in res.find_all('addOut'):
                             cond_out(inst, out, targ)
                         done.append(targ)
-                if res.find_key("decConCount", '0').value == '1':
-                    # decrease ConnectionCount on the ents, 
-                    # so they can still process normal inputs
-                    for con_inst in map.iter_ents({'classname' : 'func_instance'}):
-                        if con_inst['targetname'] in done and con_inst.has_fixup('connectioncount'):
-                            try:
-                                val = int(con_inst.get_fixup('connectioncount'))
-                                con_inst.set_fixup('connectioncount', str(val-1))
-                            except ValueError:
-                                # skip if it's invalid
-                                utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
+                
+                    
             elif name == "custantline":
                 # customise the output antline texture, toggle instances
                 # allow adding extra outputs between the instance and the toggle
                 over_name ='@' + inst['targetname'] + '_indicator'
-                for over in map.iter_ents({
-                        'classname' : 'info_overlay', 
-                        'targetname' : over_name}):
+                for over in map.iter_ents(
+                        classname='info_overlay',
+                        targetname=over_name):
                     print(over['origin'])
                     random.seed(over['origin'])
                     new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
                     set_antline_mat(over, new_tex)
                 if res.value['instance'] != '': # allow replacing the indicator_toggle instance
-                    for toggle in map.iter_ents({'classname' : 'func_instance'}):
+                    for toggle in map.iter_ents(classname='func_instance'):
                         if toggle.get_fixup('indicator_name', '') == over_name:
                             toggle['file'] = res.value['instance']
                             if len(res.value['outputs'])>0:
@@ -555,7 +567,7 @@ def variant_weight(var):
 
 def calc_rand_seed():
     '''Use the ambient light entities to create a map seed, so textures remain the same.'''
-    lst = [inst['targetname'] for inst in map.iter_ents({'classname':'func_instance', 'file':inst_file['ambLight']})]
+    lst = [inst['targetname'] for inst in map.iter_ents(classname='func_instance', file=inst_file['ambLight'])]
     if len(lst) == 0:
         return 'SEED'
     else:
@@ -728,7 +740,7 @@ def set_antline_mat(over,mat):
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
-    for over in map.iter_ents({'classname':'info_overlay'}):
+    for over in map.iter_ents(classname='info_overlay'):
         if over['material'].casefold() in TEX_VALVE:
             over['material'] = get_tex(TEX_VALVE[over['material'].casefold()])
         if over['material'].casefold() in ANTLINES:
@@ -745,7 +757,7 @@ def change_overlays():
 def change_trig():
     "Check the triggers and fizzlers."
     utils.con_log("Editing Triggers...")
-    for trig in map.iter_ents({'classname':'trigger_portal_cleanser'}):
+    for trig in map.iter_ents(classname='trigger_portal_cleanser'):
         for side in trig.sides():
             alter_mat(side)
         trig['useScanline'] = settings["fizzler"]["scanline"]
@@ -754,8 +766,8 @@ def change_trig():
 def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
-    for brush in itertools.chain(map.iter_ents({'classname':'func_brush'}),
-                                 map.iter_ents({'classname':'func_rotating'})):
+    for brush in itertools.chain(map.iter_ents(classname='func_brush'),
+                                 map.iter_ents(classname='func_rotating')):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
         type="" 
@@ -782,7 +794,7 @@ def change_func_brush():
                 alter_mat(side) # for gratings, laserfields and some others
         if "-model_arms" in parent: # is this an angled panel?:
             targ='-'.join(parent.split("-")[:-1]) # strip only the model_arms off the end
-            for ins in map.iter_ents({'classname':'func_instance', 'targetname':targ}):
+            for ins in map.iter_ents(classname='func_instance', targetname=targ):
                 if make_static_pan(ins, type):
                     map.remove_ent(brush) # delete the brush, we don't want it if we made a static one
                 else:
@@ -826,9 +838,9 @@ def change_ents():
     utils.con_log("Editing Other Entities...")
     if get_opt("remove_info_lighting") == "1":
         # styles with brush-based glass edges don't need the info_lighting, delete it to save ents.
-        for ent in map.iter_ents({'classname' : 'info_lighting'}):
+        for ent in map.iter_ents(classname='info_lighting'):
             ent.remove()
-    for auto in map.iter_ents({'classname':'logic_auto'}):
+    for auto in map.iter_ents(classname='logic_auto'):
         # remove all the logic_autos that set attachments, we can replicate this in the instance
         for out in auto.outputs:
             if 'panel_top' in out.target:
@@ -838,7 +850,7 @@ def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
     global to_pack
     utils.con_log("Editing Instances...")
-    for inst in map.iter_ents({'classname':'func_instance'}):
+    for inst in map.iter_ents(classname='func_instance'):
         if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
             if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
                 inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
@@ -861,7 +873,7 @@ def fix_inst():
                     for side in trig.sides():
                         side.mat = "tools/toolstrigger"
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
-            for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
+            for trig in map.iter_ents(classname='trigger_portal_cleanser', targetname=(inst['targetname'] + "_brush")):
                 # find the triggers that match this entity and mod them
                 trig['classname'] = "trigger_multiple"
                 for side in trig.sides():
@@ -873,7 +885,7 @@ def fix_inst():
                 # generate the output that triggers the pellet logic.
                 trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
             inst.outputs.clear() # all the original ones are junk, delete them!
-            for in_out in map.iter_ents(
+            for in_out in map.iter_ents_tags(
                    vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
                    tags={'file':'ccflag_comball_out'}):
                 # find the instance to use for output and add the commands to trigger its logic

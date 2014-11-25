@@ -278,13 +278,23 @@ class VMF:
             for br in self.brushes:
                 yield br
         if detail:
-            for ent in self.iter_ents({'classname':'func_detail'}):
+            for ent in self.iter_ents(classname='func_detail'):
                 for solid in ent.solids:
                     yield solid
+                    
+    def iter_ents(self, **cond):
+        '''Iterate through entities having the given keyvalue values.'''
+        items = cond.items()
+        for ent in self.entities[:]:
+            for key,value in items:
+                if not ent.has_key(key) or ent[key] != value:
+                    break
+            else:
+                yield ent
             
-    def iter_ents(self, vals = {}, tags = {}):
+    def iter_ents_tags(self, vals = {}, tags = {}):
         '''Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags.'''
-        for ent in self.entities:
+        for ent in self.entities[:]:
             for key,value in vals.items():
                 if not ent.has_key(key) or ent[key] != value:
                     break
