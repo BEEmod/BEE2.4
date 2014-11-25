@@ -894,6 +894,10 @@ class Entity():
             return self._fixup[var][0] # don't return the index
         else:
             return default
+            
+    def has_fixup(self, var):
+        '''Determine if this instance has the named $replace variable.'''
+        return var in self._fixup
      
     def set_fixup(self, var, val):
         '''Set the value of an instance $replace variable, creating it if needed.'''

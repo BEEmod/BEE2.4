@@ -341,7 +341,7 @@ def check_glob_conditions():
                     'instance' : res.find_key('instance', '').value,
                     'antline' : [p.value for p in res.find_all('straight')],
                     'antlinecorner' : [p.value for p in res.find_all('corner')],
-                    'outputs' : res.find_all('output')
+                    'outputs' : res.find_all('addOut')
                     }
                 if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
                     cond['results'].remove(res) # invalid
@@ -371,13 +371,12 @@ def satisfy_condition(cond, inst):
             subres = settings['styleVars'].get(flag.value.casefold(), False)
         elif name == 'stylevarfalse':
             subres = settings['styleVars'].get(flag.value.casefold(), True)
-
         if isAnd:
             sat = sat and subres
         else:
             sat = sat or subres
     if len(cond['flags']) == 0:
-        sat = True # Always satisfy this! 
+        sat = True # Always satisfy this!
     if sat:
         for res in cond['results'][:]:
             name = res.name.casefold()
@@ -413,17 +412,18 @@ def satisfy_condition(cond, inst):
                 inst['file'] += "_var" + random.choice(res.value)
             elif name == "addglobal":
                 # Add one instance in a location, but only once
-                new_inst = VLib.Entity(map, keys={
-                             "classname" : "func_instance",
-                             "targetname" : res.find_key('name', '').value,
-                             "file" : res.find_key('file', '').value,
-                             "angles" : "0 0 0",
-                             "origin" : res.find_key('position', '').value
-                           })
-                if new_inst['targetname'] == '':
-                    new_inst['targetname'] = "inst_"+str(unique_id())
-                map.add_ent(new_inst)
-                cond['results'].remove(res)
+                if res.value is not None:
+                    new_inst = VLib.Entity(map, keys={
+                                 "classname" : "func_instance",
+                                 "targetname" : res.find_key('name', '').value,
+                                 "file" : res.find_key('file', '').value,
+                                 "angles" : "0 0 0",
+                                 "origin" : res.find_key('position', '').value
+                               })
+                    if new_inst['targetname'] == '':
+                        new_inst['targetname'] = "inst_"+str(unique_id())
+                    map.add_ent(new_inst)
+                    res.value = None # Disable this
             elif name == "addoverlay": 
                 # Add another instance on top of this one
                 new_inst = VLib.Entity(map, keys={
@@ -434,11 +434,43 @@ def satisfy_condition(cond, inst):
                              "origin" : inst['origin']
                            })
                 map.add_ent(new_inst)
+            elif name == "custoutput":
+                # Add an additional output to the instance with any values
+                # Always points to the targeted item.
+                over_name ='@' + inst['targetname'] + '_indicator'
+                for toggle in map.iter_ents({'classname' : 'func_instance'}):
+                    if toggle.get_fixup('indicator_name', '') == over_name:
+                        toggle_name = toggle['targetname']
+                        break
+                else:
+                    toggle_name = '' # we want to ignore the toggle instance, if it exists
+                targets = [o.target for o in inst.outputs if o.target != toggle_name]
+                done = []
+                for targ in targets:
+                    if targ not in done:
+                        for out in res.find_all('addOut'):
+                            cond_out(inst, out, targ)
+                        done.append(targ)
+                if res.find_key("decConCount", '0').value == '1':
+                    # decrease ConnectionCount on the ents, 
+                    # so they can still process normal inputs
+                    for inst in map.iter_ents({'classname' : 'func_instance'}):
+                        if inst['targetname'] in done and inst.has_fixup('connectioncount'):
+                            try:
+                                val = int(inst.get_fixup('connectioncount'))
+                                inst.set_fixup('connectioncount', str(val-1))
+                            except ValueError:
+                                # skip if it's invalid
+                                utils.con_log(inst['targetname'] + ' has invalid ConnectionCount!')
             elif name == "custantline":
+                print("CUST")
+                # customise the output antline texture, toggle instances
+                # allow adding extra outputs between the instance and the toggle
                 over_name ='@' + inst['targetname'] + '_indicator'
                 for over in map.iter_ents({
                         'classname' : 'info_overlay', 
                         'targetname' : over_name}):
+                    print(over['origin'])
                     random.seed(over['origin'])
                     new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
                     set_antline_mat(over, new_tex)
@@ -446,15 +478,14 @@ def satisfy_condition(cond, inst):
                     for toggle in map.iter_ents({'classname' : 'func_instance'}):
                         if toggle.get_fixup('indicator_name', '') == over_name:
                             toggle['file'] = res.value['instance']
-                            for o in res.value['outputs']:
-                                # Allow adding extra outputs to customly trigger the toggle
-                                print('toggle',toggle['targetname'])
-                                inst.add_out(VLib.Output(
-                                    o.find_key('output','').value,
-                                    toggle['targetname', ''],
-                                    o.find_key('input','').value, 
-                                    inst_in=o.find_key('targ_in','').value, 
-                                    inst_out=o.find_key('targ_out','').value))
+                            if len(res.value['outputs'])>0:
+                                for out in inst.outputs[:]:
+                                    if out.target == toggle['targetname']:
+                                        inst.outputs.remove(out) # remove the original outputs
+                                for out in res.value['outputs']:
+                                    # Allow adding extra outputs to customly trigger the toggle
+                                    cond_out(inst, out, toggle['targetname'])
+                            
                     
             elif name == "styleVar":
                 for opt in res.value:
@@ -470,6 +501,14 @@ def satisfy_condition(cond, inst):
         if len(cond['results']) == 0:
             settings['conditions'].remove(cond)
     return sat
+    
+def cond_out(inst, prop, target):
+    inst.add_out(VLib.Output(
+        prop.find_key('output','').value,
+        target,
+        prop.find_key('input','').value, 
+        inst_in=prop.find_key('targ_in','').value, 
+        inst_out=prop.find_key('targ_out','').value))
     
 def process_inst_overlay(lst):
     for inst in lst:
@@ -800,57 +839,58 @@ def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
     global to_pack
     utils.con_log("Editing Instances...")
-    for inst in map.iter_ents({'classname':'func_instance'}):
-        if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
-            if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
-                inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
-            else:
-                inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
-            
-            # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
-            if inst['angles'] in fizzler_angle_fix.keys():
-                inst['angles'] =fizzler_angle_fix[inst['angles']]
-                    
-            if "ccflag_comball" in inst['file']:
-                inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
-            if "ccflag_death_fizz_model" in inst['file']:
-                inst['targetname'] = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
-        elif "ccflag_paint_fizz" in inst['file']:
-            # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
-            for trig in triggers:
-                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
-                    trig['classname'] = "trigger_paint_cleanser"
+    for inst in map.entities[:]:
+        if inst['classname'] == 'func_instance':
+            if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
+                if "_modelStart" in inst['targetname']: # strip off the extra numbers on the end, so fizzler models recieve inputs correctly
+                    inst['targetname'] = inst['targetname'].split("_modelStart")[0] + "_modelStart" 
+                else:
+                    inst['targetname'] = inst['targetname'].split("_modelEnd")[0] + "_modelEnd"
+                
+                # one side of the fizzler models are rotated incorrectly (upsidown), fix that...
+                if inst['angles'] in fizzler_angle_fix.keys():
+                    inst['angles'] =fizzler_angle_fix[inst['angles']]
+                        
+                if "ccflag_comball" in inst['file']:
+                    inst['targetname'] = inst['targetname'].split("_")[0] + "-model" + unique_id() # the field models need unique names, so the beams don't point at each other.
+                if "ccflag_death_fizz_model" in inst['file']:
+                    inst['targetname'] = inst['targetname'].split("_")[0] # we need to be able to control them directly from the instances, so make them have the same name as the base.
+            elif "ccflag_paint_fizz" in inst['file']:
+                # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
+                for trig in triggers:
+                    if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": # fizzler brushes are named like "barrierhazard46_brush"
+                        trig['classname'] = "trigger_paint_cleanser"
+                        for side in trig.sides():
+                            side.mat = "tools/toolstrigger"
+            elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
+                for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
+                    # find the triggers that match this entity and mod them
+                    trig['classname'] = "trigger_multiple"
                     for side in trig.sides():
                         side.mat = "tools/toolstrigger"
-        elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
-            for trig in map.iter_ents({'classname':'trigger_portal_cleanser','targetname': (inst['targetname'] + "_brush")}):
-                # find the triggers that match this entity and mod them
-                trig['classname'] = "trigger_multiple"
-                for side in trig.sides():
-                    side.mat = "tools/toolstrigger"
-                trig["filtername"] = "@filter_pellet"
-                trig["wait"] = "0.1"
-                trig['spawnflags'] = "72" # Physics Objects and 'Everything'
-                trig.add_out(VLib.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
-                # generate the output that triggers the pellet logic.
-                trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
-            inst.outputs.clear() # all the original ones are junk, delete them!
-            for in_out in map.iter_ents(
-                   vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
-                   tags={'file':'ccflag_comball_out'}):
-                # find the instance to use for output and add the commands to trigger its logic
-                inst.add_out(VLib.Output("OnUser1", in_out['targetname'], "FireUser1", inst_in='in', inst_out='out'))
-                inst.add_out(VLib.Output("OnUser2", in_out['targetname'], "FireUser2", inst_in='in', inst_out='out'))
-        elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
-            for trig in triggers:
-                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
-                    death_fizzler_change(inst, trig)
-        if inst['file'] == inst_file['clearPanel']:
-            make_static_pan(inst, "glass") # white/black are identified based on brush
-        if "ccflag_pist_plat" in inst['file']:
-            make_static_pist(inst) #try to convert to static piston
-        for cond in settings['conditions'][:]:
-            satisfy_condition(cond, inst)
+                    trig["filtername"] = "@filter_pellet"
+                    trig["wait"] = "0.1"
+                    trig['spawnflags'] = "72" # Physics Objects and 'Everything'
+                    trig.add_out(VLib.Output("OnStartTouch", inst['targetname']+"-branch_toggle", "FireUser1"))
+                    # generate the output that triggers the pellet logic.
+                    trig['targetname'] = inst['targetname'] + "-trigger" # get rid of the _, allowing direct control from the instance.
+                inst.outputs.clear() # all the original ones are junk, delete them!
+                for in_out in map.iter_ents(
+                       vals={'classname':'func_instance', 'origin':inst['origin'], 'angles':inst['angles']}, 
+                       tags={'file':'ccflag_comball_out'}):
+                    # find the instance to use for output and add the commands to trigger its logic
+                    inst.add_out(VLib.Output("OnUser1", in_out['targetname'], "FireUser1", inst_in='in', inst_out='out'))
+                    inst.add_out(VLib.Output("OnUser2", in_out['targetname'], "FireUser2", inst_in='in', inst_out='out'))
+            elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
+                for trig in triggers:
+                    if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush": 
+                        death_fizzler_change(inst, trig)
+            if inst['file'] == inst_file['clearPanel']:
+                make_static_pan(inst, "glass") # white/black are identified based on brush
+            if "ccflag_pist_plat" in inst['file']:
+                make_static_pist(inst) #try to convert to static piston
+            for cond in settings['conditions'][:]:
+                satisfy_condition(cond, inst)
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
