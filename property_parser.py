@@ -44,6 +44,7 @@ class Property:
         self.valid = True
 
     def edit(self, name=None, value=None):
+        '''Simultanously modify the name and value.'''
         if name is not None:
             self.name = name
         if value is not None:
@@ -92,10 +93,9 @@ class Property:
             
         return open_properties[0].value
         
-    def find_all(self: "list or Property", *keys) -> "List of matching Property objects":
+    def find_all(self: "list or Property", *keys) -> "Generator for of matching Property objects":
         "Search through a tree to obtain all properties that match a particular path."
         run_on = []
-        values = []
         depth = len(keys)
         if depth == 0:
             raise ValueError("Cannot find_all without commands!")
@@ -104,7 +104,7 @@ class Property:
         elif isinstance(self, Property):
             run_on.append(self)
             if not self.name == keys[0] and len(run_on)==1: # Add our name to the beginning if not present (otherwise this always fails)
-                return Property.find_all(run_on[0], *((self.name,) + keys))
+                yield from Property.find_all(run_on[0], *((self.name,) + keys))
                 
         for prop in run_on:
             if not isinstance(prop, Property):
@@ -112,10 +112,9 @@ class Property:
             if prop.name is not None and prop.name.casefold() == keys[0].casefold():
                 if depth > 1:
                     if isinstance(prop.value, list):
-                        values.extend(Property.find_all(prop.value, *keys[1:]))
+                        yield from Property.find_all(prop.value, *keys[1:])
                 else:
-                    values.append(prop)
-        return values
+                    yield prop
         
     def find_key(self: "list or Property", key, def_=None) -> "Property":
         "Obtain the value of the child Property with a name, with an optional default value."

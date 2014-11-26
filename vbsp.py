@@ -220,29 +220,26 @@ def load_settings():
         else:
             settings['textures'][key] = value
             
-    opts = Property.find_all(conf, 'options')
-    for options in opts:
+    for options in Property.find_all(conf, 'options'):
         for key in DEFAULTS: # get misc options
             settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
      
-    fizz_opts = Property.find_all(conf, 'fizzler')
     for item,key in TEX_FIZZLER.items():
         settings['fizzler'][key] = item
     for key,item in FIZZ_OPTIONS.items():
         settings['fizzler'][key] = item
-    for fizz_opt in fizz_opts:
+    for fizz_opt in Property.find_all(conf, 'fizzler'):
         for item,key in TEX_FIZZLER.items():
             settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
             
         for key,item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
-    cust_fizzlers = Property.find_all(conf, 'cust_fizzlers')
     
     for prop in Property.find_all(conf, 'instancefiles'):
         for key,val in inst_file.items():
             inst_file[key] = prop.find_key(key, val).value
     
-    for fizz in cust_fizzlers:
+    for fizz in Property.find_all(conf, 'cust_fizzlers'):
         flag = fizz.find_key('flag')
         if flag in settings['cust_fizzler']:
             raise Exception('Two Fizzlers with same flag!!')
@@ -263,12 +260,9 @@ def load_settings():
     settings['deathfield']['texwidth'] = VLib.conv_int(wid, 512)
     settings['deathfield']['scanline'] = deathfield.find_key('scanline', settings['fizzler']['scanline']).value
         
-    pack_commands = Property.find_all(conf, 'packer')
-    for pack in pack_commands:
+    for pack in Property.find_all(conf, 'packer'):
         process_packer(pack.value)
-        
-    conditions = Property.find_all(conf, 'conditions', 'condition')
-    for cond in conditions:
+    for cond in Property.find_all(conf, 'conditions', 'condition'):
         type = cond.find_key('type', '').value.upper()
         if type not in ("AND", "OR"):
             type = "AND"
@@ -276,7 +270,7 @@ def load_settings():
         for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", 
                   "ifStyleFalse", "ifMode", "ifPreview", "instance", 
                   "StyleVar", "instVar"):
-            flags += cond.find_all(f)
+            flags += list(cond.find_all(f))
         results = []
         for val in cond.find_all('result'):
             results.extend(val.value) # join multiple ones together
@@ -344,7 +338,7 @@ def check_glob_conditions():
                     'instance' : res.find_key('instance', '').value,
                     'antline' : [p.value for p in res.find_all('straight')],
                     'antlinecorner' : [p.value for p in res.find_all('corner')],
-                    'outputs' : res.find_all('addOut')
+                    'outputs' : list(res.find_all('addOut'))
                     }
                 if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
                     cond['results'].remove(res) # invalid
@@ -949,8 +943,7 @@ def death_fizzler_change(inst, trig):
     brush['drawinfastreflection'] ='1'
     
     if is_short:
-        sides=brush.find_all('entity', 'solid', 'side')
-        for side in sides:
+        for side in brush.find_all('entity', 'solid', 'side'):
             mat=side.find_key('material')
             if "effects/fizzler" in mat.value.casefold():
                 mat.value=get_tex('special.laserfield')
@@ -1050,8 +1043,7 @@ def hammer_pack_scan():
     global to_pack
     to_pack=[] # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
-    comments = Property.find_all(map, 'entity', 'editor', 'comments')
-    for com in comments:
+    for com in Property.find_all(map, 'entity', 'editor', 'comments'):
         if "packer_" in com.value:
             parts = com.value.split()
             last_op = -1 # 1=item, 2=file
