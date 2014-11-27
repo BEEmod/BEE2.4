@@ -206,7 +206,7 @@ class VMF:
             file = io.stringIO() 
             # acts like a file object but is actually a string. We're 
             # using this to prevent having Python duplicate the entire
-            # string every time we append b
+            # string every time we append
             ret_string = True
         else:
             ret_string = False
