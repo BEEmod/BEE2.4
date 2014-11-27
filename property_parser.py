@@ -119,6 +119,10 @@ class Property:
     def find_key(self: "list or Property", key, def_=None) -> "Property":
         "Obtain the value of the child Property with a name, with an optional default value."
         run_on = []
+        if isinstance(key, tuple) and len(key) == 2:
+            # Allow using Prop[val, default] to get values
+            def_=key[1]
+            key=key[0]
         if isinstance(self, list):
             run_on = self
         elif isinstance(self, Property):
@@ -210,18 +214,43 @@ class Property:
             yield self.value
     
     def __getitem__(self, index):
-        "Allow indexing the children directly."
+        '''Allow indexing the children directly.
+        
+        - If given an integer, it will search by position.
+        - If given a string, it will find the last Property with that name.
+          (Default can be chosen by passing a 2-tuple like Prop[key, default]
+        - If none are found, it raises IndexError
+        - [0] maps to the .value if the Property has no children
+        '''
         if self.has_children():
-            return self.value[index]
+            if isinstance(index, int):
+                return self.value[index]
+            else:
+                try:
+                    return self.find_key(index).value
+                except NoKeyError:
+                    raise IndexError
         elif index == 0:
             return self.value
         else:
             raise IndexError
             
     def __setitem__(self, index, value):
-        "Allow indexing the children directly."
+        '''Allow setting the values of the children directly.
+        
+        - If given an integer, it will search by position.
+        - If given a string, it will set the last Property with that name.
+        - If none are found, it raises IndexError
+        - [0] is the same as .value if the Property has no children, all others fail
+        '''
         if self.has_children():
-            self.value[index] = value
+            if isinstance(index, int):
+                self.value[index] = value
+            else:
+                try:
+                    self.find_key(index).value = value
+                except NoKeyError:
+                    raise IndexError
         elif index == 0:
             self.value = value
         else:
