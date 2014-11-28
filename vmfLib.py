@@ -912,7 +912,7 @@ class Entity():
     def set_fixup(self, var, val):
         '''Set the value of an instance $replace variable, creating it if needed.'''
         if var not in self._fixup:
-            max = 0
+            max = 1
             for i in self._fixup.values():
                 if int(i[1]) > max:
                     max = int(i[1])
