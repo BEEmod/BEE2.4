@@ -58,7 +58,8 @@ def loadAll(dir):
                     for over in obj_override[type][id]:
                         object.add_over(obj_types[type].parse(over[0], id, over[1]))
                 data[type].append(object)
-        print(data['Item'])
+        for thing in data:
+            print(thing, data[thing])
     finally:
         for z in zips: #close them all, we've already read the contents.
             z.close()
@@ -87,20 +88,43 @@ def parse_package(zip, info, filename, id):
                 obj[comp_type][id] = (zip, object)
 
 class Style:
-    def __init__(self, id):
+    def __init__(self, id, author, icon, editor, config=None, base_style=None):
         self.id=id
+        self.auth = author
+        self.icon = icon
+        self.editor = editor
+        self.base_style = base_style
+        if config == None:
+            self.config = Property('ItemData', [])
+        else:
+            self.config = Property('ItemData', config)
      
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a style definition.'''
-        return cls(id)
+        author = info['authors', 'Valve'].split(',')
+        icon = info['icon', '']
+        base = info['description', 'NONE']
+        if base == 'NONE':
+            base = None
+        files = zip.namelist()
+        folder = 'styles/' + info['folder']
+        config = folder + '/vbsp_config.cfg'
+        with zip.open(folder + '/items.txt', 'r') as item_data:
+            items = Property.parse(item_data)
+        if config in files:
+            with zip.open(config, 'r') as vbsp_config:
+                vbsp = Property.parse(vbsp_config)
+        else:
+            vbsp = None
+        return cls(id, author, icon, items, vbsp, base)
         
     def add_over(self, overide):
         '''Add the additional commands to ourselves.'''
         pass
         
-    def __str__(self):
-        return '<Style>' + self.id
+    def __repr__(self):
+        return '<Style:' + self.id + '>'
 
 class Item:
     def __init__(self, id, versions):
@@ -156,7 +180,7 @@ class Item:
         pass
     
     def __repr__(self):
-        return '<Item>' + self.id
+        return '<Item:' + self.id + '>'
 
 class Voice:
     def __init__(self, id, name, icon):
@@ -175,7 +199,7 @@ class Voice:
         '''Add the additional lines to ourselves.'''
         pass
     def __repr__(self):
-        return '<Voice Pack>' + self.id
+        return '<Voice:' + self.id + '>'
 
 class Skybox:
     def __init__(self, id):
@@ -191,7 +215,7 @@ class Skybox:
         pass
     
     def __repr__(self):
-        return '<Skybox>' + self.id
+        return '<Skybox ' + self.id + '>'
             
 obj_types = {
     'Style' : Style,
