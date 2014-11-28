@@ -62,6 +62,16 @@ class Vec:
         
     def copy(self):
         return Vec(self.x, self.y, self.z)
+        
+    @classmethod
+    def from_ang(cls, pitch, yaw):
+        '''Create a unit vector based on a Source rotational angle.
+        '''
+        sin_pit=math.sin(math.radians(pitch))
+        cos_pit=math.cos(math.radians(pitch))
+        sin_yaw=math.sin(math.radians(-yaw))
+        cos_yaw=math.cos(math.radians(-yaw))
+        return cls(x=cos_pit*cos_yaw,y=sin_pit*cos_yaw,z=sin_yaw)
     
     def __add__(self,other):
         "+ operation. This works on numbers (adds to all axes), or other Vectors (adds to just our one)."
