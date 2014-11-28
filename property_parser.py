@@ -305,20 +305,19 @@ class Property:
         if self.valid:
             return '\n'.join(self.to_strings())
         else:
-            return ""
+            return ''
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
         if self.valid:
-            out_val = ['"{}"'.format(self.name)]
+            out_val = '"' + self.name + '"'
             if isinstance(self.value, list):
-                out_val.append('{')
-                out_val.extend(['\t'+line for property in self.value for line in property.to_strings() if property.valid==True])
-                out_val.append('}')
+                yield out_val
+                yield '{'
+                yield from ('\t'+line for property in self.value for line in property.to_strings() if property.valid==True)
+                yield '}'
             else:
-                out_val[0] += ' "' + self.value + '"'
-                
-            return out_val
+                yield out_val + ' "' + self.value + '"'
         else:
-            return [""]
+            yield ''
 
 import utils
