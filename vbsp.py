@@ -112,6 +112,8 @@ DEFAULTS = {
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
     "signInst"                : "NONE",
+    "glassInst"               : "NONE",
+    "gratingInst"             : "NONE",
     "clump_wall_tex"          : "0",
     "clump_size"              : "4",
     "clump_width"             : "2",
@@ -131,9 +133,10 @@ inst_file = {
     "clearPanel"  : "instances/p2editor/panel_clear.vmf",
     "ambLight"    : "instances/p2editor/point_light.vmf",
     "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf",
-    "indPanCheck" : "instances/p2editor/indicator_panel.vmf",
-    "indPanTimer" : "instances/p2editor/indicator_panel.vmf" 
     # although unused, editoritems allows having different instances for toggle/timer panels
+    "indPanCheck" : "instances/p2editor/indicator_panel.vmf",
+    "indPanTimer" : "instances/p2editor/indicator_panel.vmf",
+    "glass"       : "instances/p2editor/glass_128x128.vmf"
 }
     
 fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
@@ -571,8 +574,12 @@ def calc_rand_seed():
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
+    glass_inst = get_opt('glassInst')
+    if glass_inst == "NONE":
+        glass_inst = None
     for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
+            is_glass=False
             if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
                 plane=face.find_key('plane')
                 verts=utils.split_plane(plane)
@@ -588,6 +595,11 @@ def change_brush():
                 split=face.vaxis.split(" ")
                 split[-1] = get_opt("glass_scale") # apply the glass scaling option
                 face.vaxis=" ".join(split)
+                is_glass=True
+        if is_glass and glass_inst is not None:
+            inst = find_glass_inst(soild.get_origin())
+            inst['file'] = glass_inst
+                
                 
     if (get_opt("clump_wall_tex") == "1" and 
           get_opt("clump_size").isnumeric() and 
@@ -598,6 +610,17 @@ def change_brush():
     else:
         random_walls()
         
+def find_glass_inst(origin):
+    '''Find the glass instance placed on the specified origin.'''
+    loc = Vec(origin.x//128*128 + 64,
+              origin.y//128*128 + 64,
+              origin.z//128*128 + 64)
+    print('loc', origin, (loc-origin).norm())
+    for inst in map.iter_ents(classname='func_instance', 
+                              origin=loc.join(' '), 
+                              file=inst_file['glass']):
+        print('angle', inst['angles', ''])
+    return {'file': ''}
 
 def random_walls():
     "The original wall style, with completely randomised walls."
@@ -776,6 +799,7 @@ def change_trig():
 def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
+    grating_inst = get_opt("gratingInst")
     for brush in itertools.chain(map.iter_ents(classname='func_brush'),
                                  map.iter_ents(classname='func_rotating')):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
@@ -783,6 +807,7 @@ def change_func_brush():
         type="" 
         # Func_brush/func_rotating -> angled panels and flip panels often use different textures, so let the style do that.
         top_side = None
+        is_grating=False
         for side in brush.sides():
             if side.mat.casefold() == "anim_wp/framework/squarebeams" and "special.edge" in settings['textures']:
                 side.mat = get_tex("special.edge")
@@ -801,7 +826,12 @@ def change_func_brush():
                 elif not alter_mat(side):
                     side.mat = get_tex("black.wall")
             else:
+                if side.mat.casefold() == 'metal/metalgrate018':
+                    is_grating=True
                 alter_mat(side) # for gratings, laserfields and some others
+        if is_grating and grating_inst is not None:
+            inst = find_glass_inst(brush.get_origin())
+            inst['file'] = grating_inst
         if "-model_arms" in parent: # is this an angled panel?:
             targ='-'.join(parent.split("-")[:-1]) # strip only the model_arms off the end
             for ins in map.iter_ents(classname='func_instance', targetname=targ):
