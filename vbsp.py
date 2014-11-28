@@ -111,6 +111,7 @@ DEFAULTS = {
     "sky"                     : "sky_black",
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
+    "signInst"                : "NONE",
     "clump_wall_tex"          : "0",
     "clump_size"              : "4",
     "clump_width"             : "2",
@@ -734,9 +735,24 @@ def set_antline_mat(over,mat):
 def change_overlays():
     "Alter the overlays."
     utils.con_log("Editing Overlays...")
+    sign_inst = get_opt('signInst')
+    if sign_inst == "NONE":
+        sign_inst = None
     for over in map.iter_ents(classname='info_overlay'):
         if over['material'].casefold() in TEX_VALVE:
-            over['material'] = get_tex(TEX_VALVE[over['material'].casefold()])
+            sign_type = TEX_VALVE[over['material'].casefold()]
+            if sign_inst is not None:
+                new_inst = VLib.Entity(map, keys={
+                                'classname': 'func_instance',
+                                'origin': over['origin'],
+                                'angles': over['angles', '0 0 0'],
+                                'file': sign_inst
+                            })
+                new_inst.set_fixup('mat', sign_type.replace('overlay.', ''))
+                map.add_ent(new_inst)
+                for cond in settings['conditions'][:]:
+                    satisfy_condition(cond, new_inst)
+            over['material'] = get_tex(sign_type)
         if over['material'].casefold() in ANTLINES:
             angle = over['angles'].split(" ") # get the three parts
             #TODO : analyse this, determine whether the antline is on the floor or wall (for P1 style)
