@@ -232,7 +232,44 @@ styleOptOther= [
                 ('OpenSphere', 'Opened Sphere', True),
                 ('OverEntryPuzzles', 'Have entry/exit puzzles', True)
                ]
+               
+class PalItem(ttk.Label):
+    def __init__(self, frame, name, key, sub, img):
+        "Create a label to show an item onscreen."
+        super().__init__(frame, image=img)
+        self.img=img
+        self.key=key
+        self.subKey=sub
+        self.dispName=name
+        self.bind("<Button-3>",showProps)
+        self.bind("<Button-1>", showDrag)
+        self.bind("<Shift-Button-1>", fastDrag)
+        self.bind("<Enter>", lambda e, n=name: setDispName(n))
+        self.bind("<Leave>", clearDispName)
 
+    def clear(self):
+        "Remove any items matching the passed label from the palette, to prevent adding two copies."
+        toRem=[]
+        found=False
+        for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
+            if item.key==self.key and item.subKey==self.subKey:
+                item.place_forget()
+                toRem.append(i)
+                found=True
+        for i in reversed(toRem):
+            del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enumerate()
+        return found
+
+    def onPal(self):
+        '''Determine if this item is on the palette.'''
+        for item in pal_picked:
+            if item.key==self.key and item.subKey==self.subKey:
+                return True
+        return False
+        
+    def copy(self, frame):
+        return PalItem(frame, self.dispName, self.key, self.subKey, self.img)
+    
 def demoMusic():
     messagebox.showinfo(message='This would play the track selected for a few seconds.')
     
@@ -339,7 +376,7 @@ def showDrag(e):
         del pal_picked[ind]
         drag_onPal=True
     else:
-        drag_onPal=itemOnPal(e.widget)
+        drag_onPal=e.widget.onPal()
     dragWin.deiconify()
     dragWin.lift(win)
     dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
@@ -363,10 +400,10 @@ def hideDrag(e):
     ind=pos_x+pos_y*4
 
     if drag_passedPal: #this prevents a single click on the picker from clearing items off the palette
-        clearFromPal(drag_item) # wipe duplicates off the palette first
+        drag_item.clear() # wipe duplicates off the palette first
 
         if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8: # is the cursor over the preview pane?
-            newItem=copyItem(drag_item,frames['preview'])
+            newItem=drag_item.copy(frames['preview'])
             if ind>=len(pal_picked):
                 pal_picked.append(newItem)
             else:
@@ -397,54 +434,18 @@ def moveDrag(e):
 def fastDrag(e):
     "When shift-clicking an item will be immediately moved to the palette or deleted from it."
     pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
-    clearFromPal(e.widget)
+    e.widget.clear()
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
         snd.fx('delete')
         e.widget.place_forget() # remove the clicked item
     else: # over the picker
         if len(pal_picked) < 32: # can't copy if there isn't room
             snd.fx('config')
-            newItem=copyItem(e.widget,frames['preview'])
+            newItem=e.widget.copy(frames['preview'])
             pal_picked.append(newItem)
         else:
             snd.fx('error')
     flowPreview()
-
-def clearFromPal(target):
-    "Remove any items matching the passed label from the palette, to prevent adding two copies."
-    toRem=[]
-    found=False
-    for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
-        if item.key==target.key and item.subKey==target.subKey:
-            item.place_forget()
-            toRem.append(i)
-            found=True
-    for i in reversed(toRem):
-        del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enmerate()
-    return found
-
-def itemOnPal(target):
-    for i,item in enumerate(pal_picked):
-        if item.key==target.key and item.subKey==target.subKey:
-            return True
-    return False
-
-def createItem(name, key, sub, img, frame):
-    "Create a label to show an item onscreen."
-    lbl=ttk.Label(frame, image=img)
-    lbl.img=img
-    lbl.key=key
-    lbl.subKey=sub
-    lbl.dispName=name
-    lbl.bind("<Button-3>",showProps)
-    lbl.bind("<Button-1>", showDrag)
-    lbl.bind("<Shift-Button-1>", fastDrag)
-    lbl.bind("<Enter>", lambda e, n=name: setDispName(n))
-    lbl.bind("<Leave>", clearDispName)
-    return lbl
-
-def copyItem(item, frame):
-    return createItem(item.dispName, item.key, item.subKey, item.img, frame)
 
 def setPal_listbox(e):
     global selectedPalette
@@ -700,7 +701,7 @@ def initPreview(f):
 
     for i in range(0,32):
         img=random.choice(testImg)
-        pal_picked.append(createItem(img[0], img[1], img[2], img[3], frames['preview']))
+        pal_picked.append(PalItem(frames['preview'], img[0], img[1], img[2], img[3]))
     flowPreview()
 
 def initPicker(f):
@@ -726,7 +727,7 @@ def initPicker(f):
 
     for num in range(0,len(testImg)*10):
         img=testImg[num%len(testImg)] # init with test objects
-        pal_items.append(createItem(img[0], img[1], img[2], img[3], frmScroll))
+        pal_items.append(PalItem(frmScroll, img[0], img[1], img[2], img[3]))
     pal_items_fake=[]
     for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
         pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
