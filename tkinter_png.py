@@ -138,7 +138,10 @@ class PngImageTk(object):
 
 def loadPng(path):
     "Loads in and converts a png for use in TKinter."
-    path="images/"+path+".png"
+    if path.casefold().endswith(".png"):
+        path="images/" + path
+    else:
+        path="images/"+path+".png"
     if not os.path.isfile(path):
       print("ERROR: \"" + path + "\" does not exist!")
       return img_error
