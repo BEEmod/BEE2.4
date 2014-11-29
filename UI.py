@@ -201,6 +201,8 @@ goo_list = [
         desc="A version of goo which is more reflective, and less polluted."),
     ]
     
+selected_style = "clean"
+    
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
@@ -233,18 +235,30 @@ styleOptOther= [
                 ('OverEntryPuzzles', 'Have entry/exit puzzles', True)
                ]
                
+class Item():
+    def __init__(self, item):
+        self.ver = 0
+        self.item = item
+        self.data=item.versions[self.ver]['styles'][selected_style]
+        self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
+        self.description = self.data['desc']
+               
 class PalItem(ttk.Label):
-    def __init__(self, frame, name, key, sub, img):
+    def __init__(self, frame, item, sub):
         "Create a label to show an item onscreen."
-        super().__init__(frame, image=img)
-        self.img=img
-        self.key=key
-        self.subKey=sub
-        self.dispName=name
+        self.item = item
+        self.subKey = sub
+        print(item.data['icons'].keys())
+        self.img = item.data['icons'][str(self.subKey)]
+        self.img = png.loadIcon(self.img)
+        self.name = list(Property.find_all(item.data['editor'], "Item", "Editor", "Subtype", "Name"))
+        self.name=self.name[self.subKey].value
+        super().__init__(frame, image=self.img)
+        self.dispName='Null'#data['name']
         self.bind("<Button-3>",showProps)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
-        self.bind("<Enter>", lambda e, n=name: setDispName(n))
+        self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
         self.bind("<Leave>", clearDispName)
 
     def clear(self):
@@ -252,7 +266,7 @@ class PalItem(ttk.Label):
         toRem=[]
         found=False
         for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
-            if item.key==self.key and item.subKey==self.subKey:
+            if item.item.key==self.item.key and item.subKey==self.subKey:
                 item.place_forget()
                 toRem.append(i)
                 found=True
@@ -263,12 +277,12 @@ class PalItem(ttk.Label):
     def onPal(self):
         '''Determine if this item is on the palette.'''
         for item in pal_picked:
-            if item.key==self.key and item.subKey==self.subKey:
+            if item.item.key==self.item.key and item.subKey==self.subKey:
                 return True
         return False
         
     def copy(self, frame):
-        return PalItem(frame, self.dispName, self.key, self.subKey, self.img)
+        return PalItem(frame, self.item, self.subKey)
     
 def demoMusic():
     messagebox.showinfo(message='This would play the track selected for a few seconds.')
@@ -281,7 +295,8 @@ def load_palette(data):
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
     global item_list
-    item_list=data['Item']
+    for item in data['Item']:
+        item_list.append(Item(item))
     
     
 def loadPalUI():
@@ -699,9 +714,9 @@ def initPreview(f):
     UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
     UI['pre_sel_line'].imgsave=selImg
 
-    for i in range(0,32):
-        img=random.choice(testImg)
-        pal_picked.append(PalItem(frames['preview'], img[0], img[1], img[2], img[3]))
+    #for i in range(0,32):
+    #    img=random.choice(testImg)
+    #    pal_picked.append(PalItem(frames['preview'], img[0], img[1], img[2], img[3]))
     flowPreview()
 
 def initPicker(f):
@@ -724,10 +739,14 @@ def initPicker(f):
 
     frmScroll=ttk.Frame(pal_canvas) # add another frame inside to place labels on
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
-
-    for num in range(0,len(testImg)*10):
-        img=testImg[num%len(testImg)] # init with test objects
-        pal_items.append(PalItem(frmScroll, img[0], img[1], img[2], img[3]))
+    for item in item_list:
+        #num_subitems = len(list(Property.find_all(item.versions[0]['styles'][selected_style]['editor'], "Item", "Editor", "Subtype")))
+        print("sub", item.num_sub)
+        for i in range(0,item.num_sub):
+            pal_items.append(PalItem(frmScroll, item, i))
+    #for num in range(0,len(testImg)*10):
+    #    img=testImg[num%len(testImg)] # init with test objects
+    #    pal_items.append(PalItem(frmScroll, img[0], img[1], img[2], img[3]))
     pal_items_fake=[]
     for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
         pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
