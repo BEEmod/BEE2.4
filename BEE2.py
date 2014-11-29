@@ -16,10 +16,14 @@ def load_settings():
   settings['package_dir']=dirs.find_key('package', 'packages\\').value
 
 load_settings()
+print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'])
+print('Done!')
 UI.load_packages(package_data)
+print('Loading Palettes')
 pal=paletteLoader.loadAll(settings['pal_dir'])
+print('Done!')
 UI.load_palette(pal)
 
 UI.initMain() # create all windows
-UI.event_loop() 
+UI.event_loop()

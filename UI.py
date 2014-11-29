@@ -10,6 +10,7 @@ import webbrowser
 
 from property_parser import Property
 from paletteLoader import Palette
+from packageLoader import Style as palStyle, Item as palItem, Voice as palVoice, Skybox as palSkybox
 import itemPropWin
 from selectorWin import selWin
 from selectorWin import Item as selWinItem
@@ -58,6 +59,8 @@ testImg  = [ # test palette images,remove when item loading done
             ('Observation Room',     'ITEM_SECONDARY_OBSERVATION_ROOM', 0, png.loadIcon('observation_room')),
             ('Angled Panel',         'ITEM_ANGLED_PANEL',               0, png.loadIcon('panel_flap'))
            ]
+           
+item_list = []
 
 win.iconbitmap('BEE2.ico')# set the window icon
 
@@ -239,7 +242,9 @@ def load_palette(data):
     palettes=sorted(data,key=Palette.getName) # sort by name
     
 def load_packages(data):
-    pass
+    '''Import in the list of items and styles from the packages.'''
+    global item_list
+    item_list=data['Item']
     
     
 def loadPalUI():
@@ -1014,8 +1019,8 @@ def initMain():
 
     win.bind("<Configure>",moveMain)
     windows['style'].bind("<Configure>", lambda e: snapWin('style'))
-    windows['opt'].  bind("<Configure>",   lambda e: snapWin('opt'))
-    windows['pal'].  bind("<Configure>",   lambda e: snapWin('pal'))
+    windows['opt'].  bind("<Configure>", lambda e: snapWin('opt'))
+    windows['pal'].  bind("<Configure>", lambda e: snapWin('pal'))
 
     loadPalUI()
 def event_loop():

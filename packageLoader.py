@@ -9,7 +9,7 @@ import zipfile
 from property_parser import Property
 import utils
 
-__all__ = ('loadAll', 'Style', 'Item', 'QuotePack', 'Skybox')
+__all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox')
 
 obj = {}
 obj_override = {}
@@ -58,11 +58,10 @@ def loadAll(dir):
                     for over in obj_override[type][id]:
                         object.add_over(obj_types[type].parse(over[0], id, over[1]))
                 data[type].append(object)
-        for thing in data:
-            print(thing, data[thing])
     finally:
         for z in zips: #close them all, we've already read the contents.
             z.close()
+    return data
         
 def parse_package(zip, info, filename, id):
     "Parse through the given package to find all the components."
