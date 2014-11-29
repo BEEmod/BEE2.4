@@ -4,6 +4,10 @@ import math
 
 import tkinter_png as png # png library for TKinter
 
+ICON_SIZE=96
+ITEM_WIDTH=ICON_SIZE+16
+ITEM_HEIGHT=ICON_SIZE+51
+
 class Item:
     "An item on the panel."
     __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'author', 'button', 'win')
@@ -12,25 +16,37 @@ class Item:
             name, 
             shortName, 
             longName = None,
-            icon = '_blank', 
+            icon = 'pal_test/_blank', 
             author = '',
             desc = ""):
         self.name = name
         self.shortName = shortName
         self.longName = shortName if longName is None else longName
-        self.icon = png.loadIcon(icon)
+        self.icon = png.loadPng(icon)
         self.desc = desc
         self.author = author
 
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
-    def __init__(self, tk, lst, has_none=True, none_desc='Do not add anything.', title='BEE2'):
+    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc='Do not add anything.', title='BEE2'):
+        '''Create a window object.
+        
+        Read from .selected_id to get the currently-chosen Item name, or None if the <none> Item is selected.
+        Args:
+        - tk must be a Toplevel window, either the tk() root or another window if needed.
+        - lst is a list of Item objects, defining the visible items.
+        - If has_none is True, a <none> item will be added to the beginning of the list.
+        - If has_def is True, the 'Reset to Default' button will appear, which resets to the suggested item.
+        - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
+        - title is the title of the selector window.
+        '''
         self.noneItem = Item('NONE', '', desc=none_desc)
-        self.noneItem.icon = png.loadPng('none')
+        self.noneItem.icon = png.loadPng('none_96')
         self.disp_label = StringVar()
         self.chosen_id = ''
         self.suggested = None
+        self.has_def = has_def
         if has_none:
             self.item_list = [self.noneItem] + lst
         else:
@@ -71,7 +87,7 @@ class selWin:
         self.prop_frm = ttk.Frame(self.win, borderwidth=4, relief='raised')
         self.prop_frm.grid(row=0, column=1, sticky="NSEW")
         
-        self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=64, height=64)
+        self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=ICON_SIZE, height=ICON_SIZE)
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
         
         self.prop_icon = ttk.Label(self.prop_icon_frm)
@@ -98,8 +114,9 @@ class selWin:
         self.prop_scroll.grid(row=0, column=1, sticky="NS", padx=(0,2), pady=2)
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
         
-        self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command = lambda obj=self: obj.reset_sel())
-        self.prop_reset.grid(row=5, column=0, columnspan=4, sticky = "EW", padx=8, pady=(8,1))
+        if self.has_def:
+            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command = lambda obj=self: obj.reset_sel())
+            self.prop_reset.grid(row=5, column=0, columnspan=4, sticky = "EW", padx=8, pady=(8,1))
         
         self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command = lambda obj=self: obj.save())
         self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command = lambda obj=self: obj.exit())
@@ -127,7 +144,7 @@ class selWin:
         self.save()
         
     def exit(self):
-        "Quit and cancel."
+        '''Quit and cancel, choosing the originally-selected item.'''
         self.sel_item(self.orig_selected)
         self.save()
         
@@ -171,27 +188,27 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
-        
-        if self.suggested is None or self.selected == self.suggested:
-            self.prop_reset.state(('disabled',))
-        else:
-            self.prop_reset.state(('!disabled',))
+        if self.has_def:
+            if self.suggested is None or self.selected == self.suggested:
+                self.prop_reset.state(('disabled',))
+            else:
+                self.prop_reset.state(('!disabled',))
     
     def flow_items(self, e):
         self.pal_frame.update_idletasks()
         self.pal_frame['width']=self.wid_canvas.winfo_width()
         self.prop_name['wraplength'] = self.prop_desc.winfo_width()
-        width=(self.wid_canvas.winfo_width()-10) // 80
+        width=(self.wid_canvas.winfo_width()-10) // ITEM_WIDTH
         if width <1:
             width=1 # we got way too small, prevent division by zero
         itemNum=len(self.item_list)
-        self.wid_canvas['scrollregion'] = (0, 0, width*80, math.ceil(itemNum/width)*115+20)
-        self.pal_frame['height']=(math.ceil(itemNum/width)*115+20)
+        self.wid_canvas['scrollregion'] = (0, 0, width*ITEM_WIDTH, math.ceil(itemNum/width)*ITEM_HEIGHT+20)
+        self.pal_frame['height']=(math.ceil(itemNum/width)*ITEM_HEIGHT+20)
         for i,item in enumerate(self.item_list):
             if item == self.suggested:
-                self.sugg_lbl.place(x=((i%width) *80+1),y=((i//width)*115))
+                self.sugg_lbl.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT))
                 self.sugg_lbl['width'] = item.button.winfo_width()
-            item.button.place(x=((i%width) *80+1),y=((i//width)*115+20))
+            item.button.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT+20))
             item.button.lift()
             
         
@@ -211,14 +228,14 @@ if __name__ == '__main__': # test the window if directly executing this file
             "SKY_BLACK", 
             "Black", 
             longName = "Darkness", 
-            icon = "faithplate_128",
+            icon = "pal_test/faithplate_128",
             author = "Valve",
             desc = 'Pure black darkness. Nothing to see here.'),
         Item(
             "SKY_BTS", 
             "BTS", 
             longName = "Behind The Scenes - Factory", 
-            icon = "faithplate_128",
+            icon = "pal_test/faithplate_128",
             author = "TeamSpen210",
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
@@ -229,6 +246,6 @@ if __name__ == '__main__': # test the window if directly executing this file
     def done(x):
         print(x)
         root.withdraw()
-    window = selWin(root, lst, has_none=True, none_desc='Pure blackness. Nothing to see here.')
+    window = selWin(root, lst, has_none=True, has_def=True, none_desc='Pure blackness. Nothing to see here.')
     window.init_display(root, 1, 0)
     window.set_suggested("SKY_BLACK")

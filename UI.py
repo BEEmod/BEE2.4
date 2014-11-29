@@ -98,7 +98,7 @@ skybox_list = [
         "SKY_BLACK", 
         "Black", 
         longName = "Darkness", 
-        icon = "faithplate_128",
+        icon = "pal_test/faithplate_128",
         author = "Valve",
         desc = 'Pure black darkness. Nothing to see here.'),
     selWinItem(
@@ -119,7 +119,7 @@ skybox_list = [
         "SKY_BTS", 
         "BTS", 
         longName="Behind The Scenes - Factory", 
-        icon= "faithplate_128",
+        icon= "pal_test/faithplate_128",
         author="TeamSpen210",
         desc='The dark constuction and office areas of Aperture. Catwalks '
              'extend between different buildings, with vactubes and cranes '
@@ -132,52 +132,52 @@ voice_list = [
         "VOICE_CAVE_50",
         "50s Cave",
         longName="1950s Cave",
-        icon="observation_room",
+        icon="pal_test/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_60",
         "60s Cave",
         longName="1960s Cave",
-        icon="observation_room",
+        icon="pal_test/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_70",
         "70s Cave",
         longName="1960s Cave",
-        icon="observation_room",
+        icon="pal_test/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_80",
         "80s Cave",
         longName="1980s Cave",
-        icon="observation_room",
+        icon="pal_test/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     ]
     
 music_list = [
     selWinItem(
-        "MUSIC_PETI",
+        "VALVE_PETI",
         "Random PeTI",
         longName="Random PeTI (Robot Waiting Room)",
-        icon="observation_room",
+        icon="music/peti",
         author="Valve",
         desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
     selWinItem(
-        "MUSIC_A3_1",
+        "VALVE_CONTROL_GROUP",
         "50s Chamber",
         longName="You are Not Part of the Control Group",
-        icon="paintsplat_bounce",
+        icon="music/control_group",
         author="Valve",
         desc="Cave"),
     selWinItem(
-        "MUSIC_A1",
+        "MUSIC_FUTURE_STARTER",
         "Future Starter",
-        longName="Future Starts With You",
-        icon="fixed_portal_door",
+        longName="The Future Starts With You",
+        icon="music/future_starter",
         author="Valve",
         desc="Cave"),
     ]
@@ -186,14 +186,14 @@ goo_list = [
     selWinItem(
         "GOO_NORM",
         "Regular",
-        icon="goo",
+        icon="pal_test/goo",
         author="Valve",
         desc="The standard normal Toxic Goo."),
         
     selWinItem(
         "GOO_NORM",
         "Overgrown",
-        icon="goo",
+        icon="pal_test/goo",
         author="Valve",
         desc="A version of goo which is more reflective, and less polluted."),
     ]
