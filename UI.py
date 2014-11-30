@@ -235,6 +235,7 @@ styleOptOther= [
                ]
                
 class Item():
+    '''Represents an item that can appear on the list.'''
     def __init__(self, item):
         self.ver = 0
         self.item = item
@@ -245,13 +246,19 @@ class Item():
         
     def get_icon(self, subKey):
         return png.loadIcon(self.data['icons'][str(subKey)])
+        
+    def get_properties(self):
+        props = []
+        for part in Property.find_all(self.data['editor'], "Item", "Properties"):
+            props.extend([prop.name for prop in part])
+        return props
                
 class PalItem(ttk.Label):
+    '''The icon and associated data for a single subitem.'''
     def __init__(self, frame, item, sub):
         "Create a label to show an item onscreen."
         self.item = item
         self.subKey = sub
-        print(item.data['icons'].keys())
         self.img = item.get_icon(self.subKey)
         self.name = list(Property.find_all(item.data['editor'], "Item", "Editor", "Subtype", "Name"))
         self.name=self.name[self.subKey].value

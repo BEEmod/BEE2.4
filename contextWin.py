@@ -14,7 +14,7 @@ selected_sub_item = None
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], wid_changedefaults, "ItemNameHere") # TODO: add real values for first/last args
+    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, "ItemNameHere") # TODO: add real values for first/last args
     
 def hideItemProps(vals):
     snd.fx('contract')
