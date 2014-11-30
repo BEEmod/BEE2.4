@@ -3,3 +3,4 @@
 "Skybox" "[Default]"
 "Music" "[Default]"
 "Voice" "[Default]"
+"NoDelete" "1"

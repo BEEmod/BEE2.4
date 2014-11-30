@@ -19,47 +19,8 @@ win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
 png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
-
-
-testImg  = [ # test palette images,remove when item loading done
-            ('Weighted Button',      'ITEM_BUTTON',                     0, png.loadIcon('portal_button')),
-            ('Cube Button',          'ITEM_BUTTON',                     1, png.loadIcon('box_socket')),
-            ('Sphere Button',        'ITEM_BUTTON',                     2, png.loadIcon('ball_socket')),
-            ('Pedestal Button',      'ITEM_PEDESTAL_BUTTON',            0, png.loadIcon('pedestal_button')),
-            ('Stairs',               'ITEM_STAIRS',                     0, png.loadIcon('stairs')),
-            ('Flip Panel',           'ITEM_FLIP_PANEL',                 0, png.loadIcon('panel_flip')),
-            ('Faith Plate',          'ITEM_CATAPULT',                   0, png.loadIcon('faithplate')),
-            ('Track Platform',       'ITEM_TRACK_PLATFORM',             0, png.loadIcon('arm_motionplatform')),
-            ('Deadly Goo',           'ITEM_GOO',                        0, png.loadIcon('goo')),
-            ('Storage Cube',         'ITEM_CUBE',                       0, png.loadIcon('cube')),
-            ('Companion Cube',       'ITEM_CUBE',                       1, png.loadIcon('companion_cube')),
-            ('Reflection Cube',      'ITEM_CUBE',                       2, png.loadIcon('reflection_cube')),
-            ('Safety Cube',          'ITEM_CUBE',                       3, png.loadIcon('edgeless_safety_cube')),
-            ('FrankenTurret',        'ITEM_CUBE',                       4, png.loadIcon('frankenturret')),
-            ('Cube Dropper',         'ITEM_CUBE_DROPPER',               0, png.loadIcon('item_dropper')),
-            ('Sentry Turret',        'ITEM_TURRET',                     0, png.loadIcon('turret')),
-            ('Hard Light Bridge',    'ITEM_LIGHT_BRIDGE',               0, png.loadIcon('hard_light_emitter')),
-            ('Laser Catcher',        'ITEM_LASER_CATCHER_CENTER',       0, png.loadIcon('laser_catcher')),
-            ('Light Strip',          'ITEM_LIGHTSTRIP',                 0, png.loadIcon('light_panel')),
-            ('Piston Platform',      'ITEM_PISTON_PLATFORM',            0, png.loadIcon('arm_paneltop')),
-            ('Large Faith Plate',    'ITEM_CATAPULT_LARGE',             0, png.loadIcon('faithplate_128')),
-            ('AutoPortal',           'ITEM_AUTOPORTAL',                 0, png.loadIcon('fixed_portal_door')),
-            ('Fizzler',              'ITEM_BARRIERHAZARD',              0, png.loadIcon('fizzler')),
-            ('Discouragement Field', 'ITEM_BARRIERHAZARD',              1, png.loadIcon('deathfield')),
-            ('Laser Relay',          'ITEM_LASER_RELAY_CENTER',         0, png.loadIcon('laser_receptacle')),
-            ('Laser Emitter',        'ITEM_LASER_EMITTER_CENTER',       0, png.loadIcon('laser_emitter')),
-            ('Repulsion Gel',        'ITEM_PAINT_SPLAT',                0, png.loadIcon('paintsplat_bounce')),
-            ('Propulsion Gel',       'ITEM_PAINT_SPLAT',                2, png.loadIcon('paintsplat_speed')),
-            ('Conversion Gel',       'ITEM_PAINT_SPLAT',                3, png.loadIcon('paintsplat_portal')),
-            ('Cleansing Gel',        'ITEM_PAINT_SPLAT',                4, png.loadIcon('paintsplat_water')),
-            ('Excursion Funnel',     'ITEM_TBEAM',                      0, png.loadIcon('tbeam')),
-            ('Glass Panel',          'ITEM_GLASS_PANEL',                0, png.loadIcon('airlock')),
-            ('Glass',                'ITEM_BARRIER',                    0, png.loadIcon('glass')),
-            ('Observation Room',     'ITEM_SECONDARY_OBSERVATION_ROOM', 0, png.loadIcon('observation_room')),
-            ('Angled Panel',         'ITEM_ANGLED_PANEL',               0, png.loadIcon('panel_flap'))
-           ]
            
-item_list = []
+item_list = {}
 
 win.iconbitmap('BEE2.ico')# set the window icon
 
@@ -309,7 +270,8 @@ def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
     global item_list
     for item in data['Item']:
-        item_list.append(Item(item))
+        it = Item(item)
+        item_list[it.id] = it
     
     
 def loadPalUI():
@@ -335,6 +297,16 @@ def setGame():
 def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
     # TODO: Update the listbox/menu to match, and reload the new palette.
+    for item in pal_picked:
+        item.place_forget()
+    pal_picked.clear()
+    print(*item_list.keys())
+    for item, sub in palettes[selectedPalette].pos:
+        if item in item_list.keys():
+            pal_picked.append(PalItem(frames['preview'], item_list[item], sub))
+        else:
+            print('Unkown item "' + item + '"!')
+    flowPreview()
 
 def setStyleOpt(key):
     print("Toggle style option: " + key)
@@ -682,10 +654,6 @@ def initPreview(f):
     selImg=png.loadPng('sel_bar')
     UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
     UI['pre_sel_line'].imgsave=selImg
-
-    #for i in range(0,32):
-    #    img=random.choice(testImg)
-    #    pal_picked.append(PalItem(frames['preview'], img[0], img[1], img[2], img[3]))
     flowPreview()
 
 def initPicker(f):
@@ -708,14 +676,10 @@ def initPicker(f):
 
     frmScroll=ttk.Frame(pal_canvas) # add another frame inside to place labels on
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
-    for item in item_list:
-        #num_subitems = len(list(Property.find_all(item.versions[0]['styles'][selected_style]['editor'], "Item", "Editor", "Subtype")))
-        print("sub", item.num_sub)
+    for item in item_list.values():
         for i in range(0,item.num_sub):
             pal_items.append(PalItem(frmScroll, item, i))
-    #for num in range(0,len(testImg)*10):
-    #    img=testImg[num%len(testImg)] # init with test objects
-    #    pal_items.append(PalItem(frmScroll, img[0], img[1], img[2], img[3]))
+
     pal_items_fake=[]
     for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
         pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))

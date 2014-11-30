@@ -55,7 +55,7 @@ def parse(posfile, propfile):
                 else:
                     print("Malformed row '"+line+"'!")
                     return False
-    return Palette(name, pos, [])
+    return Palette(name, pos, Property('',props))
     
     
 if __name__ == '__main__':
