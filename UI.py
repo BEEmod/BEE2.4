@@ -242,6 +242,10 @@ class Item():
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
         self.description = self.data['desc']
+        self.id = item.id
+        
+    def get_icon(self, subKey):
+        return png.loadIcon(self.data['icons'][str(subKey)])
                
 class PalItem(ttk.Label):
     def __init__(self, frame, item, sub):
@@ -249,8 +253,7 @@ class PalItem(ttk.Label):
         self.item = item
         self.subKey = sub
         print(item.data['icons'].keys())
-        self.img = item.data['icons'][str(self.subKey)]
-        self.img = png.loadIcon(self.img)
+        self.img = item.get_icon(self.subKey)
         self.name = list(Property.find_all(item.data['editor'], "Item", "Editor", "Subtype", "Name"))
         self.name=self.name[self.subKey].value
         super().__init__(frame, image=self.img)
@@ -266,7 +269,7 @@ class PalItem(ttk.Label):
         toRem=[]
         found=False
         for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
-            if item.item.key==self.item.key and item.subKey==self.subKey:
+            if self==item:
                 item.place_forget()
                 toRem.append(i)
                 found=True
@@ -277,9 +280,13 @@ class PalItem(ttk.Label):
     def onPal(self):
         '''Determine if this item is on the palette.'''
         for item in pal_picked:
-            if item.item.key==self.item.key and item.subKey==self.subKey:
+            if self==item:
                 return True
         return False
+        
+    def __eq__(self, other):
+        '''Two items are equal if they have the same overall item and sub-item index.'''
+        return self.item.id == other.item.id and self.subKey == other.subKey
         
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey)
@@ -338,10 +345,16 @@ def showProps(e):
     windows['props'].deiconify()
     windows['props'].vis=True
     windows['props'].lift(win)
-    loc_x=e.widget.winfo_rootx() + windows['props'].winfo_rootx() - UI['prop_sub_2'].winfo_rootx()
-#The pixel offset between the window and the subitem in the properties dialog - change sub_2 to move it.
+    
+    sub_item = e.widget
+    item = e.widget.item
+    icon_widget = UI['prop_sub_' + str(sub_item.subKey)]
+    
+    loc_x=e.widget.winfo_rootx() + windows['props'].winfo_rootx() - icon_widget.winfo_rootx()
+        #The pixel offset between the window and the subitem in the properties dialog
     loc_y=e.widget.winfo_rooty() + windows['props'].winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
-    if loc_x<15: # adjust to fit inside the screen, + small boundry to not obstruct taskbars, menus etc
+    
+    if loc_x<15: # adjust to fit inside the screen, + small boundary to not obstruct taskbars, menus etc
         loc_x=0
     if loc_y<45:
         loc_y=0
@@ -352,6 +365,15 @@ def showProps(e):
     windows['props'].geometry('+'+str(loc_x)+'+'+str(loc_y))
     windows['props'].relX=loc_x-win.winfo_x()
     windows['props'].relY=loc_y-win.winfo_y()
+    for pos in range(5):
+        if pos >= item.num_sub:
+            UI['prop_sub_' + str(pos)]['image'] = png.loadIcon('_blank')
+        else:
+            UI['prop_sub_' + str(pos)]['image']=item.get_icon(pos)
+        UI['prop_sub_' + str(pos)]['relief'] = 'flat'
+    UI['prop_sub_' + str(sub_item.subKey)]['relief'] = 'raised'
+    UI['prop_author']['text'] = ', '.join(item.data['auth'])
+    UI['prop_name']['text'] = sub_item.dispName
 
 def hideProps(e):
     if windows['props'].vis:

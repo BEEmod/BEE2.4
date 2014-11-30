@@ -145,7 +145,6 @@ def loadPng(path):
         path="images/" + path
     else:
         path="images/"+path+".png"
-        
     if path in loaded_png:
         return loaded_png[path]
     else:
