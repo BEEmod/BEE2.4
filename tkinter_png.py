@@ -136,27 +136,39 @@ class PngImageTk(object):
 
 # BEE2 png handlers
 
+loaded_png = {}
+loaded_spr = {}
+
 def loadPng(path):
     "Loads in and converts a png for use in TKinter."
     if path.casefold().endswith(".png"):
         path="images/" + path
     else:
         path="images/"+path+".png"
-    if not os.path.isfile(path):
-      print("ERROR: \"" + path + "\" does not exist!")
-      return img_error
-    tmp=PngImageTk(path)
-    print("Loading \""+path+"\"")
-    tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
-    return tmp.image
+        
+    if path in loaded_png:
+        return loaded_png[path]
+    else:
+        if not os.path.isfile(path):
+          print("ERROR: \"" + path + "\" does not exist!")
+          return img_error
+        tmp=PngImageTk(path)
+        print("Loading \""+path+"\"")
+        tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
+        loaded_png[path] = tmp.image
+        return tmp.image
 
 def loadSpr(name):
-  "load in the property icons and automatically double the dimensions"
-  ico=loadPng('icons/'+name)
-  return ico.zoom(2)
+  "load in the property icons and automatically double the dimensions."
+  if name in loaded_spr:
+    return loaded_spr[name]
+  else:
+      ico=loadPng('icons/'+name).zoom(2)
+      loaded_spr[name] = ico
+      return ico
 
 def loadIcon(name): 
-  "load in a palette icon, ensuring the correct size"
+  "Load in a palette icon, ensuring the correct size."
   name= "pal_test/" + name
   img=loadPng(name)
   if img.width() != 64 or img.height() != 64:
