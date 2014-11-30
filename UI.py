@@ -6,12 +6,11 @@ from tkinter import simpledialog # Premade windows for asking for strings/ints/e
 import tkinter_png as png # png library for TKinter
 import random
 import math
-import webbrowser
 
 from property_parser import Property
 from paletteLoader import Palette
 from packageLoader import Style as palStyle, Item as palItem, Voice as palVoice, Skybox as palSkybox
-import itemPropWin
+import contextWin
 from selectorWin import selWin
 from selectorWin import Item as selWinItem
 import sound as snd
@@ -202,7 +201,6 @@ goo_list = [
     ]
     
 selected_style = "clean"
-selected_item = None
     
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
@@ -259,7 +257,7 @@ class PalItem(ttk.Label):
         self.name=self.name[self.subKey].value
         super().__init__(frame, image=self.img)
         self.dispName='Null'#data['name']
-        self.bind("<Button-3>",showProps)
+        self.bind("<Button-3>", contextWin.showProps)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
         self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
@@ -340,61 +338,6 @@ def setDispName(name):
 
 def clearDispName(e):
     UI['pre_disp_name'].configure(text='')
-
-def showProps(e):
-    '''Show the properties window for an item.'''
-    snd.fx('expand')
-    windows['props'].deiconify()
-    windows['props'].vis=True
-    windows['props'].lift(win)
-    
-    sub_item = e.widget
-    item = e.widget.item
-    selected_item = item
-    icon_widget = UI['prop_sub_' + str(sub_item.subKey)]
-    
-    loc_x=e.widget.winfo_rootx() + windows['props'].winfo_rootx() - icon_widget.winfo_rootx()
-        #The pixel offset between the window and the subitem in the properties dialog
-    loc_y=e.widget.winfo_rooty() + windows['props'].winfo_rooty() - UI['prop_sub_0'].winfo_rooty()
-    
-    if loc_x<15: # adjust to fit inside the screen, + small boundary to not obstruct taskbars, menus etc
-        loc_x=0
-    if loc_y<45:
-        loc_y=0
-    if loc_x > windows['props'].winfo_screenwidth()-windows['props'].winfo_reqwidth()-15:
-        loc_x=windows['props'].winfo_screenwidth()-windows['props'].winfo_reqwidth()-15
-    if loc_y > windows['props'].winfo_screenheight()-windows['props'].winfo_reqheight()-45:
-        loc_y=windows['props'].winfo_screenheight()-windows['props'].winfo_reqheight()-45
-    windows['props'].geometry('+'+str(loc_x)+'+'+str(loc_y))
-    windows['props'].relX=loc_x-win.winfo_x()
-    windows['props'].relY=loc_y-win.winfo_y()
-    for pos in range(5):
-        if pos >= item.num_sub:
-            UI['prop_sub_' + str(pos)]['image'] = png.loadIcon('_blank')
-        else:
-            UI['prop_sub_' + str(pos)]['image']=item.get_icon(pos)
-        UI['prop_sub_' + str(pos)]['relief'] = 'flat'
-    UI['prop_sub_' + str(sub_item.subKey)]['relief'] = 'raised'
-    UI['prop_author']['text'] = ', '.join(item.data['auth'])
-    UI['prop_name']['text'] = sub_item.dispName
-    UI['prop_desc']['state']="normal"
-    UI['prop_desc'].delete(1.0, END)
-    UI['prop_desc'].insert("end", item.data['desc']) 
-    UI['prop_desc']['state']="disabled"
-
-def hideProps(e):
-    if windows['props'].vis:
-        snd.fx('contract')
-        windows['props'].withdraw()
-        windows['props'].vis=False
-
-def showItemProps():
-    snd.fx('expand')
-    itemPropWin.open(['ButtonType', 'TimerDelay', 'StartEnabled', 'StartReversed'], UI['prop_itemProps'], "ItemNameHere") # TODO: add real values for first/last args
-
-def hideItemProps(vals):
-    snd.fx('contract')
-    print(vals)
 
 def convScrToGrid(x,y):
     "Returns the location of the item hovered over on the preview pane."
@@ -512,18 +455,6 @@ def pal_addTempText(e):
     if PalEntry.get() == "":
         PalEntry.set(PalEntry_TempText)
 
-def showMoreInfo():
-    url = selected_item.data['url']
-    if url != 'NONE':
-        try:
-            webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
-        except webbrowser.Error:
-            if messagebox.askyesno(icon="error", title="BEE2 - Error", message="Failed to open a web browser. Do you wish for the URL to be copied to the clipboard instead?", detail="'" + str(url) + "'", parent=windows['props']):
-                print("saving " +url+ "to clipboard")
-                win.clipboard_clear()
-                win.clipboard_append(url)
-        hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
-
 def saveAs():
     name=""
     while True:
@@ -573,7 +504,7 @@ def snapWin(name):
 def moveMain(e):
     "When the main window moves, sub-windows should move with it."
     shouldSnap=False
-    for name in('pal','style','opt', 'props'):
+    for name in('pal','style','opt'):
         windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
     win.focus()
     shouldSnap=True
@@ -843,67 +774,6 @@ def initFilter(f):
     FilterBoxes['package'] = initFilterCol('package', pack, packageText)
     FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
 
-def initProperties(win):
-    windows['props']=Toplevel(win)
-    windows['props'].overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
-    windows['props'].resizable(False, False)
-    windows['props'].transient(master=win)
-    windows['props'].vis=False
-    windows['props'].relX=0
-    windows['props'].relY=0
-    windows['props'].withdraw() # starts hidden
-
-
-    f=ttk.Frame(windows['props'], relief="raised", borderwidth="4")
-    f.grid(row=0, column=0)
-
-    ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
-    entSpr=png.loadSpr('gear_ent')
-
-    UI['prop_name']=ttk.Label(f, text="Weighted Button", anchor="center")
-    UI['prop_name'].grid(row=1, column=0, columnspan=3, sticky="EW")
-
-    UI['prop_ent_count']=ttk.Label(f, text="2", anchor="e", compound="left", image=entSpr)
-    UI['prop_ent_count'].img=entSpr
-    UI['prop_ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
-
-    UI['prop_author']=ttk.Label(f, text=" Valve, Carl Kenner ", anchor="center", relief="sunken")
-    UI['prop_author'].grid(row=2, column=0, columnspan=3, sticky="EW")
-
-    sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
-    sub_frame.grid(column=0, columnspan=3, row=3)
-    for i in range(5):
-        UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=png.loadIcon('_blank'))
-        UI['prop_sub_'+str(i)].grid(row=0, column=i)
-    ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
-    spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
-    spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
-    img=('in_none','out_norm','rot_0','space_occupy','surf_wall_floor_ceil','ap_black') # in order: inputs, outputs, rotation handle, occupied/embed state, desiredFacing, is a Valve item (+ other authors in future)
-    for i, spr in enumerate(img):
-        spr=png.loadSpr(spr)
-        UI['prop_spr_'+str(i)]=ttk.Label(spr_frame, image=spr, relief="raised")
-        UI['prop_spr_'+str(i)].grid(row=0, column=i)
-        UI['prop_spr_'+str(i)].img=spr
-    desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
-    desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
-    UI['prop_desc']=Text(desc_frame, width=40, height=8, wrap="word")
-    UI['prop_desc'].grid(row=0, column=0, sticky="EW")
-
-    desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=UI['prop_desc'].yview)
-    UI['prop_desc']['yscrollcommand']=desc_scroll.set
-    desc_scroll.grid(row=0, column=1, sticky="NS")
-    UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
-
-    UI['prop_more']=ttk.Button(f, text="More Info>>", command=showMoreInfo)
-    UI['prop_more'].grid(row=6, column=2, sticky=E)
-
-    UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
-    UI['prop_itemProps'].grid(row=6, column=1)
-
-    UI['prop_variant']=ttk.Combobox(f, values=("Recessed","Compat (On Top)"))
-    UI['prop_variant'].current(0)
-    UI['prop_variant'].grid(row=6, column=0, sticky=W)
-
 
 def initDragIcon(win):
     global dragWin
@@ -1034,14 +904,13 @@ def initMain():
     windows['style'].bind("<Button-4>", lambda e: UI['style_can'].yview_scroll(1, "units")) # needed for linux
     windows['style'].bind("<Button-5>", lambda e: UI['style_can'].yview_scroll(-1, "units"))
 
-    win.bind("<Button-1>",hideProps)
-    windows['style'].bind("<Button-1>",hideProps)
-    windows['opt'].bind("<Button-1>",hideProps)
-    windows['pal'].bind("<Button-1>",hideProps)
+    win.bind("<Button-1>",contextWin.hideProps)
+    windows['style'].bind("<Button-1>",contextWin.hideProps)
+    windows['opt'].bind("<Button-1>",contextWin.hideProps)
+    windows['pal'].bind("<Button-1>",contextWin.hideProps)
 
-    initProperties(win)
+    contextWin.init(win)
     initDragIcon(win)
-    itemPropWin.init(win, hideItemProps)
 
     win.deiconify() # show it once we've loaded everything
 
