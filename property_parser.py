@@ -148,6 +148,14 @@ class Property:
         else:
             return Property(self.name, self.value)
             
+    def as_dict(self):
+        "Convert this property tree into a tree of dictionaries, "
+        "keeping the last if multiple items have the smae name."
+        if self.has_children():
+            return {item.name:item.as_dict() for item in self}
+        else:
+            return self.value
+            
     def make_invalid(self):
         "Soft delete this property tree, so it does not appear in any output."
         self.valid = False
