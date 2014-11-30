@@ -1,6 +1,9 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
 import math
+import random
+
+import sound as snd
 props = { # all valid properties in editoritems, Valve probably isn't going to release a major update so it's fine to hardcode this.
   'toplevel'                : ('pistPlat', 'Start Position'),
   'bottomlevel'             : ('pistPlat', 'End Position'),
@@ -79,19 +82,55 @@ defaults={ # default values for this item
   'paintflowtype'           : 1,
   'allowstreak'             : True
   }
+  
+last_angle = '0'
+  
+play_sound = False
+  
+  
+def reset_sfx():
+    global play_sound
+    play_sound = True
+  
+def sfx(sound):
+    '''Wait for a certain amount of time between retriggering sounds, so they don't overlap.'''
+    global play_sound
+    if play_sound is True:
+        snd.fx(sound)
+        play_sound = False
+        win.after(75, reset_sfx)
+        
 
 def savePaint(e, key):
-    values[key]=paintOpts.index(e.widget.get())
+    sfx('config')
+    values[key]=paintOpts.index(widgets[key].get())
 
 def saveAngle(key):
-    values[key]='ramp_'+widgets[key].get()+'_deg_open'
+    global last_angle
+    new_ang = widgets[key].get()
+    if new_ang > last_angle:
+        sfx('raise_' + random.choice(('1','2','3')))
+    elif new_ang < last_angle:
+        sfx('lower_' + random.choice(('1','2','3')))
+    last_angle = new_ang
+    values[key]='ramp_'+str(new_ang)+'_deg_open'
 
 def saveTim(val, key):
-    values[key]=widgets[key].get()
+    new_val = widgets[key].get()
+    if new_val > values[key]:
+        sfx('add')
+    elif new_val < values[key]:
+        sfx('subtract')
+    else:
+        sfx('config')
+    values[key]=new_val
 
 def savePist(val, key):
     if widgets['toplevel'].get()==widgets['bottomlevel'].get(): # user moved them to match, switch the other one around
+        sfx('swap')
         widgets['toplevel' if key=='bottomlevel' else 'bottomlevel'].set(values['cust_'+key])
+    else:
+        sfx('move')
 
     startPos=widgets['toplevel'].get()
     endPos=widgets['bottomlevel'].get()
@@ -108,9 +147,15 @@ def saveRail(key):
         values['startactive'].set(False)
     else:
         widgets['startactive'].state(['!disabled'])
+        
+def checkFX():
+    sfx('config')
+    
+def paintFX(e):
+    sfx('config')
 
 def exit():
-    "Quit and return the new settings"
+    "Quit and return the new settings."
     win.grab_release()
     win.withdraw()
     out={}
@@ -148,7 +193,7 @@ def init(tk, cback):
         labels[key]=ttk.Label(win, text=props[key][1]+':')
         if props[key][0] == 'checkbox':
             values[key] = IntVar(value=defaults[key])
-            widgets[key] = ttk.Checkbutton(win, variable=values[key])
+            widgets[key] = ttk.Checkbutton(win, variable=values[key], command=checkFX)
         elif props[key][0] == 'railLift':
             values[key] = IntVar(value=defaults[key])
             widgets[key] = ttk.Checkbutton(win, variable=values[key], command=lambda k=key: saveRail(k))
@@ -160,6 +205,7 @@ def init(tk, cback):
             widgets[key].set(paintOpts[defaults[key]])
             widgets[key].state(['readonly'])
             widgets[key].bind("<<ComboboxSelected>>", lambda e, key=key: savePaint(e,key))
+            widgets[key].bind("<Button-1>", paintFX)
             values[key]=defaults[key]
         elif props[key][0] == 'pistPlat':
             widgets[key]=Scale(win, from_=0, to=4, orient="horizontal", showvalue=False, command=lambda val, k=key: savePist(val,k))
@@ -172,8 +218,6 @@ def init(tk, cback):
             widgets[key]=Scale(win, from_=0, to=30, orient="horizontal", showvalue=True, command=lambda val, k=key: saveTim(val,k))
             values[key]=defaults[key]
         elif props[key][0] == 'railPlat':
-            widgets[key]=ttk.Checkbutton(win)
-        elif props[key][0] == 'timerDel':
             widgets[key]=ttk.Checkbutton(win)
     values['startup']=defaults['startup']
 
@@ -216,12 +260,17 @@ def open(usedProps, parent, itemName):
         widgets['div_2'].grid(row=spec_row, column=5, sticky="NS", rowspan=(ind//3)+1)
     else:  
         widgets['div_2'].grid_remove()
-    if ind+spec_row==0:
-        labels['noOptions'].grid(row=0, column=0, columnspan=9)
+    if ind+spec_row==1:
+        labels['noOptions'].grid(row=1, column=0, columnspan=9)
         ind=1
     else:
         labels['noOptions'].grid_remove()
     widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=9, sticky="EW")
+    
+    # Block sound for the first few millisec to stop excess sounds from playing
+    play_sound=False
+    win.after(25, reset_sfx)
+    
     win.deiconify()
     win.lift(parent)
     win.grab_set()

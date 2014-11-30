@@ -20,7 +20,15 @@ if initiallised:
               'expand'     : pygame.mixer.Sound(file='sounds/extrude.wav'),
               'delete'     : pygame.mixer.Sound(file='sounds/collapse.wav'),
               'error'     : pygame.mixer.Sound(file='sounds/error.wav'),
-              'contract'   : pygame.mixer.Sound(file='sounds/carve.wav')
+              'contract'   : pygame.mixer.Sound(file='sounds/carve.wav'),
+              'raise_1'   : pygame.mixer.Sound(file='sounds/panel_raise_01.wav'),
+              'raise_2'   : pygame.mixer.Sound(file='sounds/panel_raise_02.wav'),
+              'raise_3'   : pygame.mixer.Sound(file='sounds/panel_raise_03.wav'),
+              'lower_1'   : pygame.mixer.Sound(file='sounds/panel_lower_01.wav'),
+              'lower_2'   : pygame.mixer.Sound(file='sounds/panel_lower_02.wav'),
+              'lower_3'   : pygame.mixer.Sound(file='sounds/panel_lower_03.wav'),
+              'move'      : pygame.mixer.Sound(file='sounds/reconfig.wav'),
+              'swap'      : pygame.mixer.Sound(file='sounds/extrude.wav'),
              }
          
     def fx(name):
