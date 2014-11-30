@@ -202,6 +202,7 @@ goo_list = [
     ]
     
 selected_style = "clean"
+selected_item = None
     
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
@@ -341,6 +342,7 @@ def clearDispName(e):
     UI['pre_disp_name'].configure(text='')
 
 def showProps(e):
+    '''Show the properties window for an item.'''
     snd.fx('expand')
     windows['props'].deiconify()
     windows['props'].vis=True
@@ -348,6 +350,7 @@ def showProps(e):
     
     sub_item = e.widget
     item = e.widget.item
+    selected_item = item
     icon_widget = UI['prop_sub_' + str(sub_item.subKey)]
     
     loc_x=e.widget.winfo_rootx() + windows['props'].winfo_rootx() - icon_widget.winfo_rootx()
@@ -374,6 +377,10 @@ def showProps(e):
     UI['prop_sub_' + str(sub_item.subKey)]['relief'] = 'raised'
     UI['prop_author']['text'] = ', '.join(item.data['auth'])
     UI['prop_name']['text'] = sub_item.dispName
+    UI['prop_desc']['state']="normal"
+    UI['prop_desc'].delete(1.0, END)
+    UI['prop_desc'].insert("end", item.data['desc']) 
+    UI['prop_desc']['state']="disabled"
 
 def hideProps(e):
     if windows['props'].vis:
@@ -505,15 +512,17 @@ def pal_addTempText(e):
     if PalEntry.get() == "":
         PalEntry.set(PalEntry_TempText)
 
-def showMoreInfo(url):
-    try:
-        webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
-    except webbrowser.Error:
-        if messagebox.askyesno(icon="error", title="BEE2 - Error", message="Failed to open a web browser. Do you wish for the URL to be copied to the clipboard instead?", detail="'" + str(url) + "'", parent=windows['props']):
-            print("saving " +url+ "to clipboard")
-            win.clipboard_clear()
-            win.clipboard_append(url)
-    hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
+def showMoreInfo():
+    url = selected_item.data['url']
+    if url != 'NONE':
+        try:
+            webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
+        except webbrowser.Error:
+            if messagebox.askyesno(icon="error", title="BEE2 - Error", message="Failed to open a web browser. Do you wish for the URL to be copied to the clipboard instead?", detail="'" + str(url) + "'", parent=windows['props']):
+                print("saving " +url+ "to clipboard")
+                win.clipboard_clear()
+                win.clipboard_append(url)
+        hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
 
 def saveAs():
     name=""
@@ -863,14 +872,9 @@ def initProperties(win):
 
     sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
-    img=('_blank','portal_button','box_socket','ball_socket','_blank') # for now always show 'properties' for the ITEM_BUTTON_FLOOR
-    for i, ico in enumerate(img):
-        ico=png.loadIcon(ico)
-        UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=ico)
+    for i in range(5):
+        UI['prop_sub_'+str(i)]=ttk.Label(sub_frame, image=png.loadIcon('_blank'))
         UI['prop_sub_'+str(i)].grid(row=0, column=i)
-        if i==2:
-            UI['prop_sub_'+str(i)]['relief']='raised' #hardcode this to be selected
-        UI['prop_sub_'+str(i)].img=ico # save here to prevent python from garbage collecting
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
@@ -888,10 +892,9 @@ def initProperties(win):
     desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=UI['prop_desc'].yview)
     UI['prop_desc']['yscrollcommand']=desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
-    UI['prop_desc'].insert("end", "Big pressure buttons activated by players or cubes. Cube buttons are only activated by cubes, sphere buttons only by spheres.")
     UI['prop_desc']['state']="disabled" # need to set this to normal when editing text, then swap back
 
-    UI['prop_more']=ttk.Button(f, text="More Info>>", command=lambda u='https://developer.valvesoftware.com/wiki/Portal_2_Puzzle_Maker/Button': showMoreInfo(u))
+    UI['prop_more']=ttk.Button(f, text="More Info>>", command=showMoreInfo)
     UI['prop_more'].grid(row=6, column=2, sticky=E)
 
     UI['prop_itemProps']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
