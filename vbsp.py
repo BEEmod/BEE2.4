@@ -1246,7 +1246,8 @@ def save():
 def run_vbsp(args, do_swap):
     "Execute the original VBSP, copying files around so it works correctly."
     if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
-        shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
+        if os.path.isfile(path.replace(".vmf", ".log")):
+            shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
     args = [('"' + x + '"' if " " in x else x) for x in args] # put quotes around args which contain spaces
     arg = '"' + os.path.normpath(os.path.join(os.getcwd(),"vbsp_original")) + '" ' + " ".join(args)
     utils.con_log("Calling original VBSP...")
