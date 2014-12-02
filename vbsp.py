@@ -610,10 +610,13 @@ def make_bottomless_pit(solids):
             trig['landmark'] = tele_ref
             trig['target'] = tele_dest
             trig.outputs = [] # remove the usual outputs
-            origin = VLib.conv_vec(trig['origin'])
+            bbox_min, bbox_max = trig.get_bbox()
+            origin = bbox_max + bbox_min
+            origin /= 2
             # The triggers are 26 high, so make them 6units thick to make it harder to see the teleport
             for side in trig.sides():
                 for plane in side.planes:
+                    print(plane.z, origin.z)
                     if plane.z > origin.z:
                         plane.z -= 20 
             
