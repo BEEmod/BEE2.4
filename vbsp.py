@@ -14,40 +14,41 @@ import utils
 unique_counter=0 # counter for instances to ensure unique targetnames
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
-    #"metal/black_floor_metal_001c"      : "black.floor",
-    #"tile/white_floor_tile002a"         : "white.floor",
-    #"metal/black_floor_metal_001c"      : "black.ceiling",
-    #"tile/white_floor_tile002a"         : "white.ceiling",
-    "tile/white_wall_tile003a"           : "white.wall",
-    "tile/white_wall_tile003h"           : "white.wall",
-    "tile/white_wall_tile003c"           : "white.2x2",
-    "tile/white_wall_tile003f"           : "white.4x4",
-    "metal/black_wall_metal_002c"        : "black.wall",
-    "metal/black_wall_metal_002e"        : "black.wall",
-    "metal/black_wall_metal_002a"        : "black.2x2",
-    "metal/black_wall_metal_002b"        : "black.4x4",
-    "signage/signage_exit"               : "overlay.exit",
-    "signage/signage_overlay_arrow"      : "overlay.arrow",
-    "signage/signage_overlay_catapult1"  : "overlay.catapultfling",
-    "signage/signage_overlay_catapult2"  : "overlay.catapultland",
-    "signage/shape01"                    : "overlay.dot",
-    "signage/shape02"                    : "overlay.moon",
-    "signage/shape03"                    : "overlay.triangle",
-    "signage/shape04"                    : "overlay.cross",
-    "signage/shape05"                    : "overlay.square",
-    "signage/signage_shape_circle"       : "overlay.circle",
-    "signage/signage_shape_sine"         : "overlay.sine",
-    "signage/signage_shape_slash"        : "overlay.slash",
-    "signage/signage_shape_star"         : "overlay.star",
-    "signage/signage_shape_wavy"         : "overlay.wavy",
-    "anim_wp/framework/backpanels_cheap" : "special.behind",
-    "plastic/plasticwall004a"            : "special.pedestalside",
-    "anim_wp/framework/squarebeams"      : "special.edge",
-    "nature/toxicslime_a2_bridge_intro"  : "special.goo",
-    "glass/glasswindow007a_less_shiny"   : "special.glass",
-    "metal/metalgrate018"                : "special.grating",
-    "effects/laserplane"                 : "special.laserfield",
-    "sky_black"                          : "special.sky",
+    #"metal/black_floor_metal_001c"       : "black.floor",
+    #"tile/white_floor_tile002a"          : "white.floor",
+    #"metal/black_floor_metal_001c"       : "black.ceiling",
+    #"tile/white_floor_tile002a"          : "white.ceiling",
+    "tile/white_wall_tile003a"            : "white.wall",
+    "tile/white_wall_tile003h"            : "white.wall",
+    "tile/white_wall_tile003c"            : "white.2x2",
+    "tile/white_wall_tile003f"            : "white.4x4",
+    "metal/black_wall_metal_002c"         : "black.wall",
+    "metal/black_wall_metal_002e"         : "black.wall",
+    "metal/black_wall_metal_002a"         : "black.2x2",
+    "metal/black_wall_metal_002b"         : "black.4x4",
+    "signage/signage_exit"                : "overlay.exit",
+    "signage/signage_overlay_arrow"       : "overlay.arrow",
+    "signage/signage_overlay_catapult1"   : "overlay.catapultfling",
+    "signage/signage_overlay_catapult2"   : "overlay.catapultland",
+    "signage/shape01"                     : "overlay.dot",
+    "signage/shape02"                     : "overlay.moon",
+    "signage/shape03"                     : "overlay.triangle",
+    "signage/shape04"                     : "overlay.cross",
+    "signage/shape05"                     : "overlay.square",
+    "signage/signage_shape_circle"        : "overlay.circle",
+    "signage/signage_shape_sine"          : "overlay.sine",
+    "signage/signage_shape_slash"         : "overlay.slash",
+    "signage/signage_shape_star"          : "overlay.star",
+    "signage/signage_shape_wavy"          : "overlay.wavy",
+    "anim_wp/framework/backpanels_cheap"  : "special.behind",
+    "plastic/plasticwall004a"             : "special.pedestalside",
+    "anim_wp/framework/squarebeams"       : "special.edge",
+    "nature/toxicslime_a2_bridge_intro"   : "special.goo",
+    "nature/toxicslime_puzzlemaker_cheap" : "special.goo",
+    "glass/glasswindow007a_less_shiny"    : "special.glass",
+    "metal/metalgrate018"                 : "special.grating",
+    "effects/laserplane"                  : "special.laserfield",
+    "sky_black"                           : "special.sky",
     }
     
 TEX_DEFAULTS = [ # extra default replacements we need to specially handle
@@ -90,6 +91,11 @@ WALLS = [
              "metal/black_wall_metal_002a", 
              "metal/black_wall_metal_002b"
         ]
+        
+GOO_TEX = [
+        "nature/toxicslime_a2_bridge_intro",
+        "nature/toxicslime_puzzlemaker_cheap"
+    ]
 
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
@@ -168,7 +174,8 @@ settings = {"textures"           : {},
             "options"            : {},
             "deathfield"         : {},
             "instances"          : {},
-            "style_vars"          : {},
+            "style_vars"         : {},
+            "pit"                : {},
             
             "cust_fizzlers"      : [],
             "conditions"         : [],
@@ -281,7 +288,19 @@ def load_settings():
         if len(results) > 0: # is it valid?
             con = {"flags" : flags, "results" : results, "type": type}
             settings['conditions'].append(con)
-   
+     
+    if get_opt('bottomless_pit') == "1":
+        pit = Property.find_key(conf, "bottomless_pit",[])
+        settings['pit']['tex_goo'] = pit['goo_tex', 'nature/toxicslime_a2_bridge_intro']
+        settings['pit']['tex_sky'] = pit['sky_tex', 'tools/toolsskybox']
+        settings['pit']['should_tele'] = pit['teleport', '0'] == '1'
+        settings['pit']['tele_dest'] = pit['tele_target', '@goo_targ']
+        settings['pit']['tele_ref'] = pit['tele_ref', '@goo_ref']
+        settings['pit']['height']  = VLib.conv_int(pit['max_height', '386'], 386)
+        settings['pit']['side'] = [prop.value for prop in pit.find_all("side_inst")]
+        if len(settings['pit']['side']) == 0:
+            settings['pit']['side'] = [""]
+
     process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
     utils.con_log("Settings Loaded!")
     
@@ -506,7 +525,8 @@ def satisfy_condition(cond, inst):
                 for opt in res.value:
                     if opt.name.casefold() in settings['options']:
                         settings['options'][opt.name.casefold()] = opt.value
-            inst['file'] += '.vmf'
+            if not inst['file'].endswith('vmf'):
+                inst['file'] += '.vmf'
         if len(cond['results']) == 0:
             settings['conditions'].remove(cond)
     return sat
@@ -570,45 +590,83 @@ def calc_rand_seed():
         return 'SEED'
     else:
         return '|'.join(lst)
+        
+def make_bottomless_pit(solids):
+    '''Transform all the goo pits into bottomless pits.'''
+    tex_sky = settings['pit']['tex_sky']
+    teleport = settings['pit']['should_tele']
+    tele_ref = settings['pit']['tele_ref']
+    tele_dest = settings['pit']['tele_dest']
+    for solid, wat_face in solids:
+        wat_face.mat = tex_sky
+        for vec in wat_face.planes:
+            vec.z = float(str(int(vec.z)-96) + ".5")
+            # subtract 95.5 from z axis to make it 0.5 units thick
+            # we do the decimal with strings to ensure it adds floats precisely
+    pit_height = settings['pit']['height']
+    for trig in map.iter_ents(classname='trigger_multiple', wait='0.1'):
+        if teleport: # transform the skybox physics triggers into teleports to move cubes into the skybox zone
+            trig['classname'] = 'trigger_teleport'
+            trig['landmark'] = tele_ref
+            trig['target'] = tele_dest
+            trig.outputs = [] # remove the usual outputs
+            origin = VLib.conv_vec(trig['origin'])
+            # The triggers are 26 high, so make them 6units thick to make it harder to see the teleport
+            for side in trig.sides():
+                for plane in side.planes:
+                    if plane.z > origin.z:
+                        plane.z -= 20 
+            
+    
 
 def change_brush():
     "Alter all world/detail brush textures to use the configured ones."
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glassInst')
+    glass_scale = get_opt('glass_scale')
+    is_bottomless = get_opt('bottomless_pit') == "1"
+    
+    # Check the clump algorithm has all its arguements
+    can_clump = (get_opt("clump_wall_tex") == "1" and 
+                 get_opt("clump_size").isnumeric() and 
+                 get_opt("clump_width").isnumeric() and 
+                 get_opt("clump_number").isnumeric())
+                 
+    if is_bottomless:
+        pit_solids = []
+        pit_height = settings['pit']['height']
+        pit_goo_tex = settings['pit']['tex_goo']
     if glass_inst == "NONE":
         glass_inst = None
     for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
             is_glass=False
-            if face.mat.casefold()=="nature/toxicslime_a2_bridge_intro" and (get_opt("bottomless_pit")=="1"):
-                plane=face.find_key('plane')
-                verts=utils.split_plane(plane)
-                for v in verts:
-                    v[2] = str(int(v[2])- 96) + ".5" # subtract 95.5 from z axis to make it 0.5 units thick
-                    # we do the decimal with strings to ensure it adds floats precisely
-                plane.value=utils.join_plane(verts)
+            if face.mat.casefold() in GOO_TEX and is_bottomless:
+                if face.planes[2].z < pit_height:
+                    pit_solids.append((solid, face))
+                else:
+                    face.mat = pit_goo_tex
             if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
-                split=face.uaxis.split(" ")
-                split[-1] = get_opt("glass_scale") # apply the glass scaling option
-                face.uaxis=" ".join(split)
+                split_u=face.uaxis.split(" ")
+                split_v=face.vaxis.split(" ")
+                split_u[-1] = glass_scale # apply the glass scaling option
+                split_v[-1] = glass_scale
+                face.uaxis=" ".join(split_u)
+                face.vaxis=" ".join(split_v)
                 
-                split=face.vaxis.split(" ")
-                split[-1] = get_opt("glass_scale") # apply the glass scaling option
-                face.vaxis=" ".join(split)
                 is_glass=True
         if is_glass and glass_inst is not None:
             inst = find_glass_inst(soild.get_origin())
-            inst['file'] = glass_inst
-                
-                
-    if (get_opt("clump_wall_tex") == "1" and 
-          get_opt("clump_size").isnumeric() and 
-          get_opt("clump_width").isnumeric() and 
-          get_opt("clump_number").isnumeric()):
-          # Check this algorithm has all its arguements
+            inst['file'] = glass_inst                  
+    if is_bottomless:
+        print('solids', pit_solids)
+        make_bottomless_pit(pit_solids)
+        
+    if can_clump:
         clump_walls()
     else:
         random_walls()
+        
         
 def find_glass_inst(origin):
     '''Find the glass instance placed on the specified origin.'''
@@ -620,6 +678,7 @@ def find_glass_inst(origin):
                               origin=loc.join(' '), 
                               file=inst_file['glass']):
         print('angle', inst['angles', ''])
+    # TODO - make this actually work
     return {'file': ''}
 
 def random_walls():
@@ -941,6 +1000,9 @@ def fix_inst():
             make_static_pist(inst) #try to convert to static piston
         for cond in settings['conditions'][:]:
             satisfy_condition(cond, inst)
+            
+    for inst in map.iter_ents(classname='func_instance', file=''):
+        map.remove_ent(inst) # Remove instances with blank file attr, allows conditions to strip the instances when requested
 
 def death_fizzler_change(inst, trig):
     "Convert the passed fizzler brush into the required brushes for Death Fizzlers."
@@ -1198,6 +1260,8 @@ def run_vbsp(args, do_swap):
                 shutil.copy(new_path.replace(".vmf", exp), path.replace(".vmf", exp))
 
 # MAIN
+utils.con_log("BEE2 VBSP hook initiallised.")
+
 to_pack = [] # the file path for any items that we should be packing
 
 root = os.path.dirname(os.getcwd())
@@ -1217,18 +1281,15 @@ for i,a in enumerate(new_args):
         new_args[i] = ''
         old_args[i] = ''
 
-utils.con_log("BEE2 VBSP hook initiallised. Loading settings...")
-
-
-
-utils.con_log("Map path is " + path)
+utils.con_log('Map path is "' + path + '"')
 if path == "":
     raise Exception("No map passed!")
 if not path.endswith(".vmf"):
     path += ".vmf"
     new_path += ".vmf"
 
-load_settings()   
+utils.con_log("Loading settings...")
+load_settings() 
 
 if '-force_peti' in args or '-force_hammer' in args:
     # we have override command!
