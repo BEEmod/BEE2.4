@@ -162,6 +162,7 @@ class Item:
                         'auth': props['authors', ''].split(','),
                         'tags': props['tags', ''].split(';'),
                         'desc': props['description', 'NONE'],
+                        'ent':  props['ent_count', '0'],
                         'url':  props['infoURL', 'NONE'],
                         'icons': {p.name:p.value for p in props['icon', []]},
                         'editor': list(Property.find_all(editor, 'Item')),

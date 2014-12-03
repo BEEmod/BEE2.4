@@ -2,15 +2,26 @@ from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
 import webbrowser
 
+from property_parser import Property
 import tkinter_png as png # png library for TKinter
 import sound as snd
 import itemPropWin
 
 wid_sub = [0,0,0,0,0]
-wid_spr = [0,0,0,0,0,0]
+wid_spr = [0,0,0,0,0]
 
 selected_item = None
 selected_sub_item = None
+
+ROT_TYPES = {
+    "handle_none"          : "rot_0",
+    "handle_4_directions"  : "rot_4",
+    "handle_5_positions"   : "rot_5",
+    "handle_6_positions"   : "rot_6",
+    "handle_8_positions"   : "rot_8",
+    "handle_36_directions" : "rot_36",
+    "handle_catapult"      : "rot_catapult"
+}
 
 def showItemProps():
     snd.fx('expand')
@@ -68,10 +79,84 @@ def showProps(e):
     icon_widget['relief'] = 'raised'
     wid_author['text'] = ', '.join(selected_item.data['auth'])
     wid_name['text'] = selected_sub_item.dispName
+    wid_ent_count['text'] = selected_item.data['ent']
     wid_desc['state']="normal"
     wid_desc.delete(1.0, END)
     wid_desc.insert("end", selected_item.data['desc']) 
     wid_desc['state']="disabled"
+    set_sprites(selected_item)
+    
+            
+def set_sprites(item):
+    editor_data = item.data['editor']
+    has_inputs = False
+    has_polarity = False
+    has_outputs = False
+    for inp_list in Property.find_all(editor_data, "Item", "Exporting", "Inputs"):
+        for inp in inp_list:
+            if inp.name == "CONNECTION_STANDARD":
+                has_inputs = True
+            elif inp.name == "CONNECTION_TBEAM_POLARITY":
+                has_polarity = True
+    for out_list in Property.find_all(editor_data, "Item", "Exporting", "Outputs"):
+        for out in out_list:
+            if out.name == "CONNECTION_STANDARD":
+                has_outputs = True
+                break
+    has_timer = any(Property.find_all(editor_data, "Item", "Properties", "TimerDelay"))
+    
+    editor_bit = next(Property.find_all(editor_data, "Item", "Editor"))
+    rot_type = editor_bit["MovementHandle", "HANDLE_NONE"].casefold()
+    
+    facing_type = editor_bit["InvalidSurface", ""].casefold()
+    surf_wall = "wall" in facing_type
+    surf_floor = "floor" in facing_type
+    surf_ceil = "ceiling" in facing_type
+
+    is_embed = any(Property.find_all(editor_data, "Item", "Exporting", "EmbeddedVoxels"))
+    is_occupy = False
+    for vox in Property.find_all(editor_data, "Item", "Exporting", "OccupiedVoxels"):
+        collide_type = Property.find_key(vox, "CollideType", "COLLIDE").value
+        if collide_type.casefold() != "collide_nothing":
+            is_occupy = True # Collide_nothing makes it not affect anything
+            break
+            
+    if has_inputs:
+        if has_polarity:
+            wid_spr[0]['image'] = png.loadSpr('in_polarity')
+        else:
+            wid_spr[0]['image'] = png.loadSpr('in_norm')
+    else:
+        wid_spr[0]['image'] = png.loadSpr('in_none')
+    
+    if has_outputs:
+        if has_timer:
+            wid_spr[1]['image'] = png.loadSpr('out_tim')
+        else:
+            wid_spr[1]['image'] = png.loadSpr('out_norm')
+    else:
+        wid_spr[1]['image'] = png.loadSpr('out_none')
+        
+    wid_spr[2]['image'] = png.loadSpr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
+         
+    if is_occupy:
+        if is_embed:
+            wid_spr[3]['image'] = png.loadSpr('space_embed_occupy')
+        else:
+            wid_spr[3]['image'] = png.loadSpr('space_occupy')
+    else:
+        wid_spr[3]['image'] = png.loadSpr('space_none')
+       
+    face_spr = "surf"
+    if not surf_wall:
+        face_spr += "_wall"
+    if not surf_floor:
+        face_spr += "_floor"
+    if not surf_ceil:
+        face_spr += "_ceil"
+    if face_spr == "surf":
+        face_spr += "_none"
+    wid_spr[4]['image'] = png.loadSpr(face_spr)
 
 def hideProps(e):
     if prop_window.vis:
@@ -91,6 +176,8 @@ def init(win):
     prop_window.relX=0
     prop_window.relY=0
     prop_window.withdraw() # starts hidden
+    
+    
 
 
     f=ttk.Frame(prop_window, relief="raised", borderwidth="4")
@@ -117,12 +204,11 @@ def init(win):
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
-    img=('in_none','out_norm','rot_0','space_occupy','surf_wall_floor_ceil','ap_black') # in order: inputs, outputs, rotation handle, occupied/embed state, desiredFacing, is a Valve item (+ other authors in future)
-    for i, spr in enumerate(img):
-        spr=png.loadSpr(spr)
+    # sprites: inputs, outputs, rotation handle, occupied/embed state, desiredFacing
+    for i in range(5):
+        spr=png.loadSpr('ap_grey')
         wid_spr[i]=ttk.Label(spr_frame, image=spr, relief="raised")
         wid_spr[i].grid(row=0, column=i)
-        wid_spr[i].img=spr
     desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
     wid_desc=Text(desc_frame, width=40, height=8, wrap="word")

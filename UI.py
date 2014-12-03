@@ -202,7 +202,6 @@ class Item():
         self.item = item
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
-        self.description = self.data['desc']
         self.id = item.id
         
     def get_icon(self, subKey):
@@ -511,7 +510,7 @@ def updateFilters():
         value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
         for i in FilterVars[cat]:
             if FilterVars[cat][i].get() != value:
-                FilterVars_all[cat].set(True) # force it to be true so when clicked it'll blank out all the   checkboxes
+                FilterVars_all[cat].set(True) # force it to be true so when clicked it'll blank out all the checkboxes
                 FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, since they don't match
                 no_alt=False
                 break
