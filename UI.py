@@ -304,7 +304,7 @@ def setPalette():
         if item in item_list.keys():
             pal_picked.append(PalItem(frames['preview'], item_list[item], sub))
         else:
-            print('Unkown item "' + item + '"!')
+            print('Unknown item "' + item + '"!')
     flowPreview()
 
 def setStyleOpt(key):
@@ -584,7 +584,7 @@ def initOption(f):
 def initStyleOpt(f):
     global styleCheck, styleOptVars
 
-    UI['style_can']=Canvas(f)
+    UI['style_can']=Canvas(f, highlightthickness=0)
     UI['style_can'].grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
     f.rowconfigure(0, weight=1)
 
