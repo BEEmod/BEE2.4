@@ -259,10 +259,10 @@ class VMF:
         '''Get an unused ID of a type. Used by entities, solids and brush sides to keep their IDs valid.'''
         if ids not in _ID_types:
             raise ValueError('Invalid ID type!')
-        list_ = self.__dict__[_ID_types[ids]]
+        if desired==-1:
+            desired = 1
+        list_ = getattr(self,_ID_types[ids])
         if len(list_)==0 or desired not in list_ :
-            if desired==-1:
-                desired = 1
             list_.append(int(desired))
             return desired
         # Need it in ascending order
