@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import random
 import itertools
+from collections import defaultdict
 
 from property_parser import Property, KeyValError, NoKeyError
 from utils import Vec
@@ -296,6 +297,8 @@ def load_settings():
         settings['pit']['should_tele'] = pit['teleport', '0'] == '1'
         settings['pit']['tele_dest'] = pit['tele_target', '@goo_targ']
         settings['pit']['tele_ref'] = pit['tele_ref', '@goo_ref']
+        settings['pit']['off_x']  = VLib.conv_int(pit['off_x', '0'], 0)
+        settings['pit']['off_y']  = VLib.conv_int(pit['off_y', '0'], 0)
         settings['pit']['height']  = VLib.conv_int(pit['max_height', '386'], 386)
         settings['pit']['side'] = [prop.value for prop in pit.find_all("side_inst")]
         if len(settings['pit']['side']) == 0:
@@ -597,6 +600,8 @@ def make_bottomless_pit(solids):
     teleport = settings['pit']['should_tele']
     tele_ref = settings['pit']['tele_ref']
     tele_dest = settings['pit']['tele_dest']
+    tele_off_x = settings['pit']['off_x']+64
+    tele_off_y = settings['pit']['off_y']+64
     for solid, wat_face in solids:
         wat_face.mat = tex_sky
         for vec in wat_face.planes:
@@ -604,22 +609,52 @@ def make_bottomless_pit(solids):
             # subtract 95.5 from z axis to make it 0.5 units thick
             # we do the decimal with strings to ensure it adds floats precisely
     pit_height = settings['pit']['height']
+    edges = defaultdict(lambda: [None, None, None, None])
+    dirs = [
+        (0, 0, 128,  '0 270 0'), # North
+        (1, 0, -128, '0 90 0'), # South
+        (2, 128, 0,  '0 180 0'), # East
+        (3, -128, 0, '0 0 0') # West
+    ]
     for trig in map.iter_ents(classname='trigger_multiple', wait='0.1'):
         if teleport: # transform the skybox physics triggers into teleports to move cubes into the skybox zone
-            trig['classname'] = 'trigger_teleport'
-            trig['landmark'] = tele_ref
-            trig['target'] = tele_dest
-            trig.outputs = [] # remove the usual outputs
             bbox_min, bbox_max = trig.get_bbox()
-            origin = bbox_max + bbox_min
-            origin /= 2
-            # The triggers are 26 high, so make them 6units thick to make it harder to see the teleport
-            for side in trig.sides():
-                for plane in side.planes:
-                    print(plane.z, origin.z)
-                    if plane.z > origin.z:
-                        plane.z -= 20 
-            
+            origin = (bbox_min + bbox_max)/2
+            if origin.z < pit_height:
+                trig['classname'] = 'trigger_teleport'
+                trig['spawnflags'] = '4106' # Physics and npcs
+                trig['landmark'] = tele_ref
+                trig['target'] = tele_dest
+                trig.outputs = [] # remove the usual outputs
+                print('box:', trig.get_bbox())
+                for x in range(int(bbox_min.x), int(bbox_max.x), 128):
+                    for y in range(int(bbox_min.y), int(bbox_max.y), 128):
+                        edges[x,y] = None # Remove the pillar from the center of the item
+                        for i, xoff, yoff, angle in dirs:
+                            side = edges[x+xoff,y+yoff]
+                            if side is not None:
+                                side[i] = origin.z - 13
+                
+                # The triggers are 26 high, so make them 10 units thick to make it harder to see the teleport
+                for side in trig.sides():
+                    for plane in side.planes:
+                        if plane.z > origin.z:
+                            plane.z -= 16
+                          
+    file_opts = settings['pit']['side']
+    for (x,y), mask in edges.items():
+        if mask is not None:
+            for i, xoff, yoff, angle in dirs:
+                if mask[i] is not None:
+                    random.seed(str(x) + str(y) + angle)
+                    file = random.choice(file_opts)
+                    if file != '':
+                        map.add_ent(VLib.Entity(map, keys={
+                            'classname' : 'func_instance',
+                            'file' : file,
+                            'targetname' : 'goo_side' + unique_id(),
+                            'origin' : str(x+tele_off_x) + ' ' + str(y+tele_off_y) + ' ' + str(mask[i]) ,
+                            'angles' : angle}))
     
 
 def change_brush():
@@ -662,8 +697,9 @@ def change_brush():
             inst = find_glass_inst(soild.get_origin())
             inst['file'] = glass_inst                  
     if is_bottomless:
-        print('solids', pit_solids)
+        utils.con_log('Creating Bottomless Pits!')
         make_bottomless_pit(pit_solids)
+        utils.con_log('Done!')
         
     if can_clump:
         clump_walls()
