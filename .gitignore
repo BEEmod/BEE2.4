@@ -9,7 +9,8 @@ Desktop.ini
 $RECYCLE.BIN/
 
 __pycache__/
-build/
+build_BEE2/
+build_compiler/
 
 # Windows Installer files
 *.cab
