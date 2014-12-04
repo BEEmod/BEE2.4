@@ -32,8 +32,8 @@ def hideItemProps(vals):
     print(vals)
 
 def showMoreInfo():
-    url = selected_item.data['url']
-    if url != 'NONE':
+    url = selected_item.url
+    if url is not None:
         try:
             webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
         except webbrowser.Error:
@@ -42,6 +42,18 @@ def showMoreInfo():
                 root.clipboard_clear()
                 root.clipboard_append(url)
         hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
+        
+def moreInfo_showURL(e):
+    if selected_item.url is not None:
+        moreinfo_lbl['text'] = selected_item.url
+        moreinfo_win.deiconify()
+        moreinfo_win.update_idletasks()
+        x = wid_moreinfo.winfo_rootx() - (moreinfo_win.winfo_reqwidth() - wid_moreinfo.winfo_reqwidth()) // 2
+        y = wid_moreinfo.winfo_rooty() + wid_moreinfo.winfo_reqheight()
+        moreinfo_win.geometry('+' + str(x) + '+' + str(y))
+    
+def moreInfo_hideURL(e):
+    moreinfo_win.withdraw()
         
 def showProps(e):
     '''Show the properties window for an item.'''
@@ -84,6 +96,10 @@ def showProps(e):
     wid_desc.delete(1.0, END)
     wid_desc.insert("end", selected_item.data['desc']) 
     wid_desc['state']="disabled"
+    if selected_item.url is None:
+        wid_moreinfo.state(('disabled',))
+    else:
+        wid_moreinfo.state(('!disabled',))
     set_sprites(selected_item)
     
             
@@ -166,7 +182,7 @@ def hideProps(e):
 
 def init(win):
     '''Initiallise all the window components.'''
-    global root, prop_window, wid_name, wid_ent_count, wid_author, sub_frame, wid_desc, wid_moreinfo, wid_variant, wid_changedefaults
+    global root, prop_window, wid_name, wid_ent_count, wid_author, sub_frame, wid_desc, wid_moreinfo, wid_variant, wid_changedefaults, moreinfo_win, moreinfo_lbl
     root = win
     prop_window=Toplevel(root)
     prop_window.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
@@ -218,6 +234,21 @@ def init(win):
 
     wid_moreinfo=ttk.Button(f, text="More Info>>", command=showMoreInfo)
     wid_moreinfo.grid(row=6, column=2, sticky=E)
+    
+    moreinfo_win = Toplevel(win)
+    moreinfo_win.transient(master=win)
+    moreinfo_win.overrideredirect(1)
+    moreinfo_win.resizable(False, False)
+    
+    moreinfo_lbl = ttk.Label(moreinfo_win, text='', relief="groove")
+    moreinfo_lbl.grid(row=0, column=0, padx=1, pady=1)
+    
+    wid_moreinfo.bind('<Enter>', moreInfo_showURL)
+    wid_moreinfo.bind('<Leave>', moreInfo_hideURL)
+
+    
+    menu_info = Menu(wid_moreinfo)
+    menu_info.add_command(label='', state='disabled')
 
     wid_changedefaults=ttk.Button(f, text="Change Defaults...", command=showItemProps)
     wid_changedefaults.grid(row=6, column=1)

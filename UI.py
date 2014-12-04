@@ -199,6 +199,9 @@ class Item():
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
         self.id = item.id
+        self.url = self.data['url']
+        if self.url == 'NONE':
+            self.url = None
         
     def get_icon(self, subKey):
         return png.loadIcon(self.data['icons'][str(subKey)])
@@ -264,7 +267,7 @@ def load_palette(data):
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
     global item_list, skybox_win, voice_win, music_win, goo_win
-    for item in data['Item']:
+    for item in sorted(data['Item'], key=lambda i: i.id):
         it = Item(item)
         item_list[it.id] = it
     sky_list = []

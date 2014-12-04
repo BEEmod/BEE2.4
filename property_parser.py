@@ -37,7 +37,6 @@ class NoKeyError(Exception):
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
     __slots__ = ('name', 'value', 'valid') # Helps decrease memory footprint with lots of Property values.
-    #__hash__ = None
     def __init__(self, name = None, value = ""):
         self.name = name
         self.value = value
