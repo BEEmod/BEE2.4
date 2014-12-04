@@ -138,9 +138,16 @@ class selWin:
         
     def init_display(self, frame, row=0, column=0, colspan=1, rowspan=1):
         '''Create and grid() the label used to open the selector window.'''
-        self.display = ttk.Label(frame, textvariable=self.disp_label, width=10, relief="sunken")
+        
+        self.display = ttk.Entry(frame, textvariable=self.disp_label, cursor='arrow')
         self.display.grid(row=row, column=column, columnspan=colspan, rowspan=rowspan, sticky="EW")
-        self.display.bind("<Button-1>", lambda e, s=self: s.open_win())
+        self.display.bind("<Button-1>", self.open_win)
+        self.display.state(('readonly',))
+        
+        self.disp_btn = ttk.Label(self.display, text="...", relief="raised", width=2)
+        self.disp_btn.pack(side=RIGHT)
+        self.disp_btn.bind("<Button-1>", self.open_win)
+        
         self.save()
         
     def exit(self):
@@ -159,7 +166,7 @@ class selWin:
             self.disp_label.set(self.selected.shortName)
             self.chosen_id = self.selected.name
             
-    def open_win(self):
+    def open_win(self, e):
         self.win.deiconify()
         self.win.lift(self.parent)
         self.win.grab_set()

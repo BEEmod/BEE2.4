@@ -176,9 +176,6 @@ def init(win):
     prop_window.relX=0
     prop_window.relY=0
     prop_window.withdraw() # starts hidden
-    
-    
-
 
     f=ttk.Frame(prop_window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
