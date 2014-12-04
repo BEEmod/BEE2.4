@@ -3,7 +3,7 @@ Handles scanning through the zip packages to find all items, styles, voice lines
 '''
 import os
 import os.path
-import zipfile
+from zipfile import ZipFile
 
 
 from property_parser import Property
@@ -28,7 +28,7 @@ def loadAll(dir):
             print("Reading package file '"+name+"'")
             name=os.path.join(dir,name)
             if name.endswith('.zip') and not os.path.isdir(name):
-                zip = zipfile.ZipFile(name, 'r')
+                zip = ZipFile(name, 'r')
                 zips.append(zip)
                 if 'info.txt' in zip.namelist(): # Is it valid?
                     with zip.open('info.txt', 'r') as info_file:
@@ -192,8 +192,8 @@ class Voice:
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a voice line definition.'''
-        name = info.find_key('name').value
-        icon = info.find_key('icon', '_blank').value
+        name = info['name']
+        icon = info['icon', '_blank']
         return cls(id, name, icon)
         
     def add_over(self, overide):
@@ -203,17 +203,43 @@ class Voice:
         return '<Voice:' + self.id + '>'
 
 class Skybox:
-    def __init__(self, id):
+    def __init__(self, id, name, ico, config, auth, desc, short_name=None):
         self.id=id
+        self.short_name = name if short_name is None else short_name
+        self.name = name
+        self.icon = ico
+        self.config = config
+        self.auth = auth
+        self.desc = desc
      
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a skybox definition.'''
-        return cls(id)
+        name = info['name']
+        icon = info['icon', '_blank']
+        config_dir = info['config', '']
+        auth = info['authors', ''].split(',')
+        desc = info['description', '']
+        short_name = info['shortName', '']
+        if short_name == '':
+            short_name = None
+        if config_dir == '': # No config at all
+            config = []
+        else:
+            path = 'skybox/' + name + '.cfg'
+            if path in zip.namelist():
+                with zip.open(name, 'r') as conf:
+                    config = Property.parse(conf)
+            else:
+                print(name + '.cfg not in zip!')
+                config = []
+        return cls(id, name, icon, config, auth, desc, short_name)
         
     def add_over(self, override):
         '''Add the additional vbsp_config commands to ourselves.'''
-        pass
+        for zip, sky in override:
+            self.auth.extend(sky.auth)
+            self.config.extend(sky.config)
     
     def __repr__(self):
         return '<Skybox ' + self.id + '>'

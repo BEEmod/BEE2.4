@@ -4,7 +4,6 @@ import packageLoader
 import UI
 import utils
 
-#Loading commands, will load/reload the items/styles/palettes/etc
 def load_settings():
   global settings
   settings={}
@@ -20,7 +19,7 @@ print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'])
 print('Done!')
 UI.load_packages(package_data)
-print('Loading Palettes')
+print('Loading Palettes...')
 pal=paletteLoader.loadAll(settings['pal_dir'])
 print('Done!')
 UI.load_palette(pal)

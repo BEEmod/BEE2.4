@@ -56,39 +56,40 @@ paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're sp
 palettes=[]
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 
-skybox_list = [
-    selWinItem(
-        "SKY_BLACK", 
-        "Black", 
-        longName = "Darkness", 
-        icon = "pal_test/faithplate_128",
-        author = "Valve",
-        desc = 'Pure black darkness. Nothing to see here.'),
-    selWinItem(
-        "SKY_OVERGROWN",
-        "Sunlight",
-        longName = "Overgrown Sunlight",
-        author = "Valve",
-        desc = 'Sunlight peaking through crevices in the ground. Mostly pure white.'),
-    selWinItem(
-        "SKY_WHEATLEY",
-        'Fire',
-        longName = 'Reactor Fires',
-        author = 'Valve',
-        desc = 'An orange glow from the malfunctioning reactor core '
-               'beginning to self-destruct. Seen in the last few '
-               'Wheatley maps.'),
-    selWinItem(
-        "SKY_BTS", 
-        "BTS", 
-        longName="Behind The Scenes - Factory", 
-        icon= "pal_test/faithplate_128",
-        author="TeamSpen210",
-        desc='The dark constuction and office areas of Aperture. Catwalks '
-             'extend between different buildings, with vactubes and cranes '
-             'carrying objects throughout the facility. Abandoned offices can '
-             'often be found here.')
-    ]
+skyboxes = {}
+
+    # selWinItem(
+        # "SKY_BLACK", 
+        # "Black", 
+        # longName = "Darkness", 
+        # icon = "pal_test/faithplate_128",
+        # author = "Valve",
+        # desc = 'Pure black darkness. Nothing to see here.'),
+    # selWinItem(
+        # "SKY_OVERGROWN",
+        # "Sunlight",
+        # longName = "Overgrown Sunlight",
+        # author = "Valve",
+        # desc = 'Sunlight peaking through crevices in the ground. Mostly pure white.'),
+    # selWinItem(
+        # "SKY_WHEATLEY",
+        # 'Fire',
+        # longName = 'Reactor Fires',
+        # author = 'Valve',
+        # desc = 'An orange glow from the malfunctioning reactor core '
+               # 'beginning to self-destruct. Seen in the last few '
+               # 'Wheatley maps.'),
+    # selWinItem(
+        # "SKY_BTS", 
+        # "BTS", 
+        # longName="Behind The Scenes - Factory", 
+        # icon= "pal_test/faithplate_128",
+        # author="TeamSpen210",
+        # desc='The dark constuction and office areas of Aperture. Catwalks '
+             # 'extend between different buildings, with vactubes and cranes '
+             # 'carrying objects throughout the facility. Abandoned offices can '
+             # 'often be found here.')
+    
       
 voice_list = [
     selWinItem(
@@ -166,11 +167,6 @@ selected_style = "clean"
 skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
 musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
-
-skybox_win = selWin(win, skybox_list, title='Skyboxes', has_none=False)
-voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
-music_win = selWin(win, music_list, title='Background Music', has_none=True, none_desc='Add no music to the map at all.')
-goo_win = selWin(win, goo_list, title='Goo Appearence', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
 
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
@@ -267,11 +263,25 @@ def load_palette(data):
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
-    global item_list
+    global item_list, skybox_win, voice_win, music_win, goo_win
     for item in data['Item']:
         it = Item(item)
         item_list[it.id] = it
-    
+    sky_list = []
+    for sky in data['Skybox']:
+        sky_list.append(selWinItem(
+                sky.id, 
+                sky.short_name,
+                longName = sky.name,
+                icon=sky.icon, 
+                author=', '.join(sky.auth), 
+                desc=sky.desc))
+        skyboxes[sky.id] = sky
+        
+    skybox_win = selWin(win, sky_list, title='Skyboxes', has_none=False)
+    voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
+    music_win = selWin(win, music_list, title='Background Music', has_none=True, none_desc='Add no music to the map at all.')
+    goo_win = selWin(win, goo_list, title='Goo Appearence', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
@@ -909,6 +919,3 @@ def initMain():
     loadPalUI()
 def event_loop():
     win.mainloop()
-
-if __name__ == '__main__': # load the window if directly executing this file
-    initMain()
