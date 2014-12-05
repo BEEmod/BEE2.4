@@ -178,12 +178,12 @@ class VMF:
         map_info['active_cam']  = cam_props.find_key('activecamera', -1).value
         map_info['quickhide'] = Property.find_key(tree, 'quickhide', []).find_key('count', '_').value
             
+
+        map = VMF(map_info = map_info)
+        
         for c in cam_props:
             if c.name != 'activecamera':
                 Camera.parse(map, c)
-                
-        
-        map = VMF(map_info = map_info)
         
         for ent in cordons.find_all('cordon'):
             Cordon.parse(map, ent)
@@ -458,7 +458,7 @@ class Solid:
     @staticmethod    
     def parse(map, tree, hidden=False):
         '''Parse a Property tree into a Solid object.'''
-        id = conv_int(tree.find_key("id", '-1').value)
+        id = conv_int(tree["id", '-1'])
         try: 
             id = int(id)
         except TypeError:
@@ -797,12 +797,18 @@ class Entity():
                 vals = item.value.split(" ",1)
                 fixup[vals[0][1:]] = (vals[1], item.name[-2:])
             elif item.name == "solid":
-                solids.append(Solid.parse(map, item))
+                if item.has_children():
+                    solids.append(Solid.parse(map, item))
+                else:
+                    keys[item.name] = item.value
             elif item.name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
             elif item.name == "hidden":
-                solids.extend([Solid.parse(map, br, hidden=True) for br in item])
+                if item.has_children():
+                    solids.extend([Solid.parse(map, br, hidden=True) for br in item])
+                else:
+                    keys[item.name]=item.value
             elif item.name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -873,7 +879,7 @@ class Entity():
                 self.editor['groupid'] + '"\n')
         if 'visgroup' in self.editor:
             for id in self.editor['visgroup']:
-                buffer.write(ind + '\t\t"groupid" "' + id + '"\n')
+                buffer.write(ind + '\t\t"groupid" "' + str(id) + '"\n')
         for key in ('visgroupshown', 'visgroupautoshown'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' + 
@@ -1057,12 +1063,12 @@ class Output:
     @staticmethod
     def parse(prop):
         "Convert the VMF Property into an Output object."
-        if ',' in prop.value:
-            sep = True
-            vals = prop.value.split(',')
-        else:
+        if chr(27) in prop.value:
             sep = False
             vals = prop.value.split(chr(27))
+        else:
+            sep = True
+            vals = prop.value.split(',')
         if len(vals) == 5:
             if prop.name.startswith('instance:'):
                 out = prop.name.split(';')
