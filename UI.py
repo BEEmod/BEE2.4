@@ -884,7 +884,8 @@ def initMain():
     windows['pal'].geometry( str(windows['pal'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) +
       '+' + str(win.winfo_rootx()-windows['pal'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
     xpos = '+' + str(min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
-    windows['opt'].geometry(xpos + str(win.winfo_rooty()-40))
+    opt_size = str(windows['style'].winfo_reqwidth()) + 'x' + str(windows['opt'].winfo_reqheight())
+    windows['opt'].geometry(opt_size + xpos + str(win.winfo_rooty()-40))
     windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
 
     win.bind("<Configure>",moveMain)
