@@ -89,7 +89,8 @@ class VMF:
             spawn=None,
             entities=None,
             brushes=None,
-            cameras=None, 
+            cameras=None,
+            cordons=None,
             visgroups=None):
         self.solid_id = [] # All occupied solid ids
         self.face_id = []
@@ -97,6 +98,7 @@ class VMF:
         self.entities = [] if entities is None else entities
         self.brushes = [] if brushes is None else brushes
         self.cameras = [] if cameras is None else cameras
+        self.cordons = [] if cordons is None else cordons
         self.visgroups = [] if visgroups is None else visgroups
         
         self.spawn = Entity(self, []) if spawn is None else spawn
@@ -104,6 +106,7 @@ class VMF:
         self.spawn.hidden_brushes = self.brushes
         
         self.is_prefab = conv_bool(map_info.get('prefab', '_'), False)
+        self.cordon_enabled = conv_bool(map_info.get('cordons_on', '_'), False)
         self.map_ver = conv_int(map_info.get('mapversion', '_'), 0)
         if self.spawn['mapversion'] is not None:
             del self.spawn['mapversion']
@@ -131,7 +134,6 @@ class VMF:
         
     def remove_ent(self, item):
         self.entities.remove(item)
-        
         
     def add_brushes(self, item):
         for i in item:
@@ -168,22 +170,27 @@ class VMF:
             }
         for key in view_dict:
             map_info[view_dict[key]] = view_opt.find_key(key, '_').value
+            
+        cordons = Property.find_key(tree, 'cordons', [])
+        map_info['cordons_on'] = cordons['active', '0']
         
         cam_props = Property.find_key(tree, 'cameras', [])
         map_info['active_cam']  = cam_props.find_key('activecamera', -1).value
         map_info['quickhide'] = Property.find_key(tree, 'quickhide', []).find_key('count', '_').value
             
-        map = VMF(map_info = map_info)
-        cams = []
         for c in cam_props:
             if c.name != 'activecamera':
-                cams.append(Camera.parse(map, c))
+                Camera.parse(map, c)
+                
         
-        ents = []
+        map = VMF(map_info = map_info)
+        
+        for ent in cordons.find_all('cordon'):
+            Cordon.parse(map, ent)
+        
         map.entities = [Entity.parse(map, ent, hidden=False) for ent in Property.find_all(tree, 'Entity')]
         # find hidden entities
         map.entities.extend([Entity.parse(map, ent[0], hidden=True) for ent in Property.find_all(tree, 'hidden') if len(ent)==1])
-        
         
         map_spawn = Property.find_key(tree, 'world', None)
         if map_spawn is None:
@@ -199,8 +206,8 @@ class VMF:
     def export(self, file=None, inc_version=True):
         '''Serialises the object's contents into a VMF file. 
         
-        If no file is given the map will be returned as a string. By default, this
-        will increment the map's version - set inc_version to False to suppress this.
+        - If no file is given the map will be returned as a string. 
+        - By default, this will increment the map's version - set inc_version to False to suppress this.
         '''
         if file is None:
             file = io.stringIO() 
@@ -231,6 +238,7 @@ class VMF:
         file.write('\t"nGridSpacing" "' + str(self.grid_spacing) + '"\n')
         file.write('\t"bShow3DGrid" "' + bool_to_str(self.show_3d_grid) + '"\n}\n')
         
+        
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(file, ent_name = 'world')
         
@@ -244,6 +252,13 @@ class VMF:
         for cam in self.cameras:
             cam.export(file, '\t')
         file.write('}\n')
+        
+        if len(self.cordons) > 0:
+            file.write('cordons\n{\n')
+            file.write('\t"active" "' + bool_to_str(self.cordon_enabled) + '"\n')
+            for cord in self.cordons:
+                cord.export(file, '\t')
+            file.write('}\n')
         
         if self.quickhide_count > 0:
             file.write('quickhide\n{\n')
@@ -380,14 +395,54 @@ class Camera:
         buffer.write(ind + '\t"position" "[' + self.pos.join(' ') + ']"\n')
         buffer.write(ind + '\t"look" "[' + self.target.join(' ') + ']"\n')
         buffer.write(ind + '}\n')
-            
+        
+class Cordon:
+    '''Represents one cordon volume.'''
+    def __init__(self, map, min_, max_, is_active=True, name='Cordon'):
+        self.map = map
+        self.name = name
+        self.bounds_min = min_
+        self.bounds_max = max_
+        self.active = is_active
+        map.cordons.append(self)
+        
+    @staticmethod     
+    def parse(map, tree):
+        name = tree['name', 'cordon']
+        is_active = conv_bool(tree['active', '0'], False)
+        bounds = tree.find_key('box', [])
+        min_ = conv_vec(bounds['mins', '(0 0 0)'], 0, 0, 0)
+        max_ = conv_vec(bounds['maxs', '(128 128 128)'], 128, 128, 128)
+        return Cordon(map, min_, max_, is_active, name)
+        
+    def export(self, buffer, ind=''):
+        buffer.write(ind + 'cordon\n')
+        buffer.write(ind + '{\n')
+        buffer.write(ind + '\t"name" "' + self.name + '"\n')
+        buffer.write(ind + '\t"active" "' + bool_to_str(self.active) + '"\n')
+        buffer.write(ind + '\tbox\n')
+        buffer.write(ind + '\t{\n')
+        buffer.write(ind + '\t\t"mins" "(' + self.bounds_min.join(' ') + ')"\n')
+        buffer.write(ind + '\t\t"maxs" "(' + self.bounds_max.join(' ') + ')"\n')
+        buffer.write(ind + '\t}\n')
+        buffer.write(ind + '}\n')
+        
+    def copy(self):
+        '''Duplicate this cordon.'''
+        return Cordon(self.map, self.bounds_min.copy(), self.bounds_max.copy(), self.active, self.name)
+        
+    def remove(self):
+        '''Remove this cordon from the map.'''
+        map.cordons.remove(self)
+        
 class Solid:
     '''A single brush, serving as both world brushes and brush entities.'''
-    def __init__(self, map, des_id=-1, sides=None, editor=None):
+    def __init__(self, map, des_id=-1, sides=None, editor=None, hidden=False):
         self.map = map
         self.sides = [] if sides is None else sides
         self.id = map.get_id('brush', des_id)
         self.editor = {} if editor is None else editor
+        self.hidden=hidden
     
     def copy(self, des_id=-1):
         '''Duplicate this brush.'''
@@ -398,10 +453,10 @@ class Solid:
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
         sides = [s.copy() for s in self.sides]
-        return Solid(map, des_id=des_id, sides=sides, editor=editor)
+        return Solid(map, des_id=des_id, sides=sides, editor=editor, hidden=self.hidden)
         
     @staticmethod    
-    def parse(map, tree):
+    def parse(map, tree, hidden=False):
         '''Parse a Property tree into a Solid object.'''
         id = conv_int(tree.find_key("id", '-1').value)
         try: 
@@ -414,7 +469,7 @@ class Solid:
             
         editor = {'visgroup' : []}
         for v in tree.find_key("editor", []):
-            if v.name in ("visgroupshown", "visgroupautoshown"):
+            if v.name in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
                 editor[v.name] = conv_bool(v.value, default=True)
             elif v.name == 'color' and ' ' in v.value:
                 editor['color'] = v.value
@@ -428,10 +483,13 @@ class Solid:
                     editor['visgroup'].append(val)
         if len(editor['visgroup'])==0:
             del editor['visgroup'] 
-        return Solid(map, des_id = id, sides=sides, editor = editor)
+        return Solid(map, des_id=id, sides=sides, editor=editor, hidden=hidden)
         
     def export(self, buffer, ind = ''):
         '''Generate the strings needed to define this brush.'''
+        if self.hidden:
+            buffer.write(ind + 'hidden\n' + ind + '{\n')
+            ind = ind + '\t'
         buffer.write(ind + 'solid\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -449,13 +507,15 @@ class Solid:
         if 'visgroup' in self.editor:
             for id in self.editor['visgroup']:
                 buffer.write(ind + '\t\t"groupid" "' + str(id) + '"\n')
-        for key in ('visgroupshown', 'visgroupautoshown'):
+        for key in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' + 
                     bool_to_str(self.editor[key]) + '"\n')
         buffer.write(ind + '\t}\n')
         
         buffer.write(ind + '}\n')
+        if self.hidden:
+            buffer.write(ind[:-1] + '}\n')
     
     def __str__(self):
         '''Return a user-friendly description of our data.'''
@@ -741,6 +801,8 @@ class Entity():
             elif item.name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
+            elif item.name == "hidden":
+                solids.extend([Solid.parse(map, br, hidden=True) for br in item])
             elif item.name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1086,11 +1148,8 @@ class Output:
             comma_sep = (self.sep == ','))
         
 if __name__ == '__main__':
+    print('parsing...')
     map = VMF.parse('test.vmf')
-    print('moving')
-    #vec= Vec(0.5, 0, 32)
-    #for br in map.brushes:
-    #    br.translate(vec)
     print('saving...')
     with open('test_out.vmf', 'w') as file:
         map.export(file)
