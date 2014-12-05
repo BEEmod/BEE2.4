@@ -84,7 +84,7 @@ def showProps(e):
     prop_window.relY=loc_y-root.winfo_y()
     for pos in range(5):
         if pos >= selected_item.num_sub:
-            wid_sub[pos]['image'] = png.loadIcon('_blank')
+            wid_sub[pos]['image'] = png.loadPng('BEE2/blank')
         else:
             wid_sub[pos]['image'] = selected_item.get_icon(pos)
         wid_sub[pos]['relief'] = 'flat'

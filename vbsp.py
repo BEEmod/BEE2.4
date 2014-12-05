@@ -249,33 +249,33 @@ def load_settings():
     
     for prop in Property.find_all(conf, 'instancefiles'):
         for key,val in inst_file.items():
-            inst_file[key] = prop.find_key(key, val).value
+            inst_file[key] = prop[key, val]
     
     for fizz in Property.find_all(conf, 'cust_fizzlers'):
-        flag = fizz.find_key('flag')
+        flag = fizz['flag']
         if flag in settings['cust_fizzler']:
             raise Exception('Two Fizzlers with same flag!!')
         data= {}
-        data['left']     = fizz.find_key('left', 'tools/toolstrigger'),
-        data['right']    = fizz.find_key('right', 'tools/toolstrigger'),
-        data['center']   = fizz.find_key('center', 'tools/toolstrigger'),
-        data['short']    = fizz.find_key('short', 'tools/toolstrigger'),
-        data['scanline'] = fizz.find_key('scanline', settings['fizzler']['scanline'])
+        data['left']     = fizz['left', 'tools/toolstrigger'],
+        data['right']    = fizz['right', 'tools/toolstrigger'],
+        data['center']   = fizz['center', 'tools/toolstrigger'],
+        data['short']    = fizz['short', 'tools/toolstrigger'],
+        data['scanline'] = fizz['scanline', settings['fizzler']['scanline']]
         cust_fizzlers[flag] = data
         
     deathfield = Property.find_key(conf, "deathfield", [])
-    settings['deathfield']['left']     = deathfield.find_key('left', 'BEE2/fizz/lp/death_field_clean_left').value
-    settings['deathfield']['right']    = deathfield.find_key('right', 'BEE2/fizz/lp/death_field_clean_right').value
-    settings['deathfield']['center']   = deathfield.find_key('center', 'BEE2/fizz/lp/death_field_clean_center').value
-    settings['deathfield']['short']    = deathfield.find_key('short', 'BEE2/fizz/lp/death_field_clean_short').value
-    wid = deathfield.find_key('texwidth', '_').value
+    settings['deathfield']['left']     = deathfield['left', 'BEE2/fizz/lp/death_field_clean_left']
+    settings['deathfield']['right']    = deathfield['right', 'BEE2/fizz/lp/death_field_clean_right']
+    settings['deathfield']['center']   = deathfield['center', 'BEE2/fizz/lp/death_field_clean_center']
+    settings['deathfield']['short']    = deathfield['short', 'BEE2/fizz/lp/death_field_clean_short']
+    wid = deathfield['texwidth', '_']
     settings['deathfield']['texwidth'] = VLib.conv_int(wid, 512)
-    settings['deathfield']['scanline'] = deathfield.find_key('scanline', settings['fizzler']['scanline']).value
+    settings['deathfield']['scanline'] = deathfield['scanline', settings['fizzler']['scanline']]
         
     for pack in Property.find_all(conf, 'packer'):
         process_packer(pack.value)
     for cond in Property.find_all(conf, 'conditions', 'condition'):
-        type = cond.find_key('type', '').value.upper()
+        type = cond['type', ''].upper()
         if type not in ("AND", "OR"):
             type = "AND"
         flags = []
@@ -415,7 +415,7 @@ def satisfy_condition(cond, inst):
                 inst['file'] += res.value
             elif name == 'instvar':
                 if res.has_children():
-                    val = inst.get_fixup(res.find_key('variable', '').value)
+                    val = inst.get_fixup(res['variable', ''])
                     for rep in res: # lookup the number to determine the appending value
                         if rep.name.casefold() == 'variable':
                             continue # this isn't a lookup command!
@@ -438,10 +438,10 @@ def satisfy_condition(cond, inst):
                 if res.value is not None:
                     new_inst = VLib.Entity(map, keys={
                                  "classname" : "func_instance",
-                                 "targetname" : res.find_key('name', '').value,
-                                 "file" : res.find_key('file', '').value,
+                                 "targetname" : res['name', ''],
+                                 "file" : res['file', ''],
                                  "angles" : "0 0 0",
-                                 "origin" : res.find_key('position', '').value
+                                 "origin" : res['position', '']
                                })
                     if new_inst['targetname'] == '':
                         new_inst['targetname'] = "inst_"+str(unique_id())
@@ -452,7 +452,7 @@ def satisfy_condition(cond, inst):
                 new_inst = VLib.Entity(map, keys={
                              "classname" : "func_instance",
                              "targetname" : inst['targetname'],
-                             "file" : res.find_key('file', '').value,
+                             "file" : res['file', ''],
                              "angles" : inst['angles'],
                              "origin" : inst['origin']
                            })
@@ -470,8 +470,8 @@ def satisfy_condition(cond, inst):
                 targets = [o.target for o in inst.outputs if o.target != toggle_name]
                 done = []
                 
-                kill_signs = res.find_key("remIndSign", '0').value == '1'
-                dec_con_count = res.find_key("decConCount", '0').value == '1'
+                kill_signs = res["remIndSign", '0'] == '1'
+                dec_con_count = res["decConCount", '0'] == '1'
                 if kill_signs or dec_con_count:
                     for con_inst in map.iter_ents(classname='func_instance'):
                         if con_inst['targetname'] in targets:
@@ -536,17 +536,17 @@ def satisfy_condition(cond, inst):
     
 def cond_out(inst, prop, target):
     inst.add_out(VLib.Output(
-        prop.find_key('output','').value,
+        prop['output',''],
         target,
-        prop.find_key('input','').value, 
-        inst_in=prop.find_key('targ_in','').value, 
-        inst_out=prop.find_key('targ_out','').value))
+        prop['input',''], 
+        inst_in=prop['targ_in',''], 
+        inst_out=prop['targ_out','']))
     
 def process_inst_overlay(lst):
     for inst in lst:
         try:
-            flag = inst.find_key("flag").value
-            settings['overlay_inst'].append((flag,inst.find_key("file").value, inst.find_key("name", "").value))
+            flag = inst['flag']
+            settings['overlay_inst'].append((flag,inst['file'], inst['name']))
         except KeyValError:
             util.con_log('Invalid instance overlay command detected!')
             continue # ignore this one
@@ -561,11 +561,11 @@ def process_packer(f_list):
             
 def variant_weight(var):
     "Read variant commands from settings and create the weight list."
-    inst = var.find_key('base', '').value
-    count = var.find_key('number', '').value
+    inst = var['base', '']
+    count = var['number', '']
     if count.isdecimal():
         count = int(count)
-        weight = var.find_key('weights', '').value
+        weight = var['weights', '']
         if weight == '' or ',' not in weight:
             utils.con_log('Invalid weight! (' + weight + ')')
             weight = [str(i) for i in range(1,count + 1)]
@@ -1091,7 +1091,7 @@ def death_fizzler_change(inst, trig):
     
     if is_short:
         for side in brush.find_all('entity', 'solid', 'side'):
-            mat=side.find_key('material')
+            mat=side['material']
             if "effects/fizzler" in mat.value.casefold():
                 mat.value=get_tex('special.laserfield')
             alter_mat(mat) # convert to the styled version
@@ -1102,8 +1102,8 @@ def death_fizzler_change(inst, trig):
             uaxis[3]="0]"
             uaxis[4]="0.25"
             vaxis[4]="0.25"
-            side.find_key('uaxis').value = " ".join(uaxis)
-            side.find_key('vaxis').value = " ".join(vaxis)
+            side['uaxis'] = " ".join(uaxis)
+            side['vaxis'] = " ".join(vaxis)
     else:
         # We need to stretch the brush to get rid of the side sections.
         # This is the same as moving all the solids to match the bounding box.
@@ -1145,8 +1145,8 @@ def death_fizzler_change(inst, trig):
                 uaxis[4]=str(size/tex_width) # scaling
                 vaxis[3]="256]"
                 vaxis[4]="0.25" # widthwise it's always the same
-                side.find_key('uaxis').value = " ".join(uaxis)
-                side.find_key('vaxis').value = " ".join(vaxis)
+                side['uaxis'] = " ".join(uaxis)
+                side['vaxis'] = " ".join(vaxis)
             
         brush.value.remove(solids[2])
         brush.value.remove(solids[0]) # we only want the middle one with the center, the others are invalid

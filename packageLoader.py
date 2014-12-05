@@ -73,8 +73,8 @@ def parse_package(zip, info, filename, id):
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
         for object in Property.find_all(info, comp_type):
-            id = object.find_key('id').value
-            is_sub = object.find_key('overrideOrig', '0') == '1'
+            id = object['id']
+            is_sub = object['overrideOrig', '0'] == '1'
             if id in obj[comp_type]:
                 if is_sub:
                     if id in obj_override[comp_type]:
@@ -138,9 +138,9 @@ class Item:
         
         for ver in info.find_all("version"):
             vals = {}
-            vals['name'] = ver.find_key('name', '').value
-            vals['is_beta'] = ver.find_key('deta', '0').value == '1'
-            vals['is_dep'] = ver.find_key('deprecated', '0').value == '1'
+            vals['name'] = ver['name', '']
+            vals['is_beta'] = ver['deta', '0'] == '1'
+            vals['is_dep'] = ver['deprecated', '0'] == '1'
             
             vals['styles'] = {}
             for sty_list in ver.find_all('styles'):

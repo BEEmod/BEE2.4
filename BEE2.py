@@ -10,8 +10,8 @@ with open("config/config.cfg", "r") as f:
     prop=Property.parse(f)
 dirs = Property.find_key(prop, 'directories')
 
-settings['pal_dir']=dirs.find_key('palettes', 'palettes\\').value
-settings['package_dir']=dirs.find_key('package', 'packages\\').value
+settings['pal_dir']=dirs['palettes', 'palettes\\']
+settings['package_dir']=dirs['package', 'packages\\']
 
 print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'])
