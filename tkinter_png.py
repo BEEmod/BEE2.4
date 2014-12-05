@@ -168,7 +168,7 @@ def loadSpr(name):
 
 def loadIcon(name): 
   "Load in a palette icon, ensuring the correct size."
-  name= "pal_test/" + name
+  name= "items/" + name
   img=loadPng(name)
   if img.width() != 64 or img.height() != 64:
     print("ERROR: \"" + name + "\" is not 64x64!")

@@ -18,7 +18,7 @@ import sound as snd
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 
-png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
+png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
            
 item_list = {}
 
@@ -57,67 +57,34 @@ palettes=[]
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 
 skyboxes = {}
-
-    # selWinItem(
-        # "SKY_BLACK", 
-        # "Black", 
-        # longName = "Darkness", 
-        # icon = "pal_test/faithplate_128",
-        # author = "Valve",
-        # desc = 'Pure black darkness. Nothing to see here.'),
-    # selWinItem(
-        # "SKY_OVERGROWN",
-        # "Sunlight",
-        # longName = "Overgrown Sunlight",
-        # author = "Valve",
-        # desc = 'Sunlight peaking through crevices in the ground. Mostly pure white.'),
-    # selWinItem(
-        # "SKY_WHEATLEY",
-        # 'Fire',
-        # longName = 'Reactor Fires',
-        # author = 'Valve',
-        # desc = 'An orange glow from the malfunctioning reactor core '
-               # 'beginning to self-destruct. Seen in the last few '
-               # 'Wheatley maps.'),
-    # selWinItem(
-        # "SKY_BTS", 
-        # "BTS", 
-        # longName="Behind The Scenes - Factory", 
-        # icon= "pal_test/faithplate_128",
-        # author="TeamSpen210",
-        # desc='The dark constuction and office areas of Aperture. Catwalks '
-             # 'extend between different buildings, with vactubes and cranes '
-             # 'carrying objects throughout the facility. Abandoned offices can '
-             # 'often be found here.')
-    
       
 voice_list = [
     selWinItem(
         "VOICE_CAVE_50",
         "50s Cave",
         longName="1950s Cave",
-        icon="pal_test/observation_room",
+        icon="items/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_60",
         "60s Cave",
         longName="1960s Cave",
-        icon="pal_test/observation_room",
+        icon="items/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_70",
         "70s Cave",
         longName="1960s Cave",
-        icon="pal_test/observation_room",
+        icon="items/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     selWinItem(
         "VOICE_CAVE_80",
         "80s Cave",
         longName="1980s Cave",
-        icon="pal_test/observation_room",
+        icon="items/observation_room",
         author="Carl Kenner, TeamSpen210",
         desc="Cave"),
     ]
@@ -150,17 +117,30 @@ goo_list = [
     selWinItem(
         "GOO_NORM",
         "Regular",
-        icon="pal_test/goo",
+        icon="items/goo",
         author="Valve",
         desc="The standard normal Toxic Goo."),
         
     selWinItem(
         "GOO_NORM",
         "Overgrown",
-        icon="pal_test/goo",
+        icon="items/goo",
         author="Valve",
         desc="A version of goo which is more reflective, and less polluted."),
     ]
+    
+style_list = [
+    selWinItem(
+        "CLEAN",
+        "Clean",
+        author="Valve, Carl Kenner",
+        desc="Portal 2 Clean style, like after GLaDOS has been awoken and finished cleaning the facility, or in a parallel world where it was never destroyed. Similar to the default PeTI style but with more variety of wall panels and automatic security cameras."),
+    selWinItem(
+        "Portal1",
+        "Portal 1",
+        author="Carl Kenner",
+        desc="Portal 1 style test chamber. Portal 1 style elevators, the brown metal walls, white concrete walls, floor tiles, security cameras (unless the Sentient Cloud has taken over), Unstationary Scaffolds, Complementary Victory Lifts, Vital Apparatus Vents, Portal 1 Fizzlers, etc. There's an orange glow coming from behind panels.")
+]
     
 selected_style = "clean"
     
@@ -256,9 +236,6 @@ class PalItem(ttk.Label):
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey)
     
-def demoMusic():
-    messagebox.showinfo(message='This would play the track selected for a few seconds.')
-    
 def load_palette(data):
     global palettes
     print("loading data!")
@@ -266,7 +243,7 @@ def load_palette(data):
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
-    global item_list, skybox_win, voice_win, music_win, goo_win
+    global item_list, skybox_win, voice_win, music_win, goo_win, style_win
     for item in sorted(data['Item'], key=lambda i: i.id):
         it = Item(item)
         item_list[it.id] = it
@@ -285,6 +262,7 @@ def load_packages(data):
     voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
     music_win = selWin(win, music_list, title='Background Music', has_none=True, none_desc='Add no music to the map at all.')
     goo_win = selWin(win, goo_list, title='Goo Appearence', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
+    style_win = selWin(win, style_list, title='Style', has_none=False, has_def=False)
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
@@ -572,27 +550,22 @@ def initOption(f):
     ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1, column=0)
     ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))
 
-    props=ttk.LabelFrame(f, text="Properties")
+    props=ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1,weight=1)
     props.grid(row=3, column=0, sticky="EW")
     ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=1,column=3, sticky="NS")
 
     ttk.Label(props, text="Style: ").grid(row=0, column=0)
-    UIStyle=ttk.Combobox(props, values=styleText)
-    UIStyle.current(5)
-    UIStyle.grid(row=0, column=1, columnspan=2, sticky="EW")
-
     ttk.Label(props, text="Music: ").grid(row=1, column=0)
-    music_win.init_display(props, row=1, column=1)
-    ttk.Button(props, text=">", command=demoMusic, width='4pt').grid(row=1,column=2)
-
     ttk.Label(props, text="Voice: ").grid(row=2, column=0)
     ttk.Label(props, text="Skybox: ").grid(row=3, column=0)
     ttk.Label(props, text="Goo: ").grid(row=4, column=0)
     
-    voice_win.init_display(props, row=2, column=1, colspan=2)
-    skybox_win.init_display(props, row=3, column=1, colspan=2)
-    goo_win.init_display(props, row=4, column=1, colspan=2)
+    style_win.init_display(props, row=0, column=1)
+    music_win.init_display(props, row=1, column=1)
+    voice_win.init_display(props, row=2, column=1)
+    skybox_win.init_display(props, row=3, column=1)
+    goo_win.init_display(props, row=4, column=1)
 
 def initStyleOpt(f):
     global styleCheck, styleOptVars
@@ -655,7 +628,7 @@ def flowPreview():
 
 def initPreview(f):
     "Generate the preview pane which shows the items that will export to the palette."
-    previewImg  = png.loadPng('menu')
+    previewImg  = png.loadPng('BEE2/menu')
     UI['pre_bg_img']=Label(f, bg=ItemsBG, image=previewImg)
     UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
     UI['pre_bg_img'].grid(row=0,column=0)
@@ -663,7 +636,7 @@ def initPreview(f):
     UI['pre_disp_name']=ttk.Label(f, text="Item: Button", style='BG.TLabel')
     UI['pre_disp_name'].place(x=10,y=552)
 
-    selImg=png.loadPng('sel_bar')
+    selImg=png.loadPng('BEE2/sel_bar')
     UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
     UI['pre_sel_line'].imgsave=selImg
     flowPreview()
@@ -671,7 +644,7 @@ def initPreview(f):
 def initPicker(f):
     global frmScroll, pal_canvas, pal_items_fake
     ttk.Label(f, text="All Items: ", anchor="center").grid(row=0, column=0, sticky="EW")
-    UI['picker_empty_img']=png.loadIcon('_blank')
+    UI['picker_empty_img']=png.loadPng('BEE2/blank')
     cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
     cframe.grid(row=1, column=0, sticky="NSEW")
     f.rowconfigure(1, weight=1)
@@ -766,7 +739,7 @@ def initDragIcon(win):
     dragWin.withdraw()
     dragWin.transient(master=win)
     dragWin.withdraw() # starts hidden
-    UI['drag_lbl']=Label(dragWin, image=png.loadIcon('_blank'))
+    UI['drag_lbl']=Label(dragWin, image=png.loadPng('BEE2/blank'))
     UI['drag_lbl'].grid(row=0, column=0)
 
 def initMenuBar(win):

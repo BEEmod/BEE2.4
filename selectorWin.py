@@ -16,13 +16,16 @@ class Item:
             name, 
             shortName, 
             longName = None,
-            icon = 'pal_test/_blank', 
+            icon = None, 
             author = '',
             desc = ""):
         self.name = name
         self.shortName = shortName
         self.longName = shortName if longName is None else longName
-        self.icon = png.loadPng(icon)
+        if icon is None:
+            self.icon = png.loadPng('BEE2/blank')
+        else:
+            self.icon = png.loadPng(icon)
         self.desc = desc
         self.author = author
 
@@ -42,7 +45,7 @@ class selWin:
         - title is the title of the selector window.
         '''
         self.noneItem = Item('NONE', '', desc=none_desc)
-        self.noneItem.icon = png.loadPng('none_96')
+        self.noneItem.icon = png.loadPng('BEE2/none_96')
         self.disp_label = StringVar()
         self.chosen_id = ''
         self.suggested = None
@@ -64,9 +67,12 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", lambda s=self: s.exit())
         self.win.bind("<Escape>",lambda e, s=self: s.exit())
         
+        self.pane_win = ttk.Panedwindow(self.win, orient=HORIZONTAL)
+        self.pane_win.grid(row=0, column=0, sticky="NSEW")
+        
         self.wid = {}
-        shim = ttk.Frame(self.win, relief="sunken")
-        shim.grid(row=0, column=0, sticky="NSEW")
+        shim = ttk.Frame(self.pane_win, relief="sunken")
+        self.pane_win.add(shim, weight=1)
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
@@ -84,8 +90,9 @@ class selWin:
         
         self.sugg_lbl = ttk.LabelFrame(self.pal_frame, text="Suggested", labelanchor=N, height=50)
         
-        self.prop_frm = ttk.Frame(self.win, borderwidth=4, relief='raised')
-        self.prop_frm.grid(row=0, column=1, sticky="NSEW")
+        self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
+        self.prop_frm.columnconfigure(1, weight=1)
+        self.pane_win.add(self.prop_frm)
         
         self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=ICON_SIZE, height=ICON_SIZE)
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
@@ -123,7 +130,6 @@ class selWin:
         
         self.prop_ok.grid(row=6, column=0, padx=(8,16))
         self.prop_cancel.grid(row=6, column=2, padx=(16,8))
-        ttk.Sizegrip(self.prop_frm).grid(row=6, column=3, sticky="SE")
         
         for item in self.item_list:
             if item==self.noneItem:
@@ -142,11 +148,10 @@ class selWin:
         self.display = ttk.Entry(frame, textvariable=self.disp_label, cursor='arrow')
         self.display.grid(row=row, column=column, columnspan=colspan, rowspan=rowspan, sticky="EW")
         self.display.bind("<Button-1>", self.open_win)
-        self.display.state(('readonly',))
+        self.display.bind("<Key>", self.set_disp)
         
-        self.disp_btn = ttk.Label(self.display, text="...", relief="raised", width=2)
+        self.disp_btn = ttk.Button(self.display, text="...", width=1.5, command=self.open_win)
         self.disp_btn.pack(side=RIGHT)
-        self.disp_btn.bind("<Button-1>", self.open_win)
         
         self.save()
         
@@ -159,17 +164,23 @@ class selWin:
         "Save the selected item into the textbox."
         self.win.grab_release()
         self.win.withdraw()
+        self.set_disp()
+        
+    def set_disp(self, e=None):
+        '''Set the display textbox.'''
         if self.selected == self.noneItem:
             self.disp_label.set("<None>")
             self.chosen_id = None
         else:
             self.disp_label.set(self.selected.shortName)
             self.chosen_id = self.selected.name
+        return "break" # stop the entry widget from continuing with this event
             
-    def open_win(self, e):
+    def open_win(self, e=None):
         self.win.deiconify()
         self.win.lift(self.parent)
         self.win.grab_set()
+        self.win.focus_force() # Focus here to deselect the textbox
         self.win.geometry('+'+str(self.parent.winfo_rootx()+30)+'+'+str(self.parent.winfo_rooty()+30))
         self.sel_item(self.selected)
         
@@ -228,21 +239,21 @@ if __name__ == '__main__': # test the window if directly executing this file
     root=Tk()
     lbl = ttk.Label(root, text="I am a demo window.")
     lbl.grid()
-    png.img_error=png.loadIcon('_error') # If image is not readable, use this instead
+    png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
     root.geometry("+500+500")
     lst = [
         Item(
             "SKY_BLACK", 
             "Black", 
             longName = "Darkness", 
-            icon = "pal_test/faithplate_128",
+            icon = "items/faithplate_128",
             author = "Valve",
             desc = 'Pure black darkness. Nothing to see here.'),
         Item(
             "SKY_BTS", 
             "BTS", 
             longName = "Behind The Scenes - Factory", 
-            icon = "pal_test/faithplate_128",
+            icon = "items/faithplate_128",
             author = "TeamSpen210",
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '

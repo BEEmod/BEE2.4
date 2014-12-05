@@ -4,17 +4,15 @@ import packageLoader
 import UI
 import utils
 
-def load_settings():
-  global settings
-  settings={}
-  with open("config/config.cfg", "r") as f:
+global settings
+settings={}
+with open("config/config.cfg", "r") as f:
     prop=Property.parse(f)
-  dirs = Property.find_key(prop, 'directories')
-  
-  settings['pal_dir']=dirs.find_key('palettes', 'palettes\\').value
-  settings['package_dir']=dirs.find_key('package', 'packages\\').value
+dirs = Property.find_key(prop, 'directories')
 
-load_settings()
+settings['pal_dir']=dirs.find_key('palettes', 'palettes\\').value
+settings['package_dir']=dirs.find_key('package', 'packages\\').value
+
 print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'])
 print('Done!')
