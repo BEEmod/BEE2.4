@@ -196,6 +196,7 @@ def init(win):
     prop_window.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
     prop_window.resizable(False, False)
     prop_window.transient(master=root)
+    prop_window.attributes('-topmost', 1)
     prop_window.relX=0
     prop_window.relY=0
     prop_window.withdraw() # starts hidden

@@ -86,6 +86,7 @@ defaults={ # default values for this item
 last_angle = '0'
   
 play_sound = False
+is_open = False
   
   
 def reset_sfx():
@@ -156,8 +157,10 @@ def paintFX(e):
 
 def exit():
     "Quit and return the new settings."
+    global is_open
     win.grab_release()
     win.withdraw()
+    is_open=False
     out={}
     for key in props.keys():
         if key in propList:
@@ -171,9 +174,9 @@ def exit():
     callback(out)
 
 def init(tk, cback):
-    global callback, labels
+    global callback, labels, win, is_open
     callback=cback
-    global win
+    is_open=False
     win=Toplevel(tk)
     win.title("BEE2")
     win.resizable(False, False)
@@ -224,8 +227,9 @@ def init(tk, cback):
 
 def open(usedProps, parent, itemName):
     widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
-    global propList
+    global propList, is_open
     propList=usedProps
+    is_open=True
     win.transient(master=parent)
     for i,key in enumerate(propList):
         propList[i]=key.casefold()
