@@ -177,6 +177,7 @@ settings = {"textures"           : {},
             "instances"          : {},
             "style_vars"         : {},
             "pit"                : {},
+            "has_attr"           : defaultdict(lambda: False),
             
             "cust_fizzlers"      : [],
             "conditions"         : [],
@@ -281,7 +282,7 @@ def load_settings():
         flags = []
         for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue", 
                   "ifStyleFalse", "ifMode", "ifPreview", "instance", 
-                  "StyleVar", "instVar"):
+                  "StyleVar", "instVar", 'hasInst'):
             flags += list(cond.find_all(f))
         results = []
         for val in cond.find_all('result'):
@@ -320,6 +321,7 @@ def check_glob_conditions():
     
     game_mode = 'ERR'
     is_preview = 'ERR'
+    inst_files = [] # Get a list of every instance in the map.
     for item in map.iter_ents(classname='func_instance'):
         if item['file'] == inst_file['coopExit']:
             game_mode = 'COOP'
@@ -328,8 +330,8 @@ def check_glob_conditions():
         elif (item['file'] == inst_file['spEntry'] or 
              item['file'].startswith(inst_file['coopCorr'])):
             is_preview = item.get_fixup('no_player_start') == '0'
-        if is_preview != 'ERR' and game_mode != 'ERR':
-            break # found everything
+        if item['file'] not in inst_files:
+            inst_files.append(item['file'])
             
     utils.con_log("Game Mode: " + game_mode)
     utils.con_log("Is Preview: " + str(is_preview))
@@ -352,10 +354,10 @@ def check_glob_conditions():
                     cond['flags'].remove(flag)
                 if game_mode=='SP' and val == "sp":
                     cond['flags'].remove(flag)
-            elif name == "ifpreview" and is_preview is True:
+            elif name == "ifpreview" and is_preview == (val=="1"):
                 cond['flags'].remove(flag)
-            elif name == "ifnotpreview" and is_preview is False:
-                cond['flags'].remove(flag)
+            elif name == "hasinst" and val in inst_files:
+                    cond['flags'].remove(flag)
         for res in cond['results']:
             if res.name.casefold() == 'variant':
                 res.value = variant_weight(res)
@@ -394,6 +396,10 @@ def satisfy_condition(cond, inst):
             subres = settings['styleVars'].get(flag.value.casefold(), False)
         elif name == 'stylevarfalse':
             subres = settings['styleVars'].get(flag.value.casefold(), True)
+        elif name == 'has':
+            subres = settings['has_item'][flag.value]
+        elif name == 'nothas':
+            subres = not settings['has_item'][flag.value]
         if isAnd:
             sat = sat and subres
         else:
@@ -492,8 +498,6 @@ def satisfy_condition(cond, inst):
                         for out in res.find_all('addOut'):
                             cond_out(inst, out, targ)
                         done.append(targ)
-                
-                    
             elif name == "custantline":
                 # customise the output antline texture, toggle instances
                 # allow adding extra outputs between the instance and the toggle
@@ -501,7 +505,6 @@ def satisfy_condition(cond, inst):
                 for over in map.iter_ents(
                         classname='info_overlay',
                         targetname=over_name):
-                    print(over['origin'])
                     random.seed(over['origin'])
                     new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
                     set_antline_mat(over, new_tex)
@@ -516,14 +519,19 @@ def satisfy_condition(cond, inst):
                                 for out in res.value['outputs']:
                                     # Allow adding extra outputs to customly trigger the toggle
                                     cond_out(inst, out, toggle['targetname'])
-                            
-                    
+
             elif name == "styleVar":
                 for opt in res.value:
-                    if opt.name.casefold() == 'setTrue':
+                    if opt.name.casefold() == 'settrue':
                         settings['style_vars'][opt.value] = True
-                    elif opt.name.casefold() == 'setFalse':
+                    elif opt.name.casefold() == 'setfalse':
                         settings['style_vars'][opt.value] = False
+            elif name == "has":
+                for opt in res.value:
+                    if opt.value.casefold() == '1':
+                        settings['has_attr'][opt.name] = True
+                    elif opt.value.casefold() == '0':
+                        settings['has_attr'][opt.name] = False
             elif name == "styleopt":
                 for opt in res.value:
                     if opt.name.casefold() in settings['options']:
@@ -561,7 +569,6 @@ def process_packer(f_list):
             
 def variant_weight(var):
     "Read variant commands from settings and create the weight list."
-    inst = var['base', '']
     count = var['number', '']
     if count.isdecimal():
         count = int(count)
@@ -679,11 +686,14 @@ def change_brush():
     for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
             is_glass=False
-            if face.mat.casefold() in GOO_TEX and is_bottomless:
-                if face.planes[2].z < pit_height:
-                    pit_solids.append((solid, face))
-                else:
-                    face.mat = pit_goo_tex
+            if face.mat.casefold() in GOO_TEX:
+                settings['has_item']['goo'] = True
+                if is_bottomless:
+                    if face.planes[2].z < pit_height:
+                        settings['has_item']['bottomless_pit'] = True
+                        pit_solids.append((solid, face))
+                    else:
+                        face.mat = pit_goo_tex
             if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
                 split_u=face.uaxis.split(" ")
                 split_v=face.vaxis.split(" ")
@@ -1159,31 +1169,6 @@ def fix_worldspawn():
         # if PeTI thinks there should be paint, don't touch it
         map.spawn['paintinmap'] = get_opt('force_paint')
     map.spawn['skyname'] = get_tex("special.sky")
-    
-def add_extra_ents():
-    "Add our various extra instances to enable some features."
-    inst_types = {
-                    "global" : [-8192, "0 0"],
-                    "skybox" : [ 5632, "0 0"], 
-                    "other"  : [-5888, "-3072 0"],
-                    "voice"  : [-8192, "0 512"]
-                 }
-    for type in inst_types.keys():
-        if type in settings['instances']:
-            max_ent_id = max_ent_id + 1
-            for inst in get_inst(type):
-                opt = inst.split("|")
-                if len(opt)== 2:
-                    inst_types[type][0] += int(opt[0])
-                    new_inst = Entity(map, keys={
-                             "id" : str(max_ent_id),
-                             "classname" : "func_instance",
-                             "targetname" : ("inst_"+str(max_ent_id)),
-                             "file" : opt[1],
-                             "angles" : "0 0 0",
-                             "origin" : (str(inst_types[type][0]) + " " + inst_types[type][1])
-                           })
-                    map.append(new_inst)
 
 def hammer_pack_scan():
     "Look through entities to see if any packer commands exist, and add if needed."
@@ -1356,8 +1341,7 @@ else:
     map_seed = calc_rand_seed()
     progs = [
              check_glob_conditions, fix_inst, 
-             change_ents, add_extra_ents,
-             change_brush, change_overlays, 
+             change_ents, change_brush, change_overlays, 
              change_trig, change_func_brush, 
              fix_worldspawn, save
             ]
