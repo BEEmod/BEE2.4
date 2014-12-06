@@ -122,13 +122,13 @@ class selWin:
         
         if self.has_def:
             self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command = lambda obj=self: obj.reset_sel())
-            self.prop_reset.grid(row=5, column=0, columnspan=4, sticky = "EW", padx=8, pady=(8,1))
+            self.prop_reset.grid(row=5, column=1, sticky = "EW")
         
         self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command = lambda obj=self: obj.save())
         self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command = lambda obj=self: obj.exit())
         
-        self.prop_ok.grid(row=6, column=0, padx=(8,16))
-        self.prop_cancel.grid(row=6, column=2, padx=(16,8))
+        self.prop_ok.grid(row=5, column=0, padx=(8,8))
+        self.prop_cancel.grid(row=5, column=2, padx=(8,8))
         
         for item in self.item_list:
             if item==self.noneItem:
