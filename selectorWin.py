@@ -29,7 +29,6 @@ class Item:
         self.desc = desc
         self.author = author
 
-
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
     def __init__(self, tk, lst, has_none=True, has_def=True, none_desc='Do not add anything.', title='BEE2'):

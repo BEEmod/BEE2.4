@@ -196,19 +196,23 @@ class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''
     def __init__(self, frame, item, sub):
         "Create a label to show an item onscreen."
+        super().__init__(frame)
         self.item = item
         self.subKey = sub
-        self.img = item.get_icon(self.subKey)
-        self.name = list(Property.find_all(item.data['editor'], "Item", "Editor", "Subtype", "Name"))
-        self.name=self.name[self.subKey].value
-        super().__init__(frame, image=self.img)
-        self.dispName='Null'#data['name']
+        self.load_data(sub)
         self.bind("<Button-3>", contextWin.showProps)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
         self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
         self.bind("<Leave>", clearDispName)
-
+        
+    def load_data(self, sub):
+        self.img = self.item.get_icon(self.subKey)
+        self.name = list(Property.find_all(self.item.data['editor'], "Item", "Editor", "Subtype", "Name"))
+        self.name=self.name[self.subKey].value
+        self['image'] = self.img
+        self.dispName='Null'#data['name']
+        
     def clear(self):
         "Remove any items matching the passed label from the palette, to prevent adding two copies."
         toRem=[]
@@ -475,6 +479,7 @@ def moveMain(e):
     shouldSnap=False
     for name in('pal','style','opt'):
         windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
+    contextWin.follow_main()
     win.focus()
     shouldSnap=True
 

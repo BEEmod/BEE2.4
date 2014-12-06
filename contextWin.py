@@ -12,6 +12,7 @@ wid_spr = [0,0,0,0,0]
 
 selected_item = None
 selected_sub_item = None
+is_open = False
 
 ROT_TYPES = {
     "handle_none"          : "rot_0",
@@ -25,7 +26,7 @@ ROT_TYPES = {
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, "ItemNameHere") # TODO: add real values for first/last args
+    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name) # TODO: add real values for first/last args
     
 def hideItemProps(vals):
     snd.fx('contract')
@@ -57,10 +58,10 @@ def moreInfo_hideURL(e):
         
 def showProps(e):
     '''Show the properties window for an item.'''
-    global selected_item, selected_sub_item
+    global selected_item, selected_sub_item, is_open
+    is_open = True
     snd.fx('expand')
     prop_window.deiconify()
-    prop_window.vis=True
     prop_window.lift(root)
     
     selected_item = e.widget.item
@@ -90,7 +91,7 @@ def showProps(e):
         wid_sub[pos]['relief'] = 'flat'
     icon_widget['relief'] = 'raised'
     wid_author['text'] = ', '.join(selected_item.data['auth'])
-    wid_name['text'] = selected_sub_item.dispName
+    wid_name['text'] = selected_sub_item.name
     wid_ent_count['text'] = selected_item.data['ent']
     wid_desc['state']="normal"
     wid_desc.delete(1.0, END)
@@ -173,12 +174,19 @@ def set_sprites(item):
     if face_spr == "surf":
         face_spr += "_none"
     wid_spr[4]['image'] = png.loadSpr(face_spr)
+    
+def follow_main():
+    '''Move the properties window to keep a relative offset to the main window.'''
+    prop_window.geometry('+'+str(prop_window.relX+root.winfo_x())+
+                         '+'+str(prop_window.relY+root.winfo_y()))
 
-def hideProps(e):
-    if prop_window.vis:
+def hideProps(e=None):
+    '''Hide the properties window, if it's open.'''
+    global is_open
+    if is_open:
+        is_open=False
         snd.fx('contract')
         prop_window.withdraw()
-        prop_window.vis=False
 
 def init(win):
     '''Initiallise all the window components.'''
@@ -188,7 +196,6 @@ def init(win):
     prop_window.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
     prop_window.resizable(False, False)
     prop_window.transient(master=root)
-    prop_window.vis=False
     prop_window.relX=0
     prop_window.relY=0
     prop_window.withdraw() # starts hidden
@@ -212,7 +219,7 @@ def init(win):
     sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
     for i in range(len(wid_sub)):
-        wid_sub[i]=ttk.Label(sub_frame, image=png.loadIcon('_blank'))
+        wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/blank'))
         wid_sub[i].grid(row=0, column=i)
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
