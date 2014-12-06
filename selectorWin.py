@@ -10,14 +10,14 @@ ITEM_HEIGHT=ICON_SIZE+51
 
 class Item:
     "An item on the panel."
-    __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'author', 'button', 'win')
+    __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win')
     def __init__(
             self,
             name, 
             shortName, 
             longName = None,
             icon = None, 
-            author = '',
+            authors = None,
             desc = ""):
         self.name = name
         self.shortName = shortName
@@ -27,7 +27,7 @@ class Item:
         else:
             self.icon = png.loadPng(icon)
         self.desc = desc
-        self.author = author
+        self.authors = [] if authors is None else authors
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
@@ -189,12 +189,12 @@ class selWin:
         
     def sel_item(self, item):
         self.prop_name['text'] = item.longName
-        if item.author == '':
+        if len(item.authors) == 0:
             self.prop_author['text'] = ''
-        elif ',' in item.author:
-            self.prop_author['text'] = 'Authors: ' + item.author
+        elif len(item.authors) == 1:
+            self.prop_author['text'] = 'Author: ' + item.authors[0]
         else:
-            self.prop_author['text'] = 'Author: ' + item.author
+            self.prop_author['text'] = 'Authors: ' + ', '.join(item.authors)
         self.prop_icon['image'] = item.icon
         
         self.prop_desc['state']="normal"
@@ -246,14 +246,14 @@ if __name__ == '__main__': # test the window if directly executing this file
             "Black", 
             longName = "Darkness", 
             icon = "items/faithplate_128",
-            author = "Valve",
+            authors = ["Valve"],
             desc = 'Pure black darkness. Nothing to see here.'),
         Item(
             "SKY_BTS", 
             "BTS", 
             longName = "Behind The Scenes - Factory", 
             icon = "items/faithplate_128",
-            author = "TeamSpen210",
+            authors = ["TeamSpen210"],
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
                    'carrying objects throughout the facility. Abandoned offices can '

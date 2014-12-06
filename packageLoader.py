@@ -184,17 +184,31 @@ class Item:
         return '<Item:' + self.id + '>'
 
 class Voice:
-    def __init__(self, id, name, icon):
+    def __init__(self, id, name, config, icon, desc, auth=None, short_name=None):
         self.id = id
         self.name = name
         self.icon = icon
+        self.short_name = name if short_name is None else short_name
+        self.desc = desc
+        self.auth = [] if auth is None else auth
+        self.config = config
      
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a voice line definition.'''
         name = info['name']
-        icon = info['icon', '_blank']
-        return cls(id, name, icon)
+        icon = info['icon', 'BEE2/blank']
+        desc = info['description', '']
+        short_name = info['shortName', '']
+        if short_name == '':
+            short_name = None
+        auth = info['authors', ''].split(', ')
+        
+        path = 'voice/' + info['file'] + '.voice'
+        with zip.open(path, 'r') as conf:
+            config = Property.parse(conf)
+        
+        return cls(id, name, config, icon, desc, auth=auth, short_name=short_name)
         
     def add_over(self, overide):
         '''Add the additional lines to ourselves.'''
@@ -218,7 +232,7 @@ class Skybox:
         name = info['name']
         icon = info['icon', '_blank']
         config_dir = info['config', '']
-        auth = info['authors', ''].split(',')
+        auth = info['authors', ''].split(', ')
         desc = info['description', '']
         short_name = info['shortName', '']
         if short_name == '':

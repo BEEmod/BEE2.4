@@ -393,13 +393,13 @@ def satisfy_condition(cond, inst):
             bits = flag.value.split(' ')
             subres = inst.get_fixup(bits[0]) == bits[1]
         elif name == 'stylevartrue':
-            subres = settings['styleVars'].get(flag.value.casefold(), False)
+            subres = settings['style_vars'].get(flag.value.casefold(), False)
         elif name == 'stylevarfalse':
-            subres = settings['styleVars'].get(flag.value.casefold(), True)
+            subres = settings['style_vars'].get(flag.value.casefold(), True)
         elif name == 'has':
-            subres = settings['has_item'][flag.value]
+            subres = settings['has_attr'][flag.value]
         elif name == 'nothas':
-            subres = not settings['has_item'][flag.value]
+            subres = not settings['has_attr'][flag.value]
         if isAnd:
             sat = sat and subres
         else:
@@ -687,10 +687,10 @@ def change_brush():
         for face in solid:
             is_glass=False
             if face.mat.casefold() in GOO_TEX:
-                settings['has_item']['goo'] = True
+                settings['has_attr']['goo'] = True
                 if is_bottomless:
                     if face.planes[2].z < pit_height:
-                        settings['has_item']['bottomless_pit'] = True
+                        settings['has_attr']['bottomless_pit'] = True
                         pit_solids.append((solid, face))
                     else:
                         face.mat = pit_goo_tex

@@ -57,37 +57,7 @@ palettes=[]
 styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 
 skyboxes = {}
-      
-voice_list = [
-    selWinItem(
-        "VOICE_CAVE_50",
-        "50s Cave",
-        longName="1950s Cave",
-        icon="items/observation_room",
-        author="Carl Kenner, TeamSpen210",
-        desc="Cave"),
-    selWinItem(
-        "VOICE_CAVE_60",
-        "60s Cave",
-        longName="1960s Cave",
-        icon="items/observation_room",
-        author="Carl Kenner, TeamSpen210",
-        desc="Cave"),
-    selWinItem(
-        "VOICE_CAVE_70",
-        "70s Cave",
-        longName="1960s Cave",
-        icon="items/observation_room",
-        author="Carl Kenner, TeamSpen210",
-        desc="Cave"),
-    selWinItem(
-        "VOICE_CAVE_80",
-        "80s Cave",
-        longName="1980s Cave",
-        icon="items/observation_room",
-        author="Carl Kenner, TeamSpen210",
-        desc="Cave"),
-    ]
+voices = {}
     
 music_list = [
     selWinItem(
@@ -95,21 +65,21 @@ music_list = [
         "Random PeTI",
         longName="Random PeTI (Robot Waiting Room)",
         icon="music/peti",
-        author="Valve",
+        authors=["Valve"],
         desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
     selWinItem(
         "VALVE_CONTROL_GROUP",
         "50s Chamber",
         longName="You are Not Part of the Control Group",
         icon="music/control_group",
-        author="Valve",
-        desc="Cave"),
+        authors=["Valve"],
+        desc="The music played in some of the first 50s chambers. Has additional Repulsion Gel beats that mix in dynamically."),
     selWinItem(
         "MUSIC_FUTURE_STARTER",
         "Future Starter",
         longName="The Future Starts With You",
         icon="music/future_starter",
-        author="Valve",
+        authors=["Valve"],
         desc="Cave"),
     ]
     
@@ -117,28 +87,28 @@ goo_list = [
     selWinItem(
         "GOO_NORM",
         "Regular",
-        icon="items/goo",
-        author="Valve",
+        icon="goo/clean",
+        authors=["Valve"],
         desc="The standard normal Toxic Goo."),
         
     selWinItem(
-        "GOO_NORM",
+        "GOO_OVERGROWN",
         "Overgrown",
-        icon="items/goo",
-        author="Valve",
-        desc="A version of goo which is more reflective, and less polluted."),
+        icon="goo/overgrown",
+        authors=["Valve"],
+        desc="A version of goo which is more murky, and reflective."),
     ]
     
 style_list = [
     selWinItem(
         "CLEAN",
         "Clean",
-        author="Valve, Carl Kenner",
+        authors=["Valve", "Carl Kenner"],
         desc="Portal 2 Clean style, like after GLaDOS has been awoken and finished cleaning the facility, or in a parallel world where it was never destroyed. Similar to the default PeTI style but with more variety of wall panels and automatic security cameras."),
     selWinItem(
         "Portal1",
         "Portal 1",
-        author="Carl Kenner",
+        authors=["Carl Kenner"],
         desc="Portal 1 style test chamber. Portal 1 style elevators, the brown metal walls, white concrete walls, floor tiles, security cameras (unless the Sentient Cloud has taken over), Unstationary Scaffolds, Complementary Victory Lifts, Vital Apparatus Vents, Portal 1 Fizzlers, etc. There's an orange glow coming from behind panels.")
 ]
     
@@ -252,15 +222,26 @@ def load_packages(data):
         it = Item(item)
         item_list[it.id] = it
     sky_list = []
-    for sky in data['Skybox']:
+    for sky in sorted(data['Skybox'], key=lambda q: q.name):
         sky_list.append(selWinItem(
                 sky.id, 
                 sky.short_name,
                 longName = sky.name,
                 icon=sky.icon, 
-                author=', '.join(sky.auth), 
+                authors=sky.auth, 
                 desc=sky.desc))
         skyboxes[sky.id] = sky
+        
+    voice_list = []
+    for voice in sorted(data['QuotePack'], key=lambda q: q.name):
+        voice_list.append(selWinItem(
+                voice.id,
+                voice.short_name,
+                longName = voice.name,
+                icon=voice.icon,
+                authors=voice.auth,
+                desc=voice.desc))
+        voices[voice.id] = voice
         
     skybox_win = selWin(win, sky_list, title='Skyboxes', has_none=False)
     voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
