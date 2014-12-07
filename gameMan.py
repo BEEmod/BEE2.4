@@ -50,20 +50,19 @@ class Game:
                 with open(info_path, 'r') as file:
                     data=list(file)
                 found_section=False
-                for line_num, line in enumerate(data):
+                for line_num, line in reversed(list(enumerate(data))):
                     clean_line = utils.clean_line(line)
                     if add_line:
-                        if clean_line.casefold() == 'searchpaths':
-                            found_section=True
-                        elif clean_line == GAMEINFO_LINE:
+                        if clean_line == GAMEINFO_LINE:
                             break # Already added!
-                        elif found_section and clean_line == '{':
-                            # Match the next line's indentation (braces usually use different indent)
-                            indent = utils.get_indent(data[line_num+1])
-                            data.insert(line_num+1, indent + GAMEINFO_LINE + '\n')
+                        elif '|gameinfo_path|' in clean_line:
+                            print("Adding gameinfo hook to " + info_path)
+                            # Match the line's indentation
+                            data.insert(line_num+1, utils.get_indent(line) + GAMEINFO_LINE + '\n')
                             break
                     else:
                         if clean_line == GAMEINFO_LINE:
+                            print("Removing gameinfo hook from " + info_path)
                             data.pop(line_num)
                             break
                 else:
@@ -71,9 +70,9 @@ class Game:
                         print('Failed editing "' + info_path + '" to add our special folder!')
                     continue
                     
-            with open(info_path, 'w') as file:
-                for line in data:
-                    file.write(line)
+                with open(info_path, 'w') as file:
+                    for line in data:
+                        file.write(line)
                     
 gm = Game('P2', r'F:\SteamLibrary\SteamApps\common\Portal 2\\')
 gm.edit_gameinfo(1)

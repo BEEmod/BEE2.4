@@ -4,7 +4,7 @@ import collections.abc as abc
 from property_parser import Property
 
 def clean_line(line):
-    "Removes extra spaces and comments from the input."
+    '''Removes extra spaces and comments from the input.'''
     if isinstance(line, bytes):
         line=line.decode() # convert bytes to strings if needed
     if '//' in line:
@@ -12,11 +12,20 @@ def clean_line(line):
     return line.strip()
     
 def is_identifier(name, forbidden='{}\'"'):
-    "Check to see if any forbidden characters are part of a candidate name."
+    '''Check to see if any forbidden characters are part of a candidate name.'''
     for t in name:
         if t in forbidden:
             return False
     return True
+    
+def get_indent(line):
+    '''Return the whitspace which this line starts with.'''
+    white = []
+    for char in line:
+        if char in ' \t':
+            white.append(char)
+        else:
+            return ''.join(white)
     
 def con_log(*text):
     print(*text, flush=True) 
