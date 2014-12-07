@@ -23,9 +23,11 @@ def game_set(game):
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
 class Game:
-    def __init__(self, name, folder):
+    def __init__(self, name, id, folder):
         self.name = name
+        self.steamID = id
         self.root = folder
+    
         
     def dlc_priority(self):
         '''Iterate through all subfolders, in order of priority, from high to low.
@@ -47,7 +49,7 @@ class Game:
         
     def abs_path(self, path):
         return os.path.join(self.root, path)
-    
+        
     def edit_gameinfo(self, add_line=False):
         '''Modify all gameinfo.txt files to add or remove our line.
         
@@ -84,18 +86,54 @@ class Game:
                     for line in data:
                         file.write(line)
                         
+def find_steam_info(game_dir):
+    '''Determine the steam ID and game name of this folder, if it has one.
+    
+    This only works on Source games!
+    '''
+    id = -1
+    name = "ERR"
+    found_name = False
+    found_id = False
+    for folder in os.listdir(game_dir):
+        info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
+        if os.path.isfile(info_path):
+            with open(info_path, 'r') as file:
+                for line in file:
+                    clean_line = utils.clean_line(line).replace('\t',' ')
+                    if not found_id and 'steamappid' in clean_line.casefold():
+                        ID = clean_line.casefold().replace('steamappid', '').strip()
+                        try:
+                            id = int(ID)
+                        except ValueError:
+                            pass
+                    elif not found_name and 'game ' in clean_line.casefold():
+                        found_name = True
+                        ind =clean_line.casefold().rfind('game') + 4
+                        name = clean_line[ind:].strip().strip('"')
+                    if found_name and found_id:
+                        break
+        if found_name and found_id:
+            break
+    return id, name
+                        
 def load(games):
     for gm in games:
-        all_games.append(Game(gm['Name'], gm['Dir']))
+        try:
+            all_games.append(Game(gm['Name'], int(gm['SteamID']), gm['Dir']))
+        except ValueError:
+            pass
         
 def as_props():
+    '''Return the Property tree to save into the config file.'''
     return [Property("Game", [
             Property("Name", gm.name),
+            Property("SteamID", gm.steamID),
             Property("Dir", gm.root)]) for gm in all_games]
         
 def find_game(e=None):
     '''Ask for, and load in a game to export to.'''
-    mesaagebox.showinfo(message='Select the folder where 
+    messagebox.showinfo(message='Select the folder where the game executable is located (portal2.exe)...', parent=root)
     
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
@@ -103,9 +141,10 @@ def remove_game(e=None):
         messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
         
 def add_menu_opts(menu):
+    '''Add the various games to the menu.'''
     global selectedGame_radio
     selectedGame_radio = IntVar(value=0)
-    for val, game in enumerate(all_games): 
+    for val, game in enumerate(all_games):
         menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
         
 def setGame():
