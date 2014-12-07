@@ -4,10 +4,19 @@ Handles locating parts of a given game, and modifying GameInfo to support our sp
 import os
 import os.path
 
+from tkinter import * # ui library
+from tkinter import font, messagebox # simple, standard modal dialogs
+from tkinter import filedialog # open/save as dialog creator
+from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
+
 from property_parser import Property
 import utils
 
-games = {}
+all_games = []
+root = None
+
+def game_set(game):
+    pass
 
 # The line we inject to add our BEE2 folder into the game search path. 
 # We always add ours such that it's the highest priority.
@@ -44,6 +53,7 @@ class Game:
         
         Add_line determines if we are adding or removing it.
         '''
+        game_id = ''
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
@@ -73,3 +83,35 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
+                        
+def load(games):
+    for gm in games:
+        all_games.append(Game(gm['Name'], gm['Dir']))
+        
+def as_props():
+    return [Property("Game", [
+            Property("Name", gm.name),
+            Property("Dir", gm.root)]) for gm in all_games]
+        
+def find_game(e=None):
+    '''Ask for, and load in a game to export to.'''
+    mesaagebox.showinfo(message='Select the folder where 
+    
+def remove_game(e=None):
+    '''Remove the currently-chosen game from the game list.'''
+    if len(all_games) <= 1:
+        messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
+        
+def add_menu_opts(menu):
+    global selectedGame_radio
+    selectedGame_radio = IntVar(value=0)
+    for val, game in enumerate(all_games): 
+        menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
+        
+def setGame():
+    pass
+       
+if __name__ == '__main__':
+    root = Tk()
+    Button(root, text = 'Add', command=find_game).grid(row=0, column=0)
+    Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)

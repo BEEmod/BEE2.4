@@ -11,12 +11,14 @@ from property_parser import Property
 from paletteLoader import Palette
 from packageLoader import Style as palStyle, Item as palItem, Voice as palVoice, Skybox as palSkybox
 import contextWin
+import gameMan
 from selectorWin import selWin
 from selectorWin import Item as selWinItem
 import sound as snd
 
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
+gameMan.root=win
 
 png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
            
@@ -46,7 +48,6 @@ selectedPalette = 0
 selectedGame=0
 PalEntry_TempText="New Palette>"
 PalEntry = StringVar(value=PalEntry_TempText)
-selectedGame_radio = IntVar(value=0)
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 shouldSnap=True # Should we update the relative positions of windows?
 muted = IntVar(value=0) # Is the sound fx muted?
@@ -121,9 +122,6 @@ musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot W
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
 tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
-# Examples, we want to set some in styles
-games = ('common/portal2', 'common/aperturetag')
-gamesDisplay = ('Portal 2', 'Aperture Tag') #TODO: We probably want to have the user navigate to gameinfo.txt / find it from the exe to get these names
 
 styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', False),
@@ -263,7 +261,7 @@ def loadPalUI():
         menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
         menus['pal'].item_len+=1
 
-def setGame():
+def setGame(game):
     global selectedGame
     selectedGame = selectedGame_radio.get()
     print("Game: [" + str(selectedGame) + "] = " + gamesDisplay[selectedGame])
@@ -739,17 +737,14 @@ def initMenuBar(win):
     menus['file'].add_command(label="Find Game")
     menus['file'].add_command(label="Remove Game")
     menus['file'].add_separator()
-    val=0
-    for name in gamesDisplay: # Add a set of options to pick the palette into the menu system
-        menus['file'].add_radiobutton(label=name, variable=selectedGame_radio, value=val, command=setGame)
-        val+=1
-
-    menus['file'].add_separator()
     if snd.initiallised:
         menus['file'].add_checkbutton(label="Mute Sounds", variable=muted, command=lambda: snd.setMute(muted.get()))
     menus['file'].add_command(label="Quit", command=win.destroy)
+    menus['file'].add_separator()
+    
+    gameMan.add_menu_opts(menus['file']) # Add a set of options to pick the game into the menu system
+    
     menus['pal']=Menu(bar)
-
     bar.add_cascade(menu=menus['pal'], label='Palette')
     menus['pal'].add_command(label='New...', command=menu_newPal)
     menus['pal'].add_command(label='Clear')
@@ -761,8 +756,6 @@ def initMenuBar(win):
     bar.add_cascade(menu=menuHelp, label='Help')
     menuHelp.add_command(label='About') # Authors etc
     menuHelp.add_command(label='Quotes') # show the list of quotes
-
-    setGame()
 
 def initMain():
     "Initialise all windows and panes."
