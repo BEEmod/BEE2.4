@@ -73,6 +73,3 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
-                    
-gm = Game('P2', r'F:\SteamLibrary\SteamApps\common\Portal 2\\')
-gm.edit_gameinfo(1)
