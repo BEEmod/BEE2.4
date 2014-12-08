@@ -42,7 +42,7 @@ class Vec:
         
         All values are converted to Floats automatically.
         If no value is given, that axis will be set to 0.
-        A tuple can be passed in (as the x argument), which will use the three args as 
+        A tuple can be passed in (as the x argument), which will use the three args as x/y/z.
         '''
         if isinstance(x, abc.Sequence):
             ln = len(x)
@@ -72,8 +72,7 @@ class Vec:
         
     @classmethod
     def from_ang(cls, pitch, yaw):
-        '''Create a unit vector based on a Source rotational angle.
-        '''
+        '''Create a unit vector based on a Source rotational angle.'''
         sin_pit=math.sin(math.radians(pitch))
         cos_pit=math.cos(math.radians(pitch))
         sin_yaw=math.sin(math.radians(-yaw))

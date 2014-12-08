@@ -543,13 +543,14 @@ class Solid:
             bbox_min.min(side_min)
         return bbox_min, bbox_max
         
-    def get_origin(self):
+    def get_origin(self, bbox_min=None, bbox_max=None):
         '''Calculates a vector representing the exact center of this brush.'''
-        bbox_min, bbox_max = self.get_bbox()
+        if bbox_min is None or bbox_max is None:
+            bbox_min, bbox_max = self.get_bbox()
         return (bbox_min+bbox_max)/2
         
     def translate(self, diff):
-        '''Move this side by the specified vector. 
+        '''Move this solid by the specified vector. 
         
         - This does not translate textures as well.
         - A tuple can be passed in instead if desired.

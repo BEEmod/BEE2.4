@@ -519,7 +519,27 @@ def satisfy_condition(cond, inst):
                                 for out in res.value['outputs']:
                                     # Allow adding extra outputs to customly trigger the toggle
                                     cond_out(inst, out, toggle['targetname'])
-
+            elif name == "faithmods":
+                # Get data about the trigger this instance uses for flinging
+                fixup_var = res['instvar', '']
+                for trig in map.iter_ents(classname="trigger_catapult"):
+                    if inst['targetname']  in trig['targetname']:
+                        for out in trig.outputs:
+                            if out.inst_in == 'animate_angled_relay':
+                                out.inst_in = res['angled_targ', 'animate_angled_relay']
+                                out.input = res['angled_in', 'Trigger']
+                                if fixup_var:
+                                    inst.set_fixup(fixup_var, 'angled')
+                                break
+                            elif out.inst_in == 'animate_straightup_relay':
+                                out.inst_in = res['straight_targ', 'animate_straightup_relay']
+                                out.input = res['straight_in', 'Trigger']
+                                if fixup_var:
+                                    inst.set_fixup(fixup_var, 'straight')
+                                break
+                        else:
+                            continue # Check the next trigger
+                        break # If we got here, we've found the output - stop scanning
             elif name == "styleVar":
                 for opt in res.value:
                     if opt.name.casefold() == 'settrue':
@@ -789,8 +809,7 @@ def clump_walls():
     clump_size = int(get_opt("clump_size"))
     clump_wid = int(get_opt("clump_width"))
     clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
-    wall_pos = list(walls.keys()).sort()
-    
+    wall_pos = sorted(list(walls.keys()))
     random.seed(map_seed)
     for i in range(clump_numb):
         pos = random.choice(wall_pos)

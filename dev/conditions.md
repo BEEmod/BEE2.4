@@ -72,8 +72,15 @@ Type defines the mode used to decide whether it suceeds. AND means all flags mus
 	AddOut = output definition
   }
   Allows changing the texture for the item's output antline. Straight and Corner define the used texture, broken up into 3 parts separated by "|". The first defines the sideways scale used for the texture. The second defines the material, and the last (must be "static") removes the targetname of the overlay (so no info_overlay_acessor entities are created, if the texture does not toggle). Only the first two are required. If instance is present, it provides a path for a replacement version of indicator_toggle to use with the given antlines. Any AddOut command targets this toggle entity.
-
-
+- FaithMods
+  {
+  instvar = var_name
+  angled_targ = "angled_relay"
+  angled_in = "Trigger"
+  straight_targ = "straight_relay"
+  straight_in = "Trigger"
+  }
+  Does some specialised customisation for Faith Plate-based items. This will check the type of output coming from the trigger_catapult, and edit the instance based on it. InstVar adds a variable with the given name, that has a value of 'angled' or 'straight' depending on the type of Faith Plate. Use in conjunction with the InstVar result to change instances to match. The other four options are used (like addOut) to change the input given to the Faith Plate, since the PeTI ignores instructions for this in editoritems.
 
 StyleVar
   {
