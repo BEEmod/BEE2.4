@@ -250,8 +250,8 @@ class Property:
             else:
                 try:
                     return self.find_key(index).value
-                except NoKeyError:
-                    raise IndexError
+                except NoKeyError as no_key:
+                    raise IndexError(str(no_key)) from no_key
         elif index == 0:
             return self.value
         else:
@@ -271,8 +271,8 @@ class Property:
             else:
                 try:
                     self.find_key(index).value = value
-                except NoKeyError:
-                    raise IndexError
+                except NoKeyError as no_key:
+                    raise IndexError(str(no_key)) from no_key
         elif index == 0:
             self.value = value
         else:
