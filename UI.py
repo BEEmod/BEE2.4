@@ -135,9 +135,7 @@ class Item():
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
         self.id = item.id
-        self.url = self.data['url']
-        if self.url == 'NONE':
-            self.url = None
+        self.url = self.data['url', None]
         
     def get_icon(self, subKey):
         return png.loadIcon(self.data['icons'][str(subKey)])

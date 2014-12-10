@@ -207,9 +207,7 @@ class Voice:
         name = info['name']
         icon = info['icon', 'BEE2/blank']
         desc = info['description', '']
-        short_name = info['shortName', '']
-        if short_name == '':
-            short_name = None
+        short_name = info['shortName', None]
         auth = info['authors', ''].split(', ')
         
         path = 'voice/' + info['file'] + '.voice'
@@ -242,9 +240,7 @@ class Skybox:
         config_dir = info['config', '']
         auth = info['authors', ''].split(', ')
         desc = info['description', '']
-        short_name = info['shortName', '']
-        if short_name == '':
-            short_name = None
+        short_name = info['shortName', None]
         if config_dir == '': # No config at all
             config = []
         else:

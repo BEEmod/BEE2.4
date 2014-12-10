@@ -27,12 +27,24 @@ replace_chars = {
     }
 
 class KeyValError(Exception):
-    "An error that occured when parsing a Valve KeyValues file."
+    '''An error that occured when parsing a Valve KeyValues file.'''
     pass
     
 class NoKeyError(Exception):
-    "Raised if a key is not found when searching from find_key."
+    '''Raised if a key is not found when searching from find_key().
+    
+    key = The missing key that was asked for
+    all_keys = The names of all valid keys for the Property
+    '''
+    def __init__(self, key, all_keys):
+        self.key = key
+        self.all_keys = all_keys
+        
+    def __str__(self):
+        return "No key " + self.key + "!"
     pass
+    
+_NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given to find_key()
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
@@ -115,8 +127,11 @@ class Property:
                 else:
                     yield prop
         
-    def find_key(self: "list or Property", key, def_=None) -> "Property":
-        "Obtain the value of the child Property with a name, with an optional default value."
+    def find_key(self: "list or Property", key, def_=_NO_KEY_FOUND) -> "Property":
+        '''Obtain the value of the child Property with a name, with an optional default value.
+        
+        If no default value is given, this will raise NoKeyError.
+        '''
         run_on = []
         if isinstance(key, tuple) and len(key) == 2:
             # Allow using Prop[val, default] to get values
@@ -131,8 +146,8 @@ class Property:
         for prop in reversed(run_on):
             if prop.name is not None and prop.name.casefold() == key:
                 return prop
-        if def_==None:
-            raise NoKeyError('No key "' + key + '"!')
+        if def_ is _NO_KEY_FOUND:
+            raise NoKeyError(key, [prop.name for prop in run_on])
         else:
             return Property(name=key, value=def_) 
             # We were given a default, pretend that was in the original property list so code works
