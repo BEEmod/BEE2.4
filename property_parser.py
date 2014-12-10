@@ -21,9 +21,12 @@ import re
 
 __all__ = ["KeyValError", "NoKeyError", "Property"]
 
+# various escape sequences that we allow
 replace_chars = {
-    '\\n' : '\n',
-    '\\t' : '\t',
+    r'\n'  : '\n',
+    r'\t'  : '\t',
+    '\\\\' : '\\',
+    r'\/'  : '/'
     }
 
 class KeyValError(Exception):
@@ -78,6 +81,8 @@ class Property:
                         raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".")
                     try:
                         value = line_contents[3]
+                        if not freshline.endswith('"'):
+                            raise KeyValError("Line " + str(line_num) + " has value, but incomplete quotes!")
                         for orig, new in replace_chars.items():
                             value=value.replace(orig, new)
                     except IndexError:
@@ -89,7 +94,6 @@ class Property:
                 elif freshline.startswith('{'):
                     if values[-1].value:
                         raise KeyValError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
-                    
                     values[-1].value = []
                     open_properties.append(values[-1])
                 elif freshline.startswith('}'):

@@ -26,7 +26,7 @@ class Item:
             self.icon = png.loadPng('BEE2/blank')
         else:
             self.icon = png.loadPng(icon)
-        self.desc = desc.replace('\\n', '\n').replace('\\t','\t')
+        self.desc = desc
         self.authors = [] if authors is None else authors
         
     def __repr__(self):
