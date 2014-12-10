@@ -60,46 +60,48 @@ styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS
 skyboxes = {}
 voices = {}
 styles = {}
+musics = {}
+goos = {}
     
-music_list = [
-    selWinItem(
-        "VALVE_PETI",
-        "Random PeTI",
-        longName="Random PeTI (Robot Waiting Room)",
-        icon="music/peti",
-        authors=["Valve"],
-        desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
-    selWinItem(
-        "VALVE_CONTROL_GROUP",
-        "50s Chamber",
-        longName="You are Not Part of the Control Group",
-        icon="music/control_group",
-        authors=["Valve"],
-        desc="The music played in some of the first 50s chambers. Has additional Repulsion Gel beats that mix in dynamically."),
-    selWinItem(
-        "MUSIC_FUTURE_STARTER",
-        "Future Starter",
-        longName="The Future Starts With You",
-        icon="music/future_starter",
-        authors=["Valve"],
-        desc="Cave"),
-    ]
+# music_list = [
+    # selWinItem(
+        # "VALVE_PETI",
+        # "Random PeTI",
+        # longName="Random PeTI (Robot Waiting Room)",
+        # icon="music/peti",
+        # authors=["Valve"],
+        # desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
+    # selWinItem(
+        # "VALVE_CONTROL_GROUP",
+        # "50s Chamber",
+        # longName="You are Not Part of the Control Group",
+        # icon="music/control_group",
+        # authors=["Valve"],
+        # desc="The music played in some of the first 50s chambers. Has additional Repulsion Gel beats that mix in dynamically."),
+    # selWinItem(
+        # "MUSIC_FUTURE_STARTER",
+        # "Future Starter",
+        # longName="The Future Starts With You",
+        # icon="music/future_starter",
+        # authors=["Valve"],
+        # desc="Cave"),
+    # ]
     
-goo_list = [
-    selWinItem(
-        "GOO_NORM",
-        "Regular",
-        icon="goo/clean",
-        authors=["Valve"],
-        desc="The standard normal Toxic Goo."),
+# goo_list = [
+    # selWinItem(
+        # "GOO_NORM",
+        # "Regular",
+        # icon="goo/clean",
+        # authors=["Valve"],
+        # desc="The standard normal Toxic Goo."),
         
-    selWinItem(
-        "GOO_OVERGROWN",
-        "Overgrown",
-        icon="goo/overgrown",
-        authors=["Valve"],
-        desc="A version of goo which is more murky, and reflective."),
-    ]
+    # selWinItem(
+        # "GOO_OVERGROWN",
+        # "Overgrown",
+        # icon="goo/overgrown",
+        # authors=["Valve"],
+        # desc="A version of goo which is more murky, and reflective."),
+    # ]
     
 selected_style = "clean"
     
@@ -205,39 +207,31 @@ def load_packages(data):
     for item in sorted(data['Item'], key=lambda i: i.id):
         it = Item(item)
         item_list[it.id] = it
+        
     sky_list = []
-    for sky in sorted(data['Skybox'], key=lambda s: s.name):
-        sky_list.append(selWinItem(
-                sky.id, 
-                sky.short_name,
-                longName = sky.name,
-                icon=sky.icon, 
-                authors=sky.auth, 
-                desc=sky.desc))
-        skyboxes[sky.id] = sky
-        
     voice_list = []
-    for voice in sorted(data['QuotePack'], key=lambda q: q.name):
-        voice_list.append(selWinItem(
-                voice.id,
-                voice.short_name,
-                longName = voice.name,
-                icon=voice.icon,
-                authors=voice.auth,
-                desc=voice.desc))
-        voices[voice.id] = voice
-        
     style_list = []
-    for style in sorted(data['Style'], key=lambda s:s.name):
-        style_list.append(selWinItem(
-                    style.id, 
-                    style.short_name,
-                    longName = style.name,
-                    icon=style.icon,
-                    authors=style.auth,
-                    desc=style.desc))
-        styles[style.id] = style
-        
+    goo_list = []
+    music_list = []
+    
+    obj_types  = [(sky_list, skyboxes, 'Skybox'),
+                  (voice_list, voices, 'QuotePack'),
+                  (style_list, styles, 'Style'),
+                  (goo_list, goos, 'Goo'),
+                  (music_list, musics, 'Music')
+                 ]
+    for sel_list, obj_list, name in obj_types:
+        # Extract the display properties out of the object, and create a SelectorWin item to display with.
+        for obj in sorted(data[name], key=lambda o: o.name):
+            sel_list.append(selWinItem(
+                    obj.id, 
+                    obj.short_name,
+                    longName = obj.name,
+                    icon=obj.icon, 
+                    authors=obj.auth, 
+                    desc=obj.desc))
+            obj_list[obj.id] = obj
+            
     skybox_win = selWin(win, sky_list, title='Select Skyboxes', has_none=False)
     voice_win = selWin(win, voice_list, title='Select Additional Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
     music_win = selWin(win, music_list, title='Select Background Music', has_none=True, none_desc='Add no music to the map at all.')

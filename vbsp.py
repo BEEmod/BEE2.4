@@ -45,7 +45,7 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     "plastic/plasticwall004a"             : "special.pedestalside",
     "anim_wp/framework/squarebeams"       : "special.edge",
     "nature/toxicslime_a2_bridge_intro"   : "special.goo",
-    "nature/toxicslime_puzzlemaker_cheap" : "special.goo",
+    "nature/toxicslime_puzzlemaker_cheap" : "special.goo_cheap",
     "glass/glasswindow007a_less_shiny"    : "special.glass",
     "metal/metalgrate018"                 : "special.grating",
     "effects/laserplane"                  : "special.laserfield",
