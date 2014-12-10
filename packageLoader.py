@@ -9,7 +9,7 @@ from zipfile import ZipFile
 from property_parser import Property
 import utils
 
-__all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox')
+__all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox', 'Music', 'Goo')
 
 obj = {}
 obj_override = {}
@@ -87,7 +87,7 @@ def parse_package(zip, info, filename, id):
                 obj[comp_type][id] = (zip, object)
 
 class Style:
-    def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None):
+    def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None, suggested=None):
         self.id=id
         self.auth = author
         self.name = name
@@ -96,6 +96,7 @@ class Style:
         self.short_name = name if short_name is None else short_name
         self.editor = editor
         self.base_style = base_style
+        self.suggested = suggested or {}
         if config == None:
             self.config = Property('ItemData', [])
         else:
@@ -106,6 +107,10 @@ class Style:
         '''Parse a style definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', 'NONE']
+        
+        sugg = info.find_key('suggested', [])
+        sugg = (sugg['quote',''], sugg['music',''], sugg['skybox',''], sugg['goo',''])
+        
         if short_name == '':
             short_name = None
         if base == 'NONE':
@@ -120,7 +125,7 @@ class Style:
                 vbsp = Property.parse(vbsp_config)
         else:
             vbsp = None
-        return cls(id, name, auth, desc, icon, items, vbsp, base, short_name=short_name)
+        return cls(id, name, auth, desc, icon, items, vbsp, base, short_name=short_name, suggested=sugg)
         
     def add_over(self, overide):
         '''Add the additional commands to ourselves.'''
@@ -214,11 +219,12 @@ class Voice:
         return '<Voice:' + self.id + '>'
 
 class Skybox:
-    def __init__(self, id, name, ico, config, auth, desc, short_name=None):
+    def __init__(self, id, name, ico, config, mat, auth, desc, short_name=None):
         self.id=id
         self.short_name = name if short_name is None else short_name
         self.name = name
         self.icon = ico
+        self.material = mat
         self.config = config
         self.auth = auth
         self.desc = desc
@@ -228,6 +234,7 @@ class Skybox:
         '''Parse a skybox definition.'''
         config_dir = info['config', '']
         name, short_name, auth, icon, desc = get_selitem_data(info)
+        mat = info['material', 'sky_black']
         if config_dir == '': # No config at all
             config = []
         else:
@@ -238,7 +245,7 @@ class Skybox:
             else:
                 print(name + '.cfg not in zip!')
                 config = []
-        return cls(id, name, icon, config, auth, desc, short_name)
+        return cls(id, name, icon, config, mat, auth, desc, short_name)
         
     def add_over(self, override):
         '''Add the additional vbsp_config commands to ourselves.'''
@@ -248,6 +255,58 @@ class Skybox:
     
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
+        
+class Goo:
+    def __init__(self, id, name, ico, mat, mat_cheap, auth, desc, short_name=None):
+        self.id=id
+        self.short_name = name if short_name is None else short_name
+        self.name = name
+        self.icon = ico
+        self.material = mat
+        self.cheap_material = mat_cheap
+        self.auth = auth
+        self.desc = desc
+     
+    @classmethod
+    def parse(cls, zip, id, info):
+        '''Parse a goo definition.'''
+        config_dir = info['config', '']
+        name, short_name, auth, icon, desc = get_selitem_data(info)
+        mat = info['material', 'nature/toxicslime_a2_bridge_intro']
+        mat_cheap = info['material_cheap', mat]
+        return cls(id, name, icon, mat, mat_cheap, auth, desc, short_name)
+        
+    def add_over(self, override):
+        '''Add the additional vbsp_config commands to ourselves.'''
+        pass
+    
+    def __repr__(self):
+        return '<Goo ' + self.id + '>'
+  
+class Music:
+    def __init__(self, id, name, ico, inst, auth, desc, short_name=None):
+        self.id=id
+        self.short_name = name if short_name is None else short_name
+        self.name = name
+        self.icon = ico
+        self.inst = inst
+        self.auth = auth
+        self.desc = desc
+     
+    @classmethod
+    def parse(cls, zip, id, info):
+        '''Parse a music definition.'''
+        config_dir = info['config', '']
+        name, short_name, auth, icon, desc = get_selitem_data(info)
+        inst = info['instance']
+        return cls(id, name, icon, inst, auth, desc, short_name)
+        
+    def add_over(self, override):
+        '''Add the additional vbsp_config commands to ourselves.'''
+        pass
+    
+    def __repr__(self):
+        return '<Music ' + self.id + '>'
         
 def get_selitem_data(info):
     '''Return the common data for all item types - name, author, description.'''
@@ -264,7 +323,9 @@ obj_types = {
     'Style' : Style,
     'Item' : Item,
     'QuotePack': Voice,
-    'Skybox': Skybox
+    'Skybox': Skybox,
+    'Goo' : Goo,
+    'Music' : Music
     }
     
 if __name__ == '__main__':

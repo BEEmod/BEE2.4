@@ -237,9 +237,15 @@ class selWin:
             
         
     def set_suggested(self, suggested=None):
-        '''Set the suggested item to the given ID. If the ID = None or does not exist, the suggested item will be cleared.'''
+        '''Set the suggested item to the given ID. 
+        
+        If the ID is None or does not exist, the suggested item will be cleared.
+        If the ID is "<NONE>", it will be set to the None item.
+        '''
         if suggested == None:
             self.suggested = None
+        elif suggested == "<NONE>":
+            self.suggested = self.noneItem
         else:
             for item in self.item_list:
                 if item.name == suggested:
