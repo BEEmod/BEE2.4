@@ -34,7 +34,8 @@ def loadAll(dir):
                     with zip.open('info.txt', 'r') as info_file:
                         info=Property.parse(info_file)
                     id = Property.find_key(info, 'ID').value
-                    packages[id] = (id, zip, info, name)
+                    dispName = Property.find_key(info, 'Name', '').value
+                    packages[id] = (id, zip, info, name, dispName)
                 else:
                     print("ERROR: Bad package'"+name+"'!")
             
@@ -43,17 +44,19 @@ def loadAll(dir):
             obj_override[type] = {}
             data[type] = []
         
-        for id, zip, info, name in packages.values():
+        for id, zip, info, name, dispName in packages.values():
             print("Scanning package '"+id+"'")
-            is_valid=parse_package(zip, info, name, id)
+            is_valid=parse_package(zip, info, name, id, dispName)
             print("Done!")
             
         for type, objs in obj.items():
-            for id, object in objs.items():
+            for id, obj_data in objs.items():
                 print("Loading " + type + ' "' + id + '"!')
                 over = obj_override[type].get(id, [])
                 # parse through the object and return the resultant class
-                object = obj_types[type].parse(object[0], id, object[1])
+                object = obj_types[type].parse(obj_data[0], id, obj_data[1])
+                object.pak_id = obj_data[2]
+                object.pak_name = obj_data[3]
                 if id in obj_override[type]:
                     for over in obj_override[type][id]:
                         object.add_over(obj_types[type].parse(over[0], id, over[1]))
@@ -63,13 +66,12 @@ def loadAll(dir):
             z.close()
     return data
         
-def parse_package(zip, info, filename, id):
+def parse_package(zip, info, filename, pak_id, dispName):
     "Parse through the given package to find all the components."
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
-            utils.con_log('Package "' + pre.value + '" required for "' + id + '" - ignoring package!')
+            utils.con_log('Package "' + pre.value + '" required for "' + pak_id + '" - ignoring package!')
             return False
-    
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
         for object in Property.find_all(info, comp_type):
@@ -84,7 +86,7 @@ def parse_package(zip, info, filename, id):
                 else:
                     print('ERROR! "' + id + '" defined twice!')
             else:
-                obj[comp_type][id] = (zip, object)
+                obj[comp_type][id] = (zip, object, pak_id, dispName)
 
 class Style:
     def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None, suggested=None):
