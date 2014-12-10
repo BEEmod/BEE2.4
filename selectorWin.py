@@ -28,6 +28,9 @@ class Item:
             self.icon = png.loadPng(icon)
         self.desc = desc.replace('\\n', '\n').replace('\\t','\t')
         self.authors = [] if authors is None else authors
+        
+    def __repr__(self):
+        return '<Item:' + self.name + '>'
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
@@ -183,6 +186,7 @@ class selWin:
         self.win.grab_set()
         self.win.focus_force() # Focus here to deselect the textbox
         self.win.geometry('+'+str(self.parent.winfo_rootx()+30)+'+'+str(self.parent.winfo_rooty()+30))
+        self.flow_items()
         self.sel_item(self.selected)
         
     def reset_sel(self):
@@ -213,7 +217,7 @@ class selWin:
             else:
                 self.prop_reset.state(('!disabled',))
     
-    def flow_items(self, e):
+    def flow_items(self, e=None):
         self.pal_frame.update_idletasks()
         self.pal_frame['width']=self.wid_canvas.winfo_width()
         self.prop_name['wraplength'] = self.prop_desc.winfo_width()
@@ -231,10 +235,18 @@ class selWin:
             item.button.lift()
             
         
-    def set_suggested(self, suggested):
-        for item in self.item_list:
-            if item.name == suggested:
-                self.suggested=item
+    def set_suggested(self, suggested=None):
+        '''Set the suggested item to the given ID. If the ID = None or does not exist, the suggested item will be cleared.'''
+        if suggested == None:
+            self.suggested = None
+        else:
+            for item in self.item_list:
+                if item.name == suggested:
+                    self.suggested=item
+                    break
+            else: # Not found
+                self.suggested = None
+        self.flow_items() # Refresh
 
 if __name__ == '__main__': # test the window if directly executing this file
     root=Tk()

@@ -85,7 +85,7 @@ music_list = [
         desc="Cave"),
     ]
     
-goo_list = [   
+goo_list = [
     selWinItem(
         "GOO_NORM",
         "Regular",
@@ -682,13 +682,11 @@ def initFilterCol(cat, f, names):
     FilterBoxes_all[cat]=ttk.Checkbutton(f, text='All', onvalue=1, offvalue=0,  command=lambda: filterAllCallback(cat), variable=FilterVars_all[cat]) # We pass along the name of the category, so the function can figure out what to change.
     FilterBoxes_all[cat].grid(row=1, column=0, sticky=W)
 
-    val=0
-    for name in names:
-        FilterVars[cat][val]=IntVar(value=1)
-        FilterBoxes[cat][val]=ttk.Checkbutton(f, text=name, command=updateFilters, variable=FilterVars[cat][val])
-        FilterBoxes[cat][val]['variable']=FilterVars[cat][val]
-        FilterBoxes[cat][val].grid(row=val+2, column=0, sticky=W, padx=(4,0))
-        val+=1
+    for ind, name in enumerate(names):
+        FilterVars[cat][ind]=IntVar(value=1)
+        FilterBoxes[cat][ind]=ttk.Checkbutton(f, text=name, command=updateFilters, variable=FilterVars[cat][ind])
+        FilterBoxes[cat][ind]['variable']=FilterVars[cat][ind]
+        FilterBoxes[cat][ind].grid(row=ind+2, column=0, sticky=W, padx=(4,0))
 
 def initFilter(f):
 
