@@ -93,10 +93,12 @@ def showProps(e):
     wid_author['text'] = ', '.join(selected_item.data['auth'])
     wid_name['text'] = selected_sub_item.name
     wid_ent_count['text'] = selected_item.data['ent']
+    
     wid_desc['state']="normal"
     wid_desc.delete(1.0, END)
-    wid_desc.insert("end", selected_item.data['desc']) 
+    wid_desc.insert("end", selected_item.data['desc'], "all") 
     wid_desc['state']="disabled"
+    
     if selected_item.url is None:
         wid_moreinfo.state(('disabled',))
     else:
@@ -233,6 +235,7 @@ def init(win):
     desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
     wid_desc=Text(desc_frame, width=40, height=8, wrap="word")
+    wid_desc.tag_config("all", lmargin2="10") # Add a hanging indent to wrapped lines
     wid_desc.grid(row=0, column=0, sticky="EW")
 
     desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=wid_desc.yview)

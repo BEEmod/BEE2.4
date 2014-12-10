@@ -104,11 +104,7 @@ class Style:
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a style definition.'''
-        author = info['authors', 'Valve'].split(',')
-        icon = info['icon', '']
-        name = info['name', 'Unnamed']
-        short_name = info['shortName', '']
-        desc = info['description', '']
+        name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', 'NONE']
         if short_name == '':
             short_name = None
@@ -124,7 +120,7 @@ class Style:
                 vbsp = Property.parse(vbsp_config)
         else:
             vbsp = None
-        return cls(id, name, author, desc, icon, items, vbsp, base, short_name=short_name)
+        return cls(id, name, auth, desc, icon, items, vbsp, base, short_name=short_name)
         
     def add_over(self, overide):
         '''Add the additional commands to ourselves.'''
@@ -167,9 +163,9 @@ class Item:
                 with zip.open(editor, 'r') as editor_file:
                     editor = Property.parse(editor_file)
                 folders[fold] = {
-                        'auth': props['authors', ''].split(','),
+                        'auth': props['authors', ''].split(', '),
                         'tags': props['tags', ''].split(';'),
-                        'desc': props['description', 'NONE'],
+                        'desc': '\n'.join(p.value for p in props.find_all('description')),
                         'ent':  props['ent_count', '0'],
                         'url':  props['infoURL', 'NONE'],
                         'icons': {p.name:p.value for p in props['icon', []]},
@@ -204,12 +200,7 @@ class Voice:
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a voice line definition.'''
-        name = info['name']
-        icon = info['icon', 'BEE2/blank']
-        desc = info['description', '']
-        short_name = info['shortName', None]
-        auth = info['authors', ''].split(', ')
-        
+        name, short_name, auth, icon, desc = get_selitem_data(info)        
         path = 'voice/' + info['file'] + '.voice'
         with zip.open(path, 'r') as conf:
             config = Property.parse(conf)
@@ -235,12 +226,8 @@ class Skybox:
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse a skybox definition.'''
-        name = info['name']
-        icon = info['icon', '_blank']
         config_dir = info['config', '']
-        auth = info['authors', ''].split(', ')
-        desc = info['description', '']
-        short_name = info['shortName', None]
+        name, short_name, auth, icon, desc = get_selitem_data(info)
         if config_dir == '': # No config at all
             config = []
         else:
@@ -261,6 +248,17 @@ class Skybox:
     
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
+        
+def get_selitem_data(info):
+    '''Return the common data for all item types - name, author, description.'''
+    auth = info['authors', ''].split(', ')
+    # Multiple description lines will be joined together, for easier multi-line writing.""
+    desc = '\n'.join(prop.value for prop in info if prop.name.casefold()=="description" or prop.name.casefold()=="desc")
+    desc = desc.replace("[*]", "\x07") # Convert [*] into the bullet character
+    short_name = info['shortName', None]
+    name = info['name']
+    icon = info['icon', '_blank']
+    return name, short_name, auth, icon, desc
             
 obj_types = {
     'Style' : Style,

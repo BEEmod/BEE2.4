@@ -114,8 +114,9 @@ class selWin:
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
         
-        self.prop_desc = Text(self.prop_desc_frm, width=19, height=8, wrap="word", font="TkSmallCaptionFont")
+        self.prop_desc = Text(self.prop_desc_frm, width=50, height=16, wrap="word", font="TkSmallCaptionFont")
         self.prop_desc.grid(row=0, column=0, padx=(2,0), pady=2, sticky="NSEW")
+        self.prop_desc.tag_config("all", lmargin2="10") # Add a hanging indent to wrapped lines
         self.prop_desc['state']="disabled"
         
         self.prop_scroll = ttk.Scrollbar(self.prop_desc_frm, orient=VERTICAL, command=self.prop_desc.yview)
@@ -205,7 +206,7 @@ class selWin:
         
         self.prop_desc['state']="normal"
         self.prop_desc.delete(1.0, END)
-        self.prop_desc.insert("end", item.desc) 
+        self.prop_desc.insert("end", item.desc, "all") 
         self.prop_desc['state']="disabled"
         
         self.selected.button.state(('!alternate',))
@@ -270,7 +271,7 @@ if __name__ == '__main__': # test the window if directly executing this file
             authors = ["TeamSpen210"],
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
-                   'carrying objects throughout the facility.\\n Abandoned offices can '
+                   'carrying objects throughout the facility.\n Abandoned offices can '
                    'often be found here.')
           ]
         
