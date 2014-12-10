@@ -9,7 +9,7 @@ import math
 
 from property_parser import Property
 from paletteLoader import Palette
-from packageLoader import Style as palStyle, Item as palItem, Voice as palVoice, Skybox as palSkybox
+import packageLoader as package
 import contextWin
 import gameMan
 from selectorWin import selWin
@@ -55,7 +55,6 @@ muted = IntVar(value=0) # Is the sound fx muted?
 # UI vars, TODO: most should be generated on startup
 paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
 palettes=[]
-styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS','Art Therapy','Refurbished') # TODO: Fill this from the *.Bee2Item files
 
 skyboxes = {}
 voices = {}
@@ -105,9 +104,9 @@ goos = {}
     
 selected_style = "clean"
     
-skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
-voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
-musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
+# skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
+# voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
+# musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
 
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
@@ -150,11 +149,13 @@ class Item():
                
 class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''
-    def __init__(self, frame, item, sub):
+    def __init__(self, frame, item, sub, is_pre):
         "Create a label to show an item onscreen."
         super().__init__(frame)
         self.item = item
         self.subKey = sub
+        self.visible=True # Toggled according to filter settings
+        self.is_pre = is_pre # Used to distingush between picker and palette items
         self.load_data(sub)
         self.bind("<Button-3>", contextWin.showProps)
         self.bind("<Button-1>", showDrag)
@@ -194,7 +195,7 @@ class PalItem(ttk.Label):
         return self.item.id == other.item.id and self.subKey == other.subKey
         
     def copy(self, frame):
-        return PalItem(frame, self.item, self.subKey)
+        return PalItem(frame, self.item, self.subKey, self.is_pre)
     
 def load_palette(data):
     global palettes
@@ -267,7 +268,7 @@ def setPalette():
     print(*item_list.keys())
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
-            pal_picked.append(PalItem(frames['preview'], item_list[item], sub))
+            pal_picked.append(PalItem(frames['preview'], item_list[item], sub, is_pre=True))
         else:
             print('Unknown item "' + item + '"!')
     flowPreview()
@@ -518,7 +519,7 @@ def initPalette(f):
     UI['newBox'].bind("<FocusOut>", pal_addTempText)
     ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
     ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, column=0)
-
+        
 def initOption(f):
     f.columnconfigure(0,weight=1)
     ttk.Button(f, width=10, text="Save...", command=save).grid(row=0, column=0)
@@ -597,7 +598,6 @@ def flowPreview():
     for i,item in enumerate(pal_picked):
         item.pre_x=i%4
         item.pre_y=i//4 # these can be referred to to figure out where it is
-        item.is_pre=True
         item.place(x=(i%4*65+4),y=(i//4*65+32))
     UI['pre_sel_line'].lift()
 
@@ -638,7 +638,7 @@ def initPicker(f):
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
     for item in item_list.values():
         for i in range(0,item.num_sub):
-            pal_items.append(PalItem(frmScroll, item, i))
+            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     pal_items_fake=[]
     for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
@@ -652,12 +652,17 @@ def flowPicker(e):
     width=(pal_canvas.winfo_width()-10) // 65
     if width <1:
         width=1 # we got way too small, prevent division by zero
-    itemNum=len(pal_items)
-    pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
-    frmScroll['height']=(math.ceil(itemNum/width)*65+2)
-    for i,item in enumerate(pal_items):
+    vis_items = [it for it in pal_items if it.visible]
+    itemNum=len(vis_items)
+    for i,item in enumerate(vis_items):
         item.is_pre=False
         item.place(x=((i%width) *65+1),y=((i//width)*65+1))
+    
+    for item in (it for it in pal_items if not it.visible):
+        item.place_forget()
+            
+    pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
+    frmScroll['height']=(math.ceil(itemNum/width)*65+2)
 
     # this adds extra blank items on the end to finish the grid nicely.
     for i,blank in enumerate(pal_items_fake):
@@ -693,13 +698,13 @@ def initFilter(f):
     f.bind("<Enter>", filterExpand)
     f.bind("<Leave>", filterContract)
 
-    cat=ttk.Labelframe(f2, text="Categories")
-    cat.grid(row=2, column=0, sticky="NS")
+    auth=ttk.Labelframe(f2, text="Authors")
+    auth.grid(row=2, column=0, sticky="NS")
     pack=ttk.Labelframe(f2, text="Packages")
     pack.grid(row=2, column=1, sticky="NS")
     tags=ttk.Labelframe(f2, text="Tags")
     tags.grid(row=2, column=2, sticky="NS")
-    FilterBoxes['author']  = initFilterCol('author', cat, authorText)
+    FilterBoxes['author']  = initFilterCol('author', auth, authorText)
     FilterBoxes['package'] = initFilterCol('package', pack, packageText)
     FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
 
@@ -832,7 +837,8 @@ def initMain():
     windows['style'].bind("<Button-1>",contextWin.hideProps)
     windows['opt'].bind("<Button-1>",contextWin.hideProps)
     windows['pal'].bind("<Button-1>",contextWin.hideProps)
-
+    
+    setPalette()
     contextWin.init(win)
     initDragIcon(win)
 
