@@ -104,11 +104,13 @@ style_list = [
     selWinItem(
         "CLEAN",
         "Clean",
+        icon="styles/clean",
         authors=["Valve", "Carl Kenner"],
         desc="Portal 2 Clean style, like after GLaDOS has been awoken and finished cleaning the facility, or in a parallel world where it was never destroyed. Similar to the default PeTI style but with more variety of wall panels and automatic security cameras."),
     selWinItem(
         "Portal1",
         "Portal 1",
+        icon="styles/portal1",
         authors=["Carl Kenner"],
         desc="Portal 1 style test chamber. Portal 1 style elevators, the brown metal walls, white concrete walls, floor tiles, security cameras (unless the Sentient Cloud has taken over), Unstationary Scaffolds, Complementary Victory Lifts, Vital Apparatus Vents, Portal 1 Fizzlers, etc. There's an orange glow coming from behind panels.")
 ]

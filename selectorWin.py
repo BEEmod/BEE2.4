@@ -71,11 +71,11 @@ class selWin:
         
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
-        self.pane_win.add(shim, weight=1)
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
+        
         
         self.wid_canvas = Canvas(shim, highlightthickness=0)
         self.wid_canvas.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
@@ -91,7 +91,6 @@ class selWin:
         
         self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
         self.prop_frm.columnconfigure(1, weight=1)
-        self.pane_win.add(self.prop_frm)
         
         self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=ICON_SIZE, height=ICON_SIZE)
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
@@ -140,6 +139,9 @@ class selWin:
             item.button.bind("<Double-Button-1>",lambda e, s=self: s.save())
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>",lambda e, s=self: s.flow_items(e))
+        
+        self.pane_win.add(shim, weight=1)
+        self.pane_win.add(self.prop_frm)
         
     def init_display(self, frame, row=0, column=0, colspan=1, rowspan=1):
         '''Create and grid() the label used to open the selector window.'''
@@ -245,14 +247,14 @@ if __name__ == '__main__': # test the window if directly executing this file
             "SKY_BLACK", 
             "Black", 
             longName = "Darkness", 
-            icon = "items/faithplate_128",
+            icon = "skies/black",
             authors = ["Valve"],
             desc = 'Pure black darkness. Nothing to see here.'),
         Item(
             "SKY_BTS", 
             "BTS", 
             longName = "Behind The Scenes - Factory", 
-            icon = "items/faithplate_128",
+            icon = "voices/glados",
             authors = ["TeamSpen210"],
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
