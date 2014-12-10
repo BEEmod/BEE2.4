@@ -87,10 +87,13 @@ def parse_package(zip, info, filename, id):
                 obj[comp_type][id] = (zip, object)
 
 class Style:
-    def __init__(self, id, author, icon, editor, config=None, base_style=None):
+    def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None):
         self.id=id
         self.auth = author
+        self.name = name
+        self.desc = desc
         self.icon = icon
+        self.short_name = name if short_name is None else short_name
         self.editor = editor
         self.base_style = base_style
         if config == None:
@@ -103,7 +106,12 @@ class Style:
         '''Parse a style definition.'''
         author = info['authors', 'Valve'].split(',')
         icon = info['icon', '']
-        base = info['description', 'NONE']
+        name = info['name', 'Unnamed']
+        short_name = info['shortName', '']
+        desc = info['description', '']
+        base = info['base', 'NONE']
+        if short_name == '':
+            short_name = None
         if base == 'NONE':
             base = None
         files = zip.namelist()
@@ -116,7 +124,7 @@ class Style:
                 vbsp = Property.parse(vbsp_config)
         else:
             vbsp = None
-        return cls(id, author, icon, items, vbsp, base)
+        return cls(id, name, author, desc, icon, items, vbsp, base, short_name=short_name)
         
     def add_over(self, overide):
         '''Add the additional commands to ourselves.'''

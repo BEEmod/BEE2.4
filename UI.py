@@ -59,6 +59,7 @@ styleText = ('1950s','1960s','1970s','1980s','Portal 1','Clean','Overgrown','BTS
 
 skyboxes = {}
 voices = {}
+styles = {}
     
 music_list = [
     selWinItem(
@@ -99,21 +100,6 @@ goo_list = [
         authors=["Valve"],
         desc="A version of goo which is more murky, and reflective."),
     ]
-    
-style_list = [
-    selWinItem(
-        "CLEAN",
-        "Clean",
-        icon="styles/clean",
-        authors=["Valve", "Carl Kenner"],
-        desc="Portal 2 Clean style, like after GLaDOS has been awoken and finished cleaning the facility, or in a parallel world where it was never destroyed. Similar to the default PeTI style but with more variety of wall panels and automatic security cameras."),
-    selWinItem(
-        "Portal1",
-        "Portal 1",
-        icon="styles/portal1",
-        authors=["Carl Kenner"],
-        desc="Portal 1 style test chamber. Portal 1 style elevators, the brown metal walls, white concrete walls, floor tiles, security cameras (unless the Sentient Cloud has taken over), Unstationary Scaffolds, Complementary Victory Lifts, Vital Apparatus Vents, Portal 1 Fizzlers, etc. There's an orange glow coming from behind panels.")
-]
     
 selected_style = "clean"
     
@@ -222,7 +208,7 @@ def load_packages(data):
         it = Item(item)
         item_list[it.id] = it
     sky_list = []
-    for sky in sorted(data['Skybox'], key=lambda q: q.name):
+    for sky in sorted(data['Skybox'], key=lambda s: s.name):
         sky_list.append(selWinItem(
                 sky.id, 
                 sky.short_name,
@@ -243,11 +229,22 @@ def load_packages(data):
                 desc=voice.desc))
         voices[voice.id] = voice
         
-    skybox_win = selWin(win, sky_list, title='Skyboxes', has_none=False)
-    voice_win = selWin(win, voice_list, title='Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
-    music_win = selWin(win, music_list, title='Background Music', has_none=True, none_desc='Add no music to the map at all.')
-    goo_win = selWin(win, goo_list, title='Goo Appearence', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
-    style_win = selWin(win, style_list, title='Style', has_none=False, has_def=False)
+    style_list = []
+    for style in sorted(data['Style'], key=lambda s:s.name):
+        style_list.append(selWinItem(
+                    style.id, 
+                    style.short_name,
+                    longName = style.name,
+                    icon=style.icon,
+                    authors=style.auth,
+                    desc=style.desc))
+        styles[style.id] = style
+        
+    skybox_win = selWin(win, sky_list, title='Select Skyboxes', has_none=False)
+    voice_win = selWin(win, voice_list, title='Select Additional Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
+    music_win = selWin(win, music_list, title='Select Background Music', has_none=True, none_desc='Add no music to the map at all.')
+    goo_win = selWin(win, goo_list, title='Select Goo Appearance', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
+    style_win = selWin(win, style_list, title='Select Style', has_none=False, has_def=False)
     
 def loadPalUI():
     "Update the UI to show the correct palettes."

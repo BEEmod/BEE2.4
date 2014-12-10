@@ -8,7 +8,6 @@ import utils
 global settings
 settings={}
 
-
 def save_settings():
     new_props = Property('', [
         Property('directories', [ 

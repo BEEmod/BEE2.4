@@ -26,7 +26,7 @@ class Item:
             self.icon = png.loadPng('BEE2/blank')
         else:
             self.icon = png.loadPng(icon)
-        self.desc = desc
+        self.desc = desc.replace('\\n', '\n').replace('\\t','\t')
         self.authors = [] if authors is None else authors
 
 class selWin: 
@@ -258,7 +258,7 @@ if __name__ == '__main__': # test the window if directly executing this file
             authors = ["TeamSpen210"],
             desc = 'The dark constuction and office areas of Aperture. Catwalks '
                    'extend between different buildings, with vactubes and cranes '
-                   'carrying objects throughout the facility. Abandoned offices can '
+                   'carrying objects throughout the facility.\\n Abandoned offices can '
                    'often be found here.')
           ]
         
