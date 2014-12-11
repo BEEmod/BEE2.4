@@ -34,7 +34,7 @@ def loadAll(dir):
                     with zip.open('info.txt', 'r') as info_file:
                         info=Property.parse(info_file)
                     id = Property.find_key(info, 'ID').value
-                    dispName = Property.find_key(info, 'Name', '').value
+                    dispName = Property.find_key(info, 'Name', id).value
                     packages[id] = (id, zip, info, name, dispName)
                 else:
                     print("ERROR: Bad package'"+name+"'!")
@@ -170,8 +170,8 @@ class Item:
                 with zip.open(editor, 'r') as editor_file:
                     editor = Property.parse(editor_file)
                 folders[fold] = {
-                        'auth': props['authors', ''].split(', '),
-                        'tags': props['tags', ''].split(';'),
+                        'auth': sep_values(props['authors', ''],','),
+                        'tags': sep_values(props['tags', ''],';'),
                         'desc': '\n'.join(p.value for p in props.find_all('description')),
                         'ent':  props['ent_count', '0'],
                         'url':  props['infoURL', 'NONE'],
@@ -312,7 +312,7 @@ class Music:
         
 def get_selitem_data(info):
     '''Return the common data for all item types - name, author, description.'''
-    auth = info['authors', ''].split(', ')
+    auth = sep_values(info['authors', ''],',')
     # Multiple description lines will be joined together, for easier multi-line writing.""
     desc = '\n'.join(prop.value for prop in info if prop.name.casefold()=="description" or prop.name.casefold()=="desc")
     desc = desc.replace("[*]", "\x07") # Convert [*] into the bullet character
@@ -320,6 +320,10 @@ def get_selitem_data(info):
     name = info['name']
     icon = info['icon', '_blank']
     return name, short_name, auth, icon, desc
+    
+def sep_values(str, delimiter):
+    vals = str.split(delimiter)
+    return [val.strip() for val in vals]
             
 obj_types = {
     'Style' : Style,

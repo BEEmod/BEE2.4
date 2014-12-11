@@ -41,7 +41,7 @@ FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
 FilterVars={} # The variables for the checkboxes
 FilterVars_all={}
-
+filter_expanded = False
 Settings=None
 ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
 selectedPalette = 0
@@ -135,8 +135,12 @@ class Item():
         self.item = item
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
+        self.authors = self.data['auth']
+        self.tags = self.data['tags']
         self.id = item.id
         self.url = self.data['url']
+        self.pak_id = item.pak_id
+        self.pak_name = item.pak_name
         
     def get_icon(self, subKey):
         return png.loadIcon(self.data['icons'][str(subKey)])
@@ -204,11 +208,23 @@ def load_palette(data):
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
-    global item_list, skybox_win, voice_win, music_win, goo_win, style_win
+    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data
+    filter_data = { 'package' : {},
+                    'author' : {},
+                    'tags' : {}}
+                    
     for item in sorted(data['Item'], key=lambda i: i.id):
         it = Item(item)
         item_list[it.id] = it
-        
+        for tag in it.tags:
+            if tag.casefold() not in filter_data['tags']:
+                filter_data['tags'][tag.casefold()] = tag
+        for auth in it.authors:
+            print('auth', it.id, auth)
+            if auth.casefold() not in filter_data['author']:
+                filter_data['author'][auth.casefold()] = auth 
+        if it.pak_id not in filter_data['package']:
+            filter_data['package'][it.pak_id] = it.pak_name 
     sky_list = []
     voice_list = []
     style_list = []
@@ -463,20 +479,25 @@ def newPal_textbox(e):
 def filterExpand(e):
     frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
     frames['filter']['borderwidth']=4
+    frames['filter'].expanded=True
     snd.fx('expand')
+    flowPicker()
 
 def filterContract(e):
     frames['filter_expanded'].grid_remove()
     frames['filter']['borderwidth']=0
+    frames['filter'].expanded=False
     snd.fx('contract')
+    flowPicker()
 
 def updateFilters():
     # First update the 'all' checkboxes to make half-selected if not fully selected.
     for cat in FILTER_CATS: # do for each
         no_alt=True
-        value=FilterVars[cat][0].get() # compare to the first one, this will check if they are all the same
-        for i in FilterVars[cat]:
-            if FilterVars[cat][i].get() != value:
+        all_vars = iter(FilterVars[cat].values())
+        value=next(all_vars).get() # Pull the first one to get the compare value, this will check if they are all the same
+        for var in all_vars:
+            if var.get() != value:
                 FilterVars_all[cat].set(True) # force it to be true so when clicked it'll blank out all the checkboxes
                 FilterBoxes_all[cat].state(['alternate']) # make it the half-selected state, since they don't match
                 no_alt=False
@@ -484,8 +505,22 @@ def updateFilters():
         if no_alt:
             FilterBoxes_all[cat].state(['!alternate']) # no alternate if they are all the same
             FilterVars_all[cat].set(value)
-
-#TODO: This should check all the filter checkboxes, and change what is actually shown in the list of items.
+    for item in pal_items:
+        for auth in item.item.authors:
+            if FilterVars['author'][auth.casefold()].get() is 0:
+                item.visible=False
+                break
+        else:
+            if FilterVars['package'][item.item.pak_id].get() is 0:
+                item.visible=False
+            else:
+                for tag in item.item.tags:
+                    if FilterVars['tags'][tag.casefold()].get() is 0:
+                        item.visible=False
+                        break
+                else:
+                    item.visible=True
+    flowPicker()
 
 def filterAllCallback(col):
     "sets all items in a category to true/false, then updates the item list."
@@ -645,10 +680,19 @@ def initPicker(f):
         pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
     f.bind("<Configure>",flowPicker)
 
-def flowPicker(e):
+def flowPicker(e=None):
+    '''Update the picker box so all items are positioned based on the current size, and update values so scrolling works correctly.
+    
+    Should be run (e arg is ignored) whenever the items change, or the window changes shape.
+    '''
     global frmScroll, pal_items_fake
     frmScroll.update_idletasks()
     frmScroll['width']=pal_canvas.winfo_width()
+    if frames['filter'].expanded:
+        # Offset the icons so they aren't covered by the filter popup
+        offset = max(frames['filter_expanded'].winfo_height() - (pal_canvas.winfo_rooty() - frames['filter_expanded'].winfo_rooty()) + 10,0)
+    else:
+        offset = 0
     width=(pal_canvas.winfo_width()-10) // 65
     if width <1:
         width=1 # we got way too small, prevent division by zero
@@ -656,34 +700,36 @@ def flowPicker(e):
     itemNum=len(vis_items)
     for i,item in enumerate(vis_items):
         item.is_pre=False
-        item.place(x=((i%width) *65+1),y=((i//width)*65+1))
+        item.place(x=((i%width) *65+1),y=((i//width)*65+offset+1))
     
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
             
-    pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+2))
-    frmScroll['height']=(math.ceil(itemNum/width)*65+2)
+    pal_canvas.config(scrollregion = (0, 0, width*65, math.ceil(itemNum/width)*65+offset+2))
+    frmScroll['height']=(math.ceil(itemNum/width)*65+offset+2)
 
     # this adds extra blank items on the end to finish the grid nicely.
     for i,blank in enumerate(pal_items_fake):
         if i>=(itemNum%width) and i<width: # if this space is empty
-            blank.place(x=((i%width)*65+1),y=(itemNum//width)*65+1)
+            blank.place(x=((i%width)*65+1),y=(itemNum//width)*65+offset+1)
         else:
             blank.place_forget() # otherwise hide the fake item
 
-def initFilterCol(cat, f, names):
+def initFilterCol(cat, f):
     FilterBoxes[cat]={}
     FilterVars[cat]={}
     FilterVars_all[cat]=IntVar(value=1)
 
     FilterBoxes_all[cat]=ttk.Checkbutton(f, text='All', onvalue=1, offvalue=0,  command=lambda: filterAllCallback(cat), variable=FilterVars_all[cat]) # We pass along the name of the category, so the function can figure out what to change.
     FilterBoxes_all[cat].grid(row=1, column=0, sticky=W)
-
-    for ind, name in enumerate(names):
-        FilterVars[cat][ind]=IntVar(value=1)
-        FilterBoxes[cat][ind]=ttk.Checkbutton(f, text=name, command=updateFilters, variable=FilterVars[cat][ind])
-        FilterBoxes[cat][ind]['variable']=FilterVars[cat][ind]
-        FilterBoxes[cat][ind].grid(row=ind+2, column=0, sticky=W, padx=(4,0))
+    
+    for ind, (id, name) in enumerate(sorted(filter_data[cat].items(), key=lambda x:x[1])):
+        FilterVars[cat][id]=IntVar(value=1)
+        FilterBoxes[cat][id] = ttk.Checkbutton(f, text=name, command=updateFilters, variable=FilterVars[cat][id])
+        FilterBoxes[cat][id]['variable']=FilterVars[cat][id]
+        FilterBoxes[cat][id].grid(row=ind+2, column=0, sticky=W, padx=(4,0))
+        if ind==0:
+            FilterBoxes_all[cat].first_var = FilterVars[cat][id]
 
 def initFilter(f):
 
@@ -704,9 +750,9 @@ def initFilter(f):
     pack.grid(row=2, column=1, sticky="NS")
     tags=ttk.Labelframe(f2, text="Tags")
     tags.grid(row=2, column=2, sticky="NS")
-    FilterBoxes['author']  = initFilterCol('author', auth, authorText)
-    FilterBoxes['package'] = initFilterCol('package', pack, packageText)
-    FilterBoxes['tags']    = initFilterCol('tags', tags, tagText)
+    initFilterCol('author', auth)
+    initFilterCol('package', pack)
+    initFilterCol('tags', tags)
 
 
 def initDragIcon(win):
@@ -784,6 +830,7 @@ def initMain():
 
     frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
     frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
+    frames['filter'].expanded=False
     initFilter(frames['filter'])
 
     frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
@@ -791,10 +838,6 @@ def initMain():
     pickSplitFrame.rowconfigure(0, weight=1)
     pickSplitFrame.columnconfigure(0, weight=1)
     initPicker(frames['picker'])
-
-    frames['filter']=ttk.Frame(pickSplitFrame, padding=5, borderwidth=0, relief="raised")
-    frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
-    initFilter(frames['filter'])
 
     frames['filter'].lift()
 
