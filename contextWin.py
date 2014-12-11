@@ -1,5 +1,6 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
+from functools import partial
 import webbrowser
 
 from property_parser import Property
@@ -26,11 +27,19 @@ ROT_TYPES = {
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name) # TODO: add real values for first/last args
+    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name)
     
 def hideItemProps(vals):
     snd.fx('contract')
     print(vals)
+    
+def subSel(ind, e=None):
+    '''Change the currently-selected sub-item.'''
+    if selected_sub_item.is_pre: # Can only change the subitem on the preview window
+        selected_sub_item.change_subtype(ind)
+        # Redisplay the window to refresh data and move it to match
+        showProps(selected_sub_item) 
+        
 
 def showMoreInfo():
     url = selected_item.url
@@ -55,22 +64,27 @@ def moreInfo_showURL(e):
     
 def moreInfo_hideURL(e):
     moreinfo_win.withdraw()
+    
+def open_event(e):
+    '''Read data from the event, and show the window.'''
+    wid = e.widget
+    snd.fx('expand')
+    showProps(wid)
         
-def showProps(e):
+def showProps(wid):
     '''Show the properties window for an item.'''
     global selected_item, selected_sub_item, is_open
     is_open = True
-    snd.fx('expand')
     prop_window.deiconify()
     prop_window.lift(root)
     
-    selected_item = e.widget.item
-    selected_sub_item = e.widget
+    selected_item = wid.item
+    selected_sub_item = wid
     icon_widget = wid_sub[selected_sub_item.subKey]
     
-    loc_x=e.widget.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
+    loc_x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
         #The pixel offset between the window and the subitem in the properties dialog
-    loc_y=e.widget.winfo_rooty() + prop_window.winfo_rooty() - wid_sub[0].winfo_rooty()
+    loc_y=wid.winfo_rooty() + prop_window.winfo_rooty() - wid_sub[0].winfo_rooty()
     
     if loc_x<15: # adjust to fit inside the screen, + small boundary to not obstruct taskbars, menus etc
         loc_x=0
@@ -187,8 +201,8 @@ def hideProps(e=None):
     global is_open
     if is_open:
         is_open=False
-        snd.fx('contract')
         prop_window.withdraw()
+        snd.fx('contract')
 
 def init(win):
     '''Initiallise all the window components.'''
@@ -224,6 +238,7 @@ def init(win):
     for i in range(len(wid_sub)):
         wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/blank'))
         wid_sub[i].grid(row=0, column=i)
+        wid_sub[i].bind('<Button-1>', partial(subSel, i))
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)

@@ -135,6 +135,7 @@ class Item():
         self.item = item
         self.data=item.versions[self.ver]['styles'][selected_style]
         self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
+        self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
         self.authors = self.data['auth']
         self.tags = self.data['tags']
         self.id = item.id
@@ -160,19 +161,24 @@ class PalItem(ttk.Label):
         self.subKey = sub
         self.visible=True # Toggled according to filter settings
         self.is_pre = is_pre # Used to distingush between picker and palette items
-        self.load_data(sub)
-        self.bind("<Button-3>", contextWin.showProps)
+        self.img = self.item.get_icon(sub)
+        self.name = self.item.names[sub]
+        self['image'] = self.img
+        self.bind("<Button-3>", contextWin.open_event)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
         self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
         self.bind("<Leave>", clearDispName)
-        
-    def load_data(self, sub):
-        self.img = self.item.get_icon(self.subKey)
-        self.name = list(Property.find_all(self.item.data['editor'], "Item", "Editor", "Subtype", "Name"))
-        self.name=self.name[self.subKey].value
+ 
+    def change_subtype(self, ind):
+        '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
+        for item in pal_picked[:]:
+            if item.item.id == self.item.id and item.subKey == ind:
+                pal_picked.remove(item)
+        self.img = self.item.get_icon(ind)
+        self.name = self.item.names[ind]
         self['image'] = self.img
-        self.dispName='Null'#data['name']
+        self.subKey = ind
         
     def clear(self):
         "Remove any items matching the passed label from the palette, to prevent adding two copies."
@@ -220,7 +226,6 @@ def load_packages(data):
             if tag.casefold() not in filter_data['tags']:
                 filter_data['tags'][tag.casefold()] = tag
         for auth in it.authors:
-            print('auth', it.id, auth)
             if auth.casefold() not in filter_data['author']:
                 filter_data['author'][auth.casefold()] = auth 
         if it.pak_id not in filter_data['package']:
@@ -296,7 +301,7 @@ def setStyleOpt(key):
 def setDispName(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
 
-def clearDispName(e):
+def clearDispName(e=None):
     UI['pre_disp_name'].configure(text='')
 
 def convScrToGrid(x,y):
@@ -313,7 +318,7 @@ def showDrag(e):
     "Start dragging a palette item."
     global drag_onPal,drag_item, drag_passedPal
     drag_item=e.widget
-    setDispName(drag_item.dispName)
+    setDispName(drag_item.name)
     snd.fx('config')
     drag_passedPal=False
 
@@ -339,7 +344,7 @@ def hideDrag(e):
     dragWin.withdraw()
     dragWin.unbind("<B1-Motion>")
     dragWin.grab_release()
-    clearDispName(None)
+    clearDispName()
     UI['pre_sel_line'].place_forget()
     snd.fx('config')
 
@@ -348,9 +353,9 @@ def hideDrag(e):
 
     if drag_passedPal: #this prevents a single click on the picker from clearing items off the palette
         drag_item.clear() # wipe duplicates off the palette first
-
         if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8: # is the cursor over the preview pane?
             newItem=drag_item.copy(frames['preview'])
+            newItem.is_pre = True
             if ind>=len(pal_picked):
                 pal_picked.append(newItem)
             else:
@@ -364,7 +369,7 @@ def hideDrag(e):
 def moveDrag(e):
     "Update the position of dragged items as they move around."
     global drag_passedPal
-    setDispName(drag_item.dispName)
+    setDispName(drag_item.name)
     dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
@@ -389,6 +394,7 @@ def fastDrag(e):
         if len(pal_picked) < 32: # can't copy if there isn't room
             snd.fx('config')
             newItem=e.widget.copy(frames['preview'])
+            newItem.is_pre=True
             pal_picked.append(newItem)
         else:
             snd.fx('error')
