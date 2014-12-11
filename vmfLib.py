@@ -253,12 +253,15 @@ class VMF:
             cam.export(file, '\t')
         file.write('}\n')
         
+        
+        file.write('cordons\n{\n')
         if len(self.cordons) > 0:
-            file.write('cordons\n{\n')
             file.write('\t"active" "' + bool_to_str(self.cordon_enabled) + '"\n')
             for cord in self.cordons:
                 cord.export(file, '\t')
-            file.write('}\n')
+        else:
+            file.write('\t"active" "0"\n')
+        file.write('}\n')
         
         if self.quickhide_count > 0:
             file.write('quickhide\n{\n')
@@ -791,26 +794,26 @@ class Entity():
         editor = { 'visgroup' : []}
         fixup = {}
         for item in tree_list:
-            item.name = item.name.casefold()
-            if item.name == "id" and item.value.isnumeric():
+            name = item.name.casefold()
+            if name == "id" and item.value.isnumeric():
                 id = item.value
-            elif item.name in _FIXUP_KEYS:
+            elif name in _FIXUP_KEYS:
                 vals = item.value.split(" ",1)
                 fixup[vals[0][1:]] = (vals[1], item.name[-2:])
-            elif item.name == "solid":
+            elif name == "solid":
                 if item.has_children():
                     solids.append(Solid.parse(map, item))
                 else:
                     keys[item.name] = item.value
-            elif item.name == "connections" and item.has_children():
+            elif name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
-            elif item.name == "hidden":
+            elif name == "hidden":
                 if item.has_children():
                     solids.extend([Solid.parse(map, br, hidden=True) for br in item])
                 else:
                     keys[item.name]=item.value
-            elif item.name == "editor" and item.has_children():
+            elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
                         editor[v.name] = conv_bool(v.value, default=True)

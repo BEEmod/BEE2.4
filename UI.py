@@ -808,6 +808,7 @@ def initMain():
 
     initMenuBar(win)
     win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
+    win.title('BEE2')
     UIbg=Frame(win, bg=ItemsBG)
     UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
     win.columnconfigure(0, weight=1)
