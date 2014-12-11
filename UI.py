@@ -179,6 +179,7 @@ class PalItem(ttk.Label):
         self.name = self.item.names[ind]
         self['image'] = self.img
         self.subKey = ind
+        flowPreview()
         
     def clear(self):
         "Remove any items matching the passed label from the palette, to prevent adding two copies."
