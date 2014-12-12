@@ -10,13 +10,11 @@ from property_parser import Property
 import utils
 
 __all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox', 'Music', 'Goo')
-logic_items = []
 obj = {}
 obj_override = {}
 packages = {}
 
 data = {}
-zips = []
 
 def loadAll(dir):
     "Scan and read in all packages in the specified directory."
@@ -32,7 +30,7 @@ def loadAll(dir):
                 zips.append(zip)
                 if 'info.txt' in zip.namelist(): # Is it valid?
                     with zip.open('info.txt', 'r') as info_file:
-                        info=Property.parse(info_file)
+                        info=Property.parse(info_file, name + ':info.txt')
                     id = Property.find_key(info, 'ID').value
                     dispName = Property.find_key(info, 'Name', id).value
                     packages[id] = (id, zip, info, name, dispName)
@@ -154,10 +152,10 @@ class Style:
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
         with zip.open(folder + '/items.txt', 'r') as item_data:
-            items = Property.parse(item_data)
+            items = Property.parse(item_data, folder+'/items.txt')
         if config in files:
             with zip.open(config, 'r') as vbsp_config:
-                vbsp = Property.parse(vbsp_config)
+                vbsp = Property.parse(vbsp_config, config)
         else:
             vbsp = None
         return cls(id, name, auth, desc, icon, items, vbsp, base, short_name=short_name, suggested=sugg)
@@ -202,7 +200,7 @@ class Item:
             config = 'items/' + fold + '/vbsp_config.cfg'
             if props in files and editor in files:
                 with zip.open(props, 'r') as prop_file:
-                    props = Property.find_key(Property.parse(prop_file), 'Properties')
+                    props = Property.find_key(Property.parse(prop_file, props), 'Properties')
                 with zip.open(editor, 'r') as editor_file:
                     editor = Property.parse(editor_file)
                 folders[fold] = {

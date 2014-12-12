@@ -31,7 +31,15 @@ replace_chars = {
 
 class KeyValError(Exception):
     '''An error that occured when parsing a Valve KeyValues file.'''
-    pass
+    def __init__(self, message, file):
+        self.mess = message
+        self.file = file
+        
+    def __str__(self):
+        if self.file:
+            return self.mess + "\n(" + self.file + ")"
+        else:
+            return self.mess
     
 class NoKeyError(Exception):
     '''Raised if a key is not found when searching from find_key().
@@ -65,11 +73,10 @@ class Property:
             self.value = value
         
     @staticmethod
-    def parse(file_contents) -> "List of Property objects":
+    def parse(file_contents, filename='') -> "List of Property objects":
         '''Returns list of Property objects parsed from given text'''
         open_properties = [Property(None, [])]
         values = None
-
         for line_num, line in enumerate(file_contents):
             values = open_properties[-1].value
             freshline = utils.clean_line(line)
@@ -78,11 +85,11 @@ class Property:
                     line_contents = freshline.split('"')
                     name = line_contents[1]
                     if not utils.is_identifier(name):
-                        raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".")
+                        raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".", filename)
                     try:
                         value = line_contents[3]
                         if not freshline.endswith('"'):
-                            raise KeyValError("Line " + str(line_num) + " has value, but incomplete quotes!")
+                            raise KeyValError("Line " + str(line_num) + " has value, but incomplete quotes!", filename)
                         for orig, new in replace_chars.items():
                             value=value.replace(orig, new)
                     except IndexError:
@@ -93,18 +100,18 @@ class Property:
                     values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
                     if values[-1].value:
-                        raise KeyValError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".")
+                        raise KeyValError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".", filename)
                     values[-1].value = []
                     open_properties.append(values[-1])
                 elif freshline.startswith('}'):
                     open_properties.pop()
                 else:
-                    raise KeyValError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".")
+                    raise KeyValError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".", filename)
                     
             if not open_properties:
-                raise KeyValError("Too many closing brackets. Line " + str(line_num) + ".")
+                raise KeyValError("Too many closing brackets. Line " + str(line_num) + ".", filename)
         if len(open_properties) > 1:
-            raise KeyValError("End of text reached with remaining open sections.")
+            raise KeyValError("End of text reached with remaining open sections.", filename)
             
         return open_properties[0].value
         

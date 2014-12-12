@@ -87,7 +87,7 @@ def loadAll(dir):
     
 def parse(posfile, propfile, path):
     "Parse through the given palette file to get all data."
-    props=Property.parse(propfile)
+    props=Property.parse(propfile, path + ':properties.txt')
     name=Property.find_key(props, "Name", "Unnamed").value
     pos=[]
     for dirty_line in posfile:

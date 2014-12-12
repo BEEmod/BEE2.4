@@ -22,7 +22,7 @@ def save_settings():
                 conf.write(line)
 
 with open("config/config.cfg", "r") as conf:
-    prop=Property.parse(conf)
+    prop=Property.parse(conf, "config/config.cfg")
 dirs = Property.find_key(prop, 'directories')
 
 settings['pal_dir']=dirs['palettes', 'palettes\\']

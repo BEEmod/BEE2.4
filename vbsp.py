@@ -219,7 +219,7 @@ def load_settings():
     global settings
     if os.path.isfile("vbsp_config.cfg"): # do we have a config file?
         with open("vbsp_config.cfg", "r") as config: 
-            conf=Property.parse(config)
+            conf=Property.parse(config, 'vbsp_config.cfg')
     else:
         conf = [] # All the find_all commands will fail, and we will use the defaults.
                 
@@ -312,7 +312,7 @@ def load_map(path):
     global map
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
-        map=VLib.VMF.parse(Property.parse(file))
+        map=VLib.VMF.parse(Property.parse(file, path))
     utils.con_log("Parsing complete!")
 
 def check_glob_conditions():
