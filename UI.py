@@ -5,6 +5,7 @@ from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
 import tkinter_png as png # png library for TKinter
 import random
+import itertools
 import math
 
 from property_parser import Property
@@ -102,7 +103,7 @@ goos = {}
         # desc="A version of goo which is more murky, and reflective."),
     # ]
     
-selected_style = "clean"
+selected_style = "BEE2_CLEAN"
     
 # skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
 # voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
@@ -133,15 +134,22 @@ class Item():
     def __init__(self, item):
         self.ver = 0
         self.item = item
-        self.data=item.versions[self.ver]['styles'][selected_style]
-        self.num_sub = len(list(Property.find_all(self.data['editor'], "Item", "Editor", "Subtype")))
-        self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
-        self.authors = self.data['auth']
-        self.tags = self.data['tags']
+        self.def_data = self.item.def_data
+        # These pieces of data are constant, only from the first style.
+        self.num_sub = len(list(Property.find_all(self.def_data['editor'], "Item", "Editor", "Subtype")))
+        self.authors = self.def_data['auth']
+        self.tags = self.def_data['tags']
+        
+        self.load_data()
         self.id = item.id
-        self.url = self.data['url']
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
+        
+    def load_data(self):
+        '''Load data from the item.'''
+        self.data=self.item.versions[self.ver]['styles'][selected_style]
+        self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
+        self.url = self.data['url']
         
     def get_icon(self, subKey):
         return png.loadIcon(self.data['icons'][str(subKey)])
@@ -159,11 +167,10 @@ class PalItem(ttk.Label):
         super().__init__(frame)
         self.item = item
         self.subKey = sub
+        self.id = item.id
         self.visible=True # Toggled according to filter settings
         self.is_pre = is_pre # Used to distingush between picker and palette items
-        self.img = self.item.get_icon(sub)
-        self.name = self.item.names[sub]
-        self['image'] = self.img
+        self.load_data()
         self.bind("<Button-3>", contextWin.open_event)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
@@ -173,15 +180,18 @@ class PalItem(ttk.Label):
     def change_subtype(self, ind):
         '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
         for item in pal_picked[:]:
-            if item.item.id == self.item.id and item.subKey == ind:
+            if item.id == self.id and item.subKey == ind:
                 item.place_forget()
                 pal_picked.remove(item)
-        self.img = self.item.get_icon(ind)
-        self.name = self.item.names[ind]
-        self['image'] = self.img
         self.subKey = ind
+        self.load_data()
         self.master.update() # Update the frame
         flowPreview()
+                
+    def load_data(self):
+        self.img = self.item.get_icon(self.subKey)
+        self.name = self.item.names[self.subKey]
+        self['image'] = self.img
         
     def clear(self):
         '''Remove any items matching ourselves from the palette, to prevent adding two copies.'''
@@ -203,12 +213,13 @@ class PalItem(ttk.Label):
         
     def __eq__(self, other):
         '''Two items are equal if they have the same overall item and sub-item index.'''
-        return self.item.id == other.item.id and self.subKey == other.subKey
+        return self.id == other.id and self.subKey == other.subKey
         
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey, self.is_pre)
     
 def load_palette(data):
+    '''Import in all defined palettes.'''
     global palettes
     print("loading data!")
     palettes=sorted(data,key=Palette.getName) # sort by name
@@ -259,7 +270,25 @@ def load_packages(data):
     voice_win = selWin(win, voice_list, title='Select Additional Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
     music_win = selWin(win, music_list, title='Select Background Music', has_none=True, none_desc='Add no music to the map at all.')
     goo_win = selWin(win, goo_list, title='Select Goo Appearance', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
-    style_win = selWin(win, style_list, title='Select Style', has_none=False, has_def=False)
+    style_win = selWin(win, style_list, title='Select Style', has_none=False, has_def=False, callback=style_select_callback)
+    
+def suggested_style_set(e=None):
+    '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''
+    sugg = styles[selected_style].suggested
+    win_types = (voice_win, music_win, skybox_win, goo_win)
+    for win, sugg_val in zip(win_types, sugg):
+        win.sel_item_id(sugg_val)
+        
+def style_select_callback(style_id):
+    '''Callback whenever a new style is chosen.'''
+    global selected_style
+    selected_style = style_id
+    for item in itertools.chain(item_list.values(), pal_picked, pal_items):
+        item.load_data() # Refresh everything
+    sugg = styles[selected_style].suggested
+    win_types = (voice_win, music_win, skybox_win, goo_win)
+    for win, sugg_val in zip(win_types, sugg):
+        win.set_suggested(sugg_val)
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
@@ -287,7 +316,6 @@ def setPalette():
     for item in pal_picked:
         item.place_forget()
     pal_picked.clear()
-    print(*item_list.keys())
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
             pal_picked.append(PalItem(frames['preview'], item_list[item], sub, is_pre=True))
@@ -571,19 +599,22 @@ def initOption(f):
     props=ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1,weight=1)
     props.grid(row=3, column=0, sticky="EW")
-    ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=1,column=3, sticky="NS")
+    ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=2,column=3, sticky="NS")
+    
+    UI['suggested_style'] = ttk.Button(props, text="\u2193 Use Suggested \u2193", command=suggested_style_set)
+    UI['suggested_style'].grid(row=1, column=1, sticky="EW")
 
     ttk.Label(props, text="Style: ").grid(row=0, column=0)
-    ttk.Label(props, text="Music: ").grid(row=1, column=0)
-    ttk.Label(props, text="Voice: ").grid(row=2, column=0)
-    ttk.Label(props, text="Skybox: ").grid(row=3, column=0)
-    ttk.Label(props, text="Goo: ").grid(row=4, column=0)
+    ttk.Label(props, text="Music: ").grid(row=2, column=0)
+    ttk.Label(props, text="Voice: ").grid(row=3, column=0)
+    ttk.Label(props, text="Skybox: ").grid(row=4, column=0)
+    ttk.Label(props, text="Goo: ").grid(row=5, column=0)
     
     style_win.init_display(props, row=0, column=1)
-    music_win.init_display(props, row=1, column=1)
-    voice_win.init_display(props, row=2, column=1)
-    skybox_win.init_display(props, row=3, column=1)
-    goo_win.init_display(props, row=4, column=1)
+    music_win.init_display(props, row=2, column=1)
+    voice_win.init_display(props, row=3, column=1)
+    skybox_win.init_display(props, row=4, column=1)
+    goo_win.init_display(props, row=5, column=1)
 
 def initStyleOpt(f):
     global styleCheck, styleOptVars

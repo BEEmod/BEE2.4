@@ -10,7 +10,7 @@ from property_parser import Property
 import utils
 
 __all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox', 'Music', 'Goo')
-
+logic_items = []
 obj = {}
 obj_override = {}
 packages = {}
@@ -64,6 +64,7 @@ def loadAll(dir):
     finally:
         for z in zips: #close them all, we've already read the contents.
             z.close()
+    setup_style_tree(data)
     return data
         
 def parse_package(zip, info, filename, pak_id, dispName):
@@ -88,6 +89,38 @@ def parse_package(zip, info, filename, pak_id, dispName):
             else:
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
 
+def setup_style_tree(data):
+    '''Modify all items so item inheritance is properly handled.'''
+    styles = {}
+    
+    for style in data['Style']:
+        styles[style.id] = style
+    for style in styles.values():
+        base = []
+        b_style = style
+        while b_style is not None:
+            #Recursively find all the base styles for this one
+            base.append(b_style)
+            b_style = styles.get(b_style.base_style, None)
+            # Just append the style.base_style to the list, 
+            # until the style with that ID isn't found anymore.
+        style.bases = base[:]
+        
+    # To do inheritance, we simply copy the data to ensure all items have data defined for every used style.
+    for item in data['Item']:
+        for vers in item.versions:
+            for id, style in styles.items():
+                if id not in vers['styles']:
+                    for base_style in style.bases:
+                        if base_style.id in vers['styles']:
+                            # Copy the values for the parent to the child style
+                            print(item.id, id, base_style.id)
+                            vers['styles'][id] = vers['styles'][base_style.id]
+                            break
+                    else:
+                        # None found, use the first style in the list
+                        vers['styles'][id] = vers['def_style']
+                        print(item.id, id, 'DEFAULTED')
 class Style:
     def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None, suggested=None):
         self.id=id
@@ -140,7 +173,7 @@ class Item:
     def __init__(self, id, versions):
         self.id=id
         self.versions=versions
-     
+        self.def_data = versions[0]['def_style']
     @classmethod
     def parse(cls, zip, id, info):
         '''Parse an item definition.'''
@@ -148,16 +181,19 @@ class Item:
         folders = {}
         
         for ver in info.find_all("version"):
-            vals = {}
-            vals['name'] = ver['name', '']
-            vals['is_beta'] = ver['deta', '0'] == '1'
-            vals['is_dep'] = ver['deprecated', '0'] == '1'
-            
-            vals['styles'] = {}
+            vals = {
+            'name'    : ver['name', ''],
+            'is_beta' : ver['deta', '0'] == '1',
+            'is_dep'  : ver['deprecated', '0'] == '1',
+            'styles'  :  {},
+            'def_style' : None
+            }
             for sty_list in ver.find_all('styles'):
                 for sty in sty_list:
-                    vals['styles'][sty.name.casefold()] = sty.value
-                    folders[sty.value.casefold()] = True
+                    if vals['def_style'] is None:
+                        vals['def_style'] = sty.value
+                    vals['styles'][sty.name] = sty.value
+                    folders[sty.value] = True
             versions.append(vals)
         for fold in folders:
             files = zip.namelist()
@@ -183,6 +219,8 @@ class Item:
                     with zip.open(config, 'r') as vbsp_config:
                         folders[fold]['vbsp'] = Property.parse(vbsp_config)
         for ver in versions:
+            if ver['def_style'] in folders:
+                ver['def_style'] = folders[vals['def_style']]
             for sty, fold in ver['styles'].items():
                 ver['styles'][sty] = folders[fold]
         return cls(id, versions)

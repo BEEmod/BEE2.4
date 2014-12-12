@@ -8,6 +8,10 @@ ICON_SIZE=96
 ITEM_WIDTH=ICON_SIZE+16
 ITEM_HEIGHT=ICON_SIZE+51
 
+def _NO_OP(new_id):
+    '''The default callback, triggered whenever the chosen item is changed.'''
+    pass
+
 class Item:
     "An item on the panel."
     __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win')
@@ -34,7 +38,7 @@ class Item:
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
-    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc='Do not add anything.', title='BEE2'):
+    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc='Do not add anything.', title='BEE2', callback=_NO_OP):
         '''Create a window object.
         
         Read from .selected_id to get the currently-chosen Item name, or None if the <none> Item is selected.
@@ -45,11 +49,13 @@ class selWin:
         - If has_def is True, the 'Reset to Default' button will appear, which resets to the suggested item.
         - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
         - title is the title of the selector window.
+        - callback is a function to be called whenever the selected item changes.
         '''
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = png.loadPng('BEE2/none_96')
         self.disp_label = StringVar()
-        self.chosen_id = ''
+        self.chosen_id = None
+        self.callback = callback
         self.suggested = None
         self.has_def = has_def
         if has_none:
@@ -170,6 +176,7 @@ class selWin:
         self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
+        self.callback(self.chosen_id)
         
     def set_disp(self, e=None):
         '''Set the display textbox.'''
@@ -193,6 +200,16 @@ class selWin:
     def reset_sel(self):
         if self.suggested is not None:
             self.sel_item(self.suggested)
+            
+    def sel_item_id(self, id):
+        '''Select the item with the given ID.'''
+        for item in self.item_list:
+            if item.name == id:
+                self.sel_item(item)
+                self.set_disp()
+                self.callback(self.chosen_id)
+                return True
+        return False
         
     def sel_item(self, item):
         self.prop_name['text'] = item.longName
@@ -234,7 +251,6 @@ class selWin:
                 self.sugg_lbl['width'] = item.button.winfo_width()
             item.button.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT+20))
             item.button.lift()
-            
         
     def set_suggested(self, suggested=None):
         '''Set the suggested item to the given ID. 
