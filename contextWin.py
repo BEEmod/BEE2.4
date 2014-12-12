@@ -174,12 +174,6 @@ def set_sprites(item):
     surf_ceil = "ceiling" in facing_type
 
     is_embed = any(Property.find_all(editor_data, "Item", "Exporting", "EmbeddedVoxels"))
-    is_occupy = False
-    for vox in Property.find_all(editor_data, "Item", "Exporting", "OccupiedVoxels"):
-        collide_type = Property.find_key(vox, "CollideType", "COLLIDE").value
-        if collide_type.casefold() != "collide_nothing":
-            is_occupy = True # Collide_nothing makes it not affect anything
-            break
             
     if has_inputs:
         if has_polarity:
@@ -199,11 +193,8 @@ def set_sprites(item):
         
     wid_spr[2]['image'] = png.loadSpr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
          
-    if is_occupy:
-        if is_embed:
-            wid_spr[3]['image'] = png.loadSpr('space_embed_occupy')
-        else:
-            wid_spr[3]['image'] = png.loadSpr('space_occupy')
+    if is_embed:
+        wid_spr[3]['image'] = png.loadSpr('space_embed')
     else:
         wid_spr[3]['image'] = png.loadSpr('space_none')
        
@@ -290,6 +281,7 @@ def init(win):
     wid_moreinfo.grid(row=6, column=2, sticky=E)
     
     moreinfo_win = Toplevel(win)
+    moreinfo_win.withdraw()
     moreinfo_win.transient(master=win)
     moreinfo_win.overrideredirect(1)
     moreinfo_win.resizable(False, False)

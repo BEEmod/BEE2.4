@@ -277,6 +277,8 @@ def load_packages(data):
     music_win = selWin(win, music_list, title='Select Background Music', has_none=True, none_desc='Add no music to the map at all.')
     goo_win = selWin(win, goo_list, title='Select Goo Appearance', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
     style_win = selWin(win, style_list, title='Select Style', has_none=False, has_def=False, callback=style_select_callback)
+    style_win.sel_item_id('BEE2_CLEAN')
+    suggested_style_set()
     
 def suggested_style_set(e=None):
     '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''
