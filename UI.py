@@ -174,24 +174,24 @@ class PalItem(ttk.Label):
         '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
         for item in pal_picked[:]:
             if item.item.id == self.item.id and item.subKey == ind:
+                item.place_forget()
                 pal_picked.remove(item)
         self.img = self.item.get_icon(ind)
         self.name = self.item.names[ind]
         self['image'] = self.img
         self.subKey = ind
+        self.master.update() # Update the frame
         flowPreview()
         
     def clear(self):
-        "Remove any items matching the passed label from the palette, to prevent adding two copies."
-        toRem=[]
-        found=False
-        for i,item in enumerate(pal_picked): # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
+        '''Remove any items matching ourselves from the palette, to prevent adding two copies.'''
+        found = False
+        for i,item in enumerate(pal_picked[:]): 
+        # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
             if self==item:
                 item.place_forget()
-                toRem.append(i)
-                found=True
-        for i in reversed(toRem):
-            del pal_picked[i] # we have to loop in reverse to stop indexes changing on us and messing up enumerate()
+                del pal_picked[i]
+                found = True
         return found
 
     def onPal(self):

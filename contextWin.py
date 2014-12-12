@@ -1,6 +1,6 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
-from functools import partial
+from functools import partial as func_partial
 import webbrowser
 
 from property_parser import Property
@@ -15,7 +15,18 @@ selected_item = None
 selected_sub_item = None
 is_open = False
 
+SUBITEM_POS = {
+# Positions of subitems depending on the number of subitems that exist
+# This way they appear nicely centered on the list
+    1: (-1, -1,  0, -1, -1), #__0__
+    2: (-1,  0, -1,  1, -1), #_0_0_
+    3: (-1,  0,  1,  2, -1), #_000_
+    4: ( 0,  1, -1,  2,  3), #00_00
+    5: ( 0,  1,  2,  3,  4)  #00000
+}
+
 ROT_TYPES = {
+    #Image names that correspond to editoritems values
     "handle_none"          : "rot_0",
     "handle_4_directions"  : "rot_4",
     "handle_5_positions"   : "rot_5",
@@ -25,6 +36,14 @@ ROT_TYPES = {
     "handle_catapult"      : "rot_catapult"
 }
 
+def pos_for_item(sub):
+    pos = SUBITEM_POS[selected_item.num_sub]
+    for ind, sub_loc in enumerate(pos):
+        if sub == sub_loc:
+            return ind
+    else:
+        return None
+
 def showItemProps():
     snd.fx('expand')
     itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name)
@@ -33,13 +52,19 @@ def hideItemProps(vals):
     snd.fx('contract')
     print(vals)
     
-def subSel(ind, e=None):
+def sub_sel_enter(ind, e=None):
+    if SUBITEM_POS[selected_item.num_sub][ind] != -1:   
+        snd.fx('select')
+    
+def sub_sel(ind, e=None):
     '''Change the currently-selected sub-item.'''
     if selected_sub_item.is_pre: # Can only change the subitem on the preview window
-        selected_sub_item.change_subtype(ind)
-        # Redisplay the window to refresh data and move it to match
-        showProps(selected_sub_item) 
-        
+        pos = SUBITEM_POS[selected_item.num_sub][ind]
+        if pos != -1:
+            snd.fx('config')
+            selected_sub_item.change_subtype(pos)
+            # Redisplay the window to refresh data and move it to match
+            showProps(selected_sub_item) 
 
 def showMoreInfo():
     url = selected_item.url
@@ -80,7 +105,7 @@ def showProps(wid):
     
     selected_item = wid.item
     selected_sub_item = wid
-    icon_widget = wid_sub[selected_sub_item.subKey]
+    icon_widget = wid_sub[pos_for_item(selected_sub_item.subKey)]
     
     loc_x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
         #The pixel offset between the window and the subitem in the properties dialog
@@ -97,13 +122,15 @@ def showProps(wid):
     prop_window.geometry('+'+str(loc_x)+'+'+str(loc_y))
     prop_window.relX=loc_x-root.winfo_x()
     prop_window.relY=loc_y-root.winfo_y()
-    for pos in range(5):
-        if pos >= selected_item.num_sub:
-            wid_sub[pos]['image'] = png.loadPng('BEE2/blank')
+    
+    for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
+        if pos == -1:
+            wid_sub[ind]['image'] = png.loadPng('BEE2/alpha_64')
         else:
-            wid_sub[pos]['image'] = selected_item.get_icon(pos)
-        wid_sub[pos]['relief'] = 'flat'
+            wid_sub[ind]['image'] = selected_item.get_icon(pos)
+        wid_sub[ind]['relief'] = 'flat'
     icon_widget['relief'] = 'raised'
+    
     wid_author['text'] = ', '.join(selected_item.data['auth'])
     wid_name['text'] = selected_sub_item.name
     wid_ent_count['text'] = selected_item.data['ent']
@@ -236,9 +263,10 @@ def init(win):
     sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
     for i in range(len(wid_sub)):
-        wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/blank'))
+        wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/alpha_64'))
         wid_sub[i].grid(row=0, column=i)
-        wid_sub[i].bind('<Button-1>', partial(subSel, i))
+        wid_sub[i].bind('<Button-1>', func_partial(sub_sel, i))
+        wid_sub[i].bind('<Enter>', func_partial(sub_sel_enter, i))
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)

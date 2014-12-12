@@ -227,6 +227,7 @@ def init(tk, cback):
 
 def open(usedProps, parent, itemName):
     widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
+    win.title('BEE2 - ' + itemName)
     global propList, is_open
     propList=usedProps
     is_open=True
