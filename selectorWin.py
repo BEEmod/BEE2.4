@@ -105,7 +105,7 @@ class selWin:
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
         
         self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = png.loadIcon('faithplate_128')
+        self.prop_icon.img = png.loadPng('BEE2/blank')
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column = 0)
         

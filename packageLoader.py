@@ -112,13 +112,11 @@ def setup_style_tree(data):
                     for base_style in style.bases:
                         if base_style.id in vers['styles']:
                             # Copy the values for the parent to the child style
-                            print(item.id, id, base_style.id)
                             vers['styles'][id] = vers['styles'][base_style.id]
                             break
                     else:
                         # None found, use the first style in the list
                         vers['styles'][id] = vers['def_style']
-                        print(item.id, id, 'DEFAULTED')
 class Style:
     def __init__(self, id, name, author, desc, icon, editor, config=None, base_style=None, short_name=None, suggested=None):
         self.id=id
@@ -207,7 +205,7 @@ class Item:
                         'auth': sep_values(props['authors', ''],','),
                         'tags': sep_values(props['tags', ''],';'),
                         'desc': '\n'.join(p.value for p in props.find_all('description')),
-                        'ent':  props['ent_count', '0'],
+                        'ent':  props['ent_count', '??'],
                         'url':  props['infoURL', 'NONE'],
                         'icons': {p.name:p.value for p in props['icon', []]},
                         'editor': list(Property.find_all(editor, 'Item')),
@@ -216,6 +214,8 @@ class Item:
                 if config in files:
                     with zip.open(config, 'r') as vbsp_config:
                         folders[fold]['vbsp'] = Property.parse(vbsp_config)
+            else:
+                raise IOError('"items/' + fold + '" not valid! Folder likely missing!')
         for ver in versions:
             if ver['def_style'] in folders:
                 ver['def_style'] = folders[vals['def_style']]
@@ -359,7 +359,7 @@ def get_selitem_data(info):
     
 def sep_values(str, delimiter):
     vals = str.split(delimiter)
-    return [val.strip() for val in vals]
+    return [stripped for stripped in (val.strip() for val in vals) if stripped]
             
 obj_types = {
     'Style' : Style,
