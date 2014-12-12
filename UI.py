@@ -151,8 +151,14 @@ class Item():
         self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
         self.url = self.data['url']
         
-    def get_icon(self, subKey):
-        return png.loadIcon(self.data['icons'][str(subKey)])
+    def get_icon(self, subKey, allow_single=False):
+        icons = self.data['icons']
+        if (allow_single and 'all' in icons and 
+            sum(1 for item in pal_picked if item.id==self.id) == 1):
+            # If only 1 copy of this item is on the palette, use the special icon
+            return png.loadIcon(icons['all'])
+        else:
+            return png.loadIcon(icons[str(subKey)])
         
     def get_properties(self):
         props = []
@@ -189,7 +195,7 @@ class PalItem(ttk.Label):
         flowPreview()
                 
     def load_data(self):
-        self.img = self.item.get_icon(self.subKey)
+        self.img = self.item.get_icon(self.subKey, self.is_pre)
         self.name = self.item.names[self.subKey]
         self['image'] = self.img
         
@@ -292,10 +298,8 @@ def style_select_callback(style_id):
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
-    print(palettes)
     UI['palette'].delete(0, END)
     for i,pal in enumerate(palettes):
-        print(pal.name)
         UI['palette'].insert(i,pal.name)
     if menus['pal'].item_len>0:
         menus['pal'].delete(3, menus['pal'].item_len)
@@ -350,20 +354,22 @@ def showDrag(e):
     setDispName(drag_item.name)
     snd.fx('config')
     drag_passedPal=False
-
-    if e.widget.is_pre: # is the cursor over the preview pane?
-        ind=e.widget.pre_x+e.widget.pre_y*4
+    if drag_item.is_pre: # is the cursor over the preview pane?
+        ind=drag_item.pre_x+drag_item.pre_y*4
         pal_picked[ind].place_forget()
         del pal_picked[ind]
         drag_onPal=True
+        for item in pal_picked:
+            if item.id == drag_item.id:
+                item.load_data()
     else:
-        drag_onPal=e.widget.onPal()
+        drag_onPal=drag_item.onPal()
     dragWin.deiconify()
     dragWin.lift(win)
     dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
     # NOTE: _global means no other programs can interact, make sure it's released eventually or you won't be able to quit!
     moveDrag(e) # move to correct position
-    UI['drag_lbl']['image']=e.widget.img
+    UI['drag_lbl']['image']=drag_item.img
     dragWin.bind("<B1-Motion>", moveDrag)
     dragWin.bind("<ButtonRelease-1>", hideDrag)
     UI['pre_sel_line'].lift()
@@ -566,7 +572,6 @@ def filterAllCallback(col):
 
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initPalette(f):
-
     palFrame=ttk.Frame(f)
     palFrame.grid(row=0, column=0, sticky="NSEW")
     palFrame.rowconfigure(0, weight=1)
@@ -638,7 +643,6 @@ def initStyleOpt(f):
     frmOther=ttk.Labelframe(canFrame, text="Other Styles:")
     frmOther.grid(row=2, column=0, sticky="EW")
 
-
     styleCheck={}
     styleOptVars={}
     cats =[
@@ -669,6 +673,7 @@ def initTool(f):
 def flowPreview():
     "Position all the preview icons based on the array. Run to refresh if items are moved around."
     for i,item in enumerate(pal_picked):
+        item.load_data() # Check to see if this should use the single-icon
         item.pre_x=i%4
         item.pre_y=i//4 # these can be referred to to figure out where it is
         item.place(x=(i%4*65+4),y=(i//4*65+32))
@@ -770,7 +775,6 @@ def initFilterCol(cat, f):
             FilterBoxes_all[cat].first_var = FilterVars[cat][id]
 
 def initFilter(f):
-
     ttk.Label(f, text="Filters:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
     f.columnconfigure(0, weight=1)
     f.columnconfigure(1, weight=1)
@@ -836,8 +840,7 @@ def initMenuBar(win):
     menuHelp.add_command(label='Quotes') # show the list of quotes
 
 def initMain():
-    "Initialise all windows and panes."
-
+    '''Initialise all windows and panes.'''
     initMenuBar(win)
     win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
     win.title('BEE2')

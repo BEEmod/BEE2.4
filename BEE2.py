@@ -38,6 +38,5 @@ print('Loading Palettes...')
 pal=paletteLoader.loadAll(settings['pal_dir'])
 print('Done!')
 UI.load_palette(pal)
-
 UI.initMain() # create all windows
 UI.event_loop()
