@@ -749,6 +749,16 @@ def find_glass_inst(origin):
         print('angle', inst['angles', ''])
     # TODO - make this actually work
     return {'file': ''}
+    
+def face_seed(face):
+    '''Create a seed unique to this brush face, which is the same regardless of side.'''
+    origin = face.get_origin()
+    for axis in "xyz":
+        if origin[axis] % 128 < 2:
+            origin[axis] = origin[axis] // 128 # This side
+        else:
+            origin[axis] = origin[axis] // 128 + 64
+    return origin.join()
 
 def random_walls():
     "The original wall style, with completely randomised walls."
@@ -756,7 +766,7 @@ def random_walls():
         for face in solid:
             is_blackceil = roof_tex(face)
             if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
-                random.seed(face.plane_desc() + '_SCALE_VAL')
+                random.seed(face_seed(face) + '_SCALE_VAL')
                 scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
                 split=face.uaxis.split(" ")
                 split[-1] = scale
@@ -765,7 +775,7 @@ def random_walls():
                 split=face.vaxis.split(" ")
                 split[-1] = scale
                 face.vaxis=" ".join(split)
-            alter_mat(face, face.plane_desc())
+            alter_mat(face, face_seed(face))
     
 def clump_walls():
     "A wall style where textures are used in small groups near each other, clumped together."
