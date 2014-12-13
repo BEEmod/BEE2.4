@@ -46,7 +46,7 @@ def pos_for_item(sub):
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name)
+    itemPropWin.open(selected_item.properties(), wid_changedefaults, selected_sub_item.name)
     
 def hideItemProps(vals):
     snd.fx('contract')
@@ -139,6 +139,12 @@ def showProps(wid):
     wid_desc.delete(1.0, END)
     wid_desc.insert("end", selected_item.data['desc'], "all") 
     wid_desc['state']="disabled"
+    
+    if itemPropWin.can_edit(selected_item.properties()):
+        wid_changedefaults.state(('!disabled',))
+    else:
+        wid_changedefaults.state(('disabled',))
+    
     
     if selected_item.url is None:
         wid_moreinfo.state(('disabled',))

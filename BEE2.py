@@ -2,7 +2,7 @@ from property_parser import Property
 import paletteLoader
 import packageLoader
 import gameMan
-import UI
+import UI 
 import utils
 
 global settings

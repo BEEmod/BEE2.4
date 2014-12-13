@@ -160,11 +160,11 @@ class Item():
         else:
             return png.loadIcon(icons[str(subKey)])
         
-    def get_properties(self):
-        props = []
+    def properties(self):
+        '''Iterate through all properties for this item.'''
         for part in Property.find_all(self.data['editor'], "Item", "Properties"):
-            props.extend([prop.name for prop in part])
-        return props
+            for prop in part:
+                yield prop.name.casefold()
                
 class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''

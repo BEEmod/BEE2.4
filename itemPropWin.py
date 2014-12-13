@@ -4,7 +4,7 @@ import math
 import random
 
 import sound as snd
-props = { # all valid properties in editoritems, Valve probably isn't going to release a major update so it's fine to hardcode this.
+PROP_TYPES = { # all valid properties in editoritems, Valve probably isn't going to release a major update so it's fine to hardcode this.
   'toplevel'                : ('pistPlat', 'Start Position'),
   'bottomlevel'             : ('pistPlat', 'End Position'),
   'angledpanelanimation'    : ('panAngle', 'Panel Position'),
@@ -21,25 +21,25 @@ props = { # all valid properties in editoritems, Valve probably isn't going to r
   'oscillate'               : ('railLift', 'Oscillate'),
   'paintflowtype'           : ('gelType' , 'Flow Type'),
   'allowstreak'             : ('checkbox', 'Allow Streaks')
-  # 'timersound'              : ('locked',     'Timer Sound'),
-  # 'connectioncount'         : ('locked',     'Connection Count'),
-  # 'connectioncountpolarity' : ('locked',     'Polarity Connection Count'),
-  # 'buttontype'              : ('locked',     'Button Type'),
-  # 'barriertype'             : ('locked',     'Barrier Type'),
-  # 'hazardtype'              : ('locked',     'Hazard Type'),
-  # 'cubetype'                : ('locked',     'Cube Type'),
-  # 'angledpaneltype'         : ('locked',     'Angled Panel Type'),
-  # 'portalable'              : ('locked',     'Portalable'),
-  # 'verticalalignment'       : ('locked',     'Vertical Alignment'),
-  # 'targetname'              : ('locked',     'Target Name'),
-  # 'catapultspeed'           : ('locked',     'Catapult Speed'),
-  # 'autotrigger'             : ('locked',     'Auto Trigger'),
-  # 'traveldistance'          : ('locked',     'Travel Distance'),
-  # 'speed'                   : ('locked',     'Track Speed'),
-  # 'traveldirection'         : ('locked',     'Travel Direction'),
-  # 'startingposition'        : ('locked',     'Starting Position'),
-  # 'istimer'                 : ('locked',     'Is Timer?'),
-  # 'itemfallstraightdown'    : ('locked',     'Items Drop Straight Down?')
+  # 'timersound'              : 'Timer Sound'),
+  # 'connectioncount'         : 'Connection Count'),
+  # 'connectioncountpolarity' : 'Polarity Connection Count'),
+  # 'buttontype'              : 'Button Type'),
+  # 'barriertype'             : 'Barrier Type'),
+  # 'hazardtype'              : 'Hazard Type'),
+  # 'cubetype'                : 'Cube Type'),
+  # 'angledpaneltype'         : 'Angled Panel Type'),
+  # 'portalable'              : 'Portalable'),
+  # 'verticalalignment'       : 'Vertical Alignment'),
+  # 'targetname'              : 'Target Name'),
+  # 'catapultspeed'           : 'Catapult Speed'),
+  # 'autotrigger'             : 'Auto Trigger'),
+  # 'traveldistance'          : 'Travel Distance'),
+  # 'speed'                   : 'Track Speed'),
+  # 'traveldirection'         : 'Travel Direction'),
+  # 'startingposition'        : 'Starting Position'),
+  # 'istimer'                 : 'Is Timer?'),
+  # 'itemfallstraightdown'    : 'Items Drop Straight Down?')
   }
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
@@ -162,16 +162,23 @@ def exit():
     win.withdraw()
     is_open=False
     out={}
-    for key in props.keys():
+    for key in PROP_TYPES.keys():
         if key in propList:
-            if props[key][0] == 'checkbox' or props[key][0]=='railLift':
+            if PROP_TYPES[key][0] == 'checkbox' or PROP_TYPES[key][0]=='railLift':
                 out[key]=(values[key].get())
-            elif props[key][0] == 'pistPlat':
+            elif PROP_TYPES[key][0] == 'pistPlat':
                 out[key]=values[key]
                 out['startup']=values['startup']
             else:
                 out[key]=values[key]
     callback(out)
+    
+def can_edit(prop_list):
+    '''Determine if any of these properties are changeable.'''
+    for prop in prop_list:
+        if prop in PROP_TYPES:
+            return True
+    return False
 
 def init(tk, cback):
     global callback, labels, win, is_open
@@ -192,49 +199,44 @@ def init(tk, cback):
     widgets['div_2']=ttk.Separator(win, orient="vertical")
     widgets['div_h']=ttk.Separator(win, orient="horizontal")
 
-    for key in props.keys():
-        labels[key]=ttk.Label(win, text=props[key][1]+':')
-        if props[key][0] == 'checkbox':
+    for key in PROP_TYPES.keys():
+        labels[key]=ttk.Label(win, text=PROP_TYPES[key][1]+':')
+        if PROP_TYPES[key][0] == 'checkbox':
             values[key] = IntVar(value=defaults[key])
             widgets[key] = ttk.Checkbutton(win, variable=values[key], command=checkFX)
-        elif props[key][0] == 'railLift':
+        elif PROP_TYPES[key][0] == 'railLift':
             values[key] = IntVar(value=defaults[key])
             widgets[key] = ttk.Checkbutton(win, variable=values[key], command=lambda k=key: saveRail(k))
-        elif props[key][0] == 'panAngle':
+        elif PROP_TYPES[key][0] == 'panAngle':
             widgets[key]=Spinbox(win, values=(30,45,60,90), command=lambda key=key: saveAngle(key))
             values[key]=defaults[key]
-        elif props[key][0] == 'gelType':
+        elif PROP_TYPES[key][0] == 'gelType':
             widgets[key]=ttk.Combobox(win, values=paintOpts)
             widgets[key].set(paintOpts[defaults[key]])
             widgets[key].state(['readonly'])
             widgets[key].bind("<<ComboboxSelected>>", lambda e, key=key: savePaint(e,key))
             widgets[key].bind("<Button-1>", paintFX)
             values[key]=defaults[key]
-        elif props[key][0] == 'pistPlat':
+        elif PROP_TYPES[key][0] == 'pistPlat':
             widgets[key]=Scale(win, from_=0, to=4, orient="horizontal", showvalue=False, command=lambda val, k=key: savePist(val,k))
             values[key]=defaults[key]
             if (key=='toplevel' and defaults['startup']==True) or (key=='bottomlevel' and defaults['startup']==False):
                 widgets[key].set(max(defaults['toplevel'],defaults['bottomlevel']))
             if (key=='toplevel' and defaults['startup']==False) or (key=='bottomlevel' and defaults['startup']==True):
                 widgets[key].set(min(defaults['toplevel'],defaults['bottomlevel']))
-        elif props[key][0] == 'timerDel':
+        elif PROP_TYPES[key][0] == 'timerDel':
             widgets[key]=Scale(win, from_=0, to=30, orient="horizontal", showvalue=True, command=lambda val, k=key: saveTim(val,k))
             values[key]=defaults[key]
-        elif props[key][0] == 'railPlat':
+        elif PROP_TYPES[key][0] == 'railPlat':
             widgets[key]=ttk.Checkbutton(win)
     values['startup']=defaults['startup']
 
-
 def open(usedProps, parent, itemName):
-    widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
-    win.title('BEE2 - ' + itemName)
-    global propList, is_open
-    propList=usedProps
+    global propList, is_open    
+    propList=[key.casefold() for key in usedProps]
     is_open=True
-    win.transient(master=parent)
-    for i,key in enumerate(propList):
-        propList[i]=key.casefold()
     spec_row=1
+    
     for key in prop_pos_special:
         if key in propList:
             labels[key].grid( row=spec_row, column=0,   sticky=E, padx=2, pady=5)
@@ -243,13 +245,16 @@ def open(usedProps, parent, itemName):
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
+            
     if spec_row>1: # if we have a 'special' prop, add the divider between the types
         widgets['div_h'].grid(row=spec_row+1, column=0, columnspan=9, sticky="EW")
         spec_row+=2
     else:
         widgets['div_h'].grid_remove()
     ind=0
+    
     for key in prop_pos:
+        # Position each widget
         if key in propList:
             labels[key].grid( row=(ind//3)+spec_row, column=(ind%3)*3,   sticky=E, padx=2, pady=5)
             widgets[key].grid(row=(ind//3)+spec_row, column=(ind%3)*3+1, sticky="EW", padx=2, pady=5)
@@ -257,6 +262,7 @@ def open(usedProps, parent, itemName):
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
+            
     if ind>1: # is there more than 1 checkbox? (adds left divider)
         widgets['div_1'].grid(row=spec_row, column=2, sticky="NS", rowspan=(ind//3)+1)
     else:  
@@ -265,17 +271,23 @@ def open(usedProps, parent, itemName):
         widgets['div_2'].grid(row=spec_row, column=5, sticky="NS", rowspan=(ind//3)+1)
     else:  
         widgets['div_2'].grid_remove()
+        
     if ind+spec_row==1:
+        # There aren't any items, display error message
         labels['noOptions'].grid(row=1, column=0, columnspan=9)
         ind=1
     else:
         labels['noOptions'].grid_remove()
+        
     widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=9, sticky="EW")
     
     # Block sound for the first few millisec to stop excess sounds from playing
     play_sound=False
     win.after(25, reset_sfx)
     
+    widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
+    win.title('BEE2 - ' + itemName)
+    win.transient(master=parent)
     win.deiconify()
     win.lift(parent)
     win.grab_set()
