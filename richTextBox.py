@@ -27,20 +27,26 @@ class tkRichText(Text):
         '''Write the rich-text into the textbox.'''
         self['state']="normal"
         self.delete(1.0, END)
-        list_ind = 1
-        for data in desc:
-            lineType=data[0].casefold()
-            if lineType == "line":
-                self._insert("end", data[1] + "\n") 
-            elif lineType == "bullet":
-                self._insert("end", '\x07 ' + data[1] + "\n", "indent") 
-            elif lineType == "list":
-                self._insert("end", str(list_ind) + ". " + data[1] + "\n", "indent")
-                list_ind += 1
-            elif lineType == "rule":
-                self.insert("end", " \n", "hrule")
-                # Horizontal rules are created by applying a tag to a space + newline (which affects the whole line)
-                # It decreases the text size (to shrink it vertically, and gives a border
-            else:
-                print('Unknown description type "' + lineType + '"!')     
+        if isinstance(desc, str):
+            self._insert("end", desc)
+        else:
+            list_ind = 1
+            for data in desc:
+                lineType=data[0].casefold()
+                if lineType == "line":
+                    self._insert("end", data[1] + "\n") 
+                elif lineType == "bullet":
+                    self._insert("end", '\x07 ' + data[1] + "\n", "indent") 
+                elif lineType == "list":
+                    self._insert("end", str(list_ind) + ". " + data[1] + "\n", "indent")
+                    list_ind += 1
+                elif lineType == "break":
+                    self._insert("end", '\n')
+                elif lineType == "rule":
+                    self.insert("end", " \n", "hrule")
+                    # Horizontal rules are created by applying a tag to a space + newline (which affects the whole line)
+                    # It decreases the text size (to shrink it vertically, and gives a border
+                else:
+                    print('Unknown description type "' + lineType + '"!')
+            self.delete(self.index(END)+"-1char", "end") # delete the trailing newline
         self['state']="disabled"

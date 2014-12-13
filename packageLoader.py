@@ -215,7 +215,8 @@ class Item:
                     with zip.open(config, 'r') as vbsp_config:
                         folders[fold]['vbsp'] = Property.parse(vbsp_config)
             else:
-                raise IOError('"items/' + fold + '" not valid! Folder likely missing!')
+                raise IOError('"items/' + fold + '" not valid! Folder likely missing! (Editor=' + 
+                                str(editor in files) + ', Props=' + str(props in files) + ')')
         for ver in versions:
             if ver['def_style'] in folders:
                 ver['def_style'] = folders[vals['def_style']]
