@@ -1,19 +1,24 @@
 from tkinter import * # ui library
+from tkinter import font
 from tkinter import ttk # themed ui components that match the OS
 import math
 
 import tkinter_png as png # png library for TKinter
+from richTextBox import tkRichText
 
 ICON_SIZE=96
 ITEM_WIDTH=ICON_SIZE+16
 ITEM_HEIGHT=ICON_SIZE+51
+
 
 def _NO_OP(new_id):
     '''The default callback, triggered whenever the chosen item is changed.'''
     pass
 
 class Item:
-    "An item on the panel."
+    '''An item on the panel.
+    
+    '''
     __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win')
     def __init__(
             self,
@@ -31,6 +36,11 @@ class Item:
         else:
             self.icon = png.loadPng(icon)
         self.desc = desc
+        # The description is a list of tuples - (type, text)
+        # type = 'bullet' for a bullet point
+        #        'line' for normal lines
+        #        'list' for an ordered list
+        #        'hrule' for a horizontal rule (ignores text)
         self.authors = [] if authors is None else authors
         
     def __repr__(self):
@@ -38,7 +48,7 @@ class Item:
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
-    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc='Do not add anything.', title='BEE2', callback=_NO_OP):
+    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc=[('line', 'Do not add anything.')], title='BEE2', callback=_NO_OP):
         '''Create a window object.
         
         Read from .selected_id to get the currently-chosen Item name, or None if the <none> Item is selected.
@@ -50,7 +60,7 @@ class selWin:
         - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item changes.
-        '''
+        ''' 
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = png.loadPng('BEE2/none_96')
         self.disp_label = StringVar()
@@ -120,10 +130,8 @@ class selWin:
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
         
-        self.prop_desc = Text(self.prop_desc_frm, width=50, height=16, wrap="word", font="TkSmallCaptionFont")
+        self.prop_desc = tkRichText(self.prop_desc_frm, width=40, height=16, font="TkSmallCaptionFont")
         self.prop_desc.grid(row=0, column=0, padx=(2,0), pady=2, sticky="NSEW")
-        self.prop_desc.tag_config("all", lmargin2="10") # Add a hanging indent to wrapped lines
-        self.prop_desc['state']="disabled"
         
         self.prop_scroll = ttk.Scrollbar(self.prop_desc_frm, orient=VERTICAL, command=self.prop_desc.yview)
         self.prop_scroll.grid(row=0, column=1, sticky="NS", padx=(0,2), pady=2)
@@ -221,10 +229,8 @@ class selWin:
             self.prop_author['text'] = 'Authors: ' + ', '.join(item.authors)
         self.prop_icon['image'] = item.icon
         
-        self.prop_desc['state']="normal"
-        self.prop_desc.delete(1.0, END)
-        self.prop_desc.insert("end", item.desc, "all") 
-        self.prop_desc['state']="disabled"
+        self.prop_desc.set_text(item.desc)
+        
         
         self.selected.button.state(('!alternate',))
         self.selected = item
@@ -284,22 +290,25 @@ if __name__ == '__main__': # test the window if directly executing this file
             longName = "Darkness", 
             icon = "skies/black",
             authors = ["Valve"],
-            desc = 'Pure black darkness. Nothing to see here.'),
+            desc = [('line', 'Pure black darkness. Nothing to see here.')]),
         Item(
             "SKY_BTS", 
             "BTS", 
             longName = "Behind The Scenes - Factory", 
             icon = "voices/glados",
             authors = ["TeamSpen210"],
-            desc = 'The dark constuction and office areas of Aperture. Catwalks '
-                   'extend between different buildings, with vactubes and cranes '
-                   'carrying objects throughout the facility.\n Abandoned offices can '
-                   'often be found here.')
+            desc = [
+                ('line', 'The dark constuction and office areas of Aperture. Catwalks '
+                         'extend between different buildings, with vactubes and cranes '
+                         'carrying objects throughout the facility.'),
+                ('rule', ''),
+                ('line', 'Abandoned offices can often be found here.')
+                   ])
           ]
         
     def done(x):
         print(x)
         root.withdraw()
-    window = selWin(root, lst, has_none=True, has_def=True, none_desc='Pure blackness. Nothing to see here.')
+    window = selWin(root, lst, has_none=True, has_def=True)
     window.init_display(root, 1, 0)
     window.set_suggested("SKY_BLACK")

@@ -204,7 +204,7 @@ class Item:
                 folders[fold] = {
                         'auth': sep_values(props['authors', ''],','),
                         'tags': sep_values(props['tags', ''],';'),
-                        'desc': '\n'.join(p.value for p in props.find_all('description')),
+                        'desc': list(desc_parse(props)),
                         'ent':  props['ent_count', '??'],
                         'url':  props['infoURL', 'NONE'],
                         'icons': {p.name:p.value for p in props['icon', []]},
@@ -346,12 +346,19 @@ class Music:
     def __repr__(self):
         return '<Music ' + self.id + '>'
         
+def desc_parse(info):
+    for prop in info.find_all("description"):
+        if prop.has_children():
+            for line in prop:
+                yield (line.name.casefold(), line.value)   
+        else:
+            yield ("line", prop.value)
+        
 def get_selitem_data(info):
     '''Return the common data for all item types - name, author, description.'''
     auth = sep_values(info['authors', ''],',')
     # Multiple description lines will be joined together, for easier multi-line writing.""
-    desc = '\n'.join(prop.value for prop in info if prop.name.casefold()=="description" or prop.name.casefold()=="desc")
-    desc = desc.replace("[*]", "\x07") # Convert [*] into the bullet character
+    desc = list(desc_parse(info))
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']

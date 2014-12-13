@@ -4,6 +4,7 @@ from functools import partial as func_partial
 import webbrowser
 
 from property_parser import Property
+from richTextBox import tkRichText
 import tkinter_png as png # png library for TKinter
 import sound as snd
 import itemPropWin
@@ -135,10 +136,7 @@ def showProps(wid):
     wid_name['text'] = selected_sub_item.name
     wid_ent_count['text'] = selected_item.data['ent']
     
-    wid_desc['state']="normal"
-    wid_desc.delete(1.0, END)
-    wid_desc.insert("end", selected_item.data['desc'], "all") 
-    wid_desc['state']="disabled"
+    wid_desc.set_text(selected_item.data['desc'])
     
     if itemPropWin.can_edit(selected_item.properties()):
         wid_changedefaults.state(('!disabled',))
@@ -272,16 +270,15 @@ def init(win):
         spr=png.loadSpr('ap_grey')
         wid_spr[i]=ttk.Label(spr_frame, image=spr, relief="raised")
         wid_spr[i].grid(row=0, column=i)
+        
     desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
-    wid_desc=Text(desc_frame, width=40, height=8, wrap="word")
-    wid_desc.tag_config("all", lmargin2="10") # Add a hanging indent to wrapped lines
+    wid_desc=tkRichText(desc_frame, width=40, height=8, font=None)
     wid_desc.grid(row=0, column=0, sticky="EW")
 
     desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=wid_desc.yview)
     wid_desc['yscrollcommand']=desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
-    wid_desc['state']="disabled" # need to set this to normal when editing text, then swap back
 
     wid_moreinfo=ttk.Button(f, text="More Info>>", command=showMoreInfo)
     wid_moreinfo.grid(row=6, column=2, sticky=E)
@@ -292,7 +289,7 @@ def init(win):
     moreinfo_win.overrideredirect(1)
     moreinfo_win.resizable(False, False)
     
-    moreinfo_lbl = ttk.Label(moreinfo_win, text='', relief="groove")
+    moreinfo_lbl = ttk.Label(moreinfo_win, text='', relief="groove", font="TkSmallCaptionFont")
     moreinfo_lbl.grid(row=0, column=0, padx=1, pady=1)
     
     wid_moreinfo.bind('<Enter>', moreInfo_showURL)
