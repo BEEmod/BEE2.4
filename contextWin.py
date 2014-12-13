@@ -61,7 +61,7 @@ def sub_sel(ind, e=None):
     '''Change the currently-selected sub-item.'''
     if selected_sub_item.is_pre: # Can only change the subitem on the preview window
         pos = SUBITEM_POS[selected_item.num_sub][ind]
-        if pos != -1:
+        if pos != -1 and pos != selected_sub_item.subKey:
             snd.fx('config')
             selected_sub_item.change_subtype(pos)
             # Redisplay the window to refresh data and move it to match
