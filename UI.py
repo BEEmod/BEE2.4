@@ -151,10 +151,10 @@ class Item():
         self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
         self.url = self.data['url']
         
-    def get_icon(self, subKey, allow_single=False):
+    def get_icon(self, subKey, allow_single=False, single_num=1):
         icons = self.data['icons']
         if (allow_single and 'all' in icons and 
-            sum(1 for item in pal_picked if item.id==self.id) == 1):
+            sum(1 for item in pal_picked if item.id==self.id) <= single_num):
             # If only 1 copy of this item is on the palette, use the special icon
             return png.loadIcon(icons['all'])
         else:
@@ -364,14 +364,16 @@ def showDrag(e):
         for item in pal_picked:
             if item.id == drag_item.id:
                 item.load_data()
+        # When dragging off, switch to the single-only icon
+        UI['drag_lbl']['image'] = drag_item.item.get_icon(drag_item.subKey, allow_single=False)
     else:
         drag_onPal=drag_item.onPal()
+        UI['drag_lbl']['image'] = drag_item.item.get_icon(drag_item.subKey, allow_single=True, single_num=0)
     dragWin.deiconify()
     dragWin.lift(win)
     dragWin.grab_set_global() # grab makes this window the only one to receive mouse events, so it is guaranteed that it'll drop when the mouse is released.
     # NOTE: _global means no other programs can interact, make sure it's released eventually or you won't be able to quit!
     moveDrag(e) # move to correct position
-    UI['drag_lbl']['image']=drag_item.img
     dragWin.bind("<B1-Motion>", moveDrag)
     dragWin.bind("<ButtonRelease-1>", hideDrag)
     UI['pre_sel_line'].lift()

@@ -1,5 +1,6 @@
 from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
+from functools import partial as func_partial
 import math
 import random
 
@@ -67,7 +68,7 @@ defaults={ # default values for this item
   'startup'                 : False,
   'toplevel'                : 1,
   'bottomlevel'             : 0,
-  'angledpanelanimation'    : 1,
+  'angledpanelanimation'    : 'ramp_45_deg_open',
   'startenabled'            : True,
   'startreversed'           : False,
   'startdeployed'           : True,
@@ -101,10 +102,17 @@ def sfx(sound):
         play_sound = False
         win.after(75, reset_sfx)
         
+def scroll_angle(key, e):
+    if e.delta > 0 and widgets[key].get() != '90':
+        e.widget.invoke('buttonup')
+    elif e.delta < 0 and widgets[key].get() != '0':
+        e.widget.invoke('buttondown')
+        
 
 def savePaint(e, key):
     sfx('config')
     values[key]=paintOpts.index(widgets[key].get())
+    
 
 def saveAngle(key):
     global last_angle
@@ -148,6 +156,13 @@ def saveRail(key):
         values['startactive'].set(False)
     else:
         widgets['startactive'].state(['!disabled'])
+        
+def toggleCheck(var, e=None):
+    if var.get():
+        var.set(0)
+    else:
+        var.set(1)
+    sfx('config')
         
 def checkFX():
     sfx('config')
@@ -204,11 +219,13 @@ def init(tk, cback):
         if PROP_TYPES[key][0] == 'checkbox':
             values[key] = IntVar(value=defaults[key])
             widgets[key] = ttk.Checkbutton(win, variable=values[key], command=checkFX)
+            widgets[key].bind('<Return>', func_partial(toggleCheck, values[key]))
         elif PROP_TYPES[key][0] == 'railLift':
             values[key] = IntVar(value=defaults[key])
             widgets[key] = ttk.Checkbutton(win, variable=values[key], command=lambda k=key: saveRail(k))
         elif PROP_TYPES[key][0] == 'panAngle':
-            widgets[key]=Spinbox(win, values=(30,45,60,90), command=lambda key=key: saveAngle(key))
+            widgets[key]=Spinbox(win, values=(30,45,60,90), command=func_partial(saveAngle, key))
+            widgets[key].bind('<MouseWheel>', func_partial(scroll_angle, key))
             values[key]=defaults[key]
         elif PROP_TYPES[key][0] == 'gelType':
             widgets[key]=ttk.Combobox(win, values=paintOpts)

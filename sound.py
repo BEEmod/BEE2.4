@@ -31,11 +31,12 @@ if initiallised:
               'swap'      : pygame.mixer.Sound(file='sounds/extrude.wav'),
              }
          
-    def fx(name):
+    def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
         # If we ever want to use a different library for sounds, just edit this, all sound calls should route through here.
         if not muted and name in sounds:
             sounds[name].play()
 else:
-    def fx(name):
-        pass # pygame failed, just don't play sound
+    def fx(name, e=None):
+        '''Pygame has failed to initialise, we just won't play any sounds!'''
+        pass

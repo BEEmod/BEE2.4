@@ -32,11 +32,14 @@ gameMan.load(Property.find_all(prop, 'games', 'game'))
 
 print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'])
-print('Done!')
 UI.load_packages(package_data)
+print('Done!')
+
 print('Loading Palettes...')
 pal=paletteLoader.loadAll(settings['pal_dir'])
-print('Done!')
 UI.load_palette(pal)
+print('Done!')
+
+print('Initialising UI...')
 UI.initMain() # create all windows
 UI.event_loop()
