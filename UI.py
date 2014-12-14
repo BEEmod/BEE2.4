@@ -13,6 +13,7 @@ from paletteLoader import Palette
 import packageLoader as package
 import contextWin
 import gameMan
+from gameMan import translate as P2_trans
 from selectorWin import selWin
 from selectorWin import Item as selWinItem
 import sound as snd
@@ -20,6 +21,8 @@ import sound as snd
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 gameMan.root=win
+
+gameMan.load_trans_data()
 
 png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
            
@@ -196,7 +199,7 @@ class PalItem(ttk.Label):
                 
     def load_data(self):
         self.img = self.item.get_icon(self.subKey, self.is_pre)
-        self.name = self.item.names[self.subKey]
+        self.name = P2_trans(self.item.names[self.subKey])
         self['image'] = self.img
         
     def clear(self):

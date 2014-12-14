@@ -15,6 +15,20 @@ import utils
 all_games = []
 root = None
 
+trans_data = {}
+
+def load_trans_data():
+    global trans_data
+    try:
+        with open('config/basemodui_english.txt', "r") as trans:
+            trans_data = Property.parse(trans, 'config/basemodui_english.txt')
+        trans_data = Property('',trans_data).as_dict()['lang']['Tokens']
+    except IOError:
+        pass
+
+def translate(str):
+    return trans_data.get(str, str)
+
 def game_set(game):
     pass
 
@@ -27,7 +41,6 @@ class Game:
         self.name = name
         self.steamID = id
         self.root = folder
-    
         
     def dlc_priority(self):
         '''Iterate through all subfolders, in order of priority, from high to low.
@@ -154,3 +167,5 @@ if __name__ == '__main__':
     root = Tk()
     Button(root, text = 'Add', command=find_game).grid(row=0, column=0)
     Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)
+    
+    g1 = Game("Portal 2", 620, r"F:\SteamLibrary\SteamApps\common\Portal 2")
