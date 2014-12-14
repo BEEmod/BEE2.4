@@ -3,6 +3,7 @@ Handles scanning through the zip packages to find all items, styles, voice lines
 '''
 import os
 import os.path
+import shutil
 from zipfile import ZipFile
 
 
@@ -16,7 +17,7 @@ packages = {}
 
 data = {}
 
-def loadAll(dir):
+def loadAll(dir, settings={}):
     "Scan and read in all packages in the specified directory."
     dir=os.path.join(os.getcwd(),dir)
     contents=os.listdir(dir) # this is both files and dirs
@@ -59,6 +60,20 @@ def loadAll(dir):
                     for over in obj_override[type][id]:
                         object.add_over(obj_types[type].parse(over[0], id, over[1]))
                 data[type].append(object)
+        if settings.get('load_resources', False):
+            print('Loading images')
+            #Delete old images
+            for zip in zips:
+                zip_contents = zip.namelist()
+                for path in zip.namelist():
+                    loc=os.path.normcase(path)
+                    if loc.startswith(os.path.normcase("resources/BEE2/")):
+                        zip.extract(path, path="cache/")
+            
+            if os.path.isdir("cache/resources/bee2"):
+                shutil.rmtree('images/cache', ignore_errors=True)
+                shutil.move("cache/resources/bee2", "images/cache")
+               
     finally:
         for z in zips: #close them all, we've already read the contents.
             z.close()

@@ -141,20 +141,23 @@ loaded_spr = {}
 
 def loadPng(path):
     "Loads in and converts a png for use in TKinter."
-    if path.casefold().endswith(".png"):
-        path="images/" + path
-    else:
-        path="images/"+path+".png"
+    if not path.casefold().endswith(".png"):
+        path=path+".png"
+    orig_path = path
     if path in loaded_png:
         return loaded_png[path]
     else:
+        if not os.path.isfile("images/" + path):
+            # If not in the main folder, load from the zip-cache
+            path = os.path.join("cache/", path)
+        path = os.path.normpath(os.path.join("images", path))
         if not os.path.isfile(path):
-          print("ERROR: \"" + path + "\" does not exist!")
-          return img_error
+            print('ERROR: "images\\' + orig_path + '" does not exist!')
+            return img_error
         tmp=PngImageTk(path)
-        print("Loading \""+path+"\"")
+        print('Loading "' + path + '"')
         tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
-        loaded_png[path] = tmp.image
+        loaded_png[orig_path] = tmp.image
         return tmp.image
 
 def loadSpr(name):

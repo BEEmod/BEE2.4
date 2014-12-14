@@ -11,6 +11,7 @@ $RECYCLE.BIN/
 __pycache__/
 build_BEE2/
 build_compiler/
+images/cache/
 
 # Windows Installer files
 *.cab

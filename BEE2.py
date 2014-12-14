@@ -23,15 +23,18 @@ def save_settings():
 
 with open("config/config.cfg", "r") as conf:
     prop=Property.parse(conf, "config/config.cfg")
+    
 dirs = Property.find_key(prop, 'directories')
+bee2 = Property.find_key(prop, 'BEE2')
 
 settings['pal_dir']=dirs['palettes', 'palettes\\']
 settings['package_dir']=dirs['package', 'packages\\']
+settings['load_resources'] = bee2['preserve_BEE2_resource_dir', '0'] == '0'
 
 gameMan.load(Property.find_all(prop, 'games', 'game'))
 
 print('Loading Packages...')
-package_data = packageLoader.loadAll(settings['package_dir'])
+package_data = packageLoader.loadAll(settings['package_dir'], settings)
 UI.load_packages(package_data)
 print('Done!')
 
