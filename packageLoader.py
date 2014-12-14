@@ -8,6 +8,7 @@ from zipfile import ZipFile
 
 
 from property_parser import Property
+import loadScreen as loader
 import utils
 
 __all__ = ('loadAll', 'Style', 'Item', 'Voice', 'Skybox', 'Music', 'Goo')
@@ -21,6 +22,7 @@ def loadAll(dir, settings={}):
     "Scan and read in all packages in the specified directory."
     dir=os.path.join(os.getcwd(),dir)
     contents=os.listdir(dir) # this is both files and dirs
+    loader.length("PAK",len(contents))
     zips=[]
     try:
         for name in contents:
@@ -42,12 +44,17 @@ def loadAll(dir, settings={}):
             obj[type] = {}
             obj_override[type] = {}
             data[type] = []
-        
+        objects = 0
         for id, zip, info, name, dispName in packages.values():
             print("Scanning package '"+id+"'")
-            is_valid=parse_package(zip, info, name, id, dispName)
+            new_objs=parse_package(zip, info, name, id, dispName)
+            objects += new_objs
+            loader.step("PAK")
             print("Done!")
             
+        loader.length("OBJ", objects)
+        loader.length("IMG", objects)
+        
         for type, objs in obj.items():
             for id, obj_data in objs.items():
                 print("Loading " + type + ' "' + id + '"!')
@@ -60,20 +67,26 @@ def loadAll(dir, settings={}):
                     for over in obj_override[type][id]:
                         object.add_over(obj_types[type].parse(over[0], id, over[1]))
                 data[type].append(object)
+                loader.step("OBJ")
         if settings.get('load_resources', False):
             print('Loading images')
             #Delete old images
-            for zip in zips:
-                zip_contents = zip.namelist()
-                for path in zip.namelist():
+            files = [(zip, zip.namelist()) for zip in zips]
+            loader.length("RES",sum(len(names) for zip, names in files))
+            for zip, zip_contents in files:
+                for path in zip_contents:
                     loc=os.path.normcase(path)
                     if loc.startswith(os.path.normcase("resources/BEE2/")):
                         zip.extract(path, path="cache/")
+                    loader.step("RES")
             
             if os.path.isdir("cache/resources/bee2"):
                 shutil.rmtree('images/cache', ignore_errors=True)
                 shutil.move("cache/resources/bee2", "images/cache")
                 shutil.rmtree('cache/', ignore_errors=True)
+        else:
+            loader.length("RES", 1)
+            loader.step("RES")
                
     finally:
         for z in zips: #close them all, we've already read the contents.
@@ -87,9 +100,11 @@ def parse_package(zip, info, filename, pak_id, dispName):
         if pre.value not in packages:
             utils.con_log('Package "' + pre.value + '" required for "' + pak_id + '" - ignoring package!')
             return False
+    objects = 0
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
         for object in Property.find_all(info, comp_type):
+            objects += 1
             id = object['id']
             is_sub = object['overrideOrig', '0'] == '1'
             if id in obj[comp_type]:
@@ -102,6 +117,7 @@ def parse_package(zip, info, filename, pak_id, dispName):
                     print('ERROR! "' + id + '" defined twice!')
             else:
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
+    return objects
 
 def setup_style_tree(data):
     '''Modify all items so item inheritance is properly handled.'''

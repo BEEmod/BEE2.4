@@ -1,9 +1,12 @@
 from property_parser import Property
 import paletteLoader
 import packageLoader
+import loadScreen
 import gameMan
 import UI 
 import utils
+
+loadScreen.init(UI.win)
 
 global settings
 settings={}
@@ -45,4 +48,6 @@ print('Done!')
 
 print('Initialising UI...')
 UI.initMain() # create all windows
+
+loadScreen.quit()
 UI.event_loop()

@@ -12,6 +12,7 @@ from property_parser import Property
 from paletteLoader import Palette
 import packageLoader as package
 import contextWin
+import loadScreen as loader
 import gameMan
 from gameMan import translate as P2_trans
 from selectorWin import selWin
@@ -263,6 +264,7 @@ def load_packages(data):
                 filter_data['author'][auth.casefold()] = auth 
         if it.pak_id not in filter_data['package']:
             filter_data['package'][it.pak_id] = it.pak_name 
+        loader.step("IMG")
     sky_list = []
     voice_list = []
     style_list = []
@@ -286,6 +288,7 @@ def load_packages(data):
                     authors=obj.auth, 
                     desc=obj.desc))
             obj_list[obj.id] = obj
+            loader.step("IMG")
             
     skybox_win = selWin(win, sky_list, title='Select Skyboxes', has_none=False)
     voice_win = selWin(win, voice_list, title='Select Additional Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
@@ -592,13 +595,13 @@ def filterAllCallback(col):
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initPalette(f):
     palFrame=ttk.Frame(f)
-    palFrame.grid(row=0, column=0, sticky="NSEW")
+    palFrame.grid(row=0, sticky="NSEW")
     palFrame.rowconfigure(0, weight=1)
     palFrame.columnconfigure(0, weight=1)
     f.rowconfigure(0, weight=1)
 
     UI['palette']=Listbox(palFrame, width=10)
-    UI['palette'].grid(row=0,column=0, sticky="NSEW")
+    UI['palette'].grid(sticky="NSEW")
     UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
     UI['palette'].selection_set(0)
 
@@ -607,32 +610,32 @@ def initPalette(f):
     UI['palette']['yscrollcommand']=palScroll.set
 
     UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
-    UI['newBox'].grid(row=1, column=0, sticky=S) # User types in and presses enter to create
+    UI['newBox'].grid(row=1, sticky=S) # User types in and presses enter to create
     UI['newBox'].bind("<Return>", newPal_textbox)
     UI['newBox'].bind("<FocusIn>", pal_remTempText)
     UI['newBox'].bind("<FocusOut>", pal_addTempText)
-    ttk.Button(f, text=" - ").grid(row=2, column=0, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
-    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, column=0)
+    ttk.Button(f, text=" - ").grid(row=2, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
+    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3)
         
 def initOption(f):
     f.columnconfigure(0,weight=1)
-    ttk.Button(f, width=10, text="Save...", command=save).grid(row=0, column=0)
-    ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1, column=0)
-    ttk.Button(f, width=10, text="Export...").grid(row=2, column=0, pady=(0, 10))
+    ttk.Button(f, width=10, text="Save...", command=save).grid(row=0)
+    ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1)
+    ttk.Button(f, width=10, text="Export...").grid(row=2, pady=(0, 10))
 
     props=ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1,weight=1)
-    props.grid(row=3, column=0, sticky="EW")
+    props.grid(row=3, sticky="EW")
     ttk.Sizegrip(props,cursor='sb_h_double_arrow').grid(row=2,column=3, sticky="NS")
     
     UI['suggested_style'] = ttk.Button(props, text="\u2193 Use Suggested \u2193", command=suggested_style_set)
     UI['suggested_style'].grid(row=1, column=1, sticky="EW")
 
-    ttk.Label(props, text="Style: ").grid(row=0, column=0)
-    ttk.Label(props, text="Music: ").grid(row=2, column=0)
-    ttk.Label(props, text="Voice: ").grid(row=3, column=0)
-    ttk.Label(props, text="Skybox: ").grid(row=4, column=0)
-    ttk.Label(props, text="Goo: ").grid(row=5, column=0)
+    ttk.Label(props, text="Style: ").grid(row=0)
+    ttk.Label(props, text="Music: ").grid(row=2)
+    ttk.Label(props, text="Voice: ").grid(row=3)
+    ttk.Label(props, text="Skybox: ").grid(row=4)
+    ttk.Label(props, text="Goo: ").grid(row=5)
     
     style_win.init_display(props, row=0, column=1)
     music_win.init_display(props, row=2, column=1)
@@ -644,7 +647,7 @@ def initStyleOpt(f):
     global styleCheck, styleOptVars
 
     UI['style_can']=Canvas(f, highlightthickness=0)
-    UI['style_can'].grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
+    UI['style_can'].grid(sticky="NSEW") # need to use a canvas to allow scrolling
     f.rowconfigure(0, weight=1)
 
     scroll = ttk.Scrollbar(f, orient=VERTICAL, command=UI['style_can'].yview)
@@ -654,13 +657,13 @@ def initStyleOpt(f):
 
     #This should automatically switch to match different styles
     frmAll=ttk.Labelframe(canFrame, text="All:")
-    frmAll.grid(row=0, column=0, sticky="EW")
+    frmAll.grid(row=0, sticky="EW")
 
     frmChosen=ttk.Labelframe(canFrame, text="Selected Style:")
-    frmChosen.grid(row=1, column=0, sticky="EW")
+    frmChosen.grid(row=1, sticky="EW")
 
     frmOther=ttk.Labelframe(canFrame, text="Other Styles:")
-    frmOther.grid(row=2, column=0, sticky="EW")
+    frmOther.grid(row=2, sticky="EW")
 
     styleCheck={}
     styleOptVars={}

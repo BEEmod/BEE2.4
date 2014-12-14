@@ -208,7 +208,7 @@ def init(tk, cback):
     labels['noOptions']=ttk.Label(win, text='No Properties avalible!')
     widgets['saveButton']=ttk.Button(win, text='Save', command=exit)
     widgets['titleLabel']=ttk.Label(win, text='')
-    widgets['titleLabel'].grid(row=0, column=0, columnspan=9)
+    widgets['titleLabel'].grid(columnspan=9)
     
     widgets['div_1']=ttk.Separator(win, orient="vertical")
     widgets['div_2']=ttk.Separator(win, orient="vertical")
@@ -264,7 +264,7 @@ def open(usedProps, parent, itemName):
             widgets[key].grid_remove()
             
     if spec_row>1: # if we have a 'special' prop, add the divider between the types
-        widgets['div_h'].grid(row=spec_row+1, column=0, columnspan=9, sticky="EW")
+        widgets['div_h'].grid(row=spec_row+1, columnspan=9, sticky="EW")
         spec_row+=2
     else:
         widgets['div_h'].grid_remove()
@@ -291,12 +291,12 @@ def open(usedProps, parent, itemName):
         
     if ind+spec_row==1:
         # There aren't any items, display error message
-        labels['noOptions'].grid(row=1, column=0, columnspan=9)
+        labels['noOptions'].grid(row=1, columnspan=9)
         ind=1
     else:
         labels['noOptions'].grid_remove()
         
-    widgets['saveButton'].grid(row=ind+spec_row, column=0, columnspan=9, sticky="EW")
+    widgets['saveButton'].grid(row=ind+spec_row, columnspan=9, sticky="EW")
     
     # Block sound for the first few millisec to stop excess sounds from playing
     play_sound=False

@@ -165,7 +165,7 @@ def setGame():
        
 if __name__ == '__main__':
     root = Tk()
-    Button(root, text = 'Add', command=find_game).grid(row=0, column=0)
-    Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)
+    Button(root, text = 'Add', command=find_game).grid(column=0)
+    Button(root, text = 'Remove', command=remove_game).grid(column=1)
     
     g1 = Game("Portal 2", 620, r"F:\SteamLibrary\SteamApps\common\Portal 2")

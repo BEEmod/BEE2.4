@@ -64,6 +64,7 @@ def loadAll(dir):
     pal_dir = dir
     dir=os.path.join(os.getcwd(),dir)
     contents=os.listdir(dir) # this is both files and dirs
+   
     palettes=[]
     for name in contents:
         print("Loading '"+name+"'")
