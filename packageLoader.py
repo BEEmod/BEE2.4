@@ -73,6 +73,7 @@ def loadAll(dir, settings={}):
             if os.path.isdir("cache/resources/bee2"):
                 shutil.rmtree('images/cache', ignore_errors=True)
                 shutil.move("cache/resources/bee2", "images/cache")
+                shutil.rmtree('cache/', ignore_errors=True)
                
     finally:
         for z in zips: #close them all, we've already read the contents.
