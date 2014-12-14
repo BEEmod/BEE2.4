@@ -196,6 +196,18 @@ class PalItem(ttk.Label):
         self.load_data()
         self.master.update() # Update the frame
         flowPreview()
+        
+    def open_menu_at_sub(self, ind):
+        '''Make the contextWin open itself at the indicated subitem on the item picker.'''
+        if self.is_pre:
+            items_list = pal_picked
+        else:
+            items_list = []
+        # Open on the palette, but also open on the item picker if needed
+        for item in itertools.chain(items_list, pal_items):
+            if item.id == self.id and item.subKey == ind:
+                contextWin.showProps(item, warp_cursor=True)
+                break
                 
     def load_data(self):
         self.img = self.item.get_icon(self.subKey, self.is_pre)

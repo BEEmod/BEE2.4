@@ -65,7 +65,14 @@ def sub_sel(ind, e=None):
             snd.fx('config')
             selected_sub_item.change_subtype(pos)
             # Redisplay the window to refresh data and move it to match
-            showProps(selected_sub_item) 
+            showProps(selected_sub_item, warp_cursor=True) 
+            
+def sub_open(ind, e=None):
+    '''Move the context window to apply to the given item.'''
+    pos = SUBITEM_POS[selected_item.num_sub][ind]
+    if pos != -1 and pos != selected_sub_item.subKey:
+        snd.fx('expand')
+        selected_sub_item.open_menu_at_sub(pos)
 
 def showMoreInfo():
     url = selected_item.url
@@ -97,15 +104,24 @@ def open_event(e):
     snd.fx('expand')
     showProps(wid)
         
-def showProps(wid):
-    '''Show the properties window for an item.'''
+def showProps(wid, warp_cursor=False):
+    '''Show the properties window for an item.
+    
+        If warp_cursor is  true, the cusor will be moved relative to this window so it stays on top of the selected subitem.
+    '''
     global selected_item, selected_sub_item, is_open
-    is_open = True
+    if warp_cursor and is_open:
+        cursor_x, cursor_y = prop_window.winfo_pointerxy()
+        off_x = cursor_x-prop_window.winfo_rootx()
+        off_y = cursor_y-prop_window.winfo_rooty()
+    else:
+        off_x, off_y = None, None
     prop_window.deiconify()
     prop_window.lift(root)
-    
     selected_item = wid.item
     selected_sub_item = wid
+    is_open = True
+        
     icon_widget = wid_sub[pos_for_item(selected_sub_item.subKey)]
     
     loc_x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
@@ -120,9 +136,14 @@ def showProps(wid):
         loc_x=prop_window.winfo_screenwidth()-prop_window.winfo_reqwidth()-15
     if loc_y > prop_window.winfo_screenheight()-prop_window.winfo_reqheight()-45:
         loc_y=prop_window.winfo_screenheight()-prop_window.winfo_reqheight()-45
+    
     prop_window.geometry('+'+str(loc_x)+'+'+str(loc_y))
     prop_window.relX=loc_x-root.winfo_x()
     prop_window.relY=loc_y-root.winfo_y()
+
+    
+    if off_x is not None and off_y is not None:
+        prop_window.event_generate('<Motion>', warp=True, x=off_x, y=off_y)
     
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
@@ -261,6 +282,7 @@ def init(win):
         wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/alpha_64'))
         wid_sub[i].grid(row=0, column=i)
         wid_sub[i].bind('<Button-1>', func_partial(sub_sel, i))
+        wid_sub[i].bind('<Button-3>', func_partial(sub_open, i))
         wid_sub[i].bind('<Enter>', func_partial(sub_sel_enter, i))
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
