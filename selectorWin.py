@@ -1,6 +1,7 @@
 from tkinter import * # ui library
 from tkinter import font
 from tkinter import ttk # themed ui components that match the OS
+from functools import partial as func_partial
 import math
 
 import tkinter_png as png # png library for TKinter
@@ -19,7 +20,7 @@ class Item:
     '''An item on the panel.
     
     '''
-    __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win')
+    __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win', 'context_lbl')
     def __init__(
             self,
             name, 
@@ -31,16 +32,12 @@ class Item:
         self.name = name
         self.shortName = shortName
         self.longName = shortName if longName is None else longName
+        self.context_lbl = self.shortName
         if icon is None:
             self.icon = png.loadPng('BEE2/blank')
         else:
             self.icon = png.loadPng(icon)
         self.desc = desc
-        # The description is a list of tuples - (type, text)
-        # type = 'bullet' for a bullet point
-        #        'line' for normal lines
-        #        'list' for an ordered list
-        #        'hrule' for a horizontal rule (ignores text)
         self.authors = [] if authors is None else authors
         
     def __repr__(self):
@@ -82,8 +79,8 @@ class selWin:
         self.win.transient(master=tk)
         self.win.resizable(True, True)
         self.win.iconbitmap('BEE2.ico')
-        self.win.protocol("WM_DELETE_WINDOW", lambda s=self: s.exit())
-        self.win.bind("<Escape>",lambda e, s=self: s.exit())
+        self.win.protocol("WM_DELETE_WINDOW", self.exit)
+        self.win.bind("<Escape>", self.exit)
         
         self.pane_win = ttk.Panedwindow(self.win, orient=HORIZONTAL)
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
@@ -138,25 +135,37 @@ class selWin:
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
         
         if self.has_def:
-            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command = lambda obj=self: obj.reset_sel())
+            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command=self.reset_sel)
             self.prop_reset.grid(row=5, column=1, sticky = "EW")
         
-        self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command = lambda obj=self: obj.save())
-        self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command = lambda obj=self: obj.exit())
+        self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command=self.save)
+        self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command=self.exit)
         
         self.prop_ok.grid(row=5, column=0, padx=(8,8))
         self.prop_cancel.grid(row=5, column=2, padx=(8,8))
         
-        for item in self.item_list:
+        self.win.option_add('*tearOff', False)
+        self.context_menu = Menu(self.win)
+        self.sugg_font = font.nametofont('TkMenuFont')
+        self.sugg_font['weight'] = 'bold'
+        self.context_var = IntVar()
+        
+        for ind, item in enumerate(self.item_list):
             if item==self.noneItem:
                 item.button = ttk.Button(self.pal_frame, image=item.icon)
+                item.context_lbl = '<None>'
             else:
                 item.button = ttk.Button(self.pal_frame, text=item.shortName, image=item.icon, compound='top')
+            self.context_menu.add_radiobutton(
+            label=item.context_lbl, 
+            command=func_partial(self.sel_item_id, item.name),
+            var = self.context_var, value=ind)
+            
             item.win = self.win
-            item.button.bind("<Button-1>",lambda e, s=self, i=item: s.sel_item(i))
-            item.button.bind("<Double-Button-1>",lambda e, s=self: s.save())
+            item.button.bind("<Button-1>", func_partial(self.sel_item, item))
+            item.button.bind("<Double-Button-1>", self.save)
         self.flow_items(None)
-        self.wid_canvas.bind("<Configure>",lambda e, s=self: s.flow_items(e))
+        self.wid_canvas.bind("<Configure>", self.flow_items)
         
         self.pane_win.add(shim, weight=1)
         self.pane_win.add(self.prop_frm)
@@ -168,6 +177,7 @@ class selWin:
         self.display.grid(row=row, column=column, columnspan=colspan, rowspan=rowspan, sticky="EW")
         self.display.bind("<Button-1>", self.open_win)
         self.display.bind("<Key>", self.set_disp)
+        self.display.bind("<Button-3>", self.open_context)
         
         self.disp_btn = ttk.Button(self.display, text="...", width=1.5, command=self.open_win)
         self.disp_btn.pack(side=RIGHT)
@@ -179,7 +189,7 @@ class selWin:
         self.sel_item(self.orig_selected)
         self.save()
         
-    def save(self):
+    def save(self, e=None):
         "Save the selected item into the textbox."
         self.win.grab_release()
         self.win.withdraw()
@@ -194,6 +204,7 @@ class selWin:
         else:
             self.disp_label.set(self.selected.shortName)
             self.chosen_id = self.selected.name
+        self.context_var.set(self.item_list.index(self.selected))
         return "break" # stop the entry widget from continuing with this event
             
     def open_win(self, e=None):
@@ -204,6 +215,11 @@ class selWin:
         self.win.geometry('+'+str(self.parent.winfo_rootx()+30)+'+'+str(self.parent.winfo_rooty()+30))
         self.flow_items()
         self.sel_item(self.selected)
+        
+    def open_context(self, e):
+        self.context_menu.post(
+            self.display.winfo_rootx(), 
+            self.display.winfo_rooty() + self.display.winfo_height())
         
     def reset_sel(self):
         if self.suggested is not None:
@@ -219,7 +235,8 @@ class selWin:
                 return True
         return False
         
-    def sel_item(self, item):
+    def sel_item(self, item, e=None):
+        print(item)
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -230,7 +247,6 @@ class selWin:
         self.prop_icon['image'] = item.icon
         
         self.prop_desc.set_text(item.desc)
-        
         
         self.selected.button.state(('!alternate',))
         self.selected = item
@@ -264,6 +280,13 @@ class selWin:
         If the ID is None or does not exist, the suggested item will be cleared.
         If the ID is "<NONE>", it will be set to the None item.
         '''
+        
+        if self.suggested is not None:
+            self.context_menu.entryconfig(
+                self.item_list.index(self.suggested),
+                font='')
+            # Remove the font from the last suggested item
+        
         if suggested == None:
             self.suggested = None
         elif suggested == "<NONE>":
@@ -275,6 +298,11 @@ class selWin:
                     break
             else: # Not found
                 self.suggested = None
+                
+        if self.suggested is not None:
+            self.context_menu.entryconfig(
+                self.item_list.index(self.suggested),
+                font=self.sugg_font)
         self.flow_items() # Refresh
 
 if __name__ == '__main__': # test the window if directly executing this file
