@@ -12,12 +12,14 @@ STAGES = [
     ('IMG',  'Loading Images'),
          ]
 widgets = {}
+bar_var = {}
+bar_val = {}
 maxes = {}
 num_images = 0
 active=False
          
 def init(root):
-    global win, wid_list, active
+    global win, wid_list, active, bar_var, bar_val
     active=True
     win=Toplevel(root)
     win.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
@@ -31,7 +33,9 @@ def init(root):
     
     for ind, (id, stage) in enumerate(STAGES):
         ttk.Label(win, text=stage + ':').grid(row=ind*2+2)
-        widgets[id] = ttk.Progressbar(win, length=150, mode='determinate', maximum=1)
+        bar_var[id] = IntVar(0)
+        bar_val[id] = 0
+        widgets[id] = ttk.Progressbar(win, length=150, maximum=1000, variable=bar_var[id])
         widgets[id].grid(row=ind*2+3)
         maxes[id] = 150
      
@@ -48,9 +52,10 @@ def length(stage, num):
 def step(stage):
     if active:
         bar = widgets[stage]
-        bar.step(1/maxes[stage])
+        bar_val[stage] += 1
+        bar_var[stage].set(1000*bar_val[stage]/maxes[stage])
         bar.update()
-            
+
 def quit():
     '''Shutdown the loading screen, we're done!'''
     global win, widgets, maxes, active

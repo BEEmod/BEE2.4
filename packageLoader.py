@@ -238,7 +238,7 @@ class Item:
                         'tags': sep_values(props['tags', ''],';'),
                         'desc': list(desc_parse(props)),
                         'ent':  props['ent_count', '??'],
-                        'url':  props['infoURL', 'NONE'],
+                        'url':  props['infoURL', None],
                         'icons': {p.name:p.value for p in props['icon', []]},
                         'editor': list(Property.find_all(editor, 'Item')),
                         'vbsp': None

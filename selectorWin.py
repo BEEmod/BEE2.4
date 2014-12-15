@@ -236,7 +236,6 @@ class selWin:
         return False
         
     def sel_item(self, item, e=None):
-        print(item)
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
