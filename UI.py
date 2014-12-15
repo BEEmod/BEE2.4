@@ -569,20 +569,10 @@ def updateFilters():
             FilterBoxes_all[cat].state(['!alternate']) # no alternate if they are all the same
             FilterVars_all[cat].set(value)
     for item in pal_items:
-        for auth in item.item.authors:
-            if FilterVars['author'][auth.casefold()].get() is 0:
-                item.visible=False
-                break
-        else:
-            if FilterVars['package'][item.item.pak_id].get() is 0:
-                item.visible=False
-            else:
-                for tag in item.item.tags:
-                    if FilterVars['tags'][tag.casefold()].get() is 0:
-                        item.visible=False
-                        break
-                else:
-                    item.visible=True
+        item.visible = (
+            any(FilterVars['author'][auth.casefold()].get() for auth in item.item.authors) and
+            any(FilterVars['tags'][tag.casefold()].get() for tag in item.item.tags) and
+            FilterVars['package'][item.item.pak_id].get())
     flowPicker()
 
 def filterAllCallback(col):
