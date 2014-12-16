@@ -938,7 +938,7 @@ def change_func_brush():
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("gratingInst")
     for brush in itertools.chain(map.iter_ents(classname='func_brush'),
-                                 map.iter_ents(classname='func_rotating')):
+                                 map.iter_ents(classname='func_door_rotating')):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
         type="" 
