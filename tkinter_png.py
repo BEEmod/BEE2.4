@@ -155,7 +155,7 @@ def loadPng(path):
             print('ERROR: "images\\' + orig_path + '" does not exist!')
             return img_error
         tmp=PngImageTk(path)
-        print('Loading "' + path + '"')
+        #print('Loading "' + path + '"')
         tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
         loaded_png[orig_path] = tmp.image
         return tmp.image

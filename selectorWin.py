@@ -32,7 +32,10 @@ class Item:
         self.name = name
         self.shortName = shortName
         self.longName = shortName if longName is None else longName
-        self.context_lbl = self.shortName
+        if len(self.longName) > 20:
+            self.context_lbl = self.shortName
+        else:
+            self.context_lbl = self.longName
         if icon is None:
             self.icon = png.loadPng('BEE2/blank')
         else:
@@ -45,7 +48,17 @@ class Item:
 
 class selWin: 
     "The selection window for skyboxes, music, goo and voice packs."
-    def __init__(self, tk, lst, has_none=True, has_def=True, none_desc=[('line', 'Do not add anything.')], title='BEE2', callback=_NO_OP):
+    def __init__(
+            self,
+            tk, 
+            lst, 
+            has_none=True, 
+            has_def=True, 
+            none_desc=[('line', 'Do not add anything.')], 
+            title='BEE2', 
+            callback=_NO_OP, 
+            full_context=False
+                ):
         '''Create a window object.
         
         Read from .selected_id to get the currently-chosen Item name, or None if the <none> Item is selected.
@@ -57,6 +70,7 @@ class selWin:
         - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item changes.
+        - full_context controls if the short or long names are used for the context menu.
         ''' 
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = png.loadPng('BEE2/none_96')
@@ -184,7 +198,7 @@ class selWin:
         
         self.save()
         
-    def exit(self):
+    def exit(self, e=None):
         '''Quit and cancel, choosing the originally-selected item.'''
         self.sel_item(self.orig_selected)
         self.save()
@@ -202,8 +216,9 @@ class selWin:
             self.disp_label.set("<None>")
             self.chosen_id = None
         else:
-            self.disp_label.set(self.selected.shortName)
+            self.disp_label.set(self.selected.context_lbl)
             self.chosen_id = self.selected.name
+        self.orig_selected=self.selected
         self.context_var.set(self.item_list.index(self.selected))
         return "break" # stop the entry widget from continuing with this event
             

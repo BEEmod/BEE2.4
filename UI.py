@@ -37,6 +37,7 @@ UI={} # Other ui elements we need to access
 menus={} # The menu items for the main window
 pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
+pal_picked_fake = [] # Labels used for the empty palette positions
 drag_item=-1 # the item currently being moved
 drag_orig_pos=-1
 drag_onPal=False # are we dragging a palette item?
@@ -290,11 +291,43 @@ def load_packages(data):
             obj_list[obj.id] = obj
             loader.step("IMG")
             
-    skybox_win = selWin(win, sky_list, title='Select Skyboxes', has_none=False)
-    voice_win = selWin(win, voice_list, title='Select Additional Voice Lines', has_none=True, none_desc='Add no extra voice lines.')
-    music_win = selWin(win, music_list, title='Select Background Music', has_none=True, none_desc='Add no music to the map at all.')
-    goo_win = selWin(win, goo_list, title='Select Goo Appearance', has_none=True, none_desc='Use a Bottomless Pit instead. This changes appearance depending on the skybox that is chosen.')
-    style_win = selWin(win, style_list, title='Select Style', has_none=False, has_def=False, callback=style_select_callback)
+    skybox_win = selWin(
+        win, 
+        sky_list, 
+        title='Select Skyboxes', 
+        has_none=False)
+        
+    voice_win = selWin(
+        win, 
+        voice_list, 
+        title='Select Additional Voice Lines', 
+        has_none=True, 
+        none_desc='Add no extra voice lines.')
+        
+    music_win = selWin(
+        win,
+        music_list,
+        title='Select Background Music',
+        has_none=True,
+        none_desc='Add no music to the map at all.')
+        
+    goo_win = selWin(
+        win,
+        goo_list,
+        title='Select Goo Appearance',
+        has_none=True,
+        none_desc='Use a Bottomless Pit instead. This changes appearance'
+                   'depending on the skybox that is chosen.')
+                   
+    style_win = selWin(
+        win, 
+        style_list,
+        title='Select Style',
+        has_none=False,
+        has_def=False,
+        callback=style_select_callback
+                      )
+                      
     style_win.sel_item_id('BEE2_CLEAN')
     suggested_style_set()
     
@@ -689,10 +722,20 @@ def flowPreview():
         item.pre_x=i%4
         item.pre_y=i//4 # these can be referred to to figure out where it is
         item.place(x=(i%4*65+4),y=(i//4*65+32))
+        item.lift()
+    item_count = len(pal_picked)-1
+    for ind, fake in enumerate(pal_picked_fake):
+        if ind < item_count:
+            fake.place_forget()
+        else:
+            fake.place(x=(ind%4*65+4),y=(ind//4*65+32))
+            fake.lift()
+        
     UI['pre_sel_line'].lift()
 
 def initPreview(f):
     "Generate the preview pane which shows the items that will export to the palette."
+    global pal_picked_fake
     previewImg  = png.loadPng('BEE2/menu')
     UI['pre_bg_img']=Label(f, bg=ItemsBG, image=previewImg)
     UI['pre_bg_img'].imgsave=previewImg #image with the ingame items palette, needs to be saved to stop garbage collection
@@ -704,12 +747,15 @@ def initPreview(f):
     selImg=png.loadPng('BEE2/sel_bar')
     UI['pre_sel_line']=Label(f, bg="#F0F0F0", image=selImg, borderwidth=0, relief="solid")
     UI['pre_sel_line'].imgsave=selImg
+    
+    blank = png.loadPng('BEE2/blank')
+    pal_picked_fake = [ttk.Label(frames['preview'], image=blank) for _ in range(32)]
+    
     flowPreview()
 
 def initPicker(f):
     global frmScroll, pal_canvas, pal_items_fake
     ttk.Label(f, text="All Items: ", anchor="center").grid(row=0, column=0, sticky="EW")
-    UI['picker_empty_img']=png.loadPng('BEE2/blank')
     cframe=ttk.Frame(f,borderwidth=4, relief="sunken")
     cframe.grid(row=1, column=0, sticky="NSEW")
     f.rowconfigure(1, weight=1)
@@ -729,10 +775,9 @@ def initPicker(f):
     for item in item_list.values():
         for i in range(0,item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
-
-    pal_items_fake=[]
-    for i in range(0, 50): # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons)
-        pal_items_fake.append(ttk.Label(frmScroll, image=UI['picker_empty_img']))
+    blank = png.loadPng('BEE2/blank')
+    # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more (3250+ pixels just for the icons
+    pal_items_fake = [ttk.Label(frmScroll, image=blank) for _ in range(0,50)]
     f.bind("<Configure>",flowPicker)
 
 def flowPicker(e=None):
