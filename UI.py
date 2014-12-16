@@ -192,8 +192,7 @@ class PalItem(ttk.Label):
         '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
         for item in pal_picked[:]:
             if item.id == self.id and item.subKey == ind:
-                item.place_forget()
-                pal_picked.remove(item)
+                item.kill()
         self.subKey = ind
         self.load_data()
         self.master.update() # Update the frame
@@ -202,7 +201,7 @@ class PalItem(ttk.Label):
     def open_menu_at_sub(self, ind):
         '''Make the contextWin open itself at the indicated subitem on the item picker.'''
         if self.is_pre:
-            items_list = pal_picked
+            items_list = pal_picked[:]
         else:
             items_list = []
         # Open on the palette, but also open on the item picker if needed
@@ -222,10 +221,16 @@ class PalItem(ttk.Label):
         for i,item in enumerate(pal_picked[:]): 
         # remove the item off of the palette if it's on there, this lets you delete items and prevents having the same item twice.
             if self==item:
-                item.place_forget()
-                del pal_picked[i]
+                item.kill()
                 found = True
         return found
+        
+    def kill(self):
+        '''Hide and destroy this widget.'''
+        if self in pal_picked:
+            pal_picked.remove(self)
+        self.place_forget()
+        self.destroy()
 
     def onPal(self):
         '''Determine if this item is on the palette.'''
@@ -240,6 +245,9 @@ class PalItem(ttk.Label):
         
     def copy(self, frame):
         return PalItem(frame, self.item, self.subKey, self.is_pre)
+        
+    def __repr__(self):
+        return str(self.id) + ":" + str(self.subKey) + "\n"
     
 def load_palette(data):
     '''Import in all defined palettes.'''
@@ -371,7 +379,7 @@ def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
     # TODO: Update the listbox/menu to match, and reload the new palette.
     for item in pal_picked:
-        item.place_forget()
+        item.kill()
     pal_picked.clear()
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
@@ -409,8 +417,7 @@ def showDrag(e):
     drag_passedPal=False
     if drag_item.is_pre: # is the cursor over the preview pane?
         ind=drag_item.pre_x+drag_item.pre_y*4
-        pal_picked[ind].place_forget()
-        del pal_picked[ind]
+        drag_item.kill()
         drag_onPal=True
         for item in pal_picked:
             if item.id == drag_item.id:
@@ -431,6 +438,7 @@ def showDrag(e):
 
 def hideDrag(e):
     "User released the mouse button, complete the drag."
+    global drag_item
     dragWin.withdraw()
     dragWin.unbind("<B1-Motion>")
     dragWin.grab_release()
@@ -451,10 +459,11 @@ def hideDrag(e):
             else:
                 pal_picked.insert(ind,newItem)
             if len(pal_picked) > 32: # delete the item - it's fallen off the palette
-                pal_picked.pop().place_forget()
+                pal_picked.pop().kill()
         else: # drop the item
             snd.fx('delete')
         flowPreview() # always refresh
+    drag_item = None
 
 def moveDrag(e):
     "Update the position of dragged items as they move around."
@@ -479,7 +488,7 @@ def fastDrag(e):
     e.widget.clear()
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<9: # is the cursor over the preview pane?
         snd.fx('delete')
-        e.widget.place_forget() # remove the clicked item
+        e.widget.kill() # remove the clicked item
     else: # over the picker
         if len(pal_picked) < 32: # can't copy if there isn't room
             snd.fx('config')
@@ -718,19 +727,19 @@ def initTool(f):
 def flowPreview():
     "Position all the preview icons based on the array. Run to refresh if items are moved around."
     for i,item in enumerate(pal_picked):
-        item.load_data() # Check to see if this should use the single-icon
         item.pre_x=i%4
         item.pre_y=i//4 # these can be referred to to figure out where it is
         item.place(x=(i%4*65+4),y=(i//4*65+32))
+        item.load_data() # Check to see if this should use the single-icon
         item.lift()
-    item_count = len(pal_picked)-1
+    
+    item_count = len(pal_picked)
     for ind, fake in enumerate(pal_picked_fake):
         if ind < item_count:
             fake.place_forget()
         else:
             fake.place(x=(ind%4*65+4),y=(ind//4*65+32))
             fake.lift()
-        
     UI['pre_sel_line'].lift()
 
 def initPreview(f):
