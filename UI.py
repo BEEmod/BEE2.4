@@ -68,6 +68,7 @@ voices = {}
 styles = {}
 musics = {}
 goos = {}
+stylevar_list = []
     
 selected_style = "BEE2_CLEAN"
 
@@ -81,7 +82,10 @@ styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)
                ]
                
-stylevar_list = []
+styleCheck_enabled={}
+styleCheck={}
+styleCheck_disabled={}
+styleOptVars={}
                
 class Item():
     '''Represents an item that can appear on the list.'''
@@ -197,6 +201,84 @@ class PalItem(ttk.Label):
         
     def __repr__(self):
         return str(self.id) + ":" + str(self.subKey) + "\n"
+        
+class SubPane(Toplevel):
+    '''A Toplevel window that can be shown/hidden, and follows the main window when moved.'''
+    def __init__(self, parent, tool_frame, tool_img, tool_col=0, title='', resize_x=False, resize_y=False):
+        self.visible=True
+        self.allow_snap = True
+        self.parent = parent
+        self.relX = 0
+        self.relY = 0
+        super().__init__(parent)
+        
+        self.tool_button = ttk.Button(
+            tool_frame, 
+            style='BG.TButton', 
+            image=tool_img, 
+            command=self.toggle_win)
+        self.tool_button.state(('pressed',))
+        self.tool_button.grid(row=0, column=tool_col, padx=(5,2))
+        
+        self.transient(master=parent)
+        self.resizable(resize_x, resize_y)
+        self.title(title)
+        self.iconbitmap('BEE2.ico')
+        
+        self.protocol("WM_DELETE_WINDOW", self.hide_win)
+        parent.bind('<Configure>', self.follow_main, add='+')
+        self.bind('<Configure>', self.snap_win)
+        
+    def hide_win(self):
+        "Hide a window, effectively closes it without deleting the contents"
+        snd.fx('config')
+        self.withdraw()
+        self.visible=False
+        self.tool_button.state(('!pressed',))
+        
+    def toggle_win(self):
+        if self.visible:
+            self.hide_win()
+        else:
+            snd.fx('config')
+            self.visible=True
+            self.deiconify()
+            self.parent.focus() # return focus back to main window so it doesn't flicker between if you press the various buttons
+            self.tool_button.state(('pressed',))
+            
+    def move(self, x=None, y=None, width=None, height=None):
+        '''Move the window to the specified position.
+        
+        Effectively an easier-to-use form of Toplevel.geometry(), that also updates relX and relY.
+        '''
+        if width is None:
+            width = self.winfo_reqwidth()
+        if height is None:
+            height = self.winfo_reqheight()
+        if x is None:
+            x = self.winfo_x()
+        if y is None:
+            y = self.winfo_y()
+        
+        self.geometry(str(width) + 'x' + str(height) + '+' + str(x) + '+' + str(y))
+        self.relX = x - self.parent.winfo_x()
+        self.relY = y - self.parent.winfo_y()
+
+    def snap_win(self, e=None):
+        '''Callback for window movement, allows it to snap to the edge of the main window.'''
+        # TODO: Actually snap to edges of main window
+        if self.allow_snap:
+            self.relX=self.winfo_x()-self.parent.winfo_x()
+            self.relY=self.winfo_y()-self.parent.winfo_y()
+            self.update_idletasks()
+
+    def follow_main(self, e=None):
+        '''When the main window moves, sub-windows should move with it.'''
+        self.allow_snap=False
+        self.geometry('+'+str(self.parent.winfo_x()+self.relX)+'+'+str(self.parent.winfo_y()+self.relY))
+        self.allow_snap=True
+        self.parent.focus()
+        
     
 def load_palette(data):
     '''Import in all defined palettes.'''
@@ -486,42 +568,6 @@ def save():
     else:
         savePal(pal) # overwrite it
 
-def toggleWin(name):
-    snd.fx('config')
-    if windows[name].vis:
-        windows[name].vis=False
-        windows[name].withdraw()
-        UI['tool_win_'+name].state(['!pressed'])
-    else:
-        windows[name].vis=True
-        windows[name].deiconify()
-        win.focus() # return focus back to main window so it doesn't flicker between if you press the various buttons
-        UI['tool_win_'+name].state(['pressed'])
-
-def hideWin(name):
-    "Hide a window, effectively closes it without deleting the contents"
-    snd.fx('config')
-    windows[name].withdraw()
-    windows[name].vis=False
-    UI['tool_win_'+name].state(['!pressed'])
-
-def snapWin(name):
-    "Callback for window movement, allows it to snap to the edge of the main window."
-    # TODO: Actually snap to edges of main window
-    if shouldSnap:
-        windows[name].relX=windows[name].winfo_x()-win.winfo_x()
-        windows[name].relY=windows[name].winfo_y()-win.winfo_y()
-        windows[name].update_idletasks()
-
-def moveMain(e):
-    "When the main window moves, sub-windows should move with it."
-    shouldSnap=False
-    for name in('pal','style','opt'):
-        windows[name].geometry('+'+str(win.winfo_x()+windows[name].relX)+'+'+str(win.winfo_y()+windows[name].relY))
-    contextWin.follow_main()
-    win.focus()
-    shouldSnap=True
-
 def menu_newPal():
     newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
 
@@ -648,10 +694,6 @@ def initStyleOpt(f):
     Frame(frmChosen).grid()
     Frame(frmOther).grid()
 
-    styleCheck_enabled={}
-    styleCheck={}
-    styleCheck_disabled={}
-    styleOptVars={}
     for pos, (id, name, default) in enumerate(styleOptions):
         styleOptVars[id]=BooleanVar(value=default)
         styleCheck[id]=ttk.Checkbutton(frmAll, variable=styleOptVars[id], text=name)
@@ -669,7 +711,6 @@ def initStyleOpt(f):
     ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=1, column=0)
     
 def refresh_stylevars():
-    global styleCheck_enabled, styleCheck_disabled
     en_row = 0
     dis_row = 0
     for var in stylevar_list:
@@ -681,15 +722,6 @@ def refresh_stylevars():
             styleCheck_enabled[var.id].grid_remove()
             styleCheck_disabled[var.id].grid(row=dis_row,sticky="W", padx=3)
             dis_row += 1
-
-def initTool(f):
-    "Creates the small toolbar above the icons that allows toggling subwindows."
-    for i,name in enumerate(('pal','opt','style')):
-        UI['tool_win_'+name]=ttk.Button(f, command=lambda n=name:toggleWin(n), style='BG.TButton')
-        UI['tool_win_'+name].img = png.loadPng('icons/win_'+name)
-        UI['tool_win_'+name]['image'] = UI['tool_win_'+name].img
-        UI['tool_win_'+name].state(["pressed"])
-        UI['tool_win_'+name].grid(row=0, column=i, padx=(5,2))
 
 def flowPreview():
     "Position all the preview icons based on the array. Run to refresh if items are moved around."
@@ -894,9 +926,6 @@ def initMain():
     win.minsize(width=frames['preview'].winfo_reqwidth()+200,height=frames['preview'].winfo_reqheight()+5) # Prevent making the window smaller than the preview pane
     loader.step('UI')
 
-    frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26, borderwidth=0)
-    frames['toolMenu'].place(x=73, y=2)
-    initTool(frames['toolMenu'])
     loader.step('UI')
 
     ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
@@ -919,34 +948,37 @@ def initMain():
     loader.step('UI')
 
     frames['filter'].lift()
+    
+    frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26, borderwidth=0)
+    frames['toolMenu'].place(x=73, y=2)
 
-    windows['pal']=Toplevel(win)
-    windows['pal'].transient(master=win)
-    windows['pal'].resizable(False, True)
-    windows['pal'].title("BEE2 - Palettes")
-    windows['pal'].iconbitmap('BEE2.ico')
-    windows['pal'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal'))
-    windows['pal'].vis=True
+    windows['pal']=SubPane(
+        win, 
+        title='Palettes', 
+        resize_y=True, 
+        tool_frame=frames['toolMenu'], 
+        tool_img=png.loadPng('icons/win_pal'),
+        tool_col=0)
     initPalette(windows['pal'])
     loader.step('UI')
 
-    windows['opt']=Toplevel(win)
-    windows['opt'].transient(master=win)
-    windows['opt'].resizable(True, False)
-    windows['opt'].title("BEE2 - Options")
-    windows['opt'].iconbitmap('BEE2.ico')
-    windows['opt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt'))
-    windows['opt'].vis=True
+    windows['opt']=SubPane(
+        win,
+        title='BEE2 - Options',
+        resize_x=True,
+        tool_frame=frames['toolMenu'],
+        tool_img=png.loadPng('icons/win_opt'),
+        tool_col=1)
     initOption(windows['opt'])
     loader.step('UI')
 
-    windows['style']=Toplevel(win)
-    windows['style'].transient(master=win)
-    windows['style'].resizable(False, True)
-    windows['style'].title("BEE2 - Style Properties")
-    windows['style'].iconbitmap('BEE2.ico')
-    windows['style'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style'))
-    windows['style'].vis=True
+    windows['style']=SubPane(
+        win, 
+        title='BEE2 - Style Properties', 
+        resize_y=True, 
+        tool_frame=frames['toolMenu'], 
+        tool_img=png.loadPng('icons/win_style'),
+        tool_col=2)
     initStyleOpt(windows['style'])
     loader.step('UI')
 
@@ -981,21 +1013,23 @@ def initMain():
     else:
         win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
     win.update_idletasks()
-    windows['pal'].geometry( str(windows['pal'].winfo_reqwidth()) + 'x' + str(win.winfo_reqheight()) +
-      '+' + str(win.winfo_rootx()-windows['pal'].winfo_reqwidth() - 25) + '+' + str(win.winfo_rooty()-50))
-    xpos = '+' + str(min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )) + '+'
-    opt_size = str(windows['style'].winfo_reqwidth()) + 'x' + str(windows['opt'].winfo_reqheight())
-    windows['opt'].geometry(opt_size + xpos + str(win.winfo_rooty()-40))
-    windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
-
-    snapWin('style')
-    snapWin('opt')
-    snapWin('pal')
     
-    win.bind("<Configure>",moveMain)
-    windows['style'].bind("<Configure>", lambda e: snapWin('style'))
-    windows['opt'].  bind("<Configure>", lambda e: snapWin('opt'))
-    windows['pal'].  bind("<Configure>", lambda e: snapWin('pal'))
+    xpos = min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )
+   
+    windows['pal'].move(
+        x=(win.winfo_rootx()-windows['pal'].winfo_reqwidth() - 25),
+        y=(win.winfo_rooty()-50),
+        height=win.winfo_reqheight())
+    windows['opt'].move(
+        x=xpos, 
+        y=win.winfo_rooty()-40,
+        width=windows['style'].winfo_reqwidth())
+    windows['style'].move(
+        x=xpos, 
+        y=win.winfo_rooty()+windows['opt'].winfo_reqheight()+50)
+
+    
+    win.bind("<Configure>", contextWin.follow_main, add='+')
 
     loadPalUI()
     style_win.callback = style_select_callback

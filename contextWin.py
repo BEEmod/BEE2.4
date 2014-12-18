@@ -234,7 +234,7 @@ def set_sprites(item):
         face_spr += "_none"
     wid_spr[4]['image'] = png.loadSpr(face_spr)
     
-def follow_main():
+def follow_main(e=None):
     '''Move the properties window to keep a relative offset to the main window.'''
     prop_window.geometry('+'+str(prop_window.relX+root.winfo_x())+
                          '+'+str(prop_window.relY+root.winfo_y()))
