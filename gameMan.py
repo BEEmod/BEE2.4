@@ -150,6 +150,9 @@ def as_props():
 def find_game(e=None):
     '''Ask for, and load in a game to export to.'''
     messagebox.showinfo(message='Select the folder where the game executable is located (portal2.exe)...', parent=root)
+    val = filedialog.askopenfilename(title='Find Game Exe', filetypes=[('Executable', '.exe')], initialdir='C:')
+    if val:
+        print(val)
     
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
@@ -170,5 +173,4 @@ if __name__ == '__main__':
     root = Tk()
     Button(root, text = 'Add', command=find_game).grid(row=0, column=0)
     Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)
-    
     g1 = Game("Portal 2", 620, r"F:\SteamLibrary\SteamApps\common\Portal 2")

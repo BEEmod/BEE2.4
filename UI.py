@@ -69,51 +69,7 @@ styles = {}
 musics = {}
 goos = {}
     
-# music_list = [
-    # selWinItem(
-        # "VALVE_PETI",
-        # "Random PeTI",
-        # longName="Random PeTI (Robot Waiting Room)",
-        # icon="music/peti",
-        # authors=["Valve"],
-        # desc="The original PeTI music. Randomly chooses between the 7 different tracks."),
-    # selWinItem(
-        # "VALVE_CONTROL_GROUP",
-        # "50s Chamber",
-        # longName="You are Not Part of the Control Group",
-        # icon="music/control_group",
-        # authors=["Valve"],
-        # desc="The music played in some of the first 50s chambers. Has additional Repulsion Gel beats that mix in dynamically."),
-    # selWinItem(
-        # "MUSIC_FUTURE_STARTER",
-        # "Future Starter",
-        # longName="The Future Starts With You",
-        # icon="music/future_starter",
-        # authors=["Valve"],
-        # desc="Cave"),
-    # ]
-    
-# goo_list = [
-    # selWinItem(
-        # "GOO_NORM",
-        # "Regular",
-        # icon="goo/clean",
-        # authors=["Valve"],
-        # desc="The standard normal Toxic Goo."),
-        
-    # selWinItem(
-        # "GOO_OVERGROWN",
-        # "Overgrown",
-        # icon="goo/overgrown",
-        # authors=["Valve"],
-        # desc="A version of goo which is more murky, and reflective."),
-    # ]
-    
 selected_style = "BEE2_CLEAN"
-    
-# skyboxText = ('[Default]','None','Overgrown Sunlight', 'Darkness', 'Reactor Fires', 'Clean BTS', 'Wheatley BTS', 'Factory BTS', 'Portal 1 BTS', 'Art Therapy BTS', 'Test Shaft', 'Test Sphere')
-# voiceText = ('[Default]', 'None', "50's Cave","60's Cave", "70's Cave", "80's Cave", "Cave", "Cave and GLaDOS", "GLaDOS", "Portal 1 GLaDOS (ported)", "Portal 1 GLaDOS", "Rexaura GLaDOS", "Art Therapy GLaDOS", "BTS GLaDOS", "Apocalypse GLaDOS", "Apocalypse Announcer", "Announcer", "BTS Announcer")
-# musicText = ('[Default]','None', 'Random PeTI', 'Robot Waiting Room 1', 'Robot Waiting Room 2', 'Robot Waiting Room 3', 'Robot Waiting Room 4', 'Robot Waiting Room 5', 'Robot Waiting Room 6', 'You are Not Part of the Control Group', 'Vitrification Order', 'The Reunion', 'Music of the Spheres 1', 'Music of the Spheres 2', 'The Future Starts With You')
 
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
