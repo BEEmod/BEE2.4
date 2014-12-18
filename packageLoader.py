@@ -44,7 +44,9 @@ def loadAll(dir, settings={}):
             obj[type] = {}
             obj_override[type] = {}
             data[type] = []
+            
         objects = 0
+        
         for id, zip, info, name, dispName in packages.values():
             print("Scanning package '"+id+"'")
             new_objs=parse_package(zip, info, name, id, dispName)
@@ -53,7 +55,7 @@ def loadAll(dir, settings={}):
             print("Done!")
             
         loader.length("OBJ", objects)
-        loader.length("IMG", objects)
+        loader.length("IMG", objects - len(obj['StyleVar']))
         
         for type, objs in obj.items():
             for id, obj_data in objs.items():
@@ -69,8 +71,8 @@ def loadAll(dir, settings={}):
                 data[type].append(object)
                 loader.step("OBJ")
         if settings.get('load_resources', False):
-            print('Loading images')
-            #Delete old images
+            print('Extracting Resources...')
+            
             files = [(zip, zip.namelist()) for zip in zips]
             loader.length("RES",sum(len(names) for zip, names in files))
             for zip, zip_contents in files:
@@ -78,12 +80,18 @@ def loadAll(dir, settings={}):
                     loc=os.path.normcase(path)
                     if loc.startswith(os.path.normcase("resources/BEE2/")):
                         zip.extract(path, path="cache/")
+                    if loc.startswith(os.path.normcase("resources/instances/")):
+                        zip.extract(path, path="cache/")
                     loader.step("RES")
+            shutil.rmtree('images/cache', ignore_errors=True)
+            shutil.rmtree('inst_cache/', ignore_errors=True)
             
             if os.path.isdir("cache/resources/bee2"):
-                shutil.rmtree('images/cache', ignore_errors=True)
                 shutil.move("cache/resources/bee2", "images/cache")
-                shutil.rmtree('cache/', ignore_errors=True)
+            if os.path.isdir("cache/resources/instances"):
+                shutil.move("cache/resources/instances", "inst_cache/")
+                
+            shutil.rmtree('cache/', ignore_errors=True)
         else:
             loader.length("RES", 1)
             loader.step("RES")

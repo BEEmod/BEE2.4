@@ -13,6 +13,7 @@ build_BEE2/
 build_compiler/
 images/cache/
 cache/
+inst_cache/
 
 # Windows Installer files
 *.cab
