@@ -342,14 +342,14 @@ class Property:
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
         if self.valid:
-            out_val = '"' + self.name + '"'
+            out_val = '"' + str(self.name) + '"'
             if isinstance(self.value, list):
                 yield out_val
                 yield '{'
                 yield from ('\t'+line for property in self.value for line in property.to_strings() if property.valid==True)
                 yield '}'
             else:
-                yield out_val + ' "' + self.value + '"'
+                yield out_val + ' "' + str(self.value) + '"'
         else:
             yield ''
 

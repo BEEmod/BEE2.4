@@ -312,7 +312,8 @@ def load_map(path):
     global map
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
-        map=VLib.VMF.parse(Property.parse(file, path))
+        props = Property.parse(file, path)
+    map=VLib.VMF.parse(props)
     utils.con_log("Parsing complete!")
 
 def check_glob_conditions():

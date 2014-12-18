@@ -10,8 +10,10 @@ STAGES = [
     ('OBJ',  'Loading Objects'),
     ('RES', 'Extracting Items'),
     ('IMG',  'Loading Images'),
+    ('UI', 'Initialising UI')
          ]
 widgets = {}
+labels = {}
 bar_var = {}
 bar_val = {}
 maxes = {}
@@ -28,16 +30,19 @@ def init(root):
     win.geometry('+200+200')
     win.deiconify()
     
-    ttk.Label(win, text='Loading...', font=("Helvetica", 12, "bold")).grid()
-    ttk.Separator(win, orient=HORIZONTAL).grid(row=1, sticky="EW")
+    ttk.Label(win, text='Loading...', font=("Helvetica", 12, "bold")).grid(columnspan=2)
+    ttk.Separator(win, orient=HORIZONTAL).grid(row=1, sticky="EW", columnspan=2)
     
     for ind, (id, stage) in enumerate(STAGES):
-        ttk.Label(win, text=stage + ':').grid(row=ind*2+2)
-        bar_var[id] = IntVar(0)
+        ttk.Label(win, text=stage + ':').grid(row=ind*2+2, columnspan=2)
+        bar_var[id] = IntVar()
         bar_val[id] = 0
-        widgets[id] = ttk.Progressbar(win, length=150, maximum=1000, variable=bar_var[id])
-        widgets[id].grid(row=ind*2+3)
-        maxes[id] = 150
+        maxes[id] = 10
+        
+        widgets[id] = ttk.Progressbar(win, length=200, maximum=1000, variable=bar_var[id])
+        labels[id] = ttk.Label(win, text='0/??')
+        widgets[id].grid(row=ind*2+3, column=0, columnspan=2)
+        labels[id].grid(row=ind*2+2, column=1, sticky="E")
      
     win.update()
     loc_x = (win.winfo_screenwidth()-win.winfo_reqwidth())//2 
@@ -48,6 +53,7 @@ def init(root):
 def length(stage, num):
     if active:
         maxes[stage] = num
+        set_nums(stage)
             
 def step(stage):
     if active:
@@ -55,6 +61,11 @@ def step(stage):
         bar_val[stage] += 1
         bar_var[stage].set(1000*bar_val[stage]/maxes[stage])
         bar.update()
+        set_nums(stage)
+        
+def set_nums(stage):
+    labels[stage]['text'] = str(bar_val[stage]) + '/' + str(maxes[stage])
+    #labels[stage].update()
 
 def quit():
     '''Shutdown the loading screen, we're done!'''

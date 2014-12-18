@@ -23,6 +23,7 @@ win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 gameMan.root=win
 
+
 gameMan.load_trans_data()
 
 png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
@@ -120,19 +121,11 @@ tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
 
 styleOptions = [('MultiverseCave','Multiverse Cave', True),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', False),
-                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these five should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
-                ('UnlockMandatory','Unlock Default Items', False),
+                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)
                ]
-               # These should come from the styles/items.
-styleOptMain = [('HepDestCube', 'HEPs destroy cubes (Rexaura)', True),
-                ('RealObs', 'Real Observation Rooms', False)
-               ]
-styleOptOther= [
-                ('GelFaith', 'Gel-Faith-Plates', True),
-                ('OpenSphere', 'Opened Sphere', True),
-                ('OverEntryPuzzles', 'Have entry/exit puzzles', True)
-               ]
+               
+stylevar_list = []
                
 class Item():
     '''Represents an item that can appear on the list.'''
@@ -255,14 +248,14 @@ def load_palette(data):
     print("loading data!")
     palettes=sorted(data,key=Palette.getName) # sort by name
     
-def load_packages(data):
+def load_packages(data, settings):
     '''Import in the list of items and styles from the packages.'''
-    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data
+    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data, stylevar_list
     filter_data = { 'package' : {},
                     'author' : {},
                     'tags' : {}}
                     
-    for item in sorted(data['Item'], key=lambda i: i.id):
+    for item in data['Item']:
         it = Item(item)
         item_list[it.id] = it
         for tag in it.tags:
@@ -274,6 +267,9 @@ def load_packages(data):
         if it.pak_id not in filter_data['package']:
             filter_data['package'][it.pak_id] = it.pak_name 
         loader.step("IMG")
+        
+    stylevar_list = data['StyleVar']
+        
     sky_list = []
     voice_list = []
     style_list = []
@@ -332,9 +328,7 @@ def load_packages(data):
         style_list,
         title='Select Style',
         has_none=False,
-        has_def=False,
-        callback=style_select_callback
-                      )
+        has_def=False)
                       
     style_win.sel_item_id('BEE2_CLEAN')
     suggested_style_set()
@@ -356,6 +350,7 @@ def style_select_callback(style_id):
     win_types = (voice_win, music_win, skybox_win, goo_win)
     for win, sugg_val in zip(win_types, sugg):
         win.set_suggested(sugg_val)
+    refresh_stylevars()
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
@@ -387,10 +382,6 @@ def setPalette():
         else:
             print('Unknown item "' + item + '"!')
     flowPreview()
-
-def setStyleOpt(key):
-    print("Toggle style option: " + key)
-    return
 
 def setDispName(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
@@ -676,7 +667,7 @@ def initOption(f):
     goo_win.init_display(props, row=5, column=1)
 
 def initStyleOpt(f):
-    global styleCheck, styleOptVars
+    global styleCheck, styleCheck_enabled, styleCheck_disabled, styleOptVars
 
     UI['style_can']=Canvas(f, highlightthickness=0)
     UI['style_can'].grid(sticky="NSEW") # need to use a canvas to allow scrolling
@@ -696,24 +687,44 @@ def initStyleOpt(f):
 
     frmOther=ttk.Labelframe(canFrame, text="Other Styles:")
     frmOther.grid(row=2, sticky="EW")
+    
+    # The labelFrames won't update correctly if they become totally empty, so add some invisible widgets to both.
+    Frame(frmChosen).grid()
+    Frame(frmOther).grid()
 
+    styleCheck_enabled={}
     styleCheck={}
+    styleCheck_disabled={}
     styleOptVars={}
-    cats =[
-          (frmAll, styleOptions), 
-          (frmChosen, styleOptMain),
-           (frmOther, styleOptOther)
-          ]
-    for frm, lst in cats:
-        for pos,key in enumerate(lst):
-            styleOptVars[key[0]]=BooleanVar(value=key[2])
-            styleCheck[key[0]]=ttk.Checkbutton(frm, variable=styleOptVars[key[0]],   text=key[1], command=lambda key=key[0]: setStyleOpt(key)) # the key argument forces lambda to remember the string
-            styleCheck[key[0]].grid(row=pos, column=0, sticky="W", padx=3)
-
+    for pos, (id, name, default) in enumerate(styleOptions):
+        styleOptVars[id]=BooleanVar(value=default)
+        styleCheck[id]=ttk.Checkbutton(frmAll, variable=styleOptVars[id], text=name)
+        styleCheck[id].grid(row=pos, column=0, sticky="W", padx=3)
+        
+    for var in stylevar_list:
+        styleOptVars[var.id] = BooleanVar(value=var.default)
+        styleCheck_enabled[var.id] = ttk.Checkbutton(frmChosen, variable=styleOptVars[var.id], text=var.name)
+        styleCheck_disabled[var.id] = ttk.Checkbutton(frmOther, variable=styleOptVars[var.id], text=var.name)
+        
+        
     UI['style_can'].create_window(0, 0, window=canFrame, anchor="nw")
     UI['style_can'].update_idletasks()
     UI['style_can'].config(scrollregion=UI['style_can'].bbox(ALL), width=canFrame.winfo_reqwidth())
     ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=1, column=0)
+    
+def refresh_stylevars():
+    global styleCheck_enabled, styleCheck_disabled
+    en_row = 0
+    dis_row = 0
+    for var in stylevar_list:
+        if selected_style in var.styles:
+            styleCheck_enabled[var.id].grid(row=en_row,sticky="W", padx=3)
+            styleCheck_disabled[var.id].grid_remove()
+            en_row += 1
+        else:
+            styleCheck_enabled[var.id].grid_remove()
+            styleCheck_disabled[var.id].grid(row=dis_row,sticky="W", padx=3)
+            dis_row += 1
 
 def initTool(f):
     "Creates the small toolbar above the icons that allows toggling subwindows."
@@ -925,10 +936,12 @@ def initMain():
     initPreview(frames['preview'])
     frames['preview'].update_idletasks()
     win.minsize(width=frames['preview'].winfo_reqwidth()+200,height=frames['preview'].winfo_reqheight()+5) # Prevent making the window smaller than the preview pane
+    loader.step('UI')
 
     frames['toolMenu']=Frame(frames['preview'], bg=ItemsBG, width=192, height=26, borderwidth=0)
     frames['toolMenu'].place(x=73, y=2)
     initTool(frames['toolMenu'])
+    loader.step('UI')
 
     ttk.Separator(UIbg, orient=VERTICAL).grid(row=0, column=4, sticky="NS", padx=10, pady=10)
 
@@ -940,12 +953,14 @@ def initMain():
     frames['filter'].place(x=0,y=0, relwidth=1) # This will sit on top of the palette section, spanning from left to right
     frames['filter'].expanded=False
     initFilter(frames['filter'])
+    loader.step('UI')
 
     frames['picker']=ttk.Frame(pickSplitFrame, padding=(5,40,5,5), borderwidth=4, relief="raised")
     frames['picker'].grid(row=0, column=0, sticky="NSEW")
     pickSplitFrame.rowconfigure(0, weight=1)
     pickSplitFrame.columnconfigure(0, weight=1)
     initPicker(frames['picker'])
+    loader.step('UI')
 
     frames['filter'].lift()
 
@@ -957,6 +972,7 @@ def initMain():
     windows['pal'].protocol("WM_DELETE_WINDOW", lambda: hideWin('pal'))
     windows['pal'].vis=True
     initPalette(windows['pal'])
+    loader.step('UI')
 
     windows['opt']=Toplevel(win)
     windows['opt'].transient(master=win)
@@ -966,6 +982,7 @@ def initMain():
     windows['opt'].protocol("WM_DELETE_WINDOW", lambda: hideWin('opt'))
     windows['opt'].vis=True
     initOption(windows['opt'])
+    loader.step('UI')
 
     windows['style']=Toplevel(win)
     windows['style'].transient(master=win)
@@ -975,6 +992,7 @@ def initMain():
     windows['style'].protocol("WM_DELETE_WINDOW", lambda: hideWin('style'))
     windows['style'].vis=True
     initStyleOpt(windows['style'])
+    loader.step('UI')
 
     win.bind("<MouseWheel>", lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units")) # make scrollbar work globally
     win.bind("<Button-4>", lambda e: pal_canvas.yview_scroll(1, "units")) # needed for linux
@@ -992,6 +1010,7 @@ def initMain():
     setPalette()
     contextWin.init(win)
     initDragIcon(win)
+    loader.step('UI')
 
     win.deiconify() # show it once we've loaded everything
 
@@ -1013,11 +1032,17 @@ def initMain():
     windows['opt'].geometry(opt_size + xpos + str(win.winfo_rooty()-40))
     windows['style'].geometry(xpos + str(win.winfo_rooty()+windows['opt'].winfo_reqheight()+50))
 
+    snapWin('style')
+    snapWin('opt')
+    snapWin('pal')
+    
     win.bind("<Configure>",moveMain)
     windows['style'].bind("<Configure>", lambda e: snapWin('style'))
     windows['opt'].  bind("<Configure>", lambda e: snapWin('opt'))
     windows['pal'].  bind("<Configure>", lambda e: snapWin('pal'))
 
     loadPalUI()
-def event_loop():
-    win.mainloop()
+    style_win.callback = style_select_callback
+    style_select_callback(style_win.chosen_id)
+    
+event_loop = win.mainloop

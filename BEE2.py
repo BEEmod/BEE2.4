@@ -3,10 +3,11 @@ import paletteLoader
 import packageLoader
 import loadScreen
 import gameMan
-import UI 
+import UI
 import utils
 
 loadScreen.init(UI.win)
+loadScreen.length('UI', 8)
 
 global settings
 settings={}
@@ -38,7 +39,7 @@ gameMan.load(Property.find_all(prop, 'games', 'game'))
 
 print('Loading Packages...')
 package_data = packageLoader.loadAll(settings['package_dir'], settings)
-UI.load_packages(package_data)
+UI.load_packages(package_data, settings)
 print('Done!')
 
 print('Loading Palettes...')
