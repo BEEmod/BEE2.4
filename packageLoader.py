@@ -18,9 +18,9 @@ packages = {}
 
 data = {}
 
-def loadAll(dir, settings={}):
+def loadAll(dir, load_res):
     "Scan and read in all packages in the specified directory."
-    dir=os.path.join(os.getcwd(),dir)
+    dir=os.path.join(os.getcwd(), dir)
     contents=os.listdir(dir) # this is both files and dirs
     loader.length("PAK",len(contents))
     zips=[]
@@ -70,7 +70,7 @@ def loadAll(dir, settings={}):
                         object.add_over(obj_types[type].parse(over[0], id, over[1]), zip)
                 data[type].append(object)
                 loader.step("OBJ")
-        if settings.get('load_resources', False):
+        if load_res:
             print('Extracting Resources...')
             
             files = [(zip, zip.namelist()) for zip in zips]
@@ -219,7 +219,7 @@ class Item:
         for ver in info.find_all("version"):
             vals = {
             'name'    : ver['name', ''],
-            'is_beta' : ver['deta', '0'] == '1',
+            'is_beta' : ver['beta', '0'] == '1',
             'is_dep'  : ver['deprecated', '0'] == '1',
             'styles'  :  {},
             'def_style' : None

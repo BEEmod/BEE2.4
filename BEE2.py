@@ -1,3 +1,5 @@
+from configparser import ConfigParser
+
 from property_parser import Property
 import paletteLoader
 import packageLoader
@@ -9,41 +11,51 @@ import utils
 loadScreen.init(UI.win)
 loadScreen.length('UI', 8)
 
-global settings
-settings={}
+default_settings = {
+    'Directories' : {
+        'palette' : 'palettes\\',
+        'package' : 'packages\\',
+        },
+    'General' : {
+        'preserve_BEE2_resource_dir' : '0',
+        'allow_any_folder_as_game' : '0',
+        }
+}
+
+settings = ConfigParser()
 
 def save_settings():
-    new_props = Property('', [
-        Property('directories', [ 
-            Property('palettes', settings['pal_dir']),
-            Property('package', settings['package_dir']),
-        ]),
-        Property('Games', gameMan.as_props()),
-    ])
-    with open("config/config.cfg", "w") as conf:
-        for prop in new_props:
-            for line in prop.to_strings():
-                conf.write(line)
-
-with open("config/config.cfg", "r") as conf:
-    prop=Property.parse(conf, "config/config.cfg")
+    with open('config/config.cfg', 'w') as conf:
+        settings.write(conf)
+        
+settings.save = save_settings
+        
+try:
+    with open("config/config.cfg", "r") as conf:
+        settings.read_file(conf)
+except FileNotFoundError:
+    print("Config not found! Using defaults...")
+    # If we fail, just continue - we just use the default values
     
-dirs = Property.find_key(prop, 'directories')
-bee2 = Property.find_key(prop, 'BEE2')
+# Set the default values if the settings file has no values defined
+for sect, values in default_settings.items():
+    if sect not in settings:
+        settings[sect] = {}
+    for set, default in values.items():
+        if set not in settings[sect]:
+            settings[sect][set] = default
+settings.save()
 
-settings['pal_dir']=dirs['palettes', 'palettes\\']
-settings['package_dir']=dirs['package', 'packages\\']
-settings['load_resources'] = bee2['preserve_BEE2_resource_dir', '1'] == '0'
-
-gameMan.load(Property.find_all(prop, 'games', 'game'))
+gameMan.load_config()
+gameMan.load()
 
 print('Loading Packages...')
-package_data = packageLoader.loadAll(settings['package_dir'], settings)
-UI.load_packages(package_data, settings)
+package_data = packageLoader.loadAll(settings['Directories']['package'], settings['General']['preserve_BEE2_resource_dir'])
+UI.load_packages(package_data)
 print('Done!')
 
 print('Loading Palettes...')
-pal=paletteLoader.loadAll(settings['pal_dir'])
+pal=paletteLoader.loadAll(settings['Directories']['palette'])
 UI.load_palette(pal)
 print('Done!')
 

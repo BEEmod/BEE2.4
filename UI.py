@@ -286,7 +286,7 @@ def load_palette(data):
     print("loading data!")
     palettes=sorted(data,key=Palette.getName) # sort by name
     
-def load_packages(data, settings):
+def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
     global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data, stylevar_list
     filter_data = { 'package' : {},

@@ -3,6 +3,7 @@ Handles locating parts of a given game, and modifying GameInfo to support our sp
 '''
 import os
 import os.path
+from configparser import ConfigParser
 
 from tkinter import * # ui library
 from tkinter import font, messagebox # simple, standard modal dialogs
@@ -16,6 +17,15 @@ all_games = []
 root = None
 
 trans_data = {}
+
+config = ConfigParser()
+
+def load_config():
+    try:
+        with open("config/games.cfg", "r") as conf:
+            config.read_file(conf)
+    except IOError:
+        pass
 
 def load_trans_data():
     global trans_data
@@ -132,20 +142,24 @@ def find_steam_info(game_dir):
         if found_name and found_id:
             break
     return id, name
-                        
-def load(games):
-    for gm in games:
-        try:
-            all_games.append(Game(gm['Name'], int(gm['SteamID']), gm['Dir']))
-        except ValueError:
-            pass
-        
-def as_props():
-    '''Return the Property tree to save into the config file.'''
-    return [Property("Game", [
-            Property("Name", gm.name),
-            Property("SteamID", gm.steamID),
-            Property("Dir", gm.root)]) for gm in all_games]
+    
+def save():
+    for gm in all_games:
+        if gm.name not in config:
+            config[gm] = {}
+        config[gm]['SteamID'] = gm.steamID
+        config[gm]['Dir'] = gm.root
+    with open('config/games.cfg', 'w') as conf:
+        config.write(conf)
+
+def load():
+    all_games.clear()
+    for gm in config:
+        if gm != 'DEFAULT':
+            try:
+                all_games.append(Game(gm, int(config[gm]['SteamID']), config[gm]['Dir']))
+            except ValueError:
+                pass
         
 def find_game(e=None):
     '''Ask for, and load in a game to export to.'''
