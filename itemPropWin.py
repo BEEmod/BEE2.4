@@ -88,7 +88,7 @@ last_angle = '0'
   
 play_sound = False
 is_open = False
-  
+enable_tim_callback = True
   
 def reset_sfx():
     global play_sound
@@ -125,14 +125,22 @@ def saveAngle(key):
     values[key]='ramp_'+str(new_ang)+'_deg_open'
 
 def saveTim(val, key):
-    new_val = widgets[key].get()
-    if new_val > values[key]:
-        sfx('add')
-    elif new_val < values[key]:
-        sfx('subtract')
-    else:
-        sfx('config')
-    values[key]=new_val
+    global enable_tim_callback
+    if enable_tim_callback:
+        new_val = math.floor(float(val)+0.5)
+        
+        enable_tim_callback = False
+        widgets[key].set(new_val)
+        # Lock to whole numbers
+        enable_tim_callback=True
+        
+        labels[key]['text'] = 'Timer Delay:\n        (' + ('Inf' if new_val == 0 else str(new_val)) + ')'
+        
+        if new_val > values[key]:
+            sfx('add')
+        elif new_val < values[key]:
+            sfx('subtract')
+        values[key]=int(new_val)
 
 def savePist(val, key):
     if widgets['toplevel'].get()==widgets['bottomlevel'].get(): # user moved them to match, switch the other one around
@@ -237,12 +245,12 @@ def init(tk, cback):
         elif PROP_TYPES[key][0] == 'pistPlat':
             widgets[key]=Scale(win, from_=0, to=4, orient="horizontal", showvalue=False, command=lambda val, k=key: savePist(val,k))
             values[key]=defaults[key]
-            if (key=='toplevel' and defaults['startup']==True) or (key=='bottomlevel' and defaults['startup']==False):
+            if (key=='toplevel' and defaults['startup']) or (key=='bottomlevel' and not defaults['startup']):
                 widgets[key].set(max(defaults['toplevel'],defaults['bottomlevel']))
-            if (key=='toplevel' and defaults['startup']==False) or (key=='bottomlevel' and defaults['startup']==True):
+            if (key=='toplevel' and not defaults['startup']) or (key=='bottomlevel' and defaults['startup']):
                 widgets[key].set(min(defaults['toplevel'],defaults['bottomlevel']))
         elif PROP_TYPES[key][0] == 'timerDel':
-            widgets[key]=Scale(win, from_=0, to=30, orient="horizontal", showvalue=True, command=lambda val, k=key: saveTim(val,k))
+            widgets[key]=ttk.Scale(win, from_=0, to=30, orient="horizontal", command=lambda val, k=key: saveTim(val,k))
             values[key]=defaults[key]
         elif PROP_TYPES[key][0] == 'railPlat':
             widgets[key]=ttk.Checkbutton(win)
@@ -253,6 +261,46 @@ def open(usedProps, parent, itemName):
     propList=[key.casefold() for key in usedProps]
     is_open=True
     spec_row=1
+    
+    start_up = usedProps.get('startup', '0') == '1'
+    values['startup'] = start_up
+    for prop, value in usedProps.items():
+        if prop in PROP_TYPES and value is not None:
+            type = PROP_TYPES[prop][0]
+            if type == 'checkbox':
+                values[prop].set(value=='1')
+            elif type == 'railLift':
+                values[prop].set(value=='1')
+                saveRail(prop)
+            elif type == 'gelType':
+                try:
+                    widgets[prop].set(paintOpts[int(value)])
+                except ValueError:
+                    pass
+            elif type == 'panAngle':
+                widgets[prop].delete(0,2)
+                widgets[prop].insert(0, value[5:7])
+                values[prop] = value
+            elif type == 'pistPlat':
+                values[prop] == value
+                try:
+                    top_level = int(usedProps.get('toplevel', 4))
+                    bot_level = int(usedProps.get('bottomlevel', 0))
+                except ValueError:
+                    pass
+                else:
+                    if (prop=='toplevel' and start_up) or (prop=='bottomlevel' and not start_up):
+                        widgets[prop].set(max(top_level, bot_level))
+                    if (prop=='toplevel' and not start_up) or (prop=='bottomlevel' and start_up):
+                        widgets[prop].set(min(top_level, bot_level))
+            elif type == 'timerDel':
+                try:
+                    values[prop] = int(value)
+                    widgets[prop].set(values[prop])
+                except ValueError:
+                    pass
+            else:
+                values[prop] = value
     
     for key in prop_pos_special:
         if key in propList:
@@ -314,4 +362,23 @@ if __name__ == '__main__': # load the window if directly executing this file
     root=Tk()
     root.geometry("+250+250")
     init(root,print)
-    open(prop_pos+prop_pos_special,root, "TestItemWithEveryProp")
+    all_vals = {
+      'startup'                 : '1',
+      'toplevel'                : '4',
+      'bottomlevel'             : '3',
+      'angledpanelanimation'    : 'ramp_45_deg_open',
+      'startenabled'            : '1',
+      'startreversed'           : '0',
+      'startdeployed'           : '1',
+      'startactive'             : '1',
+      'startopen'               : '1',
+      'startlocked'             : '0',
+      'timerdelay'              : '15',
+      'dropperenabled'          : '1',
+      'autodrop'                : '1',
+      'autorespawn'             : '1',
+      'oscillate'               : '0',
+      'paintflowtype'           : '1',
+      'allowstreak'             : '1'
+    }
+    open(all_vals,root, "TestItemWithEveryProp")

@@ -47,11 +47,12 @@ def pos_for_item(sub):
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(selected_item.properties(), wid_changedefaults, selected_sub_item.name)
+    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name)
     
 def hideItemProps(vals):
     snd.fx('contract')
     print(vals)
+    selected_item.set_properties(vals)
     
 def sub_sel_enter(ind, e=None):
     if SUBITEM_POS[selected_item.num_sub][ind] != -1:   

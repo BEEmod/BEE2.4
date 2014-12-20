@@ -71,7 +71,7 @@ styles = {}
 musics = {}
 goos = {}
 stylevar_list = []
-    
+
 selected_style = "BEE2_CLEAN"
 
 authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
@@ -83,7 +83,7 @@ styleOptions = [('MultiverseCave','Multiverse Cave', 1),
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0)
                ]
-               
+
 styleCheck_enabled={}
 styleCheck={}
 styleCheck_disabled={}
@@ -91,7 +91,7 @@ styleOptVars={}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen versions, etc
-               
+
 class Item():
     '''Represents an item that can appear on the list.'''
     def __init__(self, item):
@@ -107,6 +107,7 @@ class Item():
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
+        self.set_properties(self.get_properties())
         
     def load_data(self):
         '''Load data from the item.'''
@@ -122,13 +123,31 @@ class Item():
             return png.loadIcon(icons['all'])
         else:
             return png.loadIcon(icons[str(subKey)])
-        
+            
     def properties(self):
         '''Iterate through all properties for this item.'''
         for part in Property.find_all(self.data['editor'], "Item", "Properties"):
             for prop in part:
                 yield prop.name.casefold()
-               
+    
+    def get_properties(self):
+        '''Return a dictionary of properties and the current value associated with them.'''
+        result = {}
+        for part in Property.find_all(self.data['editor'], "Item", "Properties"):
+            for prop in part:
+                name = prop.name.casefold()
+                if name not in result:
+                    result[name] = item_opts.get_val(self.id, 'PROP_' + name, prop["DefaultValue", None])
+        return result
+        
+    def set_properties(self, props):
+        '''Apply the properties to the item.'''
+        editor_tree = Property.find_all(self.data['editor'], "Item", "Properties")
+        for prop, value in props.items():
+            for def_prop in Property.find_all(editor_tree, prop, 'DefaultValue'):
+                def_prop.value = str(value)
+            item_opts[self.id]['PROP_' + prop] = str(value)
+    
 class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''
     def __init__(self, frame, item, sub, is_pre):
@@ -145,7 +164,7 @@ class PalItem(ttk.Label):
         self.bind("<Shift-Button-1>", fastDrag)
         self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
         self.bind("<Leave>", clearDispName)
- 
+    
     def change_subtype(self, ind):
         '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
         for item in pal_picked[:]:
@@ -155,7 +174,7 @@ class PalItem(ttk.Label):
         self.load_data()
         self.master.update() # Update the frame
         flowPreview()
-        
+    
     def open_menu_at_sub(self, ind):
         '''Make the contextWin open itself at the indicated subitem on the item picker.'''
         if self.is_pre:
@@ -189,7 +208,7 @@ class PalItem(ttk.Label):
             pal_picked.remove(self)
         self.place_forget()
         self.destroy()
-
+    
     def onPal(self):
         '''Determine if this item is on the palette.'''
         for item in pal_picked:
@@ -392,7 +411,6 @@ def load_packages(data):
         title='Select Style',
         has_none=False,
         has_def=False)
-    
                  
     last_style = gen_opts.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
     if last_style in style_win:
