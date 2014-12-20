@@ -180,7 +180,7 @@ class Style:
         base = info['base', 'NONE']
         
         sugg = info.find_key('suggested', [])
-        sugg = (sugg['quote',''], sugg['music',''], sugg['skybox',''], sugg['goo',''])
+        sugg = (sugg['quote',None], sugg['music',None], sugg['skybox','SKY_BLACK'], sugg['goo','GOO_NORM'])
         
         if short_name == '':
             short_name = None

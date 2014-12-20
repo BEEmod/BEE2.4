@@ -12,7 +12,7 @@ ITEM_WIDTH=ICON_SIZE+16
 ITEM_HEIGHT=ICON_SIZE+51
 
 
-def _NO_OP(new_id):
+def _NO_OP(*args):
     '''The default callback, triggered whenever the chosen item is changed.'''
     pass
 
@@ -57,6 +57,7 @@ class selWin:
             none_desc=[('line', 'Do not add anything.')], 
             title='BEE2', 
             callback=_NO_OP, 
+            callback_params=[],
             full_context=False
                 ):
         '''Create a window object.
@@ -70,6 +71,8 @@ class selWin:
         - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item changes.
+        - callback_params is a list of values which will be passed to the callback function. 
+          The first arguement to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the context menu.
         ''' 
         self.noneItem = Item('NONE', '', desc=none_desc)
@@ -77,6 +80,7 @@ class selWin:
         self.disp_label = StringVar()
         self.chosen_id = None
         self.callback = callback
+        self.callback_params = callback_params
         self.suggested = None
         self.has_def = has_def
         if has_none:
@@ -149,7 +153,7 @@ class selWin:
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
         
         if self.has_def:
-            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command=self.reset_sel)
+            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command=self.sel_suggested)
             self.prop_reset.grid(row=5, column=1, sticky = "EW")
         
         self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command=self.save)
@@ -208,7 +212,7 @@ class selWin:
         self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
-        self.callback(self.chosen_id)
+        self.do_callback()
         
     def set_disp(self, e=None):
         '''Set the display textbox.'''
@@ -236,19 +240,28 @@ class selWin:
             self.display.winfo_rootx(), 
             self.display.winfo_rooty() + self.display.winfo_height())
         
-    def reset_sel(self):
+    def sel_suggested(self):
         if self.suggested is not None:
             self.sel_item(self.suggested)
             
+    def do_callback(self):
+        self.callback(self.chosen_id, *self.callback_params)
+            
     def sel_item_id(self, id):
         '''Select the item with the given ID.'''
-        for item in self.item_list:
-            if item.name == id:
-                self.sel_item(item)
-                self.set_disp()
-                self.callback(self.chosen_id)
-                return True
-        return False
+        if id == '<NONE>':
+            self.sel_item(self.noneItem)
+            self.set_disp()
+            self.do_callback()
+            return True
+        else:
+            for item in self.item_list:
+                if item.name == id:
+                    self.sel_item(item)
+                    self.set_disp()
+                    self.do_callback()
+                    return True
+            return False
         
     def sel_item(self, item, e=None):
         self.prop_name['text'] = item.longName
@@ -287,6 +300,15 @@ class selWin:
                 self.sugg_lbl['width'] = item.button.winfo_width()
             item.button.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT+20))
             item.button.lift()
+            
+    def __contains__(self, obj):
+        if isinstance(obj, Item):
+            return obj in self.item_list
+        else:
+            for item in self.item_list:
+                if item.name == obj:
+                    return True
+            return False
         
     def set_suggested(self, suggested=None):
         '''Set the suggested item to the given ID. 

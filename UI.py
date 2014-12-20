@@ -300,8 +300,11 @@ def load_settings(settings):
     gen_opts = settings
     
 def load_packages(data):
-    '''Import in the list of items and styles from the packages.'''
-    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data, stylevar_list
+    '''Import in the list of items and styles from the packages.
+    
+    A lot of our other data is initialised here too. This must be called before initMain() can run.
+    '''
+    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data, stylevar_list, selected_style
     filter_data = { 'package' : {},
                     'author' : {},
                     'tags' : {}}
@@ -351,21 +354,27 @@ def load_packages(data):
         win, 
         sky_list, 
         title='Select Skyboxes', 
-        has_none=False)
+        has_none=False,
+        callback=selWin_callback,
+        callback_params=['Skybox'])
         
     voice_win = selWin(
         win, 
         voice_list, 
         title='Select Additional Voice Lines', 
         has_none=True, 
-        none_desc='Add no extra voice lines.')
+        none_desc='Add no extra voice lines.',
+        callback=selWin_callback,
+        callback_params=['Voice'])
         
     music_win = selWin(
         win,
         music_list,
         title='Select Background Music',
         has_none=True,
-        none_desc='Add no music to the map at all.')
+        none_desc='Add no music to the map at all.',
+        callback=selWin_callback,
+        callback_params=['Music'])
         
     goo_win = selWin(
         win,
@@ -373,7 +382,9 @@ def load_packages(data):
         title='Select Goo Appearance',
         has_none=True,
         none_desc='Use a Bottomless Pit instead. This changes appearance'
-                   'depending on the skybox that is chosen.')
+                   'depending on the skybox that is chosen.',
+        callback=selWin_callback,
+        callback_params=['Goo'])
                    
     style_win = selWin(
         win, 
@@ -381,9 +392,24 @@ def load_packages(data):
         title='Select Style',
         has_none=False,
         has_def=False)
-                      
-    style_win.sel_item_id('BEE2_CLEAN')
-    suggested_style_set()
+    
+                 
+    last_style = gen_opts.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
+    if last_style in style_win:
+        style_win.sel_item_id(last_style)
+        selected_style = last_style
+    else:
+        selected_style = 'BEE2_CLEAN'
+        style_win.sel_item_id('BEE2_CLEAN')
+    
+    sugg = styles[selected_style].suggested
+    obj_types = [(voice_win, 'Voice'),
+                 (music_win, 'Music'),
+                 (skybox_win, 'Skybox'),
+                 (goo_win, 'Goo')]
+    for (sel_win, opt_name), default in zip(obj_types, styles[selected_style].suggested):
+        print(opt_name, 
+        sel_win.sel_item_id(gen_opts.get_val('Last_Selected', opt_name, default)))
     
 def suggested_style_set(e=None):
     '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''
@@ -396,6 +422,7 @@ def style_select_callback(style_id):
     '''Callback whenever a new style is chosen.'''
     global selected_style
     selected_style = style_id
+    gen_opts['Last_Selected']['Style'] = style_id
     for item in itertools.chain(item_list.values(), pal_picked, pal_items):
         item.load_data() # Refresh everything
     sugg = styles[selected_style].suggested
@@ -403,6 +430,11 @@ def style_select_callback(style_id):
     for win, sugg_val in zip(win_types, sugg):
         win.set_suggested(sugg_val)
     refresh_stylevars()
+    
+def selWin_callback(style_id, win_name):
+    if style_id is None:
+        style_id = '<NONE>'
+    gen_opts['Last_Selected'][win_name] = style_id
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
