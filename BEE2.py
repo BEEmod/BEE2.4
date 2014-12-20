@@ -25,11 +25,12 @@ settings = ConfigFile('config.cfg')
 settings.set_defaults(default_settings)
 
 UI.load_settings(settings)
-
 gameMan.load()
 
 print('Loading Packages...')
-package_data = packageLoader.loadAll(settings['Directories']['package'], settings['General']['preserve_BEE2_resource_dir'])
+package_data = packageLoader.loadAll(
+    settings['Directories']['package'],
+    not settings.get_bool('General','preserve_BEE2_resource_dir'))
 UI.load_packages(package_data)
 print('Done!')
 

@@ -408,8 +408,7 @@ def load_packages(data):
                  (skybox_win, 'Skybox'),
                  (goo_win, 'Goo')]
     for (sel_win, opt_name), default in zip(obj_types, styles[selected_style].suggested):
-        print(opt_name, 
-        sel_win.sel_item_id(gen_opts.get_val('Last_Selected', opt_name, default)))
+        sel_win.sel_item_id(gen_opts.get_val('Last_Selected', opt_name, default))
     
 def suggested_style_set(e=None):
     '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''

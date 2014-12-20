@@ -8,7 +8,7 @@ active=True
 STAGES = [
     ('PAK', 'Packages'),
     ('OBJ',  'Loading Objects'),
-    ('RES', 'Extracting Items'),
+    ('RES', 'Extracting Resources'),
     ('IMG',  'Loading Images'),
     ('UI', 'Initialising UI')
          ]
@@ -34,12 +34,12 @@ def init(root):
     ttk.Separator(win, orient=HORIZONTAL).grid(row=1, sticky="EW", columnspan=2)
     
     for ind, (id, stage) in enumerate(STAGES):
-        ttk.Label(win, text=stage + ':').grid(row=ind*2+2, columnspan=2)
+        ttk.Label(win, text=stage + ':').grid(row=ind*2+2, columnspan=2, sticky="W")
         bar_var[id] = IntVar()
         bar_val[id] = 0
         maxes[id] = 10
         
-        widgets[id] = ttk.Progressbar(win, length=200, maximum=1000, variable=bar_var[id])
+        widgets[id] = ttk.Progressbar(win, length=210, maximum=1000, variable=bar_var[id])
         labels[id] = ttk.Label(win, text='0/??')
         widgets[id].grid(row=ind*2+3, column=0, columnspan=2)
         labels[id].grid(row=ind*2+2, column=1, sticky="E")
@@ -65,7 +65,12 @@ def step(stage):
         
 def set_nums(stage):
     labels[stage]['text'] = str(bar_val[stage]) + '/' + str(maxes[stage])
-    #labels[stage].update()
+    
+def skip_stage(stage):
+    '''Skip over this stage of the loading process.'''
+    labels[stage]['text'] = 'Skipped!'
+    bar_var[stage].set(1000)
+    widgets[stage].update()
 
 def quit():
     '''Shutdown the loading screen, we're done!'''

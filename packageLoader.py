@@ -22,7 +22,11 @@ def loadAll(dir, load_res):
     "Scan and read in all packages in the specified directory."
     dir=os.path.join(os.getcwd(), dir)
     contents=os.listdir(dir) # this is both files and dirs
+    
     loader.length("PAK",len(contents))
+    if not load_res:
+        loader.skip_stage("RES")
+        
     zips=[]
     try:
         for name in contents:
@@ -72,7 +76,6 @@ def loadAll(dir, load_res):
                 loader.step("OBJ")
         if load_res:
             print('Extracting Resources...')
-            
             files = [(zip, zip.namelist()) for zip in zips]
             loader.length("RES",sum(len(names) for zip, names in files))
             for zip, zip_contents in files:
@@ -92,9 +95,6 @@ def loadAll(dir, load_res):
                 shutil.move("cache/resources/instances", "inst_cache/")
                 
             shutil.rmtree('cache/', ignore_errors=True)
-        else:
-            loader.length("RES", 1)
-            loader.step("RES")
                
     finally:
         for z in zips: #close them all, we've already read the contents.
