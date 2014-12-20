@@ -1,6 +1,5 @@
-from configparser import ConfigParser
-
 from property_parser import Property
+from config import ConfigFile
 import paletteLoader
 import packageLoader
 import loadScreen
@@ -22,31 +21,11 @@ default_settings = {
         }
 }
 
-settings = ConfigParser()
+settings = ConfigFile('config.cfg')
+settings.set_defaults(default_settings)
 
-def save_settings():
-    with open('config/config.cfg', 'w') as conf:
-        settings.write(conf)
-        
-settings.save = save_settings
-        
-try:
-    with open("config/config.cfg", "r") as conf:
-        settings.read_file(conf)
-except FileNotFoundError:
-    print("Config not found! Using defaults...")
-    # If we fail, just continue - we just use the default values
-    
-# Set the default values if the settings file has no values defined
-for sect, values in default_settings.items():
-    if sect not in settings:
-        settings[sect] = {}
-    for set, default in values.items():
-        if set not in settings[sect]:
-            settings[sect][set] = default
-settings.save()
+UI.load_settings(settings)
 
-gameMan.load_config()
 gameMan.load()
 
 print('Loading Packages...')

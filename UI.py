@@ -3,12 +3,15 @@ from tkinter import ttk # themed ui components that match the OS
 from tkinter import font, messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
-import tkinter_png as png # png library for TKinter
+from functools import partial as func_partial
 import random
 import itertools
 import math
 
+import tkinter_png as png # png library for TKinter
+
 from property_parser import Property
+from config import ConfigFile
 from paletteLoader import Palette
 import packageLoader as package
 import contextWin
@@ -22,7 +25,6 @@ import sound as snd
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 gameMan.root=win
-
 
 gameMan.load_trans_data()
 
@@ -76,21 +78,24 @@ authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwi
 packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
 tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
 
-styleOptions = [('MultiverseCave','Multiverse Cave', True),
-                ('FixPortalBump','Prevent Portal Bump  (glass)', False),
-                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', False), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
-                ('NoMidVoices','Suppress Mid-Chamber Dialogue', False)
+styleOptions = [('MultiverseCave','Multiverse Cave', 1),
+                ('FixPortalBump','Prevent Portal Bump  (glass)', 0),
+                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
+                ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0)
                ]
                
 styleCheck_enabled={}
 styleCheck={}
 styleCheck_disabled={}
 styleOptVars={}
+
+item_opts = ConfigFile('item_configs.cfg')
+# A config file which remembers changed property options, chosen versions, etc
                
 class Item():
     '''Represents an item that can appear on the list.'''
     def __init__(self, item):
-        self.ver = 0
+        self.ver = int(item_opts.get_val(item.id, 'sel_version', '0'))
         self.item = item
         self.def_data = self.item.def_data
         # These pieces of data are constant, only from the first style.
@@ -279,12 +284,20 @@ class SubPane(Toplevel):
         self.allow_snap=True
         self.parent.focus()
         
+def on_app_quit():
+    '''Do a last-minute save of our config files.'''
+    item_opts.save_check()
+    gen_opts.save_check()
+    win.destroy()
     
 def load_palette(data):
     '''Import in all defined palettes.'''
     global palettes
-    print("loading data!")
     palettes=sorted(data,key=Palette.getName) # sort by name
+    
+def load_settings(settings):
+    global gen_opts
+    gen_opts = settings
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.'''
@@ -306,8 +319,9 @@ def load_packages(data):
             filter_data['package'][it.pak_id] = it.pak_name 
         loader.step("IMG")
         
-    stylevar_list = data['StyleVar']
-        
+    stylevar_list = sorted(data['StyleVar'], key=lambda x: x.id)
+    for var in stylevar_list:
+        var.default = gen_opts.get_bool('StyleVar', var.id, var.default)
     sky_list = []
     voice_list = []
     style_list = []
@@ -420,6 +434,11 @@ def setPalette():
         else:
             print('Unknown item "' + item + '"!')
     flowPreview()
+    
+def set_stylevar(var):
+    val = str(styleOptVars[var].get())
+    print('Updating ' + var + '! (val = ' + val + ')')
+    gen_opts['StyleVar'][var] = val
 
 def setDispName(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
@@ -695,15 +714,25 @@ def initStyleOpt(f):
     Frame(frmOther).grid()
 
     for pos, (id, name, default) in enumerate(styleOptions):
-        styleOptVars[id]=BooleanVar(value=default)
-        styleCheck[id]=ttk.Checkbutton(frmAll, variable=styleOptVars[id], text=name)
+        styleOptVars[id]=IntVar(value=
+            gen_opts.get_bool('StyleVar', id, default))
+        styleCheck[id]=ttk.Checkbutton(
+            frmAll, 
+            variable=styleOptVars[id], 
+            text=name, 
+            command=func_partial(set_stylevar, id)
+            )
         styleCheck[id].grid(row=pos, column=0, sticky="W", padx=3)
         
     for var in stylevar_list:
-        styleOptVars[var.id] = BooleanVar(value=var.default)
-        styleCheck_enabled[var.id] = ttk.Checkbutton(frmChosen, variable=styleOptVars[var.id], text=var.name)
-        styleCheck_disabled[var.id] = ttk.Checkbutton(frmOther, variable=styleOptVars[var.id], text=var.name)
-        
+        styleOptVars[var.id] = IntVar(value=var.default)
+        args = {
+            'variable' : styleOptVars[var.id],
+            'text' : var.name,
+            'command' : func_partial(set_stylevar, var.id)
+               }
+        styleCheck_enabled[var.id] = ttk.Checkbutton(frmChosen, **args)
+        styleCheck_disabled[var.id] = ttk.Checkbutton(frmOther, **args)
         
     UI['style_can'].create_window(0, 0, window=canFrame, anchor="nw")
     UI['style_can'].update_idletasks()
@@ -908,7 +937,8 @@ def initMain():
     '''Initialise all windows and panes.'''
     initMenuBar(win)
     win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
-    win.title('BEE2')
+    win.title('BEEMOD 2.4')
+    win.protocol("WM_DELETE_WINDOW", on_app_quit)
     UIbg=Frame(win, bg=ItemsBG)
     UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
     win.columnconfigure(0, weight=1)
@@ -1026,7 +1056,7 @@ def initMain():
         width=windows['style'].winfo_reqwidth())
     windows['style'].move(
         x=xpos, 
-        y=win.winfo_rooty()+windows['opt'].winfo_reqheight()+50)
+        y=win.winfo_rooty()+windows['opt'].winfo_reqheight() + 25)
 
     
     win.bind("<Configure>", contextWin.follow_main, add='+')

@@ -3,7 +3,7 @@ Handles locating parts of a given game, and modifying GameInfo to support our sp
 '''
 import os
 import os.path
-from configparser import ConfigParser
+from config import ConfigFile
 
 from tkinter import * # ui library
 from tkinter import font, messagebox # simple, standard modal dialogs
@@ -18,14 +18,7 @@ root = None
 
 trans_data = {}
 
-config = ConfigParser()
-
-def load_config():
-    try:
-        with open("config/games.cfg", "r") as conf:
-            config.read_file(conf)
-    except IOError:
-        pass
+config = ConfigFile('games.cfg')
 
 def load_trans_data():
     global trans_data
@@ -149,8 +142,7 @@ def save():
             config[gm] = {}
         config[gm]['SteamID'] = gm.steamID
         config[gm]['Dir'] = gm.root
-    with open('config/games.cfg', 'w') as conf:
-        config.write(conf)
+    config.save()
 
 def load():
     all_games.clear()
