@@ -3,6 +3,7 @@ Handles locating parts of a given game, and modifying GameInfo to support our sp
 '''
 import os
 import os.path
+import shutil
 from config import ConfigFile
 
 from tkinter import * # ui library
@@ -14,6 +15,7 @@ from property_parser import Property
 import utils
 
 all_games = []
+selected_game = None
 root = None
 
 trans_data = {}
@@ -24,7 +26,7 @@ def load_trans_data():
     global trans_data
     try:
         with open('config/basemodui_english.txt', "r") as trans:
-            trans_data = Property.parse(trans, 'config/basemodui_english.txt')
+            trans_data = Property.parse(trans, 'config/basemodui.txt')
         trans_data = Property('',trans_data).as_dict()['lang']['Tokens']
     except IOError:
         pass
@@ -103,7 +105,10 @@ class Game:
                         file.write(line)
                         
     def refresh_cache(self):
-        pass
+        dest = os.path.join(self.root, 'sdk_content/maps/instances/BEE2')
+        if os.path.isdir('inst_cache/'):
+            shutil.rmtree(dest, ignore_errors=True)
+            shutil.move('inst_cache/', dest)
                         
 def find_steam_info(game_dir):
     '''Determine the steam ID and game name of this folder, if it has one.
@@ -139,9 +144,9 @@ def find_steam_info(game_dir):
 def save():
     for gm in all_games:
         if gm.name not in config:
-            config[gm] = {}
-        config[gm]['SteamID'] = gm.steamID
-        config[gm]['Dir'] = gm.root
+            config[gm.name] = {}
+        config[gm.name]['SteamID'] = str(gm.steamID)
+        config[gm.name]['Dir'] = gm.root
     config.save()
 
 def load():
@@ -152,18 +157,32 @@ def load():
                 all_games.append(Game(gm, int(config[gm]['SteamID']), config[gm]['Dir']))
             except ValueError:
                 pass
+    selected_game = all_games[0]
         
 def find_game(e=None):
     '''Ask for, and load in a game to export to.'''
     messagebox.showinfo(message='Select the folder where the game executable is located (portal2.exe)...', parent=root)
-    val = filedialog.askopenfilename(title='Find Game Exe', filetypes=[('Executable', '.exe')], initialdir='C:')
-    if val:
-        print(val)
+    exe_loc = filedialog.askopenfilename(title='Find Game Exe', filetypes=[('Executable', '.exe')], initialdir='C:')
+    if exe_loc:
+        folder = os.path.dirname(exe_loc)
+        id, name = find_steam_info(folder)
+        if name == "ERR" or id == -1:
+            messagebox.showinfo(message='This does not appear to be a valid game folder!', parent=root, icon=messagebox.ERROR)
+            return
+            
+        new_game = Game(name, id, folder)
+        new_game.refresh_cache()
+        all_games.append(new_game)
+        save()
+        
     
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
     if len(all_games) <= 1:
         messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
+    else:
+        all_games.remove(selected_game)
+        selected_game = all_games[0]
         
 def add_menu_opts(menu):
     '''Add the various games to the menu.'''

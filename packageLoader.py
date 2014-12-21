@@ -456,4 +456,4 @@ obj_types = {
     }
     
 if __name__ == '__main__':
-    loadAll('packages\\')
+    loadAll('packages\\', True)
