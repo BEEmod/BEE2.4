@@ -169,9 +169,9 @@ class Style:
         self.base_style = base_style
         self.suggested = suggested or {}
         if config == None:
-            self.config = Property('ItemData', [])
+            self.config = []
         else:
-            self.config = Property('ItemData', config)
+            self.config = config
      
     @classmethod
     def parse(cls, zip, id, info):
@@ -198,9 +198,11 @@ class Style:
             vbsp = None
         return cls(id, name, auth, desc, icon, items, vbsp, base, short_name=short_name, suggested=sugg)
         
-    def add_over(self, overide, zip):
+    def add_over(self, override, zip):
         '''Add the additional commands to ourselves.'''
-        pass
+        self.editor.extend(override.editor)
+        self.config.extend(override.config)
+        self.auth.extend(override.auth)
         
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -248,8 +250,10 @@ class Item:
                         'ent':  props['ent_count', '??'],
                         'url':  props['infoURL', None],
                         'icons': {p.name:p.value for p in props['icon', []]},
+                        'all_name': props['all_name', None],
+                        'all_icon': props['all_icon', None],
                         'editor': list(Property.find_all(editor, 'Item')),
-                        'vbsp': None
+                        'vbsp': []
                        }
                 if config in files:
                     with zip.open(config, 'r') as vbsp_config:
@@ -442,8 +446,11 @@ def get_selitem_data(info):
     return name, short_name, auth, icon, desc
     
 def sep_values(str, delimiter):
-    vals = str.split(delimiter)
-    return [stripped for stripped in (val.strip() for val in vals) if stripped]
+    if str == '':
+        return []
+    else:
+        vals = str.split(delimiter)
+        return [stripped for stripped in (val.strip() for val in vals) if stripped]
             
 obj_types = {
     'Style' : Style,

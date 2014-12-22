@@ -25,7 +25,7 @@ settings = ConfigFile('config.cfg')
 settings.set_defaults(default_settings)
 
 UI.load_settings(settings)
-gameMan.load()
+gameMan.load() 
 
 print('Loading Packages...')
 package_data = packageLoader.loadAll(

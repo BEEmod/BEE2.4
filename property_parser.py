@@ -164,12 +164,10 @@ class Property:
             # We were given a default, pretend that was in the original property list so code works
     
     def copy(self):
-        "Deep copy this Property tree and return it."
+        '''Deep copy this Property tree and return it.'''
         if isinstance(self.value, list):
-            new_children = [] # we need to duplicate children...
-            for child in self.value:
-                new_children.append(child.copy()) # so recurse
-            return Property(self.name, new_children)
+            # This recurses if needed
+            return Property(self.name, [child.copy() for child in self.value])
         else:
             return Property(self.name, self.value)
             

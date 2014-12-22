@@ -147,6 +147,37 @@ class Item():
             for def_prop in Property.find_all(editor_tree, prop, 'DefaultValue'):
                 def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
+            
+    def export(self):
+        '''Generate the editoritems and vbsp_config values that represent this item.'''
+        print(self.id)
+        self.load_data()
+        
+        palette_items = {}
+        for item in pal_picked:
+            if item.id == self.id:
+                palette_items[item.subKey] = item
+        
+        new_editor = [prop.copy() for prop in self.data['editor']]
+        for index, editor_section in enumerate(Property.find_all(new_editor, "Item", "Editor", "Subtype")):
+            for editor_sec_index, pal_section in enumerate(editor_section.value):
+                if pal_section.name.casefold() == "palette":
+                    if index in palette_items:
+                        if len(palette_items) == 1:
+                            # Switch to the 'Grouped' icon
+                            if self.data['all_name'] is not None:
+                                pal_section['Tooltip'] = self.data['all_name']
+                            if self.data['all_icon'] is not None:
+                                pal_section['Image'] = self.data['all_icon']
+                        
+                        pal_section['Position'] = (str(palette_items[index].pre_x) + " " +
+                                                   str(palette_items[index].pre_y) + " 0")
+                    else:
+                        del editor_section.value[editor_sec_index]
+                        pal_section['Position'] = '999 999 999'
+                        break
+        
+        return new_editor, self.data['vbsp']
     
 class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''
@@ -224,7 +255,7 @@ class PalItem(ttk.Label):
         return PalItem(frame, self.item, self.subKey, self.is_pre)
         
     def __repr__(self):
-        return str(self.id) + ":" + str(self.subKey) + "\n"
+        return '<' + str(self.id) + ":" + str(self.subKey) + '>'
         
 class SubPane(Toplevel):
     '''A Toplevel window that can be shown/hidden, and follows the main window when moved.'''
@@ -464,12 +495,22 @@ def loadPalUI():
     for val,pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
         menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
         menus['pal'].item_len+=1
-
-def setGame(game):
-    global selectedGame
-    selectedGame = selectedGame_radio.get()
-    print("Game: [" + str(selectedGame) + "] = " + gamesDisplay[selectedGame])
-    win.title('BEE2 - '+gamesDisplay[selectedGame])
+    
+def export_editoritems(e=None):
+    '''Export the selected Items and Style into the chosen game.'''
+    gameMan.selected_game.export(
+        styles[selected_style], 
+        item_list, 
+        music=musics.get(music_win.chosen_id, None),
+        skybox=skyboxes.get(skybox_win.chosen_id, None),
+        goo=goos.get(goo_win.chosen_id, None),
+        voice=voices.get(voice_win.chosen_id, None),
+        styleVars=styleOptVars)
+    messagebox.showinfo('BEEMOD2', message='Selected Items and Style successfully exported!')
+    if not gen_opts.get_bool('General','preserve_BEE2_resource_dir'):
+        print('Copying resources...')
+        gameMan.selected_game.refresh_cache()
+        print('Done!')
 
 def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
@@ -714,7 +755,7 @@ def initOption(f):
     f.columnconfigure(0,weight=1)
     ttk.Button(f, width=10, text="Save...", command=save).grid(row=0)
     ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1)
-    ttk.Button(f, width=10, text="Export...").grid(row=2, pady=(0, 10))
+    ttk.Button(f, width=10, text="Export...", command=export_editoritems).grid(row=2, pady=(0, 10))
 
     props=ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1,weight=1)
@@ -950,6 +991,9 @@ def initDragIcon(win):
     dragWin.withdraw() # starts hidden
     UI['drag_lbl']=Label(dragWin, image=png.loadPng('BEE2/blank'))
     UI['drag_lbl'].grid(row=0, column=0)
+    
+def set_win_title(game):
+    win.title('BEEMOD 2.4 - ' + game.name)
 
 def initMenuBar(win):
     bar=Menu(win)
@@ -958,7 +1002,10 @@ def initMenuBar(win):
 
     menus['file']=Menu(bar, name='apple') #Name is used to make this the special 'BEE2' menu item on Mac
     bar.add_cascade(menu=menus['file'], label='File')
-    menus['file'].add_command(label="Export")
+    menus['file'].add_command(label="Export", accelerator='Ctrl-E', command=export_editoritems)
+    
+    win.bind_all('<Control-e>', export_editoritems)
+    
     menus['file'].add_command(label="Find Game")
     menus['file'].add_command(label="Remove Game")
     menus['file'].add_separator()
@@ -967,7 +1014,7 @@ def initMenuBar(win):
     menus['file'].add_command(label="Quit", command=win.destroy)
     menus['file'].add_separator()
     
-    gameMan.add_menu_opts(menus['file']) # Add a set of options to pick the game into the menu system
+    gameMan.add_menu_opts(menus['file'], set_win_title) # Add a set of options to pick the game into the menu system
     
     menus['pal']=Menu(bar)
     bar.add_cascade(menu=menus['pal'], label='Palette')
@@ -986,7 +1033,6 @@ def initMain():
     '''Initialise all windows and panes.'''
     initMenuBar(win)
     win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
-    win.title('BEEMOD 2.4')
     win.protocol("WM_DELETE_WINDOW", on_app_quit)
     UIbg=Frame(win, bg=ItemsBG)
     UIbg.grid(row=0,column=0, sticky=(N,S,E,W))

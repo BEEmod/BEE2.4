@@ -25,7 +25,7 @@ config = ConfigFile('games.cfg')
 def load_trans_data():
     global trans_data
     try:
-        with open('config/basemodui_english.txt', "r") as trans:
+        with open('config/basemodui.txt', "r") as trans:
             trans_data = Property.parse(trans, 'config/basemodui.txt')
         trans_data = Property('',trans_data).as_dict()['lang']['Tokens']
     except IOError:
@@ -33,8 +33,8 @@ def load_trans_data():
 
 def translate(str):
     return trans_data.get(str, str)
-
-def game_set(game):
+    
+def setgame_callback(selected_game):
     pass
 
 # The line we inject to add our BEE2 folder into the game search path. 
@@ -108,7 +108,44 @@ class Game:
         dest = os.path.join(self.root, 'sdk_content/maps/instances/BEE2')
         if os.path.isdir('inst_cache/'):
             shutil.rmtree(dest, ignore_errors=True)
-            shutil.move('inst_cache/', dest)
+            shutil.copytree('inst_cache/', dest)
+            
+    def export(self, style, all_items, music, skybox, goo, voice, styleVars):
+        '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
+        print('--------------------')
+        print('Exporting Items and Style for ' + self.name + '!')
+        print(style, music, goo, voice)
+        print([key + ' = ' + str(val.get()) for key,val in styleVars.items()])
+        
+        editoritems = style.editor[:]
+        vbsp_config = style.config[:]
+        
+        for item in sorted(all_items):
+            editor_part, config_part = all_items[item].export()
+            editoritems.extend(editor_part)
+            vbsp_config.extend(config_part)
+        
+        vbsp_config.append(Property('StyleVars',
+            [Property(key,str(val.get())) for key,val in styleVars.items()]))
+         
+        editor_path = self.abs_path('portal2_dlc2/scripts/editoritems.txt')
+        editor_backup_path = self.abs_path('portal2_dlc2/scripts/editoritems_original.txt')
+        
+        if os.path.isfile(editor_path) and not os.path.isfile(editor_backup_path):
+            print('Backing up original editoritems!')
+            shutil.move(editor_path, editor_backup_path)
+            
+        print('Writing Editoritems!')
+        with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
+            for prop in editoritems:
+                for line in prop.to_strings():
+                    editor_file.write(line + '\n')
+                    
+        print('Writing VBSP Config!')
+        with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
+            for prop in vbsp_config:
+                for line in prop.to_strings():
+                    vbsp_file.write(line +'\n')
                         
 def find_steam_info(game_dir):
     '''Determine the steam ID and game name of this folder, if it has one.
@@ -184,15 +221,19 @@ def remove_game(e=None):
         all_games.remove(selected_game)
         selected_game = all_games[0]
         
-def add_menu_opts(menu):
+def add_menu_opts(menu, callback):
     '''Add the various games to the menu.'''
-    global selectedGame_radio
+    global selectedGame_radio, setgame_callback
+    setgame_callback = callback
     selectedGame_radio = IntVar(value=0)
     for val, game in enumerate(all_games):
         menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
+    setGame()
         
 def setGame():
-    pass
+    global selected_game
+    selected_game = all_games[selectedGame_radio.get()]
+    setgame_callback(selected_game)
        
 if __name__ == '__main__':
     root = Tk()
