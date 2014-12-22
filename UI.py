@@ -29,15 +29,12 @@ gameMan.root=win
 gameMan.load_trans_data()
 
 png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
-           
-item_list = {}
-
-win.iconbitmap('BEE2.ico')# set the window icon
 
 windows={}
 frames={} #Holds frames that we need to deal with later
 UI={} # Other ui elements we need to access
 menus={} # The menu items for the main window
+
 pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
 pal_picked_fake = [] # Labels used for the empty palette positions
@@ -45,26 +42,30 @@ drag_item=-1 # the item currently being moved
 drag_orig_pos=-1
 drag_onPal=False # are we dragging a palette item?
 drag_passedPal=False # has the cursor passed over the palette
+
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters
 FilterBoxes_all={}
 FilterVars={} # The variables for the checkboxes
 FilterVars_all={}
-filter_expanded = False
-Settings=None
+
 ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
 selectedPalette = 0
-selectedGame=0
+
 PalEntry_TempText="New Palette>"
 PalEntry = StringVar(value=PalEntry_TempText)
+
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
+
 shouldSnap=True # Should we update the relative positions of windows?
+
 muted = IntVar(value=0) # Is the sound fx muted?
 
-# UI vars, TODO: most should be generated on startup
 paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
 palettes=[]
 
+# All the stuff we've loaded in
+item_list = {}
 skyboxes = {}
 voices = {}
 styles = {}
@@ -142,9 +143,8 @@ class Item():
         
     def set_properties(self, props):
         '''Apply the properties to the item.'''
-        editor_tree = Property.find_all(self.data['editor'], "Item", "Properties")
         for prop, value in props.items():
-            for def_prop in Property.find_all(editor_tree, prop, 'DefaultValue'):
+            for def_prop in Property.find_all(self.data['editor'], "Item", "Properties", prop, 'DefaultValue'):
                 def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
             
@@ -340,6 +340,11 @@ def on_app_quit():
     gen_opts.save_check()
     win.destroy()
     
+def set_mute():
+    snd.muted = (muted.get()==1)
+    print(muted.get(), snd.muted)
+    gen_opts['General']['mute_sounds'] = str(muted.get())
+    
 def load_palette(data):
     '''Import in all defined palettes.'''
     global palettes
@@ -348,6 +353,10 @@ def load_palette(data):
 def load_settings(settings):
     global gen_opts
     gen_opts = settings
+    
+    muted.set(gen_opts.get_bool('General', 'mute_sounds', False))
+    set_mute()
+    gen_opts.has_changed=False
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.
@@ -992,8 +1001,9 @@ def initDragIcon(win):
     UI['drag_lbl']=Label(dragWin, image=png.loadPng('BEE2/blank'))
     UI['drag_lbl'].grid(row=0, column=0)
     
-def set_win_title(game):
+def set_game(game):
     win.title('BEEMOD 2.4 - ' + game.name)
+    gen_opts['Last_Selected']['game'] = game.name
 
 def initMenuBar(win):
     bar=Menu(win)
@@ -1006,15 +1016,15 @@ def initMenuBar(win):
     
     win.bind_all('<Control-e>', export_editoritems)
     
-    menus['file'].add_command(label="Find Game")
-    menus['file'].add_command(label="Remove Game")
+    menus['file'].add_command(label="Add Game", command=gameMan.add_game)
+    menus['file'].add_command(label="Remove Game", command=gameMan.remove_game)
     menus['file'].add_separator()
     if snd.initiallised:
-        menus['file'].add_checkbutton(label="Mute Sounds", variable=muted, command=lambda: snd.setMute(muted.get()))
+        menus['file'].add_checkbutton(label="Mute Sounds", variable=muted, command=set_mute)
     menus['file'].add_command(label="Quit", command=win.destroy)
     menus['file'].add_separator()
     
-    gameMan.add_menu_opts(menus['file'], set_win_title) # Add a set of options to pick the game into the menu system
+    gameMan.add_menu_opts(menus['file'], set_game) # Add a set of options to pick the game into the menu system
     
     menus['pal']=Menu(bar)
     bar.add_cascade(menu=menus['pal'], label='Palette')
@@ -1034,6 +1044,8 @@ def initMain():
     initMenuBar(win)
     win.maxsize(width=win.winfo_screenwidth(), height=win.winfo_screenheight())
     win.protocol("WM_DELETE_WINDOW", on_app_quit)
+    win.iconbitmap('BEE2.ico')# set the window icon
+    
     UIbg=Frame(win, bg=ItemsBG)
     UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
     win.columnconfigure(0, weight=1)

@@ -7,6 +7,7 @@ import shutil
 from config import ConfigFile
 
 from tkinter import * # ui library
+from tkinter import ttk
 from tkinter import font, messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
 from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
@@ -117,12 +118,15 @@ class Game:
         print(style, music, goo, voice)
         print([key + ' = ' + str(val.get()) for key,val in styleVars.items()])
         
-        editoritems = style.editor[:]
         vbsp_config = style.config[:]
+        
+        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
+        renderables = Property.find_key(style.editor, "Renderables", [])
+        editoritems = Property("ItemData", list(Property.find_all(style.editor, 'Item')))
         
         for item in sorted(all_items):
             editor_part, config_part = all_items[item].export()
-            editoritems.extend(editor_part)
+            editoritems += editor_part
             vbsp_config.extend(config_part)
         
         vbsp_config.append(Property('StyleVars',
@@ -135,11 +139,12 @@ class Game:
             print('Backing up original editoritems!')
             shutil.move(editor_path, editor_backup_path)
             
+        editoritems += renderables
+            
         print('Writing Editoritems!')
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
-            for prop in editoritems:
-                for line in prop.to_strings():
-                    editor_file.write(line + '\n')
+            for line in editoritems.to_strings():
+                editor_file.write(line + '\n')
                     
         print('Writing VBSP Config!')
         with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
@@ -196,7 +201,7 @@ def load():
                 pass
     selected_game = all_games[0]
         
-def find_game(e=None):
+def add_game(e=None):
     '''Ask for, and load in a game to export to.'''
     messagebox.showinfo(message='Select the folder where the game executable is located (portal2.exe)...', parent=root)
     exe_loc = filedialog.askopenfilename(title='Find Game Exe', filetypes=[('Executable', '.exe')], initialdir='C:')
@@ -206,6 +211,8 @@ def find_game(e=None):
         if name == "ERR" or id == -1:
             messagebox.showinfo(message='This does not appear to be a valid game folder!', parent=root, icon=messagebox.ERROR)
             return
+        invalid_names = [gm.name for gm in all_games]
+        name = simpledialog.askstring(prompt="Enter the name of this game:", title="BEE2")
             
         new_game = Game(name, id, folder)
         new_game.refresh_cache()
@@ -234,9 +241,23 @@ def setGame():
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
     setgame_callback(selected_game)
+    
+def set_game_by_name(name):
+    global selected_game
+    for game in all_games:
+        if game.name == name:
+            selected_game = game
+            setgame_callback(selected_game)
+            break
        
 if __name__ == '__main__':
     root = Tk()
-    Button(root, text = 'Add', command=find_game).grid(row=0, column=0)
+    Button(root, text = 'Add', command=add_game).grid(row=0, column=0)
     Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)
-    g1 = Game("Portal 2", 620, r"F:\SteamLibrary\SteamApps\common\Portal 2")
+    menu = Menu(root)
+    dropdown = Menu(menu)
+    menu.add_cascade(menu=dropdown, label='Game')
+    root['menu'] = menu
+    
+    load()
+    add_menu_opts(dropdown, setgame_callback)

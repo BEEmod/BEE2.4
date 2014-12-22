@@ -6,9 +6,6 @@ except Exception:
     initiallised = False
 muted = False
 
-def setMute(val):
-    muted = val
-
 if initiallised:
     sounds = {
               'select'     : pygame.mixer.Sound(file='sounds/rollover.wav'),

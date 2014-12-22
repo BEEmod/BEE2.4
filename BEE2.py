@@ -18,14 +18,15 @@ default_settings = {
     'General' : {
         'preserve_BEE2_resource_dir' : '0',
         'allow_any_folder_as_game' : '0',
-        }
+        },
 }
 
 settings = ConfigFile('config.cfg')
 settings.set_defaults(default_settings)
 
 UI.load_settings(settings)
-gameMan.load() 
+gameMan.load()
+gameMan.set_game_by_name(settings.get_val('Last_Selected','Game', ''))
 
 print('Loading Packages...')
 package_data = packageLoader.loadAll(
