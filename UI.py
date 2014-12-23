@@ -10,17 +10,18 @@ import math
 
 import tkinter_png as png # png library for TKinter
 
+from gameMan import translate as P2_trans
+from selectorWin import Item as selWinItem
+from selectorWin import selWin
 from property_parser import Property
 from config import ConfigFile
-from paletteLoader import Palette
-import packageLoader as package
-import contextWin
-import loadScreen as loader
-import gameMan
-from gameMan import translate as P2_trans
-from selectorWin import selWin
-from selectorWin import Item as selWinItem
+from paletteLoader import Palette, save_pal
 import sound as snd
+import packageLoader as package
+import loadScreen as loader
+import contextWin
+import gameMan
+import utils
 
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
@@ -57,9 +58,6 @@ selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 shouldSnap=True # Should we update the relative positions of windows?
 
 muted = IntVar(value=0) # Is the sound fx muted?
-
-paletteReadOnly=('Empty','Portal 2') # Don't let the user edit these, they're special
-palettes=[]
 
 # All the stuff we've loaded in
 item_list = {}
@@ -348,7 +346,7 @@ def set_mute():
 def load_palette(data):
     '''Import in all defined palettes.'''
     global palettes
-    palettes=sorted(data,key=Palette.getName) # sort by name
+    palettes=data
     
 def load_settings(settings):
     global gen_opts
@@ -495,6 +493,7 @@ def selWin_callback(style_id, win_name):
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
+    palettes.sort(key=Palette.getName) # sort by name
     UI['palette'].delete(0, END)
     for i,pal in enumerate(palettes):
         UI['palette'].insert(i,pal.name)
@@ -504,6 +503,11 @@ def loadPalUI():
     for val,pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
         menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
         menus['pal'].item_len+=1
+        
+    if len(palettes) < 2:
+        UI['pal_remove'].state(('disabled',))
+    else:
+        UI['pal_remove'].state(('!disabled',))
     
 def export_editoritems(e=None):
     '''Export the selected Items and Style into the chosen game.'''
@@ -523,7 +527,7 @@ def export_editoritems(e=None):
 
 def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
-    # TODO: Update the listbox/menu to match, and reload the new palette.
+
     pal_clear()
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
@@ -668,23 +672,31 @@ def pal_save_as():
     name=""
     while True:
         name=simpledialog.askstring("BEE2 - Save Palette", "Enter a name:")
-        if name in paletteReadOnly:
-            messagebox.showinfo(icon="error", title="BEE2", message='The palette \"'+name+'\" cannot be overwritten. Choose another name.')
-        elif name == None:
-            return
+        if name == None:
+            return False
+        elif not utils.is_plain_text(name): # Check for non-basic characters
+            messagebox.showinfo(icon="error", title="BEE2", message='Please only use basic characters in palette names.')
         else:
             break
-    savePal(name)
+    save_pal(pal_picked, name)
+    loadPalUI()
 
 def pal_save():
     pal=palettes[selectedPalette]
-    if pal in paletteReadOnly:
-        saveAs() # If it's readonly, prompt for a name and save somewhere else
-    else:
-        savePal(pal) # overwrite it
-
-def menu_newPal():
-    newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
+    pal.pos = [(it.id, it.subKey) for it in pal_picked]
+    pal.save(allow_overwrite=True) # overwrite it
+    loadPalUI()
+    
+def pal_remove():
+    global selectedPalette
+    if len(palettes) >= 2:
+        pal = palettes[selectedPalette]
+        if messagebox.askyesno(title="BEE2", message='Are you sure you want to delete "' + pal.name + '"?'):
+            pal.delete_from_disk()
+            del palettes[selectedPalette]
+            selectedPalette -= 1
+            selectedPalette_radio.set(selectedPalette)
+            loadPalUI()
 
 def filterExpand(e):
     frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -744,7 +756,11 @@ def initPalette(f):
     palScroll=ttk.Scrollbar(f, orient=VERTICAL, command=UI['palette'].yview)
     palScroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand']=palScroll.set
-    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=2, columnspan=2)
+    
+    UI['pal_remove'] = ttk.Button(f, text='Delete Pal', command=pal_remove)
+    UI['pal_remove'].grid(row=2, sticky="EW")
+    
+    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, columnspan=2)
         
 def initOption(f):
     f.columnconfigure(0,weight=1)
@@ -1014,8 +1030,8 @@ def initMenuBar(win):
     
     menus['pal']=Menu(bar)
     bar.add_cascade(menu=menus['pal'], label='Palette')
-    menus['pal'].add_command(label='New...', command=menu_newPal)
-    menus['pal'].add_command(label='Clear')
+    menus['pal'].add_command(label='New...', command=pal_save_as)
+    menus['pal'].add_command(label='Clear', command=pal_clear)
     menus['pal'].add_separator()
     menus['pal'].item_len=0 # custom attr used to decide how many items to remove when reloading the menu buttons
     
@@ -1023,7 +1039,6 @@ def initMenuBar(win):
     menuHelp=Menu(bar, name='help') # Name for Mac-specific stuff
     bar.add_cascade(menu=menuHelp, label='Help')
     menuHelp.add_command(label='About') # Authors etc
-    menuHelp.add_command(label='Quotes') # show the list of quotes
 
 def initMain():
     '''Initialise all windows and panes.'''
@@ -1150,7 +1165,6 @@ def initMain():
     windows['style'].move(
         x=xpos, 
         y=win.winfo_rooty()+windows['opt'].winfo_reqheight() + 25)
-
     
     win.bind("<Configure>", contextWin.follow_main, add='+')
 

@@ -2,11 +2,14 @@ import os
 import os.path
 import io
 import zipfile
+import shutil
 
 from property_parser import Property
 import utils
 
 pal_dir = "palettes\\"
+
+pal_list = []
 
 class Palette:
     def __init__(self, name, pos, filename, options):
@@ -14,10 +17,12 @@ class Palette:
         self.name=name
         self.filename = filename
         self.pos=pos
+        
     def getName(self):
         return self.name
+        
     def __str__(self):
-        return self.name
+        return '<Pal: "' + self.name + '">'
         
     def save(self, allow_overwrite, name=None):
         '''Save the palette file into the specified location.'''
@@ -57,15 +62,26 @@ class Palette:
         finally:
             pos_file.close()
             prop_file.close()
+            
+    def delete_from_disk(self, name=None):
+        '''Delete this palette from disk.'''
+        if name is None:
+            name = self.filename
+        is_zip = name.endswith('.zip')
+        path = os.path.join(pal_dir, name)
+        if is_zip:
+            os.remove(path)
+        else:
+            shutil.rmtree(path)
 
 def loadAll(dir):
     "Scan and read in all palettes in the specified directory."
-    global pal_dir
+    global pal_dir, pal_list
     pal_dir = dir
     dir=os.path.join(os.getcwd(),dir)
     contents=os.listdir(dir) # this is both files and dirs
    
-    palettes=[]
+    pal_list=[]
     for name in contents:
         print("Loading '"+name+"'")
         path=os.path.join(dir,name)
@@ -74,7 +90,7 @@ def loadAll(dir):
                 if 'positions.txt' in zip.namelist() and 'properties.txt' in zip.namelist(): # Is it valid?
                     pal=parse(zip.open('positions.txt', 'r'), zip.open('properties.txt', 'r'), name)
                     if pal!=False:
-                        palettes.append(pal)
+                        pal_list.append(pal)
                 else:
                     print("ERROR: Bad palette file '"+name+"'!")
         elif os.path.isdir(path)==1:
@@ -83,8 +99,8 @@ def loadAll(dir):
                     with open(os.path.join(path,'properties.txt'), 'r') as prop:
                         pal=parse(pos, prop, name)
                         if pal!=False:
-                            palettes.append(pal)
-    return palettes
+                            pal_list.append(pal)
+    return pal_list
     
 def parse(posfile, propfile, path):
     "Parse through the given palette file to get all data."
@@ -103,6 +119,17 @@ def parse(posfile, propfile, path):
                     return False
     return Palette(name, pos, path, Property('',props))
     
+def save_pal(items, name):
+    '''Save a palette under the specified name.'''
+    pos = [(it.id, it.subKey) for it in items]
+    print(name, pos, name, [])
+    new_palette = Palette(name, pos, name, [])
+    
+    for pal in pal_list[:]:
+        if pal.name == name:
+            pal_list.remove(name)
+    pal_list.append(new_palette)
+    return new_palette.save(allow_overwrite=False) 
     
 if __name__ == '__main__':
     file=loadAll('palettes\\')

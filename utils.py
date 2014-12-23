@@ -1,4 +1,5 @@
 import math
+import string
 import collections.abc as abc
 
 from property_parser import Property
@@ -15,6 +16,15 @@ def is_identifier(name, forbidden='{}\'"'):
     '''Check to see if any forbidden characters are part of a candidate name.'''
     for t in name:
         if t in forbidden:
+            return False
+    return True
+    
+file_chars = string.ascii_letters + string.digits + '-_ .|'
+    
+def is_plain_text(name, valid_chars=file_chars):
+    '''Check to see if any characters are not in the whitelist.'''
+    for ch in name:
+        if ch not in valid_chars:
             return False
     return True
     
