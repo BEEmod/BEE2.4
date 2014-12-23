@@ -52,9 +52,6 @@ FilterVars_all={}
 ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
 selectedPalette = 0
 
-PalEntry_TempText="New Palette>"
-PalEntry = StringVar(value=PalEntry_TempText)
-
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
 
 shouldSnap=True # Should we update the relative positions of windows?
@@ -115,10 +112,13 @@ class Item():
         self.data=self.item.versions[self.ver]['styles'][selected_style]
         self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
         self.url = self.data['url']
+        self.can_group = ('all' in self.data['icons'] and 
+                          self.data['all_name'] is not None and 
+                          self.data['all_icon'] is not None)
         
     def get_icon(self, subKey, allow_single=False, single_num=1):
         icons = self.data['icons']
-        if (allow_single and 'all' in icons and 
+        if (allow_single and self.can_group and 
             sum(1 for item in pal_picked if item.id==self.id) <= single_num):
             # If only 1 copy of this item is on the palette, use the special icon
             return png.loadIcon(icons['all'])
@@ -524,9 +524,7 @@ def export_editoritems(e=None):
 def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
     # TODO: Update the listbox/menu to match, and reload the new palette.
-    for item in pal_picked:
-        item.kill()
-    pal_picked.clear()
+    pal_clear()
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
             pal_picked.append(PalItem(frames['preview'], item_list[item], sub, is_pre=True))
@@ -658,16 +656,15 @@ def setPal_radio():
     UI['palette'].selection_clear(0,len(palettes))
     UI['palette'].selection_set(selectedPalette)
     setPalette()
+        
+def pal_clear():
+    '''Empty the palette.'''
+    for item in pal_picked:
+        item.kill()
+    pal_picked.clear()
+    flowPreview()
 
-def pal_remTempText(e):
-    if PalEntry.get() == PalEntry_TempText:
-        PalEntry.set("")
-
-def pal_addTempText(e):
-    if PalEntry.get() == "":
-        PalEntry.set(PalEntry_TempText)
-
-def saveAs():
+def pal_save_as():
     name=""
     while True:
         name=simpledialog.askstring("BEE2 - Save Palette", "Enter a name:")
@@ -679,7 +676,7 @@ def saveAs():
             break
     savePal(name)
 
-def save():
+def pal_save():
     pal=palettes[selectedPalette]
     if pal in paletteReadOnly:
         saveAs() # If it's readonly, prompt for a name and save somewhere else
@@ -688,9 +685,6 @@ def save():
 
 def menu_newPal():
     newPal(simpledialog.askstring("BEE2 - New Palette", "Enter a name:"))
-
-def newPal_textbox(e):
-    newPal(PalEntry.get())
 
 def filterExpand(e):
     frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -738,32 +732,24 @@ def filterAllCallback(col):
 # UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
 def initPalette(f):
     palFrame=ttk.Frame(f)
-    palFrame.grid(row=0, sticky="NSEW")
-    palFrame.rowconfigure(0, weight=1)
-    palFrame.columnconfigure(0, weight=1)
-    f.rowconfigure(0, weight=1)
-
-    UI['palette']=Listbox(palFrame, width=10)
-    UI['palette'].grid(sticky="NSEW")
+    f.rowconfigure(1, weight=1)
+    f.columnconfigure(0, weight=1)
+    
+    ttk.Button(f, text='Clear', command=pal_clear).grid(row=0, sticky="EW")
+    UI['palette']=Listbox(f, width=10)
+    UI['palette'].grid(row=1, sticky="NSEW")
     UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
     UI['palette'].selection_set(0)
 
-    palScroll=ttk.Scrollbar(palFrame, orient=VERTICAL, command=UI['palette'].yview)
-    palScroll.grid(row=0,column=1, sticky="NS")
+    palScroll=ttk.Scrollbar(f, orient=VERTICAL, command=UI['palette'].yview)
+    palScroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand']=palScroll.set
-
-    UI['newBox']=ttk.Entry(f, textvariable=PalEntry)
-    UI['newBox'].grid(row=1, sticky=S) # User types in and presses enter to create
-    UI['newBox'].bind("<Return>", newPal_textbox)
-    UI['newBox'].bind("<FocusIn>", pal_remTempText)
-    UI['newBox'].bind("<FocusOut>", pal_addTempText)
-    ttk.Button(f, text=" - ").grid(row=2, sticky="EWS") # Delete (we probably don't want to allow deleting "None" or "Portal 2")
-    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3)
+    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=2, columnspan=2)
         
 def initOption(f):
     f.columnconfigure(0,weight=1)
-    ttk.Button(f, width=10, text="Save...", command=save).grid(row=0)
-    ttk.Button(f, width=10, text="Save as...", command=saveAs).grid(row=1)
+    ttk.Button(f, width=10, text="Save...", command=pal_save).grid(row=0)
+    ttk.Button(f, width=10, text="Save as...", command=pal_save_as).grid(row=1)
     ttk.Button(f, width=10, text="Export...", command=export_editoritems).grid(row=2, pady=(0, 10))
 
     props=ttk.LabelFrame(f, text="Properties", width="50")
