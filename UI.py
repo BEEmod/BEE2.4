@@ -27,7 +27,7 @@ win=Tk()
 win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
 gameMan.root=win
 
-gameMan.load_trans_data()
+gameMan.init()
 
 png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
 
@@ -497,12 +497,11 @@ def loadPalUI():
     UI['palette'].delete(0, END)
     for i,pal in enumerate(palettes):
         UI['palette'].insert(i,pal.name)
-    if menus['pal'].item_len>0:
-        menus['pal'].delete(3, menus['pal'].item_len)
-    menus['pal'].item_len=0
-    for val,pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
+        
+    menus['pal'].delete(3, 999) # Delete the old entries
+    
+    for val, pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
         menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
-        menus['pal'].item_len+=1
         
     if len(palettes) < 2:
         UI['pal_remove'].state(('disabled',))
@@ -524,6 +523,15 @@ def export_editoritems(e=None):
         print('Copying resources...')
         gameMan.selected_game.refresh_cache()
         print('Done!')
+        
+    for pal in palettes[:]:
+        if pal.name == '<Last Export>':
+            palettes.remove(pal)
+    new_pal = Palette('<Last Export>', [(it.id, it.subKey) for it in pal_picked], options=[], filename='LAST_EXPORT.zip')
+    # Since last_export is a zip, users won't be able to overwrite it normally!
+    palettes.append(new_pal)
+    new_pal.save(allow_overwrite=True)
+    loadPalUI()
 
 def setPalette():
     print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
@@ -1026,14 +1034,15 @@ def initMenuBar(win):
     menus['file'].add_command(label="Quit", command=win.destroy)
     menus['file'].add_separator()
     
-    gameMan.add_menu_opts(menus['file'], set_game) # Add a set of options to pick the game into the menu system
+    menus['file'].game_pos = 7 # index for game items
+    gameMan.add_menu_opts(menus['file'], callback=set_game) # Add a set of options to pick the game into the menu system
+    gameMan.game_menu = menus['file']
     
     menus['pal']=Menu(bar)
     bar.add_cascade(menu=menus['pal'], label='Palette')
     menus['pal'].add_command(label='New...', command=pal_save_as)
     menus['pal'].add_command(label='Clear', command=pal_clear)
     menus['pal'].add_separator()
-    menus['pal'].item_len=0 # custom attr used to decide how many items to remove when reloading the menu buttons
     
 
     menuHelp=Menu(bar, name='help') # Name for Mac-specific stuff

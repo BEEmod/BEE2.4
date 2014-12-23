@@ -12,10 +12,10 @@ pal_dir = "palettes\\"
 pal_list = []
 
 class Palette:
-    def __init__(self, name, pos, filename, options):
-        self.opt=options
+    def __init__(self, name, pos, options=None, filename=None):
+        self.opt={} if options is None else options
         self.name=name
-        self.filename = filename
+        self.filename = name if filename is None else filename
         self.pos=pos
         
     def getName(self):
@@ -52,8 +52,9 @@ class Palette:
                     pos_file.write("//Row " + str(ind//4) + '\n')
                 pos_file.write('"' + row[0] + '", ' + str(row[1]) + '\n')
             
+            prop_file.write('"Name"\t"' + self.name + '"\n')
             for row in self.opt:
-                prop_file.write('\n'.join(row.to_strings()) + '\n')
+                prop_file.write('\n'.join(row.to_strings()))
                 
             if is_zip:
                 with zipfile.ZipFile(path, 'w') as zip:
@@ -105,7 +106,13 @@ def loadAll(dir):
 def parse(posfile, propfile, path):
     "Parse through the given palette file to get all data."
     props=Property.parse(propfile, path + ':properties.txt')
-    name=Property.find_key(props, "Name", "Unnamed").value
+    name="Unnamed"
+    opts = {}
+    for option in props:
+        if option.name.casefold() == "name":
+            name = option.value
+        else:
+            opts[option.name.casefold()] = option.value
     pos=[]
     for dirty_line in posfile:
         line=utils.clean_line(dirty_line)
@@ -117,13 +124,13 @@ def parse(posfile, propfile, path):
                 else:
                     print("Malformed row '"+line+"'!")
                     return False
-    return Palette(name, pos, path, Property('',props))
+    return Palette(name, pos, opts, filename=path)
     
 def save_pal(items, name):
     '''Save a palette under the specified name.'''
     pos = [(it.id, it.subKey) for it in items]
     print(name, pos, name, [])
-    new_palette = Palette(name, pos, name, [])
+    new_palette = Palette(name, pos)
     
     for pal in pal_list[:]:
         if pal.name == name:

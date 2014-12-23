@@ -1,10 +1,13 @@
 from property_parser import Property
 from config import ConfigFile
+
 import paletteLoader
 import packageLoader
-import loadScreen
 import gameMan
+
+import loadScreen
 import UI
+
 import utils
 
 loadScreen.init(UI.win)

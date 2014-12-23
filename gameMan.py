@@ -17,14 +17,23 @@ import utils
 
 all_games = []
 selected_game = None
+selectedGame_radio = None 
 root = None
+game_menu = None
 
 trans_data = {}
 
 config = ConfigFile('games.cfg')
 
-def load_trans_data():
-    global trans_data
+FILES_TO_BACKUP = [
+    ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
+    ('VBSP',        'bin/vbsp',                         '.exe'),
+    ('VRAD',        'bin/vrad',                         '.exe')
+]
+
+def init():
+    global trans_data, selectedGame_radio
+    selectedGame_radio = IntVar(value=0)
     try:
         with open('config/basemodui.txt', "r") as trans:
             trans_data = Property.parse(trans, 'config/basemodui.txt')
@@ -104,6 +113,15 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
+        if not add_line:
+            # Restore the original files!
+            
+            for name, file, ext in FILES_TO_BACKUP:
+                item_path = self.abs_path(file + ext)
+                backup_path = self.abs_path(file + '_original' + ext)
+                if os.path.isfile(backup_path):
+                    print("Restoring original " + name + "!")
+                    shutil.move(backup_path, item_path)
                         
     def refresh_cache(self):
         dest = os.path.join(self.root, 'sdk_content/maps/instances/BEE2')
@@ -131,13 +149,13 @@ class Game:
         
         vbsp_config.append(Property('StyleVars',
             [Property(key,str(val.get())) for key,val in styleVars.items()]))
-         
-        editor_path = self.abs_path('portal2_dlc2/scripts/editoritems.txt')
-        editor_backup_path = self.abs_path('portal2_dlc2/scripts/editoritems_original.txt')
         
-        if os.path.isfile(editor_path) and not os.path.isfile(editor_backup_path):
-            print('Backing up original editoritems!')
-            shutil.move(editor_path, editor_backup_path)
+        for name, file, ext in FILES_TO_BACKUP:
+            item_path = self.abs_path(file + ext)
+            backup_path = self.abs_path(file + '_original' + ext)
+            if os.path.isfile(item_path) and not os.path.isfile(backup_path):
+                print('Backing up original ' + name + '!')
+                shutil.copy(item_path, backup_path)
             
         editoritems += renderables
             
@@ -215,24 +233,35 @@ def add_game(e=None):
         name = simpledialog.askstring(prompt="Enter the name of this game:", title="BEE2")
             
         new_game = Game(name, id, folder)
-        new_game.refresh_cache()
+        new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
+        add_menu_opts(game_menu)
         save()
         
     
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
-    if len(all_games) <= 1:
-        messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
-    else:
-        all_games.remove(selected_game)
-        selected_game = all_games[0]
+    global selected_game, selectedGame_radio
+    if messagebox.askyesno(title="BEE2", message='Are you sure you want to delete "' + selected_game.name + '"?'):
+        if len(all_games) <= 1:
+            messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
+        else:
+            selected_game.edit_gameinfo(add_line=False)
+            
+            all_games.remove(selected_game)
+            config.remove_section(selected_game.name)
+            config.save()
+            
+            selected_game = all_games[0]
+            selectedGame_radio.set(0)
+            add_menu_opts(game_menu)
         
-def add_menu_opts(menu, callback):
+def add_menu_opts(menu, callback=None):
     '''Add the various games to the menu.'''
     global selectedGame_radio, setgame_callback
-    setgame_callback = callback
-    selectedGame_radio = IntVar(value=0)
+    if callback is not None:
+        setgame_callback = callback
+    menu.delete(menu.game_pos, 999)
     for val, game in enumerate(all_games):
         menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
     setGame()
@@ -243,10 +272,11 @@ def setGame():
     setgame_callback(selected_game)
     
 def set_game_by_name(name):
-    global selected_game
+    global selected_game, selectedGame_radio
     for game in all_games:
         if game.name == name:
             selected_game = game
+            selectedGame_radio.set(all_games.index(game))
             setgame_callback(selected_game)
             break
        
