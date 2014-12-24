@@ -765,16 +765,16 @@ def initPalette(f):
     palScroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand']=palScroll.set
     
-    UI['pal_remove'] = ttk.Button(f, text='Delete Pal', command=pal_remove)
+    UI['pal_remove'] = ttk.Button(f, text='Delete Palette', command=pal_remove)
     UI['pal_remove'].grid(row=2, sticky="EW")
     
     ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, columnspan=2)
         
 def initOption(f):
     f.columnconfigure(0,weight=1)
-    ttk.Button(f, width=10, text="Save...", command=pal_save).grid(row=0)
-    ttk.Button(f, width=10, text="Save as...", command=pal_save_as).grid(row=1)
-    ttk.Button(f, width=10, text="Export...", command=export_editoritems).grid(row=2, pady=(0, 10))
+    ttk.Button(f, text="Save Palette...", command=pal_save).grid(row=0, sticky="EW", padx=5)
+    ttk.Button(f, text="Save Palette As...", command=pal_save_as).grid(row=1, sticky="EW", padx=5)
+    ttk.Button(f, text="Export...", command=export_editoritems).grid(row=2, sticky="EW", padx=5, pady=(0, 10))
 
     props=ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1,weight=1)
@@ -1164,16 +1164,16 @@ def initMain():
     xpos = min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )
    
     windows['pal'].move(
-        x=(win.winfo_rootx()-windows['pal'].winfo_reqwidth() - 25),
-        y=(win.winfo_rooty()-50),
-        height=win.winfo_reqheight())
+        x=(win.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
+        y=(win.winfo_rooty() - 50),
+        height=win.winfo_reqheight() + 25)
     windows['opt'].move(
         x=xpos, 
         y=win.winfo_rooty()-40,
         width=windows['style'].winfo_reqwidth())
     windows['style'].move(
         x=xpos, 
-        y=win.winfo_rooty()+windows['opt'].winfo_reqheight() + 25)
+        y=win.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
     
     win.bind("<Configure>", contextWin.follow_main, add='+')
 

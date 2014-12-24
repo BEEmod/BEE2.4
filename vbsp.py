@@ -84,19 +84,19 @@ BLACK_PAN = [
             ]
             
 WALLS = [
-             "tile/white_wall_tile003a", 
-             "tile/white_wall_tile003h", 
-             "tile/white_wall_tile003c", 
-             "metal/black_wall_metal_002c", 
-             "metal/black_wall_metal_002e", 
-             "metal/black_wall_metal_002a", 
-             "metal/black_wall_metal_002b"
+         "tile/white_wall_tile003a", 
+         "tile/white_wall_tile003h", 
+         "tile/white_wall_tile003c", 
+         "metal/black_wall_metal_002c", 
+         "metal/black_wall_metal_002e", 
+         "metal/black_wall_metal_002a", 
+         "metal/black_wall_metal_002b"
         ]
         
 GOO_TEX = [
-        "nature/toxicslime_a2_bridge_intro",
-        "nature/toxicslime_puzzlemaker_cheap"
-    ]
+           "nature/toxicslime_a2_bridge_intro",
+           "nature/toxicslime_puzzlemaker_cheap"
+          ]
 
 ANTLINES = {                              
     "signage/indicator_lights/indicator_lights_floor" : "antline",
@@ -387,9 +387,9 @@ def satisfy_condition(cond, inst):
         subres = False
         name = flag.name.casefold()
         if name == 'instance':
-            subres = inst['file'] == flag.value
+            subres = (inst['file'] == flag.value)
         elif name == 'instflag':
-            subres = flag.value in inst['file']
+            subres = flag.value in inst['file', '']
         elif name == 'instvar':
             bits = flag.value.split(' ')
             subres = inst.get_fixup(bits[0]) == bits[1]
