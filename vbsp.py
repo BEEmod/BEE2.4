@@ -1026,7 +1026,6 @@ def change_ents():
 
 def fix_inst():
     "Fix some different bugs with instances, especially fizzler models and implement custom compiler changes."
-    global to_pack
     utils.con_log("Editing Instances...")
     for inst in map.iter_ents(classname='func_instance'):
         if "_modelStart" in inst.get('targetname','') or "_modelEnd" in inst.get('targetname',''):
@@ -1080,6 +1079,8 @@ def fix_inst():
         for cond in settings['conditions'][:]:
             satisfy_condition(cond, inst)
             
+    utils.con_log('Map has attributes: ', settings['has_attr'])
+    utils.con_log('Style Vars:', settings['style_vars'])
     for inst in map.iter_ents(classname='func_instance', file=''):
         map.remove_ent(inst) # Remove instances with blank file attr, allows conditions to strip the instances when requested
 

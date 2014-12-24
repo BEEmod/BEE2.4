@@ -193,7 +193,7 @@ class VMF:
         for hidden_ent in Property.find_all(tree, 'hidden'):
             map.entities.extend([Entity.parse(map, ent, hidden=True) for ent in hidden_ent])
         
-        map_spawn = Property.find_key(tree, 'world', None)
+        map_spawn = Property.find_key(tree, 'world', [])
         if map_spawn is None:
             # Generate a fake default to parse through
             map_spawn = Property("world", [])
@@ -201,6 +201,7 @@ class VMF:
 
         if map.spawn.solids is not None:
            map.brushes = map.spawn.solids
+           
         return map
     pass
     
@@ -795,8 +796,6 @@ class Entity():
         editor = { 'visgroup' : []}
         fixup = {}
         for item in tree_list:
-            if item is None:
-                print(tree_list)
             name = item.name.casefold()
             if name == "id" and item.value.isnumeric():
                 id = item.value
@@ -836,6 +835,7 @@ class Entity():
                             editor['visgroup'].append(val)
             else:
                 keys[item.name] = item.value
+                
         return Entity(
             map, 
             keys=keys, 

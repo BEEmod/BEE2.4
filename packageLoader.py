@@ -260,7 +260,7 @@ class Item:
                        }
                 if config in files:
                     with zip.open(config, 'r') as vbsp_config:
-                        folders[fold]['vbsp'] = Property.parse(vbsp_config)
+                        folders[fold]['vbsp'] = Property.parse(vbsp_config, config)
             else:
                 raise IOError('"items/' + fold + '" not valid! Folder likely missing! (Editor=' + 
                                 str(editor in files) + ', Props=' + str(props in files) + ')')
@@ -294,7 +294,7 @@ class Voice:
         name, short_name, auth, icon, desc = get_selitem_data(info)        
         path = 'voice/' + info['file'] + '.voice'
         with zip.open(path, 'r') as conf:
-            config = Property.parse(conf)
+            config = Property.parse(conf, path)
         
         return cls(id, name, config, icon, desc, auth=auth, short_name=short_name)
         
