@@ -95,7 +95,7 @@ class Item():
         self.item = item
         self.def_data = self.item.def_data
         # These pieces of data are constant, only from the first style.
-        self.num_sub = sum(1 for _ in self.def_data['editor'].find_all("Item", "Editor", "Subtype"))
+        self.num_sub = sum(1 for _ in self.def_data['editor'].find_all("Item", "Editor", "Subtype", "Palette"))
         self.authors = self.def_data['auth']
         self.tags = self.def_data['tags']
         
@@ -108,7 +108,7 @@ class Item():
     def load_data(self):
         '''Load data from the item.'''
         self.data=self.item.versions[self.ver]['styles'][selected_style]
-        self.names = [prop.value for prop in self.data['editor'].find_all("Item", "Editor", "Subtype", "Name")]
+        self.names = [prop['name', ''] for prop in self.data['editor'].find_all("Item", "Editor", "Subtype") if prop['Palette', None] is not None]
         self.url = self.data['url']
         self.can_group = ('all' in self.data['icons'] and 
                           self.data['all_name'] is not None and 
