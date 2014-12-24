@@ -178,20 +178,20 @@ def set_sprites(item):
     has_inputs = False
     has_polarity = False
     has_outputs = False
-    for inp_list in Property.find_all(editor_data, "Item", "Exporting", "Inputs"):
+    for inp_list in editor_data.find_all("Item", "Exporting", "Inputs"):
         for inp in inp_list:
             if inp.name == "CONNECTION_STANDARD":
                 has_inputs = True
             elif inp.name == "CONNECTION_TBEAM_POLARITY":
                 has_polarity = True
-    for out_list in Property.find_all(editor_data, "Item", "Exporting", "Outputs"):
+    for out_list in editor_data.find_all("Item", "Exporting", "Outputs"):
         for out in out_list:
             if out.name == "CONNECTION_STANDARD":
                 has_outputs = True
                 break
-    has_timer = any(Property.find_all(editor_data, "Item", "Properties", "TimerDelay"))
+    has_timer = any(editor_data.find_all("Item", "Properties", "TimerDelay"))
     
-    editor_bit = next(Property.find_all(editor_data, "Item", "Editor"))
+    editor_bit = next(editor_data.find_all("Item", "Editor"))
     rot_type = editor_bit["MovementHandle", "HANDLE_NONE"].casefold()
     
     facing_type = editor_bit["InvalidSurface", ""].casefold()
@@ -199,7 +199,7 @@ def set_sprites(item):
     surf_floor = "floor" in facing_type
     surf_ceil = "ceiling" in facing_type
 
-    is_embed = any(Property.find_all(editor_data, "Item", "Exporting", "EmbeddedVoxels"))
+    is_embed = any(editor_data.find_all("Item", "Exporting", "EmbeddedVoxels"))
             
     if has_inputs:
         if has_polarity:

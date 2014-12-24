@@ -143,8 +143,9 @@ class Game:
         editoritems = Property("ItemData", list(Property.find_all(style.editor, 'Item')))
         
         for item in sorted(all_items):
-            editor_part, config_part = all_items[item].export()
-            editoritems += editor_part
+            item_block, editor_parts, config_part = all_items[item].export()
+            editoritems += item_block
+            editoritems += editor_parts
             vbsp_config.extend(config_part)
         
         vbsp_config.append(Property('StyleVars',

@@ -243,6 +243,8 @@ class Item:
                     props = Property.find_key(Property.parse(prop_file, props), 'Properties')
                 with zip.open(editor, 'r') as editor_file:
                     editor = Property.parse(editor_file)
+                    
+                editor_iter = Property.find_all(editor, 'Item')
                 folders[fold] = {
                         'auth': sep_values(props['authors', ''],','),
                         'tags': sep_values(props['tags', ''],';'),
@@ -252,7 +254,8 @@ class Item:
                         'icons': {p.name:p.value for p in props['icon', []]},
                         'all_name': props['all_name', None],
                         'all_icon': props['all_icon', None],
-                        'editor': list(Property.find_all(editor, 'Item')),
+                        'editor' : next(editor_iter), # The first Item block found
+                        'editor_extra': list(editor_iter), # Any extra blocks (offset catchers, extent items)
                         'vbsp': []
                        }
                 if config in files:

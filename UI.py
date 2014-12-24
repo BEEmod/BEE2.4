@@ -95,7 +95,7 @@ class Item():
         self.item = item
         self.def_data = self.item.def_data
         # These pieces of data are constant, only from the first style.
-        self.num_sub = len(list(Property.find_all(self.def_data['editor'], "Item", "Editor", "Subtype")))
+        self.num_sub = sum(1 for _ in self.def_data['editor'].find_all("Item", "Editor", "Subtype"))
         self.authors = self.def_data['auth']
         self.tags = self.def_data['tags']
         
@@ -108,7 +108,7 @@ class Item():
     def load_data(self):
         '''Load data from the item.'''
         self.data=self.item.versions[self.ver]['styles'][selected_style]
-        self.names = [prop.value for prop in Property.find_all(self.data['editor'], "Item", "Editor", "Subtype", "Name")]
+        self.names = [prop.value for prop in self.data['editor'].find_all("Item", "Editor", "Subtype", "Name")]
         self.url = self.data['url']
         self.can_group = ('all' in self.data['icons'] and 
                           self.data['all_name'] is not None and 
@@ -125,14 +125,14 @@ class Item():
             
     def properties(self):
         '''Iterate through all properties for this item.'''
-        for part in Property.find_all(self.data['editor'], "Item", "Properties"):
+        for part in self.data['editor'].find_all("Item", "Properties"):
             for prop in part:
                 yield prop.name.casefold()
     
     def get_properties(self):
         '''Return a dictionary of properties and the current value associated with them.'''
         result = {}
-        for part in Property.find_all(self.data['editor'], "Item", "Properties"):
+        for part in self.data['editor'].find_all("Item", "Properties"):
             for prop in part:
                 name = prop.name.casefold()
                 if name not in result:
@@ -142,7 +142,7 @@ class Item():
     def set_properties(self, props):
         '''Apply the properties to the item.'''
         for prop, value in props.items():
-            for def_prop in Property.find_all(self.data['editor'], "Item", "Properties", prop, 'DefaultValue'):
+            for def_prop in self.data['editor'].find_all("Item", "Properties", prop, 'DefaultValue'):
                 def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
             
@@ -156,8 +156,8 @@ class Item():
             if item.id == self.id:
                 palette_items[item.subKey] = item
         
-        new_editor = [prop.copy() for prop in self.data['editor']]
-        for index, editor_section in enumerate(Property.find_all(new_editor, "Item", "Editor", "Subtype")):
+        new_editor = self.data['editor'].copy()
+        for index, editor_section in enumerate(new_editor.find_all("Item", "Editor", "Subtype")):
             for editor_sec_index, pal_section in enumerate(editor_section.value):
                 if pal_section.name.casefold() == "palette":
                     if index in palette_items:
@@ -174,8 +174,7 @@ class Item():
                         del editor_section.value[editor_sec_index]
                         pal_section['Position'] = '999 999 999'
                         break
-        
-        return new_editor, self.data['vbsp']
+        return new_editor, self.data['editor_extra'], self.data['vbsp']
     
 class PalItem(ttk.Label):
     '''The icon and associated data for a single subitem.'''
@@ -519,7 +518,8 @@ def export_editoritems(e=None):
         voice=voices.get(voice_win.chosen_id, None),
         styleVars=styleOptVars)
     messagebox.showinfo('BEEMOD2', message='Selected Items and Style successfully exported!')
-    if not gen_opts.get_bool('General','preserve_BEE2_resource_dir'):
+    
+    if gen_opts.get_bool('General','preserve_BEE2_resource_dir', False) is False:
         print('Copying resources...')
         gameMan.selected_game.refresh_cache()
         print('Done!')
