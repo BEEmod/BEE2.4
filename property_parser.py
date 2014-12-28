@@ -16,18 +16,21 @@ to_strings: => string
 # A new member level property called 'comment' should be added when a comment is tacked onto the end of a line
 # Comments on bracketed lines should be separated into their own comment properties
 
+import utils
 
-import re
+__all__ = ['KeyValError', 'NoKeyError', 'Property', 'INVALID']
 
-__all__ = ["KeyValError", "NoKeyError", "Property"]
+INVALID = object()
 
 # various escape sequences that we allow
-replace_chars = {
+REPLACE_CHARS = {
     r'\n'  : '\n',
     r'\t'  : '\t',
     '\\\\' : '\\',
     r'\/'  : '/'
     }
+    
+_NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given to find_key()
 
 class KeyValError(Exception):
     '''An error that occured when parsing a Valve KeyValues file.'''
@@ -54,19 +57,38 @@ class NoKeyError(Exception):
     def __str__(self):
         return "No key " + self.key + "!"
     pass
-    
-_NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given to find_key()
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
     __slots__ = ('name', 'value', 'valid') # Helps decrease memory footprint with lots of Property values.
-    def __init__(self, name = None, value = ""):
-        self.name = name
-        self.value = value
-        self.valid = True
+    def __init__(self, name, *values, valid=True, **kargs):
+        '''Create a new property instance.
+        Values can be passed in 3 ways:
+        - A single value for the Property
+        - A number of Property objects for the tree
+        - A set of keyword arguments which will be converted into Property objects
+        - A single dictionary which will be converted into Property objects
+        '''
+        if name == INVALID:
+            self.name = None
+            self.value = None
+            self.valid = False
+        else:
+            self.name = name
+            if len(values) == 1:
+                if isinstance(values[0], Property):
+                    self.value = [values[0]]
+                elif isinstance(values[0], dict):
+                    self.value = [Property(key, val) for key,val in values[0].items()]
+                else:
+                    self.value=values[0]
+            else:
+                self.value = list(values)
+                self.value.extend(Property(key, val) for key,val in kargs.items())
+            self.valid = True
 
     def edit(self, name=None, value=None):
-        '''Simultanously modify the name and value.'''
+        '''Simultaneously modify the name and value.'''
         if name is not None:
             self.name = name
         if value is not None:
@@ -90,7 +112,7 @@ class Property:
                         value = line_contents[3]
                         if not freshline.endswith('"'):
                             raise KeyValError("Line " + str(line_num) + " has value, but incomplete quotes!", filename)
-                        for orig, new in replace_chars.items():
+                        for orig, new in REPLACE_CHARS.items():
                             value=value.replace(orig, new)
                     except IndexError:
                         value = None
@@ -160,7 +182,7 @@ class Property:
         if def_ is _NO_KEY_FOUND:
             raise NoKeyError(key, [prop.name for prop in run_on])
         else:
-            return Property(name=key, value=def_) 
+            return Property(key, def_) 
             # We were given a default, pretend that was in the original property list so code works
     
     def copy(self):
@@ -182,7 +204,7 @@ class Property:
     def make_invalid(self):
         "Soft delete this property tree, so it does not appear in any output."
         self.valid = False
-        self.value = "" # Dump this if it exists
+        self.value = None # Dump this if it exists
         self.name = None
         
     def __eq__(self,other):
@@ -228,6 +250,11 @@ class Property:
             return self.value >= other 
                 
     def __len__(self):
+        '''Determine the number of child properties.
+        
+        Singluar Properties have a length of 1
+        Invalid properties have a length of 0.
+        '''
         if self.valid:
             if self.has_children():
                 return len(self.value)
@@ -237,12 +264,25 @@ class Property:
             return 0
     
     def __iter__(self):
-        "Iterate through the value list, or loop once through the single value."
+        '''Iterate through the value list, or loop once through the single value.'''
         if self.has_children():
-            for item in self.value:
-                yield item
+            yield from self.value
         else:
             yield self.value
+            
+    def __contains__(self, key):
+        '''Check to see if a name is present in the children.
+        
+        If the Property has no children, this checks if the names match instead.
+        '''
+        key = key.casefold()
+        if self.has_children():
+            for prop in self.value:
+                if prop.name.casefold() == key:
+                    return True
+            return False
+        else:
+            return self.name.casefold() == key
     
     def __getitem__(self, index):
         '''Allow indexing the children directly.
@@ -271,7 +311,7 @@ class Property:
         
         - If given an integer, it will search by position.
         - If given a string, it will set the last Property with that name.
-        - If none are found, it raises IndexError
+        - If none are found, it appends the value to the tree
         - [0] is the same as .value if the Property has no children, all others fail
         '''
         if self.has_children():
@@ -280,19 +320,23 @@ class Property:
             else:
                 try:
                     self.find_key(index).value = value
-                except NoKeyError as no_key:
-                    raise IndexError(str(no_key)) from no_key
+                except NoKeyError:
+                    self.value.append(Property(index, value))
         elif index == 0:
             self.value = value
         else:
-            raise IndexError
+            raise IndexError('Cannot index a Property that does not have children!')
             
     def _delitem__(self, index):
         if self.has_children():
             del self.value[index]
                 
     def __add__(self, other):
-        "Allow appending other properties to this one."
+        '''Allow appending other properties to this one.
+        
+        This deep-copies the Property tree first.
+        Works with either a sequence of Properties or a single Property.
+        '''
         if self.has_children():
             copy = self.copy()
             if isinstance(other, Property):
@@ -305,7 +349,10 @@ class Property:
             return NotImplemented
     
     def __iadd__(self, other):
-        "Allow appending other properties to this one. This is the += op, where it does not copy the object."
+        '''Allow appending other properties to this one. 
+       
+        This is the += op, where it does not copy the object.
+        '''
         if self.has_children():
             if isinstance(other, Property):
                 self.value.append(other)
@@ -315,28 +362,22 @@ class Property:
         else:
             return NotImplemented
   
-    def append(self, val):
-        "Append the passed property to the list of items."
-        if isinstance(val, Property):
-            if self.has_children():
-                self.value.append(val)
-            else:
-                self.value=[self.value, val]
-        else:
-            return NotImplemented
+    append = __iadd__
+    append.__doc__ = '''Append another property to this one.'''
             
     def has_children(self):
-        "Does this have child properties?"
+        '''Does this have child properties?'''
         return isinstance(self.value, list)
         
     def __repr__(self):
-        return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
+        if self.valid:
+            return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
+        else:
+            return 'Property(<INVALID>)'
         
     def __str__(self):
-        if self.valid:
-            return '\n'.join(self.to_strings())
-        else:
-            return ''
+        return '\n'.join(self.to_strings())
+            
     def to_strings(self):
         '''Returns a list of strings that represents the property as it appears in the file.'''
         if self.valid:
@@ -350,5 +391,3 @@ class Property:
                 yield out_val + ' "' + str(self.value) + '"'
         else:
             yield ''
-
-import utils

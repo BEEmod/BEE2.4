@@ -95,6 +95,7 @@ def loadAll(dir, load_res):
                 shutil.move("cache/resources/instances", "inst_cache/")
                 
             shutil.rmtree('cache/', ignore_errors=True)
+            print('Done!')
                
     finally:
         for z in zips: #close them all, we've already read the contents.

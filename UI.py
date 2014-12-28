@@ -339,7 +339,6 @@ def on_app_quit():
     
 def set_mute():
     snd.muted = (muted.get()==1)
-    print(muted.get(), snd.muted)
     gen_opts['General']['mute_sounds'] = str(muted.get())
     
 def load_palette(data):

@@ -1,17 +1,14 @@
-from property_parser import Property
 from config import ConfigFile
-
-import paletteLoader
-import packageLoader
-import gameMan
 
 import loadScreen
 import UI
 
-import utils
-
 loadScreen.init(UI.win)
 loadScreen.length('UI', 8)
+
+import paletteLoader
+import packageLoader
+import gameMan
 
 default_settings = {
     'Directories' : {
@@ -19,8 +16,9 @@ default_settings = {
         'package' : 'packages\\',
         },
     'General' : {
-        'preserve_BEE2_resource_dir' : '0',
-        'allow_any_folder_as_game' : '0',
+        'preserve_BEE2_resource_dir': '0',
+        'allow_any_folder_as_game': '0',
+        'mute_sounds': '0'
         },
 }
 

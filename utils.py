@@ -2,8 +2,6 @@ import math
 import string
 import collections.abc as abc
 
-from property_parser import Property
-
 def clean_line(line):
     '''Removes extra spaces and comments from the input.'''
     if isinstance(line, bytes):
