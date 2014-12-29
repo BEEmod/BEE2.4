@@ -3,8 +3,6 @@ from tkinter import * # ui library
 from tkinter import font
 from tkinter import ttk # themed ui components that match the OS
 
-active=True
-
 STAGES = [
     ('PAK', 'Packages'),
     ('OBJ',  'Loading Objects'),
@@ -18,10 +16,12 @@ bar_var = {}
 bar_val = {}
 maxes = {}
 num_images = 0
+
 active=False
+# active determines whether the screen is on, and if False stops most functions from doing anything.
          
 def init(root):
-    global win, wid_list, active, bar_var, bar_val
+    global win, active, bar_var, bar_val
     active=True
     win=Toplevel(root)
     win.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
@@ -68,9 +68,10 @@ def set_nums(stage):
     
 def skip_stage(stage):
     '''Skip over this stage of the loading process.'''
-    labels[stage]['text'] = 'Skipped!'
-    bar_var[stage].set(1000)
-    widgets[stage].update()
+    if active:
+        labels[stage]['text'] = 'Skipped!'
+        bar_var[stage].set(1000)
+        widgets[stage].update()
 
 def quit():
     '''Shutdown the loading screen, we're done!'''

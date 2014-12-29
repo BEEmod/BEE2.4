@@ -18,13 +18,18 @@ packages = {}
 
 data = {}
 
+res_count = -1
+
 def loadAll(dir, load_res):
+    global res_count
     "Scan and read in all packages in the specified directory."
     dir=os.path.join(os.getcwd(), dir)
     contents=os.listdir(dir) # this is both files and dirs
     
     loader.length("PAK",len(contents))
-    if not load_res:
+    if load_res:
+        res_count = 0
+    else:
         loader.skip_stage("RES")
         
     zips=[]
@@ -38,8 +43,8 @@ def loadAll(dir, load_res):
                 if 'info.txt' in zip.namelist(): # Is it valid?
                     with zip.open('info.txt', 'r') as info_file:
                         info=Property.parse(info_file, name + ':info.txt')
-                    id = Property.find_key(info, 'ID').value
-                    dispName = Property.find_key(info, 'Name', id).value
+                    id = info['ID']
+                    dispName = info['Name', id]
                     packages[id] = (id, zip, info, name, dispName)
                 else:
                     print("ERROR: Bad package'"+name+"'!")
@@ -50,7 +55,6 @@ def loadAll(dir, load_res):
             data[type] = []
             
         objects = 0
-        
         for id, zip, info, name, dispName in packages.values():
             print("Scanning package '"+id+"'")
             new_objs=parse_package(zip, info, name, id, dispName)
@@ -59,8 +63,12 @@ def loadAll(dir, load_res):
             print("Done!")
             
         loader.length("OBJ", objects)
-        loader.length("IMG", objects - len(obj['StyleVar']))
         
+        # Except for StyleVars, each object will have at least 1 image - 
+        # in UI.py we step the progress once per object.
+        loader.length("IMG", objects - len(obj['StyleVar']))
+
+        print(objects)
         for type, objs in obj.items():
             for id, obj_data in objs.items():
                 print("Loading " + type + ' "' + id + '"!')
@@ -76,16 +84,13 @@ def loadAll(dir, load_res):
                 loader.step("OBJ")
         if load_res:
             print('Extracting Resources...')
-            files = [(zip, zip.namelist()) for zip in zips]
-            loader.length("RES",sum(len(names) for zip, names in files))
-            for zip, zip_contents in files:
-                for path in zip_contents:
+            for zip in zips:
+                for path in zip.namelist():
                     loc=os.path.normcase(path)
-                    if loc.startswith(os.path.normcase("resources/BEE2/")):
+                    if loc.startswith("resources"):
+                        loader.step("RES")
                         zip.extract(path, path="cache/")
-                    if loc.startswith(os.path.normcase("resources/instances/")):
-                        zip.extract(path, path="cache/")
-                    loader.step("RES")
+                       
             shutil.rmtree('images/cache', ignore_errors=True)
             shutil.rmtree('inst_cache/', ignore_errors=True)
             
@@ -105,6 +110,7 @@ def loadAll(dir, load_res):
         
 def parse_package(zip, info, filename, pak_id, dispName):
     "Parse through the given package to find all the components."
+    global res_count
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
             utils.con_log('Package "' + pre.value + '" required for "' + pak_id + '" - ignoring package!')
@@ -112,7 +118,8 @@ def parse_package(zip, info, filename, pak_id, dispName):
     objects = 0
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
-        for object in Property.find_all(info, comp_type):
+        #print(*info.find_all(comp_type))
+        for object in info.find_all(comp_type):
             objects += 1
             id = object['id']
             is_sub = object['overrideOrig', '0'] == '1'
@@ -126,6 +133,12 @@ def parse_package(zip, info, filename, pak_id, dispName):
                     print('ERROR! "' + id + '" defined twice!')
             else:
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
+    
+    if res_count != -1:
+        for item in zip.namelist():
+            if item.startswith("resources"):
+                res_count += 1
+        loader.length("RES", res_count)
     return objects
 
 def setup_style_tree(data):
@@ -170,7 +183,7 @@ class Style:
         self.base_style = base_style
         self.suggested = suggested or {}
         if config == None:
-            self.config = []
+            self.config = Property(None, [])
         else:
             self.config = config
      
@@ -241,10 +254,9 @@ class Item:
             config = 'items/' + fold + '/vbsp_config.cfg'
             if props in files and editor in files:
                 with zip.open(props, 'r') as prop_file:
-                    props = Property.find_key(Property.parse(prop_file, props), 'Properties')
+                    props = Property.parse(prop_file, props).find_key('Properties')
                 with zip.open(editor, 'r') as editor_file:
                     editor = Property.parse(editor_file)
-                    
                 editor_iter = Property.find_all(editor, 'Item')
                 folders[fold] = {
                         'auth': sep_values(props['authors', ''],','),
@@ -331,7 +343,7 @@ class Skybox:
                     config = Property.parse(conf)
             else:
                 print(name + '.cfg not in zip!')
-                config = []
+                config = Property(None, [])
         return cls(id, name, icon, config, mat, auth, desc, short_name)
         
     def add_over(self, override, zip):
@@ -352,7 +364,7 @@ class Goo:
         self.cheap_material = mat_cheap
         self.auth = auth
         self.desc = desc
-        self.config = config or []
+        self.config = config or Property(None, [])
      
     @classmethod
     def parse(cls, zip, id, info):
@@ -366,7 +378,7 @@ class Goo:
             with zip.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
-            config = []
+            config = Property(None, [])
             
         return cls(id, name, icon, mat, mat_cheap, auth, desc, short_name, config)
         
@@ -387,7 +399,7 @@ class Music:
         self.inst = inst
         self.auth = auth
         self.desc = desc
-        self.config = config or []
+        self.config = config or Property(None, [])
      
     @classmethod
     def parse(cls, zip, id, info):
@@ -400,7 +412,7 @@ class Music:
             with zip.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
-            config = []
+            config = Property(None, [])
         return cls(id, name, icon, inst, auth, desc, short_name, config=config)
         
     def add_over(self, override, zip):
@@ -467,4 +479,4 @@ obj_types = {
     }
     
 if __name__ == '__main__':
-    loadAll('packages\\', True)
+    loadAll('packages\\', False)

@@ -52,9 +52,9 @@ class Palette:
                     pos_file.write("//Row " + str(ind//4) + '\n')
                 pos_file.write('"' + row[0] + '", ' + str(row[1]) + '\n')
             
-            prop_file.write('"Name"\t"' + self.name + '"\n')
-            for row in self.opt:
-                prop_file.write('\n'.join(row.to_strings()))
+            prop_file.write('"Name" "' + self.name + '"\n')
+            for opt, val in self.opt.items():
+                prop_file.write('"' + opt + '" "' + val + '"\n')
                 
             if is_zip:
                 with zipfile.ZipFile(path, 'w') as zip:

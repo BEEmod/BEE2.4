@@ -37,7 +37,7 @@ def init():
     try:
         with open('config/basemodui.txt', "r") as trans:
             trans_data = Property.parse(trans, 'config/basemodui.txt')
-        trans_data = Property('',trans_data).as_dict()['lang']['Tokens']
+        trans_data = trans_data.as_dict()['lang']['Tokens']
     except IOError:
         pass
 
@@ -76,7 +76,7 @@ class Game:
                 yield folder
         
     def abs_path(self, path):
-        return os.path.join(self.root, path)
+        return os.path.normcase(os.path.join(self.root, path))
         
     def edit_gameinfo(self, add_line=False):
         '''Modify all gameinfo.txt files to add or remove our line.
@@ -136,20 +136,22 @@ class Game:
         print(style, music, goo, voice)
         print([key + ' = ' + str(val.get()) for key,val in styleVars.items()])
         
-        vbsp_config = style.config[:]
+        vbsp_config = style.config.copy()
         
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
-        renderables = Property.find_key(style.editor, "Renderables", [])
-        editoritems = Property("ItemData", list(Property.find_all(style.editor, 'Item')))
+        renderables = style.editor["Renderables", []]
+        editoritems = Property("ItemData", *style.editor.find_all('Item'))
         
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
             editoritems += item_block
             editoritems += editor_parts
-            vbsp_config.extend(config_part)
+            vbsp_config += config_part
+            
+        if 'StyleVars' not in vbsp_config:
+            vbsp_config += Property('StyleVars', [])
         
-        vbsp_config.append(Property('StyleVars',
-            [Property(key,str(val.get())) for key,val in styleVars.items()]))
+        vbsp_config['StyleVars'] += [Property(key,str(val.get())) for key,val in styleVars.items()]
         
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -159,17 +161,16 @@ class Game:
                 shutil.copy(item_path, backup_path)
             
         editoritems += renderables
-            
+        
         print('Writing Editoritems!')
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
-            for line in editoritems.to_strings():
-                editor_file.write(line + '\n')
+            for line in editoritems.export():
+                editor_file.write(line)
                     
         print('Writing VBSP Config!')
         with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
-            for prop in vbsp_config:
-                for line in prop.to_strings():
-                    vbsp_file.write(line +'\n')
+            for line in vbsp_config.export():
+                vbsp_file.write(line)
                         
 def find_steam_info(game_dir):
     '''Determine the steam ID and game name of this folder, if it has one.
@@ -288,7 +289,9 @@ if __name__ == '__main__':
     menu = Menu(root)
     dropdown = Menu(menu)
     menu.add_cascade(menu=dropdown, label='Game')
+    dropdown.game_pos = 0
     root['menu'] = menu
     
+    init()
     load()
     add_menu_opts(dropdown, setgame_callback)
