@@ -190,9 +190,12 @@ class PalItem(ttk.Label):
         self.bind("<Button-3>", contextWin.open_event)
         self.bind("<Button-1>", showDrag)
         self.bind("<Shift-Button-1>", fastDrag)
-        self.bind("<Enter>", lambda e, n=self.name: setDispName(n))
-        self.bind("<Leave>", clearDispName)
-    
+        self.bind("<Enter>", self.set_disp_name)
+        self.bind("<Leave>", clear_disp_name)
+        
+    def set_disp_name(self, e):
+        set_disp_name(self.name)
+
     def change_subtype(self, ind):
         '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
         for item in pal_picked[:]:
@@ -549,10 +552,10 @@ def set_stylevar(var):
     print('Updating ' + var + '! (val = ' + val + ')')
     gen_opts['StyleVar'][var] = val
 
-def setDispName(name):
+def set_disp_name(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
 
-def clearDispName(e=None):
+def clear_disp_name(e=None):
     UI['pre_disp_name'].configure(text='')
 
 def convScrToGrid(x,y):
@@ -569,7 +572,7 @@ def showDrag(e):
     "Start dragging a palette item."
     global drag_onPal,drag_item, drag_passedPal
     drag_item=e.widget
-    setDispName(drag_item.name)
+    set_disp_name(drag_item.name)
     snd.fx('config')
     drag_passedPal=False
     if drag_item.is_pre: # is the cursor over the preview pane?
@@ -599,7 +602,7 @@ def hideDrag(e):
     dragWin.withdraw()
     dragWin.unbind("<B1-Motion>")
     dragWin.grab_release()
-    clearDispName()
+    clear_disp_name()
     UI['pre_sel_line'].place_forget()
     snd.fx('config')
 
@@ -625,7 +628,7 @@ def hideDrag(e):
 def moveDrag(e):
     "Update the position of dragged items as they move around."
     global drag_passedPal
-    setDispName(drag_item.name)
+    set_disp_name(drag_item.name)
     dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x,pos_y=convScrToGrid(e.x_root,e.y_root)
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
