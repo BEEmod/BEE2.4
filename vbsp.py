@@ -183,6 +183,9 @@ settings = {
             "cust_fizzlers"      : [],
             "conditions"         : [],
            }
+           
+# A list of sucessful AddGlobal commands, so we can prevent adding the same instance twice.
+global_instances = []
  
 ###### UTIL functions #####
  
@@ -328,6 +331,7 @@ def load_map(path):
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
         props = Property.parse(file, path)
+    print('File = ', file)
     map=VLib.VMF.parse(props)
     utils.con_log("Parsing complete!")
 
@@ -449,8 +453,8 @@ def satisfy_condition(cond, inst):
             elif name == "variant":
                 # add _var4 or so to the instance name
                 if inst['targetname', ''] == '':
-                    # some instances don't get names, so use the global seed instead
-                    # for stuff like elevators, the origin is constant so we can't just use that
+                    # some instances don't get names, so use the global
+                    # seed instead for stuff like elevators.
                     random.seed(map_seed + inst['origin'] + inst['angles'])
                 else:
                     random.seed(inst['targetname'])
@@ -458,17 +462,26 @@ def satisfy_condition(cond, inst):
             elif name == "addglobal":
                 # Add one instance in a location, but only once
                 if res.value is not None:
-                    new_inst = VLib.Entity(map, keys={
-                                 "classname" : "func_instance",
-                                 "targetname" : res['name', ''],
-                                 "file" : res['file', ''],
-                                 "angles" : "0 0 0",
-                                 "origin" : res['position', '']
-                               })
-                    if new_inst['targetname'] == '':
-                        new_inst['targetname'] = "inst_"+str(unique_id())
-                    map.add_ent(new_inst)
-                    res.value = None # Disable this
+                    if (res['file'] not in global_instances or
+                        res['allow_multiple', '0']) == '1':
+                        # By default we will skip adding the instance 
+                        # if was already added - this is helpful for
+                        # items that add to original items, or to avoid
+                        # bugs.
+                        
+                        new_inst = VLib.Entity(map, keys={
+                                     "classname" : "func_instance",
+                                     "targetname" : res['name', ''],
+                                     "file" : res['file'],
+                                     "angles" : res['angles', '0 0 0'],
+                                     "origin" : res['position', '0 0 0'],
+                                     "fixup_style" : res['fixup_style', '0']
+                                   })
+                        global_instances.append(res['file'])
+                        if new_inst['targetname'] == '':
+                            new_inst['targetname'] = "inst_"+str(unique_id())
+                        map.add_ent(new_inst)
+                        res.value = None # Disable this
             elif name == "addoverlay": 
                 # Add another instance on top of this one
                 new_inst = VLib.Entity(map, keys={
@@ -476,7 +489,8 @@ def satisfy_condition(cond, inst):
                              "targetname" : inst['targetname'],
                              "file" : res['file', ''],
                              "angles" : inst['angles'],
-                             "origin" : inst['origin']
+                             "origin" : inst['origin'],
+                             "fixup_style" : res['fixup_style', '0']
                            })
                 map.add_ent(new_inst)
             elif name == "custoutput":
@@ -1091,11 +1105,14 @@ def fix_inst():
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if "ccflag_pist_plat" in inst['file']:
             make_static_pist(inst) #try to convert to static piston
-        for cond in settings['conditions'][:]:
+            
+    for cond in settings['conditions'][:]:
+        for inst in map.iter_ents(classname='func_instance')
             satisfy_condition(cond, inst)
             
     utils.con_log('Map has attributes: ', settings['has_attr'])
     utils.con_log('Style Vars:', settings['style_vars'])
+    utils.con_log('Global instances: ', global_instances)
     for inst in map.iter_ents(classname='func_instance', file=''):
         map.remove_ent(inst) # Remove instances with blank file attr, allows conditions to strip the instances when requested
 

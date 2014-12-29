@@ -34,7 +34,8 @@ FILES_TO_BACKUP = [
 _UNLOCK_ITEMS = [
     'ITEM_EXIT_DOOR',
     'ITEM_COOP_EXIT_DOOR',
-    'ITEM_POINT_LIGHT',
+    'ITEM_ENTRY_DOOR',
+    'ITEM_COOP_ENTRY_DOOR',
     'ITEM_OBSERVATION_ROOM'
     ]
     
@@ -152,18 +153,6 @@ class Game:
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
         editoritems = Property("ItemData", *style.editor.find_all('Item'))
         
-        if styleVars.get('UnlockDefault', False):
-            for item in editoritems.find_all('Item'):
-                # If the Unlock Default Items stylevar is enabled, we
-                # want to force the corridors and obs room to be
-                # deletable and copyable
-                print(item['type', ''], _UNLOCK_ITEMS)
-                if item['type', ''] in _UNLOCK_ITEMS:
-                    for prop in item.find_key("Editor", []):
-                        print(repr(prop))
-                        if prop.name.casefold() in ('deleteable', 'copyable'):
-                            prop.value = '1'
-        
         
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
@@ -174,7 +163,7 @@ class Game:
         if 'StyleVars' not in vbsp_config:
             vbsp_config += Property('StyleVars', [])
         
-        vbsp_config['StyleVars'] += [Property(key,str(val)) for key,val in styleVars.items()]
+        vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
         
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -184,6 +173,17 @@ class Game:
                 shutil.copy(item_path, backup_path)
                 
         editoritems += style.editor.find_key("Renderables", [])
+        
+        if styleVars.get('UnlockDefault', False):
+            print('Unlocking Items!')
+            for item in editoritems.find_all('Item'):
+                # If the Unlock Default Items stylevar is enabled, we
+                # want to force the corridors and obs room to be
+                # deletable and copyable
+                if item['type', ''] in _UNLOCK_ITEMS:
+                    for prop in item.find_key("Editor", []):
+                        if prop.name.casefold() in ('deletable', 'copyable'):
+                            prop.value = '1'
         
         print('Writing Editoritems!')
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
