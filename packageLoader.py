@@ -118,7 +118,6 @@ def parse_package(zip, info, filename, pak_id, dispName):
     objects = 0
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
-        #print(*info.find_all(comp_type))
         for object in info.find_all(comp_type):
             objects += 1
             id = object['id']
@@ -249,14 +248,15 @@ class Item:
             versions.append(vals)
         for fold in folders:
             files = zip.namelist()
-            props = 'items/' + fold + '/properties.txt'
-            editor = 'items/' + fold + '/editoritems.txt'
-            config = 'items/' + fold + '/vbsp_config.cfg'
-            if props in files and editor in files:
-                with zip.open(props, 'r') as prop_file:
-                    props = Property.parse(prop_file, props).find_key('Properties')
-                with zip.open(editor, 'r') as editor_file:
-                    editor = Property.parse(editor_file)
+            prop_path = 'items/' + fold + '/properties.txt'
+            editor_path = 'items/' + fold + '/editoritems.txt'
+            config_path = 'items/' + fold + '/vbsp_config.cfg'
+            if prop_path in files and editor_path in files:
+                with zip.open(prop_path, 'r') as prop_file:
+                    props = Property.parse(prop_file, prop_path).find_key('Properties')
+                with zip.open(editor_path, 'r') as editor_file:
+                    editor = Property.parse(editor_file, editor_path)
+                    
                 editor_iter = Property.find_all(editor, 'Item')
                 folders[fold] = {
                         'auth': sep_values(props['authors', ''],','),
@@ -271,9 +271,17 @@ class Item:
                         'editor_extra': list(editor_iter), # Any extra blocks (offset catchers, extent items)
                         'vbsp': []
                        }
-                if config in files:
-                    with zip.open(config, 'r') as vbsp_config:
-                        folders[fold]['vbsp'] = Property.parse(vbsp_config, config)
+                
+                # If we have at least 1, but not all of the grouping icon
+                # definitions then notify the author.
+                if (0 < ((folders[fold]['all_name'] is not None) + 
+                     (folders[fold]['all_icon'] is not None) +
+                     ('all' in folders[fold]['icons'])) < 3):
+                     print('Warning: "'  + prop_path + '" has incomplete grouping icon definition!')
+                     
+                if config_path in files:
+                    with zip.open(config_path, 'r') as vbsp_config:
+                        folders[fold]['vbsp'] = Property.parse(vbsp_config, config_path)
             else:
                 raise IOError('"items/' + fold + '" not valid! Folder likely missing! (Editor=' + 
                                 str(editor in files) + ', Props=' + str(props in files) + ')')
