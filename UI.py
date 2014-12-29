@@ -77,7 +77,8 @@ tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
 styleOptions = [('MultiverseCave','Multiverse Cave', 1),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', 0),
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
-                ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0)
+                ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0),
+                ('UnlockDefault', 'Unlock Default Items', 0)
                ]
 
 styleCheck_enabled={}
@@ -172,6 +173,7 @@ class Item():
                     else:
                         del editor_section.value[editor_sec_index]
                         break
+            
         return new_editor, self.data['editor_extra'], self.data['vbsp']
     
 class PalItem(ttk.Label):
@@ -506,6 +508,7 @@ def loadPalUI():
     
 def export_editoritems(e=None):
     '''Export the selected Items and Style into the chosen game.'''
+    styleVars = {key:(value.get()==1) for key,value in styleOptVars.items()}
     gameMan.selected_game.export(
         styles[selected_style], 
         item_list, 
@@ -513,7 +516,7 @@ def export_editoritems(e=None):
         skybox=skyboxes.get(skybox_win.chosen_id, None),
         goo=goos.get(goo_win.chosen_id, None),
         voice=voices.get(voice_win.chosen_id, None),
-        styleVars=styleOptVars)
+        styleVars=styleVars)
     messagebox.showinfo('BEEMOD2', message='Selected Items and Style successfully exported!')
     
     if gen_opts.get_bool('General','preserve_BEE2_resource_dir', False) is False:

@@ -37,12 +37,16 @@ def get_indent(line):
     
 def con_log(*text):
     print(*text, flush=True) 
-
-# VMF specific        
-
+  
+def bool_as_int(bool):
+    '''Convert a True/False value into the 1/0 strings often appearing in config files.'''
+    if bool:
+        return '1'
+    else:
+        return '0'
 
 class Vec:
-    "A 3D Vector. This has most standard Vector functions."
+    '''A 3D Vector. This has most standard Vector functions.'''
     __slots__ = ('x', 'y', 'z')
     
     def __init__(self, x=0, y=0, z=0):
@@ -94,15 +98,12 @@ class Vec:
         else:
             return Vec(self.x+other, self.y+other,self.z+other)
             
-
-            
     def __sub__(self,other):
         "- operation. This works on numbers (adds to all axes), or other Vectors (adds to just our one)."
         if isinstance(other, Vec):
             return Vec(self.x-other.x, self.y-other.y, self.z-other.z)
         else:
-            return Vec(self.x-other, self.y-other)
-            
+            return Vec(self.x-other, self.y-other)         
     
     def __mul__(self, other):
         "Multiply the Vector by a scalar."
@@ -278,12 +279,7 @@ class Vec:
         else:
             return math.sqrt(self.x**2 + self.y**2 + self.z**2)
             
-    def __len__(self):
-        '''len(x) gives the magnitude of the vector.
         
-        NOTE: This gives an integer, so using .mag() is far more desirable.
-        '''
-        return int(self.mag())
         
     def join(self, delim=', '):
         '''Return a string with all numbers joined by the passed delimiter.
@@ -364,12 +360,24 @@ class Vec:
         else:
             return self.x**2 + self.y**2 + self.z**2
             
+    def __len__(self):
+        '''The len() of a vector is the number of non-zero axis.'''
+        return sum(1 for axis in (self.x, self.y, self.z) if axis != 0)
+            
     def keys(self):
         '''Return the three axes.
         
         Useful in conjunction with a for loop, to execute code on the x/y/z components.
         '''
         return ("x", "y", "z")
+        
+    def __contains__(self, key):
+        '''Vectors contain the three axes.'''
+        return key in 'xyz'
+        
+    def __reversed__(self):
+        '''The reversed form of a Vector has inverted axes.'''
+        return Vec(-self.x, -self.y, -self.z)
         
     def norm(self):
         "Normalise the Vector by transforming it to have a magnitude of 1 but the same direction."
@@ -393,3 +401,6 @@ class Vec:
     mag_sq = len_sq
     __truediv__ = __div__
     __itruediv__ = __idiv__
+    
+abc.Mapping.register(Vec)
+abc.MutableMapping.register(Vec)

@@ -31,6 +31,14 @@ FILES_TO_BACKUP = [
     ('VRAD',        'bin/vrad',                         '.exe')
 ]
 
+_UNLOCK_ITEMS = [
+    'ITEM_EXIT_DOOR',
+    'ITEM_COOP_EXIT_DOOR',
+    'ITEM_POINT_LIGHT',
+    'ITEM_OBSERVATION_ROOM'
+    ]
+    
+
 def init():
     global trans_data, selectedGame_radio
     selectedGame_radio = IntVar(value=0)
@@ -133,13 +141,29 @@ class Game:
         '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
         print('--------------------')
         print('Exporting Items and Style for ' + self.name + '!')
-        print(style, music, goo, voice)
-        print([key + ' = ' + str(val.get()) for key,val in styleVars.items()])
+        print('Style =', style)
+        print('Music =', music)
+        print('Goo =', goo)
+        print('Voice =', voice)
+        print('Style Vars:', styleVars)
         
         vbsp_config = style.config.copy()
         
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
         editoritems = Property("ItemData", *style.editor.find_all('Item'))
+        
+        if styleVars.get('UnlockDefault', False):
+            for item in editoritems.find_all('Item'):
+                # If the Unlock Default Items stylevar is enabled, we
+                # want to force the corridors and obs room to be
+                # deletable and copyable
+                print(item['type', ''], _UNLOCK_ITEMS)
+                if item['type', ''] in _UNLOCK_ITEMS:
+                    for prop in item.find_key("Editor", []):
+                        print(repr(prop))
+                        if prop.name.casefold() in ('deleteable', 'copyable'):
+                            prop.value = '1'
+        
         
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
@@ -150,7 +174,7 @@ class Game:
         if 'StyleVars' not in vbsp_config:
             vbsp_config += Property('StyleVars', [])
         
-        vbsp_config['StyleVars'] += [Property(key,str(val.get())) for key,val in styleVars.items()]
+        vbsp_config['StyleVars'] += [Property(key,str(val)) for key,val in styleVars.items()]
         
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)

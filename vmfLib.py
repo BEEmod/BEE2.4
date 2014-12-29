@@ -57,12 +57,6 @@ def conv_bool(str, default=False):
     else:
         return default
         
-def bool_to_str(bool):
-    if bool:
-        return '1'
-    else:
-        return '0'
-        
 def conv_vec(str, x=0, y=0, z=0):
     '''Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
     parts = str.split(' ')
@@ -229,16 +223,16 @@ class VMF:
         file.write('\t"editorbuild" "' + str(self.hammer_build) + '"\n')
         file.write('\t"mapversion" "' + str(self.map_ver) + '"\n')
         file.write('\t"formatversion" "' + str(self.format_ver) + '"\n')
-        file.write('\t"prefab" "' + bool_to_str(self.is_prefab) + '"\n}\n')
+        file.write('\t"prefab" "' + utils.bool_as_int(self.is_prefab) + '"\n}\n')
             
         # TODO: Visgroups
         
         file.write('viewsettings\n{\n')
-        file.write('\t"bSnapToGrid" "' + bool_to_str(self.snap_grid) + '"\n')
-        file.write('\t"bShowGrid" "' + bool_to_str(self.show_grid) + '"\n')
-        file.write('\t"bShowLogicalGrid" "' + bool_to_str(self.show_logic_grid) + '"\n')
+        file.write('\t"bSnapToGrid" "' + utils.bool_as_int(self.snap_grid) + '"\n')
+        file.write('\t"bShowGrid" "' + utils.bool_as_int(self.show_grid) + '"\n')
+        file.write('\t"bShowLogicalGrid" "' + utils.bool_as_int(self.show_logic_grid) + '"\n')
         file.write('\t"nGridSpacing" "' + str(self.grid_spacing) + '"\n')
-        file.write('\t"bShow3DGrid" "' + bool_to_str(self.show_3d_grid) + '"\n}\n')
+        file.write('\t"bShow3DGrid" "' + utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
         
         
         self.spawn['mapversion'] = str(self.map_ver)
@@ -258,7 +252,7 @@ class VMF:
         
         file.write('cordons\n{\n')
         if len(self.cordons) > 0:
-            file.write('\t"active" "' + bool_to_str(self.cordon_enabled) + '"\n')
+            file.write('\t"active" "' + utils.bool_as_int(self.cordon_enabled) + '"\n')
             for cord in self.cordons:
                 cord.export(file, '\t')
         else:
@@ -424,7 +418,7 @@ class Cordon:
         buffer.write(ind + 'cordon\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"name" "' + self.name + '"\n')
-        buffer.write(ind + '\t"active" "' + bool_to_str(self.active) + '"\n')
+        buffer.write(ind + '\t"active" "' + utils.bool_as_int(self.active) + '"\n')
         buffer.write(ind + '\tbox\n')
         buffer.write(ind + '\t{\n')
         buffer.write(ind + '\t\t"mins" "(' + self.bounds_min.join(' ') + ')"\n')
@@ -515,7 +509,7 @@ class Solid:
         for key in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' + 
-                    bool_to_str(self.editor[key]) + '"\n')
+                    utils.bool_as_int(self.editor[key]) + '"\n')
         buffer.write(ind + '\t}\n')
         
         buffer.write(ind + '}\n')
@@ -669,7 +663,7 @@ class Side:
             buffer.write(ind + '\t\t"startposition" "[' + self.disp_pos.join(' ') + ']"\n')
             buffer.write(ind + '\t\t"flags" "' + str(self.disp_flags) + '"\n')
             buffer.write(ind + '\t\t"elevation" "' + str(self.disp_elev) + '"\n')
-            buffer.write(ind + '\t\t"subdiv" "' + bool_to_str(self.disp_is_subdiv) + '"\n')
+            buffer.write(ind + '\t\t"subdiv" "' + utils.bool_as_int(self.disp_is_subdiv) + '"\n')
             for v in _DISP_ROWS:
                 if len(self.disp_data[v]) > 0:
                     buffer.write(ind + '\t\t' + v + '\n')
@@ -890,7 +884,7 @@ class Entity():
         for key in ('visgroupshown', 'visgroupautoshown'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' + 
-                    bool_to_str(self.editor[key]) + '"\n')
+                    utils.bool_as_int(self.editor[key]) + '"\n')
         for key in ('logicalpos','comments'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' + 
