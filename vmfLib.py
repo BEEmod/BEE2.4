@@ -146,21 +146,21 @@ class VMF:
     @staticmethod
     def parse(tree):
         '''Convert a property_parser tree into VMF classes.'''
-        if not isinstance(tree, list):
+        if not isinstance(tree, Property):
             # if not a tree, try to read the file
             with open(tree, "r") as file:
                 tree = Property.parse(file)
         map_info = {}
         
-        ver_info = Property.find_key(tree, 'versioninfo', [])
+        ver_info = tree.find_key('versioninfo', [])
         for key in ('editorversion', 'mapversion', 'editorbuild', 'prefab'):
-            map_info[key] = ver_info.find_key(key, '_').value
-        map_info['formatversion'] = ver_info.find_key('formatversion', '100').value
+            map_info[key] = ver_info[key, '']
+        map_info['formatversion'] = ver_info['formatversion', '100']
         if map_info['formatversion'] != '100':
-            # If the version is different, this is probably to fail horribly
-            print('WARNING: Unknown VMF format version " ' + map_info['formatversion'] + '"!')
+            # If the version is different, we're probably about to fail horribly
+            raise Exception('Unknown VMF format version " ' + map_info['formatversion'] + '"!')
         
-        view_opt = Property.find_key(tree, 'viewsettings', [])
+        view_opt = tree.find_key('viewsettings', [])
         view_dict = { 
             'bSnapToGrid' : 'snaptogrid',
             'bShowGrid' : 'showgrid',
@@ -169,14 +169,14 @@ class VMF:
             'nGridSpacing' : 'gridspacing'
             }
         for key in view_dict:
-            map_info[view_dict[key]] = view_opt.find_key(key, '_').value
+            map_info[view_dict[key]] = view_opt[key, '']
             
-        cordons = Property.find_key(tree, 'cordons', [])
+        cordons = tree.find_key('cordons', [])
         map_info['cordons_on'] = cordons['active', '0']
         
-        cam_props = Property.find_key(tree, 'cameras', [])
-        map_info['active_cam']  = cam_props.find_key('activecamera', -1).value
-        map_info['quickhide'] = Property.find_key(tree, 'quickhide', []).find_key('count', '_').value
+        cam_props = tree.find_key('cameras', [])
+        map_info['active_cam']  = conv_int((cam_props['activecamera', '']),-1)
+        map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
             
 
         map = VMF(map_info = map_info)
@@ -188,12 +188,12 @@ class VMF:
         for ent in cordons.find_all('cordon'):
             Cordon.parse(map, ent)
         
-        map.entities = [Entity.parse(map, ent, hidden=False) for ent in Property.find_all(tree, 'Entity')]
+        map.entities = [Entity.parse(map, ent, hidden=False) for ent in tree.find_all('Entity')]
         # find hidden entities
-        for hidden_ent in Property.find_all(tree, 'hidden'):
+        for hidden_ent in tree.find_all('hidden'):
             map.entities.extend([Entity.parse(map, ent, hidden=True) for ent in hidden_ent])
         
-        map_spawn = Property.find_key(tree, 'world', [])
+        map_spawn = tree.find_key('world', [])
         if map_spawn is None:
             # Generate a fake default to parse through
             map_spawn = Property("world", [])

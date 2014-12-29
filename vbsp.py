@@ -170,18 +170,19 @@ FIZZ_OPTIONS = {
     "scanline"       : "0",
     }
     
-settings = {"textures"           : {},
+settings = {
+            "textures"           : {},
             "fizzler"            : {},
             "options"            : {},
-            "deathfield"         : {},
-            "instances"          : {},
-            "style_vars"         : {},
             "pit"                : {},
+            "deathfield"         : {},
+            
+            "style_vars"         : defaultdict(lambda: False),
             "has_attr"           : defaultdict(lambda: False),
             
             "cust_fizzlers"      : [],
             "conditions"         : [],
-            }
+           }
  
 ###### UTIL functions #####
  
@@ -216,66 +217,80 @@ def alter_mat(prop, seed=None):
 ##### MAIN functions ######
 
 def load_settings():
+    '''Load in all our settings from vbsp_config.'''
     global settings
     if os.path.isfile("vbsp_config.cfg"): # do we have a config file?
         with open("vbsp_config.cfg", "r") as config: 
             conf=Property.parse(config, 'vbsp_config.cfg')
     else:
-        conf = [] # All the find_all commands will fail, and we will use the defaults.
+        conf = Property(None, []) 
+        # All the find_all commands will fail, and we will use the defaults.
                 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
         
     for item,key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in Property.find_all(conf, 'textures', cat, name)]
+        value = [prop.value for prop in conf.find_all('textures', cat, name)]
         if len(value)==0:
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
             
-    for options in Property.find_all(conf, 'options'):
-        for key in DEFAULTS: # get misc options
-            settings['options'][key.casefold()] = Property.find_key(options, key, DEFAULTS[key]).value  
+    # get misc options
+    for option_block in conf.find_all('options'):
+        for opt in option_block:
+            settings['options'][opt.name.casefold()] = opt.value
+    for key, default in DEFAULTS.items():
+        if key.casefold() not in settings['options']:
+            settings['options'][key.casefold()] = default
      
-    for item,key in TEX_FIZZLER.items():
+    for item, key in TEX_FIZZLER.items():
         settings['fizzler'][key] = item
-    for key,item in FIZZ_OPTIONS.items():
+        
+    for key, item in FIZZ_OPTIONS.items():
         settings['fizzler'][key] = item
-    for fizz_opt in Property.find_all(conf, 'fizzler'):
-        for item,key in TEX_FIZZLER.items():
-            settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
+        
+    for fizz_opt in conf.find_all('fizzler'):
+        for item, key in TEX_FIZZLER.items():
+            settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
             
         for key,item in FIZZ_OPTIONS.items():
-            settings['fizzler'][key] = Property.find_key(fizz_opt, key, settings['fizzler'][key]).value
+            settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
     
-    for prop in Property.find_all(conf, 'instancefiles'):
+    for prop in conf.find_all('instancefiles'):
         for key,val in inst_file.items():
             inst_file[key] = prop[key, val]
     
-    for fizz in Property.find_all(conf, 'cust_fizzlers'):
+    for fizz in conf.find_all('cust_fizzlers'):
         flag = fizz['flag']
         if flag in settings['cust_fizzler']:
             raise Exception('Two Fizzlers with same flag!!')
-        data= {}
-        data['left']     = fizz['left', 'tools/toolstrigger'],
-        data['right']    = fizz['right', 'tools/toolstrigger'],
-        data['center']   = fizz['center', 'tools/toolstrigger'],
-        data['short']    = fizz['short', 'tools/toolstrigger'],
-        data['scanline'] = fizz['scanline', settings['fizzler']['scanline']]
-        cust_fizzlers[flag] = data
+        cust_fizzlers[flag] = {
+            'left'     : fizz['left', 'tools/toolstrigger'],
+            'right'    : fizz['right', 'tools/toolstrigger'],
+            'center'   : fizz['center', 'tools/toolstrigger'],
+            'short'    : fizz['short', 'tools/toolstrigger'],
+            'scanline' : fizz['scanline', settings['fizzler']['scanline']]
+            }
         
-    deathfield = Property.find_key(conf, "deathfield", [])
-    settings['deathfield']['left']     = deathfield['left', 'BEE2/fizz/lp/death_field_clean_left']
-    settings['deathfield']['right']    = deathfield['right', 'BEE2/fizz/lp/death_field_clean_right']
-    settings['deathfield']['center']   = deathfield['center', 'BEE2/fizz/lp/death_field_clean_center']
-    settings['deathfield']['short']    = deathfield['short', 'BEE2/fizz/lp/death_field_clean_short']
-    wid = deathfield['texwidth', '_']
-    settings['deathfield']['texwidth'] = VLib.conv_int(wid, 512)
-    settings['deathfield']['scanline'] = deathfield['scanline', settings['fizzler']['scanline']]
+    deathfield = conf.find_key("deathfield", [])
+    settings['deathfield'] = {
+        'left'     : deathfield['left', 'BEE2/fizz/lp/death_field_clean_left'],
+        'right'    : deathfield['right', 'BEE2/fizz/lp/death_field_clean_right'],
+        'center'   : deathfield['center', 'BEE2/fizz/lp/death_field_clean_center'],
+        'short'    : deathfield['short', 'BEE2/fizz/lp/death_field_clean_short'],
+        'texwidth' : VLib.conv_int(deathfield['texwidth', '_'], 512),
+        'scanline' : deathfield['scanline', settings['fizzler']['scanline']],
+        }
         
-    for pack in Property.find_all(conf, 'packer'):
-        process_packer(pack.value)
-    for cond in Property.find_all(conf, 'conditions', 'condition'):
+    for stylevar_block in conf.find_all('stylevar'):
+        for var in stylevar_block:
+            settings['style_vars'][var.name.casefold()] = var.value
+        
+    for pack_block in conf.find_all('packer'):
+        for pack_cmd in pack_block:
+            process_packer(pack_cmd.value)
+    for cond in conf.find_all('conditions', 'condition'):
         type = cond['type', ''].upper()
         if type not in ("AND", "OR"):
             type = "AND"
@@ -292,7 +307,7 @@ def load_settings():
             settings['conditions'].append(con)
      
     if get_opt('bottomless_pit') == "1":
-        pit = Property.find_key(conf, "bottomless_pit",[])
+        pit = conf.find_key("bottomless_pit",[])
         settings['pit']['tex_goo'] = pit['goo_tex', 'nature/toxicslime_a2_bridge_intro']
         settings['pit']['tex_sky'] = pit['sky_tex', 'tools/toolsskybox']
         settings['pit']['should_tele'] = pit['teleport', '0'] == '1'
@@ -305,7 +320,7 @@ def load_settings():
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
 
-    process_inst_overlay(Property.find_all(conf, 'instances', 'overlayInstance'))
+    process_inst_overlay(conf.find_all('instances', 'overlayInstance'))
     utils.con_log("Settings Loaded!")
     
 def load_map(path):
@@ -1206,9 +1221,10 @@ def hammer_pack_scan():
     global to_pack
     to_pack=[] # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
-    for com in Property.find_all(map, 'entity', 'editor', 'comments'):
-        if "packer_" in com.value:
-            parts = com.value.split()
+    for ent in map.entities:
+        com = ent.editor.get('comments', '')
+        if "packer_" in com:
+            parts = com.split()
             last_op = -1 # 1=item, 2=file
             print(parts)
             for frag in parts:

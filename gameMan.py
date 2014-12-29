@@ -139,7 +139,6 @@ class Game:
         vbsp_config = style.config.copy()
         
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
-        renderables = style.editor["Renderables", []]
         editoritems = Property("ItemData", *style.editor.find_all('Item'))
         
         for item in sorted(all_items):
@@ -159,8 +158,8 @@ class Game:
             if os.path.isfile(item_path) and not os.path.isfile(backup_path):
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
-            
-        editoritems += renderables
+                
+        editoritems += style.editor.find_key("Renderables", [])
         
         print('Writing Editoritems!')
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
