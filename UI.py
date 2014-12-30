@@ -254,12 +254,16 @@ class PalItem(ttk.Label):
         
 class SubPane(Toplevel):
     '''A Toplevel window that can be shown/hidden, and follows the main window when moved.'''
-    def __init__(self, parent, tool_frame, tool_img, tool_col=0, title='', resize_x=False, resize_y=False):
+    def __init__(self, parent, tool_frame, tool_img, tool_col=0, title='', resize_x=False, resize_y=False, name=''):
         self.visible=True
-        self.allow_snap = True
+        self.win_name = name
+        self.allow_snap = False
+        self.can_save = False
         self.parent = parent
         self.relX = 0
         self.relY = 0
+        self.can_resize_x = resize_x
+        self.can_resize_y = resize_y
         super().__init__(parent)
         
         self.tool_button = ttk.Button(
@@ -285,6 +289,7 @@ class SubPane(Toplevel):
             snd.fx('config')
         self.withdraw()
         self.visible=False
+        self.save_conf()   
         self.tool_button.state(('!pressed',))
         
     def show_win(self, play_snd=True):
@@ -293,11 +298,9 @@ class SubPane(Toplevel):
             snd.fx('config')
         self.deiconify()
         self.visible=True
+        self.save_conf()  
         self.tool_button.state(('pressed',))
-        
-        # return focus back to main window so it doesn't flicker between
-        # if you press the various buttons
-        self.parent.focus()
+        self.follow_main()
         
     def toggle_win(self):
         if self.visible:
@@ -318,10 +321,10 @@ class SubPane(Toplevel):
             x = self.winfo_x()
         if y is None:
             y = self.winfo_y()
-        
         self.geometry(str(width) + 'x' + str(height) + '+' + str(x) + '+' + str(y))
         self.relX = x - self.parent.winfo_x()
         self.relY = y - self.parent.winfo_y()
+        self.save_conf()
 
     def snap_win(self, e=None):
         '''Callback for window movement, allows it to snap to the edge of the main window.'''
@@ -330,13 +333,52 @@ class SubPane(Toplevel):
             self.relX=self.winfo_x()-self.parent.winfo_x()
             self.relY=self.winfo_y()-self.parent.winfo_y()
             self.update_idletasks()
+            self.save_conf()
 
     def follow_main(self, e=None):
         '''When the main window moves, sub-windows should move with it.'''
         self.allow_snap=False
-        self.geometry('+'+str(self.parent.winfo_x()+self.relX)+'+'+str(self.parent.winfo_y()+self.relY))
+        self.geometry('+'+str(self.parent.winfo_x()+self.relX)+
+                      '+'+str(self.parent.winfo_y()+self.relY))
         self.allow_snap=True
         self.parent.focus()
+        
+    def save_conf(self):
+        if self.can_save:
+            gen_opts['win_state'][self.win_name + '_visible'] = utils.bool_as_int(self.visible)
+            gen_opts['win_state'][self.win_name + '_x'] = str(self.relX)
+            gen_opts['win_state'][self.win_name + '_y'] = str(self.relY)
+            if self.can_resize_x:
+                gen_opts['win_state'][self.win_name + '_width'] = str(self.winfo_width())
+            if self.can_resize_y:
+                gen_opts['win_state'][self.win_name + '_height'] = str(self.winfo_height()) 
+        
+    def load_conf(self):
+        try:
+            if self.can_resize_x:
+                width = int(gen_opts['win_state'][self.win_name + '_width'])
+            else:
+                width = self.winfo_reqwidth()
+            if self.can_resize_y:
+                height = int(gen_opts['win_state'][self.win_name + '_width'])
+            else:
+                height = self.winfo_reqheight()
+            self.deiconify()
+            
+            self.geometry(str(width) + 'x' + str(height))
+            self.sizefrom('user')
+            
+            self.relX = int(gen_opts['win_state'][self.win_name + '_x'])
+            self.relY = int(gen_opts['win_state'][self.win_name + 'y'])
+            self.follow_main()
+            self.positionfrom('user')
+        except (ValueError, KeyError):
+            pass
+        if not gen_opts.get_bool('win_state',self.win_name + '_visible',True):
+            self.after(150, self.hide_win)
+            
+        # Prevent this until here, so the <config> event won't erase our settings
+        self.can_save = True
         
 def on_app_quit():
     '''Do a last-minute save of our config files.'''
@@ -1041,7 +1083,7 @@ def initMenuBar(win):
     menus['file'].add_separator()
     if snd.initiallised:
         menus['file'].add_checkbutton(label="Mute Sounds", variable=muted, command=set_mute)
-    menus['file'].add_command(label="Quit", command=win.destroy)
+    menus['file'].add_command(label="Quit", command=on_app_quit)
     menus['file'].add_separator()
     
     menus['file'].game_pos = 7 # index for game items
@@ -1111,7 +1153,8 @@ def initMain():
 
     windows['pal']=SubPane(
         win, 
-        title='Palettes', 
+        title='Palettes',
+        name='pal',
         resize_x=True,
         resize_y=True, 
         tool_frame=frames['toolMenu'], 
@@ -1123,6 +1166,7 @@ def initMain():
     windows['opt']=SubPane(
         win,
         title='BEE2 - Options',
+        name='opt',
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img=png.loadPng('icons/win_opt'),
@@ -1133,6 +1177,7 @@ def initMain():
     windows['style']=SubPane(
         win, 
         title='BEE2 - Style Properties', 
+        name='style',
         resize_y=True, 
         tool_frame=frames['toolMenu'], 
         tool_img=png.loadPng('icons/win_style'),
@@ -1188,6 +1233,10 @@ def initMain():
     windows['style'].move(
         x=xpos, 
         y=win.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
+        
+    windows['style'].load_conf()
+    windows['opt'].load_conf()
+    windows['pal'].load_conf()
     
     win.bind("<Configure>", contextWin.follow_main, add='+')
 

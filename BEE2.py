@@ -43,6 +43,7 @@ print('Done!')
 
 print('Initialising UI...')
 UI.initMain() # create all windows
+print('Done!')
 
 loadScreen.quit()
 UI.event_loop()
