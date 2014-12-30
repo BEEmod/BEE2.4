@@ -10,15 +10,14 @@ import math
 
 import tkinter_png as png # png library for TKinter
 
-from gameMan import translate as P2_trans
-from selectorWin import Item as selWinItem
-from selectorWin import selWin
+from selectorWin import selWin, Item as selWinItem
 from property_parser import Property
 from config import ConfigFile
-from paletteLoader import Palette, save_pal
+
 import sound as snd
-import packageLoader as package
+#import packageLoader as package
 import loadScreen as loader
+import paletteLoader
 import contextWin
 import gameMan
 import utils
@@ -216,7 +215,7 @@ class PalItem(ttk.Label):
                 
     def load_data(self):
         self.img = self.item.get_icon(self.subKey, self.is_pre)
-        self.name = P2_trans(self.item.names[self.subKey])
+        self.name = gameMan.translate(self.item.names[self.subKey])
         self['image'] = self.img
         
     def clear(self):
@@ -280,22 +279,31 @@ class SubPane(Toplevel):
         parent.bind('<Configure>', self.follow_main, add='+')
         self.bind('<Configure>', self.snap_win)
         
-    def hide_win(self):
-        "Hide a window, effectively closes it without deleting the contents"
-        snd.fx('config')
+    def hide_win(self, play_snd=True):
+        '''Hide the window.'''
+        if play_snd:
+            snd.fx('config')
         self.withdraw()
         self.visible=False
         self.tool_button.state(('!pressed',))
+        
+    def show_win(self, play_snd=True):
+        '''Show the window.'''
+        if play_snd:
+            snd.fx('config')
+        self.deiconify()
+        self.visible=True
+        self.tool_button.state(('pressed',))
+        
+        # return focus back to main window so it doesn't flicker between
+        # if you press the various buttons
+        self.parent.focus()
         
     def toggle_win(self):
         if self.visible:
             self.hide_win()
         else:
-            snd.fx('config')
-            self.visible=True
-            self.deiconify()
-            self.parent.focus() # return focus back to main window so it doesn't flicker between if you press the various buttons
-            self.tool_button.state(('pressed',))
+            self.show_win()
             
     def move(self, x=None, y=None, width=None, height=None):
         '''Move the window to the specified position.
@@ -351,6 +359,10 @@ def load_settings(settings):
     
     muted.set(gen_opts.get_bool('General', 'mute_sounds', False))
     set_mute()
+    try:
+        selectedPalette_radio.set(int(gen_opts['Last_Selected']['palette']))
+    except (KeyError, ValueError):
+        pass # It'll be set to the first palette by default, and then saved
     gen_opts.has_changed=False
     
 def load_packages(data):
@@ -490,7 +502,7 @@ def selWin_callback(style_id, win_name):
     
 def loadPalUI():
     "Update the UI to show the correct palettes."
-    palettes.sort(key=Palette.getName) # sort by name
+    palettes.sort(key=str) # sort by name
     UI['palette'].delete(0, END)
     for i,pal in enumerate(palettes):
         UI['palette'].insert(i,pal.name)
@@ -526,15 +538,14 @@ def export_editoritems(e=None):
     for pal in palettes[:]:
         if pal.name == '<Last Export>':
             palettes.remove(pal)
-    new_pal = Palette('<Last Export>', [(it.id, it.subKey) for it in pal_picked], options={}, filename='LAST_EXPORT.zip')
+    new_pal = paletteLoader.Palette('<Last Export>', [(it.id, it.subKey) for it in pal_picked], options={}, filename='LAST_EXPORT.zip')
     # Since last_export is a zip, users won't be able to overwrite it normally!
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
     loadPalUI()
 
 def setPalette():
-    print("Palette chosen: ["+ str(selectedPalette) + "] = " + palettes[selectedPalette].name)
-
+    gen_opts['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
@@ -685,7 +696,7 @@ def pal_save_as():
             messagebox.showinfo(icon="error", title="BEE2", message='Please only use basic characters in palette names.')
         else:
             break
-    save_pal(pal_picked, name)
+    paletteLoader.save_pal(pal_picked, name)
     loadPalUI()
 
 def pal_save():
@@ -767,7 +778,7 @@ def initPalette(f):
     UI['pal_remove'] = ttk.Button(f, text='Delete Palette', command=pal_remove)
     UI['pal_remove'].grid(row=2, sticky="EW")
     
-    ttk.Sizegrip(f, cursor="sb_v_double_arrow").grid(row=3, columnspan=2)
+    ttk.Sizegrip(f).grid(row=2, column=1)
         
 def initOption(f):
     f.columnconfigure(0,weight=1)
@@ -1101,6 +1112,7 @@ def initMain():
     windows['pal']=SubPane(
         win, 
         title='Palettes', 
+        resize_x=True,
         resize_y=True, 
         tool_frame=frames['toolMenu'], 
         tool_img=png.loadPng('icons/win_pal'),
@@ -1141,7 +1153,6 @@ def initMain():
     windows['opt'].bind("<Button-1>",contextWin.hideProps)
     windows['pal'].bind("<Button-1>",contextWin.hideProps)
     
-    setPalette()
     contextWin.init(win)
     initDragIcon(win)
     loader.step('UI')
@@ -1152,6 +1163,10 @@ def initMain():
     windows['style'].update_idletasks()
     windows['opt'].update_idletasks()
     windows['pal'].update_idletasks()
+    
+    win.after(50, setPal_radio)
+    # This also refreshes the palette, and sets the listbox appropriately
+    # It needs to have a little delay to allow the listbox to become visible first
 
     # move windows around to make it look nice on startup
     if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette

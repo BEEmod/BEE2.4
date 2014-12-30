@@ -18,11 +18,8 @@ class Palette:
         self.filename = name if filename is None else filename
         self.pos=pos
         
-    def getName(self):
-        return self.name
-        
     def __str__(self):
-        return '<Pal: "' + self.name + '">'
+        return self.name
         
     def save(self, allow_overwrite, name=None):
         '''Save the palette file into the specified location.'''
