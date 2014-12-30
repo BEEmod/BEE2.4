@@ -142,7 +142,7 @@ class Property:
             
         return open_properties[0]
         
-    def find_all(self: "list or Property", *keys) -> "Generator for matching Property objects":
+    def find_all(self, *keys) -> "Generator for matching Property objects":
         '''Search through a tree to obtain all properties that match a particular path.
         
         '''
@@ -161,7 +161,7 @@ class Property:
                 else:
                     yield prop
         
-    def find_key(self: "Property", key, def_=_NO_KEY_FOUND) -> "Property":
+    def find_key(self, key, def_=_NO_KEY_FOUND) -> "Property":
         '''Obtain the value of the child Property with a name, with an optional default value.
         
         If no default value is given, this will raise NoKeyError.
@@ -176,6 +176,27 @@ class Property:
         else:
             return Property(key, def_)
             # We were given a default, pretend that was in the original property list so code works
+    
+    def set_key(self, path, value):
+        '''Set the value of a key deep in the tree hierachy.
+        
+        path should be a tuple of names, or a single string.
+        '''
+        if isinstance(path, tuple):
+            prop = self
+            for key in path:
+                try:
+                    prop = prop.find_key(key)
+                except NoKeyError:
+                    new_prop = Property(key, [])
+                    prop.append(new_prop)
+                    prop = new_prop
+            prop.value = value
+        else:
+            try:
+                self.find_key(path).value = value
+            except NoKeyError:
+                self.value.append(Property(path, value))
     
     def copy(self):
         '''Deep copy this Property tree and return it.'''
@@ -308,16 +329,15 @@ class Property:
         - If given an integer, it will search by position.
         - If given a string, it will set the last Property with that name.
         - If none are found, it appends the value to the tree
+        - If given a tuple of strings, it will search through that path,
+          and set the value of the last matching Property
         - [0] is the same as .value if the Property has no children, all others fail
         '''
         if self.has_children():
             if isinstance(index, int):
                 self.value[index] = value
             else:
-                try:
-                    self.find_key(index).value = value
-                except NoKeyError:
-                    self.value.append(Property(index, value))
+                self.set_key(index, value)
         elif index == 0:
             self.value = value
         else:
@@ -400,6 +420,11 @@ class Property:
                 new_list.append(prop)
         
         self.value = new_list
+        
+    def ensure_exists(self, key):
+        '''Ensure a Property group exists with this name.'''
+        if key not in self:
+            self.value.append(Property(key, []))
             
     def has_children(self):
         '''Does this have child properties?'''

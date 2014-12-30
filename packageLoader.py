@@ -343,7 +343,7 @@ class Skybox:
         name, short_name, auth, icon, desc = get_selitem_data(info)
         mat = info['material', 'sky_black']
         if config_dir == '': # No config at all
-            config = []
+            config = Property(None, [])
         else:
             path = 'skybox/' + name + '.cfg'
             if path in zip.namelist():

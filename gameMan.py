@@ -141,32 +141,43 @@ class Game:
     def export(self, style, all_items, music, skybox, goo, voice, styleVars):
         '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
         print('--------------------')
-        print('Exporting Items and Style for ' + self.name + '!')
-        print('Style =', )
+        print('Exporting Items and Style for "' + self.name + '"!')
+        print('Style =', style)
         print('Music =', music)
         print('Goo =', goo)
         print('Voice =', voice)
-        print('Style Vars:', styleVars)
+        print('Skybox =', skybox)
+        print('Style Vars:\n  {')
+        for key, val in styleVars.items():
+            print('  ' + key + ' = ' + str(val))
+        print('  }')
         
         vbsp_config = style.config.copy()
         
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
         editoritems = Property("ItemData", *style.editor.find_all('Item'))
         
-        
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
-                
+            
+        if voice is not None:
+            vbsp_config += voice.config
+            
+        if skybox is not None:
+            vbsp_config.set_key(('Textures', 'Special', 'Sky'), skybox.material)
+            vbsp_config += skybox.config
+            
         # If there are multiple of these blocks, merge them together
         vbsp_config.merge_children('Conditions', 
                                    'InstanceFiles', 
                                    'Options',
-                                   'StyleVars')     
-        if 'StyleVars' not in vbsp_config:
-            vbsp_config += Property('StyleVars', [])
+                                   'StyleVars',
+                                   'Textures')
+                                 
+        vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
         
         
@@ -194,8 +205,7 @@ class Game:
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
-                
-                    
+   
         print('Writing VBSP Config!')
         with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
