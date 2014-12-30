@@ -181,7 +181,7 @@ class Style:
         self.editor = editor
         self.base_style = base_style
         self.suggested = suggested or {}
-        if config == None:
+        if config is None:
             self.config = Property(None, [])
         else:
             self.config = config

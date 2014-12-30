@@ -142,7 +142,7 @@ class Game:
         '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
         print('--------------------')
         print('Exporting Items and Style for ' + self.name + '!')
-        print('Style =', style)
+        print('Style =', )
         print('Music =', music)
         print('Goo =', goo)
         print('Voice =', voice)
@@ -159,11 +159,16 @@ class Game:
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
-            
+                
+        # If there are multiple of these blocks, merge them together
+        vbsp_config.merge_children('Conditions', 
+                                   'InstanceFiles', 
+                                   'Options',
+                                   'StyleVars')     
         if 'StyleVars' not in vbsp_config:
             vbsp_config += Property('StyleVars', [])
-        
         vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
+        
         
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -189,6 +194,7 @@ class Game:
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
+                
                     
         print('Writing VBSP Config!')
         with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
