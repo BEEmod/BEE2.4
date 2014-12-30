@@ -35,30 +35,43 @@ REPLACE_CHARS = {
 _NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given to find_key()
 
 class KeyValError(Exception):
-    '''An error that occured when parsing a Valve KeyValues file.'''
-    def __init__(self, message, file):
+    '''An error that occured when parsing a Valve KeyValues file.
+    
+    mess = The error message that occured.
+    file = The filename passed to Property.parse(), if it exists
+    line_num = The line where the error occured.
+    '''
+    def __init__(self, message, file, line):
         self.mess = message
         self.file = file
+        self.line_num = line
         
     def __str__(self):
+        '''Generate the complete error message.
+
+        This includes the line number and file, if avalible.
+        '''
+        mess = self.mess
+        if self.line_num:
+            mess += '\nError occured on line ' + str(self.line_num)
+            if self.file:
+                mess += ', with file'
         if self.file:
-            return self.mess + "\n(" + self.file + ")"
-        else:
-            return self.mess
+            if not self.line_num:
+                mess += '\nError occured with file'
+            mess += ' "' + self.file + '"'
+        return mess
     
 class NoKeyError(Exception):
     '''Raised if a key is not found when searching from find_key().
     
-    key = The missing key that was asked for
-    all_keys = The names of all valid keys for the Property
+    key = The missing key that was asked for.
     '''
-    def __init__(self, key, all_keys):
+    def __init__(self, key):
         self.key = key
-        self.all_keys = all_keys
         
     def __str__(self):
         return "No key " + self.key + "!"
-    pass
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
@@ -112,11 +125,11 @@ class Property:
                     line_contents = freshline.split('"')
                     name = line_contents[1]
                     if not utils.is_identifier(name):
-                        raise KeyValError("Invalid name " + name + ". Line " + str(line_num) + ".", filename)
+                        raise KeyValError('Invalid name ' + name + '!', filename, line_num)
                     try:
                         value = line_contents[3]
                         if not freshline.endswith('"'):
-                            raise KeyValError("Line " + str(line_num) + " has value, but incomplete quotes!", filename)
+                            raise KeyValError('Key has value, but incomplete quotes!', filename, line_num)
                         for orig, new in REPLACE_CHARS.items():
                             value=value.replace(orig, new)
                     except IndexError:
@@ -127,18 +140,18 @@ class Property:
                     values.append(Property(freshline, []))
                 elif freshline.startswith('{'):
                     if values[-1].value:
-                        raise KeyValError("Property cannot have sub-section if it already has an in-line value. Line " + str(line_num) + ".", filename)
+                        raise KeyValError('Property cannot have sub-section if it already has an in-line value.', filename, line_num)
                     values[-1].value = []
                     open_properties.append(values[-1])
                 elif freshline.startswith('}'):
                     open_properties.pop()
                 else:
-                    raise KeyValError("Unexpected beginning character '"+freshline[0]+"'. Line " + str(line_num) + ".", filename)
+                    raise KeyValError("Unexpected beginning character '"+freshline[0]+'"!', filename, line_num)
                     
             if not open_properties:
-                raise KeyValError("Too many closing brackets. Line " + str(line_num) + ".", filename)
+                raise KeyValError('Too many closing brackets.', filename, line_num)
         if len(open_properties) > 1:
-            raise KeyValError("End of text reached with remaining open sections.", filename)
+            raise KeyValError('End of text reached with remaining open sections.', filename, None)
             
         return open_properties[0]
         
@@ -172,7 +185,7 @@ class Property:
             if prop.name is not None and prop.name.casefold() == key:
                 return prop
         if def_ is _NO_KEY_FOUND:
-            raise NoKeyError(key, [prop.name for prop in self.value])
+            raise NoKeyError(key)
         else:
             return Property(key, def_)
             # We were given a default, pretend that was in the original property list so code works
