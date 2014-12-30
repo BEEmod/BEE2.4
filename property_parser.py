@@ -354,7 +354,7 @@ class Property:
                     copy.value.extend(other.value)
                 else:
                     copy.value.append(other) # we want to add the other property tree to our own, not its values.
-            else: # assume a list/iteratable thing
+            else: # assume a sequence
                 copy.value += other # add the values to ours.
             return copy
         else:
@@ -379,6 +379,27 @@ class Property:
   
     append = __iadd__
     append.__doc__ = '''Append another property to this one.'''
+    
+    def merge_children(self, *names):
+        '''Merge together any children of ours with the given names.
+        
+        After execution, this tree will have only one sub-Property for
+        each of the given names. This ignores leaf Properties.
+        '''
+        folded_names = [name.casefold() for name in names]
+        new_list = []
+        merge = {name.casefold(): Property(name, []) for name in names}
+        if self.has_children():
+            for item in self.value[:]:
+                if item.name.casefold() in folded_names:
+                    merge[item.name.casefold()].value.extend(item.value)
+                else:
+                    new_list.append(item)
+        for prop in merge.values():
+            if len(prop.value) > 0:
+                new_list.append(prop)
+        
+        self.value = new_list
             
     def has_children(self):
         '''Does this have child properties?'''

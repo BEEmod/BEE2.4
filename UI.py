@@ -70,10 +70,6 @@ stylevar_list = []
 
 selected_style = "BEE2_CLEAN"
 
-authorText = ('BenVlodgi & Rantis','HMW','Carl Kenner', 'Felix Griffin', 'Bisqwit', 'TeamSpen210')
-packageText = ('BEEMOD', 'BEE2', 'HMW', 'Stylemod', 'FGEmod')
-tagText = ('Test Elements', 'Panels', 'Geometry', 'Logic', 'Custom')
-
 styleOptions = [('MultiverseCave','Multiverse Cave', 1),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', 0),
                 ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
