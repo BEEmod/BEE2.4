@@ -399,12 +399,13 @@ class Goo:
         return '<Goo ' + self.id + '>'
   
 class Music:
-    def __init__(self, id, name, ico, inst, auth, desc, short_name=None, config=None):
+    def __init__(self, id, name, ico, auth, desc, short_name=None, config=None, inst=None, sound=None):
         self.id=id
         self.short_name = name if short_name is None else short_name
         self.name = name
         self.icon = ico
         self.inst = inst
+        self.sound = sound
         self.auth = auth
         self.desc = desc
         self.config = config or Property(None, [])
@@ -413,7 +414,8 @@ class Music:
     def parse(cls, zip, id, info):
         '''Parse a music definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
-        inst = info['instance']
+        inst = info['instance', None]
+        sound = info['soundscript', None]
         
         config_dir = 'music/' + info['config', '']
         if config_dir in zip.namelist():
@@ -421,7 +423,7 @@ class Music:
                 config = Property.parse(conf, config_dir)
         else:
             config = Property(None, [])
-        return cls(id, name, icon, inst, auth, desc, short_name, config=config)
+        return cls(id, name, icon, auth, desc, short_name=short_name, inst=inst, sound=sound, config=config)
         
     def add_over(self, override, zip):
         '''Add the additional vbsp_config commands to ourselves.'''

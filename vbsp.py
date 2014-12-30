@@ -103,6 +103,7 @@ ANTLINES = {
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     } # these need to be handled separately to accommodate the scale-changing
 
+
 DEFAULTS = {
     "bottomless_pit"          : "0",
     "remove_info_lighting"    : "0",
@@ -125,6 +126,11 @@ DEFAULTS = {
     "clump_size"              : "4",
     "clump_width"             : "2",
     "clump_number"            : "6",
+    "music_instance"          : "",
+    "music_soundscript"       : "",
+    "music_location_sp"       : "-2000 2000 0",
+    "music_location_coop"     : "-2000 -2000 0",
+    "music_id"                : "<NONE>"
     }
 
 # These instances have to be specially handled / we want to identify them
@@ -186,6 +192,10 @@ settings = {
            
 # A list of sucessful AddGlobal commands, so we can prevent adding the same instance twice.
 global_instances = []
+
+
+game_mode = 'ERR'
+is_preview = 'ERR'
  
 ###### UTIL functions #####
  
@@ -337,10 +347,9 @@ def load_map(path):
 
 def check_glob_conditions():
     "Check all the global conditions, like style vars."
+    global game_mode, is_preview
     utils.con_log("Checking global conditions...")
     
-    game_mode = 'ERR'
-    is_preview = 'ERR'
     inst_files = [] # Get a list of every instance in the map.
     for item in map.iter_ents(classname='func_instance'):
         if item['file'] == inst_file['coopExit']:
@@ -395,37 +404,56 @@ def check_glob_conditions():
         satisfy_condition(cond, false_ent)
     utils.con_log("Done!")
     
+def get_cond_flag(name, flag, inst):
+    '''Determine the result of a condition flag.
+    
+    '''
+    if name == 'and':
+        for sub_flag in flag:
+            if get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
+                return True
+        # If the AND block is empty, return True
+        return len(sub_flag.value) == 0 
+    elif name == 'or':
+        for sub_flag in flag:
+            if not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
+                return False
+        return True
+    elif name == 'not':
+        return not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst)
+    elif name == 'nor':
+        return not get_cond_flag('or', flag, inst)
+    elif name == 'nand':
+        return not get_cond_flag('and', flag, inst)
+    elif name == 'instance':
+        return (inst['file'] == flag.value)
+    elif name == 'instflag':
+        return flag.value in inst['file', '']
+    elif name == 'instvar':
+        bits = flag.value.split(' ')
+        return inst.get_fixup(bits[0]) == bits[1]
+    elif name == 'stylevartrue':
+        return settings['style_vars'].get(flag.value.casefold(), False)
+    elif name == 'stylevarfalse':
+        return settings['style_vars'].get(flag.value.casefold(), True)
+    elif name == 'has':
+        return settings['has_attr'][flag.value]
+    elif name == 'has_music':
+        return get_opt('music_id') == flag.value
+    
 def satisfy_condition(cond, inst):
     '''Try to satisfy this condition. 
     
     This may delete the condition from the settings list, so iterate using a copy only.
     '''
-    isAnd = cond['type'].casefold() == 'and'
-    sat = isAnd
+    sat = False
     for flag in cond['flags']:
-        subres = False
         name = flag.name.casefold()
-        if name == 'instance':
-            subres = (inst['file'] == flag.value)
-        elif name == 'instflag':
-            subres = flag.value in inst['file', '']
-        elif name == 'instvar':
-            bits = flag.value.split(' ')
-            subres = inst.get_fixup(bits[0]) == bits[1]
-        elif name == 'stylevartrue':
-            subres = settings['style_vars'].get(flag.value.casefold(), False)
-        elif name == 'stylevarfalse':
-            subres = settings['style_vars'].get(flag.value.casefold(), True)
-        elif name == 'has':
-            subres = settings['has_attr'][flag.value]
-        elif name == 'nothas':
-            subres = not settings['has_attr'][flag.value]
-        if isAnd:
-            sat = sat and subres
-        else:
-            sat = sat or subres
+        if get_cond_flag(name, flag, inst):
+            sat=True
+            break
     if len(cond['flags']) == 0:
-        sat = True # Always satisfy this!
+        sat = True # Always satisfy this!   
     if sat:
         for res in cond['results'][:]:
             name = res.name.casefold()
@@ -766,7 +794,6 @@ def change_brush():
     else:
         random_walls()
         
-        
 def find_glass_inst(origin):
     '''Find the glass instance placed on the specified origin.'''
     loc = Vec(origin.x//128*128 + 64,
@@ -962,6 +989,36 @@ def change_trig():
             alter_mat(side)
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
+        
+def add_music():
+    '''Add the music ambient_generic or instance, if needed.'''
+    utils.con_log("Adding Music...")
+    if game_mode == "COOP":
+        loc = get_opt('music_location_coop')
+    else:
+        loc = get_opt('music_location_sp')
+        
+    sound = get_opt('music_soundscript')
+    inst = get_opt('music_instance')
+    if sound != '':
+        map.add_ent(VLib.Entity(map, keys={
+            'classname': 'ambient_generic',
+            'spawnflags': '17', # Looping, Infinite Range, Starts Silent
+            'targetname': '@music',
+            'origin': loc,
+            'message': sound,
+            'health': '10', # Volume
+        }))
+        
+    if inst != '':
+        map.add_ent(VLib.Entity(map, keys={
+            'classname': 'func_instance',
+            'targetname': 'music',
+            'angles': '0 0 0',
+            'origin': loc,
+            'file': inst,
+            'fixup_type': '0'
+        }))      
 
 def change_func_brush():
     "Edit func_brushes."
@@ -1107,7 +1164,7 @@ def fix_inst():
             make_static_pist(inst) #try to convert to static piston
             
     for cond in settings['conditions'][:]:
-        for inst in map.iter_ents(classname='func_instance')
+        for inst in map.iter_ents(classname='func_instance'):
             satisfy_condition(cond, inst)
             
     utils.con_log('Map has attributes: ', settings['has_attr'])
@@ -1404,7 +1461,7 @@ else:
     
     map_seed = calc_rand_seed()
     progs = [
-             check_glob_conditions, fix_inst, 
+             check_glob_conditions, fix_inst, add_music,
              change_ents, change_brush, change_overlays, 
              change_trig, change_func_brush, 
              fix_worldspawn, save

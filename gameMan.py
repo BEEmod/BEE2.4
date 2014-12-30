@@ -170,12 +170,23 @@ class Game:
             vbsp_config.set_key(('Textures', 'Special', 'Sky'), skybox.material)
             vbsp_config += skybox.config
             
+        if music is not None:
+            if music.sound is not None:
+                vbsp_config.set_key(('Options', 'music_SoundScript'), music.sound)
+            if music.inst is not None:
+                vbsp_config.set_key(('Options', 'music_instance'), music.inst)
+            
+            vbsp_config.set_key(('Options', 'music_ID'), music.id)
+            vbsp_config += music.config
+            
+            
         # If there are multiple of these blocks, merge them together
         vbsp_config.merge_children('Conditions', 
                                    'InstanceFiles', 
                                    'Options',
                                    'StyleVars',
                                    'Textures')
+                                   
                                  
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
