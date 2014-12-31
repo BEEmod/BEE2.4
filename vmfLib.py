@@ -144,15 +144,22 @@ class VMF:
             # if not a tree, try to read the file
             with open(tree, "r") as file:
                 tree = Property.parse(file)
+                
         map_info = {}
-        
         ver_info = tree.find_key('versioninfo', [])
-        for key in ('editorversion', 'mapversion', 'editorbuild', 'prefab'):
+        for key in ('editorversion', 
+                    'mapversion', 
+                    'editorbuild', 
+                    'prefab'):
             map_info[key] = ver_info[key, '']
+            
         map_info['formatversion'] = ver_info['formatversion', '100']
         if map_info['formatversion'] != '100':
             # If the version is different, we're probably about to fail horribly
-            raise Exception('Unknown VMF format version " ' + map_info['formatversion'] + '"!')
+            raise Exception(
+                'Unknown VMF format version " ' +
+                map_info['formatversion'] + '"!'
+                )
         
         view_opt = tree.find_key('viewsettings', [])
         view_dict = { 

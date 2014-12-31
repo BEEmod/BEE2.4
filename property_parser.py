@@ -174,13 +174,14 @@ class Property:
                 else:
                     yield prop
         
-    def find_key(self, key, def_=_NO_KEY_FOUND) -> "Property":
-        '''Obtain the value of the child Property with a name, with an optional default value.
+    def find_key(self, *keys, def_=_NO_KEY_FOUND) -> "Property":
+        '''Obtain the value of the child Property with a given name. 
         
-        If no default value is given, this will raise NoKeyError.
+        - If no child is found with the given name, this will return the
+          default value, or raise NoKeyError if none is provided.
+        - This prefers keys located closer to the end of the value list.
         '''
         key=key.casefold()
-            
         for prop in reversed(self.value):
             if prop.name is not None and prop.name.casefold() == key:
                 return prop
@@ -193,23 +194,34 @@ class Property:
     def set_key(self, path, value):
         '''Set the value of a key deep in the tree hierachy.
         
-        path should be a tuple of names, or a single string.
+        -If any of the hierachy do not exist (or do not have children),
+          blank properties will be added automatically
+        - path should be a tuple of names, or a single string.
         '''
+        current_prop = self
         if isinstance(path, tuple):
-            prop = self
-            for key in path:
-                try:
-                    prop = prop.find_key(key)
-                except NoKeyError:
+            # Search through each item in the tree!
+            for key in path[:-2]:
+                folded_key=key.casefold()
+                # We can't use find_key() here because we also
+                # need to check that the property has chilren to search
+                # through
+                for prop in reversed(self.value):
+                    if (prop.name is not None and 
+                            prop.name.casefold() == folded_key and
+                            prop.has_children()):
+                        current_prop=prop
+                        break
+                else:
+                    # No matching property found
                     new_prop = Property(key, [])
-                    prop.append(new_prop)
-                    prop = new_prop
-            prop.value = value
-        else:
-            try:
-                self.find_key(path).value = value
-            except NoKeyError:
-                self.value.append(Property(path, value))
+                    current_prop.append(new_prop)
+                    current_prop = new_prop
+            path = path[-1]
+        try:
+            current_prop.find_key(path).value = value
+        except NoKeyError:
+            self.value.append(Property(path, value))
     
     def copy(self):
         '''Deep copy this Property tree and return it.'''
@@ -325,7 +337,7 @@ class Property:
             else:
                 if isinstance(index, tuple):
                     # With default value
-                    return self.find_key(index[0], index[1]).value
+                    return self.find_key(index[0], def_=index[1]).value
                 else:
                     try:
                         return self.find_key(index).value
