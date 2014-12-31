@@ -174,7 +174,7 @@ class Property:
                 else:
                     yield prop
         
-    def find_key(self, *keys, def_=_NO_KEY_FOUND) -> "Property":
+    def find_key(self, key, def_=_NO_KEY_FOUND) -> "Property":
         '''Obtain the value of the child Property with a given name. 
         
         - If no child is found with the given name, this will return the
@@ -290,7 +290,7 @@ class Property:
     def __len__(self):
         '''Determine the number of child properties.
         
-        Singluar Properties have a length of 1
+        Singluar Properties have a length of 1.
         Invalid properties have a length of 0.
         '''
         if self.valid:
@@ -325,14 +325,14 @@ class Property:
     def __getitem__(self, index):
         '''Allow indexing the children directly.
         
-        - If given an integer, it will search by position.
+        - If given an index or slice, it will search by position.
         - If given a string, it will find the last Property with that name.
-          (Default can be chosen by passing a 2-tuple like Prop[key, default]
-        - If none are found, it raises IndexError
-        - [0] maps to the .value if the Property has no children
+          (Default can be chosen by passing a 2-tuple like Prop[key, default])
+        - If none are found, it raises IndexError.
+        - [0] maps to the .value if the Property has no children.
         '''
         if self.has_children():
-            if isinstance(index, int):
+            if isinstance(index, int) or isinstance(index, slice):
                 return self.value[index]
             else:
                 if isinstance(index, tuple):
@@ -351,15 +351,15 @@ class Property:
     def __setitem__(self, index, value):
         '''Allow setting the values of the children directly.
         
-        - If given an integer, it will search by position.
+        - If given an index or slice, it will search by position.
         - If given a string, it will set the last Property with that name.
-        - If none are found, it appends the value to the tree
+        - If none are found, it appends the value to the tree.
         - If given a tuple of strings, it will search through that path,
-          and set the value of the last matching Property
-        - [0] is the same as .value if the Property has no children, all others fail
+          and set the value of the last matching Property.
+        - [0] sets the .value if the Property has no children.
         '''
         if self.has_children():
-            if isinstance(index, int):
+            if isinstance(index, int) or isinstance(index, slice):
                 self.value[index] = value
             else:
                 self.set_key(index, value)
