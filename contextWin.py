@@ -1,15 +1,27 @@
-from tkinter import * # ui library
-from tkinter import ttk # themed ui components that match the OS
+'''
+The rightclick pane which shows item descriptions,and allows changing 
+various item properties.
+- init() creates all the required widgets, and is called with the root window.
+- showProps() shows the screen.
+- hideProps() hides the screen.
+- open_event is the TK callback version of showProps(), which gets the
+  clicked widget from the event
+'''
+from tkinter import *
+from tkinter import ttk
 from functools import partial as func_partial
 import webbrowser
 
 from property_parser import Property
 from richTextBox import tkRichText
+
 import tkinter_png as png # png library for TKinter
 import sound as snd
 import itemPropWin
 
+# Holds the Labels for the 5 possible subitems
 wid_sub = [0,0,0,0,0]
+# Holds the 5 sprite labels
 wid_spr = [0,0,0,0,0]
 
 selected_item = None
@@ -37,10 +49,12 @@ ROT_TYPES = {
     "handle_catapult"      : "rot_catapult"
 }
 
-def pos_for_item(sub):
+def pos_for_item():
+    '''Get the index the selected item is located at.'''
     pos = SUBITEM_POS[selected_item.num_sub]
-    for ind, sub_loc in enumerate(pos):
-        if sub == sub_loc:
+    subKey = selected_sub_item.subKey
+    for ind, sub in enumerate(pos):
+        if subKey == sub:
             return ind
     else:
         return None
@@ -108,7 +122,8 @@ def open_event(e):
 def showProps(wid, warp_cursor=False):
     '''Show the properties window for an item.
     
-        If warp_cursor is  true, the cusor will be moved relative to this window so it stays on top of the selected subitem.
+    wid should be the UI.PalItem widget that represents the item.
+    If warp_cursor is  true, the cursor will be moved relative to this window so it stays on top of the selected subitem.
     '''
     global selected_item, selected_sub_item, is_open
     if warp_cursor and is_open:
@@ -123,7 +138,7 @@ def showProps(wid, warp_cursor=False):
     selected_sub_item = wid
     is_open = True
         
-    icon_widget = wid_sub[pos_for_item(selected_sub_item.subKey)]
+    icon_widget = wid_sub[pos_for_item()]
     
     loc_x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
         #The pixel offset between the window and the subitem in the properties dialog
@@ -144,7 +159,18 @@ def showProps(wid, warp_cursor=False):
 
     
     if off_x is not None and off_y is not None:
+        # move the mouse cursor
         prop_window.event_generate('<Motion>', warp=True, x=off_x, y=off_y)
+        
+    load_item_data()
+
+def set_item_version(e=None):
+    selected_item.change_version(wid_variant.current())
+    load_item_data()
+            
+def load_item_data():
+    '''Refresh the window to use the selected item's data.'''
+    item_data = selected_item.data
     
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
@@ -152,29 +178,39 @@ def showProps(wid, warp_cursor=False):
         else:
             wid_sub[ind]['image'] = selected_item.get_icon(pos)
         wid_sub[ind]['relief'] = 'flat'
-    icon_widget['relief'] = 'raised'
     
-    wid_author['text'] = ', '.join(selected_item.data['auth'])
+    wid_sub[pos_for_item()]['relief'] = 'raised'
+    
+    wid_author['text'] = ', '.join(item_data['auth'])
     wid_name['text'] = selected_sub_item.name
-    wid_ent_count['text'] = selected_item.data['ent']
+    wid_ent_count['text'] = item_data['ent']
     
-    wid_desc.set_text(selected_item.data['desc'])
+    wid_desc.set_text(item_data['desc'])
     
     if itemPropWin.can_edit(selected_item.properties()):
-        wid_changedefaults.state(('!disabled',))
+        wid_changedefaults.state(['!disabled'])
     else:
-        wid_changedefaults.state(('disabled',))
+        wid_changedefaults.state(['disabled'])
     
+    if len(selected_item.item.versions) == 1:
+        wid_variant.state(['disabled'])
+        wid_variant['values'] = ['']
+        wid_variant.current(0)
+    else:
+        wid_variant.state(['!disabled'])
+        version_names = [(('[DEP] ' if ver['is_dep'] else '') +
+                          ('[BETA] ' if ver['is_beta'] else '') +
+                          ver['name']) for ver in 
+                         selected_item.item.versions
+                        ]
+        wid_variant['values'] = version_names
+        wid_variant.current(selected_item.ver)
     
     if selected_item.url is None:
-        wid_moreinfo.state(('disabled',))
+        wid_moreinfo.state(['disabled'])
     else:
-        wid_moreinfo.state(('!disabled',))
-    set_sprites(selected_item)
-    
-            
-def set_sprites(item):
-    editor_data = item.data['editor']
+        wid_moreinfo.state(['!disabled'])
+    editor_data = item_data['editor']
     has_inputs = False
     has_polarity = False
     has_outputs = False
@@ -325,7 +361,9 @@ def init(win):
     wid_changedefaults=ttk.Button(f, text="Change Defaults...", command=showItemProps)
     wid_changedefaults.grid(row=6, column=1)
 
-    wid_variant=ttk.Combobox(f, values=("Recessed","Compat (On Top)"))
+    wid_variant=ttk.Combobox(f, values=['VERSION'], exportselection=0)
+    wid_variant.state(['readonly']) # Prevent directly typing in values
+    wid_variant.bind('<<ComboboxSelected>>', set_item_version)
     wid_variant.current(0)
     wid_variant.grid(row=6, column=0, sticky=W)
     

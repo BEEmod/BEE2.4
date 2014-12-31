@@ -18,7 +18,7 @@ import utils
 all_games = []
 selected_game = None
 selectedGame_radio = None 
-root = None
+root = None # This should be set to the Tk() root instance
 game_menu = None
 
 trans_data = {}

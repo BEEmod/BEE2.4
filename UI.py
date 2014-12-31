@@ -23,21 +23,25 @@ import gameMan
 import utils
 
 win=Tk()
-win.withdraw() # hide the main window while everything is loading, so you don't see the bits appearing
+win.withdraw() # hide the main window while everything is loading, so 
+               # you don't see the bits appearing
+               
 gameMan.root=win
-
 gameMan.init()
 
-png.img_error=png.loadPng('BEE2/error') # If image is not readable, use this instead
+# If image is not readable, use this instead
+png.img_error=png.loadPng('BEE2/error') 
 
+# Holds the TK Toplevels, frames, widgets and menus
 windows={}
-frames={} #Holds frames that we need to deal with later
-UI={} # Other ui elements we need to access
-menus={} # The menu items for the main window
+frames={}
+UI={}
+menus={}
 
 pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
 pal_picked_fake = [] # Labels used for the empty palette positions
+
 drag_item=-1 # the item currently being moved
 drag_orig_pos=-1
 drag_onPal=False # are we dragging a palette item?
@@ -50,11 +54,11 @@ FilterVars={} # The variables for the checkboxes
 FilterVars_all={}
 
 ItemsBG="#CDD0CE" # Colour of the main background to match the menu image
+
+
+selected_style = "BEE2_CLEAN"
 selectedPalette = 0
-
 selectedPalette_radio = IntVar(value=0) # fake value the menu radio buttons set
-
-shouldSnap=True # Should we update the relative positions of windows?
 
 muted = IntVar(value=0) # Is the sound fx muted?
 
@@ -67,11 +71,10 @@ musics = {}
 goos = {}
 stylevar_list = []
 
-selected_style = "BEE2_CLEAN"
-
+# Special StyleVars that are hardcoded into the BEE2
 styleOptions = [('MultiverseCave','Multiverse Cave', 1),
                 ('FixPortalBump','Prevent Portal Bump  (glass)', 0),
-                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0), # these four should be hardcoded (part of Portal 2 basically), other settings should be extracted from style file and put into cats
+                ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0),
                 ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0),
                 ('UnlockDefault', 'Unlock Default Items', 0)
                ]
@@ -91,10 +94,10 @@ class Item():
         self.item = item
         self.def_data = self.item.def_data
         # These pieces of data are constant, only from the first style.
-        self.num_sub = sum(1 for _ in self.def_data['editor'].find_all("Editor", "Subtype", "Palette"))
+        self.num_sub = sum(1 for _ in self.def_data['editor'].find_all(
+                                      "Editor","Subtype","Palette"))
         self.authors = self.def_data['auth']
         self.tags = self.def_data['tags']
-        
         self.load_data()
         self.id = item.id
         self.pak_id = item.pak_id
@@ -103,14 +106,27 @@ class Item():
         
     def load_data(self):
         '''Load data from the item.'''
-        self.data=self.item.versions[self.ver]['styles'][selected_style]
-        self.names = [prop['name', ''] for prop in self.data['editor'].find_all("Editor", "Subtype") if prop['Palette', None] is not None]
+        self.data=self.item.versions[self.ver]['styles'].get(
+            selected_style,
+            self.def_data,
+            )
+        self.names = [prop['name', ''] for prop in 
+                      self.data['editor'].find_all("Editor", "Subtype")
+                      if prop['Palette', None] is not None]
+                        
         self.url = self.data['url']
         self.can_group = ('all' in self.data['icons'] and 
                           self.data['all_name'] is not None and 
                           self.data['all_icon'] is not None)
         
     def get_icon(self, subKey, allow_single=False, single_num=1):
+        '''Get an icon for the given subkey.
+        
+        If allow_single is true, the grouping icon can be returned 
+        instead if only one item is on the palette.
+        Drag-icons have different rules for what counts as 'single', so
+        they use the single_num parameter to control the output.
+        '''
         icons = self.data['icons']
         if (allow_single and self.can_group and 
             sum(1 for item in pal_picked if item.id==self.id) <= single_num):
@@ -141,6 +157,22 @@ class Item():
             for def_prop in self.data['editor'].find_all("Properties", prop, 'DefaultValue'):
                 def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
+            
+    def refresh_subitems(self):
+        '''Call load_data() on all our subitems, so they reload icons and names.'''
+        for refresh_cmd, item_list in [
+                    (flowPreview, pal_picked), 
+                    (flowPicker, pal_items)]:
+            for item in item_list:
+                if item.id == self.id:
+                    item.load_data()
+            refresh_cmd()
+            
+    def change_version(self, version):
+        item_opts[self.id]['sel_version'] = str(version)
+        self.ver = version
+        self.load_data()
+        self.refresh_subitems()
             
     def export(self):
         '''Generate the editoritems and vbsp_config values that represent this item.'''
@@ -360,7 +392,7 @@ class SubPane(Toplevel):
             else:
                 width = self.winfo_reqwidth()
             if self.can_resize_y:
-                height = int(gen_opts['win_state'][self.win_name + '_width'])
+                height = int(gen_opts['win_state'][self.win_name + '_height'])
             else:
                 height = self.winfo_reqheight()
             self.deiconify()
@@ -369,7 +401,7 @@ class SubPane(Toplevel):
             self.sizefrom('user')
             
             self.relX = int(gen_opts['win_state'][self.win_name + '_x'])
-            self.relY = int(gen_opts['win_state'][self.win_name + 'y'])
+            self.relY = int(gen_opts['win_state'][self.win_name + '_y'])
             self.follow_main()
             self.positionfrom('user')
         except (ValueError, KeyError):
@@ -552,7 +584,7 @@ def loadPalUI():
     menus['pal'].delete(3, 999) # Delete the old entries
     
     for val, pal in enumerate(palettes): # Add a set of options to pick the palette into the menu system
-        menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=setPal_radio)
+        menus['pal'].add_radiobutton(label=pal.name, variable=selectedPalette_radio, value=val, command=set_pal_radio)
         
     if len(palettes) < 2:
         UI['pal_remove'].state(('disabled',))
@@ -585,16 +617,6 @@ def export_editoritems(e=None):
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
     loadPalUI()
-
-def setPalette():
-    gen_opts['Last_Selected']['palette'] = str(selectedPalette)
-    pal_clear()
-    for item, sub in palettes[selectedPalette].pos:
-        if item in item_list.keys():
-            pal_picked.append(PalItem(frames['preview'], item_list[item], sub, is_pre=True))
-        else:
-            print('Unknown item "' + item + '"!')
-    flowPreview()
     
 def set_stylevar(var):
     val = str(styleOptVars[var].get())
@@ -708,18 +730,33 @@ def fastDrag(e):
             snd.fx('error')
     flowPreview()
 
-def setPal_listbox(e):
+def set_pal_listbox(e=None):
     global selectedPalette
     selectedPalette = int(UI['palette'].curselection()[0])
     selectedPalette_radio.set(selectedPalette)
-    setPalette()
+    set_palette()
 
-def setPal_radio():
+def set_pal_radio():
     global selectedPalette
     selectedPalette = selectedPalette_radio.get()
+    set_pal_listbox_selection()
+    set_palette()
+    
+def set_pal_listbox_selection(e=None):
+    '''Select the currently chosen palette in the listbox.'''
     UI['palette'].selection_clear(0,len(palettes))
     UI['palette'].selection_set(selectedPalette)
-    setPalette()
+    
+
+def set_palette():
+    gen_opts['Last_Selected']['palette'] = str(selectedPalette)
+    pal_clear()
+    for item, sub in palettes[selectedPalette].pos:
+        if item in item_list.keys():
+            pal_picked.append(PalItem(frames['preview'], item_list[item], sub, is_pre=True))
+        else:
+            print('Unknown item "' + item + '"!')
+    flowPreview()
         
 def pal_clear():
     '''Empty the palette.'''
@@ -801,7 +838,10 @@ def filterAllCallback(col):
         FilterVars[col][i].set(val)
     updateFilters()
 
-# UI functions, each accepts the parent frame to place everything in. initMainWind generates the main frames that hold all the panes to make it easy to move them around if needed
+# UI functions, each accepts the parent frame to place everything in. 
+# initMainWind generates the main frames that hold all the panes to 
+# make it easy to move them around if needed
+
 def initPalette(f):
     palFrame=ttk.Frame(f)
     f.rowconfigure(1, weight=1)
@@ -810,7 +850,9 @@ def initPalette(f):
     ttk.Button(f, text='Clear', command=pal_clear).grid(row=0, sticky="EW")
     UI['palette']=Listbox(f, width=10)
     UI['palette'].grid(row=1, sticky="NSEW")
-    UI['palette'].bind("<<ListboxSelect>>", setPal_listbox)
+    UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
+    UI['palette'].bind("<Enter>", set_pal_listbox_selection) 
+    # Set the selected state when hovered, so users can see which is selected.
     UI['palette'].selection_set(0)
 
     palScroll=ttk.Scrollbar(f, orient=VERTICAL, command=UI['palette'].yview)
@@ -1209,9 +1251,8 @@ def initMain():
     windows['opt'].update_idletasks()
     windows['pal'].update_idletasks()
     
-    win.after(50, setPal_radio)
-    # This also refreshes the palette, and sets the listbox appropriately
-    # It needs to have a little delay to allow the listbox to become visible first
+    win.after(50, set_pal_listbox_selection)
+    set_palette()
 
     # move windows around to make it look nice on startup
     if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
