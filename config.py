@@ -69,10 +69,6 @@ class ConfigFile(ConfigParser):
             return default
             
     get_bool = getboolean
-            
-    def __setitem__(self, key, val):
-        self.has_changed = True
-        super().__setitem__(key, val)
         
     def add_section(self, section):
         self.has_changed = True
@@ -83,10 +79,11 @@ class ConfigFile(ConfigParser):
         super().remove_section(section)
         
     def set(self, section, option, value):
-        self.has_changed = True
-        super().set(section, option, value)
+        orig_val = self.get(section, option, fallback=None)
+        if orig_val is None or orig_val is not value:
+            self.has_changed = True
+            super().set(section, option, value)
         
-    __setitem__.__doc__ = ConfigParser.__setitem__.__doc__
     add_section.__doc__ = ConfigParser.add_section.__doc__
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
     set.__doc__ = ConfigParser.set.__doc__

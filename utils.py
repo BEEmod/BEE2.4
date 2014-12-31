@@ -44,6 +44,22 @@ def bool_as_int(bool):
         return '1'
     else:
         return '0'
+        
+def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
+    '''Adjust a window position to ensure it fits inside the screen.'''
+    max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
+    max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
+    
+    if x<horiz_bound: 
+        x = horiz_bound
+    elif x > max_x:
+        x = max_x
+    
+    if y < vert_bound:
+        y = vert_bound
+    elif y > max_y:
+        y = max_y
+    return x, y
 
 class Vec:
     '''A 3D Vector. This has most standard Vector functions.'''

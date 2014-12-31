@@ -18,6 +18,7 @@ from richTextBox import tkRichText
 import tkinter_png as png # png library for TKinter
 import sound as snd
 import itemPropWin
+import utils
 
 # Holds the Labels for the 5 possible subitems
 wid_sub = [0,0,0,0,0]
@@ -140,23 +141,18 @@ def showProps(wid, warp_cursor=False):
         
     icon_widget = wid_sub[pos_for_item()]
     
-    loc_x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx()
-        #The pixel offset between the window and the subitem in the properties dialog
-    loc_y=wid.winfo_rooty() + prop_window.winfo_rooty() - wid_sub[0].winfo_rooty()
-    
-    if loc_x<15: # adjust to fit inside the screen, + small boundary to not obstruct taskbars, menus etc
-        loc_x=0
-    if loc_y<45:
-        loc_y=0
-    if loc_x > prop_window.winfo_screenwidth()-prop_window.winfo_reqwidth()-15:
-        loc_x=prop_window.winfo_screenwidth()-prop_window.winfo_reqwidth()-15
-    if loc_y > prop_window.winfo_screenheight()-prop_window.winfo_reqheight()-45:
-        loc_y=prop_window.winfo_screenheight()-prop_window.winfo_reqheight()-45
+    #Calculate the pixel offset between the window and the subitem in
+    # the properties dialog, and shift if needed to keep it inside the
+    # window
+    loc_x, loc_y = utils.adjust_inside_screen(
+        x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx(),
+        y=wid.winfo_rooty() + prop_window.winfo_rooty() - icon_widget.winfo_rooty(),
+        win=prop_window,
+        )
     
     prop_window.geometry('+'+str(loc_x)+'+'+str(loc_y))
     prop_window.relX=loc_x-root.winfo_x()
     prop_window.relY=loc_y-root.winfo_y()
-
     
     if off_x is not None and off_y is not None:
         # move the mouse cursor

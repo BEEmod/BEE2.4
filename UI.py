@@ -314,6 +314,7 @@ class SubPane(Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
         parent.bind('<Configure>', self.follow_main, add='+')
         self.bind('<Configure>', self.snap_win)
+        self.bind('<FocusIn>', self.enable_snap)
         
     def hide_win(self, play_snd=True):
         '''Hide the window.'''
@@ -353,10 +354,16 @@ class SubPane(Toplevel):
             x = self.winfo_x()
         if y is None:
             y = self.winfo_y()
+
+        x, y = utils.adjust_inside_screen(x, y, win=self)
         self.geometry(str(width) + 'x' + str(height) + '+' + str(x) + '+' + str(y))
+        
         self.relX = x - self.parent.winfo_x()
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
+    
+    def enable_snap(self, e=None):
+        self.allow_snap=True
 
     def snap_win(self, e=None):
         '''Callback for window movement, allows it to snap to the edge of the main window.'''
@@ -364,15 +371,17 @@ class SubPane(Toplevel):
         if self.allow_snap:
             self.relX=self.winfo_x()-self.parent.winfo_x()
             self.relY=self.winfo_y()-self.parent.winfo_y()
-            self.update_idletasks()
             self.save_conf()
 
     def follow_main(self, e=None):
         '''When the main window moves, sub-windows should move with it.'''
         self.allow_snap=False
-        self.geometry('+'+str(self.parent.winfo_x()+self.relX)+
-                      '+'+str(self.parent.winfo_y()+self.relY))
-        self.allow_snap=True
+        x, y = utils.adjust_inside_screen(
+            x=self.parent.winfo_x()+self.relX,
+            y=self.parent.winfo_y()+self.relY,
+            win=self
+            )
+        self.geometry('+'+str(x)+'+'+str(y))
         self.parent.focus()
         
     def save_conf(self):
@@ -402,6 +411,7 @@ class SubPane(Toplevel):
             
             self.relX = int(gen_opts['win_state'][self.win_name + '_x'])
             self.relY = int(gen_opts['win_state'][self.win_name + '_y'])
+            
             self.follow_main()
             self.positionfrom('user')
         except (ValueError, KeyError):
@@ -414,8 +424,11 @@ class SubPane(Toplevel):
         
 def on_app_quit():
     '''Do a last-minute save of our config files.'''
-    item_opts.save_check()
+    gen_opts['win_state']['main_window_x'] = str(win.winfo_rootx())
+    gen_opts['win_state']['main_window_y'] = str(win.winfo_rooty())
+    
     gen_opts.save_check()
+    item_opts.save_check()
     win.destroy()
     
 def set_mute():
@@ -1252,17 +1265,26 @@ def initMain():
     windows['pal'].update_idletasks()
     
     win.after(50, set_pal_listbox_selection)
+    # This needs some time for the listbox to appear first
     set_palette()
-
-    # move windows around to make it look nice on startup
-    if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
-        win.geometry('+' + str(windows['pal'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
+    
+    # Position windows according to remembered settings:
+    try:
+        start_x = int(gen_opts['win_state']['main_window_x'])
+        start_y = int(gen_opts['win_state']['main_window_y'])
+    except (ValueError, KeyError):
+        # We don't have a config, position the window ourselves
+        if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50): # move the main window if needed to allow room for palette
+            win.geometry('+' + str(windows['pal'].winfo_reqwidth() + 50) + '+' + str(win.winfo_rooty()) )
+        else:
+            win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
     else:
-        win.geometry('+' + str(win.winfo_rootx()) + '+' + str(win.winfo_rooty()) )
+        start_x, start_y = utils.adjust_inside_screen(start_x, start_y, win=win)
+        win.geometry('+' + str(start_x) + '+' + str(start_y))
     win.update_idletasks()
     
+    # Default positions for sub-panes
     xpos = min(win.winfo_screenwidth() - windows['style'].winfo_reqwidth(),win.winfo_rootx() + win.winfo_reqwidth() + 25 )
-   
     windows['pal'].move(
         x=(win.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
         y=(win.winfo_rooty() - 50),
@@ -1274,13 +1296,14 @@ def initMain():
     windows['style'].move(
         x=xpos, 
         y=win.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
-        
+     
+    # Load from config file     
     windows['style'].load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()
     
+    
     win.bind("<Configure>", contextWin.follow_main, add='+')
-
     loadPalUI()
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
