@@ -5,7 +5,11 @@ import math
 import random
 
 import sound as snd
-PROP_TYPES = { # all valid properties in editoritems, Valve probably isn't going to release a major update so it's fine to hardcode this.
+import utils
+
+PROP_TYPES = {
+   # all valid properties in editoritems, Valve probably isn't going to
+   # release a major update so it's fine to hardcode this.
   'toplevel'                : ('pistPlat', 'Start Position'),
   'bottomlevel'             : ('pistPlat', 'End Position'),
   'angledpanelanimation'    : ('panAngle', 'Panel Position'),
@@ -45,9 +49,28 @@ PROP_TYPES = { # all valid properties in editoritems, Valve probably isn't going
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
 
-# order of the different properties, 'special' are the larger controls like sliders or dropdown boxes
-prop_pos_special= ['toplevel', 'bottomlevel', 'angledpanelanimation', 'paintflowtype', 'timerdelay']
-prop_pos = ['allowstreak', 'startenabled', 'startreversed', 'startdeployed', 'startopen', 'startlocked', 'startactive','oscillate', 'dropperenabled', 'autodrop', 'autorespawn']
+# order of the different properties, 'special' are the larger controls 
+# like sliders or dropdown boxes
+prop_pos_special= [
+    'toplevel', 
+    'bottomlevel',
+    'angledpanelanimation', 
+    'paintflowtype', 
+    'timerdelay',
+    ]
+prop_pos = [
+    'allowstreak', 
+    'startenabled', 
+    'startreversed', 
+    'startdeployed', 
+    'startopen', 
+    'startlocked', 
+    'startactive',
+    'oscillate', 
+    'dropperenabled', 
+    'autodrop', 
+    'autorespawn',
+    ]
 
 widgets={} # holds the checkbox or other item used to manipulate the box
 labels={} # holds the descriptive labels for each property
@@ -55,8 +78,9 @@ labels={} # holds the descriptive labels for each property
 propList=[]
 
 values={}  # selected values for this items
+out_values = {}
 
-paintOpts = [
+PAINT_OPTS = [
   'Light',
   'Medium',
   'Heavy',
@@ -68,7 +92,7 @@ defaults={ # default values for this item
   'startup'                 : False,
   'toplevel'                : 1,
   'bottomlevel'             : 0,
-  'angledpanelanimation'    : 'ramp_45_deg_open',
+  'angledpanelanimation'    : '45',
   'startenabled'            : True,
   'startreversed'           : False,
   'startdeployed'           : True,
@@ -106,25 +130,22 @@ def scroll_angle(key, e):
     if e.delta > 0 and widgets[key].get() != '90':
         e.widget.invoke('buttonup')
     elif e.delta < 0 and widgets[key].get() != '0':
-        e.widget.invoke('buttondown')
-        
+        e.widget.invoke('buttondown')     
 
-def savePaint(e, key):
+def save_paint(key, val):
     sfx('config')
-    values[key]=paintOpts.index(widgets[key].get())
-    
+    out_values[key]=val  
 
-def saveAngle(key):
+def save_angle(key, new_angle):
     global last_angle
-    new_ang = widgets[key].get()
-    if new_ang > last_angle:
-        sfx('raise_' + random.choice(('1','2','3')))
-    elif new_ang < last_angle:
-        sfx('lower_' + random.choice(('1','2','3')))
-    last_angle = new_ang
-    values[key]='ramp_'+str(new_ang)+'_deg_open'
+    if new_angle > last_angle:
+        sfx('raise_' + random.choice('123'))
+    elif new_angle < last_angle:
+        sfx('lower_' + random.choice('123'))
+    last_angle = new_angle
+    out_values[key]='ramp_'+str(new_angle)+'_deg_open'
 
-def saveTim(val, key):
+def save_tim(key, val):
     global enable_tim_callback
     if enable_tim_callback:
         new_val = math.floor(float(val)+0.5)
@@ -134,46 +155,55 @@ def saveTim(val, key):
         # Lock to whole numbers
         enable_tim_callback=True
         
-        labels[key]['text'] = 'Timer Delay:\n        (' + ('Inf' if new_val == 0 else str(new_val)) + ')'
+        labels[key]['text'] = (
+            'Timer Delay:\n        (' + 
+            ('Inf' if new_val == 0 else str(new_val)) + ')'
+        )
         
         if new_val > values[key]:
             sfx('add')
         elif new_val < values[key]:
             sfx('subtract')
-        values[key]=int(new_val)
+        values[key]=new_val
+        out_values[key]=str(new_val)
 
-def savePist(val, key):
-    if widgets['toplevel'].get()==widgets['bottomlevel'].get(): # user moved them to match, switch the other one around
+def save_pist(key, val):
+    if widgets['toplevel'].get()==widgets['bottomlevel'].get(): 
+        # user moved them to match, switch the other one around
         sfx('swap')
-        widgets['toplevel' if key=='bottomlevel' else 'bottomlevel'].set(values['cust_'+key])
+        widgets[
+            'toplevel' if key=='bottomlevel' else 'bottomlevel'
+               ].set(values[key])
     else:
         sfx('move')
 
     startPos=widgets['toplevel'].get()
     endPos=widgets['bottomlevel'].get()
 
-    values['startup']= startPos > endPos
-    values['toplevel']=max(startPos,endPos)
-    values['bottomlevel']=min(startPos,endPos)
-    values['cust_toplevel']=startPos
-    values['cust_bottomlevel']=endPos
+    values['toplevel']=startPos
+    values['bottomlevel']=endPos
+    
+    values['startup']= utils.bool_as_int(startPos > endPos)
+    out_values['toplevel']=str(max(startPos,endPos))
+    out_values['bottomlevel']=str(min(startPos,endPos))
 
-def saveRail(key):
+def save_rail(key):
     if values[key].get()==0:
         widgets['startactive'].state(['disabled'])
         values['startactive'].set(False)
     else:
         widgets['startactive'].state(['!disabled'])
         
-def toggleCheck(var, e=None):
+def toggleCheck(key, var, e=None):
     if var.get():
         var.set(0)
     else:
         var.set(1)
-    sfx('config')
+    set_check(key)
         
-def checkFX():
+def set_check(key):
     sfx('config')
+    out_values[key] = str(values[key].get())
     
 def paintFX(e):
     sfx('config')
@@ -184,16 +214,7 @@ def exit():
     win.grab_release()
     win.withdraw()
     is_open=False
-    out={}
-    for key in PROP_TYPES.keys():
-        if key in propList:
-            if PROP_TYPES[key][0] == 'checkbox' or PROP_TYPES[key][0]=='railLift':
-                out[key]=(values[key].get())
-            elif PROP_TYPES[key][0] == 'pistPlat':
-                out[key]=values[key]
-                out['startup']=values['startup']
-            else:
-                out[key]=values[key]
+    out={key: out_values.get(key, values[key]) for key in values}
     callback(out)
     
 def can_edit(prop_list):
@@ -224,35 +245,96 @@ def init(tk, cback):
 
     for key in PROP_TYPES.keys():
         labels[key]=ttk.Label(win, text=PROP_TYPES[key][1]+':')
-        if PROP_TYPES[key][0] == 'checkbox':
+        type = PROP_TYPES[key][0]
+        if type == 'checkbox':
             values[key] = IntVar(value=defaults[key])
-            widgets[key] = ttk.Checkbutton(win, variable=values[key], command=checkFX)
-            widgets[key].bind('<Return>', func_partial(toggleCheck, values[key]))
-        elif PROP_TYPES[key][0] == 'railLift':
+            out_values[key] = utils.bool_as_int(defaults[key])
+            widgets[key] = ttk.Checkbutton(
+                win, 
+                variable=values[key], 
+                command=func_partial(set_check, key),
+                )
+            widgets[key].bind(
+                '<Return>', 
+                func_partial(
+                    toggleCheck, 
+                    key, 
+                    values[key],
+                    )
+                )
+                
+        elif type == 'railLift':
             values[key] = IntVar(value=defaults[key])
-            widgets[key] = ttk.Checkbutton(win, variable=values[key], command=lambda k=key: saveRail(k))
-        elif PROP_TYPES[key][0] == 'panAngle':
-            widgets[key]=Spinbox(win, values=(30,45,60,90), command=func_partial(saveAngle, key))
-            widgets[key].bind('<MouseWheel>', func_partial(scroll_angle, key))
+            out_values[key] = utils.bool_as_int(defaults[key])
+            widgets[key] = ttk.Checkbutton(
+                win, 
+                variable=values[key], 
+                command=func_partial(save_rail, key),
+                )
+                
+        elif type == 'panAngle':
+            frm = ttk.Frame(win)
+            widgets[key]=frm
+            values[key]=StringVar(value=defaults[key])
+            for pos, angle in enumerate(['30', '45', '60', '90']):
+                ttk.Radiobutton(
+                    frm, 
+                    variable=values[key], 
+                    value=angle,
+                    text=angle,
+                    command=func_partial(save_angle, key, angle),
+                    ).grid(row=0, column=pos)
+                frm.columnconfigure(pos, weight=1)
+                
+        elif type == 'gelType':
+            frm = ttk.Frame(win)
+            widgets[key]=frm
+            values[key]=IntVar(value=defaults[key])
+            for pos, text in enumerate(PAINT_OPTS):
+                ttk.Radiobutton(
+                    frm, 
+                    variable=values[key], 
+                    value=pos,
+                    text=text,
+                    command=func_partial(save_paint, key, pos),
+                    ).grid(row=0, column=pos)
+                frm.columnconfigure(pos, weight=1)
+            out_values[key]=str(defaults[key])
+            
+        elif type == 'pistPlat':
+            widgets[key]=Scale(
+                win, 
+                from_=0, 
+                to=4, 
+                orient="horizontal", 
+                showvalue=False, 
+                command=func_partial(save_pist, key),
+                )
             values[key]=defaults[key]
-        elif PROP_TYPES[key][0] == 'gelType':
-            widgets[key]=ttk.Combobox(win, values=paintOpts)
-            widgets[key].set(paintOpts[defaults[key]])
-            widgets[key].state(['readonly'])
-            widgets[key].bind("<<ComboboxSelected>>", lambda e, key=key: savePaint(e,key))
-            widgets[key].bind("<Button-1>", paintFX)
+            out_values[key]=str(defaults[key])
+            if ((key=='toplevel' and defaults['startup']) or
+                    (key=='bottomlevel' and not defaults['startup'])):
+                widgets[key].set(max(
+                    defaults['toplevel'],
+                    defaults['bottomlevel']
+                    ))
+            if ((key=='toplevel' and not defaults['startup']) or 
+                    (key=='bottomlevel' and defaults['startup'])):
+                widgets[key].set(min(
+                    defaults['toplevel'],
+                    defaults['bottomlevel']))
+                
+        elif type == 'timerDel':
+            widgets[key]=ttk.Scale(
+                win, 
+                from_=0, 
+                to=30, 
+                orient="horizontal", 
+                command=func_partial(save_tim,key),
+                )
             values[key]=defaults[key]
-        elif PROP_TYPES[key][0] == 'pistPlat':
-            widgets[key]=Scale(win, from_=0, to=4, orient="horizontal", showvalue=False, command=lambda val, k=key: savePist(val,k))
-            values[key]=defaults[key]
-            if (key=='toplevel' and defaults['startup']) or (key=='bottomlevel' and not defaults['startup']):
-                widgets[key].set(max(defaults['toplevel'],defaults['bottomlevel']))
-            if (key=='toplevel' and not defaults['startup']) or (key=='bottomlevel' and defaults['startup']):
-                widgets[key].set(min(defaults['toplevel'],defaults['bottomlevel']))
-        elif PROP_TYPES[key][0] == 'timerDel':
-            widgets[key]=ttk.Scale(win, from_=0, to=30, orient="horizontal", command=lambda val, k=key: saveTim(val,k))
-            values[key]=defaults[key]
-        elif PROP_TYPES[key][0] == 'railPlat':
+            
+        elif type == 'railPlat':
             widgets[key]=ttk.Checkbutton(win)
     values['startup']=defaults['startup']
 
@@ -271,16 +353,13 @@ def open(usedProps, parent, itemName):
                 values[prop].set(value=='1')
             elif type == 'railLift':
                 values[prop].set(value=='1')
-                saveRail(prop)
+                save_rail(prop)
             elif type == 'gelType':
-                try:
-                    widgets[prop].set(paintOpts[int(value)])
-                except ValueError:
-                    pass
+                values[prop].set(value)
             elif type == 'panAngle':
-                widgets[prop].delete(0,2)
-                widgets[prop].insert(0, value[5:7])
-                values[prop] = value
+                last_angle = value[5:7]
+                values[prop].set(last_angle)
+                out_values[prop] = value
             elif type == 'pistPlat':
                 values[prop] == value
                 try:
@@ -356,12 +435,19 @@ def open(usedProps, parent, itemName):
     win.deiconify()
     win.lift(parent)
     win.grab_set()
-    win.geometry('+'+str(parent.winfo_rootx()-30)+'+'+str(parent.winfo_rooty()-win.winfo_reqheight()-30))
+    win.geometry(
+        '+'+str(parent.winfo_rootx()-30)+
+        '+'+str(parent.winfo_rooty()-win.winfo_reqheight()-30)
+        )
 
 if __name__ == '__main__': # load the window if directly executing this file
     root=Tk()
     root.geometry("+250+250")
-    init(root,print)
+    def callback(vals):
+        for key, value in sorted(vals.items()):
+            print(key + ' = ' + repr(value))
+            
+    init(root,callback)
     all_vals = {
       'startup'                 : '1',
       'toplevel'                : '4',
