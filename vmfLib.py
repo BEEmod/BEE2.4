@@ -13,34 +13,34 @@ CURRENT_HAMMER_BUILD = 5304
 # Used to set the defaults for versioninfo
 
 _ID_types = {
-    'brush' : 'solid_id', 
-    'face'  : 'face_id', 
+    'brush' : 'solid_id',
+    'face'  : 'face_id',
     'ent'   : 'ent_id'
     }
-    
+
 _FIXUP_KEYS = ["replace0" + str(i) for i in range(1,10)] + ["replace" + str(i) for i in range(10,17)]
     # $replace01, $replace02, ..., $replace15, $replace16
-    
+
 _DISP_ROWS = ('normals','distances','offsets','offset_normals','alphas','triangle_tags')
-    # all the rows that displacements have, in the form 
+    # all the rows that displacements have, in the form
     # "row0" "???"
     # "row1" "???"
     # etc
-    
+
 def conv_int(str, default=0):
     '''Converts a string to an integer, using a default if the string is unparsable.'''
     try:
         return int(str)
     except ValueError:
         return int(default)
-        
+
 def conv_float(str, default=0):
     '''Converts a string to an float, using a default if the string is unparsable.'''
     try:
         return float(str)
     except ValueError:
         return float(default)
-        
+
 def conv_bool(str, default=False):
     '''Converts a string to a boolean, using a default if the string is unparsable.'''
     if isinstance(str, bool): # True, False
@@ -56,7 +56,7 @@ def conv_bool(str, default=False):
         return True
     else:
         return default
-        
+
 def conv_vec(str, x=0, y=0, z=0):
     '''Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
     parts = str.split(' ')
@@ -72,13 +72,13 @@ def conv_vec(str, x=0, y=0, z=0):
             return Vec(x,y,z)
 
 class VMF:
-    '''Represents a VMF file, and holds counters for various IDs used. 
-    
-    Has functions for searching for specific entities or brushes, and 
+    '''Represents a VMF file, and holds counters for various IDs used.
+
+    Has functions for searching for specific entities or brushes, and
     converts to/from a property_parser tree.
     '''
     def __init__(
-            self, 
+            self,
             map_info={},
             spawn=None,
             entities=None,
@@ -94,17 +94,17 @@ class VMF:
         self.cameras = [] if cameras is None else cameras
         self.cordons = [] if cordons is None else cordons
         self.visgroups = [] if visgroups is None else visgroups
-        
+
         self.spawn = Entity(self, []) if spawn is None else spawn
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
-        
+
         self.is_prefab = conv_bool(map_info.get('prefab', '_'), False)
         self.cordon_enabled = conv_bool(map_info.get('cordons_on', '_'), False)
         self.map_ver = conv_int(map_info.get('mapversion', '_'), 0)
         if self.spawn['mapversion'] is not None:
             del self.spawn['mapversion']
-        
+
         #These three are mostly useless for us, but we'll preserve them anyway
         self.format_ver = conv_int(map_info.get('formatversion', '_'), 100)
         self.hammer_ver = conv_int(map_info.get('editorversion', '_'), CURRENT_HAMMER_VERSION)
@@ -116,27 +116,27 @@ class VMF:
         self.grid_spacing = conv_int(map_info.get('gridspacing', '_'), 64)
         self.active_cam = conv_int(map_info.get('active_cam', '_'), -1)
         self.quickhide_count = conv_int(map_info.get('quickhide', '_'), -1)
-        
+
     def add_brush(self, item):
         self.brushes.append(item)
-        
+
     def remove_brush(self, item):
         self.brushes.remove(item)
-        
+
     def add_ent(self, item):
         self.entities.append(item)
-        
+
     def remove_ent(self, item):
         self.entities.remove(item)
-        
+
     def add_brushes(self, item):
         for i in item:
             self.add_brush(i)
-        
+
     def add_ents(self, item):
         for i in item:
             self.add_ent(i)
-    
+
     @staticmethod
     def parse(tree):
         '''Convert a property_parser tree into VMF classes.'''
@@ -144,15 +144,15 @@ class VMF:
             # if not a tree, try to read the file
             with open(tree, "r") as file:
                 tree = Property.parse(file)
-                
+
         map_info = {}
         ver_info = tree.find_key('versioninfo', [])
-        for key in ('editorversion', 
-                    'mapversion', 
-                    'editorbuild', 
+        for key in ('editorversion',
+                    'mapversion',
+                    'editorbuild',
                     'prefab'):
             map_info[key] = ver_info[key, '']
-            
+
         map_info['formatversion'] = ver_info['formatversion', '100']
         if map_info['formatversion'] != '100':
             # If the version is different, we're probably about to fail horribly
@@ -160,9 +160,9 @@ class VMF:
                 'Unknown VMF format version " ' +
                 map_info['formatversion'] + '"!'
                 )
-        
+
         view_opt = tree.find_key('viewsettings', [])
-        view_dict = { 
+        view_dict = {
             'bSnapToGrid' : 'snaptogrid',
             'bShowGrid' : 'showgrid',
             'bShow3DGrid' : 'show3dgrid',
@@ -171,29 +171,29 @@ class VMF:
             }
         for key in view_dict:
             map_info[view_dict[key]] = view_opt[key, '']
-            
+
         cordons = tree.find_key('cordons', [])
         map_info['cordons_on'] = cordons['active', '0']
-        
+
         cam_props = tree.find_key('cameras', [])
         map_info['active_cam']  = conv_int((cam_props['activecamera', '']),-1)
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
-            
+
 
         map = VMF(map_info = map_info)
-        
+
         for c in cam_props:
             if c.name != 'activecamera':
                 Camera.parse(map, c)
-        
+
         for ent in cordons.find_all('cordon'):
             Cordon.parse(map, ent)
-        
+
         map.entities = [Entity.parse(map, ent, hidden=False) for ent in tree.find_all('Entity')]
         # find hidden entities
         for hidden_ent in tree.find_all('hidden'):
             map.entities.extend([Entity.parse(map, ent, hidden=True) for ent in hidden_ent])
-        
+
         map_spawn = tree.find_key('world', [])
         if map_spawn is None:
             # Generate a fake default to parse through
@@ -202,52 +202,52 @@ class VMF:
 
         if map.spawn.solids is not None:
            map.brushes = map.spawn.solids
-           
+
         return map
     pass
-    
+
     def export(self, file=None, inc_version=True):
-        '''Serialises the object's contents into a VMF file. 
-        
-        - If no file is given the map will be returned as a string. 
+        '''Serialises the object's contents into a VMF file.
+
+        - If no file is given the map will be returned as a string.
         - By default, this will increment the map's version - set inc_version to False to suppress this.
         '''
         if file is None:
-            file = io.stringIO() 
-            # acts like a file object but is actually a string. We're 
+            file = io.stringIO()
+            # acts like a file object but is actually a string. We're
             # using this to prevent having Python duplicate the entire
             # string every time we append
             ret_string = True
         else:
             ret_string = False
-            
+
         if inc_version:
             # Increment this to indicate the map was modified
             self.map_ver += 1
-            
+
         file.write('versioninfo\n{\n')
         file.write('\t"editorversion" "' + str(self.hammer_ver) + '"\n')
         file.write('\t"editorbuild" "' + str(self.hammer_build) + '"\n')
         file.write('\t"mapversion" "' + str(self.map_ver) + '"\n')
         file.write('\t"formatversion" "' + str(self.format_ver) + '"\n')
         file.write('\t"prefab" "' + utils.bool_as_int(self.is_prefab) + '"\n}\n')
-            
+
         # TODO: Visgroups
-        
+
         file.write('viewsettings\n{\n')
         file.write('\t"bSnapToGrid" "' + utils.bool_as_int(self.snap_grid) + '"\n')
         file.write('\t"bShowGrid" "' + utils.bool_as_int(self.show_grid) + '"\n')
         file.write('\t"bShowLogicalGrid" "' + utils.bool_as_int(self.show_logic_grid) + '"\n')
         file.write('\t"nGridSpacing" "' + str(self.grid_spacing) + '"\n')
         file.write('\t"bShow3DGrid" "' + utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
-        
-        
+
+
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(file, ent_name = 'world')
-        
+
         for ent in self.entities:
             ent.export(file)
-            
+
         file.write('cameras\n{\n')
         if len(self.cameras) == 0:
             self.active_cam = -1
@@ -255,8 +255,8 @@ class VMF:
         for cam in self.cameras:
             cam.export(file, '\t')
         file.write('}\n')
-        
-        
+
+
         file.write('cordons\n{\n')
         if len(self.cordons) > 0:
             file.write('\t"active" "' + utils.bool_as_int(self.cordon_enabled) + '"\n')
@@ -265,17 +265,17 @@ class VMF:
         else:
             file.write('\t"active" "0"\n')
         file.write('}\n')
-        
+
         if self.quickhide_count > 0:
             file.write('quickhide\n{\n')
             file.write('\t"count" "' + str(self.quickhide_count) + '"\n')
             file.write('}\n')
-            
+
         if ret_string:
             string = file.getvalue()
             file.close()
             return string
-    
+
     def get_id(self, ids, desired=-1):
         '''Get an unused ID of a type. Used by entities, solids and brush sides to keep their IDs valid.'''
         if ids not in _ID_types:
@@ -292,7 +292,7 @@ class VMF:
             if id not in list_:
                 list_.append(int(id))
                 return id
-                
+
     def iter_wbrushes(self, world=True, detail=True):
         '''Iterate through all world and detail solids in the map.'''
         if world:
@@ -302,7 +302,7 @@ class VMF:
             for ent in self.iter_ents(classname='func_detail'):
                 for solid in ent.solids:
                     yield solid
-                    
+
     def iter_ents(self, **cond):
         '''Iterate through entities having the given keyvalue values.'''
         items = cond.items()
@@ -312,7 +312,7 @@ class VMF:
                     break
             else:
                 yield ent
-            
+
     def iter_ents_tags(self, vals = {}, tags = {}):
         '''Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags.'''
         for ent in self.entities[:]:
@@ -325,10 +325,10 @@ class VMF:
                         break
                 else:
                     yield ent
-    
+
     def iter_inputs(self, name):
         '''Loop through all Outputs which target the named entity.
-        
+
         - Allows using * at beginning/end
         '''
         wild_start = name[:1]=='*'
@@ -353,55 +353,55 @@ class VMF:
                     else:
                         if out.target == name: # target
                             yield out
-                
+
 class Camera:
     def __init__(self, map, pos, targ):
         self.pos = pos
         self.target = targ
         self.map = map
         map.cameras.append(self)
-        
+
     def targ_ent(self, ent):
         '''Point the camera at an entity.'''
         if ent['origin']:
             self.target = conv_vec(ent['origin'], 0,0,0)
-        
+
     def is_active(self):
         '''Is this camera in use?'''
         return map.active_cam == map.cameras.index(self)+1
-        
+
     def set_active(self):
         '''Set this to be the map's active camera'''
         map.active_cam = map.cameras.index(self) + 1
-        
+
     def set_inactive_all(self):
         '''Disable all cameras in this map.'''
         map.active_cam = -1
-        
+
     @staticmethod
     def parse(map, tree):
         '''Read a camera from a property_parser tree.'''
         pos = conv_vec(tree.find_key('position', '_').value, 0,0,0)
         targ = conv_vec(tree.find_key('look', '_').value, 0,64,0)
         return Camera(map, pos, targ)
-    
+
     def copy(self):
         '''Duplicate this camera object.'''
         return Camera(self.map, self.pos.copy(), self.target.copy())
-    
+
     def remove(self):
         '''Delete this camera from the map.'''
         map.cameras.remove(self)
         if self.is_active():
             self.set_inactive()
-        
+
     def export(self, buffer, ind=''):
         buffer.write(ind + 'camera\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"position" "[' + self.pos.join(' ') + ']"\n')
         buffer.write(ind + '\t"look" "[' + self.target.join(' ') + ']"\n')
         buffer.write(ind + '}\n')
-        
+
 class Cordon:
     '''Represents one cordon volume.'''
     def __init__(self, map, min_, max_, is_active=True, name='Cordon'):
@@ -411,8 +411,8 @@ class Cordon:
         self.bounds_max = max_
         self.active = is_active
         map.cordons.append(self)
-        
-    @staticmethod     
+
+    @staticmethod
     def parse(map, tree):
         name = tree['name', 'cordon']
         is_active = conv_bool(tree['active', '0'], False)
@@ -420,7 +420,7 @@ class Cordon:
         min_ = conv_vec(bounds['mins', '(0 0 0)'], 0, 0, 0)
         max_ = conv_vec(bounds['maxs', '(128 128 128)'], 128, 128, 128)
         return Cordon(map, min_, max_, is_active, name)
-        
+
     def export(self, buffer, ind=''):
         buffer.write(ind + 'cordon\n')
         buffer.write(ind + '{\n')
@@ -432,15 +432,15 @@ class Cordon:
         buffer.write(ind + '\t\t"maxs" "(' + self.bounds_max.join(' ') + ')"\n')
         buffer.write(ind + '\t}\n')
         buffer.write(ind + '}\n')
-        
+
     def copy(self):
         '''Duplicate this cordon.'''
         return Cordon(self.map, self.bounds_min.copy(), self.bounds_max.copy(), self.active, self.name)
-        
+
     def remove(self):
         '''Remove this cordon from the map.'''
         map.cordons.remove(self)
-        
+
 class Solid:
     '''A single brush, serving as both world brushes and brush entities.'''
     def __init__(self, map, des_id=-1, sides=None, editor=None, hidden=False):
@@ -449,7 +449,7 @@ class Solid:
         self.id = map.get_id('brush', des_id)
         self.editor = {} if editor is None else editor
         self.hidden=hidden
-    
+
     def copy(self, des_id=-1):
         '''Duplicate this brush.'''
         editor = {}
@@ -460,19 +460,19 @@ class Solid:
             editor['visgroup'] = self.editor['visgroup'][:]
         sides = [s.copy() for s in self.sides]
         return Solid(map, des_id=des_id, sides=sides, editor=editor, hidden=self.hidden)
-        
-    @staticmethod    
+
+    @staticmethod
     def parse(map, tree, hidden=False):
         '''Parse a Property tree into a Solid object.'''
         id = conv_int(tree["id", '-1'])
-        try: 
+        try:
             id = int(id)
         except TypeError:
             id = -1
         sides = []
         for side in tree.find_all("side"):
             sides.append(Side.parse(map, side))
-            
+
         editor = {'visgroup' : []}
         for v in tree.find_key("editor", []):
             if v.name in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
@@ -488,9 +488,9 @@ class Solid:
                 if val:
                     editor['visgroup'].append(val)
         if len(editor['visgroup'])==0:
-            del editor['visgroup'] 
+            del editor['visgroup']
         return Solid(map, des_id=id, sides=sides, editor=editor, hidden=hidden)
-        
+
     def export(self, buffer, ind = ''):
         '''Generate the strings needed to define this brush.'''
         if self.hidden:
@@ -501,28 +501,28 @@ class Solid:
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         for s in self.sides:
             s.export(buffer, ind + '\t')
-        
+
         buffer.write(ind + '\teditor\n')
         buffer.write(ind + '\t{\n')
         if 'color' in self.editor:
-            buffer.write(ind + '\t\t"color" "' + 
+            buffer.write(ind + '\t\t"color" "' +
                 self.editor['color'] + '"\n')
         if 'groupid' in self.editor:
-            buffer.write(ind + '\t\t"groupid" "' + 
+            buffer.write(ind + '\t\t"groupid" "' +
                 self.editor['groupid'] + '"\n')
         if 'visgroup' in self.editor:
             for id in self.editor['visgroup']:
                 buffer.write(ind + '\t\t"groupid" "' + str(id) + '"\n')
         for key in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
             if key in self.editor:
-                buffer.write(ind + '\t\t"' + key + '" "' + 
+                buffer.write(ind + '\t\t"' + key + '" "' +
                     utils.bool_as_int(self.editor[key]) + '"\n')
         buffer.write(ind + '\t}\n')
-        
+
         buffer.write(ind + '}\n')
         if self.hidden:
             buffer.write(ind[:-1] + '}\n')
-    
+
     def __str__(self):
         '''Return a user-friendly description of our data.'''
         st = "<solid:" + str(self.id) + ">\n{\n"
@@ -530,16 +530,16 @@ class Solid:
             st += str(s) + "\n"
         st += "}"
         return st
-        
+
     def __iter__(self):
         for s in self.sides:
             yield s
-        
+
     def __del__(self):
         '''Forget this solid's ID when the object is destroyed.'''
         if self.id in self.map.solid_id:
             self.map.solid_id.remove(self.id)
-        
+
     def get_bbox(self):
         '''Get two vectors representing the space this brush takes up.'''
         bbox_min, bbox_max = self.sides[0].get_bbox()
@@ -548,16 +548,16 @@ class Solid:
             bbox_max.max(side_max)
             bbox_min.min(side_min)
         return bbox_min, bbox_max
-        
+
     def get_origin(self, bbox_min=None, bbox_max=None):
         '''Calculates a vector representing the exact center of this brush.'''
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
         return (bbox_min+bbox_max)/2
-        
+
     def translate(self, diff):
-        '''Move this solid by the specified vector. 
-        
+        '''Move this solid by the specified vector.
+
         - This does not translate textures as well.
         - A tuple can be passed in instead if desired.
         '''
@@ -567,7 +567,7 @@ class Solid:
 
 class Side:
     "A brush face."
-    __slots__ = ('map', 'planes', 'id', 'lightmap', 'smooth', 'mat', 'ham_rot', 'uaxis', 'vaxis', 
+    __slots__ = ('map', 'planes', 'id', 'lightmap', 'smooth', 'mat', 'ham_rot', 'uaxis', 'vaxis',
                  'disp_power', 'disp_pos', 'disp_flags', 'disp_elev', 'disp_is_subdiv', 'disp_allowed_verts', 'disp_data', 'is_disp')
     def __init__(self, map, planes=[(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt={}, des_id=-1, disp_data={}):
         self.map = map
@@ -594,8 +594,8 @@ class Side:
             self.is_disp = True
         else:
             self.is_disp = False
-            
-    @staticmethod    
+
+    @staticmethod
     def parse(map, tree):
         '''Parse the property tree into a Side object.'''
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
@@ -610,7 +610,7 @@ class Side:
                 raise ValueError("Invalid planes in '" + plane + "'!")
         if not len(planes) == 3:
             raise ValueError("Wrong number of solid planes in '" + plane + "'!")
-        opt = { 
+        opt = {
             'material' : tree.find_key('material', '').value,
             'uaxis' : tree.find_key('uaxis', '[0 1  0 0] 0.25').value,
             'vaxis' : tree.find_key('vaxis', '[0 0 -1 0] 0.25').value,
@@ -635,7 +635,7 @@ class Side:
                     rows.sort(key=lambda x: conv_int(x.name[3:],0))
                     disp_data[v] = [v.value for v in rows]
         return Side(map, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
-        
+
     def copy(self, des_id=-1):
         '''Duplicate this brush side.'''
         planes = [p.as_tuple() for p in self.planes]
@@ -648,7 +648,7 @@ class Side:
             'lightmap' : self.lightmap,
             }
         return Side(map, planes=planes, opt=opt, des_id=des_id)
-        
+
     def export(self, buffer, ind = ''):
         '''Generate the strings required to define this side in a VMF.'''
         buffer.write(ind + 'side\n')
@@ -665,7 +665,7 @@ class Side:
         if self.is_disp:
             buffer.write(ind + '\tdispinfo\n')
             buffer.write(ind + '\t{\n')
-            
+
             buffer.write(ind + '\t\t"power" "' + str(self.disp_power) + '"\n')
             buffer.write(ind + '\t\t"startposition" "[' + self.disp_pos.join(' ') + ']"\n')
             buffer.write(ind + '\t\t"flags" "' + str(self.disp_flags) + '"\n')
@@ -686,7 +686,7 @@ class Side:
                 buffer.write(ind + '\t\t}\n')
             buffer.write(ind + '\t}\n')
         buffer.write(ind + '}\n')
- 
+
     def __str__(self):
         '''Dump a user-friendly representation of the side.'''
         st = "\tmat = " + self.mat
@@ -694,12 +694,12 @@ class Side:
         pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
         st += '\tplane: ' + ", ".join(pl_str) + '\n'
         return st
-        
+
     def __del__(self):
         '''Forget this side's ID when the object is destroyed.'''
         if self.id in self.map.face_id:
             self.map.face_id.remove(self.id)
-        
+
     def get_bbox(self):
         '''Generate the highest and lowest points these planes form.'''
         bbox_max=self.planes[0].copy()
@@ -708,46 +708,46 @@ class Side:
             bbox_max.max(v)
             bbox_min.min(v)
         return bbox_min, bbox_max
-        
+
     def get_origin(self):
         '''Calculates a vector representing the exact center of this plane.'''
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
         return origin
-        
+
     def translate(self, diff):
-        '''Move this side by the specified vector. 
-        
+        '''Move this side by the specified vector.
+
         - This does not translate textures as well.
         - A tuple can be passed in instead if desired.
         '''
         for p in self.planes:
             p += diff
-    
+
     def plane_desc(self):
         '''Return a string which describes this face, for use in texture randomisation.'''
         return self.planes[0].join(' ') + self.planes[1].join(' ') + self.planes[2].join(' ')
-        
+
 class Entity():
     '''A representation of either a point or brush entity.
-    
+
     Creation:
     Entity(args) for a brand-new Entity
     Entity.parse(property) if reading from a VMF file
     ent.copy() to duplicate an existing entity
-    
+
     Supports [] operations to read and write keyvalues.
     If reading instance $replace values use get_fixup(), set_fixup() and del_fixup().
     '''
     def __init__(
-            self, 
-            map, 
-            keys = None, 
+            self,
+            map,
+            keys = None,
             fixup = None,
-            id=-1, 
-            outputs=None, 
-            solids=None, 
-            editor=None, 
+            id=-1,
+            outputs=None,
+            solids=None,
+            editor=None,
             hidden=False):
         self.map = map
         self.keys = {} if keys is None else keys
@@ -757,7 +757,7 @@ class Entity():
         self.id = map.get_id('ent', desired = id)
         self.hidden = hidden
         self.editor = {'visgroup' : []} if editor is None else editor
-        
+
     def copy(self, des_id=-1):
         '''Duplicate this entity entirely, including solids and outputs.'''
         new_keys = {}
@@ -765,18 +765,18 @@ class Entity():
         new_editor = {}
         for key, value in self.keys.items():
             new_keys[key] = value
-            
+
         for key, value in self._fixup.items():
             new_fixup[key] = (value[0],value[1])
-            
+
         for key, value in self.editor.items():
             if key != 'visgroup':
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
-        
+
         new_solids = [s.copy() for s in self.solids]
         outs = [o.copy() for o in self.outputs]
-        
+
         return Entity(
             map=self.map,
             keys=new_keys,
@@ -786,7 +786,7 @@ class Entity():
             solids=new_solids,
             editor=new_editor,
             hidden=self.hidden)
-        
+
     @staticmethod
     def parse(map, tree_list, hidden=False):
         '''Parse a property tree into an Entity object.'''
@@ -836,28 +836,28 @@ class Entity():
                             editor['visgroup'].append(val)
             else:
                 keys[item.name] = item.value
-                
+
         return Entity(
-            map, 
-            keys=keys, 
+            map,
+            keys=keys,
             id=id,
             solids=solids,
             outputs=outputs,
-            editor=editor, 
-            hidden=hidden, 
+            editor=editor,
+            hidden=hidden,
             fixup=fixup)
-    
+
     def is_brush(self):
         '''Is this Entity a brush entity?'''
         return len(self.solids) > 0
-    
+
     def export(self, buffer, ent_name = 'entity', ind=''):
         '''Generate the strings needed to create this entity.'''
-        
+
         if self.hidden:
             buffer.write(ind + 'hidden\n' + ind + '{\n')
             ind = ind + '\t'
-        
+
         buffer.write(ind + ent_name + '\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -869,61 +869,61 @@ class Entity():
                 buffer.write(ind + '\t"replace' + val[1][1] + '" "$' + val[0] + " " + val[1][0] + '"\n')
         if self.is_brush():
             for s in self.solids:
-                s.export(buffer, ind=ind+'\t')       
+                s.export(buffer, ind=ind+'\t')
         if len(self.outputs) > 0:
             buffer.write(ind + '\tconnections\n')
             buffer.write(ind + '\t{\n')
             for o in self.outputs:
                 o.export(buffer, ind=ind+'\t\t')
             buffer.write(ind + '\t}\n')
-            
+
         buffer.write(ind + '\teditor\n')
         buffer.write(ind + '\t{\n')
         if 'color' in self.editor:
-            buffer.write(ind + '\t\t"color" "' + 
+            buffer.write(ind + '\t\t"color" "' +
                 self.editor['color'] + '"\n')
         if 'groupid' in self.editor:
-            buffer.write(ind + '\t\t"groupid" "' + 
+            buffer.write(ind + '\t\t"groupid" "' +
                 self.editor['groupid'] + '"\n')
         if 'visgroup' in self.editor:
             for id in self.editor['visgroup']:
                 buffer.write(ind + '\t\t"groupid" "' + str(id) + '"\n')
         for key in ('visgroupshown', 'visgroupautoshown'):
             if key in self.editor:
-                buffer.write(ind + '\t\t"' + key + '" "' + 
+                buffer.write(ind + '\t\t"' + key + '" "' +
                     utils.bool_as_int(self.editor[key]) + '"\n')
         for key in ('logicalpos','comments'):
             if key in self.editor:
-                buffer.write(ind + '\t\t"' + key + '" "' + 
+                buffer.write(ind + '\t\t"' + key + '" "' +
                     self.editor[key] + '"\n')
         buffer.write(ind + '\t}\n')
-        
+
         buffer.write(ind + '}\n')
         if self.hidden:
             buffer.write(ind[:-1] + '}\n')
-            
+
     def sides(self):
         '''Iterate through all our brush sides.'''
         if self.is_brush():
             for solid in self.solids:
                 for face in solid:
                     yield face
-            
+
     def add_out(self, output):
         "Add the output to our list."
         self.outputs.append(output)
-        
+
     def remove(self):
-        '''Remove this entity from the map. 
-        
+        '''Remove this entity from the map.
+
         Useful if it is required to delete an entity while looping, as
-        this will still keep the object intact. Ensure any lists are 
+        this will still keep the object intact. Ensure any lists are
         also deleted so the object will be garbage-collected.
         '''
         self.map.entities.remove(self)
         if self.id in self.map.ent_id:
             self.map.ent_id.remove(self.id)
-        
+
     def __str__(self):
         '''Dump a user-friendly representation of the entity.'''
         st ="<Entity>: \n{\n"
@@ -934,10 +934,10 @@ class Entity():
             st+='\t' + str(out) +'\n'
         st += "}\n"
         return st
-        
+
     def __getitem__(self, key, default = None):
         '''Allow using [] syntax to search for keyvalues.
-        
+
         - This will return None instead of KeyError if the value is not found.
         - It ignores case-matching, but will use the first given version of a key.
         - If used via Entity.get() the default argument is available.
@@ -952,10 +952,10 @@ class Entity():
                 return self.keys[k]
         else:
             return default
-            
+
     def __setitem__(self, key, val):
         '''Allow using [] syntax to save a keyvalue.
-        
+
         - It is case-insensitive, so it will overwrite a key which only differs by case
         '''
         key_fold = key.casefold()
@@ -966,25 +966,25 @@ class Entity():
                 break
         else:
             self.keys[key] = val
-        
+
     def __delitem__(self, key):
         key = key.casefold()
         for k in self.keys:
             if k.casefold() == key:
                 del self.keys[k]
                 break
-            
+
     def get_fixup(self, var, default=None):
         '''Get the value of an instance $replace variable.'''
         if var in self._fixup:
             return self._fixup[var][0] # don't return the index
         else:
             return default
-            
+
     def has_fixup(self, var):
         '''Determine if this instance has the named $replace variable.'''
         return var in self._fixup
-     
+
     def set_fixup(self, var, val):
         '''Set the value of an instance $replace variable, creating it if needed.'''
         if var not in self._fixup:
@@ -999,14 +999,14 @@ class Entity():
             self._fixup[var] = (val, max)
         else:
             self._fixup[var] = (val, self._fixup[var][1])
-            
+
     def rem_fixup(self, var):
         '''Delete a instance $replace variable.'''
         if var in self._fixup:
             del self._fixup[var]
-            
+
     get = __getitem__
-            
+
     def has_key(self, key):
         '''Determine if a value exists for the given key.'''
         key = key.casefold()
@@ -1015,12 +1015,12 @@ class Entity():
                 return True
         else:
             return False
-        
+
     def __del__(self):
         '''Forget this entity's ID when the object is destroyed.'''
         if self.id in self.map.ent_id:
             self.map.ent_id.remove(self.id)
-        
+
     def get_bbox(self):
         '''Get two vectors representing the space this entity takes up.'''
         if self.is_brush():
@@ -1034,7 +1034,7 @@ class Entity():
             origin = self.get_origin()
             # the bounding box is 0x0 large for a point ent basically
             return origin, origin.copy()
-        
+
     def get_origin(self):
         '''Return a vector representing the center of this entity's brushes.'''
         if self.is_brush():
@@ -1042,11 +1042,11 @@ class Entity():
             return (bbox_min+bbox_max)/2
         else:
             return Vec(self['origin'].split(" "))
-        
+
 class Output:
     '''An output from one entity pointing to another.'''
-    __slots__ = ('output', 'inst_out', 'target', 
-                 'input', 'inst_in', 'params', 'delay', 
+    __slots__ = ('output', 'inst_out', 'target',
+                 'input', 'inst_in', 'params', 'delay',
                  'times', 'sep')
     def __init__(self,
                  out,
@@ -1064,10 +1064,10 @@ class Output:
         self.input = inp
         self.inst_in = inst_in
         self.params = param
-        self.delay = delay 
+        self.delay = delay
         self.times = times
         self.sep = ',' if comma_sep else chr(27)
-    
+
     @staticmethod
     def parse(prop):
         "Convert the VMF Property into an Output object."
@@ -1085,7 +1085,7 @@ class Output:
             else:
                 inst_out = None
                 out = prop.name
-                
+
             if vals[1].startswith('instance:'):
                 inp = vals[1].split(';')
                 inst_inp = inp[0][9:]
@@ -1094,38 +1094,38 @@ class Output:
                 inst_inp = None
                 inp = vals[1]
             return Output(
-                out, 
-                vals[0], 
-                inp, 
-                param = vals[2], 
-                delay = float(vals[3]), 
-                times=int(vals[4]), 
-                inst_out = inst_out, 
-                inst_in = inst_inp, 
+                out,
+                vals[0],
+                inp,
+                param = vals[2],
+                delay = float(vals[3]),
+                times=int(vals[4]),
+                inst_out = inst_out,
+                inst_in = inst_inp,
                 comma_sep = sep)
-                
+
     def exp_out(self):
         if self.inst_out:
             return 'instance:' + self.inst_out + ';' + self.output
         else:
             return self.output
-            
+
     def exp_in(self):
         if self.inst_in:
             return 'instance:' + self.inst_in + ';' + self.input
         else:
             return self.input
-            
+
     def __str__(self):
         '''Generate a user-friendly representation of this output.'''
         st = "<Output> "
         if self.inst_out:
-            st += self.inst_out + ":" 
+            st += self.inst_out + ":"
         st += self.output + " -> " + self.target
         if self.inst_in:
             st += "-" + self.inst_in
         st += " -> " + self.input
-        
+
         if self.params and not self.inst_in:
             st += " (" + self.params + ")"
         if self.delay != 0:
@@ -1134,33 +1134,33 @@ class Output:
             st += " (once" if self.times==1 else (" (" + str(self.times) + " times")
             st += " only)"
         return st
-        
+
     def export(self, buffer, ind = ''):
         '''Generate the text required to define this output in the VMF.'''
         buffer.write(ind + '"' + self.exp_out())
-        
+
         if self.inst_in:
             params = self.params
             inp = 'instance:' + self.inst_in + ';' + self.input
         else:
             inp = self.input
             params = self.params
-            
+
         buffer.write('" "' + self.sep.join(
         (self.target, inp, self.params, str(self.delay), str(self.times))) + '"\n')
-        
+
     def copy(self):
         '''Duplicate this output object.'''
         return Outputs(
-            self.output, 
-            self.target, 
-            self.input, 
-            param=self.params, 
+            self.output,
+            self.target,
+            self.input,
+            param=self.params,
             times=self.times,
             inst_out=self.inst_out,
             inst_in=self.inst_in,
             comma_sep = (self.sep == ','))
-        
+
 if __name__ == '__main__':
     print('parsing...')
     map = VMF.parse('test.vmf')
