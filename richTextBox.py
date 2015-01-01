@@ -10,7 +10,8 @@ class tkRichText(Text):
      - "line" : standard line, with carriage return after.
      - "bullet" : indented with a bullet at the beginning
      - "list" : indented with "1. " at the beggining, the number increasing
-     - "hrule" : A horizontal line. This ignores the text part.
+     - "break" : A carriage return. This ignores the text part."
+     - "rule" : A horizontal line. This ignores the text part.
     '''
     def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
         super().__init__(parent, width=width, height=height, wrap="word", font=font)
@@ -45,7 +46,7 @@ class tkRichText(Text):
                 elif lineType == "rule":
                     self.insert("end", " \n", "hrule")
                     # Horizontal rules are created by applying a tag to a space + newline (which affects the whole line)
-                    # It decreases the text size (to shrink it vertically, and gives a border
+                    # It decreases the text size (to shrink it vertically), and gives a border
                 else:
                     print('Unknown description type "' + lineType + '"!')
             self.delete(self.index(END)+"-1char", "end") # delete the trailing newline

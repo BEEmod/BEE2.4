@@ -18,8 +18,10 @@ except Exception:
         
         No sounds will be played.
         '''
+    initiallised = False
 else:
     # Succeeded
+    initiallised = True
     sounds = {
         'select':'rollover',
         'add':'increment',
