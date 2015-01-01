@@ -402,7 +402,7 @@ def check_glob_conditions():
 
 def get_cond_flag(name, flag, inst):
     '''Determine the result of a condition flag.
-
+    
     '''
     if name == 'and':
         for sub_flag in flag:
@@ -439,7 +439,7 @@ def get_cond_flag(name, flag, inst):
 
 def satisfy_condition(cond, inst):
     '''Try to satisfy this condition.
-
+    
     This may delete the condition from the settings list, so iterate using a copy only.
     '''
     sat = False
@@ -1094,7 +1094,7 @@ def change_func_brush():
 
 def make_static_pan(ent, type):
     '''Convert a regular panel into a static version
-
+    
     This is done to save entities and improve lighting.'''
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
@@ -1113,7 +1113,7 @@ def make_static_pan(ent, type):
 
 def make_static_pist(ent):
     '''Convert a regular piston into a static version.
-
+    
     This is done to save entities and improve lighting.'''
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
@@ -1276,7 +1276,7 @@ def fix_inst():
 
 def death_fizzler_change(inst, trig):
     '''Convert the passed fizzler brush into the required brushes for Death Fizzlers.
-
+    
     The Death Fizzler has 4 brushes:
       - new_trig: trigger_portal_cleanser with standard fizzler texture
         for fizzler-only mode (-fizz_blue)

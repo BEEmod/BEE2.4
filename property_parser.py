@@ -36,7 +36,7 @@ _NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given 
 
 class KeyValError(Exception):
     '''An error that occured when parsing a Valve KeyValues file.
-
+    
     mess = The error message that occured.
     file = The filename passed to Property.parse(), if it exists
     line_num = The line where the error occured.
@@ -49,7 +49,7 @@ class KeyValError(Exception):
 
     def __str__(self):
         '''Generate the complete error message.
-
+        
         This includes the line number and file, if avalible.
         '''
         mess = self.mess
@@ -65,7 +65,7 @@ class KeyValError(Exception):
 
 class NoKeyError(Exception):
     '''Raised if a key is not found when searching from find_key().
-
+    
     key = The missing key that was asked for.
     '''
     def __init__(self, key):
@@ -191,7 +191,7 @@ class Property:
 
     def find_all(self, *keys) -> "Generator for matching Property objects":
         '''Search through a tree to obtain all properties that match a particular path.
-
+        
         '''
         depth = len(keys)
         if depth == 0:
@@ -209,7 +209,7 @@ class Property:
 
     def find_key(self, key, def_=_NO_KEY_FOUND) -> "Property":
         '''Obtain the value of the child Property with a given name.
-
+        
         - If no child is found with the given name, this will return the
           default value, or raise NoKeyError if none is provided.
         - This prefers keys located closer to the end of the value list.
@@ -226,7 +226,7 @@ class Property:
 
     def set_key(self, path, value):
         '''Set the value of a key deep in the tree hierachy.
-
+        
         -If any of the hierachy do not exist (or do not have children),
           blank properties will be added automatically
         - path should be a tuple of names, or a single string.
@@ -266,7 +266,7 @@ class Property:
 
     def as_dict(self):
         '''Convert this property tree into a tree of dictionaries.
-
+        
         This keeps only the last if multiple items have the same name.
         '''
         if self.has_children():
@@ -324,7 +324,7 @@ class Property:
 
     def __len__(self):
         '''Determine the number of child properties.
-
+        
         Singluar Properties have a length of 1.
         Invalid properties have a length of 0.
         '''
@@ -345,7 +345,7 @@ class Property:
 
     def __contains__(self, key):
         '''Check to see if a name is present in the children.
-
+        
         If the Property has no children, this checks if the names match instead.
         '''
         key = key.casefold()
@@ -359,7 +359,7 @@ class Property:
 
     def __getitem__(self, index):
         '''Allow indexing the children directly.
-
+        
         - If given an index or slice, it will search by position.
         - If given a string, it will find the last Property with that name.
           (Default can be chosen by passing a 2-tuple like Prop[key, default])
@@ -385,7 +385,7 @@ class Property:
 
     def __setitem__(self, index, value):
         '''Allow setting the values of the children directly.
-
+        
         - If given an index or slice, it will search by position.
         - If given a string, it will set the last Property with that name.
         - If none are found, it appends the value to the tree.
@@ -405,7 +405,7 @@ class Property:
 
     def __delitem__(self, index):
         '''Delete the given property index.
-
+        
         - If given an integer, it will delete by position.
         - If given a string, it will delete the last Property with that name.
         - If the Property has no children, it will blank the value instead.
@@ -423,7 +423,7 @@ class Property:
 
     def __add__(self, other):
         '''Allow appending other properties to this one.
-
+        
         This deep-copies the Property tree first.
         Works with either a sequence of Properties or a single Property.
         '''
@@ -444,7 +444,7 @@ class Property:
 
     def __iadd__(self, other):
         '''Allow appending other properties to this one.
-
+        
         This is the += op, where it does not copy the object.
         '''
         if self.has_children():
@@ -464,7 +464,7 @@ class Property:
 
     def merge_children(self, *names):
         '''Merge together any children of ours with the given names.
-
+        
         After execution, this tree will have only one sub-Property for
         each of the given names. This ignores leaf Properties.
         '''

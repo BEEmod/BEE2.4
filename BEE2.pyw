@@ -42,7 +42,7 @@ print('Done!')
 
 print('Loading Palettes...')
 UI.load_palette(
-    paletteLoader.loadAll(settings['Directories']['palette']),
+    paletteLoader.load_palettes(settings['Directories']['palette']),
     )
 print('Done!')
 
@@ -50,5 +50,5 @@ print('Initialising UI...')
 UI.initMain() # create all windows
 print('Done!')
 
-loadScreen.quit()
+loadScreen.close_window()
 UI.event_loop()

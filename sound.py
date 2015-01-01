@@ -1,39 +1,50 @@
-try:
-    import pygame # using this for audio
-    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024) # buffer must be power of 2, higher means less choppy audio but a longer time to start
-    initiallised = True
-except Exception:
-    initiallised = False
+'''
+This module provides a wrapper around PyGame, in order to play sounds easily.
+To use, call sound.fx() with one of the dict keys.
+If PyGame fails to load, all fx() calls will fail silently.
+(Sounds are not critical to the app, so they just won't play.)
+'''
 muted = False
 
-if initiallised:
+try:
+    import pygame
+    # buffer must be power of 2, higher means less choppy audio but
+    # higher latency between play() and the sound actually playing.
+    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
+except Exception:
+    print('ERROR:SOUNDS NOT INITIALISED!')
+    def fx(*args):
+        '''Pygame has failed to initialise!
+        
+        No sounds will be played.
+        '''
+else:
+    # Succeeded
     sounds = {
-              'select'     : pygame.mixer.Sound(file='sounds/rollover.wav'),
-              'add'        : pygame.mixer.Sound(file='sounds/increment.wav'),
-              'config'     : pygame.mixer.Sound(file='sounds/reconfig.wav'),
-              'subtract'   : pygame.mixer.Sound(file='sounds/decrement.wav'),
-              'connect'    : pygame.mixer.Sound(file='sounds/connection_made.wav'),
-              'disconnect' : pygame.mixer.Sound(file='sounds/connection_destroyed.wav'),
-              'expand'     : pygame.mixer.Sound(file='sounds/extrude.wav'),
-              'delete'     : pygame.mixer.Sound(file='sounds/collapse.wav'),
-              'error'     : pygame.mixer.Sound(file='sounds/error.wav'),
-              'contract'   : pygame.mixer.Sound(file='sounds/carve.wav'),
-              'raise_1'   : pygame.mixer.Sound(file='sounds/panel_raise_01.wav'),
-              'raise_2'   : pygame.mixer.Sound(file='sounds/panel_raise_02.wav'),
-              'raise_3'   : pygame.mixer.Sound(file='sounds/panel_raise_03.wav'),
-              'lower_1'   : pygame.mixer.Sound(file='sounds/panel_lower_01.wav'),
-              'lower_2'   : pygame.mixer.Sound(file='sounds/panel_lower_02.wav'),
-              'lower_3'   : pygame.mixer.Sound(file='sounds/panel_lower_03.wav'),
-              'move'      : pygame.mixer.Sound(file='sounds/reconfig.wav'),
-              'swap'      : pygame.mixer.Sound(file='sounds/extrude.wav'),
-             }
-         
+        'select':'rollover',
+        'add':'increment',
+        'config':'reconfig',
+        'subtract':'decrement',
+        'connect':'connection_made',
+        'disconnect':'connection_destroyed',
+        'expand':'extrude',
+        'delete':'collapse',
+        'error':'error',
+        'contract':'carve',
+        'raise_1':'panel_raise_01',
+        'raise_2':'panel_raise_02',
+        'raise_3':'panel_raise_03',
+        'lower_1':'panel_lower_01',
+        'lower_2':'panel_lower_02',
+        'lower_3':'panel_lower_03',
+        'move':'reconfig',
+        'swap':'extrude',
+        }
+
+    for key in sounds:
+        sounds[key] = pygame.mixer.Sound('sounds/' + sounds[key] + '.wav')
+
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
-        # If we ever want to use a different library for sounds, just edit this, all sound calls should route through here.
         if not muted and name in sounds:
             sounds[name].play()
-else:
-    def fx(name, e=None):
-        '''Pygame has failed to initialise, we just won't play any sounds!'''
-        pass
