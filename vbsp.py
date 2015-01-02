@@ -128,9 +128,14 @@ DEFAULTS = {
     "clump_number"            : "6",
     "music_instance"          : "",
     "music_soundscript"       : "",
+    # default to the origin of the elevator instance
+    # That's likely to be enclosed
     "music_location_sp"       : "-2000 2000 0",
     "music_location_coop"     : "-2000 -2000 0",
-    "music_id"                : "<NONE>"
+    "music_id"                : "<NONE>",
+    "global_pti_ents"         : "",
+    #default pos is next to arivial_departure_ents
+    "global_pti_ents_loc"     : "-2304 -2688 -64",
     }
 
 # These instances have to be specially handled / we want to identify them
@@ -295,7 +300,7 @@ def load_settings():
         'scanline' : deathfield['scanline', settings['fizzler']['scanline']],
         }
 
-    for stylevar_block in conf.find_all('stylevar'):
+    for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = var.value
 
@@ -970,7 +975,7 @@ def change_overlays():
                     'origin': over['origin'],
                     'angles': over['angles', '0 0 0'],
                     'file': sign_inst,
-                })
+                    })
                 new_inst.set_fixup('mat', sign_type.replace('overlay.', ''))
                 map.add_ent(new_inst)
                 for cond in settings['conditions'][:]:
@@ -1006,8 +1011,8 @@ def change_trig():
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
-def add_music():
-    '''Add the music ambient_generic or instance, if needed.'''
+def add_extra_ents():
+    '''Add the various extra instances to the map.'''
     utils.con_log("Adding Music...")
     if game_mode == "COOP":
         loc = get_opt('music_location_coop')
@@ -1024,7 +1029,7 @@ def add_music():
             'origin': loc,
             'message': sound,
             'health': '10', # Volume
-        }))
+            }))
 
     if inst != '':
         map.add_ent(VLib.Entity(map, keys={
@@ -1033,8 +1038,26 @@ def add_music():
             'angles': '0 0 0',
             'origin': loc,
             'file': inst,
-            'fixup_type': '0',
-        }))
+            'fixup_style': '0',
+            }))
+    pti_file = get_opt("global_pti_ents")
+    pti_loc = get_opt("global_pti_ents_loc")
+    if pti_file != '':
+        utils.con_log('Adding Global PTI Ents')
+        global_pti_ents = VLib.Entity(map, keys={
+            'classname': 'func_instance',
+            'targetname': 'global_pti_ents',
+            'angles': '0 0 0',
+            'origin': pti_loc,
+            'file': pti_file,
+            'fixup_style': '0',
+            })
+        has_cave = settings['style_vars'].get('multiversecave', '1') == '1'
+        global_pti_ents.set_fixup(
+            'disable_pti_audio', 
+            utils.bool_as_int(not has_cave),
+            )
+        map.add_ent(global_pti_ents)
 
 def change_func_brush():
     "Edit func_brushes."
@@ -1545,8 +1568,8 @@ for i, a in enumerate(new_args):
     fixed_a = os.path.normpath(a)
     if "sdk_content\\maps\\" in fixed_a:
         new_args[i] = fixed_a.replace(
-            r'sdk_content\maps\\',
-            r'sdk_content\maps\styled\\',
+            'sdk_content\\maps\\',
+            'sdk_content\\maps\styled\\',
             1,
             )
         new_path = new_args[i]
@@ -1592,7 +1615,7 @@ else:
 
     check_glob_conditions()
     fix_inst()
-    add_music()
+    add_extra_ents()
     change_ents()
     change_brush()
     change_overlays()

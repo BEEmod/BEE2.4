@@ -976,6 +976,8 @@ class Entity():
 
     def get_fixup(self, var, default=None):
         '''Get the value of an instance $replace variable.'''
+        if var[0] == '$':
+            var = var[1:]
         if var in self._fixup:
             return self._fixup[var][0] # don't return the index
         else:
@@ -987,6 +989,8 @@ class Entity():
 
     def set_fixup(self, var, val):
         '''Set the value of an instance $replace variable, creating it if needed.'''
+        if var[0] == '$':
+            var = var[1:]
         if var not in self._fixup:
             max = 1
             for i in self._fixup.values():
@@ -1002,6 +1006,8 @@ class Entity():
 
     def rem_fixup(self, var):
         '''Delete a instance $replace variable.'''
+        if var[0] == '$':
+            var = var[1:]
         if var in self._fixup:
             del self._fixup[var]
 
