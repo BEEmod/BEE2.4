@@ -20,14 +20,17 @@ import sound as snd
 import itemPropWin
 import utils
 
-# Holds the Labels for the 5 possible subitems
-wid_sub = [0,0,0,0,0]
-# Holds the 5 sprite labels
-wid_spr = [0,0,0,0,0]
+wid = {
+    'subitem': [0,0,0,0,0],
+    # Holds the 5 sprite labels
+    'sprite': [0,0,0,0,0],
+    }
 
 selected_item = None
 selected_sub_item = None
 is_open = False
+
+version_lookup = []
 
 SUBITEM_POS = {
 # Positions of subitems depending on the number of subitems that exist
@@ -62,7 +65,7 @@ def pos_for_item():
 
 def showItemProps():
     snd.fx('expand')
-    itemPropWin.open(selected_item.get_properties(), wid_changedefaults, selected_sub_item.name)
+    itemPropWin.open(selected_item.get_properties(), wid['changedefaults'], selected_sub_item.name)
     
 def hideItemProps(vals):
     snd.fx('contract')
@@ -93,22 +96,45 @@ def sub_open(ind, e=None):
 def showMoreInfo():
     url = selected_item.url
     if url is not None:
+        OPEN_IN_TAB = 2
         try:
-            webbrowser.open(url, new=2, autoraise=True) # 2 = open in tab if possible
+            webbrowser.open(url, new=OPEN_IN_TAB, autoraise=True)
         except webbrowser.Error:
-            if messagebox.askyesno(icon="error", title="BEE2 - Error", message="Failed to open a web browser. Do you wish for the URL to be copied to the clipboard instead?", detail="'" + str(url) + "'", parent=prop_window):
-                print("saving " +url+ "to clipboard")
+            if messagebox.askyesno(
+                    icon="error", 
+                    title="BEE2 - Error", 
+                    message='Failed to open a web browser. Do you wish for '
+                            'the URL to be copied to the clipboard instead?',
+                    detail="'" + str(url) + "'", 
+                    parent=prop_window
+                    ):
+                print("Saving " +url+ "to clipboard!")
                 root.clipboard_clear()
                 root.clipboard_append(url)
-        hideProps(None) # either the webbrowser or the messagebox could cause the properties to move behind the main window, so hide it so it doesn't appear there
+        # Either the webbrowser or the messagebox could cause the
+        # properties to move behind the main window, so hide it 
+        # so it doesn't appear there.
+        hideProps(None) 
         
 def moreInfo_showURL(e):
     if selected_item.url is not None:
-        moreinfo_lbl['text'] = selected_item.url
+        wid['moreinfo_context']['text'] = selected_item.url
         moreinfo_win.deiconify()
         moreinfo_win.update_idletasks()
-        x = wid_moreinfo.winfo_rootx() - (moreinfo_win.winfo_reqwidth() - wid_moreinfo.winfo_reqwidth()) // 2
-        y = wid_moreinfo.winfo_rooty() + wid_moreinfo.winfo_reqheight()
+        moreinfo_win.lift()
+        
+        # Center vertically below the button
+        x = (
+            wid['moreinfo'].winfo_rootx() -
+            (
+                moreinfo_win.winfo_reqwidth() 
+                - wid['moreinfo'].winfo_reqwidth()
+                ) // 2
+            )
+        y = (
+            wid['moreinfo'].winfo_rooty()
+            + wid['moreinfo'].winfo_reqheight()
+            )
         moreinfo_win.geometry('+' + str(x) + '+' + str(y))
     
 def moreInfo_hideURL(e):
@@ -120,7 +146,7 @@ def open_event(e):
     snd.fx('expand')
     showProps(wid)
         
-def showProps(wid, warp_cursor=False):
+def showProps(widget, warp_cursor=False):
     '''Show the properties window for an item.
     
     wid should be the UI.PalItem widget that represents the item.
@@ -135,18 +161,18 @@ def showProps(wid, warp_cursor=False):
         off_x, off_y = None, None
     prop_window.deiconify()
     prop_window.lift(root)
-    selected_item = wid.item
-    selected_sub_item = wid
+    selected_item = widget.item
+    selected_sub_item = widget
     is_open = True
         
-    icon_widget = wid_sub[pos_for_item()]
+    icon_widget = wid['subitem'][pos_for_item()]
     
     #Calculate the pixel offset between the window and the subitem in
     # the properties dialog, and shift if needed to keep it inside the
     # window
     loc_x, loc_y = utils.adjust_inside_screen(
-        x=wid.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx(),
-        y=wid.winfo_rooty() + prop_window.winfo_rooty() - icon_widget.winfo_rooty(),
+        x=widget.winfo_rootx() + prop_window.winfo_rootx() - icon_widget.winfo_rootx(),
+        y=widget.winfo_rooty() + prop_window.winfo_rooty() - icon_widget.winfo_rooty(),
         win=prop_window,
         )
     
@@ -161,51 +187,66 @@ def showProps(wid, warp_cursor=False):
     load_item_data()
 
 def set_item_version(e=None):
-    selected_item.change_version(wid_variant.current())
+    selected_item.change_version(wid['variant'].current())
     load_item_data()
             
 def load_item_data():
     '''Refresh the window to use the selected item's data.'''
+    global version_lookup
     item_data = selected_item.data
     
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid_sub[ind]['image'] = png.loadPng('BEE2/alpha_64')
+            wid['subitem'][ind]['image'] = png.loadPng('BEE2/alpha_64')
         else:
-            wid_sub[ind]['image'] = selected_item.get_icon(pos)
-        wid_sub[ind]['relief'] = 'flat'
+            wid['subitem'][ind]['image'] = selected_item.get_icon(pos)
+        wid['subitem'][ind]['relief'] = 'flat'
     
-    wid_sub[pos_for_item()]['relief'] = 'raised'
+    wid['subitem'][pos_for_item()]['relief'] = 'raised'
     
-    wid_author['text'] = ', '.join(item_data['auth'])
-    wid_name['text'] = selected_sub_item.name
-    wid_ent_count['text'] = item_data['ent']
+    wid['author']['text'] = ', '.join(item_data['auth'])
+    wid['name']['text'] = selected_sub_item.name
+    wid['ent_count']['text'] = item_data['ent']
     
-    wid_desc.set_text(item_data['desc'])
+    wid['desc'].set_text(item_data['desc'])
     
     if itemPropWin.can_edit(selected_item.properties()):
-        wid_changedefaults.state(['!disabled'])
+        wid['changedefaults'].state(['!disabled'])
     else:
-        wid_changedefaults.state(['disabled'])
+        wid['changedefaults'].state(['disabled'])
     
-    if len(selected_item.item.versions) == 1:
-        wid_variant.state(['disabled'])
-        wid_variant['values'] = ['']
-        wid_variant.current(0)
+    if selected_item.is_beta and selected_item.is_dep:
+        wid['beta_dep']['text'] = 'Beta, Deprecated Item!'
+    elif selected_item.is_beta:
+        wid['beta_dep']['text'] = 'Beta Item!'
+    elif selected_item.is_dep:
+        wid['beta_dep']['text'] = 'Deprecated Item!'
     else:
-        wid_variant.state(['!disabled'])
-        version_names = [(('[DEP] ' if ver['is_dep'] else '') +
-                          ('[BETA] ' if ver['is_beta'] else '') +
-                          ver['name']) for ver in 
-                         selected_item.item.versions
-                        ]
-        wid_variant['values'] = version_names
-        wid_variant.current(selected_item.ver)
+        wid['beta_dep']['text'] = None
+        
+    version_lookup, version_names = selected_item.get_version_names()
+    if len(version_names) <= 1:
+        # There aren't any alternates to choose from, disable the box
+        wid['variant'].state(['disabled'])
+        # We want to display Beta / Dep tags still, so users know.
+        if selected_item.is_beta and selected_item.is_dep:
+            wid['variant']['values'] = ['[BETA] [DEP] No Alts!']
+        elif selected_item.is_beta:
+            wid['variant']['values'] = ['[BETA] No Alt Versions!']
+        elif selected_item.is_dep:
+            wid['variant']['values'] = ['[DEP] No Alt Versions!']
+        else:
+            wid['variant']['values'] = ['No Alternate Versions!']
+        wid['variant'].current(0)
+    else:
+        wid['variant'].state(['!disabled'])
+        wid['variant']['values'] = version_names
+        wid['variant'].current(version_lookup.index(selected_item.ver))
     
     if selected_item.url is None:
-        wid_moreinfo.state(['disabled'])
+        wid['moreinfo'].state(['disabled'])
     else:
-        wid_moreinfo.state(['!disabled'])
+        wid['moreinfo'].state(['!disabled'])
     editor_data = item_data['editor']
     has_inputs = False
     has_polarity = False
@@ -232,29 +273,29 @@ def load_item_data():
     surf_ceil = "ceiling" in facing_type
 
     is_embed = any(editor_data.find_all("Exporting", "EmbeddedVoxels"))
-            
+
     if has_inputs:
         if has_polarity:
-            wid_spr[0]['image'] = png.loadSpr('in_polarity')
+            wid['sprite'][0]['image'] = png.loadSpr('in_polarity')
         else:
-            wid_spr[0]['image'] = png.loadSpr('in_norm')
+            wid['sprite'][0]['image'] = png.loadSpr('in_norm')
     else:
-        wid_spr[0]['image'] = png.loadSpr('in_none')
+        wid['sprite'][0]['image'] = png.loadSpr('in_none')
     
     if has_outputs:
         if has_timer:
-            wid_spr[1]['image'] = png.loadSpr('out_tim')
+            wid['sprite'][1]['image'] = png.loadSpr('out_tim')
         else:
-            wid_spr[1]['image'] = png.loadSpr('out_norm')
+            wid['sprite'][1]['image'] = png.loadSpr('out_norm')
     else:
-        wid_spr[1]['image'] = png.loadSpr('out_none')
+        wid['sprite'][1]['image'] = png.loadSpr('out_none')
         
-    wid_spr[2]['image'] = png.loadSpr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
+    wid['sprite'][2]['image'] = png.loadSpr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
          
     if is_embed:
-        wid_spr[3]['image'] = png.loadSpr('space_embed')
+        wid['sprite'][3]['image'] = png.loadSpr('space_embed')
     else:
-        wid_spr[3]['image'] = png.loadSpr('space_none')
+        wid['sprite'][3]['image'] = png.loadSpr('space_none')
        
     face_spr = "surf"
     if not surf_wall:
@@ -265,7 +306,7 @@ def load_item_data():
         face_spr += "_ceil"
     if face_spr == "surf":
         face_spr += "_none"
-    wid_spr[4]['image'] = png.loadSpr(face_spr)
+    wid['sprite'][4]['image'] = png.loadSpr(face_spr)
     
 def follow_main(e=None):
     '''Move the properties window to keep a relative offset to the main window.'''
@@ -282,7 +323,7 @@ def hideProps(e=None):
 
 def init(win):
     '''Initiallise all the window components.'''
-    global root, prop_window, wid_name, wid_ent_count, wid_author, sub_frame, wid_desc, wid_moreinfo, wid_variant, wid_changedefaults, moreinfo_win, moreinfo_lbl
+    global root, prop_window, wid, moreinfo_win
     root = win
     prop_window=Toplevel(root)
     prop_window.overrideredirect(1) # this prevents stuff like the title bar, normal borders etc from appearing in this window.
@@ -297,46 +338,52 @@ def init(win):
     f.grid(row=0, column=0)
 
     ttk.Label(f, text="Properties:", anchor="center").grid(row=0, column=0, columnspan=3, sticky="EW")
-    entSpr=png.loadSpr('gear_ent')
 
-    wid_name=ttk.Label(f, text="", anchor="center")
-    wid_name.grid(row=1, column=0, columnspan=3, sticky="EW")
+    wid['name']=ttk.Label(f, text="", anchor="center")
+    wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
 
-    wid_ent_count=ttk.Label(f, text="2", anchor="e", compound="left", image=entSpr)
-    wid_ent_count.img=entSpr
-    wid_ent_count.grid(row=0, column=2, rowspan=2, sticky=E)
+    wid['ent_count']=ttk.Label(f, text="2", anchor="e", compound="left", image=png.loadSpr('gear_ent'))
+    wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
 
-    wid_author=ttk.Label(f, text="", anchor="center", relief="sunken")
-    wid_author.grid(row=2, column=0, columnspan=3, sticky="EW")
+    wid['author']=ttk.Label(f, text="", anchor="center", relief="sunken")
+    wid['author'].grid(row=2, column=0, columnspan=3, sticky="EW")
 
     sub_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
-    for i in range(len(wid_sub)):
-        wid_sub[i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/alpha_64'))
-        wid_sub[i].grid(row=0, column=i)
-        wid_sub[i].bind('<Button-1>', func_partial(sub_sel, i))
-        wid_sub[i].bind('<Button-3>', func_partial(sub_open, i))
-        wid_sub[i].bind('<Enter>', func_partial(sub_sel_enter, i))
+    for i, _ in enumerate(wid['subitem']):
+        wid['subitem'][i]=ttk.Label(sub_frame, image=png.loadPng('BEE2/alpha_64'))
+        wid['subitem'][i].grid(row=0, column=i)
+        wid['subitem'][i].bind('<Button-1>', func_partial(sub_sel, i))
+        wid['subitem'][i].bind('<Button-3>', func_partial(sub_open, i))
+        wid['subitem'][i].bind('<Enter>', func_partial(sub_sel_enter, i))
+        
+    wid['beta_dep'] = ttk.Label(f, text='', anchor="nw")
+    wid['beta_dep'].grid(row=4, column=0, sticky="NW")
+        
     ttk.Label(f, text="Description:", anchor="sw").grid(row=4, column=0, sticky="SW")
+    
     spr_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
     # sprites: inputs, outputs, rotation handle, occupied/embed state, desiredFacing
     for i in range(5):
         spr=png.loadSpr('ap_grey')
-        wid_spr[i]=ttk.Label(spr_frame, image=spr, relief="raised")
-        wid_spr[i].grid(row=0, column=i)
+        wid['sprite'][i]=ttk.Label(spr_frame, image=spr, relief="raised")
+        wid['sprite'][i].grid(row=0, column=i)
         
     desc_frame=ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
-    wid_desc=tkRichText(desc_frame, width=40, height=8, font=None)
-    wid_desc.grid(row=0, column=0, sticky="EW")
+    
+    wid['desc']=tkRichText(desc_frame, width=40, height=8, font=None)
+    wid['desc'].grid(row=0, column=0, sticky="EW")
 
-    desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=wid_desc.yview)
-    wid_desc['yscrollcommand']=desc_scroll.set
+    desc_scroll=ttk.Scrollbar(desc_frame, orient=VERTICAL, command=wid['desc'].yview)
+    wid['desc']['yscrollcommand']=desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
 
-    wid_moreinfo=ttk.Button(f, text="More Info>>", command=showMoreInfo)
-    wid_moreinfo.grid(row=6, column=2, sticky=E)
+    wid['moreinfo']=ttk.Button(f, text="More Info>>", command=showMoreInfo)
+    wid['moreinfo'].grid(row=6, column=2, sticky=E)
+    wid['moreinfo'].bind('<Enter>', moreInfo_showURL)
+    wid['moreinfo'].bind('<Leave>', moreInfo_hideURL)
     
     moreinfo_win = Toplevel(win)
     moreinfo_win.withdraw()
@@ -344,24 +391,28 @@ def init(win):
     moreinfo_win.overrideredirect(1)
     moreinfo_win.resizable(False, False)
     
-    moreinfo_lbl = ttk.Label(moreinfo_win, text='', relief="groove", font="TkSmallCaptionFont")
-    moreinfo_lbl.grid(row=0, column=0, padx=1, pady=1)
+    wid['moreinfo_context'] = ttk.Label(
+        moreinfo_win,
+        text='',
+        relief="groove", 
+        font="TkSmallCaptionFont",
+        padding=(5, 2),
+        )
+    wid['moreinfo_context'].grid(row=0, column=0)
     
-    wid_moreinfo.bind('<Enter>', moreInfo_showURL)
-    wid_moreinfo.bind('<Leave>', moreInfo_hideURL)
 
     
-    menu_info = Menu(wid_moreinfo)
+    menu_info = Menu(wid['moreinfo'])
     menu_info.add_command(label='', state='disabled')
 
-    wid_changedefaults=ttk.Button(f, text="Change Defaults...", command=showItemProps)
-    wid_changedefaults.grid(row=6, column=1)
+    wid['changedefaults']=ttk.Button(f, text="Change Defaults...", command=showItemProps)
+    wid['changedefaults'].grid(row=6, column=1)
 
-    wid_variant=ttk.Combobox(f, values=['VERSION'], exportselection=0)
-    wid_variant.state(['readonly']) # Prevent directly typing in values
-    wid_variant.bind('<<ComboboxSelected>>', set_item_version)
-    wid_variant.current(0)
-    wid_variant.grid(row=6, column=0, sticky=W)
+    wid['variant']=ttk.Combobox(f, values=['VERSION'], exportselection=0)
+    wid['variant'].state(['readonly']) # Prevent directly typing in values
+    wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
+    wid['variant'].current(0)
+    wid['variant'].grid(row=6, column=0, sticky=W)
     
     itemPropWin.init(root, hideItemProps)
     

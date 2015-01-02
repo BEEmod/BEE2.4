@@ -1,14 +1,13 @@
 from config import ConfigFile
 
-import loadScreen
 import UI
-
-loadScreen.init(UI.win)
-loadScreen.length('UI', 8)
-
+import loadScreen
 import paletteLoader
 import packageLoader
 import gameMan
+
+loadScreen.init(UI.win)
+loadScreen.length('UI', 8)
 
 DEFAULT_SETTINGS = {
     'Directories' : {
