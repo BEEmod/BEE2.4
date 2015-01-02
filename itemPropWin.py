@@ -220,7 +220,7 @@ def init(tk, cback):
     win.protocol("WM_DELETE_WINDOW", exit)
     win.withdraw()
     labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')
-    widgets['saveButton'] = ttk.Button(win, text='Save', command=exit)
+    widgets['saveButton'] = ttk.Button(win, text='Close', command=exit)
     widgets['titleLabel'] = ttk.Label(win, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
