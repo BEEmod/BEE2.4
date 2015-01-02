@@ -222,7 +222,7 @@ def load_item_data():
     elif selected_item.is_dep:
         wid['beta_dep']['text'] = 'Deprecated Item!'
     else:
-        wid['beta_dep']['text'] = None
+        wid['beta_dep']['text'] = ''
         
     version_lookup, version_names = selected_item.get_version_names()
     if len(version_names) <= 1:
