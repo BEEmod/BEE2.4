@@ -25,7 +25,10 @@ settings = ConfigFile('config.cfg')
 settings.set_defaults(DEFAULT_SETTINGS)
 
 UI.load_settings(settings)
-gameMan.load()
+
+# If we have no games, gameMan will quit the app entirely.
+gameMan.load(UI.quit_application, loadScreen.win)
+
 gameMan.set_game_by_name(
     settings.get_val('Last_Selected', 'Game', ''),
     )

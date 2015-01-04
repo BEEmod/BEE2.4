@@ -261,7 +261,7 @@ def save():
         config[gm.name]['Dir'] = gm.root
     config.save()
 
-def load():
+def load(UI_quit_func, loadScreen_window):
     all_games.clear()
     for gm in config:
         if gm != 'DEFAULT':
@@ -269,27 +269,68 @@ def load():
                 all_games.append(Game(gm, int(config[gm]['SteamID']), config[gm]['Dir']))
             except ValueError:
                 pass
+    if len(all_games) == 0:
+        # Hide the loading screen, since it appears on top
+        loadScreen_window.withdraw()
+        
+        # Ask the user for Portal 2's location...
+        if not add_game(refresh_menu=False):
+            # they cancelled, quit
+            UI_quit_func()
+        loadScreen_window.deiconify()
     selected_game = all_games[0]
         
-def add_game(e=None):
+def add_game(e=None, refresh_menu=True):
     '''Ask for, and load in a game to export to.'''
-    messagebox.showinfo(message='Select the folder where the game executable is located (portal2.exe)...', parent=root)
-    exe_loc = filedialog.askopenfilename(title='Find Game Exe', filetypes=[('Executable', '.exe')], initialdir='C:')
+    
+    messagebox.showinfo(
+        message='Select the folder where the game executable is located '
+                '(portal2.exe)...',
+        parent=root,
+        )
+    exe_loc = filedialog.askopenfilename(
+        title='Find Game Exe',
+        filetypes=[('Executable', '.exe')],
+        initialdir='C:',
+        )
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         id, name = find_steam_info(folder)
         if name == "ERR" or id == -1:
-            messagebox.showinfo(message='This does not appear to be a valid game folder!', parent=root, icon=messagebox.ERROR)
-            return
+            messagebox.showinfo(
+                message='This does not appear to be a valid game folder!', 
+                parent=root, 
+                icon=messagebox.ERROR,
+                )
+            return False
         invalid_names = [gm.name for gm in all_games]
-        name = simpledialog.askstring(prompt="Enter the name of this game:", title="BEE2")
+        while True:
+            name = simpledialog.askstring(
+                prompt="Enter the name of this game:", 
+                title="BEE2",
+                )
+            if name in invalid_names:
+                messagebox.showinfo(
+                    icon=messagebox.ERROR, 
+                    parent=root,
+                    message='This name is already taken!',
+                    )
+            elif name == '':
+                messagebox.showinfo(
+                    icon=messagebox.ERROR, 
+                    parent=root,
+                    message='Please enter a name for this game!',
+                    )
+            else:
+                break
             
         new_game = Game(name, id, folder)
         new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
-        add_menu_opts(game_menu)
+        if refresh_menu:
+            add_menu_opts(game_menu)
         save()
-        
+        return True
     
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''

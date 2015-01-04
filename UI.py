@@ -476,14 +476,17 @@ class SubPane(Toplevel):
         # Prevent this until here, so the <config> event won't erase our settings
         self.can_save = True
         
-def on_app_quit():
-    '''Do a last-minute save of our config files.'''
+def quit_application():
+    '''Do a last-minute save of our config files, and quit the app.'''
     gen_opts['win_state']['main_window_x'] = str(win.winfo_rootx())
     gen_opts['win_state']['main_window_y'] = str(win.winfo_rooty())
     
     gen_opts.save_check()
     item_opts.save_check()
+    
+    # Destroy the TK windows
     win.destroy()
+    exit(0)
     
 def set_mute():
     snd.muted = (muted.get()==1)
@@ -1424,7 +1427,7 @@ def initMenuBar(win):
         command=gameMan.remove_game,
         )
     menus['file'].add_separator()
-    menus['file'].add_command(label="Quit", command=on_app_quit)
+    menus['file'].add_command(label="Quit", command=quit_application)
     menus['file'].add_separator()
     
     menus['file'].game_pos = 7 # index for game items
@@ -1462,7 +1465,7 @@ def initMain():
         width=win.winfo_screenwidth(),
         height=win.winfo_screenheight(),
         )
-    win.protocol("WM_DELETE_WINDOW", on_app_quit)
+    win.protocol("WM_DELETE_WINDOW", quit_application)
     win.iconbitmap('BEE2.ico')# set the window icon
     
     UIbg=Frame(win, bg=ItemsBG)
