@@ -11,8 +11,7 @@ from property_parser import Property, KeyValError
 from utils import Vec
 import vmfLib as VLib
 import utils
-
-unique_counter=0 # counter for instances to ensure unique targetnames
+import voiceLine
 
 TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacement keys:
     #"metal/black_floor_metal_001c"       : "black.floor",
@@ -103,7 +102,6 @@ ANTLINES = {
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     } # these need to be handled separately to accommodate the scale-changing
 
-
 DEFAULTS = {
     "bottomless_pit"          : "0",
     "remove_info_lighting"    : "0",
@@ -151,13 +149,15 @@ inst_file = {
     "clearPanel"  : "instances/p2editor/panel_clear.vmf",
     "ambLight"    : "instances/p2editor/point_light.vmf",
     "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf",
-    # although unused, editoritems allows having different instances for toggle/timer panels
+    # although unused, editoritems allows having different instances 
+    # for toggle/timer panels
     "indPanCheck" : "instances/p2editor/indicator_panel.vmf",
     "indPanTimer" : "instances/p2editor/indicator_panel.vmf",
     "glass"       : "instances/p2editor/glass_128x128.vmf"
 }
-
-fizzler_angle_fix = { # angles needed to ensure fizzlers are not upsidown (key=original, val=fixed)
+# angles needed to ensure fizzlers are not upside-down 
+# (key=original, val=fixed)
+fizzler_angle_fix = {
     "0 0 -90"   : "0 180 90",
     "0 0 180"   : "0 180 180",
     "0 90 0"    : "0 -90 0",
@@ -181,6 +181,7 @@ FIZZ_OPTIONS = {
     "scanline"       : "0",
     }
 
+# Configuration data extracted from VBSP_config
 settings = {
             "textures"           : {},
             "fizzler"            : {},
@@ -193,17 +194,17 @@ settings = {
 
             "cust_fizzlers"      : [],
             "conditions"         : [],
+            "voice_data_sp"      : Property("Quotes_SP", []),
+            "voice_data_coop"    : Property("Quotes_COOP", []),
            }
 
 # A list of sucessful AddGlobal commands, so we can prevent adding the same instance twice.
 global_instances = []
 
 
-game_mode = 'ERR'
-is_preview = 'ERR'
-
 ###### UTIL functions #####
 
+unique_counter = 0 # counter for instances to ensure unique targetnames
 def unique_id():
     "Return a unique prefix so we ensure instances don't overlap if making them."
     global unique_counter
@@ -299,6 +300,12 @@ def load_settings():
         'texwidth' : VLib.conv_int(deathfield['texwidth', '_'], 512),
         'scanline' : deathfield['scanline', settings['fizzler']['scanline']],
         }
+        
+    for quote_block in conf.find_all("quotes_sp"):
+        settings['voice_data_sp'] += quote_block.value
+        
+    for quote_block in conf.find_all("quotes_coop"):
+        settings['voice_data_coop'] += quote_block.value
 
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
@@ -307,6 +314,7 @@ def load_settings():
     for pack_block in conf.find_all('packer'):
         for pack_cmd in pack_block:
             process_packer(pack_cmd.value)
+            
     for cond in conf.find_all('conditions', 'condition'):
         flags = []
         for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue",
@@ -342,29 +350,93 @@ def load_map(path):
     with open(path, "r") as file:
         utils.con_log("Parsing Map...")
         props = Property.parse(file, path)
-    print('File = ', file)
+    file.close()
     map=VLib.VMF.parse(props)
     utils.con_log("Parsing complete!")
-
-def check_glob_conditions():
-    "Check all the global conditions, like style vars."
-    global game_mode, is_preview
-    utils.con_log("Checking global conditions...")
-
+    
+def add_voice(voice_timer_pos, mode):
+    inst_loc = {}
+    print(mode)
+    if mode == 'COOP':
+        utils.con_log('Adding Coop voice lines!')
+        data = settings['voice_data_coop']
+    elif mode == 'SP':
+        utils.con_log('Adding Singleplayer voice lines!')
+        data = settings['voice_data_sp']
+    else:
+        return
+        
+    voiceLine.add_voice(
+        voice_data=data,
+        map_attr=settings['has_attr'],
+        style_vars=settings['style_vars'],
+        VMF=map,
+        config=voice_timer_pos,
+        )
+        
+def get_map_info():
+    '''Determine various attributes about the map.
+    
+    - SP/COOP status
+    - if in preview mode
+    - timer values for entry/exit corridors
+    '''
+    game_mode = 'ERR'
+    is_preview = 'ERR'
+    
+    # Timer_delay values for the entry/exit corridors, needed for quotes
+    voice_timer_pos = {} 
+    
     inst_files = [] # Get a list of every instance in the map.
+    FILE_COOP_EXIT = inst_file['coopExit']
+    FILE_SP_EXIT = inst_file['spExit']
+    FILE_COOP_CORR = inst_file['coopCorr']
+    FILE_SP_ENTRY_CORR = inst_file['spEntryCorr']
+    FILE_SP_EXIT_CORR = inst_file['spExitCorr'] 
+    FILE_OBS = inst_file['largeObs']
+    FILE_COOP_ENTRY = inst_file['coopEntry']
     for item in map.iter_ents(classname='func_instance'):
-        if item['file'] == inst_file['coopExit']:
+        file = item['file']
+        if file == FILE_COOP_EXIT:
             game_mode = 'COOP'
-        elif item['file'] == inst_file['spExit']:
+        elif file == FILE_SP_EXIT:
             game_mode = 'SP'
-        elif (item['file'] == inst_file['spEntry'] or
-             item['file'].startswith(inst_file['coopCorr'])):
+        elif file == inst_file['spEntry']:
             is_preview = item.get_fixup('no_player_start') == '0'
+            
+        elif file.startswith(FILE_COOP_CORR):
+            is_preview = item.get_fixup('no_player_start') == '0'
+            voice_timer_pos['exit'] = (
+                item.get_fixup('timer_delay', '0')
+                )
+        elif file.startswith(FILE_SP_ENTRY_CORR):
+            voice_timer_pos['entry'] = (
+                item.get_fixup('timer_delay', '0')
+                )
+        elif file.startswith(FILE_SP_EXIT_CORR):
+            voice_timer_pos['exit'] = (
+                item.get_fixup('timer_delay', '0')
+                )
+        elif file == FILE_COOP_ENTRY:
+            voice_timer_pos['entry'] = (
+                item.get_fixup('timer_delay', '0')
+                )
+        elif file == FILE_OBS:
+            voice_timer_pos['obs'] = (
+                item.get_fixup('timer_delay', '0')
+                )
+                
         if item['file'] not in inst_files:
             inst_files.append(item['file'])
 
     utils.con_log("Game Mode: " + game_mode)
     utils.con_log("Is Preview: " + str(is_preview))
+    
+    return is_preview, game_mode, voice_timer_pos, inst_files
+
+def check_glob_conditions(preview, mode, all_inst):
+    "Check all the global conditions, like style vars."
+    utils.con_log("Checking global conditions...")
 
     false_ent = VLib.Entity(map, id=999999999) # create a fake entity to apply file-changing commands to
 
@@ -380,13 +452,13 @@ def check_glob_conditions():
                     elif (get_opt(val) == "0" and name.endswith("false")):
                         cond['flags'].remove(flag)
             elif name == "ifmode":
-                if game_mode=='COOP' and val == "coop":
+                if mode=='COOP' and val == "coop":
                     cond['flags'].remove(flag)
-                if game_mode=='SP' and val == "sp":
+                if mode=='SP' and val == "sp":
                     cond['flags'].remove(flag)
-            elif name == "ifpreview" and is_preview == (val=="1"):
+            elif name == "ifpreview" and preview == (val=="1"):
                 cond['flags'].remove(flag)
-            elif name == "hasinst" and val in inst_files:
+            elif name == "hasinst" and val in all_inst:
                 cond['flags'].remove(flag)
         for res in cond['results']:
             if res.name.casefold() == 'variant':
@@ -467,7 +539,7 @@ def satisfy_condition(cond, inst):
                 cond['results'].remove(res)
             elif name == 'suffix':
                 # Add the specified suffix to the filename
-                inst['file'] += res.value
+                inst['file'] += '_' + res.value
             elif name == 'instvar':
                 if res.has_children():
                     val = inst.get_fixup(res['variable', ''])
@@ -499,13 +571,13 @@ def satisfy_condition(cond, inst):
                         # bugs.
 
                         new_inst = VLib.Entity(map, keys={
-                                     "classname" : "func_instance",
-                                     "targetname" : res['name', ''],
-                                     "file" : res['file'],
-                                     "angles" : res['angles', '0 0 0'],
-                                     "origin" : res['position', '0 0 0'],
-                                     "fixup_style" : res['fixup_style', '0']
-                                   })
+                            "classname" : "func_instance",
+                            "targetname" : res['name', ''],
+                            "file" : res['file'],
+                            "angles" : res['angles', '0 0 0'],
+                            "origin" : res['position', '0 0 0'],
+                            "fixup_style" : res['fixup_style', '0'],
+                            })
                         global_instances.append(res['file'])
                         if new_inst['targetname'] == '':
                             new_inst['targetname'] = "inst_"+str(unique_id())
@@ -514,13 +586,13 @@ def satisfy_condition(cond, inst):
             elif name == "addoverlay":
                 # Add another instance on top of this one
                 new_inst = VLib.Entity(map, keys={
-                             "classname" : "func_instance",
-                             "targetname" : inst['targetname'],
-                             "file" : res['file', ''],
-                             "angles" : inst['angles'],
-                             "origin" : inst['origin'],
-                             "fixup_style" : res['fixup_style', '0']
-                           })
+                    "classname" : "func_instance",
+                    "targetname" : inst['targetname'],
+                    "file" : res['file', ''],
+                    "angles" : inst['angles'],
+                    "origin" : inst['origin'],
+                    "fixup_style" : res['fixup_style', '0']
+                    })
                 map.add_ent(new_inst)
             elif name == "custoutput":
                 # Add an additional output to the instance with any values
@@ -1011,10 +1083,10 @@ def change_trig():
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
-def add_extra_ents():
+def add_extra_ents(mode):
     '''Add the various extra instances to the map.'''
     utils.con_log("Adding Music...")
-    if game_mode == "COOP":
+    if mode == "COOP":
         loc = get_opt('music_location_coop')
     else:
         loc = get_opt('music_location_sp')
@@ -1607,21 +1679,31 @@ if is_hammer:
     make_packlist(path)
 else:
     utils.con_log("PeTI map detected!")
-    unique_counter = 0
 
     load_map(path)
 
     map_seed = calc_rand_seed()
 
-    check_glob_conditions()
+    (
+    is_preview, 
+    game_mode, 
+    voice_timer_pos, 
+    all_inst,
+    ) = get_map_info()
+    check_glob_conditions(
+        preview=is_preview,
+        mode=game_mode,
+        all_inst=all_inst,
+        )
     fix_inst()
-    add_extra_ents()
+    add_extra_ents(mode=game_mode)
     change_ents()
     change_brush()
     change_overlays()
     change_trig()
     change_func_brush()
     fix_worldspawn()
+    add_voice(voice_timer_pos, game_mode)
     save()
 
     run_vbsp(new_args, True)
