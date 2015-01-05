@@ -2,6 +2,30 @@
 
 A Portal 2  Mod tool
 
+# Modules:
+- BEE2: Main application script, starts up the application.
+- config: Subclass of ConfigParser, with some useful tweaks
+- contextWin: Implements the rightclick context menu for items.
+- gameMan: Manages adding and removing games as well as exporting editoritems.
+- itemPropWin: A window which allows changing the default properties for an item.
+- loadScreen: Shows a window with loading bars during the startup process.
+- packageLoader: Reads packages and parses all data out of them.
+- paletteLoader: Reads and writes palettes to disk.
+- property_parser: Library to allow reading and writing Valve's KeyValues format.
+- richTextBox: Subclassed version of Tkinter's Text widget, with options to allow easily adding special formating like bullet lists.
+- selectorWin: Window class which allows picking items from a list, displaying various data about each option.
+- sound: Handles playing sound effects, using PyGame.
+- UI: Holds the majority of the UI code, tying the components together.
+- utils: Various utility functions and a Vector class.
+- VBSP: The BEE2's VBSP hook, which modifies a map VMF before it is compiled by the original VBSP.
+- vmfLib: A library which parses a VMF file to allow easy modification.
+- voiceLine: Parses quote pack data, and determines the appropriate quote to use for a given map.
+- VRAD: The BEE2's VRAD hook, which switches to use fast lighting when not in preview mode, and packs files into the BSP after the compilation.
+
+- png
+- tkinter_png: Libraries to read PNG files into Tkinter-compatible formats.  
+ Additionally contains some BEE2-specific helper functions that do the conversion, and cache calls so an image is only read once.
+
 Intended features:
 
 Back end:
