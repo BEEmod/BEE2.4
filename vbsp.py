@@ -317,13 +317,14 @@ def load_settings():
             
     for cond in conf.find_all('conditions', 'condition'):
         flags = []
-        for f in ("instFlag" , "ifMat", "ifQuote", "ifStyleTrue",
-                  "ifStyleFalse", "ifMode", "ifPreview", "instance",
-                  "StyleVar", "instVar", 'hasInst'):
-            flags += list(cond.find_all(f))
         results = []
-        for val in cond.find_all('result'):
-            results.extend(val.value) # join multiple ones together
+        
+        for prop in cond:
+            if prop.name.casefold() == 'result':
+                results.extend(prop.value) # join multiple ones together
+            else:
+                flags.append(prop)
+            
         if len(results) > 0: # is it valid?
             con = {
                 "flags" : flags, 
@@ -334,7 +335,7 @@ def load_settings():
             
     # Sort by priority, where higher = done earlier
     settings['conditions'].sort(key=lambda cond: cond['priority'], reverse=True)
-
+    print(settings['conditions'])
     if get_opt('bottomless_pit') == "1":
         pit = conf.find_key("bottomless_pit",[])
         settings['pit'] = {
@@ -443,7 +444,7 @@ def get_map_info():
     
     return is_preview, game_mode, voice_timer_pos, inst_files
 
-def check_glob_conditions(preview, mode, all_inst):
+def check_glob_conditions(all_inst):
     "Check all the global conditions, like style vars."
     utils.con_log("Checking global conditions...")
 
@@ -453,23 +454,17 @@ def check_glob_conditions(preview, mode, all_inst):
         to_rem = []
         for flag in cond['flags'][:]:
             name = flag.name.casefold()
-            val = flag.value.casefold()
             if name in ("ifstyletrue", "ifstylefalse"):
+                val = flag.value.casefold()
                 if val in DEFAULTS.keys(): # is it a valid var?
                     if (get_opt(val) == "1" and name.endswith("true")):
                         cond['flags'].remove(flag)
                     elif (get_opt(val) == "0" and name.endswith("false")):
                         cond['flags'].remove(flag)
-            elif name == "ifmode":
-                if mode=='COOP' and val == "coop":
-                    cond['flags'].remove(flag)
-                if mode=='SP' and val == "sp":
-                    cond['flags'].remove(flag)
-            elif name == "ifpreview" and preview == (val=="1"):
+            elif name == "hasinst" and flag.value in all_inst:
                 cond['flags'].remove(flag)
-            elif name == "hasinst" and val in all_inst:
-                cond['flags'].remove(flag)
-        for res in cond['results']:
+                
+        for res in cond['results'][:]:
             if res.name.casefold() == 'variant':
                 res.value = variant_weight(res)
             elif res.name.casefold() == 'custantline':
@@ -492,25 +487,26 @@ def get_cond_flag(name, flag, inst):
     '''
     if name == 'and':
         for sub_flag in flag:
-            if get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
-                return True
+            if not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
+                return False
         # If the AND block is empty, return True
         return len(sub_flag.value) == 0
     elif name == 'or':
         for sub_flag in flag:
-            if not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
-                return False
-        return True
+            if get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
+                return True
+        return False
     elif name == 'not':
         return not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst)
     elif name == 'nor':
         return not get_cond_flag('or', flag, inst)
     elif name == 'nand':
         return not get_cond_flag('and', flag, inst)
+        
     elif name == 'instance':
-        return (inst['file'] == flag.value)
+        return inst['file'].casefold() == flag.value.casefold()
     elif name == 'instflag':
-        return flag.value in inst['file', '']
+        return flag.value.casefold() in inst['file', ''].casefold()
     elif name == 'instvar':
         bits = flag.value.split(' ')
         return inst.get_fixup(bits[0]) == bits[1]
@@ -522,21 +518,22 @@ def get_cond_flag(name, flag, inst):
         return settings['has_attr'][flag.value]
     elif name == 'has_music':
         return get_opt('music_id') == flag.value
+    elif name == "ifmode":
+        return GAME_MODE.casefold() == val
+    elif name == "ifpreview":
+        return preview == (val=="1")
 
 def satisfy_condition(cond, inst):
     '''Try to satisfy this condition.
     
     This may delete the condition from the settings list, so iterate using a copy only.
     '''
-    sat = False
+    sat = True
     for flag in cond['flags']:
         name = flag.name.casefold()
-        if get_cond_flag(name, flag, inst):
-            sat = True
+        if not get_cond_flag(name, flag, inst):
+            sat = False
             break
-    if len(cond['flags']) == 0:
-        sat = True # Always satisfy this!
-        
     if sat:
         for res in cond['results'][:]:
             name = res.name.casefold()
@@ -1695,25 +1692,23 @@ else:
     map_seed = calc_rand_seed()
 
     (
-    is_preview, 
-    game_mode, 
+    IS_PREVIEW, 
+    GAME_MODE, 
     voice_timer_pos, 
     all_inst,
     ) = get_map_info()
     check_glob_conditions(
-        preview=is_preview,
-        mode=game_mode,
         all_inst=all_inst,
         )
     fix_inst()
-    add_extra_ents(mode=game_mode)
+    add_extra_ents(mode=GAME_MODE)
     change_ents()
     change_brush()
     change_overlays()
     change_trig()
     change_func_brush()
     fix_worldspawn()
-    add_voice(voice_timer_pos, game_mode)
+    add_voice(voice_timer_pos, GAME_MODE)
     save()
 
     run_vbsp(new_args, True)
