@@ -120,7 +120,7 @@ class Property:
         '''Returns list of Property objects parsed from given text'''
         open_properties = [Property(None, [])]
         values = None
-        for line_num, line in enumerate(file_contents):
+        for line_num, line in enumerate(file_contents, start=1):
             values = open_properties[-1].value
             freshline = utils.clean_line(line)
             if not freshline:
