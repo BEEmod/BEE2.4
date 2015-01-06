@@ -325,20 +325,29 @@ def load_settings():
         for val in cond.find_all('result'):
             results.extend(val.value) # join multiple ones together
         if len(results) > 0: # is it valid?
-            con = {"flags" : flags, "results" : results}
+            con = {
+                "flags" : flags, 
+                "results" : results, 
+                "priority": VLib.conv_int(cond['priority', 0], 0),
+                }
             settings['conditions'].append(con)
+            
+    # Sort by priority, where higher = done earlier
+    settings['conditions'].sort(key=lambda cond: cond['priority'], reverse=True)
 
     if get_opt('bottomless_pit') == "1":
         pit = conf.find_key("bottomless_pit",[])
-        settings['pit']['tex_goo'] = pit['goo_tex', 'nature/toxicslime_a2_bridge_intro']
-        settings['pit']['tex_sky'] = pit['sky_tex', 'tools/toolsskybox']
-        settings['pit']['should_tele'] = pit['teleport', '0'] == '1'
-        settings['pit']['tele_dest'] = pit['tele_target', '@goo_targ']
-        settings['pit']['tele_ref'] = pit['tele_ref', '@goo_ref']
-        settings['pit']['off_x']  = VLib.conv_int(pit['off_x', '0'], 0)
-        settings['pit']['off_y']  = VLib.conv_int(pit['off_y', '0'], 0)
-        settings['pit']['height']  = VLib.conv_int(pit['max_height', '386'], 386)
-        settings['pit']['side'] = [prop.value for prop in pit.find_all("side_inst")]
+        settings['pit'] = {
+            'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
+            'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
+            'should_tele': pit['teleport', '0'] == '1',
+            'tele_dest': pit['tele_target', '@goo_targ'],
+            'tele_ref': pit['tele_ref', '@goo_ref'],
+            'off_x': VLib.conv_int(pit['off_x', '0'], 0),
+            'off_y': VLib.conv_int(pit['off_y', '0'], 0),
+            'height': VLib.conv_int(pit['max_height', '386'], 386),
+            'side': [prop.value for prop in pit.find_all("side_inst")],
+            }
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
 
@@ -523,10 +532,11 @@ def satisfy_condition(cond, inst):
     for flag in cond['flags']:
         name = flag.name.casefold()
         if get_cond_flag(name, flag, inst):
-            sat=True
+            sat = True
             break
     if len(cond['flags']) == 0:
         sat = True # Always satisfy this!
+        
     if sat:
         for res in cond['results'][:]:
             name = res.name.casefold()
@@ -563,19 +573,19 @@ def satisfy_condition(cond, inst):
             elif name == "addglobal":
                 # Add one instance in a location, but only once
                 if res.value is not None:
+                    print(res['file'], global_instances)
                     if (res['file'] not in global_instances or
-                        res['allow_multiple', '0']) == '1':
+                        res['allow_multiple', '0'] == '1'):
                         # By default we will skip adding the instance
                         # if was already added - this is helpful for
                         # items that add to original items, or to avoid
                         # bugs.
-
                         new_inst = VLib.Entity(map, keys={
                             "classname" : "func_instance",
                             "targetname" : res['name', ''],
                             "file" : res['file'],
                             "angles" : res['angles', '0 0 0'],
-                            "origin" : res['position', '0 0 0'],
+                            "origin" : res['position', '0 0 -10000'],
                             "fixup_style" : res['fixup_style', '0'],
                             })
                         global_instances.append(res['file'])
