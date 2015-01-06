@@ -14,6 +14,7 @@ build_compiler/
 images/cache/
 cache/
 inst_cache/
+source_cache/
 
 # Windows Installer files
 *.cab

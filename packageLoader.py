@@ -113,11 +113,15 @@ def load_packages(dir, load_res):
 
             shutil.rmtree('images/cache', ignore_errors=True)
             shutil.rmtree('inst_cache/', ignore_errors=True)
+            shutil.rmtree('source_cache/', ignore_errors=True)
 
             if os.path.isdir("cache/resources/bee2"):
                 shutil.move("cache/resources/bee2", "images/cache")
             if os.path.isdir("cache/resources/instances"):
                 shutil.move("cache/resources/instances", "inst_cache/")
+            for file_type in ("materials", "models", "sounds", "scripts"):
+                if os.path.isdir("cache/resources/" + file_type):
+                    shutil.move("cache/resources/" + file_type, "source_cache/" +file_type)
 
             shutil.rmtree('cache/', ignore_errors=True)
             print('Done!')
