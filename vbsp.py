@@ -335,7 +335,7 @@ def load_settings():
             
     # Sort by priority, where higher = done earlier
     settings['conditions'].sort(key=lambda cond: cond['priority'], reverse=True)
-    print(settings['conditions'])
+
     if get_opt('bottomless_pit') == "1":
         pit = conf.find_key("bottomless_pit",[])
         settings['pit'] = {

@@ -390,7 +390,7 @@ class Vec:
         elif ind == 1 or ind == "y":
             self.y = float(val)
         elif ind == 2 or ind == "z":
-            self.y = float(val)
+            self.z = float(val)
         else:
             return NotImplemented
 
