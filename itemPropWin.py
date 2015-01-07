@@ -199,7 +199,12 @@ def exit():
     win.grab_release()
     win.withdraw()
     is_open = False
-    out = {key: out_values.get(key, values[key]) for key in values}
+    out = {}
+    for key in propList:
+        if key in PROP_TYPES:
+            # Use out_values if it has a matching key,
+            # or use values by default.
+            out[key] = out_values.get(key, values[key])
     callback(out)
 
 def can_edit(prop_list):

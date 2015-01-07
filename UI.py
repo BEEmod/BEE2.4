@@ -10,6 +10,7 @@ import math
 
 import tkinter_png as png # png library for TKinter
 
+from itemPropWin import PROP_TYPES
 from selectorWin import selWin, Item as selWinItem
 from property_parser import Property
 from config import ConfigFile
@@ -153,11 +154,12 @@ class Item():
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
                 name = prop.name.casefold()
-                if name not in result:
+                # PROP_TYPES is a dict holding all the modifiable properties.
+                if name not in result and name in PROP_TYPES:
                     result[name] = item_opts.get_val(
                         self.id,
                         'PROP_' + name,
-                        prop["DefaultValue", None],
+                        prop["DefaultValue", ''],
                         )
         return result
         
