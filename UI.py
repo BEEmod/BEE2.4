@@ -42,6 +42,7 @@ menus={}
 pal_picked=[] # array of the picker icons
 pal_items=[] # array of the "all items" icons
 pal_picked_fake = [] # Labels used for the empty palette positions
+pal_items_fake = [] # Labels for empty picker positions
 
 drag_item=-1 # the item currently being moved
 drag_orig_pos=-1
@@ -527,11 +528,14 @@ def load_packages(data):
     A lot of our other data is initialised here too. 
     This must be called before initMain() can run.
     '''
-    global item_list, skybox_win, voice_win, music_win, goo_win, style_win, filter_data, stylevar_list, selected_style
+    global skybox_win, voice_win, music_win, goo_win, style_win
+    global item_list, filter_data, stylevar_list
+    global selected_style
+    
     filter_data = { 'package' : {},
                     'author' : {},
                     'tags' : {}}
-                    
+              
     for item in data['Item']:
         it = Item(item)
         item_list[it.id] = it
@@ -542,10 +546,11 @@ def load_packages(data):
             if auth.casefold() not in filter_data['author']:
                 filter_data['author'][auth.casefold()] = auth 
         if it.pak_id not in filter_data['package']:
-            filter_data['package'][it.pak_id] = it.pak_name 
+            filter_data['package'][it.pak_id] = it.pak_name
         loader.step("IMG")
         
     stylevar_list = sorted(data['StyleVar'], key=lambda x: x.id)
+    
     for var in stylevar_list:
         var.default = gen_opts.get_bool('StyleVar', var.id, var.default)
     sky_list = []
@@ -724,6 +729,11 @@ def export_editoritems(e=None):
         options={}, 
         filename='LAST_EXPORT.zip',
         )
+    
+    # Save the configs since we're writing to disk anyway.
+    gen_opts.save_check()
+    item_opts.save_check()
+    
     # Since last_export is a zip, users won't be able to overwrite it
     # normally!
     palettes.append(new_pal)
@@ -1216,7 +1226,7 @@ def initPreview(f):
     flowPreview()
 
 def initPicker(f):
-    global frmScroll, pal_canvas, pal_items_fake
+    global frmScroll, pal_canvas
     ttk.Label(
         f,
         text="All Items: ",
@@ -1251,18 +1261,14 @@ def initPicker(f):
     for item in item_list.values():
         for i in range(0,item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
-    blank = png.loadPng('BEE2/blank')
-    # NOTE - this will fail silently if someone has a monitor that can fit 51 columns or more 
-    # That would need 3250+ pixels just for the icons, so not too big a deal
-    pal_items_fake = [ttk.Label(frmScroll, image=blank) for _ in range(0,50)]
     f.bind("<Configure>",flowPicker)
-
+    
 def flowPicker(e=None):
     '''Update the picker box so all items are positioned corrctly.
     
     Should be run (e arg is ignored) whenever the items change, or the window changes shape.
     '''
-    global frmScroll, pal_items_fake
+    global frmScroll
     frmScroll.update_idletasks()
     frmScroll['width']=pal_canvas.winfo_width()
     if frames['filter'].expanded:
@@ -1290,21 +1296,26 @@ def flowPicker(e=None):
     
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
-            
+    height = (itemNum//width + 1)*65 + offset + 2
     pal_canvas['scrollregion'] = (
         0, 
         0, 
         width*65, 
-        math.ceil((itemNum//width + 1)*65+offset+2),
+        height,
         )
-    frmScroll['height'] = (math.ceil(itemNum/width)*65+offset+2)
-
+    frmScroll['height'] = height
+    
     # this adds extra blank items on the end to finish the grid nicely.
-    for i,blank in enumerate(pal_items_fake):
+    blank_img = png.loadPng('BEE2/blank')
+        
+    for i in range(width):
+        if i not in pal_items_fake:
+            pal_items_fake.append(ttk.Label(frmScroll, image=blank_img))
         if i>=(itemNum%width) and i<width: # if this space is empty
-            blank.place(x=((i%width)*65+1),y=(itemNum//width)*65+offset+1)
-        else:
-            blank.place_forget() # otherwise hide the fake item
+            pal_items_fake[i].place(x=((i%width)*65+1),y=(itemNum//width)*65+offset+1)
+            
+    for item in pal_items_fake[width:]:
+        item.place_forget()
 
 def initFilterCol(cat, f):
     FilterBoxes[cat]={}
