@@ -66,9 +66,9 @@ def load_packages(dir, load_res):
             data[obj_type] = []
 
         objects = 0
-        for id, zip, info, name, dispName in packages.values():
-            print("Scanning package '"+id+"'")
-            new_objs=parse_package(zip, info, name, id, dispName)
+        for pak_id, zip, info, name, dispName in packages.values():
+            print("Scanning package '" + pak_id + "'")
+            new_objs=parse_package(zip, info, name, pak_id, dispName)
             objects += new_objs
             loader.step("PAK")
             print("Done!")
