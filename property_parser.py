@@ -234,7 +234,8 @@ class Property:
         current_prop = self
         if isinstance(path, tuple):
             # Search through each item in the tree!
-            for key in path[:-2]:
+            for key in path[:-1]:
+                print(key)
                 folded_key = key.casefold()
                 # We can't use find_key() here because we also
                 # need to check that the property has chilren to search
@@ -254,7 +255,7 @@ class Property:
         try:
             current_prop.find_key(path).value = value
         except NoKeyError:
-            self.value.append(Property(path, value))
+            current_prop.value.append(Property(path, value))
 
     def copy(self):
         '''Deep copy this Property tree and return it.'''
