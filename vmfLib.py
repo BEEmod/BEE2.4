@@ -599,7 +599,7 @@ class Side:
     def parse(map, tree):
         '''Parse the property tree into a Side object.'''
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
-        verts = tree.find_key("plane", "(0 0 0) (0 0 0) (0 0 0)").value[1:-1].split(") (")
+        verts = tree["plane", "(0 0 0) (0 0 0) (0 0 0)"][1:-1].split(") (")
         id = conv_int(tree.find_key("id", '-1').value)
         planes = [0,0,0]
         for i,v in enumerate(verts):
@@ -757,6 +757,15 @@ class Entity():
         self.id = map.get_id('ent', desired = id)
         self.hidden = hidden
         self.editor = {'visgroup' : []} if editor is None else editor
+        
+        if 'logicalpos' not in self.editor:
+            self.editor['logicalpos'] = '[0 ' + str(self.id) + ']'
+        if 'visgroupshown' not in self.editor:
+            self.editor['visgroupshown'] = '1'
+        if 'visgroupautoshown' not in self.editor:
+            self.editor['visgroupautoshown'] = '1'
+        if 'color' not in self.editor:
+            self.editor['color'] = '255 255 255'
 
     def copy(self, des_id=-1):
         '''Duplicate this entity entirely, including solids and outputs.'''

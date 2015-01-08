@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import random
 import itertools
+from enum import Enum
 from collections import defaultdict
 
 from property_parser import Property, KeyValError
@@ -18,14 +19,6 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     #"tile/white_floor_tile002a"          : "white.floor",
     #"metal/black_floor_metal_001c"       : "black.ceiling",
     #"tile/white_floor_tile002a"          : "white.ceiling",
-    "tile/white_wall_tile003a"            : "white.wall",
-    "tile/white_wall_tile003h"            : "white.wall",
-    "tile/white_wall_tile003c"            : "white.2x2",
-    "tile/white_wall_tile003f"            : "white.4x4",
-    "metal/black_wall_metal_002c"         : "black.wall",
-    "metal/black_wall_metal_002e"         : "black.wall",
-    "metal/black_wall_metal_002a"         : "black.2x2",
-    "metal/black_wall_metal_002b"         : "black.4x4",
     "signage/signage_exit"                : "overlay.exit",
     "signage/signage_overlay_arrow"       : "overlay.arrow",
     "signage/signage_overlay_catapult1"   : "overlay.catapultfling",
@@ -52,50 +45,67 @@ TEX_VALVE = { # all the textures produced by the Puzzlemaker, and their replacem
     }
 
 TEX_DEFAULTS = [ # extra default replacements we need to specially handle
-        # These have the same item so we can't store this in the regular dictionary.
-        ("metal/black_floor_metal_001c", "black.floor" ),
-        ("tile/white_floor_tile002a",    "white.floor"),
-        ("metal/black_floor_metal_001c", "black.ceiling"),
-        ("tile/white_floor_tile002a",    "white.ceiling"),
-        ("",                             "special.white"),
-        ("",                             "special.black"),
-        ("",                             "special.white_gap"),
-        ("",                             "special.black_gap"),
+    # These have the same item so we can't store this in the regular dictionary.
+    ("metal/black_floor_metal_001c", "black.floor" ),
+    ("tile/white_floor_tile002a",    "white.floor"),
+    ("metal/black_floor_metal_001c", "black.ceiling"),
+    ("tile/white_floor_tile002a",    "white.ceiling"),
+    ("tile/white_wall_tile003a",     "white.wall"),
+    ("tile/white_wall_tile003h",     "white.wall"),
+    ("tile/white_wall_tile003c",     "white.2x2"),
+    ("tile/white_wall_tile003f",     "white.4x4"),
+    ("metal/black_wall_metal_002c",  "black.wall"),
+    ("metal/black_wall_metal_002e",  "black.wall"),
+    ("metal/black_wall_metal_002a",  "black.2x2"),
+    ("metal/black_wall_metal_002b",  "black.wall_4x4"),
+    ("",                             "special.white"),
+    ("",                             "special.black"),
+    ("",                             "special.white_gap"),
+    ("",                             "special.black_gap"),
 
-        # And these have the extra scale information, which isn't in the maps.
-        ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
-        ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
-        ]
+    # And these have the extra scale information, which isn't in the maps.
+    ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
+    ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
+    ]
+    
+class ORIENT(Enum):
+    floor = 1
+    wall = 2
+    ceiling = 3
+    ceil = 3
 
 WHITE_PAN = [
-             "tile/white_floor_tile002a",
-             "tile/white_wall_tile003a",
-             "tile/white_wall_tile003h",
-             "tile/white_wall_tile003c",
-             "tile/white_wall_tile003f"
-            ]
+    "tile/white_floor_tile002a",
+    "tile/white_wall_tile003a",
+    "tile/white_wall_tile003h",
+    "tile/white_wall_tile003c",
+    "tile/white_wall_tile003f",
+    ]
 BLACK_PAN = [
-             "metal/black_floor_metal_001c",
-             "metal/black_wall_metal_002c",
-             "metal/black_wall_metal_002e",
-             "metal/black_wall_metal_002a",
-             "metal/black_wall_metal_002b"
-            ]
+    "metal/black_floor_metal_001c",
+    "metal/black_wall_metal_002c",
+    "metal/black_wall_metal_002e",
+    "metal/black_wall_metal_002a",
+    "metal/black_wall_metal_002b",
+    ]
 
-WALLS = [
-         "tile/white_wall_tile003a",
-         "tile/white_wall_tile003h",
-         "tile/white_wall_tile003c",
-         "metal/black_wall_metal_002c",
-         "metal/black_wall_metal_002e",
-         "metal/black_wall_metal_002a",
-         "metal/black_wall_metal_002b"
-        ]
+
+PANELS = [
+    "metal/black_floor_metal_001c",
+    "tile/white_floor_tile002a",
+    "tile/white_wall_tile003a",
+    "tile/white_wall_tile003h",
+    "tile/white_wall_tile003c",
+    "metal/black_wall_metal_002c",
+    "metal/black_wall_metal_002e",
+    "metal/black_wall_metal_002a",
+    "metal/black_wall_metal_002b",
+    ]
 
 GOO_TEX = [
-           "nature/toxicslime_a2_bridge_intro",
-           "nature/toxicslime_puzzlemaker_cheap"
-          ]
+    "nature/toxicslime_a2_bridge_intro",
+    "nature/toxicslime_puzzlemaker_cheap",
+    ]
 
 ANTLINES = {
     "signage/indicator_lights/indicator_lights_floor" : "antline",
@@ -133,7 +143,7 @@ DEFAULTS = {
     "music_id"                : "<NONE>",
     "global_pti_ents"         : "",
     #default pos is next to arivial_departure_ents
-    "global_pti_ents_loc"     : "-2304 -2688 -64",
+    "global_pti_ents_loc"     : "-2400 -2800 0",
     }
 
 # These instances have to be specially handled / we want to identify them
@@ -220,16 +230,32 @@ def get_tex(name):
     else:
         raise Exception('No texture "' + name + '"!')
 
-def alter_mat(prop, seed=None):
+def alter_mat(face, seed=None):
     "Randomise the texture used for a face, based on configured textures."
-    mat=prop.mat.casefold()
+    mat=face.mat.casefold()
     if seed:
         random.seed(seed)
+        
     if mat in TEX_VALVE: # should we convert it?
-        prop.mat = get_tex(TEX_VALVE[mat])
+        face.mat = get_tex(TEX_VALVE[mat])
+        return True
+    elif mat in PANELS:
+        type = 'white' if mat in WHITE_PAN else 'black'
+        orient = get_face_orient(face)
+        if orient == ORIENT.wall:
+            if (mat == 'metal/black_wall_metal_002b' or 
+                    mat == 'tile/white_wall_tile_003f'):
+                orient = 'wall_4x4'
+            else:
+                orient = 'wall'
+        elif orient == ORIENT.floor:
+            orient = 'floor'
+        elif orient == ORIENT.ceiling:
+            orient = 'ceiling'
+        face.mat = get_tex(type + '.' + orient)
         return True
     elif mat in TEX_FIZZLER:
-        prop.mat = settings['fizzler'][TEX_FIZZLER[mat]]
+        face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
 
@@ -899,12 +925,15 @@ def face_seed(face):
 
 def random_walls():
     "The original wall style, with completely randomised walls."
+    scale_walls = get_opt("random_blackwall_scale") == "1"
     for solid in map.iter_wbrushes(world=True, detail=True):
         for face in solid:
-            is_blackceil = roof_tex(face)
-            if (face.mat.casefold() in BLACK_PAN[1:] or is_blackceil) and get_opt("random_blackwall_scale") == "1":
+            orient = get_face_orient(face)
+            # Only modify black walls and ceilings
+            if scale_walls and face.mat.casefold() in BLACK_PAN and orient is not ORIENT.floor:
                 random.seed(face_seed(face) + '_SCALE_VAL')
-                scale = random.choice(("0.25", "0.5", "1")) # randomly scale textures to achieve the P1 multi-sized black tile look
+                # randomly scale textures to achieve the P1 multi-sized black tile look
+                scale = random.choice(("0.25", "0.5", "1"))
                 split=face.uaxis.split(" ")
                 split[-1] = scale
                 face.uaxis=" ".join(split)
@@ -929,7 +958,8 @@ def clump_walls():
                 alter_mat(face)
                 continue
             origin = face.get_origin().as_tuple()
-            if mat in WALLS:
+            orient = get_face_orient(face)
+            if orient is ORIENT.wall:
                 if mat in WHITE_PAN: # placeholder to indicate these can be replaced.
                     face.mat = "WHITE"
                 elif mat in BLACK_PAN:
@@ -949,8 +979,6 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
-                    random.seed(origin)
-                    roof_tex(face)
 
     todo_walls = len(walls) # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -1001,29 +1029,16 @@ def clump_walls():
                 face.mat = get_tex("black.wall")
         else:
             alter_mat(face, seed=pos)
-
-def roof_tex(face):
-    '''Determine if a texture is on the roof or if it's on the floor.'''
-    if face.mat.casefold() in (
-        "metal/black_floor_metal_001c",
-        "tile/white_floor_tile002a",
-        ):
-        # The roof/ceiling texture are identical, we need to examine
-        # the planes to figure out the orientation!
-        # first.y < last.y if it's a ceiling texture
-        if int(face.planes[0]['y']) < int(face.planes[2]['y']):
-            side = "ceiling"
+        
+def get_face_orient(face):
+    '''Determine the orientation of an on-grid face.'''
+    if face.planes[0]['z'] == face.planes[1]['z'] == face.planes[2]['z']:
+        if face.planes[0]['y'] < face.planes[2]['y']:
+            return ORIENT.ceiling
         else:
-            side = "floor"
-        type = "black." if face.mat.casefold() in BLACK_PAN else "white."
-        face.mat = get_tex(type + side)
-
-        # The P1 style needs to know if it's a black ceiling, for the
-        # randomised texture scaling.
-        return (type + side == "black.ceiling")
+            return ORIENT.floor
     else:
-        alter_mat(face)
-        return False
+        return ORIENT.wall
 
 def set_antline_mat(over,mat):
     mat = mat.split('|')
@@ -1595,6 +1610,7 @@ def save():
     "Save the modified map back to the correct location."
     out = []
     utils.con_log("Saving New Map...")
+    os.makedirs(os.path.dirname(new_path), exist_ok=True)
     with open(new_path, 'w') as f:
         map.export(file=f, inc_version=True)
     utils.con_log("Complete!")
