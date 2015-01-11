@@ -1102,25 +1102,38 @@ def initStyleOpt(f):
     UI['style_can'].grid(sticky="NSEW")
     f.rowconfigure(0, weight=1)
 
-    scroll = ttk.Scrollbar(f, orient=VERTICAL, command=UI['style_can'].yview)
-    scroll.grid(column=1, row=0, rowspan=2, sticky="NS")
-    UI['style_can']['yscrollcommand'] = scroll.set
+    UI['style_scroll'] = ttk.Scrollbar(f, orient=VERTICAL, command=UI['style_can'].yview)
+    UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
+    UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
     canFrame=ttk.Frame(UI['style_can'])
 
     #This should automatically switch to match different styles
     frmAll=ttk.Labelframe(canFrame, text="All:")
-    frmAll.grid(row=0, sticky="EW")
+    frmAll.grid(row=0, sticky='EW')
 
     frmChosen=ttk.Labelframe(canFrame, text="Selected Style:")
-    frmChosen.grid(row=1, sticky="EW")
+    frmChosen.grid(row=1, sticky='EW')
+    
+    ttk.Separator(
+        canFrame,
+        orient=HORIZONTAL,
+        ).grid(row=2, sticky='EW', pady=(10,5))
 
     frmOther=ttk.Labelframe(canFrame, text="Other Styles:")
-    frmOther.grid(row=2, sticky="EW")
+    frmOther.grid(row=3, sticky='EW')
     
-    # The labelFrames won't update correctly if they become totally 
-    # empty, so add some invisible widgets to both.
-    Frame(frmChosen).grid()
-    Frame(frmOther).grid()
+    UI['stylevar_chosen_none'] = ttk.Label(
+        frmChosen, 
+        text='No Options!',
+        font='TkMenuFont',
+        justify='center',
+        )
+    UI['stylevar_other_none'] = ttk.Label(
+        frmOther,
+        text='None!',
+        font='TkMenuFont',
+        justify='center',
+        )
 
     for pos, (id, name, default) in enumerate(styleOptions):
         styleOptVars[id]=IntVar(value=
@@ -1153,6 +1166,8 @@ def initStyleOpt(f):
         f, 
         cursor="sb_v_double_arrow",
         ).grid(row=1, column=0)
+        
+    UI['style_can'].bind('<Configure>', flow_stylevar)
     
 def refresh_stylevars():
     en_row = 0
@@ -1166,6 +1181,18 @@ def refresh_stylevars():
             styleCheck_enabled[var.id].grid_remove()
             styleCheck_disabled[var.id].grid(row=dis_row,sticky="W", padx=3)
             dis_row += 1
+    if en_row == 0:
+        UI['stylevar_chosen_none'].grid(sticky='EW')
+    else:
+        UI['stylevar_chosen_none'].grid_remove()
+        
+    if dis_row == 0:
+        UI['stylevar_other_none'].grid(sticky='EW')
+    else:
+        UI['stylevar_other_none'].grid_remove()
+
+def flow_stylevar(e=None):
+    UI['style_can']['scrollregion'] = UI['style_can'].bbox(ALL)
 
 def flowPreview():
     '''Position all the preview icons based on the array. 
@@ -1268,7 +1295,6 @@ def flowPicker(e=None):
     
     Should be run (e arg is ignored) whenever the items change, or the window changes shape.
     '''
-    global frmScroll
     frmScroll.update_idletasks()
     frmScroll['width']=pal_canvas.winfo_width()
     if frames['filter'].expanded:
