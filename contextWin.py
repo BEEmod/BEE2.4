@@ -187,7 +187,7 @@ def showProps(widget, warp_cursor=False):
     load_item_data()
 
 def set_item_version(e=None):
-    selected_item.change_version(wid['variant'].current())
+    selected_item.change_version(version_lookup[wid['variant'].current()])
     load_item_data()
             
 def load_item_data():
@@ -241,7 +241,7 @@ def load_item_data():
     else:
         wid['variant'].state(['!disabled'])
         wid['variant']['values'] = version_names
-        wid['variant'].current(version_lookup.index(selected_item.ver))
+        wid['variant'].current(version_lookup.index(selected_item.selected_ver))
     
     if selected_item.url is None:
         wid['moreinfo'].state(['disabled'])

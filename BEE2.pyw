@@ -17,7 +17,7 @@ DEFAULT_SETTINGS = {
     'General' : {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
-        'mute_sounds': '0'
+        'mute_sounds': '0',
         },
     }
 

@@ -83,7 +83,6 @@ def load_packages(dir, load_res):
         for obj_type, objs in obj.items():
             for obj_id, obj_data in objs.items():
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
-                over = obj_override[obj_type].get(obj_id, [])
                 # parse through the object and return the resultant class
                 object_ = obj_types[obj_type].parse(
                     obj_data[0],
@@ -93,13 +92,13 @@ def load_packages(dir, load_res):
                 object_.pak_id = obj_data[2]
                 object_.pak_name = obj_data[3]
                 if obj_id in obj_override[obj_type]:
-                    for over, zip in obj_override[obj_type][obj_id]:
+                    for zip_file, info_block in obj_override[obj_type][obj_id]:
                         override = obj_types[obj_type].parse(
-                            over[0],
+                            zip_file,
                             obj_id,
-                            over[1],
-                            ),
-                        object_.add_over(override, zip)
+                            info_block,
+                            )
+                        object_.add_over(override, zip_file)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
         if load_res:
@@ -149,11 +148,11 @@ def parse_package(zip, info, filename, pak_id, dispName):
             if id in obj[comp_type]:
                 if is_sub:
                     if id in obj_override[comp_type]:
-                        obj_override[comp_type].append((zip, object))
+                        obj_override[comp_type][id].append((zip, object))
                     else:
-                        obj_override[comp_type] = [(zip,object)]
+                        obj_override[comp_type][id] = [(zip,object)]
                 else:
-                    print('ERROR! "' + id + '" defined twice!')
+                    raise Exception('ERROR! "' + id + '" defined twice!')
             else:
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
 
@@ -165,35 +164,62 @@ def parse_package(zip, info, filename, pak_id, dispName):
     return objects
 
 def setup_style_tree(data):
-    '''Modify all items so item inheritance is properly handled.'''
-    styles = {}
+    '''Modify all items so item inheritance is properly handled.
+    
+    This will guarantee that all items have a definition for each 
+    combination of item and version.
+    The priority is:
+    - Exact Match 
+    - Parent style
+    - Grandparent (etc) style 
+    - First version's style
+    - First style of first version
+    '''
+    all_styles = {}
 
     for style in data['Style']:
-        styles[style.id] = style
-    for style in styles.values():
+        all_styles[style.id] = style
+        
+    for style in all_styles.values():
         base = []
         b_style = style
         while b_style is not None:
             #Recursively find all the base styles for this one
             base.append(b_style)
-            b_style = styles.get(b_style.base_style, None)
+            b_style = all_styles.get(b_style.base_style, None)
             # Just append the style.base_style to the list,
             # until the style with that ID isn't found anymore.
-        style.bases = base[:]
+        style.bases = base
+    
+    # All styles now have a .bases attribute, which is a list of the
+    # parent styles that exist.
 
-    # To do inheritance, we simply copy the data to ensure all items have data defined for every used style.
+    # To do inheritance, we simply copy the data to ensure all items 
+    # have data defined for every used style.
     for item in data['Item']:
-        for vers in item.versions:
-            for id, style in styles.items():
-                if id not in vers['styles']:
-                    for base_style in style.bases:
-                        if base_style.id in vers['styles']:
-                            # Copy the values for the parent to the child style
-                            vers['styles'][id] = vers['styles'][base_style.id]
-                            break
+        all_ver = list(item.versions.values())
+        # Move default version to the beginning, so it's read first
+        all_ver.remove(item.def_ver)
+        all_ver.insert(0, item.def_ver)
+        for vers in all_ver:
+            for sty_id, style in all_styles.items():
+                if sty_id in vers['styles']:
+                    continue # We already have a definition
+                for base_style in style.bases:
+                    if base_style.id in vers['styles']:
+                        # Copy the values for the parent to the child style
+                        vers['styles'][sty_id] = vers['styles'][base_style.id]
+                        break
+                else:
+                    # For the base version, use the first style if
+                    # a styled version is not present
+                    if vers['id'] == item.def_ver['id']:
+                        vers['styles'][sty_id] = vers['def_style']
                     else:
-                        # None found, use the first style in the list
-                        vers['styles'][id] = vers['def_style']
+                        # For versions other than the first, use 
+                        # the base version's definition
+                        vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
+                        
 
 def parse_item_folder(folders, zip):
     for fold in folders:
@@ -223,7 +249,7 @@ def parse_item_folder(folders, zip):
             'icons': {p.name:p.value for p in props['icon', []]},
             'all_name': props['all_name', None],
             'all_icon': props['all_icon', None],
-            'vbsp': [],
+            'vbsp': Property,
 
             # The first Item block found
             'editor' : next(editor_iter),
@@ -243,7 +269,7 @@ def parse_item_folder(folders, zip):
             with zip.open(config_path, 'r') as vbsp_config:
                 folders[fold]['vbsp'] = Property.parse(vbsp_config, config_path)
         except KeyError:
-            pass
+            folders[fold]['vbsp'] = Property(None, [])
 
 class Style:
     def __init__(
@@ -324,23 +350,27 @@ class Style:
         return '<Style:' + self.id + '>'
 
 class Item:
-    def __init__(self, id, versions):
-        self.id=id
-        self.versions=versions
-        self.def_data = versions[0]['def_style']
+    def __init__(self, item_id, versions, def_version):
+        self.id = item_id
+        self.versions = versions
+        self.def_ver = def_version
+        self.def_data = def_version['def_style']
+        
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, item_id, info):
         '''Parse an item definition.'''
-        versions = []
+        versions = {}
+        def_version = None
         folders = {}
 
-        for ver in info.find_all("version"):
+        for ver in info.find_all('version'):
             vals = {
-                'name'    : ver['name', ''],
+                'name'    : ver['name', 'Regular'],
+                'id'      : ver['ID', 'VER_DEFAULT'],
                 'is_beta' : ver['beta', '0'] == '1',
                 'is_dep'  : ver['deprecated', '0'] == '1',
                 'styles'  :  {},
-                'def_style' : None
+                'def_style' : None,
                 }
             for sty_list in ver.find_all('styles'):
                 for sty in sty_list:
@@ -348,21 +378,45 @@ class Item:
                         vals['def_style'] = sty.value
                     vals['styles'][sty.name] = sty.value
                     folders[sty.value] = True
-            versions.append(vals)
+            versions[vals['id']] = vals
+            if def_version is None:
+                def_version = vals
 
-        parse_item_folder(folders, zip)
+        parse_item_folder(folders, zip_file)
 
-        for ver in versions:
+        for ver in versions.values():
             if ver['def_style'] in folders:
-                ver['def_style'] = folders[vals['def_style']]
+                ver['def_style'] = folders[ver['def_style']]
             for sty, fold in ver['styles'].items():
                 ver['styles'][sty] = folders[fold]
-        return cls(id, versions)
+                
+        if not versions:
+            raise ValueError('Item "' + item_id + '" has no versions!')
+            
+        return cls(item_id, versions, def_version)
 
-    def add_over(self, override, zip):
+    def add_over(self, override, zip_file):
         '''Add the other item data to ourselves.'''
-        pass
-
+        for ver_id, version in override.versions.items():
+            if ver_id not in self.versions:
+                # We don't have that version!
+                self.versions[ver_id] = version
+            else:
+                our_ver = self.versions[ver_id]['styles']
+                for sty_id, style in version['styles'].items():
+                    if sty_id not in our_ver:
+                        # We don't have that style!
+                        our_ver[sty_id] = style
+                    else:
+                        # We both have a matching folder, merge the 
+                        # definitions
+                        our_style = our_ver[sty_id]
+                        
+                        our_style['auth'].extend(style['auth'])
+                        our_style['desc'].extend(style['desc'])
+                        our_style['tags'].extend(style['tags'])
+                        our_style['vbsp'] += style['vbsp']
+            
     def __repr__(self):
         return '<Item:' + self.id + '>'
 

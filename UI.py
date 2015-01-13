@@ -96,9 +96,14 @@ item_opts = ConfigFile('item_configs.cfg')
 class Item():
     '''Represents an item that can appear on the list.'''
     def __init__(self, item):
-        self.ver = int(item_opts.get_val(item.id, 'sel_version', '0'))
+        self.ver_list = sorted(item.versions.keys())
+        
+        self.selected_ver = item_opts.get_val(item.id, 'sel_version', item.def_ver['id'])
+        if self.selected_ver not in item.versions:
+            self.selected_ver = self.def_ver['id']
+            
         self.item = item
-        self.def_data = self.item.def_data
+        self.def_data = self.item.def_ver['def_style']
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(1 for _ in self.def_data['editor'].find_all(
                                       "Editor","Subtype","Palette"))
@@ -112,7 +117,7 @@ class Item():
         
     def load_data(self):
         '''Load data from the item.'''
-        version = self.item.versions[self.ver]
+        version = self.item.versions[self.selected_ver]
         self.data=version['styles'].get(
             selected_style,
             self.def_data,
@@ -186,29 +191,29 @@ class Item():
             refresh_cmd()
             
     def change_version(self, version):
-        item_opts[self.id]['sel_version'] = str(version)
-        self.ver = version
+        item_opts[self.id]['sel_version'] = version
+        self.selected_ver = version
         self.load_data()
         self.refresh_subitems()
         
     def get_version_names(self):
         '''Get a list of the names and corresponding IDs for the item.'''
         vers = []
-        vers_id = []
-        for i, ver in enumerate(self.item.versions):
+        for ver_id in self.ver_list:
+            ver = self.item.versions[ver_id]
             name = ver['name']
+            
             if ver['is_dep']:
                 name = '[DEP] ' + name
-            
+                
             if ver['is_beta']:
                 # We always display the currently selected version, so
                 # it's possible to deselect it.
-                if i != self.ver and not show_beta_items.get():
+                if ver_id != self.selected_ver and not show_beta_items.get():
                     continue
                 name = '[BETA] ' + name
             vers.append(name)
-            vers_id.append(i)
-        return vers_id, vers
+        return self.ver_list, vers
             
     def export(self):
         '''Generate the editoritems and vbsp_config values that represent this item.'''
@@ -1508,7 +1513,7 @@ def initMain():
     win.iconbitmap('BEE2.ico')# set the window icon
     
     UIbg=Frame(win, bg=ItemsBG)
-    UIbg.grid(row=0,column=0, sticky=(N,S,E,W))
+    UIbg.grid(row=0,column=0, sticky='NSEW')
     win.columnconfigure(0, weight=1)
     win.rowconfigure(0, weight=1)
     UIbg.rowconfigure(0, weight=1)
