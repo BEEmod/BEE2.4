@@ -142,7 +142,6 @@ def parse_package(zip, info, filename, pak_id, dispName):
     # First read through all the components we have, so we can match overrides to the originals
     for comp_type in obj_types:
         for object in info.find_all(comp_type):
-            objects += 1
             id = object['id']
             is_sub = object['overrideOrig', '0'] == '1'
             if id in obj[comp_type]:
@@ -154,6 +153,7 @@ def parse_package(zip, info, filename, pak_id, dispName):
                 else:
                     raise Exception('ERROR! "' + id + '" defined twice!')
             else:
+                objects += 1
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
 
     if res_count != -1:
