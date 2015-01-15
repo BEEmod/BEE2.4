@@ -63,7 +63,7 @@ TEX_DEFAULTS = [ # extra default replacements we need to specially handle
     ("",                             "special.white_gap"),
     ("",                             "special.black_gap"),
 
-    # And these have the extra scale information, which isn't in the maps.
+    # And these defaults have the extra scale information, which isn't in the maps.
     ("0.25|signage/indicator_lights/indicator_lights_floor", "overlay.antline"),
     ("1|signage/indicator_lights/indicator_lights_corner_floor", "overlay.antlinecorner")
     ]
@@ -148,7 +148,7 @@ DEFAULTS = {
 
 # These instances have to be specially handled / we want to identify them
 # The corridors are used as a startsWith match, others are exact only
-inst_file = {
+INST_FILE = {
     "coopExit"    : "instances/p2editor/coop_exit.vmf",
 	"coopEntry"   : "instances/p2editor/door_entrance_coop_1.vmf",
 	"spExit"      : "instances/p2editor/elevator_exit.vmf",
@@ -157,13 +157,14 @@ inst_file = {
     "spEntryCorr" : "instances/p2editor/door_entrance_",
     "coopCorr"    : "instances/p2editor/door_exit_coop_",
     "clearPanel"  : "instances/p2editor/panel_clear.vmf",
+    "pistPlat"    : "instances/p2editor/lift_standalone.vmf",
     "ambLight"    : "instances/p2editor/point_light.vmf",
     "largeObs"    : "instances/p2editor/observation_room_256x128_1.vmf",
     # although unused, editoritems allows having different instances 
     # for toggle/timer panels
     "indPanCheck" : "instances/p2editor/indicator_panel.vmf",
     "indPanTimer" : "instances/p2editor/indicator_panel.vmf",
-    "glass"       : "instances/p2editor/glass_128x128.vmf"
+    "glass"       : "instances/p2editor/glass_128x128.vmf",
 }
 # angles needed to ensure fizzlers are not upside-down 
 # (key=original, val=fixed)
@@ -302,8 +303,8 @@ def load_settings():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
     for prop in conf.find_all('instancefiles'):
-        for key,val in inst_file.items():
-            inst_file[key] = prop[key, val]
+        for key,val in INST_FILE.items():
+            INST_FILE[key] = prop[key, val]
 
     for fizz in conf.find_all('cust_fizzlers'):
         flag = fizz['flag']
@@ -424,20 +425,20 @@ def get_map_info():
     voice_timer_pos = {} 
     
     inst_files = [] # Get a list of every instance in the map.
-    FILE_COOP_EXIT = inst_file['coopExit']
-    FILE_SP_EXIT = inst_file['spExit']
-    FILE_COOP_CORR = inst_file['coopCorr']
-    FILE_SP_ENTRY_CORR = inst_file['spEntryCorr']
-    FILE_SP_EXIT_CORR = inst_file['spExitCorr'] 
-    FILE_OBS = inst_file['largeObs']
-    FILE_COOP_ENTRY = inst_file['coopEntry']
+    FILE_COOP_EXIT = INST_FILE['coopExit']
+    FILE_SP_EXIT = INST_FILE['spExit']
+    FILE_COOP_CORR = INST_FILE['coopCorr']
+    FILE_SP_ENTRY_CORR = INST_FILE['spEntryCorr']
+    FILE_SP_EXIT_CORR = INST_FILE['spExitCorr'] 
+    FILE_OBS = INST_FILE['largeObs']
+    FILE_COOP_ENTRY = INST_FILE['coopEntry']
     for item in map.iter_ents(classname='func_instance'):
         file = item['file']
         if file == FILE_COOP_EXIT:
             game_mode = 'COOP'
         elif file == FILE_SP_EXIT:
             game_mode = 'SP'
-        elif file == inst_file['spEntry']:
+        elif file == INST_FILE['spEntry']:
             is_preview = item.get_fixup('no_player_start') == '0'
             
         elif file.startswith(FILE_COOP_CORR):
@@ -645,8 +646,8 @@ def satisfy_condition(cond, inst):
                 if kill_signs or dec_con_count:
                     for con_inst in map.iter_ents(classname='func_instance'):
                         if con_inst['targetname'] in targets:
-                            if kill_signs and (con_inst['file'] == inst_file['indPanTimer'] or
-                                               con_inst['file'] == inst_file['indPanCheck']):
+                            if kill_signs and (con_inst['file'] == INST_FILE['indPanTimer'] or
+                                               con_inst['file'] == INST_FILE['indPanCheck']):
                                 map.remove_ent(con_inst)
                             if dec_con_count and con_inst.has_fixup('connectioncount'):
                             # decrease ConnectionCount on the ents,
@@ -779,7 +780,7 @@ def variant_weight(var):
 
 def calc_rand_seed():
     '''Use the ambient light entities to create a map seed, so textures remain the same.'''
-    lst = [inst['targetname'] for inst in map.iter_ents(classname='func_instance', file=inst_file['ambLight'])]
+    lst = [inst['targetname'] for inst in map.iter_ents(classname='func_instance', file=INST_FILE['ambLight'])]
     if len(lst) == 0:
         return 'SEED'
     else:
@@ -908,7 +909,7 @@ def find_glass_inst(origin):
     print('loc', origin, (loc-origin).norm())
     for inst in map.iter_ents(classname='func_instance',
                               origin=loc.join(' '),
-                              file=inst_file['glass']):
+                              file=INST_FILE['glass']):
         print('angle', inst['angles', ''])
     # TODO - make this actually work
     return {'file': ''}
@@ -1374,9 +1375,9 @@ def fix_inst():
             for trig in triggers:
                 if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush":
                     death_fizzler_change(inst, trig)
-        if inst['file'] == inst_file['clearPanel']:
+        if inst['file'] == INST_FILE['clearPanel']:
             make_static_pan(inst, "glass") # white/black are identified based on brush
-        if "ccflag_pist_plat" in inst['file']:
+        if inst['file'] == INST_FILE['pistPlat']:
             make_static_pist(inst) #try to convert to static piston
 
     for cond in settings['conditions'][:]:
