@@ -1621,8 +1621,8 @@ def run_vbsp(args, do_swap):
     if do_swap: # we can't overwrite the original vmf, so we run VBSP from a separate location.
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(path.replace(".vmf",".log"), new_path.replace(".vmf",".log"))
-    # put quotes around args which contain spaces
-    args = [('"' + x + '"' if " " in x else x) for x in args]
+    # Put quotes around args which contain spaces, and remove blank args.
+    args = [('"' + x + '"' if " " in x else x) for x in args if x]
 
     arg = (
         '"'
@@ -1670,10 +1670,15 @@ for i, a in enumerate(new_args):
             )
         new_path = new_args[i]
         path = a
-    # we need to strip these out, otherwise VBSP will get confused
+    # We need to strip these out, otherwise VBSP will get confused.
     if a == '-force_peti' or a == '-force_hammer':
         new_args[i] = ''
         old_args[i] = ''
+    # Strip the entity limit, and the following number
+    if a == '-entity_limit':
+        new_args[i] = ''
+        if len(new_args) > i+1 and new_args[i+1] == '1750':
+            new_args[i+1] = ''
 
 utils.con_log('Map path is "' + path + '"')
 if path == "":

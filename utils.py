@@ -324,8 +324,6 @@ class Vec:
         else:
             return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
-
-
     def join(self, delim=', '):
         '''Return a string with all numbers joined by the passed delimiter.
 
