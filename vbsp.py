@@ -11,6 +11,7 @@ from collections import defaultdict
 from property_parser import Property, KeyValError
 from utils import Vec
 import vmfLib as VLib
+import vbsp_conditions as conditions
 import utils
 import voiceLine
 
@@ -508,233 +509,6 @@ def check_glob_conditions(all_inst):
         satisfy_condition(cond, false_ent)
     utils.con_log("Done!")
 
-def get_cond_flag(name, flag, inst):
-    '''Determine the result of a condition flag.
-    
-    '''
-    if name == 'and':
-        for sub_flag in flag:
-            if not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
-                return False
-        # If the AND block is empty, return True
-        return len(sub_flag.value) == 0
-    elif name == 'or':
-        for sub_flag in flag:
-            if get_cond_flag(sub_flag.name.casefold(), sub_flag, inst):
-                return True
-        return False
-    elif name == 'not':
-        return not get_cond_flag(sub_flag.name.casefold(), sub_flag, inst)
-    elif name == 'nor':
-        return not get_cond_flag('or', flag, inst)
-    elif name == 'nand':
-        return not get_cond_flag('and', flag, inst)
-        
-    elif name == 'instance':
-        return inst['file'].casefold() == flag.value.casefold()
-    elif name == 'instflag':
-        return flag.value.casefold() in inst['file', ''].casefold()
-    elif name == 'instvar':
-        bits = flag.value.split(' ')
-        return inst.get_fixup(bits[0]) == bits[1]
-    elif name == 'stylevartrue':
-        return settings['style_vars'].get(flag.value.casefold(), False)
-    elif name == 'stylevarfalse':
-        return settings['style_vars'].get(flag.value.casefold(), True)
-    elif name == 'has':
-        return settings['has_attr'][flag.value]
-    elif name == 'has_music':
-        return get_opt('music_id') == flag.value
-    elif name == "ifmode":
-        return GAME_MODE.casefold() == val
-    elif name == "ifpreview":
-        return preview == (val=="1")
-
-def satisfy_condition(cond, inst):
-    '''Try to satisfy this condition.
-    
-    This may delete the condition from the settings list, so iterate using a copy only.
-    '''
-    sat = True
-    for flag in cond['flags']:
-        name = flag.name.casefold()
-        if not get_cond_flag(name, flag, inst):
-            sat = False
-            break
-    if sat:
-        for res in cond['results'][:]:
-            name = res.name.casefold()
-            inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
-            if name == "changeinstance":
-                # Set the file to a value
-                inst['file'] = res.value
-            elif name == "packer":
-                process_packer(res.value)
-                cond['results'].remove(res)
-            elif name == 'suffix':
-                # Add the specified suffix to the filename
-                inst['file'] += '_' + res.value
-            elif name == 'instvar':
-                if res.has_children():
-                    val = inst.get_fixup(res['variable', ''])
-                    for rep in res: # lookup the number to determine the appending value
-                        if rep.name.casefold() == 'variable':
-                            continue # this isn't a lookup command!
-                        if rep.name == val:
-                            inst['file'] += '_' + rep.value
-                            break
-                else: # append the value
-                    inst['file'] += '_' + inst.get_fixup(res.value, '')
-            elif name == "variant":
-                # add _var4 or so to the instance name
-                if inst['targetname', ''] == '':
-                    # some instances don't get names, so use the global
-                    # seed instead for stuff like elevators.
-                    random.seed(map_seed + inst['origin'] + inst['angles'])
-                else:
-                    random.seed(inst['targetname'])
-                inst['file'] += "_var" + random.choice(res.value)
-            elif name == "addglobal":
-                # Add one instance in a location, but only once
-                if res.value is not None:
-                    print(res['file'], global_instances)
-                    if (res['file'] not in global_instances or
-                        res['allow_multiple', '0'] == '1'):
-                        # By default we will skip adding the instance
-                        # if was already added - this is helpful for
-                        # items that add to original items, or to avoid
-                        # bugs.
-                        new_inst = VLib.Entity(map, keys={
-                            "classname" : "func_instance",
-                            "targetname" : res['name', ''],
-                            "file" : res['file'],
-                            "angles" : res['angles', '0 0 0'],
-                            "origin" : res['position', '0 0 -10000'],
-                            "fixup_style" : res['fixup_style', '0'],
-                            })
-                        global_instances.append(res['file'])
-                        if new_inst['targetname'] == '':
-                            new_inst['targetname'] = "inst_"+str(unique_id())
-                        map.add_ent(new_inst)
-                        res.value = None # Disable this
-            elif name == "addoverlay":
-                # Add another instance on top of this one
-                new_inst = VLib.Entity(map, keys={
-                    "classname" : "func_instance",
-                    "targetname" : inst['targetname'],
-                    "file" : res['file', ''],
-                    "angles" : inst['angles'],
-                    "origin" : inst['origin'],
-                    "fixup_style" : res['fixup_style', '0']
-                    })
-                map.add_ent(new_inst)
-            elif name == "custoutput":
-                # Add an additional output to the instance with any values
-                # Always points to the targeted item.
-                over_name ='@' + inst['targetname'] + '_indicator'
-                for toggle in map.iter_ents(classname='func_instance'):
-                    if toggle.get_fixup('indicator_name', '') == over_name:
-                        toggle_name = toggle['targetname']
-                        break
-                else:
-                    toggle_name = '' # we want to ignore the toggle instance, if it exists
-                targets = [o.target for o in inst.outputs if o.target != toggle_name]
-                done = []
-
-                kill_signs = res["remIndSign", '0'] == '1'
-                dec_con_count = res["decConCount", '0'] == '1'
-                if kill_signs or dec_con_count:
-                    for con_inst in map.iter_ents(classname='func_instance'):
-                        if con_inst['targetname'] in targets:
-                            if kill_signs and (con_inst['file'] == INST_FILE['indPanTimer'] or
-                                               con_inst['file'] == INST_FILE['indPanCheck']):
-                                map.remove_ent(con_inst)
-                            if dec_con_count and con_inst.has_fixup('connectioncount'):
-                            # decrease ConnectionCount on the ents,
-                            # so they can still process normal inputs
-                                try:
-                                    val = int(con_inst.get_fixup('connectioncount'))
-                                    con_inst.set_fixup('connectioncount', str(val-1))
-                                except ValueError:
-                                    # skip if it's invalid
-                                    utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
-                for targ in targets:
-                    if targ not in done:
-                        for out in res.find_all('addOut'):
-                            cond_out(inst, out, targ)
-                        done.append(targ)
-            elif name == "custantline":
-                # customise the output antline texture, toggle instances
-                # allow adding extra outputs between the instance and the toggle
-                over_name ='@' + inst['targetname'] + '_indicator'
-                for over in map.iter_ents(
-                        classname='info_overlay',
-                        targetname=over_name):
-                    random.seed(over['origin'])
-                    new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
-                    set_antline_mat(over, new_tex)
-                if res.value['instance'] != '': # allow replacing the indicator_toggle instance
-                    for toggle in map.iter_ents(classname='func_instance'):
-                        if toggle.get_fixup('indicator_name', '') == over_name:
-                            toggle['file'] = res.value['instance']
-                            if len(res.value['outputs'])>0:
-                                for out in inst.outputs[:]:
-                                    if out.target == toggle['targetname']:
-                                        inst.outputs.remove(out) # remove the original outputs
-                                for out in res.value['outputs']:
-                                    # Allow adding extra outputs to customly trigger the toggle
-                                    cond_out(inst, out, toggle['targetname'])
-            elif name == "faithmods":
-                # Get data about the trigger this instance uses for flinging
-                fixup_var = res['instvar', '']
-                for trig in map.iter_ents(classname="trigger_catapult"):
-                    if inst['targetname']  in trig['targetname']:
-                        for out in trig.outputs:
-                            if out.inst_in == 'animate_angled_relay':
-                                out.inst_in = res['angled_targ', 'animate_angled_relay']
-                                out.input = res['angled_in', 'Trigger']
-                                if fixup_var:
-                                    inst.set_fixup(fixup_var, 'angled')
-                                break
-                            elif out.inst_in == 'animate_straightup_relay':
-                                out.inst_in = res['straight_targ', 'animate_straightup_relay']
-                                out.input = res['straight_in', 'Trigger']
-                                if fixup_var:
-                                    inst.set_fixup(fixup_var, 'straight')
-                                break
-                        else:
-                            continue # Check the next trigger
-                        break # If we got here, we've found the output - stop scanning
-            elif name == "styleVar":
-                for opt in res.value:
-                    if opt.name.casefold() == 'settrue':
-                        settings['style_vars'][opt.value] = True
-                    elif opt.name.casefold() == 'setfalse':
-                        settings['style_vars'][opt.value] = False
-            elif name == "has":
-                for opt in res.value:
-                    if opt.value.casefold() == '1':
-                        settings['has_attr'][opt.name] = True
-                    elif opt.value.casefold() == '0':
-                        settings['has_attr'][opt.name] = False
-            elif name == "styleopt":
-                for opt in res.value:
-                    if opt.name.casefold() in settings['options']:
-                        settings['options'][opt.name.casefold()] = opt.value
-            if not inst['file'].endswith('vmf'):
-                inst['file'] += '.vmf'
-        if len(cond['results']) == 0:
-            settings['conditions'].remove(cond)
-    return sat
-
-def cond_out(inst, prop, target):
-    inst.add_out(VLib.Output(
-        prop['output',''],
-        target,
-        prop['input',''],
-        inst_in=prop['targ_in',''],
-        inst_out=prop['targ_out','']))
-
 def process_inst_overlay(lst):
     for inst in lst:
         try:
@@ -751,32 +525,6 @@ def process_packer(f_list):
             to_pack.append(cmd.value)
         if cmd.name.casefold()=="add_list":
             to_pack.append("|list|" + cmd.value)
-
-def variant_weight(var):
-    "Read variant commands from settings and create the weight list."
-    count = var['number', '']
-    if count.isdecimal():
-        count = int(count)
-        weight = var['weights', '']
-        if weight == '' or ',' not in weight:
-            utils.con_log('Invalid weight! (' + weight + ')')
-            weight = [str(i) for i in range(1,count + 1)]
-        else:
-            vals=weight.split(',')
-            weight=[]
-            if len(vals) == count:
-                for i,val in enumerate(vals):
-                    if val.isdecimal():
-                        weight.extend([str(i+1) for tmp in range(1,int(val)+1)]) # repeat the index the correct number of times
-                    else:
-                        break
-            if len(weight) == 0:
-                utils.con_log('Failed parsing weight! (' + weight + ')')
-                weight = [str(i) for i in range(1,count + 1)]
-        # random.choice(weight) will now give an index with the correct probabilities.
-        return weight
-    else:
-        return [''] # This won't append anything to the file
 
 def calc_rand_seed():
     '''Use the ambient light entities to create a map seed, so textures remain the same.'''
@@ -1380,10 +1128,6 @@ def fix_inst():
         if inst['file'] == INST_FILE['pistPlat']:
             make_static_pist(inst) #try to convert to static piston
 
-    for cond in settings['conditions'][:]:
-        for inst in map.iter_ents(classname='func_instance'):
-            satisfy_condition(cond, inst)
-
     utils.con_log('Map has attributes: ', settings['has_attr'])
     utils.con_log('Style Vars:', settings['style_vars'])
     utils.con_log('Global instances: ', global_instances)
@@ -1650,90 +1394,100 @@ def run_vbsp(args, do_swap):
                 shutil.copy(new_path.replace(".vmf", exp), path.replace(".vmf", exp))
 
 # MAIN
-utils.con_log("BEE2 VBSP hook initiallised.")
+if __name__ == '__main__': 
+    utils.con_log("BEE2 VBSP hook initiallised.")
 
-to_pack = [] # the file path for any items that we should be packing
+    to_pack = [] # the file path for any items that we should be packing
 
-root = os.path.dirname(os.getcwd())
-args = " ".join(sys.argv)
-new_args = sys.argv[1:]
-old_args = sys.argv[1:]
-new_path = ""
-path = ""
-for i, a in enumerate(new_args):
-    fixed_a = os.path.normpath(a)
-    if "sdk_content\\maps\\" in fixed_a:
-        new_args[i] = fixed_a.replace(
-            'sdk_content\\maps\\',
-            'sdk_content\\maps\styled\\',
-            1,
-            )
-        new_path = new_args[i]
-        path = a
-    # We need to strip these out, otherwise VBSP will get confused.
-    if a == '-force_peti' or a == '-force_hammer':
-        new_args[i] = ''
-        old_args[i] = ''
-    # Strip the entity limit, and the following number
-    if a == '-entity_limit':
-        new_args[i] = ''
-        if len(new_args) > i+1 and new_args[i+1] == '1750':
-            new_args[i+1] = ''
+    root = os.path.dirname(os.getcwd())
+    args = " ".join(sys.argv)
+    new_args = sys.argv[1:]
+    old_args = sys.argv[1:]
+    new_path = ""
+    path = ""
+    for i, a in enumerate(new_args):
+        fixed_a = os.path.normpath(a)
+        if "sdk_content\\maps\\" in fixed_a:
+            new_args[i] = fixed_a.replace(
+                'sdk_content\\maps\\',
+                'sdk_content\\maps\styled\\',
+                1,
+                )
+            new_path = new_args[i]
+            path = a
+        # We need to strip these out, otherwise VBSP will get confused.
+        if a == '-force_peti' or a == '-force_hammer':
+            new_args[i] = ''
+            old_args[i] = ''
+        # Strip the entity limit, and the following number
+        if a == '-entity_limit':
+            new_args[i] = ''
+            if len(new_args) > i+1 and new_args[i+1] == '1750':
+                new_args[i+1] = ''
 
-utils.con_log('Map path is "' + path + '"')
-if path == "":
-    raise Exception("No map passed!")
-if not path.endswith(".vmf"):
-    path += ".vmf"
-    new_path += ".vmf"
+    utils.con_log('Map path is "' + path + '"')
+    if path == "":
+        raise Exception("No map passed!")
+    if not path.endswith(".vmf"):
+        path += ".vmf"
+        new_path += ".vmf"
 
-utils.con_log("Loading settings...")
-load_settings()
+    utils.con_log("Loading settings...")
+    load_settings()
 
-if '-force_peti' in args or '-force_hammer' in args:
-    # we have override command!
-    if '-force_peti' in args:
-        utils.con_log('OVERRIDE: Attempting to convert!')
-        is_hammer = False
+    if '-force_peti' in args or '-force_hammer' in args:
+        # we have override command!
+        if '-force_peti' in args:
+            utils.con_log('OVERRIDE: Attempting to convert!')
+            is_hammer = False
+        else:
+            utils.con_log('OVERRIDE: Abandoning conversion!')
+            is_hammer = True
     else:
-        utils.con_log('OVERRIDE: Abandoning conversion!')
-        is_hammer = True
-else:
-    # If we don't get the special -force args, check for the entity
-    # limit to determine if we should convert
-    is_hammer = "-entity_limit 1750" not in args
-if is_hammer:
-    utils.con_log("Hammer map detected! skipping conversion..")
-    run_vbsp(old_args, False)
-    make_packlist(path)
-else:
-    utils.con_log("PeTI map detected!")
+        # If we don't get the special -force args, check for the entity
+        # limit to determine if we should convert
+        is_hammer = "-entity_limit 1750" not in args
+    if is_hammer:
+        utils.con_log("Hammer map detected! skipping conversion..")
+        run_vbsp(old_args, False)
+        make_packlist(path)
+    else:
+        utils.con_log("PeTI map detected!")
 
-    load_map(path)
+        load_map(path)
 
-    map_seed = calc_rand_seed()
+        map_seed = calc_rand_seed()
 
-    (
-    IS_PREVIEW, 
-    GAME_MODE, 
-    voice_timer_pos, 
-    all_inst,
-    ) = get_map_info()
-    check_glob_conditions(
-        all_inst=all_inst,
-        )
-    fix_inst()
-    add_extra_ents(mode=GAME_MODE)
-    change_ents()
-    change_brush()
-    change_overlays()
-    change_trig()
-    change_func_brush()
-    fix_worldspawn()
-    add_voice(voice_timer_pos, GAME_MODE)
-    save()
+        (
+        IS_PREVIEW, 
+        GAME_MODE, 
+        voice_timer_pos, 
+        all_inst,
+        ) = get_map_info()
+        
+        conditions.init(
+            settings=settings, 
+            vmf=map, 
+            seed=map_seed, 
+            preview=IS_PREVIEW, 
+            mode=GAME_MODE,
+            )
+        check_glob_conditions(
+            all_inst=all_inst,
+            )
+        fix_inst()
+        conditions.check_all()
+        add_extra_ents(mode=GAME_MODE)
+        change_ents()
+        change_brush()
+        change_overlays()
+        change_trig()
+        change_func_brush()
+        fix_worldspawn()
+        add_voice(voice_timer_pos, GAME_MODE)
+        save()
 
-    run_vbsp(new_args, True)
-    make_packlist(path) # VRAD will access the original BSP location
+        run_vbsp(new_args, True)
+        make_packlist(path) # VRAD will access the original BSP location
 
-utils.con_log("BEE2 VBSP hook finished!")
+    utils.con_log("BEE2 VBSP hook finished!")
