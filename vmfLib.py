@@ -180,30 +180,30 @@ class VMF:
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
 
 
-        map = VMF(map_info = map_info)
+        map_obj = VMF(map_info = map_info)
 
         for c in cam_props:
             if c.name != 'activecamera':
-                Camera.parse(map, c)
+                Camera.parse(map_obj, c)
 
         for ent in cordons.find_all('cordon'):
-            Cordon.parse(map, ent)
+            Cordon.parse(map_obj, ent)
 
-        map.entities = [Entity.parse(map, ent, hidden=False) for ent in tree.find_all('Entity')]
+        map_obj.entities = [Entity.parse(map_obj, ent, hidden=False) for ent in tree.find_all('Entity')]
         # find hidden entities
         for hidden_ent in tree.find_all('hidden'):
-            map.entities.extend([Entity.parse(map, ent, hidden=True) for ent in hidden_ent])
+            map_obj.entities.extend([Entity.parse(map_obj, ent, hidden=True) for ent in hidden_ent])
 
         map_spawn = tree.find_key('world', [])
         if map_spawn is None:
             # Generate a fake default to parse through
             map_spawn = Property("world", [])
-        map.spawn = Entity.parse(map, map_spawn)
+        map_obj.spawn = Entity.parse(map_obj, map_spawn)
 
-        if map.spawn.solids is not None:
-           map.brushes = map.spawn.solids
+        if map_obj.spawn.solids is not None:
+           map_obj.brushes = map_obj.spawn.solids
 
-        return map
+        return map_obj
     pass
 
     def export(self, file=None, inc_version=True):
@@ -459,7 +459,7 @@ class Solid:
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
         sides = [s.copy() for s in self.sides]
-        return Solid(map, des_id=des_id, sides=sides, editor=editor, hidden=self.hidden)
+        return Solid(self.map, des_id=des_id, sides=sides, editor=editor, hidden=self.hidden)
 
     @staticmethod
     def parse(map, tree, hidden=False):
@@ -647,7 +647,7 @@ class Side:
             'smoothing' : self.smooth,
             'lightmap' : self.lightmap,
             }
-        return Side(map, planes=planes, opt=opt, des_id=des_id)
+        return Side(self.map, planes=planes, opt=opt, des_id=des_id)
 
     def export(self, buffer, ind = ''):
         '''Generate the strings required to define this side in a VMF.'''
