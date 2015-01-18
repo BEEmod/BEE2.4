@@ -204,8 +204,6 @@ settings = {
             "style_vars"         : defaultdict(lambda: False),
             "has_attr"           : defaultdict(lambda: False),
 
-            "cust_fizzlers"      : [],
-            "conditions"         : [],
             "voice_data_sp"      : Property("Quotes_SP", []),
             "voice_data_coop"    : Property("Quotes_COOP", []),
            }
@@ -307,18 +305,6 @@ def load_settings():
         for key,val in INST_FILE.items():
             INST_FILE[key] = prop[key, val]
 
-    for fizz in conf.find_all('cust_fizzlers'):
-        flag = fizz['flag']
-        if flag in settings['cust_fizzler']:
-            raise Exception('Two Fizzlers with same flag!!')
-        cust_fizzlers[flag] = {
-            'left'     : fizz['left', 'tools/toolstrigger'],
-            'right'    : fizz['right', 'tools/toolstrigger'],
-            'center'   : fizz['center', 'tools/toolstrigger'],
-            'short'    : fizz['short', 'tools/toolstrigger'],
-            'scanline' : fizz['scanline', settings['fizzler']['scanline']]
-            }
-
     deathfield = conf.find_key("deathfield", [])
     settings['deathfield'] = {
         'left'     : deathfield['left', 'BEE2/fizz/lp/death_field_clean_left'],
@@ -344,25 +330,7 @@ def load_settings():
             process_packer(pack_cmd.value)
             
     for cond in conf.find_all('conditions', 'condition'):
-        flags = []
-        results = []
-        
-        for prop in cond:
-            if prop.name.casefold() == 'result':
-                results.extend(prop.value) # join multiple ones together
-            else:
-                flags.append(prop)
-            
-        if len(results) > 0: # is it valid?
-            con = {
-                "flags" : flags, 
-                "results" : results, 
-                "priority": VLib.conv_int(cond['priority', 0], 0),
-                }
-            settings['conditions'].append(con)
-            
-    # Sort by priority, where higher = done earlier
-    settings['conditions'].sort(key=lambda cond: cond['priority'], reverse=True)
+        conditions.add(cond)
 
     if get_opt('bottomless_pit') == "1":
         pit = conf.find_key("bottomless_pit",[])
@@ -471,43 +439,6 @@ def get_map_info():
     utils.con_log("Is Preview: " + str(is_preview))
     
     return is_preview, game_mode, voice_timer_pos, inst_files
-
-def check_glob_conditions(all_inst):
-    "Check all the global conditions, like style vars."
-    utils.con_log("Checking global conditions...")
-
-    false_ent = VLib.Entity(map, id=999999999) # create a fake entity to apply file-changing commands to
-
-    for cond in settings['conditions'][:]:
-        to_rem = []
-        for flag in cond['flags'][:]:
-            name = flag.name.casefold()
-            if name in ("ifstyletrue", "ifstylefalse"):
-                val = flag.value.casefold()
-                if val in DEFAULTS.keys(): # is it a valid var?
-                    if (get_opt(val) == "1" and name.endswith("true")):
-                        cond['flags'].remove(flag)
-                    elif (get_opt(val) == "0" and name.endswith("false")):
-                        cond['flags'].remove(flag)
-            elif name == "hasinst" and flag.value in all_inst:
-                cond['flags'].remove(flag)
-                
-        for res in cond['results'][:]:
-            if res.name.casefold() == 'variant':
-                res.value = variant_weight(res)
-            elif res.name.casefold() == 'custantline':
-                res.value = {
-                    'instance' : res.find_key('instance', '').value,
-                    'antline' : [p.value for p in res.find_all('straight')],
-                    'antlinecorner' : [p.value for p in res.find_all('corner')],
-                    'outputs' : list(res.find_all('addOut'))
-                    }
-                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
-                    cond['results'].remove(res) # invalid
-        if len(cond['results']) == 0:
-            settings['conditions'].remove(cond)
-        satisfy_condition(cond, false_ent)
-    utils.con_log("Done!")
 
 def process_inst_overlay(lst):
     for inst in lst:
@@ -821,8 +752,8 @@ def change_overlays():
                     })
                 new_inst.set_fixup('mat', sign_type.replace('overlay.', ''))
                 map.add_ent(new_inst)
-                for cond in settings['conditions'][:]:
-                    satisfy_condition(cond, new_inst)
+                conditions.check_inst(new_inst)
+                
             over['material'] = get_tex(sign_type)
         if over['material'].casefold() in ANTLINES:
             angle = over['angles'].split(" ") # get the three parts
@@ -1127,14 +1058,6 @@ def fix_inst():
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if inst['file'] == INST_FILE['pistPlat']:
             make_static_pist(inst) #try to convert to static piston
-
-    utils.con_log('Map has attributes: ', settings['has_attr'])
-    utils.con_log('Style Vars:', settings['style_vars'])
-    utils.con_log('Global instances: ', global_instances)
-
-    # Remove instances with blank file attr, allows conditions to strip the instances when requested
-    for inst in map.iter_ents(classname='func_instance', file=''):
-        map.remove_ent(inst)
 
 def death_fizzler_change(inst, trig):
     '''Convert the passed fizzler brush into the required brushes for Death Fizzlers.
@@ -1471,18 +1394,19 @@ if __name__ == '__main__':
             seed=map_seed, 
             preview=IS_PREVIEW, 
             mode=GAME_MODE,
+            inst_list=all_inst,
             )
-        check_glob_conditions(
-            all_inst=all_inst,
-            )
+            
         fix_inst()
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
+        
         change_ents()
         change_brush()
         change_overlays()
         change_trig()
         change_func_brush()
+        
         fix_worldspawn()
         add_voice(voice_timer_pos, GAME_MODE)
         save()

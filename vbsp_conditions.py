@@ -5,52 +5,107 @@ import utils
 import voiceLine
 
 GLOBAL_INSTANCES = []
+conditions = []
 
-def init(settings, vmf, seed, preview, mode):
+def add(prop_block):
+    '''Add a condition to the list.'''
+    flags = []
+    results = []
+    priority = 0
+    for prop in prop_block:
+        if prop.name.casefold() == 'result':
+            results.extend(prop.value) # join multiple ones together
+        elif prop.name.casefold() == 'priority':
+            priority = VLib.conv_int(prop.value, priority)
+        else:
+            flags.append(prop)
+        
+    if len(results) > 0: # is it valid?
+        con = {
+            "flags" : flags, 
+            "results" : results, 
+            "priority": priority,
+            }
+        conditions.append(con)
+
+def init(settings, vmf, seed, preview, mode, inst_list):
     # Get a bunch of values from VBSP, since we can't import directly.
-    global conditions, VMF, STYLE_VARS, VOICE_ATTR, MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
+    global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW, GAME_MODE, ALL_INST
     VMF = vmf
-    conditions = settings['conditions']
     STYLE_VARS = settings['style_vars']
     VOICE_ATTR = settings['has_attr']
-    MAP_RAND_SEED = map_seed
+    OPTIONS = settings['options']
+    MAP_RAND_SEED = seed
     IS_PREVIEW = preview
     GAME_MODE = mode
+    ALL_INST = inst_list
+    
+    # Sort by priority, where higher = done earlier
+    conditions.sort(key=lambda cond: cond['priority'], reverse=True)
+    setup_cond()
 
 def check_all():
     '''Check all conditions.'''
-    setup_cond()
     
+    utils.con_log('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.iter_ents(classname='func_instance'):
             run_cond(inst, condition)
-            
+            if len(condition['results']) == 0:
+                break
+    remove_blank_inst()
+    
+    utils.con_log('Map has attributes: ', [key for key,value in VOICE_ATTR.items() if value])
+    utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
+    utils.con_log('Global instances: ', GLOBAL_INSTANCES)
+    
+def check_inst(inst):
+    '''Run all condtions on a given instance.'''
+    for condition in conditions:
+        run_cond(inst, condition)
+    remove_blank_inst()
+    
+def remove_blank_inst():
+    '''Remove instances with blank file attr.
+    
+    This allows conditions to strip the instances when requested.
+    '''
+    for inst in VMF.iter_ents(classname='func_instance', file=''):
+        VMF.remove_ent(inst)
     
 def setup_cond():
+    '''Some conditions require setup logic before they are run.'''
     for cond in conditions:
-        for res in cond['results']:
+        for res in cond['results'][:]:
             res_name = res.name.casefold()
             if res_name == 'variant':
-                res.value = variant_weight(res.value)
+                res.value = variant_weight(res)
+            elif res_name == 'custantline':
+                res.value = {
+                    'instance' : res.find_key('instance', '').value,
+                    'antline' : [p.value for p in res.find_all('straight')],
+                    'antlinecorner' : [p.value for p in res.find_all('corner')],
+                    'outputs' : list(res.find_all('addOut'))
+                    }
+                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
+                    cond['results'].remove(res) # invalid
 
 def run_cond(inst, cond):
     '''Try to satisfy this condition on the given instance.'''     
-    sat = True
     for flag in cond['flags']:
-        if not check_flag(name, flag, inst):
-            sat = False
-            break  
-    if sat:
-        inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
-        for res in cond['results']:
-            try: 
-                func = RESULT_LOOKUP[res.name.casefold()]
-            except KeyError:
-                utils.con_log('"' + flag.name + '" is not a valid condition result!')
-            else:
-                func(inst, res)  
-        if not inst['file'].endswith('vmf'):
-            inst['file'] += '.vmf'
+        if not check_flag(flag, inst):
+            return
+    
+    inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
+    for res in cond['results']:
+        try: 
+            func = RESULT_LOOKUP[res.name.casefold()]
+        except KeyError:
+            utils.con_log('"' + flag.name + '" is not a valid condition result!')
+        else:
+            func(inst, res)  
+    if not inst['file'].endswith('vmf'):
+        inst['file'] += '.vmf'
     
     
 def check_flag(flag, inst):
@@ -60,10 +115,10 @@ def check_flag(flag, inst):
         utils.con_log('"' + flag.name + '" is not a valid condition flag!')
         return False
     else:
-        return func(flag, inst)
+        return func(inst, flag)
         
 def variant_weight(var):
-    "Read variant commands from settings and create the weight list."
+    '''Read variant commands from settings and create the weight list.'''
     count = var['number', '']
     if count.isdecimal():
         count = int(count)
@@ -131,6 +186,10 @@ def flag_file_equal(inst, flag):
 def flag_file_cont(inst, flag):
     return flag.value.casefold() in inst['file'].casefold()
     
+def flag_has_inst(inst, flag):
+    '''Return true if the filename is present anywhere in the map.'''
+    return flag.value.casefold() in HAS_INST
+    
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
     return inst.get_fixup(bits[0]) == bits[1]
@@ -142,7 +201,15 @@ def flag_voice_has(inst, flag):
     return VOICE_ATTR[flag.value]
     
 def flag_music(inst, flag):
-    return settings['options']['music_id'] == flag.value
+    return OPTIONS['music_id'] == flag.value
+    
+def flag_option(inst, flag):
+    bits = flag.value.split(' ')
+    key = bits[0].casefold()
+    if key in OPTIONS:
+        return OPTIONS[key] == bits[1]
+    else:
+        return False
     
 def flag_game_mode(inst, flag):
     return GAME_MODE.casefold() == val
@@ -187,7 +254,7 @@ def res_add_variant(inst, res):
     if inst['targetname', ''] == '':
         # some instances don't get names, so use the global
         # seed instead for stuff like elevators.
-        random.seed(VBSP.map_seed + inst['origin'] + inst['angles'])
+        random.seed(MAP_RAND_SEED + inst['origin'] + inst['angles'])
     else:
         random.seed(inst['targetname'])
     inst['file'] += "_var" + random.choice(res.value)
@@ -204,7 +271,7 @@ def res_add_global_inst(inst, res):
             # if was already added - this is helpful for
             # items that add to original items, or to avoid
             # bugs.
-            new_inst = VLib.Entity(map, keys={
+            new_inst = VLib.Entity(VMF, keys={
                 "classname" : "func_instance",
                 "targetname" : res['name', ''],
                 "file" : res['file'],
@@ -219,7 +286,7 @@ def res_add_global_inst(inst, res):
             res.value = None # Disable this
 def res_add_overlay_inst(inst, res):
     '''Add another instance on top of this one.'''
-    new_inst = VLib.Entity(map, keys={
+    new_inst = VLib.Entity(VMF, keys={
         "classname" : "func_instance",
         "targetname" : inst['targetname'],
         "file" : res['file', ''],
@@ -248,11 +315,11 @@ def res_cust_output(inst, res):
     kill_signs = res["remIndSign", '0'] == '1'
     dec_con_count = res["decConCount", '0'] == '1'
     if kill_signs or dec_con_count:
-        for con_inst in map.iter_ents(classname='func_instance'):
+        for con_inst in VMF.iter_ents(classname='func_instance'):
             if con_inst['targetname'] in targets:
                 if kill_signs and (con_inst['file'] == INST_FILE['indPanTimer'] or
                                    con_inst['file'] == INST_FILE['indPanCheck']):
-                    map.remove_ent(con_inst)
+                    VMF.remove_ent(con_inst)
                 if dec_con_count and con_inst.has_fixup('connectioncount'):
                 # decrease ConnectionCount on the ents,
                 # so they can still process normal inputs
@@ -281,7 +348,7 @@ def res_cust_antline(inst, res):
         
     # allow replacing the indicator_toggle instance
     if res.value['instance']: 
-        for toggle in map.iter_ents(classname='func_instance'):
+        for toggle in VMF.iter_ents(classname='func_instance'):
             if toggle.get_fixup('indicator_name', '') == over_name:
                 toggle['file'] = res.value['instance']
                 if len(res.value['outputs']) > 0:
@@ -296,7 +363,7 @@ def res_cust_antline(inst, res):
 def res_faith_mods(inst, res):
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
-    for trig in map.iter_ents(classname="trigger_catapult"):
+    for trig in VMF.iter_ents(classname="trigger_catapult"):
         if inst['targetname']  in trig['targetname']:
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
@@ -343,11 +410,13 @@ FLAG_LOOKUP = {
     'instance': flag_file_equal,
     'instfile': flag_file_cont,
     'instvar': flag_instvar,
+    'hasinst': flag_has_inst,
     'stylevar': flag_stylevar,
     'has': flag_voice_has,
-    'has_music': flag_music,
+    'hasmusic': flag_music,
     'ifmode': flag_game_mode,
     'ifpreview': flag_is_preview,
+    'ifoption': flag_option,
     }
 
 RESULT_LOOKUP = {

@@ -10,7 +10,7 @@ loadScreen.init(UI.win)
 loadScreen.length('UI', 8)
 
 DEFAULT_SETTINGS = {
-    'Directories' : {
+    'Directories' : { 
         'palette' : 'palettes\\',
         'package' : 'packages\\',
         },
