@@ -1,4 +1,6 @@
-from property_parser import Property, KeyValError
+import random
+
+from property_parser import Property, NoKeyError
 from utils import Vec
 import vmfLib as VLib
 import utils
@@ -7,6 +9,19 @@ import voiceLine
 GLOBAL_INSTANCES = []
 conditions = []
 
+TEX_FIZZLER = {
+    "effects/fizzler_center" : "center",
+    "effects/fizzler_l"      : "left",
+    "effects/fizzler_r"      : "right",
+    "effects/fizzler"        : "short",
+    "tools/toolsnodraw"      : "nodraw",
+    }
+    
+ANTLINES = {
+    "signage/indicator_lights/indicator_lights_floor" : "antline",
+    "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
+    }
+    
 def add(prop_block):
     '''Add a condition to the list.'''
     flags = []
@@ -228,6 +243,25 @@ def res_change_instance(inst, res):
 def res_add_suffix(inst, res):
     '''Add the specified suffix to the filename.'''
     inst['file'] += '_' + res.value
+            
+def res_set_style_var(inst, res):
+    for opt in res.value:
+        if opt.name.casefold() == 'settrue':
+            STYLE_VARS[opt.value.casefold()] = True
+        elif opt.name.casefold() == 'setfalse':
+            STYLE_VARS[opt.value.casefold()] = False
+            
+def res_set_voice_attr(inst, res):
+    for opt in res.value:
+        if opt.value.casefold() == '1':
+            VOICE_ATTR[opt.name] = True
+        elif opt.value.casefold() == '0':
+            VOICE_ATTR[opt.name] = False
+            
+def res_set_option(inst, res):
+    for opt in res.value:
+        if opt.name.casefold() in settings['options']:
+            settings['options'][opt.name.casefold()] = opt.value
 
 def res_add_inst_var(inst, res):
     '''Append the value of an instance variable to the filename.
@@ -380,27 +414,143 @@ def res_faith_mods(inst, res):
                     break
             else:
                 continue # Check the next trigger
-            break # If we got here, we've found the output - stop scanning  
+            break # If we got here, we've found the output - stop scanning
             
-def res_set_style_var(inst, res):
-    for opt in res.value:
-        if opt.name.casefold() == 'settrue':
-            STYLE_VARS[opt.value.casefold()] = True
-        elif opt.name.casefold() == 'setfalse':
-            STYLE_VARS[opt.value.casefold()] = False
-            
-def res_set_voice_attr(inst, res):
-    for opt in res.value:
-        if opt.value.casefold() == '1':
-            VOICE_ATTR[opt.name] = True
-        elif opt.value.casefold() == '0':
-            VOICE_ATTR[opt.name] = False
-            
-def res_set_option(inst, res):
-    for opt in res.value:
-        if opt.name.casefold() in settings['options']:
-            settings['options'][opt.name.casefold()] = opt.value
+def res_cust_fizzler(base_inst, res):
+    '''Modify a fizzler item to allow for custom brush ents.'''
+    model_name = res['modelname', None]
+    make_unique = res['UniqueModel', '0'] == '1'
+    fizz_name = base_inst['targetname','']
+    if model_name is not None or make_unique:
+        unique_ind = 0
+        model_targetnames = (
+            fizz_name + '_modelStart',
+            fizz_name + '_modelEnd',
+            )
+        for inst in VMF.iter_ents(classname='func_instance'):
+            if inst['targetname', ''] in model_targetnames:
+                if model_name is not None:
+                    if model_name == '':
+                        inst['targetname'] = base_inst['targetname']
+                    else:
+                        inst['targetname'] = base_inst['targetname'] + '-' + model_name
+                if make_unique:
+                    unique_ind += 1
+                    inst['targetname'] += str(unique_id)
+    new_brush_config = list(res.find_all('brush'))
+    if len(new_brush_config) > 0:
+        for orig_brush in VMF.iter_ents(
+                classname='trigger_portal_cleanser', 
+                targetname=fizz_name + '_brush',
+                ):
+            VMF.remove_ent(orig_brush)
+            for config in new_brush_config:
+                new_brush = orig_brush.copy()
+                VMF.add_ent(new_brush)
+                new_brush.keys.clear() # Wipe the original keyvalues
+                new_brush['origin'] = orig_brush['origin']
+                new_brush['targetname'] = fizz_name + '-' + config['name', 'brush']
+                # All ents must have a classname!
+                new_brush['classname'] = 'trigger_portal_cleanser'
+                
+                for prop in config['keys', []]:
+                    new_brush[prop.name] = prop.value
+                
+                laserfield_conf = config.find_key('MakeLaserField', None)
+                if laserfield_conf.value is not None:
+                    # Resize the brush into a laserfield format, without
+                    # the 128*64 parts. If the brush is 128x128, we can 
+                    # skip the resizing since it's already correct.
+                    laser_tex = laserfield_conf['texture', 'effects/laserplane']
+                    nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
+                    tex_width = VLib.conv_int(laserfield_conf['texwidth', '512'], 512)
+                    is_short = False
+                    for side in new_brush.sides():
+                        if side.mat.casefold() == 'effects/fizzler':
+                            is_short = True
+                            break
+                    
+                    if is_short:
+                        for side in new_brush.sides():
+                            if side.mat.casefold() == 'effects/fizzler':
+                                side.mat = laser_tex
+                                
+                                uaxis = side.uaxis.split(" ")
+                                vaxis = side.vaxis.split(" ")
+                                # the format is like "[1 0 0 -393.4] 0.25"
+                                side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
+                                side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
+                            else:
+                                side.mat = nodraw_tex
+                    else:
+                        # The hard part - stretching the brush.
+                        convert_to_laserfield(new_brush, laser_tex, nodraw_tex, tex_width)
+                else:
+                    # Just change the textures
+                    for side in new_brush.sides():
+                        try:
+                            side.mat = config[TEX_FIZZLER[side.mat.casefold()]]
+                        except (KeyError, IndexError):
+                            # If we fail, just use the original textures
+                            pass
+                            
+def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
+    '''Convert a fizzler into a laserfield func_brush.
+    We need to stretch the brush to get rid of the side sections.
+    This is the same as moving all the solids to match the
+     bounding box. We first get the origin, used to figure out if
+     a point should be set to the max or min axis.
+    '''
+
+    # Get the origin and bbox.
+    # The origin isn't in the center, but it still works as long as it's in-between the outermost coordinates
+    origin = Vec(*[int(v) for v in brush['origin'].split(' ')])
+    bbox_min, bbox_max = brush.get_bbox()
     
+    # we only want the middle one with the center, the others are
+    # useless. PeTI happens to always have that in the middle.
+    brush.solids = [brush.solids[1]]
+
+    for side in brush.solids[0].sides:
+        # For every coordinate, set to the maximum if it's larger than the origin.
+        for v in side.planes:
+            for ax in 'xyz':
+                if int(v[ax]) > origin[ax]:
+                    v[ax] = str(bbox_max[ax])
+                else:
+                    v[ax] = str(bbox_min[ax])
+                    
+        # Determine the shape of this plane.
+        bounds_min, bounds_max = side.get_bbox()
+        dimensions = [0,0,0]
+        for i in range(3):
+            dimensions[i] = bounds_max[i] - bounds_min[i]
+        if 2 in dimensions: # The front/back won't have this dimension
+            # This must be a side of the brush.
+            side.mat = nodraw_tex
+        else:
+            side.mat = laser_tex
+            # Now we figure out the corrrect u/vaxis values for the texture.
+            
+            uaxis = side.uaxis.split(" ")
+            vaxis = side.vaxis.split(" ")
+            # the format is like "[1 0 0 -393.4] 0.25"
+            size = 0
+            offset = 0
+            for i, wid in enumerate(dimensions):
+                if wid > size:
+                    size = int(wid)
+                    offset = int(bounds_min[i])
+            side.uaxis = (
+                " ".join(uaxis[:3]) + " " +
+                # texture offset to fit properly
+                str(tex_width/size * -offset) + "] " +
+                str(size/tex_width) # scaling
+                )
+            # heightwise it's always the same
+            side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
+                
+       
 FLAG_LOOKUP = {
     'and': flag_and,
     'or': flag_or,
@@ -428,6 +578,7 @@ RESULT_LOOKUP = {
     "addoverlay": res_add_overlay_inst,
     "custoutput": res_cust_output,
     "custantline": res_cust_antline,
+    "custfizzler": res_cust_fizzler,
     "faithmods": res_faith_mods,
     "stylevar": res_set_style_var,
     "has": res_set_voice_attr,

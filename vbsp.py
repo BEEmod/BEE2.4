@@ -11,7 +11,7 @@ from collections import defaultdict
 from property_parser import Property, KeyValError
 from utils import Vec
 import vmfLib as VLib
-import vbsp_conditions as conditions
+import conditions
 import utils
 import voiceLine
 
@@ -977,29 +977,6 @@ def fix_inst():
             if inst['angles'] in fizzler_angle_fix:
                 inst['angles'] = fizzler_angle_fix[inst['angles']]
 
-            if "ccflag_comball" in inst['file']:
-                # the field models need unique names, so the beams
-                # don't point at each other.
-                inst['targetname'] = (
-                    inst['targetname'].split("_")[0] +
-                    "-model" +
-                    unique_id()
-                    )
-            if "ccflag_death_fizz_model" in inst['file']:
-                # we need to be able to control them directly from the
-                # instances, so make them have the same name as the base.
-                inst['targetname'] = inst['targetname'].split("_")[0]
-
-        elif "ccflag_paint_fizz" in inst['file']:
-            # convert fizzler brush to trigger_paint_cleanser (this is part of the base's name)
-            for trig in map.iter_ents(
-                    classname='trigger_portal_cleanser',
-                    targetname=inst['targetname'] + "_brush",
-                    ):
-                for side in trig.sides():
-                    side.mat = "tools/toolstrigger"
-                trig['classname'] = "trigger_paint_cleanser"
-
         elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
             # find the triggers that match this entity and mod them
             for trig in map.iter_ents(
@@ -1049,11 +1026,7 @@ def fix_inst():
                     inst_in='in',
                     inst_out='out',
                     ))
-
-        elif "ccflag_death_fizz_base" in inst['file']: # LP's Death Fizzler
-            for trig in triggers:
-                if trig['classname']=="trigger_portal_cleanser" and trig['targetname'] == inst['targetname'] + "_brush":
-                    death_fizzler_change(inst, trig)
+                    
         if inst['file'] == INST_FILE['clearPanel']:
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if inst['file'] == INST_FILE['pistPlat']:
@@ -1110,7 +1083,6 @@ def death_fizzler_change(inst, trig):
 
     if is_short:
         for side in brush.sides():
-            side.mat
             if "effects/fizzler" in side.mat.casefold():
                 side.mat=get_tex('special.laserfield')
             alter_mat(mat) # convert to the styled version
