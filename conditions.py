@@ -207,7 +207,7 @@ def flag_has_inst(inst, flag):
     
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
-    return inst.get_fixup(bits[0]) == bits[1]
+    return inst.fixup[bits[0]] == bits[1]
     
 def flag_stylevar(inst, flag):
     return STYLE_VARS[flag.value.casefold()]
@@ -270,7 +270,7 @@ def res_add_inst_var(inst, res):
     lookup.
     '''
     if res.has_children():
-        val = inst.get_fixup(res['variable', ''])
+        val = inst.fixup[res['variable', '']]
         for rep in res: # lookup the number to determine the appending value
             if rep.name.casefold() == 'variable':
                 continue # this isn't a lookup command!
@@ -278,7 +278,7 @@ def res_add_inst_var(inst, res):
                 inst['file'] += '_' + rep.value
                 break
     else: # append the value
-        inst['file'] += '_' + inst.get_fixup(res.value, '')
+        inst['file'] += '_' + inst.fixup[res.value, '']
         
 def res_add_variant(inst, res):
     '''This allows using a random instance from a weighted group.
@@ -337,7 +337,7 @@ def res_cust_output(inst, res):
     '''
     over_name = '@' + inst['targetname'] + '_indicator'
     for toggle in VMF.iter_ents(classname='func_instance'):
-        if toggle.get_fixup('indicator_name', '') == over_name:
+        if toggle.fixup['indicator_name', ''] == over_name:
             toggle_name = toggle['targetname']
             break
     else:
@@ -354,12 +354,12 @@ def res_cust_output(inst, res):
                 if kill_signs and (con_inst['file'] == INST_FILE['indPanTimer'] or
                                    con_inst['file'] == INST_FILE['indPanCheck']):
                     VMF.remove_ent(con_inst)
-                if dec_con_count and con_inst.has_fixup('connectioncount'):
+                if dec_con_count and 'connectioncount' in con_inst:
                 # decrease ConnectionCount on the ents,
                 # so they can still process normal inputs
                     try:
-                        val = int(con_inst.get_fixup('connectioncount'))
-                        con_inst.set_fixup('connectioncount', str(val-1))
+                        val = int(con_inst.fixup['connectioncount'])
+                        con_inst.fixup['connectioncount'] = str(val-1)
                     except ValueError:
                         # skip if it's invalid
                         utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
@@ -383,7 +383,7 @@ def res_cust_antline(inst, res):
     # allow replacing the indicator_toggle instance
     if res.value['instance']: 
         for toggle in VMF.iter_ents(classname='func_instance'):
-            if toggle.get_fixup('indicator_name', '') == over_name:
+            if toggle.fixup['indicator_name', ''] == over_name:
                 toggle['file'] = res.value['instance']
                 if len(res.value['outputs']) > 0:
                     for out in inst.outputs[:]:
@@ -404,13 +404,13 @@ def res_faith_mods(inst, res):
                     out.inst_in = res['angled_targ', 'animate_angled_relay']
                     out.input = res['angled_in', 'Trigger']
                     if fixup_var:
-                        inst.set_fixup(fixup_var, 'angled')
+                        inst.fixup[fixup_var] = 'angled'
                     break
                 elif out.inst_in == 'animate_straightup_relay':
                     out.inst_in = res['straight_targ', 'animate_straightup_relay']
                     out.input = res['straight_in', 'Trigger']
                     if fixup_var:
-                        inst.set_fixup(fixup_var, 'straight')
+                        inst.fixup[fixup_var] = 'straight'
                     break
             else:
                 continue # Check the next trigger
@@ -431,7 +431,7 @@ def res_cust_fizzler(base_inst, res):
         )
     for inst in VMF.iter_ents(classname='func_instance'):
         if inst['targetname', ''] in model_targetnames:
-            if inst.get_fixup('skin', '0') == '2':
+            if inst.fixup['skin', '0'] == '2':
                 # This is a laserfield! We can't edit that!
                 utils.con_log('CustFizzler excecuted on LaserField!')
                 return
@@ -444,7 +444,7 @@ def res_cust_fizzler(base_inst, res):
                 unique_ind += 1
                 inst['targetname'] += str(unique_id)
                 
-            for key, value in base_inst.iter_fixups():
+            for key, value in base_inst.fixup.items():
                 inst.set_fixup(key, value)
                 
     new_brush_config = list(res.find_all('brush'))

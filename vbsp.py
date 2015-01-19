@@ -385,28 +385,28 @@ def get_map_info():
         elif file == FILE_SP_EXIT:
             game_mode = 'SP'
         elif file == INST_FILE['spEntry']:
-            is_preview = item.get_fixup('no_player_start') == '0'
+            is_preview = item.fixup['no_player_start'] == '0'
             
         elif file.startswith(FILE_COOP_CORR):
-            is_preview = item.get_fixup('no_player_start') == '0'
+            is_preview = item.fixup['no_player_start'] == '0'
             voice_timer_pos['exit'] = (
                 item.get_fixup('timer_delay', '0')
                 )
         elif file.startswith(FILE_SP_ENTRY_CORR):
             voice_timer_pos['entry'] = (
-                item.get_fixup('timer_delay', '0')
+                item.fixup['timer_delay', '0']
                 )
         elif file.startswith(FILE_SP_EXIT_CORR):
             voice_timer_pos['exit'] = (
-                item.get_fixup('timer_delay', '0')
+                item.fixup['timer_delay', '0']
                 )
         elif file == FILE_COOP_ENTRY:
             voice_timer_pos['entry'] = (
-                item.get_fixup('timer_delay', '0')
+                item.fixup['timer_delay', '0']
                 )
         elif file == FILE_OBS:
             voice_timer_pos['obs'] = (
-                item.get_fixup('timer_delay', '0')
+                item.fixup['timer_delay', '0']
                 )
                 
         if item['file'] not in inst_files:
@@ -730,7 +730,7 @@ def change_overlays():
                     'angles': over['angles', '0 0 0'],
                     'file': sign_inst,
                     })
-                new_inst.set_fixup('mat', sign_type.replace('overlay.', ''))
+                new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
                 map.add_ent(new_inst)
                 conditions.check_inst(new_inst)
                 
@@ -877,12 +877,12 @@ def make_static_pan(ent, type):
         return False # no conversion allowed!
 
     angle="00"
-    if ent.get_fixup('animation') is not None:
+    if ent.fixup['animation'] is not None:
         # the 5:7 is the number in "ramp_45_deg_open"
-        angle = ent.get_fixup('animation')[5:7]
-    if ent.get_fixup('start_deployed') == "0":
+        angle = ent.fixup['animation'][5:7]
+    if ent.fixup['start_deployed'] == "0":
         angle = "00" # different instance flat with the wall
-    if ent.get_fixup('connectioncount') != "0":
+    if ent.fixup['connectioncount', '0'] != "0":
         return False
     # something like "static_pan/45_white.vmf"
     ent["file"] = get_opt("staticPan") + angle + "_" + type + ".vmf"
@@ -896,10 +896,10 @@ def make_static_pist(ent):
         return False # no conversion allowed!
 
     print("Trying to make static...")
-    bottom_pos = ent.get_fixup('bottom_level', '-1')
+    bottom_pos = ent.fixup['bottom_level', '-1']
 
-    if (ent.get_fixup('connectioncount') != "0" or
-            ent.get_fixup('disable_autodrop') != "0"): # can it move?
+    if (ent.fixup['connectioncount', '0'] != "0" or
+            ent.fixup['disable_autodrop'] != "0"): # can it move?
         if int(bottom_pos) > 0:
             # The piston doesn't go fully down, use alt instances.
             ent['file'] = ent['file'][:-4] + "_" + bottom_pos + ".vmf"
@@ -907,8 +907,8 @@ def make_static_pist(ent):
         ent['file'] = (
             get_opt("staticPan") + "pist_"
             + (
-                ent.get_fixup('top_level')
-                if ent.get_fixup('start_up') == "1"
+                ent.fixup['top_level', '1']
+                if ent.fixup['start_up'] == "1"
                 else bottom_pos
                 )
             + ".vmf"

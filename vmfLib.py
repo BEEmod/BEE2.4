@@ -737,7 +737,7 @@ class Entity():
     ent.copy() to duplicate an existing entity
 
     Supports [] operations to read and write keyvalues.
-    If reading instance $replace values use get_fixup(), set_fixup() and del_fixup().
+    To read instance $replace values operate on entity.fixup[]
     '''
     def __init__(
             self,
@@ -751,7 +751,7 @@ class Entity():
             hidden=False):
         self.map = map
         self.keys = {} if keys is None else keys
-        self._fixup = {} if fixup is None else fixup
+        self.fixup = EntityFixup({} if fixup is None else fixup)
         self.outputs = [] if outputs is None else outputs
         self.solids = [] if solids is None else solids
         self.id = map.get_id('ent', desired = id)
@@ -811,7 +811,10 @@ class Entity():
                 id = item.value
             elif name in _FIXUP_KEYS:
                 vals = item.value.split(" ",1)
-                fixup[vals[0][1:]] = (vals[1], item.name[-2:])
+                var = vals[0][1:] # Strip the $ sign
+                value = vals[1]
+                index = item.name[-2:] # Index is the last 2 digits
+                fixup[var.casefold()] = (var, value, index)
             elif name == "solid":
                 if item.has_children():
                     solids.append(Solid.parse(map, item))
@@ -872,10 +875,9 @@ class Entity():
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
         for key in sorted(self.keys.keys()):
             buffer.write(ind + '\t"' + key + '" "' + str(self.keys[key]) + '"\n')
-        if len(self._fixup) > 0:
-            for val in sorted(self._fixup.items(), key=lambda x: x[1][1]):
-                # we end up with (key, (val, index)) and we want to sort by the index
-                buffer.write(ind + '\t"replace' + val[1][1] + '" "$' + val[0] + " " + val[1][0] + '"\n')
+        
+        self.fixup.export(buffer, ind)
+            
         if self.is_brush():
             for s in self.solids:
                 s.export(buffer, ind=ind+'\t')
@@ -983,43 +985,6 @@ class Entity():
                 del self.keys[k]
                 break
 
-    def get_fixup(self, var, default=None):
-        '''Get the value of an instance $replace variable.'''
-        if var[0] == '$':
-            var = var[1:]
-        if var in self._fixup:
-            return self._fixup[var][0] # don't return the index
-        else:
-            return default
-
-    def has_fixup(self, var):
-        '''Determine if this instance has the named $replace variable.'''
-        return var in self._fixup
-
-    def set_fixup(self, var, val):
-        '''Set the value of an instance $replace variable, creating it if needed.'''
-        if var[0] == '$':
-            var = var[1:]
-        if var not in self._fixup:
-            max = 1
-            for i in self._fixup.values():
-                if int(i[1]) > max:
-                    max = int(i[1])
-            if max <9:
-                max = "0" + str(max)
-            else:
-                max = str(max)
-            self._fixup[var] = (val, max)
-        else:
-            self._fixup[var] = (val, self._fixup[var][1])
-
-    def rem_fixup(self, var):
-        '''Delete a instance $replace variable.'''
-        if var[0] == '$':
-            var = var[1:]
-        if var in self._fixup:
-            del self._fixup[var]
-
     get = __getitem__
 
     def has_key(self, key):
@@ -1057,6 +1022,88 @@ class Entity():
             return (bbox_min+bbox_max)/2
         else:
             return Vec(self['origin'].split(" "))
+            
+class EntityFixup:
+    '''A speciallised mapping which keeps track of the variable indexes.
+    
+    This also treats variable names case-insensitively, and strips $ 
+    signs off the front of them.
+    '''
+    
+    def __init__(self, fixes=None):
+        self._fixup = fixes or {}
+        # In _fixup each variable is stored as a tuple of (var_name, 
+        # value, index) with keys equal to the casefolded var name.
+        
+    def get(self, var, default=None):
+        '''Get the value of an instance $replace variable.'''
+        if var[0] == '$':
+            var = var[1:]
+        folded_var = var.casefold()
+        if folded_var in self._fixup:
+            return self._fixup[folded_var][1] # don't return the index
+        else:
+            return default
+
+    def __contains__(self, var):
+        '''Determine if this instance has the named $replace variable.'''
+        return var.casefold() in self._fixup
+        
+    def __getitem__(self, key):
+        if isinstance(key, tuple):
+            return self.get(key[0], default=key[1])
+        else:
+            return self.get(key)
+
+    def __setitem__(self, var, val):
+        '''Set the value of an instance $replace variable, creating it if needed.'''
+        if var[0] == '$':
+            var = var[1:]
+        folded_var = var.vasefold()
+        if folded_var not in self._fixup:
+            max = 1
+            for i in self._fixup.values():
+                if int(i[1]) > max:
+                    max = int(i[1])
+            if max < 9:
+                max = "0" + str(max)
+            else:
+                max = str(max)
+            self._fixup[folded_var] = (var, val, max)
+        else:
+            self._fixup[folded_var] = (var, val, self._fixup[var][2])
+
+    def __delitem__(self, var):
+        '''Delete a instance $replace variable.'''
+        if var[0] == '$':
+            var = var[1:]
+        var = var.casefold()
+        if var in self._fixup:
+            del self._fixup[var]
+            
+    def keys(self):
+        '''Iterate over all set variable names.'''
+        for value in self._fixup.values():
+            yield value[0]
+        
+    __iter__ = keys
+    
+    def items(self):
+        '''Iterate over all variable-value pairs.'''
+        for value in self._fixup.values():
+            yield value[0], value[1]
+            
+    def values(self):
+        for value in self._fixup.values():
+            yield value[1]
+            
+    def export(self, buffer, ind):
+        '''Export all the replace values into the VMF.'''
+        if len(self._fixup) > 0:
+            for (key, value, index) in sorted(self._fixup.values(), key=lambda x: x[2]):
+                    # we end up with (key, val, index) and we want to sort by the index
+                    buffer.write(ind + '\t"replace' + index + '" "$' + key + " " + value + '"\n')
+
 
 class Output:
     '''An output from one entity pointing to another.'''
