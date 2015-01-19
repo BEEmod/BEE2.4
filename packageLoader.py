@@ -144,15 +144,14 @@ def parse_package(zip, info, filename, pak_id, dispName):
         for object in info.find_all(comp_type):
             id = object['id']
             is_sub = object['overrideOrig', '0'] == '1'
-            if id in obj[comp_type]:
-                if is_sub:
-                    if id in obj_override[comp_type]:
-                        obj_override[comp_type][id].append((zip, object))
-                    else:
-                        obj_override[comp_type][id] = [(zip,object)]
+            if is_sub:
+                if id in obj_override[comp_type]:
+                    obj_override[comp_type][id].append((zip, object))
                 else:
-                    raise Exception('ERROR! "' + id + '" defined twice!')
+                    obj_override[comp_type][id] = [(zip,object)]
             else:
+                if id in obj[comp_type]:
+                    raise Exception('ERROR! "' + id + '" defined twice!')
                 objects += 1
                 obj[comp_type][id] = (zip, object, pak_id, dispName)
 
@@ -673,4 +672,4 @@ obj_types = {
     }
 
 if __name__ == '__main__':
-    load_packages('packages\\', True)
+    load_packages('packages\\', False)
