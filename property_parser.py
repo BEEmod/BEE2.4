@@ -84,9 +84,13 @@ class Property:
         Values can be passed in 4 ways:
         - A single value for the Property
         - A number of Property objects for the tree
-        - A set of keyword arguments which will be converted into Property objects
-        - A single dictionary which will be converted into Property objects
+        - A set of keyword arguments which will be converted into 
+          Property objects
+        - A single dictionary which will be converted into Property 
+          objects
         Values default to just ''.
+        If INVALID is passed as the only parameter, an Property object 
+        will be returned that has be marked as invalid.
         '''
         if name == INVALID:
             self.name = None
@@ -497,7 +501,7 @@ class Property:
         if self.valid:
             return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
         else:
-            return 'Property(<INVALID>)'
+            return 'Property(INVALID)'
 
     def __str__(self):
         return ''.join(self.export())

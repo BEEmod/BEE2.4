@@ -8,7 +8,7 @@ import itertools
 from enum import Enum
 from collections import defaultdict
 
-from property_parser import Property, KeyValError
+from property_parser import Property
 from utils import Vec
 import vmfLib as VLib
 import conditions
@@ -58,7 +58,7 @@ TEX_DEFAULTS = [ # extra default replacements we need to specially handle
     ("metal/black_wall_metal_002c",  "black.wall"),
     ("metal/black_wall_metal_002e",  "black.wall"),
     ("metal/black_wall_metal_002a",  "black.2x2"),
-    ("metal/black_wall_metal_002b",  "black.wall_4x4"),
+    ("metal/black_wall_metal_002b",  "black.4x4"),
     ("",                             "special.white"),
     ("",                             "special.black"),
     ("",                             "special.white_gap"),
@@ -82,21 +82,9 @@ WHITE_PAN = [
     "tile/white_wall_tile003c",
     "tile/white_wall_tile003f",
     ]
+    
 BLACK_PAN = [
     "metal/black_floor_metal_001c",
-    "metal/black_wall_metal_002c",
-    "metal/black_wall_metal_002e",
-    "metal/black_wall_metal_002a",
-    "metal/black_wall_metal_002b",
-    ]
-
-
-PANELS = [
-    "metal/black_floor_metal_001c",
-    "tile/white_floor_tile002a",
-    "tile/white_wall_tile003a",
-    "tile/white_wall_tile003h",
-    "tile/white_wall_tile003c",
     "metal/black_wall_metal_002c",
     "metal/black_wall_metal_002e",
     "metal/black_wall_metal_002a",
@@ -114,29 +102,29 @@ ANTLINES = {
     } # these need to be handled separately to accommodate the scale-changing
 
 DEFAULTS = {
-    "bottomless_pit"          : "0",
-    "remove_info_lighting"    : "0",
+    "bottomless_pit"          : "0", # Convert goo into bottomless pits
+    "remove_info_lighting"    : "0", # Remove the glass info_lighting ents
+    "remove_pedestal_plat"    : "0", # Remove pedestal button platforms
     "fix_glass"               : "0",
-    "fix_portal_bump"         : "0",
-    "random_blackwall_scale"  : "0",
-    "no_mid_voices"           : "0",
-    "use_screenshot"          : "0",
+    "fix_portal_bump"         : "0", # P1 style randomly sized black walls
+    "random_blackwall_scale"  : "0", 
+    "no_mid_voices"           : "0", # Remove the midpoint voice lines
     "force_fizz_reflect"      : "0",
     "force_brush_reflect"     : "0",
-    "remove_exit_signs"       : "0",
-    "force_paint"             : "0",
-    "sky"                     : "sky_black",
+    "remove_exit_signs"       : "0", # Remove the exit sign overlays
+    "force_paint"             : "0", # Force paintinmap = 1
+    "sky"                     : "sky_black", # Change the skybox
     "glass_scale"             : "0.15",
     "staticPan"               : "NONE",
     "signInst"                : "NONE",
     "glassInst"               : "NONE",
     "gratingInst"             : "NONE",
-    "clump_wall_tex"          : "0",
-    "clump_size"              : "4",
+    "clump_wall_tex"          : "0", # Use the clumping wall algorithm
+    "clump_size"              : "4", # The maximum dimensions of a clump
     "clump_width"             : "2",
-    "clump_number"            : "6",
-    "music_instance"          : "",
-    "music_soundscript"       : "",
+    "clump_number"            : "6", # The number of clumps created
+    "music_instance"          : "", # The instance for the chosen music
+    "music_soundscript"       : "", # The soundscript for the chosen music
     # default to the origin of the elevator instance
     # That's likely to be enclosed
     "music_location_sp"       : "-2000 2000 0",
@@ -239,7 +227,7 @@ def alter_mat(face, seed=None):
     if mat in TEX_VALVE: # should we convert it?
         face.mat = get_tex(TEX_VALVE[mat])
         return True
-    elif mat in PANELS:
+    elif mat in BLACK_PAN or mat in WHITE_PAN:
         type = 'white' if mat in WHITE_PAN else 'black'
         orient = get_face_orient(face)
         if orient == ORIENT.wall:
@@ -304,16 +292,6 @@ def load_settings():
     for prop in conf.find_all('instancefiles'):
         for key,val in INST_FILE.items():
             INST_FILE[key] = prop[key, val]
-
-    deathfield = conf.find_key("deathfield", [])
-    settings['deathfield'] = {
-        'left'     : deathfield['left', 'BEE2/fizz/lp/death_field_clean_left'],
-        'right'    : deathfield['right', 'BEE2/fizz/lp/death_field_clean_right'],
-        'center'   : deathfield['center', 'BEE2/fizz/lp/death_field_clean_center'],
-        'short'    : deathfield['short', 'BEE2/fizz/lp/death_field_clean_short'],
-        'texwidth' : VLib.conv_int(deathfield['texwidth', '_'], 512),
-        'scanline' : deathfield['scanline', settings['fizzler']['scanline']],
-        }
         
     for quote_block in conf.find_all("quotes_sp"):
         settings['voice_data_sp'] += quote_block.value
@@ -348,7 +326,6 @@ def load_settings():
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
 
-    process_inst_overlay(conf.find_all('instances', 'overlayInstance'))
     utils.con_log("Settings Loaded!")
 
 def load_map(path):
@@ -439,15 +416,6 @@ def get_map_info():
     utils.con_log("Is Preview: " + str(is_preview))
     
     return is_preview, game_mode, voice_timer_pos, inst_files
-
-def process_inst_overlay(lst):
-    for inst in lst:
-        try:
-            flag = inst['flag']
-            settings['overlay_inst'].append((flag,inst['file'], inst['name']))
-        except KeyValError:
-            util.con_log('Invalid instance overlay command detected!')
-            continue # ignore this one
 
 def process_packer(f_list):
     "Read packer commands from settings."
@@ -540,6 +508,14 @@ def change_brush():
                  get_opt("clump_size").isnumeric() and
                  get_opt("clump_width").isnumeric() and
                  get_opt("clump_number").isnumeric())
+                 
+    if get_opt('remove_pedestal_plat'):
+        # Remove the pedestal platforms
+        for ent in map.iter_ents(classname='func_detail'):
+            for side in ent.sides():
+                if side.mat.casefold() == 'plastic/plasticwall004a':
+                    map.remove_ent(ent)
+                    break # Skip to next entity
 
     if is_bottomless:
         pit_solids = []
@@ -551,6 +527,8 @@ def change_brush():
         for face in solid:
             is_glass=False
             if face.mat.casefold() in GOO_TEX:
+                # Force this voice attribute on, since conditions can't
+                # detect goo pits / bottomless pits
                 settings['has_attr']['goo'] = True
                 if is_bottomless:
                     if face.planes[2].z < pit_height:
@@ -558,7 +536,7 @@ def change_brush():
                         pit_solids.append((solid, face))
                     else:
                         face.mat = pit_goo_tex
-            if face.mat.casefold()=="glass/glasswindow007a_less_shiny":
+            if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
                 split_u=face.uaxis.split(" ")
                 split_v=face.vaxis.split(" ")
                 split_u[-1] = glass_scale # apply the glass scaling option
@@ -637,6 +615,7 @@ def clump_walls():
                 # These textures aren't always on grid, ignore them..
                 alter_mat(face)
                 continue
+                
             origin = face.get_origin().as_tuple()
             orient = get_face_orient(face)
             if orient is ORIENT.wall:
@@ -659,6 +638,7 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
+                    alter_mat(face, face_seed(face))
 
     todo_walls = len(walls) # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -1031,119 +1011,7 @@ def fix_inst():
             make_static_pan(inst, "glass") # white/black are identified based on brush
         if inst['file'] == INST_FILE['pistPlat']:
             make_static_pist(inst) #try to convert to static piston
-
-def death_fizzler_change(inst, trig):
-    '''Convert the passed fizzler brush into the required brushes for Death Fizzlers.
-    
-    The Death Fizzler has 4 brushes:
-      - new_trig: trigger_portal_cleanser with standard fizzler texture
-        for fizzler-only mode (-fizz_blue)
-      - trig: trigger_portal_cleanser with death fizzler texture for
-        both mode (-fizz_red)
-      - hurt: trigger_hurt for deathfield mode (-hurt)
-      - brush: func_brush for the deathfield-only mode (-brush)
-    '''
-    new_trig = trig.copy()
-    hurt = trig.copy()
-    brush = trig.copy()
-    map.add_ent(new_trig)
-    map.add_ent(hurt)
-    map.add_ent(brush)
-
-    for side in trig.sides():
-        if side.mat.casefold() in TEX_FIZZLER: #is this not nodraw?
-            # convert to death fizzler textures
-            side.mat = settings["deathfield"][TEX_FIZZLER[side.mat.casefold()]]
-    trig['targetname'] = inst['targetname'] + "-fizz_red"
-    trig['spawnflags'] = "9" # clients + physics objects
-
-    new_trig['targetname'] = inst['targetname'] + "-fizz_blue"
-    new_trig['spawnflags'] = "9" # clients + physics objects
-
-    # Create the trigger_hurt
-    is_short = False # if true we can shortcut for the brush
-    for side in trig.sides():
-        if side.mat.casefold() == "effects/fizzler":
-            is_short = True
-        side.mat = "tools/toolstrigger"
-
-    hurt['classname'] = "trigger_hurt"
-    hurt['targetname'] = inst['targetname'] + "-hurt"
-    hurt['spawnflags'] = "1" # clients only
-    hurt['damage'] = '100000'
-    hurt['damagetype'] ='1024'
-    hurt['nodmgforce'] = '1'
-
-    brush['targetname'] = inst['targetname'] + "-brush"
-    brush['classname'] = 'func_brush'
-    brush['spawnflags'] = "2"  # ignore player +USE
-    brush['solidity'] = '1' # not solid
-    brush['renderfx'] = '14' # constant glow
-    brush['drawinfastreflection'] ='1'
-
-    if is_short:
-        for side in brush.sides():
-            if "effects/fizzler" in side.mat.casefold():
-                side.mat=get_tex('special.laserfield')
-            alter_mat(mat) # convert to the styled version
-
-            uaxis = side.uaxis.split(" ")
-            vaxis = side.vaxis.split(" ")
-            # the format is like "[1 0 0 -393.4] 0.25"
-            side['uaxis'] = ' '.join(uaxis[:2]) + ' 0] 0.25'
-            side['vaxis'] = ' '.join(vaxis[:3]) + ' 0.25'
-    else:
-        # We need to stretch the brush to get rid of the side sections.
-        # This is the same as moving all the solids to match the
-        # bounding box. We first get the origin, used to figure out if
-        # a point should be set to the max or min axis.
-
-        origin = Vec(*[int(v) for v in brush['origin'].split(' ')])
-        bbox_max, bbox_min = brush.get_bbox()
-        for side in trig.sides():
-            for v in side.planes:
-                for ax in 'xyz':
-                    if int(v[ax]) > origin[ax]:
-                        v[ax] = str(bbox_max[ax])
-                    else:
-                        v[ax] = str(bbox_min[ax])
-
-        tex_width = settings['deathfield']['texwidth']
-        for side in brush.solids[1].sides:
-            if side.mat.casefold() == "effects/fizzler_center":
-                side.mat = get_tex('special.laserfield')
-            else:
-                side.mat = 'tools/toolsnodraw'
-            bounds_max, bounds_min = side.get_bbox()
-            dimensions = [0,0,0]
-            for i in range(3):
-                dimensions[i] = bounds_max[i] - bounds_min[i]
-            if 2 in dimensions: # The front/back won't have this dimension
-                side.mat = "tools/toolsnodraw"
-            else:
-                uaxis = side['uaxis'].split(" ")
-                vaxis = side['vaxis'].split(" ")
-                # the format is like "[1 0 0 -393.4] 0.25"
-                size = 0
-                offset = 0
-                for i, w in enumerate(dimensions):
-                    if int(w) > size:
-                        size = int(w)
-                        offset = int(bounds_min[i])
-                print(size)
-                print(uaxis[3], size)
-                side['uaxis'] = (
-                    " ".join(uaxis[:2]) + " " +
-                    # texture offset to fit properly
-                    str(tex_width/size * -offset) + "] " +
-                    str(size/tex_width) # scaling
-                    )
-                # widthwise it's always the same
-                side['vaxis'] = (" ".join(vaxis[:2]) + " 256] 0.25")
-        # we only want the middle one with the center, the others are
-        # useless
-        brush.solids = [brush.solids[1]]
-
+            
 def fix_worldspawn():
     "Adjust some properties on WorldSpawn."
     utils.con_log("Editing WorldSpawn")
