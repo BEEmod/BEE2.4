@@ -421,22 +421,32 @@ def res_cust_fizzler(base_inst, res):
     model_name = res['modelname', None]
     make_unique = res['UniqueModel', '0'] == '1'
     fizz_name = base_inst['targetname','']
-    if model_name is not None or make_unique:
+    if make_unique:
         unique_ind = 0
-        model_targetnames = (
-            fizz_name + '_modelStart',
-            fizz_name + '_modelEnd',
-            )
-        for inst in VMF.iter_ents(classname='func_instance'):
-            if inst['targetname', ''] in model_targetnames:
-                if model_name is not None:
-                    if model_name == '':
-                        inst['targetname'] = base_inst['targetname']
-                    else:
-                        inst['targetname'] = base_inst['targetname'] + '-' + model_name
-                if make_unique:
-                    unique_ind += 1
-                    inst['targetname'] += str(unique_id)
+        
+    # search for the model instances
+    model_targetnames = (
+        fizz_name + '_modelStart',
+        fizz_name + '_modelEnd',
+        )
+    for inst in VMF.iter_ents(classname='func_instance'):
+        if inst['targetname', ''] in model_targetnames:
+            if inst.get_fixup('skin', '0') == '2':
+                # This is a laserfield! We can't edit that!
+                utils.con_log('CustFizzler excecuted on LaserField!')
+                return
+            if model_name is not None:
+                if model_name == '':
+                    inst['targetname'] = base_inst['targetname']
+                else:
+                    inst['targetname'] = base_inst['targetname'] + '-' + model_name
+            if make_unique:
+                unique_ind += 1
+                inst['targetname'] += str(unique_id)
+                
+            for key, value in base_inst.iter_fixups():
+                inst.set_fixup(key, value)
+                
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) > 0:
         for orig_brush in VMF.iter_ents(

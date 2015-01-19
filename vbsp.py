@@ -1007,9 +1007,9 @@ def fix_inst():
                     inst_out='out',
                     ))
                     
-        if inst['file'] == INST_FILE['clearPanel']:
+        elif inst['file'] == INST_FILE['clearPanel']:
             make_static_pan(inst, "glass") # white/black are identified based on brush
-        if inst['file'] == INST_FILE['pistPlat']:
+        elif inst['file'] == INST_FILE['pistPlat']:
             make_static_pist(inst) #try to convert to static piston
             
 def fix_worldspawn():
@@ -1236,7 +1236,7 @@ if __name__ == '__main__':
             mode=GAME_MODE,
             inst_list=all_inst,
             )
-            
+        
         fix_inst()
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
