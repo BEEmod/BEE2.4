@@ -38,7 +38,13 @@ _UNLOCK_ITEMS = [
     'ITEM_COOP_ENTRY_DOOR',
     'ITEM_OBSERVATION_ROOM'
     ]
-    
+  
+# The source and desination locations of resources that must be copied 
+# into the game folder.
+CACHE_LOC = [
+    ('inst_cache/', 'sdk_content/maps/instances/BEE2'),
+    ('source_cache/', 'BEE2/'),
+    ]
 
 def init(tk):
     global trans_data, selectedGame_radio, root
@@ -133,11 +139,25 @@ class Game:
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
                         
+            clear_cache()
+            
     def refresh_cache(self):
-        dest = os.path.join(self.root, 'sdk_content/maps/instances/BEE2')
-        if os.path.isdir('inst_cache/'):
-            shutil.rmtree(dest, ignore_errors=True)
             shutil.copytree('inst_cache/', dest)
+        '''Copy over the resource files into this game.'''
+        for source, dest in CACHE_LOC:
+            dest = self.abs_path(INST_LOC)
+            try:
+                shutil.rmtree(dest)
+                shutil.copytree(source, dest)
+            except (IOError, shutil.Error):
+                pass
+            
+    def clear_cache(self):
+        for source, dest in CACHE_LOC:
+            try:
+                shutil.rmtree(self.abs_path(dest))
+            except (IOError, shutil.Error):
+                pass
             
     def export(self, style, all_items, music, skybox, goo, voice, styleVars):
         '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
@@ -267,9 +287,11 @@ def load(UI_quit_func, loadScreen_window):
     for gm in config:
         if gm != 'DEFAULT':
             try:
-                all_games.append(Game(gm, int(config[gm]['SteamID']), config[gm]['Dir']))
+                new_game = Game(gm, int(config[gm]['SteamID']), config[gm]['Dir'])
             except ValueError:
                 pass
+            else:
+                all_games.append(new_game)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen_window.withdraw()
@@ -384,6 +406,6 @@ if __name__ == '__main__':
     dropdown.game_pos = 0
     root['menu'] = menu
     
-    init()
-    load()
+    init(root)
+    load(quit, Toplevel())
     add_menu_opts(dropdown, setgame_callback)
