@@ -445,7 +445,7 @@ def res_cust_fizzler(base_inst, res):
                 inst['targetname'] += str(unique_id)
                 
             for key, value in base_inst.fixup.items():
-                inst.set_fixup(key, value)
+                inst.fixup[key] = value
                 
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) > 0:

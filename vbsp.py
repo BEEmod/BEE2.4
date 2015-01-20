@@ -233,7 +233,10 @@ def alter_mat(face, seed=None):
         if orient == ORIENT.wall:
             if (mat == 'metal/black_wall_metal_002b' or 
                     mat == 'tile/white_wall_tile_003f'):
-                orient = 'wall_4x4'
+                orient = '4x4'
+            elif (mat == 'metal/black_wall_metal_002a' or 
+                    mat == 'tile/white_wall_tile003c'):
+                orient = '2x2'
             else:
                 orient = 'wall'
         elif orient == ORIENT.floor:
@@ -390,7 +393,7 @@ def get_map_info():
         elif file.startswith(FILE_COOP_CORR):
             is_preview = item.fixup['no_player_start'] == '0'
             voice_timer_pos['exit'] = (
-                item.get_fixup('timer_delay', '0')
+                item.fixup['timer_delay', '0']
                 )
         elif file.startswith(FILE_SP_ENTRY_CORR):
             voice_timer_pos['entry'] = (
@@ -807,10 +810,9 @@ def add_extra_ents(mode):
             'fixup_style': '0',
             })
         has_cave = settings['style_vars'].get('multiversecave', '1') == '1'
-        global_pti_ents.set_fixup(
-            'disable_pti_audio', 
-            utils.bool_as_int(not has_cave),
-            )
+        global_pti_ents.fixup[
+            'disable_pti_audio'
+            ] = utils.bool_as_int(not has_cave)
         map.add_ent(global_pti_ents)
 
 def change_func_brush():

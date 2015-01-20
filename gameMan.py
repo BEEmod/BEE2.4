@@ -40,8 +40,9 @@ _UNLOCK_ITEMS = [
     ]
     
 
-def init():
-    global trans_data, selectedGame_radio
+def init(tk):
+    global trans_data, selectedGame_radio, root
+    root = tk
     selectedGame_radio = IntVar(value=0)
     try:
         with open('config/basemodui.txt', "r") as trans:
@@ -245,7 +246,7 @@ def find_steam_info(game_dir):
                             pass
                     elif not found_name and 'game ' in clean_line.casefold():
                         found_name = True
-                        ind =clean_line.casefold().rfind('game') + 4
+                        ind = clean_line.casefold().rfind('game') + 4
                         name = clean_line[ind:].strip().strip('"')
                     if found_name and found_id:
                         break

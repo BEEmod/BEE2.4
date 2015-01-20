@@ -26,28 +26,27 @@ import utils
 win=Tk()
 win.withdraw() # hide the main window while everything is loading, so
                # you don't see the bits appearing
-               
-gameMan.root=win
-gameMan.init()
+
+gameMan.init(win)
 
 # If image is not readable, use this instead
-png.img_error=png.loadPng('BEE2/error') 
+png.img_error = png.loadPng('BEE2/error') 
 
 # Holds the TK Toplevels, frames, widgets and menus
-windows={}
-frames={}
-UI={}
-menus={}
+windows = {}
+frames = {}
+UI = {}
+menus = {}
 
-pal_picked=[] # array of the picker icons
-pal_items=[] # array of the "all items" icons
+pal_picked = [] # array of the picker icons
+pal_items = [] # array of the "all items" icons
 pal_picked_fake = [] # Labels used for the empty palette positions
 pal_items_fake = [] # Labels for empty picker positions
 
-drag_item=-1 # the item currently being moved
-drag_orig_pos=-1
-drag_onPal=False # are we dragging a palette item?
-drag_passedPal=False # has the cursor passed over the palette
+drag_item = -1 # the item currently being moved
+drag_orig_pos = -1
+drag_onPal = False # are we dragging a palette item?
+drag_passedPal = False # has the cursor passed over the palette
 
 FILTER_CATS=('author','package','tags')
 FilterBoxes={} # the various checkboxes for the filters

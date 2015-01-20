@@ -1059,7 +1059,7 @@ class EntityFixup:
         '''Set the value of an instance $replace variable, creating it if needed.'''
         if var[0] == '$':
             var = var[1:]
-        folded_var = var.vasefold()
+        folded_var = var.casefold()
         if folded_var not in self._fixup:
             max = 1
             for i in self._fixup.values():
