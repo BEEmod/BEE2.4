@@ -94,12 +94,19 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
         
+    def is_modded(self):
+        return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
+        
     def edit_gameinfo(self, add_line=False):
         '''Modify all gameinfo.txt files to add or remove our line.
         
         Add_line determines if we are adding or removing it.
         '''
-        game_id = ''
+        
+        if self.is_modded() == add_line:
+            # It's already in the correct state!
+            return
+        
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
@@ -129,20 +136,21 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
-        if not add_line:
+        if add_line:
+            with open(self.abs_path('BEE2_EDIT_FLAG'), 'w') as file:
+                file.write('')
+        else:
+            os.remove(self.abs_path('BEE2_EDIT_FLAG'))
             # Restore the original files!
-            
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
                 if os.path.isfile(backup_path):
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
-                        
             clear_cache()
             
     def refresh_cache(self):
-            shutil.copytree('inst_cache/', dest)
         '''Copy over the resource files into this game.'''
         for source, dest in CACHE_LOC:
             dest = self.abs_path(INST_LOC)
@@ -211,7 +219,6 @@ class Game:
                                  
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
-        
         
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -292,6 +299,7 @@ def load(UI_quit_func, loadScreen_window):
                 pass
             else:
                 all_games.append(new_game)
+                new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen_window.withdraw()
