@@ -7,11 +7,10 @@ import shutil
 from config import ConfigFile
 
 from tkinter import * # ui library
-from tkinter import ttk
-from tkinter import font, messagebox # simple, standard modal dialogs
+from tkinter import messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
-from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
 
+from query_dialogs import ask_string
 from property_parser import Property
 import utils
 
@@ -148,7 +147,7 @@ class Game:
                 if os.path.isfile(backup_path):
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
-            clear_cache()
+            self.clear_cache()
             
     def refresh_cache(self):
         '''Copy over the resource files into this game.'''
@@ -318,6 +317,7 @@ def add_game(e=None, refresh_menu=True):
         message='Select the folder where the game executable is located '
                 '(portal2.exe)...',
         parent=root,
+        title='BEE2 - Add Game',
         )
     exe_loc = filedialog.askopenfilename(
         title='Find Game Exe',
@@ -332,25 +332,30 @@ def add_game(e=None, refresh_menu=True):
                 message='This does not appear to be a valid game folder!', 
                 parent=root, 
                 icon=messagebox.ERROR,
+                title='BEE2 - Add Game',
                 )
             return False
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = simpledialog.askstring(
+            name = ask_string(
                 prompt="Enter the name of this game:", 
-                title="BEE2",
+                title='BEE2 - Add Game',
                 )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR, 
                     parent=root,
                     message='This name is already taken!',
+                    title='BEE2 - Add Game',
                     )
+            elif name is None:
+                return False
             elif name == '':
                 messagebox.showinfo(
                     icon=messagebox.ERROR, 
                     parent=root,
                     message='Please enter a name for this game!',
+                    title='BEE2 - Add Game',
                     )
             else:
                 break
@@ -366,9 +371,19 @@ def add_game(e=None, refresh_menu=True):
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
     global selected_game, selectedGame_radio
-    if messagebox.askyesno(title="BEE2", message='Are you sure you want to delete "' + selected_game.name + '"?'):
+    confirm = messagebox.askyesno(
+        title="BEE2", 
+        message='Are you sure you want to delete "' 
+            + selected_game.name 
+            + '"?',
+        )
+    if confirm:
         if len(all_games) <= 1:
-            messagebox.showerror(message='You cannot remove every game from the list!', title='BEE2', parent=root)
+            messagebox.showerror(
+                message='You cannot remove every game from the list!', 
+                title='BEE2', 
+                parent=root,
+                )
         else:
             selected_game.edit_gameinfo(add_line=False)
             
@@ -385,7 +400,13 @@ def add_menu_opts(menu, callback=None):
     global selectedGame_radio, setgame_callback
     if callback is not None:
         setgame_callback = callback
-    menu.delete(menu.game_pos, 999)
+
+    for ind in range(menu.index(END), 0, -1):
+        # Delete all the old radiobutton
+        # Iterate backward to ensure indexes stay the same.
+        if menu.type(ind) == RADIOBUTTON:
+            menu.delete(ind)
+            
     for val, game in enumerate(all_games):
         menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
     setGame()

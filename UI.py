@@ -2,14 +2,13 @@ from tkinter import * # ui library
 from tkinter import ttk # themed ui components that match the OS
 from tkinter import messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
-from tkinter import simpledialog # Premade windows for asking for strings/ints/etc
 from functools import partial as func_partial
 import random
 import itertools
 import math
 
 import tkinter_png as png # png library for TKinter
-
+from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from selectorWin import selWin, Item as selWinItem
 from property_parser import Property
@@ -680,14 +679,18 @@ def selWin_callback(style_id, win_name):
         style_id = '<NONE>'
     gen_opts['Last_Selected'][win_name] = style_id
     
-def loadPalUI():
+def refresh_pal_ui():
     "Update the UI to show the correct palettes."
     palettes.sort(key=str) # sort by name
     UI['palette'].delete(0, END)
     for i,pal in enumerate(palettes):
         UI['palette'].insert(i,pal.name)
         
-    menus['pal'].delete(3, 999) # Delete the old entries
+    for ind in range(menus['pal'].index(END), 0, -1):
+        # Delete all the old radiobuttons
+        # Iterate backward to ensure indexes stay the same.
+        if menus['pal'].type(ind) == RADIOBUTTON:
+            menus['pal'].delete(ind)
     # Add a set of options to pick the palette into the menu system
     for val, pal in enumerate(palettes): 
         menus['pal'].add_radiobutton(
@@ -696,11 +699,12 @@ def loadPalUI():
             value=val,
             command=set_pal_radio,
             )
-        
     if len(palettes) < 2:
         UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
     else:
         UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
     
 def export_editoritems(e=None):
     '''Export the selected Items and Style into the chosen game.'''
@@ -742,7 +746,7 @@ def export_editoritems(e=None):
     # normally!
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
-    loadPalUI()
+    refresh_pal_ui()
     
 def set_stylevar(var):
     val = str(styleOptVars[var].get())
@@ -889,11 +893,17 @@ def set_pal_listbox_selection(e=None):
     '''Select the currently chosen palette in the listbox.'''
     UI['palette'].selection_clear(0,len(palettes))
     UI['palette'].selection_set(selectedPalette)
-    
 
-def set_palette():
+def set_palette(e=None):
+    '''Select a palette.'''
     gen_opts['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
+    menus['pal'].entryconfigure(
+        1, 
+        label='Delete Palette "' 
+        + palettes[selectedPalette].name
+        + '"',
+        )
     for item, sub in palettes[selectedPalette].pos:
         if item in item_list.keys():
             pal_picked.append(PalItem(
@@ -913,10 +923,10 @@ def pal_clear():
     pal_picked.clear()
     flowPreview()
 
-def pal_save_as():
+def pal_save_as(e=None):
     name = ""
     while True:
-        name = simpledialog.askstring(
+        name = ask_string(
             "BEE2 - Save Palette", 
             "Enter a name:",
             )
@@ -925,36 +935,38 @@ def pal_save_as():
         # Check for non-basic characters
         elif not utils.is_plain_text(name): 
             messagebox.showinfo(
-                icon="error",
-                title="BEE2",
+                icon=messagebox.ERROR,
+                title='BEE2',
                 message='Please only use basic characters in palette '
                         'names.',
+                parent=win,
                 )
         else:
             break
     paletteLoader.save_pal(pal_picked, name)
-    loadPalUI()
+    refresh_pal_ui()
 
-def pal_save():
+def pal_save(e=None):
     pal=palettes[selectedPalette]
     pal.pos = [(it.id, it.subKey) for it in pal_picked]
     pal.save(allow_overwrite=True) # overwrite it
-    loadPalUI()
+    refresh_pal_ui()
     
 def pal_remove():
     global selectedPalette
     if len(palettes) >= 2:
         pal = palettes[selectedPalette]
         if messagebox.askyesno(
-                title="BEE2", 
+                title='BEE2', 
                 message='Are you sure you want to delete "' 
                     + pal.name + '"?',
+                parent=win,
                 ):
             pal.delete_from_disk()
             del palettes[selectedPalette]
             selectedPalette -= 1
             selectedPalette_radio.set(selectedPalette)
-            loadPalUI()
+            refresh_pal_ui()
 
 def filterExpand(e):
     frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
@@ -1449,40 +1461,64 @@ def initMenuBar(win):
     win.option_add('*tearOff', False)
     
     # Name is used to make this the special 'BEE2' menu item on Mac
-    
     menus['file']=Menu(bar, name='apple') 
-    bar.add_cascade(menu=menus['file'], label='File')
+    file_menu = menus['file']
+    bar.add_cascade(menu=file_menu, label='File')
     
-    menus['file'].add_command(
+    file_menu.add_command(
         label="Export",
-        accelerator='Ctrl-E',
         command=export_editoritems,
+        accelerator='Ctrl-E',
         )
-    
     win.bind_all('<Control-e>', export_editoritems)
     
-    menus['file'].add_command(
+    file_menu.add_command(
         label="Add Game",
         command=gameMan.add_game,
-        )
-    menus['file'].add_command(
-        label="Remove Game",
+    )
+    file_menu.add_command(
+        label="Remove Selected Game",
         command=gameMan.remove_game,
         )
-    menus['file'].add_separator()
-    menus['file'].add_command(label="Quit", command=quit_application)
-    menus['file'].add_separator()
+    file_menu.add_separator()
+    file_menu.add_command(
+        label="Quit",
+        command=quit_application,
+        )
+    file_menu.add_separator()
     
-    menus['file'].game_pos = 7 # index for game items
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game) 
     gameMan.game_menu = menus['file']
     
+    
     menus['pal'] = Menu(bar)
-    bar.add_cascade(menu=menus['pal'], label='Palette')
-    menus['pal'].add_command(label='New...', command=pal_save_as)
-    menus['pal'].add_command(label='Clear', command=pal_clear)
-    menus['pal'].add_separator()
+    pal_menu = menus['pal']
+    bar.add_cascade(menu=pal_menu, label='Palette')
+    pal_menu.add_command(
+        label='Clear',
+        command=pal_clear,
+        )
+    pal_menu.add_command(
+        label='Delete Palette',
+        command=pal_remove,
+        )
+    pal_menu.add_command(
+        label='Save Palette',
+        command=pal_save,
+        accelerator='Ctrl-S',
+        )
+    pal_menu.add_command(
+        label='Save Palette As...',
+        command=pal_save_as,
+        accelerator='Ctrl-Shift-S'
+        )   
+    pal_menu.add_separator()
+    
+    # refresh_pal_ui() adds the palette menu options here.
+    
+    win.bind_all('<Control-s>', pal_save)
+    win.bind_all('<Control-Shift-s>', pal_save_as)
     
     menus['tools'] = Menu(bar)
     bar.add_cascade(menu=menus['tools'], label='Options')
@@ -1600,7 +1636,7 @@ def initMain():
 
     windows['opt']=SubPane(
         win,
-        title='BEE2 - Options',
+        title='Export Options',
         name='opt',
         resize_x=True,
         tool_frame=frames['toolMenu'],
@@ -1611,7 +1647,7 @@ def initMain():
 
     windows['style']=SubPane(
         win, 
-        title='BEE2 - Style Properties', 
+        title='Style Properties', 
         name='style',
         resize_y=True, 
         tool_frame=frames['toolMenu'], 
@@ -1721,7 +1757,7 @@ def initMain():
     
     
     win.bind("<Configure>", contextWin.follow_main, add='+')
-    loadPalUI()
+    refresh_pal_ui()
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     
