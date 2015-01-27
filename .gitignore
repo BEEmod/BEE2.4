@@ -8,13 +8,21 @@ Desktop.ini
 # Recycle Bin used on file shares
 $RECYCLE.BIN/
 
+# Compiled module files
 __pycache__/
-build_BEE2/
-build_compiler/
+
+#These folders are generated automatically by the BEE2
 images/cache/
 cache/
 inst_cache/
 source_cache/
+
+# Compiled application output
+build_BEE2/
+build_compiler/
+
+# Package source is in BEE2-items/
+packages/
 
 # Windows Installer files
 *.cab
