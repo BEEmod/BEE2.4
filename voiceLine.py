@@ -1,4 +1,6 @@
 import random
+import itertools
+import operator
 
 from property_parser import Property, KeyValError
 from utils import Vec
@@ -7,8 +9,8 @@ import utils
 
 INST_PREFIX = 'instances/BEE2/voice/'
 
-
 def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
+    '''Add a voice line to the map.'''
     print('Adding Voice!')
     if len(voice_data.value) == 0:
         print('No Data!')
@@ -37,14 +39,18 @@ def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
             return float(quote[0])
         except ValueError:
             return 0.0
-    for group in voice_data.find_all('group'):
+            
+    for group in itertools.chain(
+            voice_data.find_all('group'),
+            voice_data.find_all('midinst'),
+            ):
         QUOTE_TARGETNAME = group['Choreo_Name', '@choreo']
         possible_quotes = []
         for quote in group.find_all('quote'):
             valid_quote = True
             for flag in quote:
                 name = flag.name.casefold()
-                if name == 'instance' or name == 'midinst':
+                if name == 'instance':
                     continue
                 # break out if a flag is unsatisfied
                 if name == 'has' and map_attr[flag.value] is False:
@@ -63,17 +69,17 @@ def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
                     break
                     
             if valid_quote:
-                inst = list(quote.find_all('instance'))
-                if len(inst) > 0:
-                    possible_quotes.append((
-                        quote['priority', '0'],
-                        inst,
-                        ))
-                if ALLOW_MID_VOICES:
-                    for result in quote.find_all('midinst'):
-                        mid_quotes.append(result['file'])
-        possible_quotes.sort(key=sort_func)
-        if len(possible_quotes) > 0:
+                if ALLOW_MID_VOICES and group.name.casefold() == 'midinst':
+                    mid_quotes.extend(quote.find_all('instance', 'file'))
+                else:
+                    inst_list = list(quote.find_all('instance'))
+                    if inst_list:
+                        possible_quotes.append((
+                            quote['priority', '0'],
+                            inst_list,
+                            ))        
+        if possible_quotes:
+            possible_quotes.sort(key=sort_func)
             timer_val = config.get(
                 group['config', ''].casefold(),
                 '0')
@@ -102,7 +108,7 @@ def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
                         "targetname": QUOTE_TARGETNAME,
                         "origin": choreo_loc,
                         "scenefile": prop.value,
-                        "busyactor": "1",
+                        "busyactor": "1", # Wait for actor to stop talking
                         "onplayerdeath": "0",
                         }))
                 elif name == 'snd':
