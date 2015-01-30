@@ -254,10 +254,10 @@ def alter_mat(face, seed=None):
 
 def load_settings():
     '''Load in all our settings from vbsp_config.'''
-    if os.path.isfile("vbsp_config.cfg"): # do we have a config file?
-        with open("vbsp_config.cfg", "r") as config:
-            conf=Property.parse(config, 'vbsp_config.cfg')
-    else:
+    try:
+        with open("bee2/vbsp_config.cfg", "r") as config:
+            conf = Property.parse(config, 'bee2/vbsp_config.cfg')
+    except FileNotFoundError:
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
