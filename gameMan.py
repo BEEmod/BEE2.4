@@ -245,7 +245,7 @@ class Game:
                 editor_file.write(line)
    
         print('Writing VBSP Config!')
-        with open(self.abs_path('bin/vbsp_config.cfg'), 'w') as vbsp_file:
+        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
                         

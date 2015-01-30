@@ -136,6 +136,10 @@ class VMF:
     def add_ents(self, item):
         for i in item:
             self.add_ent(i)
+            
+    def create_ent(self, **kargs):
+        '''Quick method to allow creating point entities.'''
+        self.add_ent(Entity(self, keys=kargs))
 
     @staticmethod
     def parse(tree):
@@ -728,7 +732,7 @@ class Side:
         '''Return a string which describes this face, for use in texture randomisation.'''
         return self.planes[0].join(' ') + self.planes[1].join(' ') + self.planes[2].join(' ')
 
-class Entity():
+class Entity:
     '''A representation of either a point or brush entity.
 
     Creation:
@@ -770,14 +774,11 @@ class Entity():
     def copy(self, des_id=-1):
         '''Duplicate this entity entirely, including solids and outputs.'''
         new_keys = {}
-        new_fixup = {}
+        new_fixup = self.fixup._fixup.copy()
         new_editor = {}
         for key, value in self.keys.items():
             new_keys[key] = value
-
-        for key, value in self._fixup.items():
-            new_fixup[key] = (value[0],value[1])
-
+            
         for key, value in self.editor.items():
             if key != 'visgroup':
                 new_editor[key] = value

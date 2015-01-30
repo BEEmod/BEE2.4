@@ -6,6 +6,7 @@ from functools import partial as func_partial
 import random
 import itertools
 import math
+import operator
 
 import tkinter_png as png # png library for TKinter
 from query_dialogs import ask_string
@@ -552,7 +553,7 @@ def load_packages(data):
             filter_data['package'][it.pak_id] = it.pak_name
         loader.step("IMG")
         
-    stylevar_list = sorted(data['StyleVar'], key=lambda x: x.id)
+    stylevar_list = sorted(data['StyleVar'], key=operator.attrgetter('id'))
     
     for var in stylevar_list:
         var.default = gen_opts.get_bool('StyleVar', var.id, var.default)
@@ -572,7 +573,7 @@ def load_packages(data):
     for sel_list, obj_list, name in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(data[name], key=lambda o: o.name):
+        for obj in sorted(data[name], key=operator.attrgetter('name')):
             sel_list.append(selWinItem(
                 obj.id, 
                 obj.short_name,
@@ -1381,7 +1382,7 @@ def initFilterCol(cat, f):
     
     for ind, (id, name) in enumerate(sorted(
             filter_data[cat].items(), 
-            key=lambda x:x[1],
+            key=operator.itemgetter(1),
             )):
         FilterVars[cat][id]=IntVar(value=1)
         FilterBoxes[cat][id] = ttk.Checkbutton(

@@ -189,8 +189,8 @@ settings = {
             "pit"                : {},
             "deathfield"         : {},
 
-            "style_vars"         : defaultdict(lambda: False),
-            "has_attr"           : defaultdict(lambda: False),
+            "style_vars"         : defaultdict(bool),
+            "has_attr"           : defaultdict(bool),
 
             "voice_data_sp"      : Property("Quotes_SP", []),
             "voice_data_coop"    : Property("Quotes_COOP", []),
@@ -263,7 +263,7 @@ def load_settings():
 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
 
-    for item,key in tex_defaults: # collect textures from config
+    for item, key in tex_defaults: # collect textures from config
         cat, name = key.split(".")
         value = [prop.value for prop in conf.find_all('textures', cat, name)]
         if len(value)==0:
@@ -293,7 +293,7 @@ def load_settings():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
     for prop in conf.find_all('instancefiles'):
-        for key,val in INST_FILE.items():
+        for key, val in INST_FILE.items():
             INST_FILE[key] = prop[key, val]
         
     for quote_block in conf.find_all("quotes_sp"):
@@ -304,7 +304,7 @@ def load_settings():
 
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
-            settings['style_vars'][var.name.casefold()] = var.value
+            settings['style_vars'][var.name.casefold()] = VLib.conv_bool(var.value)
 
     for pack_block in conf.find_all('packer'):
         for pack_cmd in pack_block:
@@ -451,8 +451,16 @@ def make_bottomless_pit(solids):
             # subtract 95.5 from z axis to make it 0.5 units thick
             # we do the decimal with strings to ensure it adds floats precisely
     pit_height = settings['pit']['height']
+    
+    # To figure out what positions need edge pieces, we use a dict
+    # indexed by XY tuples. The four Nones match the NSEW directions.
+    # For each trigger, we loop through the grid points it's in. We
+    # set all the center parts to None, but set the 4 neighbouring
+    # blocks if they aren't None.
+    # If a value = None, it is occupied by goo.
     edges = defaultdict(lambda: [None, None, None, None])
     dirs = [
+        # index, x, y, angles
         (0, 0, 128,  '0 270 0'), # North
         (1, 0, -128, '0 90 0'), # South
         (2, 128, 0,  '0 180 0'), # East
@@ -467,7 +475,7 @@ def make_bottomless_pit(solids):
                 trig['spawnflags'] = '4106' # Physics and npcs
                 trig['landmark'] = tele_ref
                 trig['target'] = tele_dest
-                trig.outputs = [] # remove the usual outputs
+                trig.outputs.clear()
                 print('box:', trig.get_bbox())
                 for x in range(int(bbox_min.x), int(bbox_max.x), 128):
                     for y in range(int(bbox_min.y), int(bbox_max.y), 128):
@@ -1237,6 +1245,7 @@ if __name__ == '__main__':
             preview=IS_PREVIEW, 
             mode=GAME_MODE,
             inst_list=all_inst,
+            inst_files=INST_FILE,
             )
         
         fix_inst()
