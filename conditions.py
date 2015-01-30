@@ -1,4 +1,5 @@
 import random
+from operator import itemgetter
 
 from property_parser import Property, NoKeyError
 from utils import Vec
@@ -22,6 +23,12 @@ ANTLINES = {
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     }
     
+def print(*args, print_=print, **kargs):
+    if 'flush' in kargs:
+        del kargs['flush']
+    print_(*[repr(arg) for arg in args], flush=True, **kargs)
+utils.con_log = print
+    
 def add(prop_block):
     '''Add a condition to the list.'''
     flags = []
@@ -42,10 +49,11 @@ def add(prop_block):
             "priority": priority,
             }
         conditions.append(con)
-
-def init(settings, vmf, seed, preview, mode, inst_list):
+ 
+def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
     # Get a bunch of values from VBSP, since we can't import directly.
-    global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW, GAME_MODE, ALL_INST
+    global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW
+    global GAME_MODE, ALL_INST, INST_FILES
     VMF = vmf
     STYLE_VARS = settings['style_vars']
     VOICE_ATTR = settings['has_attr']
@@ -54,9 +62,10 @@ def init(settings, vmf, seed, preview, mode, inst_list):
     IS_PREVIEW = preview
     GAME_MODE = mode
     ALL_INST = inst_list
+    INST_FILES = {key.casefold(): value for key,value in inst_files.items()}
     
     # Sort by priority, where higher = done earlier
-    conditions.sort(key=lambda cond: cond['priority'], reverse=True)
+    conditions.sort(key=itemgetter('priority'), reverse=True)
     setup_cond()
 
 def check_all():
@@ -110,7 +119,7 @@ def run_cond(inst, cond):
     for flag in cond['flags']:
         if not check_flag(flag, inst):
             return
-    
+
     inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
     for res in cond['results']:
         try: 
@@ -124,14 +133,15 @@ def run_cond(inst, cond):
     
     
 def check_flag(flag, inst):
+    print('checking ' + flag.name + '(' + str(flag.value) + ') on ' + inst['file'])
     try: 
         func = FLAG_LOOKUP[flag.name.casefold()]
     except KeyError:
         utils.con_log('"' + flag.name + '" is not a valid condition flag!')
         return False
     else:
-        return func(inst, flag)
-        
+        res = func(inst, flag)
+        return res
 def variant_weight(var):
     '''Read variant commands from settings and create the weight list.'''
     count = var['number', '']
@@ -159,6 +169,7 @@ def variant_weight(var):
         return [''] # This won't append anything to the file
 
 def add_output(inst, prop, target):
+    '''Add a customisable output to an instance.'''
     inst.add_out(VLib.Output(
         prop['output',''],
         target,
@@ -166,6 +177,15 @@ def add_output(inst, prop, target):
         inst_in=prop['targ_in',''],
         inst_out=prop['targ_out',''],
         ))
+        
+def resolve_inst_path(path):
+    '''Allow referring to the instFile section in condtion parameters.'''
+    if path.startswith('<') and path.endswith('>'):
+        try:
+            path = INST_FILES[path[1:-1].casefold()]
+        except KeyError:
+            utils.con_log(path + ' not found in instanceFiles block!')
+    return path.casefold()
         
 ###########
 ## FLAGS ##
@@ -196,24 +216,24 @@ def flag_nand(inst, flag):
     return not flag_and(inst,flag)
     
 def flag_file_equal(inst, flag):
-    return inst['file'].casefold() == flag.value.casefold()
+    return inst['file'].casefold() == resolve_inst_path(flag.value)
     
 def flag_file_cont(inst, flag):
-    return flag.value.casefold() in inst['file'].casefold()
+    return resolve_inst_path(flag.value) in inst['file'].casefold()
     
 def flag_has_inst(inst, flag):
     '''Return true if the filename is present anywhere in the map.'''
-    return flag.value.casefold() in HAS_INST
+    return resolve_inst_path(flag.value) in HAS_INST
     
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
     return inst.fixup[bits[0]] == bits[1]
     
 def flag_stylevar(inst, flag):
-    return STYLE_VARS[flag.value.casefold()]
+    return bool(STYLE_VARS[flag.value.casefold()])
     
 def flag_voice_has(inst, flag):
-    return VOICE_ATTR[flag.value]
+    return bool(VOICE_ATTR[flag.value])
     
 def flag_music(inst, flag):
     return OPTIONS['music_id'] == flag.value
@@ -238,7 +258,7 @@ def flag_is_preview(inst, flag):
    
 def res_change_instance(inst, res):
     '''Set the file to a value.'''
-    inst['file'] = res.value
+    inst['file'] = resolve_inst_path(res.value)
     
 def res_add_suffix(inst, res):
     '''Add the specified suffix to the filename.'''
@@ -308,7 +328,7 @@ def res_add_global_inst(inst, res):
             new_inst = VLib.Entity(VMF, keys={
                 "classname" : "func_instance",
                 "targetname" : res['name', ''],
-                "file" : res['file'],
+                "file" : resolve_inst_path(res['file']),
                 "angles" : res['angles', '0 0 0'],
                 "origin" : res['position', '0 0 -10000'],
                 "fixup_style" : res['fixup_style', '0'],
@@ -320,10 +340,11 @@ def res_add_global_inst(inst, res):
             res.value = None # Disable this
 def res_add_overlay_inst(inst, res):
     '''Add another instance on top of this one.'''
+    print('adding overlay', res['file'])
     new_inst = VLib.Entity(VMF, keys={
         "classname" : "func_instance",
         "targetname" : inst['targetname'],
-        "file" : res['file', ''],
+        "file" : resolve_inst_path(res['file', '']),
         "angles" : inst['angles'],
         "origin" : inst['origin'],
         "fixup_style" : res['fixup_style', '0'],
@@ -395,10 +416,11 @@ def res_cust_antline(inst, res):
                 break # Stop looking!
                         
 def res_faith_mods(inst, res):
+    '''Modify the trigger_catrapult that is created for ItemFaithPlate items.'''
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
     for trig in VMF.iter_ents(classname="trigger_catapult"):
-        if inst['targetname']  in trig['targetname']:
+        if inst['targetname'] in trig['targetname']:
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
                     out.inst_in = res['angled_targ', 'animate_angled_relay']
@@ -568,7 +590,7 @@ FLAG_LOOKUP = {
     'nor': flag_nor,
     'nand': flag_nand,
     'instance': flag_file_equal,
-    'instfile': flag_file_cont,
+    'instpart': flag_file_cont,
     'instvar': flag_instvar,
     'hasinst': flag_has_inst,
     'stylevar': flag_stylevar,
