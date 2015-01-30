@@ -11,19 +11,6 @@ $RECYCLE.BIN/
 # Compiled module files
 __pycache__/
 
-#These folders are generated automatically by the BEE2
-images/cache/
-cache/
-inst_cache/
-source_cache/
-
-# Compiled application output
-build_BEE2/
-build_compiler/
-
-# Package source is in BEE2-items/
-packages/
-
 # Windows Installer files
 *.cab
 *.msi
@@ -57,7 +44,27 @@ Icon
 *.prt
 *.filelist.txt
 
+# Compiled application output
+build_BEE2/
+build_compiler/
+
+# Package source is in BEE2-items/
+packages/
+
+# The auto-generated palette
+palettes/LAST_EXPORT.zip
+
 # Ignore dev output
 test_out.vmf
 preview_styled.vmf
-palettes/LAST_EXPORT.zip
+
+#These folders are generated automatically by the BEE2
+images/cache/
+cache/
+inst_cache/
+source_cache/
+
+# The config files automaticall regenerate with the defaults.
+config/item_configs.cfg
+config/config.cfg
+config/games.cfg
