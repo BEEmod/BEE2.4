@@ -207,6 +207,7 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
             
+        vbsp_config.set_key(('Options', 'BEE2_loc'), os.getcwd())
             
         # If there are multiple of these blocks, merge them together
         vbsp_config.merge_children('Conditions', 
@@ -240,11 +241,13 @@ class Game:
                             prop.value = '1'
         
         print('Writing Editoritems!')
+        os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
    
         print('Writing VBSP Config!')
+        os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
