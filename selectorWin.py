@@ -20,7 +20,17 @@ class Item:
     '''An item on the panel.
     
     '''
-    __slots__ = ('name', 'shortName', 'longName', 'icon', 'desc', 'authors', 'button', 'win', 'context_lbl')
+    __slots__ = [
+        'name', 
+        'shortName', 
+        'longName',
+        'icon',
+        'desc',
+        'authors',
+        'button',
+        'win',
+        'context_lbl',
+        ]
     def __init__(
             self,
             name, 
@@ -47,7 +57,7 @@ class Item:
         return '<Item:' + self.name + '>'
 
 class selWin: 
-    "The selection window for skyboxes, music, goo and voice packs."
+    '''The selection window for skyboxes, music, goo and voice packs.'''
     def __init__(
             self,
             tk, 
@@ -78,6 +88,7 @@ class selWin:
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = png.loadPng('BEE2/none_96')
         self.disp_label = StringVar()
+        self.display = None
         self.chosen_id = None
         self.callback = callback
         self.callback_params = callback_params
@@ -100,6 +111,7 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
         
+        # PanedWindow allows resizing the two areas independently.
         self.pane_win = ttk.Panedwindow(self.win, orient=HORIZONTAL)
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
         
@@ -110,11 +122,12 @@ class selWin:
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
         
-        
+        # We need to use a canvas to allow scrolling.
         self.wid_canvas = Canvas(shim, highlightthickness=0)
-        self.wid_canvas.grid(row=0, column=0, sticky="NSEW") # need to use a canvas to allow scrolling
-
-        self.pal_frame=ttk.Frame(self.wid_canvas) # add another frame inside to place labels on
+        self.wid_canvas.grid(row=0, column=0, sticky="NSEW") 
+        
+        # Add another frame inside to place labels on.
+        self.pal_frame=ttk.Frame(self.wid_canvas) 
         self.wid_canvas.create_window(1, 1, window=self.pal_frame, anchor="nw")
         
         self.wid_scroll = ttk.Scrollbar(shim, orient=VERTICAL, command=self.wid_canvas.yview)
@@ -123,10 +136,18 @@ class selWin:
         
         self.sugg_lbl = ttk.LabelFrame(self.pal_frame, text="Suggested", labelanchor=N, height=50)
         
+        # Holds all the widgets which provide info for the current item.
         self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
         self.prop_frm.columnconfigure(1, weight=1)
         
-        self.prop_icon_frm = ttk.Frame(self.prop_frm, borderwidth=4, relief='raised', width=ICON_SIZE, height=ICON_SIZE)
+        # Border around the selected item icon.
+        self.prop_icon_frm = ttk.Frame(
+            self.prop_frm,
+            borderwidth=4,
+            relief='raised',
+            width=ICON_SIZE,
+            height=ICON_SIZE,
+            )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
         
         self.prop_icon = ttk.Label(self.prop_icon_frm)
@@ -134,7 +155,12 @@ class selWin:
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column = 0)
         
-        self.prop_name = ttk.Label(self.prop_frm, text="Item", justify=CENTER, font=("Helvetica", 12, "bold"))
+        self.prop_name = ttk.Label(
+            self.prop_frm,
+            text="Item",
+            justify=CENTER,
+            font=("Helvetica", 12, "bold"),
+            )
         self.prop_name.grid(row=1, column = 0, columnspan=4)
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
         self.prop_author.grid(row=2, column = 0, columnspan=4)
@@ -145,39 +171,87 @@ class selWin:
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
         
-        self.prop_desc = tkRichText(self.prop_desc_frm, width=40, height=16, font="TkSmallCaptionFont")
-        self.prop_desc.grid(row=0, column=0, padx=(2,0), pady=2, sticky="NSEW")
+        self.prop_desc = tkRichText(
+            self.prop_desc_frm,
+            width=40,
+            height=16,
+            font="TkSmallCaptionFont",
+            )
+        self.prop_desc.grid(
+            row=0,
+            column=0,
+            padx=(2,0),
+            pady=2,
+            sticky='NSEW',
+            )
         
-        self.prop_scroll = ttk.Scrollbar(self.prop_desc_frm, orient=VERTICAL, command=self.prop_desc.yview)
+        self.prop_scroll = ttk.Scrollbar(
+            self.prop_desc_frm,
+            orient=VERTICAL,
+            command=self.prop_desc.yview,
+            )
         self.prop_scroll.grid(row=0, column=1, sticky="NS", padx=(0,2), pady=2)
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
         
+        ttk.Button(
+            self.prop_frm,
+            text = "OK",
+            command=self.save,
+            ).grid(
+                row=5,
+                column=0,
+                padx=(8,8),
+                )
+                
         if self.has_def:
-            self.prop_reset = ttk.Button(self.prop_frm, text = "Reset to Default", command=self.sel_suggested)
-            self.prop_reset.grid(row=5, column=1, sticky = "EW")
-        
-        self.prop_ok = ttk.Button(self.prop_frm, text = "OK", command=self.save)
-        self.prop_cancel = ttk.Button(self.prop_frm, text = "Cancel", command=self.exit)
-        
-        self.prop_ok.grid(row=5, column=0, padx=(8,8))
-        self.prop_cancel.grid(row=5, column=2, padx=(8,8))
+            self.prop_reset = ttk.Button(
+                self.prop_frm,
+                text="Reset to Default",
+                command=self.sel_suggested,
+                )
+            self.prop_reset.grid(
+                row=5,
+                column=1,
+                sticky='EW',
+                )  
+                
+        ttk.Button(
+            self.prop_frm,
+            text="Cancel",
+            command=self.exit,
+            ).grid(
+                row=5,
+                column=2,
+                padx=(8,8),
+                )
         
         self.win.option_add('*tearOff', False)
         self.context_menu = Menu(self.win)
-        self.sugg_font = font.nametofont('TkMenuFont')
+        # Make a bold version of the context menu font
+        self.sugg_font = font.nametofont('TkMenuFont').copy()
         self.sugg_font['weight'] = 'bold'
         self.context_var = IntVar()
         
         for ind, item in enumerate(self.item_list):
             if item==self.noneItem:
-                item.button = ttk.Button(self.pal_frame, image=item.icon)
+                item.button = ttk.Button(
+                    self.pal_frame,
+                    image=item.icon,
+                    )
                 item.context_lbl = '<None>'
             else:
-                item.button = ttk.Button(self.pal_frame, text=item.shortName, image=item.icon, compound='top')
+                item.button = ttk.Button(
+                    self.pal_frame,
+                    text=item.shortName,
+                    image=item.icon,
+                    compound='top',
+                    )
             self.context_menu.add_radiobutton(
             label=item.context_lbl, 
             command=func_partial(self.sel_item_id, item.name),
-            var = self.context_var, value=ind)
+            var=self.context_var,
+            value=ind,
+            )
             
             item.win = self.win
             item.button.bind("<Button-1>", func_partial(self.sel_item, item))
@@ -216,13 +290,22 @@ class selWin:
         
     def set_disp(self, e=None):
         '''Set the display textbox.'''
+        # Bold the text if the suggested item is selected (like the 
+        # context menu). We check for truthness to ensure it's actually
+        # initialised.
+        if self.display:
+            if self.selected == self.suggested:
+                self.display['font'] = self.sugg_font
+            else:
+                self.display['font'] = 'TkMenuFont'   
+            
         if self.selected == self.noneItem:
             self.disp_label.set("<None>")
             self.chosen_id = None
         else:
             self.disp_label.set(self.selected.context_lbl)
             self.chosen_id = self.selected.name
-        self.orig_selected=self.selected
+        self.orig_selected = self.selected
         self.context_var.set(self.item_list.index(self.selected))
         return "break" # stop the entry widget from continuing with this event
             
@@ -241,6 +324,7 @@ class selWin:
             self.display.winfo_rooty() + self.display.winfo_height())
         
     def sel_suggested(self):
+        '''Select the suggested item.'''
         if self.suggested is not None:
             self.sel_item(self.suggested)
             
@@ -302,7 +386,10 @@ class selWin:
             item.button.lift()
             
     def __contains__(self, obj):
-        if isinstance(obj, Item):
+        '''Determine if the given SelWinItem or item ID is in this item list.'''
+        if obj == '<None>':
+            return self.noneItem in self.item_list
+        elif isinstance(obj, Item):
             return obj in self.item_list
         else:
             for item in self.item_list:
@@ -320,7 +407,7 @@ class selWin:
         if self.suggested is not None:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
-                font='')
+                font='TkMenuFont')
             # Remove the font from the last suggested item
         
         if suggested == None:
