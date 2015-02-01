@@ -5,9 +5,11 @@ from tkinter import font
 import os
 import itertools
 import functools
+import operator
 
 from property_parser import Property
 from config import ConfigFile
+import tkinter_png as png
 import utils
 
 voice_item = None
@@ -65,6 +67,8 @@ def save():
     print('Saving Configs!')
     config_sp.save_check()
     config_coop.save_check()
+    config_mid_sp.save_check()
+    config_mid_coop.save_check()
     win.withdraw()
     
 def refresh(e=None):
@@ -80,12 +84,29 @@ def refresh(e=None):
             notebook.forget(tab)
         else:
             notebook.add(tab)
-            notebook.tab(tab, text=tab.nb_text)
+            if tab.nb_is_mid:
+                # For the midpoint tabs, we use a special image to make
+                # sure they are well-distinguished from the other groups.
+                notebook.tab(
+                    tab,
+                    compound='image',
+                    image=png.loadPng('icons/mid_quote'),
+                    )
+            else:
+                notebook.tab(tab, text=tab.nb_text)
             
     for name, tab in sorted(TABS_COOP.items()):
         if is_coop:
             notebook.add(tab)
-            notebook.tab(tab, text=tab.nb_text)
+            if tab.nb_is_mid:
+                notebook.tab(
+                    tab, 
+                    compound='image',
+                    image=png.loadPng('icons/mid_quote'),
+                    )
+            else:
+                notebook.tab(tab, text=tab.nb_text)
+
         else:
             notebook.forget(tab)
     notebook.select(current_tab)
@@ -183,7 +204,7 @@ def init(root):
     
 def show(quote_pack):
     '''Display the editing window.'''
-    global voice_item, config_sp, config_coop
+    global voice_item, config_sp, config_coop, config_mid_sp, config_mid_coop
     voice_item = quote_pack
     
     notebook = UI['tabs']
@@ -193,6 +214,8 @@ def show(quote_pack):
     os.makedirs('config/voice', exist_ok=True)
     config_sp = ConfigFile('voice/SP_' + quote_pack.id + '.cfg')
     config_coop = ConfigFile('voice/COOP_' + quote_pack.id + '.cfg')
+    config_mid_sp = ConfigFile('voice/MID_SP_' + quote_pack.id + '.cfg')
+    config_mid_coop = ConfigFile('voice/MID_COOP_' + quote_pack.id + '.cfg')
     
     # Destroy all the old tabs
     for tab in itertools.chain(
@@ -208,22 +231,42 @@ def show(quote_pack):
     TABS_SP.clear()
     TABS_COOP.clear()
     
-    for group in quote_data.find_all('quotes_sp', 'group'):
-        make_tab(group, TABS_SP, config_sp, 'sp')
-    for group in quote_data.find_all('quotes_coop', 'group'):
-        make_tab(TABS_COOP, config_coop, 'coop')
-        
+    add_tabs(quote_data, 'quotes_sp', TABS_SP, config_sp)
+    add_tabs(quote_data, 'quotes_coop', TABS_COOP, config_coop)
+    
     config_sp.save()
     config_coop.save()
+    config_mid_sp.save()
+    config_mid_coop.save()
     
     refresh()
     win.deiconify()
     win.lift(win.winfo_parent())
     utils.center_win(win) # Center inside the parent
+    
+def add_tabs(quote_data, section, tab_dict, config):
+    '''Add all the tabs for one of the game modes.'''
+    for group in quote_data.find_all(section, 'group'):
+        frame = make_tab(
+            group,
+            tab_dict,
+            config,
+            is_mid=False,
+            )
+    
+    mid_quotes = list(quote_data.find_all(section, 'midchamber'))
+    if len(mid_quotes) > 0:
+        frame = make_tab(
+            mid_quotes[0],
+            tab_dict,
+            config,
+            is_mid=True,
+            )
+        frame.nb_text = ''
 
-def make_tab(group, tab_dict, config, mode):
+def make_tab(group, tab_dict, config, is_mid=False):
     '''Create all the widgets for a tab.'''
-    group_name = group['name']
+    group_name = group['name', 'No Name!']
     group_desc = group['desc', '']
     # This is just to hold the canvas and scrollbar
     outer_frame = ttk.Frame(UI['tabs'])
@@ -234,7 +277,7 @@ def make_tab(group, tab_dict, config, mode):
     # We add this attribute so the refresh() method knows all the 
     # tab names
     outer_frame.nb_text = group_name
-    
+    outer_frame.nb_is_mid = is_mid
     
     # We need a canvas to make the list scrollable.
     canv = Canvas(
@@ -263,6 +306,10 @@ def make_tab(group, tab_dict, config, mode):
     # <Configure>.
     canv.frame = frame
     
+    if is_mid:
+        group_name = 'Mid - Chamber'
+        group_desc = 'Lines played during normal gameplay'
+        
     ttk.Label(
         frame,
         text=group_name,
@@ -273,7 +320,7 @@ def make_tab(group, tab_dict, config, mode):
             column=0, 
             sticky='EW',
             )
-            
+    
     ttk.Label(
         frame,
         text=group_desc + ':',
@@ -298,7 +345,7 @@ def make_tab(group, tab_dict, config, mode):
     for quote in sorted_quotes:
         ttk.Label(
             frame, 
-            text=quote['name'],
+            text=quote['name', 'No Name!'],
             font=QUOTE_FONT,
             ).grid(
                 column=0,
@@ -335,6 +382,8 @@ def make_tab(group, tab_dict, config, mode):
                 )
             check.bind("<Enter>", show_trans)
     canv.bind('<Configure>', configure_canv)
+    
+    return outer_frame
 
 
 if __name__ == '__main__':
