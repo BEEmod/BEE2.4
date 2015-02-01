@@ -65,6 +65,14 @@ def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     elif y > max_y:
         y = max_y
     return x, y
+    
+def center_win(window):
+    '''Center a subwindow to be inside a parent window.'''
+    parent = window.nametowidget(window.winfo_parent())
+    
+    x = parent.winfo_rootx() + window.winfo_width()//2
+    y = parent.winfo_rooty() + window.winfo_height()//2
+    window.geometry('+' + str(x) + '+' + str(y))
 
 class Vec:
     '''A 3D Vector. This has most standard Vector functions.'''

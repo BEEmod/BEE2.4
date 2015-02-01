@@ -262,11 +262,10 @@ class selWin:
         self.pane_win.add(shim, weight=1)
         self.pane_win.add(self.prop_frm)
         
-    def init_display(self, frame, row=0, column=0, colspan=1, rowspan=1):
-        '''Create and grid() the label used to open the selector window.'''
+    def widget(self, frame):
+        '''Create and return the special textbox used to open the selector window.'''
         
         self.display = ttk.Entry(frame, textvariable=self.disp_label, cursor='arrow')
-        self.display.grid(row=row, column=column, columnspan=colspan, rowspan=rowspan, sticky="EW")
         self.display.bind("<Button-1>", self.open_win)
         self.display.bind("<Key>", self.set_disp)
         self.display.bind("<Button-3>", self.open_context)
@@ -275,6 +274,8 @@ class selWin:
         self.disp_btn.pack(side=RIGHT)
         
         self.save()
+        
+        return self.display
         
     def exit(self, e=None):
         '''Quit and cancel, choosing the originally-selected item.'''

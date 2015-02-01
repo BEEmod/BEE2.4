@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import ttk
 
 import os
+import itertools
 
 from property_parser import Property
 from config import ConfigFile
@@ -45,11 +46,12 @@ def configure_canv(e):
         canvas.winfo_reqwidth(),
         frame.winfo_reqheight(),
         )
-    print(canvas.winfo_width())
-    frame['width'] = canvas.winfo_width()
+    frame['width'] = canvas.winfo_reqwidth()
     
 def save():
-    pass
+    config_sp.save()
+    config_coop.save()
+    win.withdraw()
     
 def refresh(e=None):
     notebook = UI['tabs']
@@ -79,6 +81,8 @@ def init(root):
     global win
     win = Toplevel(root, name='voiceEditor')
     win.columnconfigure(0, weight=1)
+    win.transient(master=root)
+    win.withdraw()
     
     btn_frame = ttk.Frame(win)
     btn_frame.grid(row=0, column=0, sticky='EW')
@@ -103,12 +107,13 @@ def init(root):
     
     pane = ttk.PanedWindow(
         win,
-        orient=VERTICAL)
-        
+        orient=VERTICAL,
+        )
+    UI['pane'] = pane
     pane.grid(row=1, column=0, sticky='NSEW')
     win.rowconfigure(1, weight=1)
     
-    UI['tabs'] = ttk.Notebook(pane, name='notebook')
+    UI['tabs'] = ttk.Notebook(pane)
     UI['tabs'].enable_traversal() # Add keyboard shortcuts
     pane.add(UI['tabs'], weight=2)
     
@@ -134,7 +139,7 @@ def init(root):
     UI['trans'] = Text(
         trans_inner_frame,
         width=10, 
-        height=8,
+        height=10,
         wrap='word',
         relief='flat',
         state='disabled',
@@ -154,6 +159,9 @@ def init(root):
         text='Save',
         command=save,
         ).grid(row=2, column=0)
+        
+    pane.rowconfigure(0, minsize=100)
+    pane.rowconfigure(1, minsize=100)
     
 def show(quote_pack):
     '''Display the editing window.'''
@@ -169,30 +177,33 @@ def show(quote_pack):
     config_coop = ConfigFile('voice/COOP_' + quote_pack.id + '.cfg')
     
     # Destroy all the old tabs
-    for tab in TABS_SP.values():
-        notebook.forget(tab)
+    for tab in itertools.chain(
+            TABS_SP.values(),
+            TABS_COOP.values(),
+            ):
+        try:
+            notebook.forget(tab)
+        except TclError:
+            pass
         tab.destroy()
-    for tab in TABS_COOP.values():
-        notebook.forget(tab)
-        tab.destroy()
+        
     TABS_SP.clear()
     TABS_COOP.clear()
-    
-    make_tabs(quote_data.find_key('quotes_sp'), TABS_SP, config_sp, 'sp')
-    make_tabs(quote_data.find_key('quotes_coop'), TABS_COOP, config_coop, 'coop')
+    make_tabs(quote_data.find_key('quotes_sp', []), TABS_SP, config_sp, 'sp')
+    make_tabs(quote_data.find_key('quotes_coop', []), TABS_COOP, config_coop, 'coop')
     config_sp.save()
     config_coop.save()
     
     refresh()
     win.deiconify()
     win.lift(win.winfo_parent())
+    utils.center_win(win) # Center inside the parent
 
 def make_tabs(props, tab_dict, config, mode):
     '''Create all the widgets for a tab.'''
     for group in props.find_all('Group'):
         group_name = group['name']
         group_desc = group['desc', '']
-        print(group_name, group_desc)
         # This is just to hold the canvas and scrollbar
         outer_frame = ttk.Frame(UI['tabs'])
         outer_frame.columnconfigure(0, weight=1)
@@ -208,7 +219,6 @@ def make_tabs(props, tab_dict, config, mode):
         canv = Canvas(
             outer_frame, 
             highlightthickness=0,
-            name=mode + '_' + group_name + '_canv',
             )
         scroll = ttk.Scrollbar(
         outer_frame,
@@ -221,11 +231,9 @@ def make_tabs(props, tab_dict, config, mode):
         
         UI['tabs'].add(outer_frame)
         
-        
         # This holds the actual elements
         frame = ttk.Frame(
-            canv, 
-            name=mode + '_' + group_name + '_frame',
+            canv,
             )
         frame.columnconfigure(0, weight=1)
         canv.create_window(0, 0, window=frame, anchor="nw")
@@ -298,7 +306,9 @@ if __name__ == '__main__':
     data = packageLoader.load_packages('packages\\', False)
 
     root = Tk()
-    ttk.Label(root, text='Root Window').grid()
+    lab = ttk.Label(root, text='Root Window')
+    lab.bind('<Button-1>', lambda e: show(d['BEE2_CAVE_50s']))
+    lab.grid()
     init(root)
     d = {quote.id: quote for quote in data['QuotePack']}
     print(d)

@@ -16,8 +16,8 @@ from property_parser import Property
 from config import ConfigFile
 
 import sound as snd
-#import packageLoader as package
 import loadScreen as loader
+import voiceEditor
 import paletteLoader
 import contextWin
 import gameMan
@@ -490,7 +490,6 @@ def quit_application():
     
     gen_opts.save_check()
     item_opts.save_check()
-    
     # Destroy the TK windows
     win.destroy()
     exit(0)
@@ -584,12 +583,40 @@ def load_packages(data):
             obj_list[obj.id] = obj
             loader.step("IMG")
             
+            
+    def win_callback(style_id, win_name):
+        '''Callback for the selector windows.
+        
+        This saves into the config file the last selected item.
+        '''
+        if style_id is None:
+            style_id = '<NONE>'
+        gen_opts['Last_Selected'][win_name] = style_id
+        
+    def voice_callback(style_id):
+        '''Special callback for the voice selector window.
+        
+        The configuation button is disabled whin no music is selected.
+        '''
+        try:
+            if style_id is None:
+                style_id = '<NONE>'
+                UI['conf_voice'].state(['disabled'])
+                UI['conf_voice']['image'] = png.loadPng('icons/gear_disabled')
+            else:
+                UI['conf_voice'].state(['!disabled'])
+                UI['conf_voice']['image'] = png.loadPng('icons/gear')
+        except KeyError:
+            # When first initialising, conf_voice won't exist!
+            pass
+        gen_opts['Last_Selected']['Voice'] = style_id
+            
     skybox_win = selWin(
         win, 
         sky_list, 
         title='Select Skyboxes', 
         has_none=False,
-        callback=selWin_callback,
+        callback=win_callback,
         callback_params=['Skybox'],
         )
         
@@ -599,8 +626,7 @@ def load_packages(data):
         title='Select Additional Voice Lines', 
         has_none=True, 
         none_desc='Add no extra voice lines.',
-        callback=selWin_callback,
-        callback_params=['Voice'],
+        callback=voice_callback,
         )
         
     music_win = selWin(
@@ -609,7 +635,7 @@ def load_packages(data):
         title='Select Background Music',
         has_none=True,
         none_desc='Add no music to the map at all.',
-        callback=selWin_callback,
+        callback=win_callback,
         callback_params=['Music'],
         )
         
@@ -620,7 +646,7 @@ def load_packages(data):
         has_none=True,
         none_desc='Use a Bottomless Pit instead. This changes appearance'
                   'depending on the skybox that is chosen.',
-        callback=selWin_callback,
+        callback=win_callback,
         callback_params=['Goo'],
         )
                    
@@ -674,11 +700,6 @@ def style_select_callback(style_id):
     for win, sugg_val in zip(win_types, sugg):
         win.set_suggested(sugg_val)
     refresh_stylevars()
-    
-def selWin_callback(style_id, win_name):
-    if style_id is None:
-        style_id = '<NONE>'
-    gen_opts['Last_Selected'][win_name] = style_id
     
 def refresh_pal_ui():
     "Update the UI to show the correct palettes."
@@ -1067,6 +1088,7 @@ def initPalette(f):
     ttk.Sizegrip(f).grid(row=2, column=1)
         
 def initOption(f):
+    '''Initialise the options pane.'''
     f.columnconfigure(0,weight=1)
     ttk.Button(
         f,
@@ -1085,19 +1107,20 @@ def initOption(f):
         ).grid(row=2, sticky="EW", padx=5, pady=(0, 10))
 
     props=ttk.LabelFrame(f, text="Properties", width="50")
-    props.columnconfigure(1,weight=1)
+    props.columnconfigure(1, weight=1)
     props.grid(row=3, sticky="EW")
-    ttk.Sizegrip(
-        props,
-        cursor='sb_h_double_arrow',
-        ).grid(row=2,column=3, sticky="NS")
     
     UI['suggested_style'] = ttk.Button(
         props,
         text="\u2193 Use Suggested \u2193",
         command=suggested_style_set,
         )
-    UI['suggested_style'].grid(row=1, column=1, sticky="EW")
+    UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
+    
+    def configure_voice():
+        chosen = voices.get(voice_win.chosen_id, None)
+        if chosen is not None:   
+            voiceEditor.show(chosen)
 
     ttk.Label(props, text="Style: ").grid(row=0)
     ttk.Label(props, text="Music: ").grid(row=2)
@@ -1105,11 +1128,34 @@ def initOption(f):
     ttk.Label(props, text="Skybox: ").grid(row=4)
     ttk.Label(props, text="Goo: ").grid(row=5)
     
-    style_win.init_display(props, row=0, column=1)
-    music_win.init_display(props, row=2, column=1)
-    voice_win.init_display(props, row=3, column=1)
-    skybox_win.init_display(props, row=4, column=1)
-    goo_win.init_display(props, row=5, column=1)
+    voice_frame = ttk.Frame(props)
+    voice_frame.columnconfigure(1, weight=1)
+    UI['conf_voice'] = ttk.Button(
+        voice_frame,
+        image=png.loadPng('icons/gear'),
+        command=configure_voice,
+        width=8,
+        )
+    UI['conf_voice'].grid(row=0, column=0, sticky='NS')
+        
+    # Make all the selector window textboxes
+    style_win.widget(props).grid(row=0, column=1, sticky='EW')
+    music_win.widget(props).grid(row=2, column=1, sticky='EW')
+    voice_frame.grid(row=3, column=1, sticky='EW')
+    skybox_win.widget(props).grid(row=4, column=1, sticky='EW')
+    goo_win.widget(props).grid(row=5, column=1,sticky='EW')
+    
+    voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
+    
+    ttk.Sizegrip(
+        props,
+        cursor='sb_h_double_arrow',
+        ).grid(
+            row=0, 
+            column=5, 
+            rowspan=5,
+            sticky="NS",
+            )
 
 def initStyleOpt(f):
     global styleCheck, styleCheck_enabled, styleCheck_disabled, styleOptVars
@@ -1690,6 +1736,7 @@ def initMain():
     windows['opt'].bind("<Button-1>",contextWin.hideProps)
     windows['pal'].bind("<Button-1>",contextWin.hideProps)
     
+    voiceEditor.init(win)
     contextWin.init(win)
     initDragIcon(win)
     loader.step('UI')
