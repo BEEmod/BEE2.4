@@ -1,8 +1,10 @@
 from tkinter import *
 from tkinter import ttk
+from tkinter import font
 
 import os
 import itertools
+import functools
 
 from property_parser import Property
 from config import ConfigFile
@@ -16,6 +18,13 @@ coop_selected = False
 TABS_SP = {}
 TABS_COOP = {}
 
+def quote_sort_func(quote):
+    '''The quotes will be sorted by their priority value.'''
+    try:
+        return float(quote['priority', '0'])
+    except ValueError:
+        return 0.0
+            
 def modeswitch_sp():
     global coop_selected
     coop_selected = False
@@ -37,6 +46,10 @@ def show_trans(e):
     text.insert('end', e.widget.transcript)
     text['state'] = 'disabled'
     
+def check_toggled(var, config_section, quote_id):
+    '''Update the config file to match the checkbox.'''
+    config_section[quote_id] = utils.bool_as_int(var.get())
+    
 def configure_canv(e):
     canvas = e.widget
     frame = canvas.frame
@@ -49,8 +62,9 @@ def configure_canv(e):
     frame['width'] = canvas.winfo_reqwidth()
     
 def save():
-    config_sp.save()
-    config_coop.save()
+    print('Saving Configs!')
+    config_sp.save_check()
+    config_coop.save_check()
     win.withdraw()
     
 def refresh(e=None):
@@ -78,7 +92,11 @@ def refresh(e=None):
 
 def init(root):
     '''Initialise all the widgets.'''
-    global win
+    global win, QUOTE_FONT
+    
+    QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
+    QUOTE_FONT['weight'] = 'bold'
+    
     win = Toplevel(root, name='voiceEditor')
     win.columnconfigure(0, weight=1)
     win.transient(master=root)
@@ -267,11 +285,18 @@ def make_tabs(props, tab_dict, config, mode):
             column=0,
             sticky='EW',
             )
+                
+        sorted_quotes = sorted(
+            group.find_all('Quote'),
+            key = quote_sort_func,
+            reverse=True,
+            )
             
-        for quote in group.find_all('Quote'):
+        for quote in sorted_quotes:
             ttk.Label(
                 frame, 
                 text=quote['name'],
+                font=QUOTE_FONT,
                 ).grid(
                     column=0,
                     sticky=W,
@@ -288,6 +313,13 @@ def make_tabs(props, tab_dict, config, mode):
                     )
                 check.transcript = '\n'.join(
                     ['"' + trans.value + '"'
+                
+                check['command'] = functools.partial(
+                    check_toggled,
+                    check.quote_var,
+                    config[group_name],
+                    line_id,
+                    )
                     for trans in
                     line.find_all('trans')
                     ])
@@ -297,7 +329,7 @@ def make_tabs(props, tab_dict, config, mode):
                     padx=(10, 0),
                     sticky=W,
                     )
-                check.bind("<Enter>", show_trans) 
+                check.bind("<Enter>", show_trans)
         canv.bind('<Configure>', configure_canv)
 
 
