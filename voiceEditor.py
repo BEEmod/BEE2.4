@@ -311,8 +311,7 @@ def make_tabs(props, tab_dict, config, mode):
                 check.quote_var = IntVar(
                     value=config.get_bool(group_name, line_id, True),
                     )
-                check.transcript = '\n'.join(
-                    ['"' + trans.value + '"'
+                check['variable'] = check.quote_var
                 
                 check['command'] = functools.partial(
                     check_toggled,
@@ -320,10 +319,12 @@ def make_tabs(props, tab_dict, config, mode):
                     config[group_name],
                     line_id,
                     )
+                    
+                check.transcript = '\n\n'.join(
+                    ['"' + trans.value + '"'
                     for trans in
                     line.find_all('trans')
-                    ])
-                check['variable'] = check.quote_var
+                    ])  
                 check.grid(
                     column=0,
                     padx=(10, 0),
