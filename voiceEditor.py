@@ -121,6 +121,9 @@ def init(root):
     win = Toplevel(root, name='voiceEditor')
     win.columnconfigure(0, weight=1)
     win.transient(master=root)
+    win.iconbitmap('BEE2.ico')
+    win.protocol("WM_DELETE_WINDOW", win.withdraw)
+    win.bind("<Escape>", win.withdraw)
     win.withdraw()
     
     btn_frame = ttk.Frame(win)
@@ -207,6 +210,7 @@ def show(quote_pack):
     global voice_item, config_sp, config_coop, config_mid_sp, config_mid_coop
     voice_item = quote_pack
     
+    win.title('BEE2 - Configure "' + voice_item.name + '"')
     notebook = UI['tabs']
     
     quote_data = quote_pack.config
@@ -397,4 +401,4 @@ if __name__ == '__main__':
     init(root)
     d = {quote.id: quote for quote in data['QuotePack']}
     print(d)
-    show(d['BEE2_CAVE_50s'])
+    show(d['BEE2_GLADOS_CLEAN'])
