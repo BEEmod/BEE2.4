@@ -207,8 +207,12 @@ def show(quote_pack):
         
     TABS_SP.clear()
     TABS_COOP.clear()
-    make_tabs(quote_data.find_key('quotes_sp', []), TABS_SP, config_sp, 'sp')
-    make_tabs(quote_data.find_key('quotes_coop', []), TABS_COOP, config_coop, 'coop')
+    
+    for group in quote_data.find_all('quotes_sp', 'group'):
+        make_tab(group, TABS_SP, config_sp, 'sp')
+    for group in quote_data.find_all('quotes_coop', 'group'):
+        make_tab(TABS_COOP, config_coop, 'coop')
+        
     config_sp.save()
     config_coop.save()
     
@@ -217,121 +221,120 @@ def show(quote_pack):
     win.lift(win.winfo_parent())
     utils.center_win(win) # Center inside the parent
 
-def make_tabs(props, tab_dict, config, mode):
+def make_tab(group, tab_dict, config, mode):
     '''Create all the widgets for a tab.'''
-    for group in props.find_all('Group'):
-        group_name = group['name']
-        group_desc = group['desc', '']
-        # This is just to hold the canvas and scrollbar
-        outer_frame = ttk.Frame(UI['tabs'])
-        outer_frame.columnconfigure(0, weight=1)
-        outer_frame.rowconfigure(0, weight=1)
-        
-        tab_dict[group_name] = outer_frame
-        # We add this attribute so the refresh() method knows all the 
-        # tab names
-        outer_frame.nb_text = group_name
-        
-        
-        # We need a canvas to make the list scrollable.
-        canv = Canvas(
-            outer_frame, 
-            highlightthickness=0,
-            )
-        scroll = ttk.Scrollbar(
-        outer_frame,
-        orient=VERTICAL,
-        command=canv.yview,
+    group_name = group['name']
+    group_desc = group['desc', '']
+    # This is just to hold the canvas and scrollbar
+    outer_frame = ttk.Frame(UI['tabs'])
+    outer_frame.columnconfigure(0, weight=1)
+    outer_frame.rowconfigure(0, weight=1)
+    
+    tab_dict[group_name] = outer_frame
+    # We add this attribute so the refresh() method knows all the 
+    # tab names
+    outer_frame.nb_text = group_name
+    
+    
+    # We need a canvas to make the list scrollable.
+    canv = Canvas(
+        outer_frame, 
+        highlightthickness=0,
         )
-        canv['yscrollcommand'] = scroll.set
-        canv.grid(row=0, column=0, sticky='NSEW')
-        scroll.grid(row=0, column=1, sticky='NS')
-        
-        UI['tabs'].add(outer_frame)
-        
-        # This holds the actual elements
-        frame = ttk.Frame(
-            canv,
-            )
-        frame.columnconfigure(0, weight=1)
-        canv.create_window(0, 0, window=frame, anchor="nw")
-        
-        # We do this so we can adjust the scrollregion later in 
-        # <Configure>.
-        canv.frame = frame
-        
-        ttk.Label(
-            frame,
-            text=group_name,
-            anchor='center',
-            font='tkHeadingFont',
-            ).grid(
-                row=0, 
-                column=0, 
-                sticky='EW',
-                )
-                
-        ttk.Label(
-            frame,
-            text=group_desc + ':',
-            ).grid(
-                row=1, 
-                column=0, 
-                sticky='EW',
-                )
-                
-        ttk.Separator(frame, orient=HORIZONTAL).grid(
-            row=2,
-            column=0,
+    scroll = ttk.Scrollbar(
+    outer_frame,
+    orient=VERTICAL,
+    command=canv.yview,
+    )
+    canv['yscrollcommand'] = scroll.set
+    canv.grid(row=0, column=0, sticky='NSEW')
+    scroll.grid(row=0, column=1, sticky='NS')
+    
+    UI['tabs'].add(outer_frame)
+    
+    # This holds the actual elements
+    frame = ttk.Frame(
+        canv,
+        )
+    frame.columnconfigure(0, weight=1)
+    canv.create_window(0, 0, window=frame, anchor="nw")
+    
+    # We do this so we can adjust the scrollregion later in 
+    # <Configure>.
+    canv.frame = frame
+    
+    ttk.Label(
+        frame,
+        text=group_name,
+        anchor='center',
+        font='tkHeadingFont',
+        ).grid(
+            row=0, 
+            column=0, 
             sticky='EW',
             )
-                
-        sorted_quotes = sorted(
-            group.find_all('Quote'),
-            key = quote_sort_func,
-            reverse=True,
+            
+    ttk.Label(
+        frame,
+        text=group_desc + ':',
+        ).grid(
+            row=1, 
+            column=0, 
+            sticky='EW',
             )
             
-        for quote in sorted_quotes:
-            ttk.Label(
-                frame, 
-                text=quote['name'],
-                font=QUOTE_FONT,
-                ).grid(
-                    column=0,
-                    sticky=W,
-                    )
+    ttk.Separator(frame, orient=HORIZONTAL).grid(
+        row=2,
+        column=0,
+        sticky='EW',
+        )
             
-            for line in quote.find_all('Instance'):
-                line_id = line['id', line['name']]
-                check = ttk.Checkbutton(    
-                    frame,
-                    text=line['name'],
-                    )
-                check.quote_var = IntVar(
-                    value=config.get_bool(group_name, line_id, True),
-                    )
-                check['variable'] = check.quote_var
+    sorted_quotes = sorted(
+        group.find_all('Quote'),
+        key = quote_sort_func,
+        reverse=True,
+        )
+        
+    for quote in sorted_quotes:
+        ttk.Label(
+            frame, 
+            text=quote['name'],
+            font=QUOTE_FONT,
+            ).grid(
+                column=0,
+                sticky=W,
+                )
+        
+        for line in quote.find_all('Instance'):
+            line_id = line['id', line['name']]
+            check = ttk.Checkbutton(    
+                frame,
+                text=line['name'],
+                )
+            check.quote_var = IntVar(
+                value=config.get_bool(group_name, line_id, True),
+                )
+            check['variable'] = check.quote_var
+            
+            check['command'] = functools.partial(
+                check_toggled,
+                check.quote_var,
+                config[group_name],
+                line_id,
+                )
                 
-                check['command'] = functools.partial(
-                    check_toggled,
-                    check.quote_var,
-                    config[group_name],
-                    line_id,
-                    )
-                    
-                check.transcript = '\n\n'.join(
-                    ['"' + trans.value + '"'
-                    for trans in
-                    line.find_all('trans')
-                    ])  
-                check.grid(
-                    column=0,
-                    padx=(10, 0),
-                    sticky=W,
-                    )
-                check.bind("<Enter>", show_trans)
-        canv.bind('<Configure>', configure_canv)
+            check.transcript = '\n\n'.join(
+                ['"' + trans.value + '"'
+                for trans in
+                line.find_all('trans')
+                ])  
+            check.grid(
+                column=0,
+                padx=(10, 0),
+                sticky=W,
+                )
+            check.bind("<Enter>", show_trans)
+    canv.bind('<Configure>', configure_canv)
 
 
 if __name__ == '__main__':
