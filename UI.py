@@ -92,7 +92,7 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
-class Item():
+class Item:
     '''Represents an item that can appear on the list.'''
     def __init__(self, item):
         self.ver_list = sorted(item.versions.keys())
@@ -495,15 +495,17 @@ def quit_application():
     exit(0)
     
 def set_mute():
+    '''Apply the muted setting based on the variable.'''
     snd.muted = (muted.get()==1)
     gen_opts['General']['mute_sounds'] = str(muted.get())
     
 def load_palette(data):
     '''Import in all defined palettes.'''
     global palettes
-    palettes=data
+    palettes = data
     
 def load_settings(settings):
+    '''Load options from the general config file.'''
     global gen_opts
     gen_opts = settings
     
@@ -523,7 +525,7 @@ def load_settings(settings):
         selectedPalette_radio.set(int(gen_opts['Last_Selected']['palette']))
     except (KeyError, ValueError):
         pass # It'll be set to the first palette by default, and then saved
-    gen_opts.has_changed=False
+    gen_opts.has_changed = False
     
 def load_packages(data):
     '''Import in the list of items and styles from the packages.
@@ -592,11 +594,12 @@ def load_packages(data):
         if style_id is None:
             style_id = '<NONE>'
         gen_opts['Last_Selected'][win_name] = style_id
+        suggested_refresh()
         
     def voice_callback(style_id):
         '''Special callback for the voice selector window.
         
-        The configuation button is disabled whin no music is selected.
+        The configuration button is disabled whin no music is selected.
         '''
         try:
             if style_id is None:
@@ -610,6 +613,7 @@ def load_packages(data):
             # When first initialising, conf_voice won't exist!
             pass
         gen_opts['Last_Selected']['Voice'] = style_id
+        suggested_refresh()
             
     skybox_win = selWin(
         win, 
@@ -679,27 +683,16 @@ def load_packages(data):
             ):
         sel_win.sel_item_id(gen_opts.get_val('Last_Selected', opt_name, default))
     
-def suggested_style_set(e=None):
-    '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''
-    sugg = styles[selected_style].suggested
-    win_types = (voice_win, music_win, skybox_win, goo_win)
-    for win, sugg_val in zip(win_types, sugg):
-        win.sel_item_id(sugg_val)
-        
-def style_select_callback(style_id):
-    '''Callback whenever a new style is chosen.'''
-    global selected_style
-    selected_style = style_id
-    gen_opts['Last_Selected']['Style'] = style_id
-    
-    for item in itertools.chain(item_list.values(), pal_picked, pal_items):
-        item.load_data() # Refresh everything
-        
-    sugg = styles[selected_style].suggested
-    win_types = (voice_win, music_win, skybox_win, goo_win)
-    for win, sugg_val in zip(win_types, sugg):
-        win.set_suggested(sugg_val)
-    refresh_stylevars()
+def suggested_refresh():
+    '''Enable or disable the suggestion setting button.'''
+    if (voice_win.is_suggested() and
+            music_win.is_suggested() and
+            skybox_win.is_suggested() and
+            goo_win.is_suggested()
+            ):
+        UI['suggested_style'].state(['disabled'])
+    else:
+        UI['suggested_style'].state(['!disabled'])
     
 def refresh_pal_ui():
     "Update the UI to show the correct palettes."
@@ -769,11 +762,6 @@ def export_editoritems(e=None):
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
     refresh_pal_ui()
-    
-def set_stylevar(var):
-    val = str(styleOptVars[var].get())
-    print('Updating ' + var + '! (val = ' + val + ')')
-    gen_opts['StyleVar'][var] = val
 
 def set_disp_name(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
@@ -899,12 +887,6 @@ def fastDrag(e):
             snd.fx('error')
     flowPreview()
 
-def set_pal_listbox(e=None):
-    global selectedPalette
-    selectedPalette = int(UI['palette'].curselection()[0])
-    selectedPalette_radio.set(selectedPalette)
-    set_palette()
-
 def set_pal_radio():
     global selectedPalette
     selectedPalette = selectedPalette_radio.get()
@@ -990,22 +972,8 @@ def pal_remove():
             selectedPalette_radio.set(selectedPalette)
             refresh_pal_ui()
 
-def filterExpand(e):
-    frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
-    frames['filter']['borderwidth']=4
-    frames['filter'].expanded=True
-    snd.fx('expand')
-    flowPicker()
-
-def filterContract(e):
-    frames['filter_expanded'].grid_remove()
-    frames['filter']['borderwidth']=0
-    frames['filter'].expanded=False
-    snd.fx('contract')
-    flowPicker()
-
 def updateFilters():
-    
+
     # First update the 'all' checkboxes to make half-selected if not 
     # fully selected.
     for cat in FILTER_CATS: # do for each
@@ -1048,13 +1016,6 @@ def updateFilters():
             )
     flowPicker()
 
-def filterAllCallback(col):
-    '''Sets all items in a category to true/false, then updates the item list.'''
-    val = FilterVars_all[col].get()
-    for i in FilterVars[col]:
-        FilterVars[col][i].set(val)
-    updateFilters()
-
 # UI functions, each accepts the parent frame to place everything in.
 # initMainWind generates the main frames that hold all the panes to
 # make it easy to move them around if needed
@@ -1072,6 +1033,12 @@ def initPalette(f):
         
     UI['palette']=Listbox(f, width=10)
     UI['palette'].grid(row=1, sticky="NSEW")
+    
+    def set_pal_listbox(e=None):
+        global selectedPalette
+        selectedPalette = int(UI['palette'].curselection()[0])
+        selectedPalette_radio.set(selectedPalette)
+        set_palette()
     UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
     UI['palette'].bind("<Enter>", set_pal_listbox_selection)
     # Set the selected state when hovered, so users can see which is
@@ -1110,14 +1077,24 @@ def initOption(f):
     props.columnconfigure(1, weight=1)
     props.grid(row=3, sticky="EW")
     
+    def suggested_style_set():
+        '''Set music, skybox, voices, goo, etc to the settings defined for a style.'''
+        sugg = styles[selected_style].suggested
+        win_types = (voice_win, music_win, skybox_win, goo_win)
+        for win, sugg_val in zip(win_types, sugg):
+            win.sel_item_id(sugg_val)
+        UI['suggested_style'].state(['disabled'])
+    
     UI['suggested_style'] = ttk.Button(
         props,
+        # '\u2193' is the downward arrow symbol.
         text="\u2193 Use Suggested \u2193",
         command=suggested_style_set,
         )
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
     
     def configure_voice():
+        '''Open the voiceEditor window to configure a Quote Pack.'''
         chosen = voices.get(voice_win.chosen_id, None)
         if chosen is not None:   
             voiceEditor.show(chosen)
@@ -1151,9 +1128,9 @@ def initOption(f):
         props,
         cursor='sb_h_double_arrow',
         ).grid(
-            row=0, 
+            row=2, 
             column=5, 
-            rowspan=5,
+            rowspan=2,
             sticky="NS",
             )
 
@@ -1197,6 +1174,11 @@ def initStyleOpt(f):
         font='TkMenuFont',
         justify='center',
         )
+        
+    def set_stylevar(var):
+        '''Save the value for a particular stylevar.'''
+        val = str(styleOptVars[var].get())
+        gen_opts['StyleVar'][var] = val
 
     for pos, (id, name, default) in enumerate(styleOptions):
         styleOptVars[id]=IntVar(value=
@@ -1410,15 +1392,23 @@ def initFilterCol(cat, f):
     FilterBoxes[cat]={}
     FilterVars[cat]={}
     FilterVars_all[cat]=IntVar(value=1)
+    
+    def filter_all_callback(col):
+        '''Sets all items in a category to true/false, then updates the item list.'''
+        val = FilterVars_all[col].get()
+        for i in FilterVars[col]:
+            FilterVars[col][i].set(val)
+        updateFilters()
 
     FilterBoxes_all[cat]=ttk.Checkbutton(
         f,
         text='All',
         onvalue=1,
         offvalue=0,
-        command=lambda: filterAllCallback(cat), 
+        # We pass along the name of the category, so the function can figure out what to change.
+        command=func_partial(filter_all_callback,cat), 
         variable=FilterVars_all[cat],
-        ) # We pass along the name of the category, so the function can figure out what to change.
+        ) 
         
     FilterBoxes_all[cat].grid(
         row=1,
@@ -1465,6 +1455,20 @@ def initFilter(f):
     frames['filter_expanded']=f2
     # Not added to window, we add it below the others to expand the
     # lists
+    
+    def filterExpand(e):
+        frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
+        frames['filter']['borderwidth']=4
+        frames['filter'].expanded=True
+        snd.fx('expand')
+        flowPicker()
+
+    def filterContract(e):
+        frames['filter_expanded'].grid_remove()
+        frames['filter']['borderwidth']=0
+        frames['filter'].expanded=False
+        snd.fx('contract')
+        flowPicker()
 
     f.bind("<Enter>", filterExpand)
     f.bind("<Leave>", filterContract)
@@ -1806,6 +1810,23 @@ def initMain():
     
     win.bind("<Configure>", contextWin.follow_main, add='+')
     refresh_pal_ui()
+    
+    def style_select_callback(style_id):
+        '''Callback whenever a new style is chosen.'''
+        global selected_style
+        selected_style = style_id
+        gen_opts['Last_Selected']['Style'] = style_id
+        
+        for item in itertools.chain(item_list.values(), pal_picked, pal_items):
+            item.load_data() # Refresh everything
+            
+        sugg = styles[selected_style].suggested
+        win_types = (voice_win, music_win, skybox_win, goo_win)
+        for win, sugg_val in zip(win_types, sugg):
+            win.set_suggested(sugg_val)
+        suggested_refresh()
+        refresh_stylevars()
+    
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     
