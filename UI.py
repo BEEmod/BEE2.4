@@ -685,14 +685,15 @@ def load_packages(data):
     
 def suggested_refresh():
     '''Enable or disable the suggestion setting button.'''
-    if (voice_win.is_suggested() and
-            music_win.is_suggested() and
-            skybox_win.is_suggested() and
-            goo_win.is_suggested()
-            ):
-        UI['suggested_style'].state(['disabled'])
-    else:
-        UI['suggested_style'].state(['!disabled'])
+    if 'suggested_style' in UI:
+        if (voice_win.is_suggested() and
+                music_win.is_suggested() and
+                skybox_win.is_suggested() and
+                goo_win.is_suggested()
+                ):
+            UI['suggested_style'].state(['disabled'])
+        else:
+            UI['suggested_style'].state(['!disabled'])
     
 def refresh_pal_ui():
     "Update the UI to show the correct palettes."

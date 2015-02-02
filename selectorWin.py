@@ -295,7 +295,7 @@ class selWin:
         # context menu). We check for truthness to ensure it's actually
         # initialised.
         if self.display:
-            if self.selected == self.suggested:
+            if self.is_suggested():
                 self.display['font'] = self.sugg_font
             else:
                 self.display['font'] = 'TkMenuFont'   
@@ -397,6 +397,10 @@ class selWin:
                 if item.name == obj:
                     return True
             return False
+            
+    def is_suggested(self):
+        '''Return whether the current item is the suggested one.'''
+        return self.suggested == self.selected
         
     def set_suggested(self, suggested=None):
         '''Set the suggested item to the given ID. 
@@ -427,6 +431,7 @@ class selWin:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
                 font=self.sugg_font)
+        self.set_disp() # Update the textbox if needed
         self.flow_items() # Refresh
 
 if __name__ == '__main__': # test the window if directly executing this file
