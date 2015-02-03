@@ -10,11 +10,11 @@ loadScreen.init(UI.win)
 loadScreen.length('UI', 8)
 
 DEFAULT_SETTINGS = {
-    'Directories' : { 
-        'palette' : 'palettes\\',
-        'package' : 'packages\\',
+    'Directories': {
+        'palette': 'palettes\\',
+        'package': 'packages\\',
         },
-    'General' : {
+    'General': {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
         'mute_sounds': '0',
@@ -49,7 +49,7 @@ UI.load_palette(
 print('Done!')
 
 print('Initialising UI...')
-UI.initMain() # create all windows
+UI.initMain()  # create all windows
 print('Done!')
 
 loadScreen.close_window()

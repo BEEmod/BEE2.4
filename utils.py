@@ -2,7 +2,7 @@ import math
 import string
 import collections.abc as abc
 
-def clean_line(line):
+def clean_line(line: str):
     '''Removes extra spaces and comments from the input.'''
     if isinstance(line, bytes):
         line = line.decode() # convert bytes to strings if needed
@@ -27,7 +27,7 @@ def is_plain_text(name, valid_chars=FILE_CHARS):
     return True
 
 def get_indent(line):
-    '''Return the whitspace which this line starts with.'''
+    '''Return the whitespace which this line starts with.'''
     white = []
     for char in line:
         if char in ' \t':
@@ -38,7 +38,7 @@ def get_indent(line):
 def con_log(*text):
     '''Log text to the screen.
 
-    Portal 2 needs the flush in order to recieve VBSP/VRAD's logged
+    Portal 2 needs the flush in order to receive VBSP/VRAD's logged
     output into the developer console and update the progress bars.
     '''
     print(*text, flush=True)
@@ -65,18 +65,18 @@ def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     elif y > max_y:
         y = max_y
     return x, y
-    
+
 def center_win(window):
     '''Center a subwindow to be inside a parent window.'''
     parent = window.nametowidget(window.winfo_parent())
-    
+
     x = parent.winfo_rootx() + window.winfo_width()//2
     y = parent.winfo_rooty() + window.winfo_height()//2
     window.geometry('+' + str(x) + '+' + str(y))
 
 class Vec:
     '''A 3D Vector. This has most standard Vector functions.'''
-    __slots__ = ('x', 'y', 'z')
+    __slots__ = 'xyz'
 
     def __init__(self, x=0, y=0, z=0):
         '''Create a Vector.
