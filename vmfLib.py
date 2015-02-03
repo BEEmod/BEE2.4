@@ -61,18 +61,25 @@ def conv_bool(val, default=False):
 
 
 def conv_vec(val, x=0, y=0, z=0):
-    '''Convert a string in the form '(4 6 -4)' into a vector, using a default if the string is unparsable.'''
+    '''Convert a string in the form '(4 6 -4)' into a vector.
+
+     If the string is unparsable, this uses the defaults (x,y,z).
+     '''
     parts = val.split(' ')
     if len(parts) == 3:
         # strip off the brackets if present
-        if parts[0][0] in ('(','{','[', '<'):
+        if parts[0][0] in '({[<':
             parts[0] = parts[0][1:]
-        if parts[2][-1] in (')','}',']', '>'):
+        if parts[2][-1] in ')}]>':
             parts[2] = parts[2][:-1]
         try:
-            return Vec(float(parts[0]),float(parts[1]),float(parts[2]))
+            return Vec(
+                float(parts[0]),
+                float(parts[1]),
+                float(parts[2]),
+            )
         except ValueError:
-            return Vec(x,y,z)
+            return Vec(x, y, z)
 
 
 class VMF:
@@ -106,7 +113,8 @@ class VMF:
         self.is_prefab = conv_bool(map_info.get('prefab'), False)
         self.cordon_enabled = conv_bool(map_info.get('cordons_on'), False)
         self.map_ver = conv_int(map_info.get('mapversion'), 0)
-        if self.spawn['mapversion'] is not None:
+        if 'mapversion' in self.spawn:
+            # This is saved only in the main VMF object.
             del self.spawn['mapversion']
 
         # These three are mostly useless for us, but we'll preserve them anyway
@@ -254,6 +262,7 @@ class VMF:
 
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(dest_file, ent_name = 'world')
+        del self.spawn['mapversion']
 
         for ent in self.entities:
             ent.export(dest_file)
@@ -293,7 +302,7 @@ class VMF:
         if desired == -1:
             desired = 1
         list_ = getattr(self, _ID_types[ids])
-        if len(list_) == 0 or desired not in list_ :
+        if len(list_) == 0 or desired not in list_:
             list_.append(int(desired))
             return desired
         # Need it in ascending order
@@ -324,14 +333,18 @@ class VMF:
                 yield ent
 
     def iter_ents_tags(self, vals = {}, tags = {}):
-        '''Iterate through all entities with the given keyvalue values, and with keyvalues containing the tags.'''
+        '''Iterate through all entities.
+
+        The returned entities must have exactly the given keyvalue values,
+        and have keyvalues containing the tags.
+        '''
         for ent in self.entities[:]:
             for key,value in vals.items():
                 if not ent.has_key(key) or ent[key] != value:
                     break
             else: # passed through without breaks
-                for key,value in tags.items():
-                    if not ent.has_key(key) or value not in ent[key]:
+                for key, value in tags.items():
+                    if key not in ent or value not in ent[key]:
                         break
                 else:
                     yield ent
@@ -341,8 +354,8 @@ class VMF:
 
         - Allows using * at beginning/end
         '''
-        wild_start = name[:1]=='*'
-        wild_end = name[-1:]=='*'
+        wild_start = name[:1] == '*'
+        wild_end = name[-1:] == '*'
         if wild_start:
             name = name[1:]
         if wild_end:
@@ -351,17 +364,17 @@ class VMF:
             for out in ent.outputs:
                 if wild_start:
                     if wild_end:
-                        if name in out.target: # blah-target-blah
+                        if name in out.target:  # blah-target-blah
                             yield out
                     else:
-                        if out.target.endswith(name): # target-blah
+                        if out.target.endswith(name):  # target-blah
                             yield out
                 else:
                     if wild_end:
-                        if out.target.startswith(name): # blah-target
+                        if out.target.startswith(name):  # blah-target
                             yield out
                     else:
-                        if out.target == name: # target
+                        if out.target == name:  # target
                             yield out
 
 class Camera:
@@ -374,25 +387,25 @@ class Camera:
     def targ_ent(self, ent):
         '''Point the camera at an entity.'''
         if ent['origin']:
-            self.target = conv_vec(ent['origin'], 0,0,0)
+            self.target = conv_vec(ent['origin'], 0, 0, 0)
 
     def is_active(self):
         '''Is this camera in use?'''
-        return map.active_cam == map.cameras.index(self)+1
+        return self.map.active_cam == self.map.cameras.index(self) + 1
 
     def set_active(self):
         '''Set this to be the map's active camera'''
-        map.active_cam = map.cameras.index(self) + 1
+        self.map.active_cam = self.map.cameras.index(self) + 1
 
     def set_inactive_all(self):
         '''Disable all cameras in this map.'''
-        map.active_cam = -1
+        self.map.active_cam = -1
 
     @staticmethod
     def parse(map, tree):
         '''Read a camera from a property_parser tree.'''
-        pos = conv_vec(tree.find_key('position', '_').value, 0,0,0)
-        targ = conv_vec(tree.find_key('look', '_').value, 0,64,0)
+        pos = conv_vec(tree.find_key('position', '_').value, 0, 0, 0)
+        targ = conv_vec(tree.find_key('look', '_').value, 0, 64, 0)
         return Camera(map, pos, targ)
 
     def copy(self):
@@ -401,9 +414,9 @@ class Camera:
 
     def remove(self):
         '''Delete this camera from the map.'''
-        map.cameras.remove(self)
+        self.map.cameras.remove(self)
         if self.is_active():
-            self.set_inactive()
+            self.set_inactive_all()
 
     def export(self, buffer, ind=''):
         buffer.write(ind + 'camera\n')
@@ -435,21 +448,33 @@ class Cordon:
         buffer.write(ind + 'cordon\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"name" "' + self.name + '"\n')
-        buffer.write(ind + '\t"active" "' + utils.bool_as_int(self.active) + '"\n')
+        buffer.write(ind + '\t"active" "' +
+                     utils.bool_as_int(self.active) +
+                     '"\n')
         buffer.write(ind + '\tbox\n')
         buffer.write(ind + '\t{\n')
-        buffer.write(ind + '\t\t"mins" "(' + self.bounds_min.join(' ') + ')"\n')
-        buffer.write(ind + '\t\t"maxs" "(' + self.bounds_max.join(' ') + ')"\n')
+        buffer.write(ind + '\t\t"mins" "(' +
+                     self.bounds_min.join(' ') +
+                     ')"\n')
+        buffer.write(ind + '\t\t"maxs" "(' +
+                     self.bounds_max.join(' ') +
+                     ')"\n')
         buffer.write(ind + '\t}\n')
         buffer.write(ind + '}\n')
 
     def copy(self):
         '''Duplicate this cordon.'''
-        return Cordon(self.map, self.bounds_min.copy(), self.bounds_max.copy(), self.active, self.name)
+        return Cordon(
+            self.map,
+            self.bounds_min.copy(),
+            self.bounds_max.copy(),
+            self.active,
+            self.name,
+        )
 
     def remove(self):
         '''Remove this cordon from the map.'''
-        map.cordons.remove(self)
+        self.map.cordons.remove(self)
 
 class Solid:
     '''A single brush, serving as both world brushes and brush entities.'''
@@ -474,11 +499,11 @@ class Solid:
     @staticmethod
     def parse(map, tree, hidden=False):
         '''Parse a Property tree into a Solid object.'''
-        id = conv_int(tree["id", '-1'])
+        solid_id = conv_int(tree["id", '-1'])
         try:
-            id = int(id)
+            solid_id = int(solid_id)
         except TypeError:
-            id = -1
+            solid_id = -1
         sides = []
         for side in tree.find_all("side"):
             sides.append(Side.parse(map, side))
@@ -497,15 +522,21 @@ class Solid:
                 val = conv_int(v.value, default = -1)
                 if val:
                     editor['visgroup'].append(val)
-        if len(editor['visgroup'])==0:
+        if len(editor['visgroup']) == 0:
             del editor['visgroup']
-        return Solid(map, des_id=id, sides=sides, editor=editor, hidden=hidden)
+        return Solid(
+            map,
+            des_id=solid_id,
+            sides=sides,
+            editor=editor,
+            hidden=hidden,
+        )
 
     def export(self, buffer, ind = ''):
         '''Generate the strings needed to define this brush.'''
         if self.hidden:
             buffer.write(ind + 'hidden\n' + ind + '{\n')
-            ind = ind + '\t'
+            ind += '\t'
         buffer.write(ind + 'solid\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
@@ -519,14 +550,16 @@ class Solid:
                 self.editor['color'] + '"\n')
         if 'groupid' in self.editor:
             buffer.write(ind + '\t\t"groupid" "' +
-                self.editor['groupid'] + '"\n')
+                         self.editor['groupid'] + '"\n')
         if 'visgroup' in self.editor:
-            for id in self.editor['visgroup']:
-                buffer.write(ind + '\t\t"groupid" "' + str(id) + '"\n')
+            for vis_id in self.editor['visgroup']:
+                buffer.write(ind + '\t\t"groupid" "' + str(vis_id) + '"\n')
         for key in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
             if key in self.editor:
                 buffer.write(ind + '\t\t"' + key + '" "' +
-                    utils.bool_as_int(self.editor[key]) + '"\n')
+                    utils.bool_as_int(self.editor[key]) +
+                    '"\n'
+                    )
         buffer.write(ind + '\t}\n')
 
         buffer.write(ind + '}\n')
@@ -597,7 +630,18 @@ class Side:
         'is_disp',
     ]
 
-    def __init__(self, map, planes=[(0, 0, 0),(0, 0, 0),(0, 0, 0)], opt={}, des_id=-1, disp_data={}):
+    def __init__(
+            self,
+            map,
+            planes=[
+                (0, 0, 0),
+                (0, 0, 0),
+                (0, 0, 0)
+                ],
+            opt={},
+            des_id=-1,
+            disp_data={},
+            ):
         self.map = map
         self.planes = [Vec(), Vec(), Vec()]
         self.id = map.get_id('face', des_id)
@@ -606,7 +650,7 @@ class Side:
         self.lightmap = opt.get("lightmap", 16)
         self.smooth = opt.get("smoothing", 0)
         self.mat = opt.get("material", "")
-        self.ham_rot = opt.get("rotation" , 0)
+        self.ham_rot = opt.get("rotation", 0)
         self.uaxis = opt.get("uaxis", "[0 1 0 0] 0.25")
         self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
         if len(disp_data) > 0:
@@ -668,7 +712,7 @@ class Side:
             for v in _DISP_ROWS:
                 rows = disp_tree.find_key(v, []).value
                 if len(rows) > 0:
-                    rows.sort(key=lambda x: conv_int(x.name[3:],0))
+                    rows.sort(key=lambda x: conv_int(x.name[3:], 0))
                     disp_data[v] = [v.value for v in rows]
         return Side(map, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
 
@@ -769,7 +813,10 @@ class Side:
             p += diff
 
     def plane_desc(self):
-        '''Return a string which describes this face, for use in texture randomisation.'''
+        '''Return a string which describes this face.
+
+         This is for use in texture randomisation.
+         '''
         return self.planes[0].join(' ') + self.planes[1].join(' ') + self.planes[2].join(' ')
 
 class Entity:
@@ -786,8 +833,8 @@ class Entity:
     def __init__(
             self,
             map,
-            keys = None,
-            fixup = None,
+            keys=None,
+            fixup=None,
             id=-1,
             outputs=None,
             solids=None,
@@ -844,17 +891,17 @@ class Entity:
         solids = []
         keys = {}
         outputs = []
-        editor = { 'visgroup' : []}
+        editor = {'visgroup': []}
         fixup = {}
         for item in tree_list:
             name = item.name.casefold()
             if name == "id" and item.value.isnumeric():
                 id = item.value
             elif name in _FIXUP_KEYS:
-                vals = item.value.split(" ",1)
-                var = vals[0][1:] # Strip the $ sign
+                vals = item.value.split(" ", 1)
+                var = vals[0][1:]  # Strip the $ sign
                 value = vals[1]
-                index = item.name[-2:] # Index is the last 2 digits
+                index = item.name[-2:]  # Index is the last 2 digits
                 fixup[var.casefold()] = (var, value, index)
             elif name == "solid":
                 if item.has_children():
@@ -904,8 +951,12 @@ class Entity:
         '''Is this Entity a brush entity?'''
         return len(self.solids) > 0
 
-    def export(self, buffer, ent_name = 'entity', ind=''):
-        '''Generate the strings needed to create this entity.'''
+    def export(self, buffer, ent_name='entity', ind=''):
+        '''Generate the strings needed to create this entity.
+
+        ent_name is the key used for the item's block, which is used to allow
+        generating the MapSpawn data block from the entity object.
+        '''
 
         if self.hidden:
             buffer.write(ind + 'hidden\n' + ind + '{\n')
@@ -966,12 +1017,7 @@ class Entity:
         self.outputs.append(output)
 
     def remove(self):
-        '''Remove this entity from the map.
-
-        Useful if it is required to delete an entity while looping, as
-        this will still keep the object intact. Ensure any lists are
-        also deleted so the object will be garbage-collected.
-        '''
+        '''Remove this entity from the map.'''
         self.map.entities.remove(self)
         if self.id in self.map.ent_id:
             self.map.ent_id.remove(self.id)
@@ -1028,7 +1074,7 @@ class Entity:
 
     get = __getitem__
 
-    def __contains__(self, key):
+    def __contains__(self, key:str):
         '''Determine if a value exists for the given key.'''
         key = key.casefold()
         for k in self.keys:
@@ -1078,7 +1124,7 @@ class EntityFixup:
         # In _fixup each variable is stored as a tuple of (var_name,
         # value, index) with keys equal to the casefolded var name.
 
-    def get(self, var, default=None):
+    def get(self, var, default: str=None):
         '''Get the value of an instance $replace variable.'''
         if var[0] == '$':
             var = var[1:]
@@ -1088,7 +1134,7 @@ class EntityFixup:
         else:
             return default
 
-    def __contains__(self, var):
+    def __contains__(self, var: str):
         '''Determine if this instance has the named $replace variable.'''
         return var.casefold() in self._fixup
 
@@ -1099,7 +1145,9 @@ class EntityFixup:
             return self.get(key)
 
     def __setitem__(self, var, val):
-        '''Set the value of an instance $replace variable, creating it if needed.'''
+        '''Set the value of an instance $replace variable.
+
+        '''
         if var[0] == '$':
             var = var[1:]
         folded_var = var.casefold()
@@ -1282,6 +1330,7 @@ if __name__ == '__main__':
     print('parsing...')
     vmf_file = VMF.parse('test.vmf')
     print('saving...')
+
     with open('test_out.vmf', 'w') as file:
         vmf_file.export(file)
     print('done!')
