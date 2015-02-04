@@ -4,11 +4,12 @@ Handles locating parts of a given game, and modifying GameInfo to support our sp
 import os
 import os.path
 import shutil
-from config import ConfigFile
+from BEE2_config import ConfigFile
 
 from tkinter import * # ui library
 from tkinter import messagebox # simple, standard modal dialogs
 from tkinter import filedialog # open/save as dialog creator
+from tk_root import TK_ROOT
 
 from query_dialogs import ask_string
 from property_parser import Property
@@ -16,8 +17,7 @@ import utils
 
 all_games = []
 selected_game = None
-selectedGame_radio = None 
-root = None # This should be set to the Tk() root instance
+selectedGame_radio = IntVar(value=0)
 game_menu = None
 
 trans_data = {}
@@ -37,18 +37,17 @@ _UNLOCK_ITEMS = [
     'ITEM_COOP_ENTRY_DOOR',
     'ITEM_OBSERVATION_ROOM'
     ]
-  
-# The source and desination locations of resources that must be copied 
+
+# The source and desination locations of resources that must be copied
 # into the game folder.
 CACHE_LOC = [
     ('inst_cache/', 'sdk_content/maps/instances/BEE2'),
     ('source_cache/', 'BEE2/'),
     ]
 
-def init(tk):
-    global trans_data, selectedGame_radio, root
-    root = tk
-    selectedGame_radio = IntVar(value=0)
+
+def init_trans():
+    global trans_data
     try:
         with open('config/basemodui.txt', "r") as trans:
             trans_data = Property.parse(trans, 'config/basemodui.txt')
@@ -56,26 +55,32 @@ def init(tk):
     except IOError:
         pass
 
-def translate(str):
-    return trans_data.get(str, str)
-    
+
+def translate(string):
+    return trans_data.get(string, string)
+
+
 def setgame_callback(selected_game):
     pass
 
-# The line we inject to add our BEE2 folder into the game search path. 
+# The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority.
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
 class Game:
-    def __init__(self, name, id, folder):
+    def __init__(self, name, steam_id, folder):
         self.name = name
-        self.steamID = id
+        self.steamID = steam_id
         self.root = folder
-        
+
     def dlc_priority(self):
-        '''Iterate through all subfolders, in order of priority, from high to low.
-        
-        We assume the priority follows [update, portal2_dlcN, portal2_dlc2, portal2_dlc1, portal2, <all others>]
+        '''Iterate through all subfolders, in order of high to low priority.
+
+        We assume the priority follows:
+        1. update,
+        2. portal2_dlc99, ..., portal2_dlc2, portal2_dlc1
+        3. portal2,
+        4. <all others>
         '''
         dlc_count = 1
         priority = ["portal2"]
@@ -84,35 +89,38 @@ class Game:
             dlc_count+=1
         if os.path.isdir(self.abs_path("update")):
             priority.append("update")
-        blacklist = ("bin", "Soundtrack", "sdk_tools", "sdk_content") # files are definitely not here
+        # files are definitely not here
+        blacklist = ("bin", "Soundtrack", "sdk_tools", "sdk_content")
         yield from reversed(priority)
         for folder in os.listdir(self.root):
-            if os.path.isdir(self.abs_path(folder)) and folder not in priority and folder not in blacklist:
+            if (os.path.isdir(self.abs_path(folder)) and
+                    folder not in priority and
+                    folder not in blacklist):
                 yield folder
-        
+
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
-        
+
     def is_modded(self):
         return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
-        
+
     def edit_gameinfo(self, add_line=False):
         '''Modify all gameinfo.txt files to add or remove our line.
-        
+
         Add_line determines if we are adding or removing it.
         '''
-        
+
         if self.is_modded() == add_line:
             # It's already in the correct state!
             return
-        
+
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
                 with open(info_path, 'r') as file:
-                    data=list(file)
-                found_section=False
-                for line_num, line in reversed(list(enumerate(data))):
+                    data = list(file)
+
+                for line_num, line in reversed(enumerate(data)):
                     clean_line = utils.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
@@ -120,7 +128,10 @@ class Game:
                         elif '|gameinfo_path|' in clean_line:
                             print("Adding gameinfo hook to " + info_path)
                             # Match the line's indentation
-                            data.insert(line_num+1, utils.get_indent(line) + GAMEINFO_LINE + '\n')
+                            data.insert(
+                                line_num+1,
+                                utils.get_indent(line) + GAMEINFO_LINE + '\n',
+                                )
                             break
                     else:
                         if clean_line == GAMEINFO_LINE:
@@ -129,9 +140,12 @@ class Game:
                             break
                 else:
                     if add_line:
-                        print('Failed editing "' + info_path + '" to add our special folder!')
+                        print('Failed editing "' +
+                              info_path +
+                              '" to add our special folder!'
+                        )
                     continue
-                    
+
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
@@ -148,26 +162,28 @@ class Game:
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
             self.clear_cache()
-            
+
     def refresh_cache(self):
         '''Copy over the resource files into this game.'''
         for source, dest in CACHE_LOC:
-            dest = self.abs_path(INST_LOC)
+            dest = self.abs_path(dest)
             try:
                 shutil.rmtree(dest)
                 shutil.copytree(source, dest)
             except (IOError, shutil.Error):
                 pass
-            
+
     def clear_cache(self):
         for source, dest in CACHE_LOC:
             try:
                 shutil.rmtree(self.abs_path(dest))
             except (IOError, shutil.Error):
                 pass
-            
-    def export(self, style, all_items, music, skybox, goo, voice, styleVars):
-        '''Generate the editoritems.txt and vbsp_config for the selected style and items.'''
+
+    def export(self, style, all_items, music, skybox, goo, voice, style_vars):
+        '''Generate the editoritems.txt and vbsp_config.
+
+        '''
         print('--------------------')
         print('Exporting Items and Style for "' + self.name + '"!')
         print('Style =', style)
@@ -176,60 +192,61 @@ class Game:
         print('Voice =', voice)
         print('Skybox =', skybox)
         print('Style Vars:\n  {')
-        for key, val in styleVars.items():
+        for key, val in style_vars.items():
             print('  ' + key + ' = ' + str(val))
         print('  }')
-        
+
         vbsp_config = style.config.copy()
-        
-        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and "Renderables" sections. 
+
+        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
+        # "Renderables" sections.
         editoritems = Property("ItemData", *style.editor.find_all('Item'))
-        
+
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
-            
+
         if voice is not None:
             vbsp_config += voice.config
-            
+
         if skybox is not None:
             vbsp_config.set_key(('Textures', 'Special', 'Sky'), skybox.material)
             vbsp_config += skybox.config
-            
+
         if music is not None:
             if music.sound is not None:
                 vbsp_config.set_key(('Options', 'music_SoundScript'), music.sound)
             if music.inst is not None:
                 vbsp_config.set_key(('Options', 'music_instance'), music.inst)
-            
+
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
-            
+
         vbsp_config.set_key(('Options', 'BEE2_loc'), os.getcwd())
-            
+
         # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children('Conditions', 
-                                   'InstanceFiles', 
+        vbsp_config.merge_children('Conditions',
+                                   'InstanceFiles',
                                    'Options',
                                    'StyleVars',
                                    'Textures')
-                                   
-                                 
+
+
         vbsp_config.ensure_exists('StyleVars')
-        vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in styleVars.items()]
-        
+        vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in style_vars.items()]
+
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
             if os.path.isfile(item_path) and not os.path.isfile(backup_path):
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
-                
+
         editoritems += style.editor.find_key("Renderables", [])
-        
-        if styleVars.get('UnlockDefault', False):
+
+        if style_vars.get('UnlockDefault', False):
             print('Unlocking Items!')
             for item in editoritems.find_all('Item'):
                 # If the Unlock Default Items stylevar is enabled, we
@@ -239,25 +256,26 @@ class Game:
                     for prop in item.find_key("Editor", []):
                         if prop.name.casefold() in ('deletable', 'copyable'):
                             prop.value = '1'
-        
+
         print('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
-   
+
         print('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
-                        
+
+
 def find_steam_info(game_dir):
     '''Determine the steam ID and game name of this folder, if it has one.
-    
+
     This only works on Source games!
     '''
-    id = -1
+    game_id = -1
     name = "ERR"
     found_name = False
     found_id = False
@@ -270,7 +288,7 @@ def find_steam_info(game_dir):
                     if not found_id and 'steamappid' in clean_line.casefold():
                         ID = clean_line.casefold().replace('steamappid', '').strip()
                         try:
-                            id = int(ID)
+                            game_id = int(ID)
                         except ValueError:
                             pass
                     elif not found_name and 'game ' in clean_line.casefold():
@@ -281,8 +299,9 @@ def find_steam_info(game_dir):
                         break
         if found_name and found_id:
             break
-    return id, name
-    
+    return game_id, name
+
+
 def save():
     for gm in all_games:
         if gm.name not in config:
@@ -291,7 +310,9 @@ def save():
         config[gm.name]['Dir'] = gm.root
     config.save()
 
-def load(UI_quit_func, loadScreen_window):
+
+def load(ui_quit_func, load_screen_window):
+    global selected_game
     all_games.clear()
     for gm in config:
         if gm != 'DEFAULT':
@@ -304,22 +325,23 @@ def load(UI_quit_func, loadScreen_window):
                 new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
-        loadScreen_window.withdraw()
-        
+        load_screen_window.withdraw()
+
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            UI_quit_func()
-        loadScreen_window.deiconify()
+            ui_quit_func()
+        load_screen_window.deiconify()
     selected_game = all_games[0]
-        
+
+
 def add_game(e=None, refresh_menu=True):
     '''Ask for, and load in a game to export to.'''
-    
+
     messagebox.showinfo(
         message='Select the folder where the game executable is located '
                 '(portal2.exe)...',
-        parent=root,
+        parent=TK_ROOT,
         title='BEE2 - Add Game',
         )
     exe_loc = filedialog.askopenfilename(
@@ -332,8 +354,8 @@ def add_game(e=None, refresh_menu=True):
         id, name = find_steam_info(folder)
         if name == "ERR" or id == -1:
             messagebox.showinfo(
-                message='This does not appear to be a valid game folder!', 
-                parent=root, 
+                message='This does not appear to be a valid game folder!',
+                parent=TK_ROOT,
                 icon=messagebox.ERROR,
                 title='BEE2 - Add Game',
                 )
@@ -341,13 +363,13 @@ def add_game(e=None, refresh_menu=True):
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = ask_string(
-                prompt="Enter the name of this game:", 
+                prompt="Enter the name of this game:",
                 title='BEE2 - Add Game',
                 )
             if name in invalid_names:
                 messagebox.showinfo(
-                    icon=messagebox.ERROR, 
-                    parent=root,
+                    icon=messagebox.ERROR,
+                    parent=TK_ROOT,
                     message='This name is already taken!',
                     title='BEE2 - Add Game',
                     )
@@ -355,14 +377,14 @@ def add_game(e=None, refresh_menu=True):
                 return False
             elif name == '':
                 messagebox.showinfo(
-                    icon=messagebox.ERROR, 
-                    parent=root,
+                    icon=messagebox.ERROR,
+                    parent=TK_ROOT,
                     message='Please enter a name for this game!',
                     title='BEE2 - Add Game',
                     )
             else:
                 break
-            
+
         new_game = Game(name, id, folder)
         new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
@@ -370,34 +392,36 @@ def add_game(e=None, refresh_menu=True):
             add_menu_opts(game_menu)
         save()
         return True
-    
+
+
 def remove_game(e=None):
     '''Remove the currently-chosen game from the game list.'''
     global selected_game, selectedGame_radio
     confirm = messagebox.askyesno(
-        title="BEE2", 
-        message='Are you sure you want to delete "' 
-            + selected_game.name 
-            + '"?',
+        title="BEE2",
+        message='Are you sure you want to delete "'
+                + selected_game.name
+                + '"?',
         )
     if confirm:
         if len(all_games) <= 1:
             messagebox.showerror(
-                message='You cannot remove every game from the list!', 
-                title='BEE2', 
-                parent=root,
+                message='You cannot remove every game from the list!',
+                title='BEE2',
+                parent=TK_ROOT,
                 )
         else:
             selected_game.edit_gameinfo(add_line=False)
-            
+
             all_games.remove(selected_game)
             config.remove_section(selected_game.name)
             config.save()
-            
+
             selected_game = all_games[0]
             selectedGame_radio.set(0)
             add_menu_opts(game_menu)
-        
+
+
 def add_menu_opts(menu, callback=None):
     '''Add the various games to the menu.'''
     global selectedGame_radio, setgame_callback
@@ -409,16 +433,18 @@ def add_menu_opts(menu, callback=None):
         # Iterate backward to ensure indexes stay the same.
         if menu.type(ind) == RADIOBUTTON:
             menu.delete(ind)
-            
+
     for val, game in enumerate(all_games):
         menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
     setGame()
-        
+
+
 def setGame():
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
     setgame_callback(selected_game)
-    
+
+
 def set_game_by_name(name):
     global selected_game, selectedGame_radio
     for game in all_games:
@@ -427,17 +453,16 @@ def set_game_by_name(name):
             selectedGame_radio.set(all_games.index(game))
             setgame_callback(selected_game)
             break
-       
+
 if __name__ == '__main__':
-    root = Tk()
-    Button(root, text = 'Add', command=add_game).grid(row=0, column=0)
-    Button(root, text = 'Remove', command=remove_game).grid(row=0, column=1)
-    menu = Menu(root)
+    Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
+    Button(TK_ROOT, text='Remove', command=remove_game).grid(row=0, column=1)
+    menu = Menu(TK_ROOT)
     dropdown = Menu(menu)
     menu.add_cascade(menu=dropdown, label='Game')
     dropdown.game_pos = 0
-    root['menu'] = menu
-    
-    init(root)
+    TK_ROOT['menu'] = menu
+
+    init_trans()
     load(quit, Toplevel())
     add_menu_opts(dropdown, setgame_callback)

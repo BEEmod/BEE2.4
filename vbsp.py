@@ -150,13 +150,13 @@ INST_FILE = {
     "pistPlat":    "instances/p2editor/lift_standalone.vmf",
     "ambLight":    "instances/p2editor/point_light.vmf",
     "largeObs":    "instances/p2editor/observation_room_256x128_1.vmf",
-    # although unused, editoritems allows having different instances 
+    # although unused, editoritems allows having different instances
     # for toggle/timer panels
     "indPanCheck":  "instances/p2editor/indicator_panel.vmf",
     "indPanTimer":  "instances/p2editor/indicator_panel.vmf",
     "glass":        "instances/p2editor/glass_128x128.vmf",
 }
-# angles needed to ensure fizzlers are not upside-down 
+# angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
 FIZZLER_ANGLE_FIX = {
     "0 0 -90":    "0 180 90",
@@ -363,7 +363,7 @@ def add_voice(voice_timer_pos, mode):
 
 def get_map_info():
     '''Determine various attributes about the map.
-    
+
     - SP/COOP status
     - if in preview mode
     - timer values for entry/exit corridors
@@ -886,7 +886,7 @@ def change_func_brush():
 
 def make_static_pan(ent, type):
     '''Convert a regular panel into a static version
-    
+
     This is done to save entities and improve lighting.'''
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
@@ -905,7 +905,7 @@ def make_static_pan(ent, type):
 
 def make_static_pist(ent):
     '''Convert a regular piston into a static version.
-    
+
     This is done to save entities and improve lighting.'''
     if get_opt("staticPan") == "NONE":
         return False # no conversion allowed!
@@ -1103,10 +1103,10 @@ def get_valid_folders():
     "Look through our game path to find folders in order of priority"
     dlc_count = 1
     priority = ["portal2"]
-    while os.path.isdir(os.path.join(root, "portal2_dlc" + str(dlc_count))):
+    while os.path.isdir(os.path.join(TK_ROOT, "portal2_dlc" + str(dlc_count))):
         priority.append("portal2_dlc" + str(dlc_count))
         dlc_count+=1
-    if os.path.isdir(os.path.join(root, "update")):
+    if os.path.isdir(os.path.join(TK_ROOT, "update")):
         priority.append("update")
 
     blacklist = [ # files are definitely not here
@@ -1116,14 +1116,14 @@ def get_valid_folders():
         "sdk_content"
         ]
 
-    all_folders = [f for f in os.listdir(root) if os.path.isdir(os.path.join(root, f)) and f not in priority and f not in blacklist]
+    all_folders = [f for f in os.listdir(TK_ROOT) if os.path.isdir(os.path.join(TK_ROOT, f)) and f not in priority and f not in blacklist]
     in_order = [x for x in reversed(priority)] + all_folders
     return in_order
 
 def expand_source_name(file, folders):
     "Determine the full path for an item with a truncated path."
     for f in folders:
-        poss=os.path.normpath(os.path.join(root, f, file))
+        poss=os.path.normpath(os.path.join(TK_ROOT, f, file))
         if os.path.isfile(poss):
             return poss
     utils.con_log( file + " not found!")
@@ -1177,7 +1177,7 @@ if __name__ == '__main__':
 
     to_pack = [] # the file path for any items that we should be packing
 
-    root = os.path.dirname(os.getcwd())
+    TK_ROOT = os.path.dirname(os.getcwd())
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]

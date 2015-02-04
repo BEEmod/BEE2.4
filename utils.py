@@ -2,16 +2,20 @@ import math
 import string
 import collections.abc as abc
 
+
 def clean_line(line: str):
     '''Removes extra spaces and comments from the input.'''
     if isinstance(line, bytes):
-        line = line.decode() # convert bytes to strings if needed
+        line = line.decode()  # convert bytes to strings if needed
     if '//' in line:
         line = line.split('//', 1)[0]
     return line.strip()
 
+
 def is_identifier(name, forbidden='{}\'"'):
-    '''Check to see if any forbidden characters are part of a candidate name.'''
+    '''Check to see if any forbidden characters are part of a candidate name.
+
+    '''
     for char in name:
         if char in forbidden:
             return False
@@ -19,21 +23,28 @@ def is_identifier(name, forbidden='{}\'"'):
 
 FILE_CHARS = string.ascii_letters + string.digits + '-_ .|'
 
+
 def is_plain_text(name, valid_chars=FILE_CHARS):
-    '''Check to see if any characters are not in the whitelist.'''
+    '''Check to see if any characters are not in the whitelist.
+
+    '''
     for char in name:
         if char not in valid_chars:
             return False
     return True
 
+
 def get_indent(line):
-    '''Return the whitespace which this line starts with.'''
+    '''Return the whitespace which this line starts with.
+
+    '''
     white = []
     for char in line:
         if char in ' \t':
             white.append(char)
         else:
             return ''.join(white)
+
 
 def con_log(*text):
     '''Log text to the screen.
@@ -43,12 +54,16 @@ def con_log(*text):
     '''
     print(*text, flush=True)
 
+
 def bool_as_int(val):
-    '''Convert a True/False value into the 1/0 strings often appearing in config files.'''
+    '''Convert a True/False value into '1' or '0'.
+
+    '''
     if val:
         return '1'
     else:
         return '0'
+
 
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     '''Adjust a window position to ensure it fits inside the screen.'''
@@ -66,6 +81,7 @@ def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
         y = max_y
     return x, y
 
+
 def center_win(window):
     '''Center a subwindow to be inside a parent window.'''
     parent = window.nametowidget(window.winfo_parent())
@@ -74,31 +90,34 @@ def center_win(window):
     y = parent.winfo_rooty() + window.winfo_height()//2
     window.geometry('+' + str(x) + '+' + str(y))
 
+
 class Vec:
     '''A 3D Vector. This has most standard Vector functions.'''
-    __slots__ = 'xyz'
+    __slots__ = ('x', 'y', 'z')
 
-    def __init__(self, x=0, y=0, z=0):
+    def __init__(self, x=0.0, y=0.0, z=0.0):
         '''Create a Vector.
 
         All values are converted to Floats automatically.
         If no value is given, that axis will be set to 0.
-        A sequence can be passed in (as the x argument), which will use the three args as x/y/z.
+        A sequence can be passed in (as the x argument), which will use
+        the three args as x/y/z.
         '''
         if isinstance(x, abc.Sequence):
-            length = len(x)
             try:
                 self.x = float(x[0])
             except (TypeError, KeyError):
                 self.x = 0.0
-            try:
-                self.y = float(x[1])
-            except (TypeError, KeyError):
-                self.y = 0.0
-            try:
-                self.z = float(x[2])
-            except (TypeError, KeyError):
-                self.z = 0.0
+            else:
+                try:
+                    self.y = float(x[1])
+                except (TypeError, KeyError):
+                    self.y = 0.0
+                else:
+                    try:
+                        self.z = float(x[2])
+                    except (TypeError, KeyError):
+                        self.z = 0.0
         else:
             self.x = float(x)
             self.y = float(y)
@@ -121,14 +140,20 @@ class Vec:
             )
 
     def __add__(self, other):
-        '''+ operation. This additionally works on scalars (adds to all axes).'''
+        '''+ operation.
+
+        This additionally works on scalars (adds to all axes).
+        '''
         if isinstance(other, Vec):
             return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
         else:
             return Vec(self.x + other, self.y + other, self.z + other)
 
     def __sub__(self, other):
-        '''- operation. This additionally works on scalars (adds to all axes).'''
+        '''- operation.
+
+        This additionally works on scalars (adds to all axes).
+        '''
         if isinstance(other, Vec):
             return Vec(self.x - other.x, self.y - other.y, self.z - other.z)
         else:
@@ -163,13 +188,19 @@ class Vec:
             return Vec(self.x % other, self.y % other, self.z % other)
 
     def __divmod__(self, other):
+        '''Divide the vector by a scalar, returning the result and remainder.
+
+        '''
         if isinstance(other, Vec):
             return NotImplemented
         else:
             return self // other, self % other
 
     def __iadd__(self, other):
-        "+= operation. Like the normal one except without duplication."
+        '''+= operation.
+
+        Like the normal one except without duplication.
+        '''
         if isinstance(other, Vec):
             self.x += other.x
             self.y += other.y
@@ -182,7 +213,10 @@ class Vec:
             return self
 
     def __isub__(self, other):
-        "-= operation. Like the normal one except without duplication."
+        '''-= operation.
+
+        Like the normal one except without duplication.
+        '''
         if isinstance(other, Vec):
             self.x += other.x
             self.y += other.y
@@ -195,7 +229,10 @@ class Vec:
             return self
 
     def __imul__(self, other):
-        "*= operation. Like the normal one except without duplication."
+        '''*= operation.
+
+        Like the normal one except without duplication.
+        '''
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -205,7 +242,10 @@ class Vec:
             return self
 
     def __idiv__(self, other):
-        "/= operation. Like the normal one except without duplication."
+        '''/= operation.
+
+        Like the normal one except without duplication.
+        '''
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -224,7 +264,11 @@ class Vec:
         if isinstance(other, Vec):
             return other.x == self.x and other.y == self.y and other.z == self.z
         elif isinstance(other, tuple):
-            return self.x == other[0] and self.y == other[1] and self.z == other[2]
+            return (
+                self.x == other[0] and
+                self.y == other[1] and
+                self.z == other[2]
+            )
         else:
             try:
                 return self.mag() == float(other)
@@ -290,9 +334,9 @@ class Vec:
         '''
         if isinstance(other, Vec):
             return (
-                    self.x > other.x and
-                    self.y > other.y and
-                    self.z > other.z
+                self.x > other.x and
+                self.y > other.y and
+                self.z > other.z
                 )
         elif isinstance(other, abc.Sequence):
             return (
@@ -307,7 +351,9 @@ class Vec:
                 return NotImplemented
 
     def max(self, other):
-        "Set this vector's values to be the maximum between ourself and the other vector."
+        '''Set this vector's values to the maximum of the two vectors.
+
+        '''
         if self.x < other.x:
             self.x = other.x
         if self.y < other.y:
@@ -315,9 +361,10 @@ class Vec:
         if self.z < other.z:
             self.z = other.z
 
-
     def min(self, other):
-        "Set this vector's values to be the minimum between ourself and the other vector."
+        '''Set this vector's values to be the minimum of the two vectors.' \
+                          '
+        '''
         if self.x > other.x:
             self.x = other.x
         if self.y > other.y:
@@ -358,7 +405,6 @@ class Vec:
             return "(" + str(self.x) + ", " + str(self.y) + ")"
         else:
             return "(" + self.join() + ")"
-
 
     def __repr__(self):
         "Code required to reproduce this vector."
@@ -402,7 +448,7 @@ class Vec:
 
     def as_tuple(self):
         "Return the Vector as a tuple."
-        return (self.x, self.y, self.z)
+        return self.x, self.y, self.z
 
     def len_sq(self):
         "Return the magnitude squared, which is slightly faster."
@@ -424,8 +470,12 @@ class Vec:
         return Vec(-self.x, -self.y, -self.z)
 
     def norm(self):
-        "Normalise the Vector by transforming it to have a magnitude of 1 but the same direction."
-        print(self.x, self.y, self.z)
+        '''Normalise the Vector.
+
+         This is done by transforming it to have a magnitude of 1 but the same
+         direction.
+         The vector is left unchange if it is equal to (0,0,0)
+         '''
         if self.x == 0 and self.y == 0 and self.z == 0:
             # Don't do anything for this, and don't copy
             return self
@@ -443,9 +493,9 @@ class Vec:
     def cross(self, other):
         '''Return the cross product of both Vectors.'''
         return Vec(
-            self.y*other.z - self.z*other.y,
-            self.z*other.x - self.x*other.z,
-            self.x*other.y - self.y*other.x,
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
             )
 
     len = mag

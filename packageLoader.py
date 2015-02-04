@@ -15,14 +15,14 @@ __all__ = [
     'load_packages',
     'Style',
     'Item',
-    'Voice',
+    'QuotePack',
     'Skybox',
     'Music',
     'Goo',
     'StyleVar',
     ]
 
-obj = {}
+all_obj = {}
 obj_override = {}
 packages = {}
 
@@ -30,14 +30,15 @@ data = {}
 
 res_count = -1
 
-def load_packages(dir, load_res):
+
+def load_packages(pak_dir, load_res):
     '''Scan and read in all packages in the specified directory.'''
     global res_count
-    dir=os.path.join(os.getcwd(), dir)
-    contents=os.listdir(dir) # this is both files and dirs
+    pak_dir = os.path.join(os.getcwd(), pak_dir)
+    contents = os.listdir(pak_dir)  # this is both files and dirs
 
-    loader.length("PAK",len(contents))
-    
+    loader.length("PAK", len(contents))
+
     if load_res:
         res_count = 0
     else:
@@ -46,29 +47,29 @@ def load_packages(dir, load_res):
     zips=[]
     try:
         for name in contents:
-            print("Reading package file '"+name+"'")
-            name=os.path.join(dir,name)
+            print('Reading package file "'+name+'"')
+            name = os.path.join(pak_dir, name)
             if name.endswith('.zip') and not os.path.isdir(name):
-                zip = ZipFile(name, 'r')
-                zips.append(zip)
-                if 'info.txt' in zip.namelist(): # Is it valid?
-                    with zip.open('info.txt', 'r') as info_file:
-                        info=Property.parse(info_file, name + ':info.txt')
+                zip_file = ZipFile(name, 'r')
+                zips.append(zip_file)
+                if 'info.txt' in zip_file.namelist():  # Is it valid?
+                    with zip_file.open('info.txt', 'r') as info_file:
+                        info = Property.parse(info_file, name + ':info.txt')
                     pak_id = info['ID']
-                    dispName = info['Name', pak_id]
-                    packages[pak_id] = (pak_id, zip, info, name, dispName)
+                    disp_name = info['Name', pak_id]
+                    packages[pak_id] = (pak_id, zip_file, info, name, disp_name)
                 else:
                     print("ERROR: Bad package'"+name+"'!")
 
         for obj_type in obj_types:
-            obj[obj_type] = {}
+            all_obj[obj_type] = {}
             obj_override[obj_type] = {}
             data[obj_type] = []
 
         objects = 0
-        for pak_id, zip, info, name, dispName in packages.values():
+        for pak_id, zip_file, info, name, dispName in packages.values():
             print("Scanning package '" + pak_id + "'")
-            new_objs=parse_package(zip, info, name, pak_id, dispName)
+            new_objs= parse_package(zip_file, info, pak_id, dispName)
             objects += new_objs
             loader.step("PAK")
             print("Done!")
@@ -77,10 +78,10 @@ def load_packages(dir, load_res):
 
         # Except for StyleVars, each object will have at least 1 image -
         # in UI.py we step the progress once per object.
-        loader.length("IMG", objects - len(obj['StyleVar']))
+        loader.length("IMG", objects - len(all_obj['StyleVar']))
 
         print(objects)
-        for obj_type, objs in obj.items():
+        for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
                 # parse through the object and return the resultant class
@@ -103,12 +104,12 @@ def load_packages(dir, load_res):
                 loader.step("OBJ")
         if load_res:
             print('Extracting Resources...')
-            for zip in zips:
-                for path in zip.namelist():
-                    loc=os.path.normcase(path)
+            for zip_file in zips:
+                for path in zip_file.namelist():
+                    loc = os.path.normcase(path)
                     if loc.startswith("resources"):
                         loader.step("RES")
-                        zip.extract(path, path="cache/")
+                        zip_file.extract(path, path="cache/")
 
             shutil.rmtree('images/cache', ignore_errors=True)
             shutil.rmtree('inst_cache/', ignore_errors=True)
@@ -131,29 +132,36 @@ def load_packages(dir, load_res):
     setup_style_tree(data)
     return data
 
-def parse_package(zip, info, filename, pak_id, dispName):
+def parse_package(zip, info, pak_id, dispName):
     "Parse through the given package to find all the components."
     global res_count
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
-            utils.con_log('Package "' + pre.value + '" required for "' + pak_id + '" - ignoring package!')
+            utils.con_log(
+                'Package "' +
+                pre.value +
+                '" required for "' +
+                pak_id +
+                '" - ignoring package!'
+            )
             return False
     objects = 0
-    # First read through all the components we have, so we can match overrides to the originals
+    # First read through all the components we have, so we can match
+    # overrides to the originals
     for comp_type in obj_types:
-        for object in info.find_all(comp_type):
-            id = object['id']
-            is_sub = object['overrideOrig', '0'] == '1'
+        for obj in info.find_all(comp_type):
+            obj_id = obj['id']
+            is_sub = obj['overrideOrig', '0'] == '1'
             if is_sub:
-                if id in obj_override[comp_type]:
-                    obj_override[comp_type][id].append((zip, object))
+                if obj_id in obj_override[comp_type]:
+                    obj_override[comp_type][obj_id].append((zip, obj))
                 else:
-                    obj_override[comp_type][id] = [(zip,object)]
+                    obj_override[comp_type][obj_id] = [(zip,obj)]
             else:
-                if id in obj[comp_type]:
-                    raise Exception('ERROR! "' + id + '" defined twice!')
+                if obj_id in all_obj[comp_type]:
+                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
                 objects += 1
-                obj[comp_type][id] = (zip, object, pak_id, dispName)
+                all_obj[comp_type][obj_id] = (zip, obj, pak_id, dispName)
 
     if res_count != -1:
         for item in zip.namelist():
@@ -164,13 +172,13 @@ def parse_package(zip, info, filename, pak_id, dispName):
 
 def setup_style_tree(data):
     '''Modify all items so item inheritance is properly handled.
-    
-    This will guarantee that all items have a definition for each 
+
+    This will guarantee that all items have a definition for each
     combination of item and version.
     The priority is:
-    - Exact Match 
+    - Exact Match
     - Parent style
-    - Grandparent (etc) style 
+    - Grandparent (etc) style
     - First version's style
     - First style of first version
     '''
@@ -178,7 +186,7 @@ def setup_style_tree(data):
 
     for style in data['Style']:
         all_styles[style.id] = style
-        
+
     for style in all_styles.values():
         base = []
         b_style = style
@@ -189,11 +197,11 @@ def setup_style_tree(data):
             # Just append the style.base_style to the list,
             # until the style with that ID isn't found anymore.
         style.bases = base
-    
+
     # All styles now have a .bases attribute, which is a list of the
     # parent styles that exist.
 
-    # To do inheritance, we simply copy the data to ensure all items 
+    # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in data['Item']:
         all_ver = list(item.versions.values())
@@ -215,21 +223,21 @@ def setup_style_tree(data):
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
                     else:
-                        # For versions other than the first, use 
+                        # For versions other than the first, use
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
-                        
 
-def parse_item_folder(folders, zip):
+
+def parse_item_folder(folders, zip_file):
     for fold in folders:
-        files = zip.namelist()
+        files = zip_file.namelist()
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
         try:
-            with zip.open(prop_path, 'r') as prop_file:
+            with zip_file.open(prop_path, 'r') as prop_file:
                 props = Property.parse(prop_file, prop_path).find_key('Properties')
-            with zip.open(editor_path, 'r') as editor_file:
+            with zip_file.open(editor_path, 'r') as editor_file:
                 editor = Property.parse(editor_file, editor_path)
         except KeyError as err:
             # Opening the files failed!
@@ -237,18 +245,18 @@ def parse_item_folder(folders, zip):
                 '"items/' + fold + '" not valid!'
                 'Folder likely missing! '
                 ) from err
-                    
+
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
-            'auth': sep_values(props['authors', ''],','),
-            'tags': sep_values(props['tags', ''],';'),
-            'desc': list(desc_parse(props)),
-            'ent':  props['ent_count', '??'],
-            'url':  props['infoURL', None],
-            'icons': {p.name:p.value for p in props['icon', []]},
+            'auth':     sep_values(props['authors', ''],','),
+            'tags':     sep_values(props['tags', ''],';'),
+            'desc':     list(desc_parse(props)),
+            'ent':      props['ent_count', '??'],
+            'url':      props['infoURL', None],
+            'icons':    {p.name:p.value for p in props['icon', []]},
             'all_name': props['all_name', None],
             'all_icon': props['all_icon', None],
-            'vbsp': Property,
+            'vbsp':     Property(None, []),
 
             # The first Item block found
             'editor' : next(editor_iter),
@@ -265,10 +273,11 @@ def parse_item_folder(folders, zip):
             print('Warning: "'  + prop_path + '" has incomplete grouping icon definition!')
 
         try:
-            with zip.open(config_path, 'r') as vbsp_config:
+            with zip_file.open(config_path, 'r') as vbsp_config:
                 folders[fold]['vbsp'] = Property.parse(vbsp_config, config_path)
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
+
 
 class Style:
     def __init__(
@@ -299,7 +308,7 @@ class Style:
             self.config = config
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, style_id, info):
         '''Parse a style definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', 'NONE']
@@ -316,18 +325,18 @@ class Style:
             short_name = None
         if base == 'NONE':
             base = None
-        files = zip.namelist()
+        files = zip_file.namelist()
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
-        with zip.open(folder + '/items.txt', 'r') as item_data:
+        with zip_file.open(folder + '/items.txt', 'r') as item_data:
             items = Property.parse(item_data, folder+'/items.txt')
         if config in files:
-            with zip.open(config, 'r') as vbsp_config:
+            with zip_file.open(config, 'r') as vbsp_config:
                 vbsp = Property.parse(vbsp_config, config)
         else:
             vbsp = None
         return cls(
-            id,
+            style_id,
             name,
             auth,
             desc,
@@ -339,7 +348,7 @@ class Style:
             suggested=sugg
             )
 
-    def add_over(self, override, zip):
+    def add_over(self, override, zip_file):
         '''Add the additional commands to ourselves.'''
         self.editor.extend(override.editor)
         self.config.extend(override.config)
@@ -354,7 +363,7 @@ class Item:
         self.versions = versions
         self.def_ver = def_version
         self.def_data = def_version['def_style']
-        
+
     @classmethod
     def parse(cls, zip_file, item_id, info):
         '''Parse an item definition.'''
@@ -364,12 +373,12 @@ class Item:
 
         for ver in info.find_all('version'):
             vals = {
-                'name'    : ver['name', 'Regular'],
-                'id'      : ver['ID', 'VER_DEFAULT'],
-                'is_beta' : ver['beta', '0'] == '1',
-                'is_dep'  : ver['deprecated', '0'] == '1',
-                'styles'  :  {},
-                'def_style' : None,
+                'name':     ver['name', 'Regular'],
+                'id':       ver['ID', 'VER_DEFAULT'],
+                'is_beta':  ver['beta', '0'] == '1',
+                'is_dep':   ver['deprecated', '0'] == '1',
+                'styles':   {},
+                'def_style': None,
                 }
             for sty_list in ver.find_all('styles'):
                 for sty in sty_list:
@@ -388,10 +397,10 @@ class Item:
                 ver['def_style'] = folders[ver['def_style']]
             for sty, fold in ver['styles'].items():
                 ver['styles'][sty] = folders[fold]
-                
+
         if not versions:
             raise ValueError('Item "' + item_id + '" has no versions!')
-            
+
         return cls(item_id, versions, def_version)
 
     def add_over(self, override, zip_file):
@@ -407,19 +416,20 @@ class Item:
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
-                        # We both have a matching folder, merge the 
+                        # We both have a matching folder, merge the
                         # definitions
                         our_style = our_ver[sty_id]
-                        
+
                         our_style['auth'].extend(style['auth'])
                         our_style['desc'].extend(style['desc'])
                         our_style['tags'].extend(style['tags'])
                         our_style['vbsp'] += style['vbsp']
-            
+
     def __repr__(self):
         return '<Item:' + self.id + '>'
 
-class Voice:
+
+class QuotePack:
     def __init__(
             self,
             id,
@@ -459,8 +469,10 @@ class Voice:
     def add_over(self, override, zip):
         '''Add the additional lines to ourselves.'''
         pass
+
     def __repr__(self):
         return '<Voice:' + self.id + '>'
+
 
 class Skybox:
     def __init__(
@@ -484,7 +496,7 @@ class Skybox:
         self.desc = desc
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, item_id, info):
         '''Parse a skybox definition.'''
         config_dir = info['config', '']
         name, short_name, auth, icon, desc = get_selitem_data(info)
@@ -493,18 +505,18 @@ class Skybox:
             config = Property(None, [])
         else:
             path = 'skybox/' + name + '.cfg'
-            if path in zip.namelist():
-                with zip.open(name, 'r') as conf:
+            if path in zip_file.namelist():
+                with zip_file.open(name, 'r') as conf:
                     config = Property.parse(conf)
             else:
                 print(name + '.cfg not in zip!')
                 config = Property(None, [])
-        return cls(id, name, icon, config, mat, auth, desc, short_name)
+        return cls(item_id, name, icon, config, mat, auth, desc, short_name)
 
     def add_over(self, override, zip):
         '''Add the additional vbsp_config commands to ourselves.'''
-        self.auth.extend(sky.auth)
-        self.config.extend(sky.config)
+        self.auth.extend(override.auth)
+        self.config.extend(override.config)
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
@@ -632,7 +644,11 @@ class StyleVar:
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
 
+
 def desc_parse(info):
+    '''Parse the description blocks, to create data which matches richTextBox.
+
+    '''
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
@@ -640,10 +656,12 @@ def desc_parse(info):
         else:
             yield ("line", prop.value)
 
+
 def get_selitem_data(info):
-    '''Return the common data for all item types - name, author, description.'''
+    '''Return the common data for all item types - name, author, description.
+
+    '''
     auth = sep_values(info['authors', ''], ',')
-    # Multiple description lines will be joined together, for easier multi-line writing.
     desc = list(desc_parse(info))
     short_name = info['shortName', None]
     name = info['name']
@@ -662,13 +680,13 @@ def sep_values(str, delimiter):
             (val.strip() for val in vals) if stripped]
 
 obj_types = {
-    'Style' : Style,
-    'Item' : Item,
-    'QuotePack': Voice,
-    'Skybox': Skybox,
-    'Goo' : Goo,
-    'Music' : Music,
-    'StyleVar' : StyleVar
+    'Style':     Style,
+    'Item':      Item,
+    'QuotePack': QuotePack,
+    'Skybox':    Skybox,
+    'Goo':       Goo,
+    'Music':     Music,
+    'StyleVar':  StyleVar,
     }
 
 if __name__ == '__main__':

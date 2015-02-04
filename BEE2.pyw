@@ -1,4 +1,4 @@
-from config import ConfigFile
+from BEE2_config import ConfigFile
 
 import UI
 import loadScreen
@@ -6,7 +6,6 @@ import paletteLoader
 import packageLoader
 import gameMan
 
-loadScreen.init(UI.win)
 loadScreen.length('UI', 8)
 
 DEFAULT_SETTINGS = {

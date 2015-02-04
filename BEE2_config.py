@@ -32,7 +32,6 @@ class ConfigFile(ConfigParser):
 
     def set_defaults(self, def_settings):
         '''Set the default values if the settings file has no values defined.'''
-        has_changed = False
         for sect, values in def_settings.items():
             if sect not in self:
                 self[sect] = {}

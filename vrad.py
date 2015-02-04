@@ -6,7 +6,7 @@ import shutil
 import random
 
 import utils
-    
+
 def quote(txt):
     return '"' + txt + '"'
 
@@ -28,7 +28,7 @@ to_pack = [] # the file path for any items that we should be packing
 to_pack_inst = {} # items to pack for a specific instance
 to_pack_mat = {} # files to pack if material is used (by VBSP_styles only)
 
-root = os.path.dirname(os.getcwd())
+TK_ROOT = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
 new_args=sys.argv[1:]
 old_args=sys.argv[1:]
@@ -62,10 +62,10 @@ new_args = ['-bounce', '2', '-noextra'] + new_args
 utils.con_log("Map path is " + path)
 if path == "":
     raise Exception("No map passed!")
-    
+
 if not path.endswith(".bsp"):
     path += ".bsp"
-    
+
 if '-force_peti' in args or '-force_hammer' in args:
     # we have override command!
     if '-force_peti' in args:
@@ -75,7 +75,7 @@ if '-force_peti' in args or '-force_hammer' in args:
         utils.con_log('OVERRIDE: Preserving args!')
         is_peti = False
 else:
-    # If we don't get the special -force args, check for the name 
+    # If we don't get the special -force args, check for the name
     # equalling preview to determine if we should convert
     is_peti = os.path.basename(path) == "preview.bsp"
 if is_peti:
@@ -84,7 +84,7 @@ if is_peti:
 else:
     utils.con_log("Hammer map detected! Not forcing cheap lighting..")
     run_vrad(old_args)
-    
+
 pack_file = path[:-4] + '.filelist.txt'
 
 if os.path.isfile(pack_file):

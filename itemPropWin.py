@@ -1,5 +1,6 @@
-from tkinter import * # ui library
-from tkinter import ttk # themed ui components that match the OS
+from tkinter import *  # ui library
+from tk_root import TK_ROOT
+from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
 import math
 import random
@@ -10,22 +11,22 @@ import utils
 # all editable properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'toplevel'                : ('pistPlat', 'Start Position'),
-    'bottomlevel'             : ('pistPlat', 'End Position'),
-    'angledpanelanimation'    : ('panAngle', 'Panel Position'),
-    'startenabled'            : ('checkbox', 'Start Enabled'),
-    'startreversed'           : ('checkbox', 'Start Reversed'),
-    'startdeployed'           : ('checkbox', 'Start Deployed'),
-    'startactive'             : ('checkbox', 'Start Active'),
-    'startopen'               : ('checkbox', 'Start Open'),
-    'startlocked'             : ('checkbox', 'Start Locked'),
-    'timerdelay'              : ('timerDel', 'Delay \n(0=infinite)'),
-    'dropperenabled'          : ('checkbox', 'Dropper Enabled'),
-    'autodrop'                : ('checkbox', 'Auto Drop'),
-    'autorespawn'             : ('checkbox', 'Auto Respawn'),
-    'oscillate'               : ('railLift', 'Oscillate'),
-    'paintflowtype'           : ('gelType' , 'Flow Type'),
-    'allowstreak'             : ('checkbox', 'Allow Streaks'),
+    'toplevel':                 ('pistPlat', 'Start Position'),
+    'bottomlevel':              ('pistPlat', 'End Position'),
+    'angledpanelanimation':     ('panAngle', 'Panel Position'),
+    'startenabled':             ('checkbox', 'Start Enabled'),
+    'startreversed':            ('checkbox', 'Start Reversed'),
+    'startdeployed':            ('checkbox', 'Start Deployed'),
+    'startactive':              ('checkbox', 'Start Active'),
+    'startopen':                ('checkbox', 'Start Open'),
+    'startlocked':              ('checkbox', 'Start Locked'),
+    'timerdelay':               ('timerDel', 'Delay \n(0=infinite)'),
+    'dropperenabled':           ('checkbox', 'Dropper Enabled'),
+    'autodrop':                 ('checkbox', 'Auto Drop'),
+    'autorespawn':              ('checkbox', 'Auto Respawn'),
+    'oscillate':                ('railLift', 'Oscillate'),
+    'paintflowtype':            ('gelType',  'Flow Type'),
+    'allowstreak':              ('checkbox', 'Allow Streaks'),
     }
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
@@ -71,22 +72,22 @@ PAINT_OPTS = [
 
 DEFAULTS = { # default values for this item
     'startup': False,
-    'toplevel':1,
-    'bottomlevel':0,
-    'angledpanelanimation':'45',
-    'startenabled':True,
-    'startreversed':False,
-    'startdeployed':True,
-    'startactive':True,
-    'startopen':True,
-    'startlocked':False,
-    'timerdelay':3,
-    'dropperenabled':True,
-    'autodrop':True,
-    'autorespawn':True,
-    'oscillate':True,
-    'paintflowtype':1,
-    'allowstreak':True
+    'toplevel': 1,
+    'bottomlevel': 0,
+    'angledpanelanimation': '45',
+    'startenabled': True,
+    'startreversed': False,
+    'startdeployed': True,
+    'startactive': True,
+    'startopen': True,
+    'startlocked': False,
+    'timerdelay': 3,
+    'dropperenabled': True,
+    'autodrop': True,
+    'autorespawn': True,
+    'oscillate': True,
+    'paintflowtype': 1,
+    'allowstreak': True
     }
 
 last_angle = '0'
@@ -95,13 +96,20 @@ play_sound = False
 is_open = False
 enable_tim_callback = True
 
+
+def callback(name):
+    '''Do nothing by default!'''
+    pass
+
+
 def reset_sfx():
     global play_sound
     play_sound = True
 
+
 def sfx(sound):
     '''Play a sound effect.
-    
+
     This waits for a certain amount of time between retriggering sounds
     so they don't overlap.
     '''
@@ -111,15 +119,18 @@ def sfx(sound):
         play_sound = False
         win.after(75, reset_sfx)
 
+
 def scroll_angle(key, e):
     if e.delta > 0 and widgets[key].get() != '90':
         e.widget.invoke('buttonup')
     elif e.delta < 0 and widgets[key].get() != '0':
         e.widget.invoke('buttondown')
 
+
 def save_paint(key, val):
     sfx('config')
     out_values[key] = val
+
 
 def save_angle(key, new_angle):
     global last_angle
@@ -129,6 +140,7 @@ def save_angle(key, new_angle):
         sfx('lower_' + random.choice('123'))
     last_angle = new_angle
     out_values[key] = 'ramp_' + str(new_angle) + '_deg_open'
+
 
 def save_tim(key, val):
     global enable_tim_callback
@@ -152,6 +164,7 @@ def save_tim(key, val):
         values[key] = new_val
         out_values[key] = str(new_val)
 
+
 def save_pist(key, val):
     if widgets['toplevel'].get() == widgets['bottomlevel'].get():
         # user moved them to match, switch the other one around
@@ -162,15 +175,16 @@ def save_pist(key, val):
     else:
         sfx('move')
 
-    startPos = widgets['toplevel'].get()
-    endPos = widgets['bottomlevel'].get()
+    start_pos = widgets['toplevel'].get()
+    end_pos = widgets['bottomlevel'].get()
 
-    values['toplevel'] = startPos
-    values['bottomlevel'] = endPos
+    values['toplevel'] = start_pos
+    values['bottomlevel'] = end_pos
 
-    values['startup'] = utils.bool_as_int(startPos > endPos)
-    out_values['toplevel'] = str(max(startPos, endPos))
-    out_values['bottomlevel'] = str(min(startPos, endPos))
+    values['startup'] = utils.bool_as_int(start_pos > end_pos)
+    out_values['toplevel'] = str(max(start_pos, end_pos))
+    out_values['bottomlevel'] = str(min(start_pos, end_pos))
+
 
 def save_rail(key):
     if values[key].get() == 0:
@@ -179,6 +193,7 @@ def save_rail(key):
     else:
         widgets['startactive'].state(['!disabled'])
 
+
 def toggleCheck(key, var, e=None):
     if var.get():
         var.set(0)
@@ -186,14 +201,17 @@ def toggleCheck(key, var, e=None):
         var.set(1)
     set_check(key)
 
+
 def set_check(key):
     sfx('config')
     out_values[key] = str(values[key].get())
 
-def paintFX(e):
+
+def paint_fx(e=None):
     sfx('config')
 
-def exit():
+
+def exit_win():
     "Quit and return the new settings."
     global is_open
     win.grab_release()
@@ -207,6 +225,7 @@ def exit():
             out[key] = out_values.get(key, values[key])
     callback(out)
 
+
 def can_edit(prop_list):
     '''Determine if any of these properties are changeable.'''
     for prop in prop_list:
@@ -214,18 +233,19 @@ def can_edit(prop_list):
             return True
     return False
 
-def init(tk, cback):
+
+def init(cback):
     global callback, labels, win, is_open
     callback = cback
     is_open = False
-    win = Toplevel(tk)
+    win = Toplevel(TK_ROOT)
     win.title("BEE2")
     win.resizable(False, False)
     win.iconbitmap(r'BEE2.ico')
-    win.protocol("WM_DELETE_WINDOW", exit)
+    win.protocol("WM_DELETE_WINDOW", exit_win)
     win.withdraw()
     labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')
-    widgets['saveButton'] = ttk.Button(win, text='Close', command=exit)
+    widgets['saveButton'] = ttk.Button(win, text='Close', command=exit_win)
     widgets['titleLabel'] = ttk.Label(win, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
@@ -327,33 +347,34 @@ def init(tk, cback):
             widgets[key] = ttk.Checkbutton(win)
     values['startup'] = DEFAULTS['startup']
 
-def open(usedProps, parent, itemName):
-    global propList, is_open
-    propList = [key.casefold() for key in usedProps]
+
+def show_window(used_props, parent, item_name):
+    global propList, is_open, block_sound, last_angle
+    propList = [key.casefold() for key in used_props]
     is_open = True
     spec_row = 1
 
-    start_up = usedProps.get('startup', '0') == '1'
+    start_up = used_props.get('startup', '0') == '1'
     values['startup'] = start_up
-    for prop, value in usedProps.items():
+    for prop, value in used_props.items():
         if prop in PROP_TYPES and value is not None:
-            type = PROP_TYPES[prop][0]
-            if type == 'checkbox':
+            prop_type = PROP_TYPES[prop][0]
+            if prop_type == 'checkbox':
                 values[prop].set(value == '1')
-            elif type == 'railLift':
+            elif prop_type == 'railLift':
                 values[prop].set(value == '1')
                 save_rail(prop)
-            elif type == 'gelType':
+            elif prop_type == 'gelType':
                 values[prop].set(value)
-            elif type == 'panAngle':
+            elif prop_type == 'panAngle':
                 last_angle = value[5:7]
                 values[prop].set(last_angle)
                 out_values[prop] = value
-            elif type == 'pistPlat':
-                values[prop] == value
+            elif prop_type == 'pistPlat':
+                values[prop] = value
                 try:
-                    top_level = int(usedProps.get('toplevel', 4))
-                    bot_level = int(usedProps.get('bottomlevel', 0))
+                    top_level = int(used_props.get('toplevel', 4))
+                    bot_level = int(used_props.get('bottomlevel', 0))
                 except ValueError:
                     pass
                 else:
@@ -373,7 +394,7 @@ def open(usedProps, parent, itemName):
                                 bot_level,
                                 )
                             )
-            elif type == 'timerDel':
+            elif prop_type == 'timerDel':
                 try:
                     values[prop] = int(value)
                     widgets[prop].set(values[prop])
@@ -403,11 +424,11 @@ def open(usedProps, parent, itemName):
         else:
             labels[key].grid_remove()
             widgets[key].grid_remove()
-# if we have a 'special' prop, add the dividerbetween the types
+# if we have a 'special' prop, add the divider between the types
     if spec_row > 1:
         widgets['div_h'].grid(
             row=spec_row + 1,
-            columnspan=9, 
+            columnspan=9,
             sticky="EW",
             )
         spec_row += 2
@@ -437,7 +458,7 @@ def open(usedProps, parent, itemName):
             labels[key].grid_remove()
             widgets[key].grid_remove()
 
-    if ind > 1: # is there more than 1 checkbox? (add left divider)
+    if ind > 1:  # is there more than 1 checkbox? (add left divider)
         widgets['div_1'].grid(
             row=spec_row,
             column=2,
@@ -447,7 +468,7 @@ def open(usedProps, parent, itemName):
     else:
         widgets['div_1'].grid_remove()
 
-    if ind > 2: # are there more than 2 checkboxes? (add right divider)
+    if ind > 2:  # are there more than 2 checkboxes? (add right divider)
         widgets['div_2'].grid(
             row=spec_row,
             column=5,
@@ -472,11 +493,11 @@ def open(usedProps, parent, itemName):
 
     # Block sound for the first few millisec to stop excess sounds from
     # playing
-    play_sound = False
+    block_sound = False
     win.after(50, reset_sfx)
 
-    widgets['titleLabel'].configure(text='Settings for "' + itemName + '"')
-    win.title('BEE2 - ' + itemName)
+    widgets['titleLabel'].configure(text='Settings for "' + item_name + '"')
+    win.title('BEE2 - ' + item_name)
     win.transient(master=parent)
     win.deiconify()
     win.lift(parent)
@@ -488,30 +509,30 @@ def open(usedProps, parent, itemName):
 
 # load the window if directly executing this file
 if __name__ == '__main__':
-    root = Tk()
-    root.geometry('+250+250')
+    TK_ROOT.geometry('+250+250')
+
     def callback(vals):
         for key, value in sorted(vals.items()):
             print(key + ' = ' + repr(value))
 
-    init(root,callback)
+    init(callback)
     all_vals = {
-        'startup':'1',
-        'toplevel':'4',
-        'bottomlevel':'3',
-        'angledpanelanimation':'ramp_45_deg_open',
-        'startenabled':'1',
-        'startreversed':'0',
-        'startdeployed':'1',
-        'startactive':'1',
-        'startopen':'1',
-        'startlocked':'0',
-        'timerdelay':'15',
-        'dropperenabled':'1',
-        'autodrop':'1',
-        'autorespawn':'1',
-        'oscillate':'0',
-        'paintflowtype':'1',
-        'allowstreak':'1'
+        'startup': '1',
+        'toplevel': '4',
+        'bottomlevel': '3',
+        'angledpanelanimation': 'ramp_45_deg_open',
+        'startenabled': '1',
+        'startreversed': '0',
+        'startdeployed': '1',
+        'startactive': '1',
+        'startopen': '1',
+        'startlocked': '0',
+        'timerdelay': '15',
+        'dropperenabled': '1',
+        'autodrop': '1',
+        'autorespawn': '1',
+        'oscillate': '0',
+        'paintflowtype': '1',
+        'allowstreak': '1'
         }
-    open(all_vals,root, "TestItemWithEveryProp")
+    show_window(all_vals, TK_ROOT, "TestItemWithEveryProp")

@@ -1,6 +1,7 @@
-from tkinter import * # ui library
-from tkinter import ttk # themed ui components that match the OS
-from tkinter import messagebox # simple, standard modal dialogs
+from tkinter import *  # ui library
+from tkinter import ttk  # themed ui components that match the OS
+from tkinter import messagebox  # simple, standard modal dialogs
+from tk_root import TK_ROOT
 from functools import partial as func_partial
 import itertools
 import operator
@@ -9,7 +10,7 @@ import tkinter_png as png # png library for TKinter
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from selectorWin import selWin, Item as selWinItem
-from config import ConfigFile
+from BEE2_config import ConfigFile
 
 import sound as snd
 import loadScreen as loader
@@ -18,13 +19,6 @@ import paletteLoader
 import contextWin
 import gameMan
 import utils
-
-win = Tk()
-# hide the main window while everything is loading, so
-# you don't see the bits appearing
-win.withdraw()
-
-gameMan.init(win)
 
 # If image is not readable, use this instead
 png.img_error = png.loadPng('BEE2/error')
@@ -45,7 +39,7 @@ drag_orig_pos = -1
 drag_onPal = False  # are we dragging a palette item?
 drag_passedPal = False  # has the cursor passed over the palette
 
-FILTER_CATS = ('author','package','tags')
+FILTER_CATS = ('author', 'package', 'tags')
 FilterBoxes = {}  # the various checkboxes for the filters
 FilterBoxes_all = {}
 FilterVars = {}  # The variables for the checkboxes
@@ -72,11 +66,14 @@ goos = {}
 stylevar_list = []
 
 # Special StyleVars that are hardcoded into the BEE2
+# These are effectively attributes of Portal 2 itself, and always work
+# in every style.
 styleOptions = [
-    ('MultiverseCave','Multiverse Cave', 1),
-    ('FixPortalBump','Prevent Portal Bump  (glass)', 0),
-    ('FixFizzlerBump','Prevent Portal Bump  (fizzler)', 0),
-    ('NoMidVoices','Suppress Mid-Chamber Dialogue', 0),
+    # ID, Name, default value
+    ('MultiverseCave', 'Multiverse Cave', 1),
+    ('FixPortalBump', 'Prevent Portal Bump  (glass)', 0),
+    ('FixFizzlerBump', 'Prevent Portal Bump  (fizzler)', 0),
+    ('NoMidVoices', 'Suppress Mid-Chamber Dialogue', 0),
     ('UnlockDefault', 'Unlock Default Items', 0),
     ]
 
@@ -164,7 +161,8 @@ class Item:
         icons = self.data['icons']
         if (allow_single and self.can_group and
             sum(1 for item in pal_picked if item.id==self.id) <= single_num):
-            # If only 1 copy of this item is on the palette, use the special icon
+            # If only 1 copy of this item is on the palette, use the
+            # special icon
             return png.loadIcon(icons['all'])
         else:
             return png.loadIcon(icons[str(subKey)])
@@ -176,7 +174,9 @@ class Item:
                 yield prop.name.casefold()
 
     def get_properties(self):
-        '''Return a dictionary of properties and the current value associated with them.'''
+        '''Return a dictionary of properties and the current value for them.
+
+        '''
         result = {}
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
@@ -202,7 +202,9 @@ class Item:
             item_opts[self.id]['PROP_' + prop] = str(value)
 
     def refresh_subitems(self):
-        '''Call load_data() on all our subitems, so they reload icons and names.'''
+        '''Call load_data() on all our subitems, so they reload icons and names.
+
+        '''
         for refresh_cmd, item_list in [
                     (flowPreview, pal_picked),
                     (flowPicker, pal_items)]:
@@ -237,7 +239,9 @@ class Item:
         return self.ver_list, vers
 
     def export(self):
-        '''Generate the editoritems and vbsp_config values that represent this item.'''
+        '''Generate the editoritems and vbsp_config data for this item.
+
+        '''
         self.load_data()
 
         palette_items = {}
@@ -267,6 +271,7 @@ class Item:
 
         return new_editor, self.data['editor_extra'], self.data['vbsp']
 
+
 class PalItem(Label):
     '''The icon and associated data for a single subitem.'''
     def __init__(self, frame, item, sub, is_pre):
@@ -279,11 +284,13 @@ class PalItem(Label):
         self.item = item
         self.subKey = sub
         self.id = item.id
-        self.visible = True # Toggled according to filter settings
-        self.is_pre = is_pre # Used to distinguish between picker and palette items
+        # Toggled according to filter settings
+        self.visible = True
+        # Used to distinguish between picker and palette items
+        self.is_pre = is_pre
         self.load_data()
         self.bind("<Button-3>", contextWin.open_event)
-        self.bind("<Button-1>", showDrag)
+        self.bind("<Button-1>", drag_start)
         self.bind("<Shift-Button-1>", fastDrag)
         self.bind("<Enter>", self.set_disp_name)
         self.bind("<Leave>", clear_disp_name)
@@ -292,7 +299,10 @@ class PalItem(Label):
         set_disp_name(self.name)
 
     def change_subtype(self, ind):
-        '''Change the subtype of this icon, removing duplicates from the palette if needed.'''
+        '''Change the subtype of this icon.
+
+        This removes duplicates from the palette if needed.
+        '''
         for item in pal_picked[:]:
             if item.id == self.id and item.subKey == ind:
                 item.kill()
@@ -302,7 +312,9 @@ class PalItem(Label):
         flowPreview()
 
     def open_menu_at_sub(self, ind):
-        '''Make the contextWin open itself at the indicated subitem on the item picker.'''
+        '''Make the contextWin open itself at the indicated subitem.
+
+        '''
         if self.is_pre:
             items_list = pal_picked[:]
         else:
@@ -511,13 +523,13 @@ class SubPane(Toplevel):
 
 def quit_application():
     '''Do a last-minute save of our config files, and quit the app.'''
-    gen_opts['win_state']['main_window_x'] = str(win.winfo_rootx())
-    gen_opts['win_state']['main_window_y'] = str(win.winfo_rooty())
+    gen_opts['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
+    gen_opts['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
     gen_opts.save_check()
     item_opts.save_check()
     # Destroy the TK windows
-    win.destroy()
+    TK_ROOT.destroy()
     exit(0)
 
 def set_mute():
@@ -642,7 +654,7 @@ def load_packages(data):
         suggested_refresh()
 
     skybox_win = selWin(
-        win,
+        TK_ROOT,
         sky_list,
         title='Select Skyboxes',
         has_none=False,
@@ -651,7 +663,7 @@ def load_packages(data):
         )
 
     voice_win = selWin(
-        win,
+        TK_ROOT,
         voice_list,
         title='Select Additional Voice Lines',
         has_none=True,
@@ -660,7 +672,7 @@ def load_packages(data):
         )
 
     music_win = selWin(
-        win,
+        TK_ROOT,
         music_list,
         title='Select Background Music',
         has_none=True,
@@ -670,7 +682,7 @@ def load_packages(data):
         )
 
     goo_win = selWin(
-        win,
+        TK_ROOT,
         goo_list,
         title='Select Goo Appearance',
         has_none=True,
@@ -681,7 +693,7 @@ def load_packages(data):
         )
 
     style_win = selWin(
-        win,
+        TK_ROOT,
         style_list,
         title='Select Style',
         has_none=False,
@@ -801,9 +813,10 @@ def conv_screen_to_grid(x,y):
     return ((x-UI['pre_bg_img'].winfo_rootx()-8)//65,
            (y-UI['pre_bg_img'].winfo_rooty()-32)//65)
 
-def showDrag(e):
+def drag_start(e):
     "Start dragging a palette item."
     global drag_onPal,drag_item, drag_passedPal
+    drag_win = windows['drag_win']
     drag_item=e.widget
     set_disp_name(drag_item.name)
     snd.fx('config')
@@ -827,24 +840,24 @@ def showDrag(e):
             allow_single=True,
             single_num=0,
             )
-    dragWin.deiconify()
-    dragWin.lift(win)
+    drag_win.deiconify()
+    drag_win.lift(TK_ROOT)
     # grab makes this window the only one to receive mouse events, so
     # it is guaranteed that it'll drop when the mouse is released.
-    dragWin.grab_set_global()
+    drag_win.grab_set_global()
     # NOTE: _global means no other programs can interact, make sure
     # it's released eventually or you won't be able to quit!
     moveDrag(e) # move to correct position
-    dragWin.bind("<B1-Motion>", moveDrag)
-    dragWin.bind("<ButtonRelease-1>", hideDrag)
+    drag_win.bind("<B1-Motion>", moveDrag)
     UI['pre_sel_line'].lift()
 
-def hideDrag(e):
+def drag_stop(e):
     "User released the mouse button, complete the drag."
     global drag_item
-    dragWin.withdraw()
-    dragWin.unbind("<B1-Motion>")
-    dragWin.grab_release()
+    drag_win = windows['drag_win']
+    drag_win.withdraw()
+    drag_win.unbind("<B1-Motion>")
+    drag_win.grab_release()
     clear_disp_name()
     UI['pre_sel_line'].place_forget()
     snd.fx('config')
@@ -875,18 +888,19 @@ def hideDrag(e):
 def moveDrag(e):
     '''Update the position of dragged items as they move around.'''
     global drag_passedPal
+    drag_win = windows['drag_win']
     set_disp_name(drag_item.name)
-    dragWin.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
+    drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x,pos_y=conv_screen_to_grid(e.x_root,e.y_root)
     if pos_x>=0 and pos_y>=0 and pos_x<4 and pos_y<8:
         drag_passedPal=True
-        dragWin.configure(cursor='plus')
+        drag_win.configure(cursor='plus')
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
     else:
         if drag_onPal and drag_passedPal:
-            dragWin.configure(cursor='x_cursor')
+            drag_win.configure(cursor='x_cursor')
         else:
-            dragWin.configure(cursor='no')
+            drag_win.configure(cursor='no')
         UI['pre_sel_line'].place_forget()
 
 def fastDrag(e):
@@ -963,7 +977,7 @@ def pal_save_as(e=None):
                 title='BEE2',
                 message='Please only use basic characters in palette '
                         'names.',
-                parent=win,
+                parent=TK_ROOT,
                 )
         else:
             break
@@ -984,7 +998,7 @@ def pal_remove():
                 title='BEE2',
                 message='Are you sure you want to delete "'
                     + pal.name + '"?',
-                parent=win,
+                parent=TK_ROOT,
                 ):
             pal.delete_from_disk()
             del palettes[selectedPalette]
@@ -1504,35 +1518,36 @@ def initFilter(f):
     initFilterCol('tags', tags)
 
 
-def initDragIcon(win):
-    global dragWin
-    dragWin=Toplevel(win)
+def initDragIcon():
+    drag_win = Toplevel(TK_ROOT)
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
-    dragWin.overrideredirect(1)
-    dragWin.resizable(False, False)
-    dragWin.withdraw()
-    dragWin.transient(master=win)
-    dragWin.withdraw() # starts hidden
-    UI['drag_lbl']=Label(
-        dragWin,
+    drag_win.overrideredirect(1)
+    drag_win.resizable(False, False)
+    drag_win.withdraw()
+    drag_win.transient(master=TK_ROOT)
+    drag_win.withdraw()  # starts hidden
+    drag_win.bind("<ButtonRelease-1>", drag_stop)
+    UI['drag_lbl'] = Label(
+        drag_win,
         image=png.loadPng('BEE2/blank'),
         )
     UI['drag_lbl'].grid(row=0, column=0)
+    windows['drag_win'] = drag_win
 
 def set_game(game):
-    win.title('BEEMOD 2.4 - ' + game.name)
+    TK_ROOT.title('BEEMOD 2.4 - ' + game.name)
     gen_opts['Last_Selected']['game'] = game.name
 
 def initMenuBar(win):
-    bar=Menu(win)
-    win['menu']=bar
+    bar = Menu(win)
+    win['menu'] = bar
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', False)
 
     # Name is used to make this the special 'BEE2' menu item on Mac
-    menus['file']=Menu(bar, name='apple')
+    menus['file'] = Menu(bar, name='apple')
     file_menu = menus['file']
     bar.add_cascade(menu=file_menu, label='File')
 
@@ -1610,18 +1625,18 @@ def initMenuBar(win):
 
 def initMain():
     '''Initialise all windows and panes.'''
-    initMenuBar(win)
-    win.maxsize(
-        width=win.winfo_screenwidth(),
-        height=win.winfo_screenheight(),
+    initMenuBar(TK_ROOT)
+    TK_ROOT.maxsize(
+        width=TK_ROOT.winfo_screenwidth(),
+        height=TK_ROOT.winfo_screenheight(),
         )
-    win.protocol("WM_DELETE_WINDOW", quit_application)
-    win.iconbitmap('BEE2.ico')# set the window icon
+    TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
+    TK_ROOT.iconbitmap('BEE2.ico')# set the window icon
 
-    UIbg=Frame(win, bg=ItemsBG)
+    UIbg=Frame(TK_ROOT, bg=ItemsBG)
     UIbg.grid(row=0,column=0, sticky='NSEW')
-    win.columnconfigure(0, weight=1)
-    win.rowconfigure(0, weight=1)
+    TK_ROOT.columnconfigure(0, weight=1)
+    TK_ROOT.rowconfigure(0, weight=1)
     UIbg.rowconfigure(0, weight=1)
 
     style=ttk.Style()
@@ -1634,7 +1649,7 @@ def initMain():
     frames['preview'].grid(row=0, column=3, sticky="NW", padx=(2,5),pady=5)
     initPreview(frames['preview'])
     frames['preview'].update_idletasks()
-    win.minsize(
+    TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
         ) # Prevent making the window smaller than the preview pane
@@ -1694,7 +1709,7 @@ def initMain():
     frames['toolMenu'].place(x=73, y=2)
 
     windows['pal']=SubPane(
-        win,
+        TK_ROOT,
         title='Palettes',
         name='pal',
         resize_x=True,
@@ -1706,7 +1721,7 @@ def initMain():
     loader.step('UI')
 
     windows['opt']=SubPane(
-        win,
+        TK_ROOT,
         title='Export Options',
         name='opt',
         resize_x=True,
@@ -1717,7 +1732,7 @@ def initMain():
     loader.step('UI')
 
     windows['style']=SubPane(
-        win,
+        TK_ROOT,
         title='Style Properties',
         name='style',
         resize_y=True,
@@ -1728,16 +1743,16 @@ def initMain():
     loader.step('UI')
 
     # make scrollbar work globally
-    win.bind(
+    TK_ROOT.bind(
         "<MouseWheel>",
         lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
         )
     # needed for linux
-    win.bind(
+    TK_ROOT.bind(
         "<Button-4>",
         lambda e: pal_canvas.yview_scroll(1, "units"),
         )
-    win.bind(
+    TK_ROOT.bind(
         "<Button-5>",
         lambda e: pal_canvas.yview_scroll(-1, "units"),
         )
@@ -1755,24 +1770,24 @@ def initMain():
         lambda e: UI['style_can'].yview_scroll(-1, "units"),
         )
 
-    win.bind("<Button-1>",contextWin.hideProps)
-    windows['style'].bind("<Button-1>",contextWin.hideProps)
-    windows['opt'].bind("<Button-1>",contextWin.hideProps)
-    windows['pal'].bind("<Button-1>",contextWin.hideProps)
+    TK_ROOT.bind("<Button-1>",contextWin.hide_context)
+    windows['style'].bind("<Button-1>",contextWin.hide_context)
+    windows['opt'].bind("<Button-1>",contextWin.hide_context)
+    windows['pal'].bind("<Button-1>",contextWin.hide_context)
 
-    voiceEditor.init(win)
-    contextWin.init(win)
-    initDragIcon(win)
+    voiceEditor.init_widgets()
+    contextWin.init_widgets()
+    initDragIcon()
     loader.step('UI')
 
-    win.deiconify() # show it once we've loaded everything
+    TK_ROOT.deiconify() # show it once we've loaded everything
 
-    win.update_idletasks()
+    TK_ROOT.update_idletasks()
     windows['style'].update_idletasks()
     windows['opt'].update_idletasks()
     windows['pal'].update_idletasks()
 
-    win.after(50, set_pal_listbox_selection)
+    TK_ROOT.after(50, set_pal_listbox_selection)
     # This needs some time for the listbox to appear first
     set_palette()
 
@@ -1783,44 +1798,44 @@ def initMain():
     except (ValueError, KeyError):
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
-        if(win.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50):
-            win.geometry(
+        if TK_ROOT.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50:
+            TK_ROOT.geometry(
                 '+' + str(windows['pal'].winfo_reqwidth() + 50) +
-                '+' + str(win.winfo_rooty())
+                '+' + str(TK_ROOT.winfo_rooty())
                 )
         else:
-            win.geometry(
-                '+' + str(win.winfo_rootx()) +
-                '+' + str(win.winfo_rooty())
+            TK_ROOT.geometry(
+                '+' + str(TK_ROOT.winfo_rootx()) +
+                '+' + str(TK_ROOT.winfo_rooty())
                 )
     else:
         start_x, start_y = utils.adjust_inside_screen(
             start_x,
             start_y,
-            win=win,
+            win=TK_ROOT,
             )
-        win.geometry('+' + str(start_x) + '+' + str(start_y))
-    win.update_idletasks()
+        TK_ROOT.geometry('+' + str(start_x) + '+' + str(start_y))
+    TK_ROOT.update_idletasks()
 
     # Default positions for sub-panes
     xpos = min(
-        win.winfo_screenwidth()
+        TK_ROOT.winfo_screenwidth()
             - windows['style'].winfo_reqwidth(),
-        win.winfo_rootx()
-            + win.winfo_reqwidth()
+        TK_ROOT.winfo_rootx()
+            + TK_ROOT.winfo_reqwidth()
             + 25,
         )
     windows['pal'].move(
-        x=(win.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
-        y=(win.winfo_rooty() - 50),
-        height=win.winfo_reqheight() + 25)
+        x=(TK_ROOT.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
+        y=(TK_ROOT.winfo_rooty() - 50),
+        height=TK_ROOT.winfo_reqheight() + 25)
     windows['opt'].move(
         x=xpos,
-        y=win.winfo_rooty()-40,
+        y=TK_ROOT.winfo_rooty()-40,
         width=windows['style'].winfo_reqwidth())
     windows['style'].move(
         x=xpos,
-        y=win.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
+        y=TK_ROOT.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
 
     # Load from config file
     windows['style'].load_conf()
@@ -1828,7 +1843,7 @@ def initMain():
     windows['pal'].load_conf()
 
 
-    win.bind("<Configure>", contextWin.follow_main, add='+')
+    TK_ROOT.bind("<Configure>", contextWin.follow_main, add='+')
     refresh_pal_ui()
 
     def style_select_callback(style_id):
@@ -1850,4 +1865,4 @@ def initMain():
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
 
-event_loop = win.mainloop
+event_loop = TK_ROOT.mainloop
