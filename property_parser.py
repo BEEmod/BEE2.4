@@ -1,16 +1,3 @@
-'''
-Property: class
-- Represents Property found in property files, like those used by valve.
-name: string
-- Name of the section or property.
-value: string || Property[]
--  Value is single string when Property is in-line, Property array when Property is section.
-parse: string[] => Property[]
-- Returns a list of Property objects parsed from given text.
-to_strings: => string
-- Returns a string list representation of what the property appears as in the file.
-'''
-
 # TODO: Add comment support. Read in, and export comments.
 # - Single comments should appear as properties with the name of '//'
 # - A new member level property called 'comment' should be added when a
@@ -24,19 +11,21 @@ __all__ = ['KeyValError', 'NoKeyError', 'Property', 'INVALID']
 
 # various escape sequences that we allow
 REPLACE_CHARS = {
-    r'\n'  : '\n',
-    r'\t'  : '\t',
-    '\\\\' : '\\',
-    r'\/'  : '/'
+    r'\n':  '\n',
+    r'\t':  '\t',
+    '\\\\': '\\',
+    r'\/':   '/',
     }
 
 INVALID = object()
 
-_NO_KEY_FOUND = object() # Sentinel value to indicate that no default was given to find_key()
+# Sentinel value to indicate that no default was given to find_key()
+_NO_KEY_FOUND = object()
+
 
 class KeyValError(Exception):
     '''An error that occured when parsing a Valve KeyValues file.
-    
+
     mess = The error message that occured.
     file = The filename passed to Property.parse(), if it exists
     line_num = The line where the error occured.
@@ -47,9 +36,16 @@ class KeyValError(Exception):
         self.file = file
         self.line_num = line
 
+    def __repr__(self):
+        return 'KeyValError({!r}, {!r}, {!r})'.format(
+            self.mess,
+            self.file,
+            self.line_num,
+            )
+
     def __str__(self):
         '''Generate the complete error message.
-        
+
         This includes the line number and file, if avalible.
         '''
         mess = self.mess
@@ -63,37 +59,44 @@ class KeyValError(Exception):
             mess += ' "' + self.file + '"'
         return mess
 
+
 class NoKeyError(Exception):
     '''Raised if a key is not found when searching from find_key().
-    
+
     key = The missing key that was asked for.
     '''
     def __init__(self, key):
         super().__init__()
         self.key = key
 
+    def __repr__(self):
+        return 'NoKeyError({!r})'.format(self.key)
+
     def __str__(self):
         return "No key " + self.key + "!"
+
 
 class Property:
     '''Represents Property found in property files, like those used by Valve.'''
     # Helps decrease memory footprint with lots of Property values.
-    __slots__ = ('name', 'value', 'valid')
+    __slots__ = ('_folded_name', 'real_name', 'value', 'valid')
+
     def __init__(self, name, *values, **kargs):
         '''Create a new property instance.
         Values can be passed in 4 ways:
         - A single value for the Property
         - A number of Property objects for the tree
-        - A set of keyword arguments which will be converted into 
+        - A set of keyword arguments which will be converted into
           Property objects
-        - A single dictionary which will be converted into Property 
+        - A single dictionary which will be converted into Property
           objects
         Values default to just ''.
-        If INVALID is passed as the only parameter, an Property object 
+        If INVALID is passed as the only parameter, an Property object
         will be returned that has be marked as invalid.
         '''
         if name == INVALID:
-            self.name = None
+            self.real_name = None
+            self._folded_name = None
             self.value = None
             self.valid = False
         else:
@@ -108,14 +111,28 @@ class Property:
             else:
                 self.value = list(values)
                 self.value.extend(Property(key, val) for key, val in kargs.items())
-            if (values) == 0 and len(kargs) == 0:
+            if values == 0 and len(kargs) == 0:
                 self.value = ''
             self.valid = True
+
+    @property
+    def name(self):
+        return self._folded_name
+
+    @name.setter
+    def name(self, new_name):
+        self.real_name = new_name
+        if new_name is None:
+            self._folded_name = None
+        else:
+            self._folded_name = new_name.casefold()
+        pass
 
     def edit(self, name=None, value=None):
         '''Simultaneously modify the name and value.'''
         if name is not None:
-            self.name = name
+            self.real_name = name
+            self._folded_name = name.casefold()
         if value is not None:
             self.value = value
 
@@ -130,7 +147,7 @@ class Property:
             if not freshline:
                 # Skip blank lines!
                 continue
-                
+
             if freshline.startswith('"'): # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
@@ -195,42 +212,45 @@ class Property:
 
     def find_all(self, *keys) -> "Generator for matching Property objects":
         '''Search through a tree to obtain all properties that match a particular path.
-        
+
         '''
         depth = len(keys)
         if depth == 0:
             raise ValueError("Cannot find_all without commands!")
 
+        keys = [key.casefold() for key in keys]
         for prop in self:
             if not isinstance(prop, Property):
-                raise ValueError("Cannot find_all on a value that is not a Property!")
-            if prop.name is not None and prop.name.casefold() == keys[0].casefold():
+                raise ValueError(
+                    'Cannot find_all on a value that is not a Property!'
+                )
+            if prop.name is not None and prop.name == keys[0]:
                 if depth > 1:
                     if prop.has_children():
                         yield from Property.find_all(prop.value, *keys[1:])
                 else:
                     yield prop
 
-    def find_key(self, key, def_=_NO_KEY_FOUND) -> "Property":
+    def find_key(self, key, def_=_NO_KEY_FOUND) -> 'Property':
         '''Obtain the value of the child Property with a given name.
-        
+
         - If no child is found with the given name, this will return the
           default value, or raise NoKeyError if none is provided.
         - This prefers keys located closer to the end of the value list.
         '''
         key = key.casefold()
         for prop in reversed(self.value):
-            if prop.name is not None and prop.name.casefold() == key:
+            if prop.name is not None and prop.name == key:
                 return prop
         if def_ is _NO_KEY_FOUND:
             raise NoKeyError(key)
         else:
             return Property(key, def_)
-            # We were given a default, pretend that was in the original property list so code works
+            # We were given a default, return it wrapped in a Property.
 
     def set_key(self, path, value):
         '''Set the value of a key deep in the tree hierachy.
-        
+
         -If any of the hierachy do not exist (or do not have children),
           blank properties will be added automatically
         - path should be a tuple of names, or a single string.
@@ -239,14 +259,13 @@ class Property:
         if isinstance(path, tuple):
             # Search through each item in the tree!
             for key in path[:-1]:
-                print(key)
                 folded_key = key.casefold()
                 # We can't use find_key() here because we also
                 # need to check that the property has chilren to search
                 # through
                 for prop in reversed(self.value):
                     if (prop.name is not None and
-                            prop.name.casefold() == folded_key and
+                            prop.name == folded_key and
                             prop.has_children()):
                         current_prop = prop
                         break
@@ -271,11 +290,11 @@ class Property:
 
     def as_dict(self):
         '''Convert this property tree into a tree of dictionaries.
-        
+
         This keeps only the last if multiple items have the same name.
         '''
         if self.has_children():
-            return {item.name:item.as_dict() for item in self}
+            return {item.name: item.as_dict() for item in self}
         else:
             return self.value
 
@@ -329,7 +348,7 @@ class Property:
 
     def __len__(self):
         '''Determine the number of child properties.
-        
+
         Singluar Properties have a length of 1.
         Invalid properties have a length of 0.
         '''
@@ -350,21 +369,21 @@ class Property:
 
     def __contains__(self, key):
         '''Check to see if a name is present in the children.
-        
+
         If the Property has no children, this checks if the names match instead.
         '''
         key = key.casefold()
         if self.has_children():
             for prop in self.value:
-                if prop.name.casefold() == key:
+                if prop.name == key:
                     return True
             return False
         else:
-            return self.name.casefold() == key
+            return self.name == key
 
     def __getitem__(self, index):
         '''Allow indexing the children directly.
-        
+
         - If given an index or slice, it will search by position.
         - If given a string, it will find the last Property with that name.
           (Default can be chosen by passing a 2-tuple like Prop[key, default])
@@ -390,7 +409,7 @@ class Property:
 
     def __setitem__(self, index, value):
         '''Allow setting the values of the children directly.
-        
+
         - If given an index or slice, it will search by position.
         - If given a string, it will set the last Property with that name.
         - If none are found, it appends the value to the tree.
@@ -406,11 +425,13 @@ class Property:
         elif index == 0:
             self.value = value
         else:
-            raise IndexError('Cannot index a Property that does not have children!')
+            raise IndexError(
+                'Cannot index a Property that does not have children!'
+            )
 
     def __delitem__(self, index):
         '''Delete the given property index.
-        
+
         - If given an integer, it will delete by position.
         - If given a string, it will delete the last Property with that name.
         - If the Property has no children, it will blank the value instead.
@@ -428,7 +449,7 @@ class Property:
 
     def __add__(self, other):
         '''Allow appending other properties to this one.
-        
+
         This deep-copies the Property tree first.
         Works with either a sequence of Properties or a single Property.
         '''
@@ -449,7 +470,7 @@ class Property:
 
     def __iadd__(self, other):
         '''Allow appending other properties to this one.
-        
+
         This is the += op, where it does not copy the object.
         '''
         if self.has_children():
@@ -469,7 +490,7 @@ class Property:
 
     def merge_children(self, *names):
         '''Merge together any children of ours with the given names.
-        
+
         After execution, this tree will have only one sub-Property for
         each of the given names. This ignores leaf Properties.
         '''
@@ -478,8 +499,8 @@ class Property:
         merge = {name.casefold(): Property(name, []) for name in names}
         if self.has_children():
             for item in self.value[:]:
-                if item.name.casefold() in folded_names:
-                    merge[item.name.casefold()].value.extend(item.value)
+                if item.name in folded_names:
+                    merge[item.name].value.extend(item.value)
                 else:
                     new_list.append(item)
         for prop in merge.values():
@@ -507,9 +528,13 @@ class Property:
         return ''.join(self.export())
 
     def export(self):
-        '''Iterates over a set of strings that represents the property as it appears in the file.'''
+        '''Generate the set of strings for a property file.
+
+        Recursively calls itself for all child properties.
+        If the Property is marked invalid, it will immediately return.
+        '''
         if self.valid:
-            out_val = '"' + str(self.name) + '"'
+            out_val = '"' + str(self.real_name) + '"'
             if isinstance(self.value, list):
                 if self.name is None:
                     # If the name is None, we just output the chilren
@@ -519,7 +544,7 @@ class Property:
                         line
                         for prop in self.value
                         for line in prop.export()
-                        if prop.valid == True
+                        if prop.valid
                         )
                 else:
                     yield out_val + '\n'
@@ -528,10 +553,10 @@ class Property:
                         '\t'+line
                         for prop in self.value
                         for line in prop.export()
-                        if prop.valid == True
+                        if prop.valid
                         )
                     yield '\t}\n'
             else:
                 yield out_val + ' "' + str(self.value) + '"\n'
         else:
-            yield ''
+            return

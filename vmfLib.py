@@ -28,7 +28,9 @@ _DISP_ROWS = ('normals','distances','offsets','offset_normals','alphas','triangl
 
 
 def conv_int(val, default=0):
-    '''Converts a string to an integer, using a default if the string is unparsable.'''
+    '''Converts a string to an integer, using a default if it fails.
+
+    '''
     try:
         return int(val)
     except ValueError:
@@ -36,7 +38,9 @@ def conv_int(val, default=0):
 
 
 def conv_float(val, default=0):
-    '''Converts a string to an float, using a default if the string is unparsable.'''
+    '''Converts a string to an float, using a default if it fails.
+
+    '''
     try:
         return float(val)
     except ValueError:
@@ -44,14 +48,16 @@ def conv_float(val, default=0):
 
 
 def conv_bool(val, default=False):
-    '''Converts a string to a boolean, using a default if the string is unparsable.'''
-    if isinstance(val, bool): # True, False
+    '''Converts a string to a boolean, using a default if it fails.
+
+    Accepts either '0', '1', 'false', 'true'
+    '''
+    if isinstance(val, bool):  # True, False
         return val
-    elif val.isnumeric(): # 0,1
-        try:
-            return bool(int(val))
-        except ValueError:
-            return default
+    elif val == '1':
+        return True
+    elif val == '0':
+        return False
     elif val.casefold() == 'false':
         return False
     elif val.casefold() == 'true':
@@ -632,7 +638,7 @@ class Side:
 
     def __init__(
             self,
-            map,
+            VMF,
             planes=[
                 (0, 0, 0),
                 (0, 0, 0),
@@ -642,9 +648,9 @@ class Side:
             des_id=-1,
             disp_data={},
             ):
-        self.map = map
+        self.map = VMF
         self.planes = [Vec(), Vec(), Vec()]
-        self.id = map.get_id('face', des_id)
+        self.id = VMF.get_id('face', des_id)
         for i, pln in enumerate(planes):
             self.planes[i] = Vec(x=pln[0], y=pln[1], z=pln[2])
         self.lightmap = opt.get("lightmap", 16)
@@ -668,7 +674,7 @@ class Side:
             self.is_disp = False
 
     @staticmethod
-    def parse(map, tree):
+    def parse(VMF, tree):
         '''Parse the property tree into a Side object.'''
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
         verts = tree["plane", "(0 0 0) (0 0 0) (0 0 0)"][1:-1].split(") (")
@@ -714,7 +720,7 @@ class Side:
                 if len(rows) > 0:
                     rows.sort(key=lambda x: conv_int(x.name[3:], 0))
                     disp_data[v] = [v.value for v in rows]
-        return Side(map, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
+        return Side(VMF, planes=planes, opt=opt, des_id=id, disp_data=disp_data)
 
     def copy(self, des_id=-1):
         '''Duplicate this brush side.'''
@@ -778,7 +784,7 @@ class Side:
     def __str__(self):
         '''Dump a user-friendly representation of the side.'''
         st = "\tmat = " + self.mat
-        st += "\n\trotation = " + self.ham_rot + '\n'
+        st += "\n\trotation = " + str(self.ham_rot) + '\n'
         pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
         st += '\tplane: ' + ", ".join(pl_str) + '\n'
         return st
@@ -894,7 +900,7 @@ class Entity:
         editor = {'visgroup': []}
         fixup = {}
         for item in tree_list:
-            name = item.name.casefold()
+            name = item.name
             if name == "id" and item.value.isnumeric():
                 id = item.value
             elif name in _FIXUP_KEYS:

@@ -652,7 +652,7 @@ def desc_parse(info):
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
-                yield (line.name.casefold(), line.value)
+                yield (line.name, line.value)
         else:
             yield ("line", prop.value)
 

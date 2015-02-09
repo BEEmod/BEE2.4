@@ -171,7 +171,7 @@ class Item:
         '''Iterate through all properties for this item.'''
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
-                yield prop.name.casefold()
+                yield prop.name
 
     def get_properties(self):
         '''Return a dictionary of properties and the current value for them.
@@ -180,7 +180,7 @@ class Item:
         result = {}
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
-                name = prop.name.casefold()
+                name = prop.name
                 # PROP_TYPES is a dict holding all the modifiable properties.
                 if name not in result and name in PROP_TYPES:
                     result[name] = item_opts.get_val(
@@ -252,7 +252,7 @@ class Item:
         new_editor = self.data['editor'].copy()
         for index, editor_section in enumerate(new_editor.find_all("Editor", "Subtype")):
             for editor_sec_index, pal_section in enumerate(editor_section.value):
-                if pal_section.name.casefold() == "palette":
+                if pal_section.name == "palette":
                     if index in palette_items:
                         if len(palette_items) == 1:
                             # Switch to the 'Grouped' icon

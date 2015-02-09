@@ -254,7 +254,7 @@ class Game:
                 # deletable and copyable
                 if item['type', ''] in _UNLOCK_ITEMS:
                     for prop in item.find_key("Editor", []):
-                        if prop.name.casefold() in ('deletable', 'copyable'):
+                        if prop.name == 'deletable' or prop.name == 'copyable':
                             prop.value = '1'
 
         print('Writing Editoritems!')

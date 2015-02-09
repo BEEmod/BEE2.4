@@ -17,39 +17,39 @@ TEX_FIZZLER = {
     "effects/fizzler"        : "short",
     "tools/toolsnodraw"      : "nodraw",
     }
-    
+
 ANTLINES = {
     "signage/indicator_lights/indicator_lights_floor" : "antline",
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     }
-    
+
 def print(*args, print_=print, **kargs):
     if 'flush' in kargs:
         del kargs['flush']
     print_(*[repr(arg) for arg in args], flush=True, **kargs)
 utils.con_log = print
-    
+
 def add(prop_block):
     '''Add a condition to the list.'''
     flags = []
     results = []
     priority = 0
     for prop in prop_block:
-        if prop.name.casefold() == 'result':
+        if prop.name == 'result':
             results.extend(prop.value) # join multiple ones together
-        elif prop.name.casefold() == 'priority':
+        elif prop.name == 'priority':
             priority = VLib.conv_int(prop.value, priority)
         else:
             flags.append(prop)
-        
+
     if len(results) > 0: # is it valid?
         con = {
-            "flags" : flags, 
-            "results" : results, 
+            "flags" : flags,
+            "results" : results,
             "priority": priority,
             }
         conditions.append(con)
- 
+
 def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
     # Get a bunch of values from VBSP, since we can't import directly.
     global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW
@@ -63,14 +63,14 @@ def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
     GAME_MODE = mode
     ALL_INST = inst_list
     INST_FILES = {key.casefold(): value for key,value in inst_files.items()}
-    
+
     # Sort by priority, where higher = done earlier
     conditions.sort(key=itemgetter('priority'), reverse=True)
     setup_cond()
 
 def check_all():
     '''Check all conditions.'''
-    
+
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.iter_ents(classname='func_instance'):
@@ -78,33 +78,32 @@ def check_all():
             if len(condition['results']) == 0:
                 break
     remove_blank_inst()
-    
+
     utils.con_log('Map has attributes: ', [key for key,value in VOICE_ATTR.items() if value])
     utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
     utils.con_log('Global instances: ', GLOBAL_INSTANCES)
-    
+
 def check_inst(inst):
     '''Run all condtions on a given instance.'''
     for condition in conditions:
         run_cond(inst, condition)
     remove_blank_inst()
-    
+
 def remove_blank_inst():
     '''Remove instances with blank file attr.
-    
+
     This allows conditions to strip the instances when requested.
     '''
     for inst in VMF.iter_ents(classname='func_instance', file=''):
         VMF.remove_ent(inst)
-    
+
 def setup_cond():
     '''Some conditions require setup logic before they are run.'''
     for cond in conditions:
         for res in cond['results'][:]:
-            res_name = res.name.casefold()
-            if res_name == 'variant':
+            if res.name == 'variant':
                 res.value = variant_weight(res)
-            elif res_name == 'custantline':
+            elif res.name == 'custantline':
                 res.value = {
                     'instance' : res.find_key('instance', '').value,
                     'antline' : [p.value for p in res.find_all('straight')],
@@ -115,27 +114,27 @@ def setup_cond():
                     cond['results'].remove(res) # invalid
 
 def run_cond(inst, cond):
-    '''Try to satisfy this condition on the given instance.'''     
+    '''Try to satisfy this condition on the given instance.'''
     for flag in cond['flags']:
         if not check_flag(flag, inst):
             return
 
     inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
     for res in cond['results']:
-        try: 
-            func = RESULT_LOOKUP[res.name.casefold()]
+        try:
+            func = RESULT_LOOKUP[res.name]
         except KeyError:
             utils.con_log('"' + flag.name + '" is not a valid condition result!')
         else:
-            func(inst, res)  
+            func(inst, res)
     if not inst['file'].endswith('vmf'):
         inst['file'] += '.vmf'
-    
-    
+
+
 def check_flag(flag, inst):
     print('checking ' + flag.name + '(' + str(flag.value) + ') on ' + inst['file'])
-    try: 
-        func = FLAG_LOOKUP[flag.name.casefold()]
+    try:
+        func = FLAG_LOOKUP[flag.name]
     except KeyError:
         utils.con_log('"' + flag.name + '" is not a valid condition flag!')
         return False
@@ -177,7 +176,7 @@ def add_output(inst, prop, target):
         inst_in=prop['targ_in',''],
         inst_out=prop['targ_out',''],
         ))
-        
+
 def resolve_inst_path(path):
     '''Allow referring to the instFile section in condtion parameters.'''
     if path.startswith('<') and path.endswith('>'):
@@ -186,58 +185,58 @@ def resolve_inst_path(path):
         except KeyError:
             utils.con_log(path + ' not found in instanceFiles block!')
     return path.casefold()
-        
+
 ###########
 ## FLAGS ##
 ###########
-        
+
 def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
             return False
         # If the AND block is empty, return True
         return len(sub_flag.value) == 0
-        
+
 def flag_or(inst, flag):
     for sub_flag in flag:
         if check_flag(sub_flag, inst):
             return True
     return False
-    
+
 def flag_not(inst, flag):
     if len(flag.value) == 1:
         return not check_flag(flag[0], inst)
     return False
-    
+
 def flag_nor(inst, flag):
     return not flag_or(inst,flag)
-    
+
 def flag_nand(inst, flag):
     return not flag_and(inst,flag)
-    
+
 def flag_file_equal(inst, flag):
     return inst['file'].casefold() == resolve_inst_path(flag.value)
-    
+
 def flag_file_cont(inst, flag):
     return resolve_inst_path(flag.value) in inst['file'].casefold()
-    
+
 def flag_has_inst(inst, flag):
     '''Return true if the filename is present anywhere in the map.'''
     return resolve_inst_path(flag.value) in HAS_INST
-    
+
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
     return inst.fixup[bits[0]] == bits[1]
-    
+
 def flag_stylevar(inst, flag):
     return bool(STYLE_VARS[flag.value.casefold()])
-    
+
 def flag_voice_has(inst, flag):
     return bool(VOICE_ATTR[flag.value])
-    
+
 def flag_music(inst, flag):
     return OPTIONS['music_id'] == flag.value
-    
+
 def flag_option(inst, flag):
     bits = flag.value.split(' ')
     key = bits[0].casefold()
@@ -245,64 +244,64 @@ def flag_option(inst, flag):
         return OPTIONS[key] == bits[1]
     else:
         return False
-    
+
 def flag_game_mode(inst, flag):
     return GAME_MODE.casefold() == val
-    
+
 def flag_is_preview(inst, flag):
     return IS_PREVIEW == (val=="1")
 
 #############
 ## RESULTS ##
 #############
-   
+
 def res_change_instance(inst, res):
     '''Set the file to a value.'''
     inst['file'] = resolve_inst_path(res.value)
-    
+
 def res_add_suffix(inst, res):
     '''Add the specified suffix to the filename.'''
     inst['file'] += '_' + res.value
-            
+
 def res_set_style_var(inst, res):
     for opt in res.value:
-        if opt.name.casefold() == 'settrue':
+        if opt.name == 'settrue':
             STYLE_VARS[opt.value.casefold()] = True
-        elif opt.name.casefold() == 'setfalse':
+        elif opt.name == 'setfalse':
             STYLE_VARS[opt.value.casefold()] = False
-            
+
 def res_set_voice_attr(inst, res):
     for opt in res.value:
         if opt.value.casefold() == '1':
             VOICE_ATTR[opt.name] = True
         elif opt.value.casefold() == '0':
             VOICE_ATTR[opt.name] = False
-            
+
 def res_set_option(inst, res):
     for opt in res.value:
-        if opt.name.casefold() in settings['options']:
-            settings['options'][opt.name.casefold()] = opt.value
+        if opt.name in settings['options']:
+            settings['options'][opt.name] = opt.value
 
 def res_add_inst_var(inst, res):
     '''Append the value of an instance variable to the filename.
-    
+
     Pass either the variable name, or a set of value:suffix pairs for a
     lookup.
     '''
     if res.has_children():
         val = inst.fixup[res['variable', '']]
         for rep in res: # lookup the number to determine the appending value
-            if rep.name.casefold() == 'variable':
+            if rep.name == 'variable':
                 continue # this isn't a lookup command!
             if rep.name == val:
                 inst['file'] += '_' + rep.value
                 break
     else: # append the value
         inst['file'] += '_' + inst.fixup[res.value, '']
-        
+
 def res_add_variant(inst, res):
     '''This allows using a random instance from a weighted group.
-    
+
     A suffix will be added in the form "_var4".
     '''
     if inst['targetname', ''] == '':
@@ -312,10 +311,10 @@ def res_add_variant(inst, res):
     else:
         random.seed(inst['targetname'])
     inst['file'] += "_var" + random.choice(res.value)
-    
+
 def res_add_global_inst(inst, res):
     '''Add one instance in a location.
-    
+
     Once this is executed, it will be ignored thereafter.
     '''
     if res.value is not None:
@@ -350,10 +349,10 @@ def res_add_overlay_inst(inst, res):
         "fixup_style" : res['fixup_style', '0'],
         })
     VMF.add_ent(new_inst)
-    
+
 def res_cust_output(inst, res):
     '''Add an additional output to the instance with any values.
-    
+
     Always points to the targeted item.
     '''
     over_name = '@' + inst['targetname'] + '_indicator'
@@ -363,10 +362,10 @@ def res_cust_output(inst, res):
             break
     else:
         toggle_name = '' # we want to ignore the toggle instance, if it exists
-        
+
     # Make this a set to ignore repeated targetnames
     targets = {o.target for o in inst.outputs if o.target != toggle_name}
-    
+
     kill_signs = res["remIndSign", '0'] == '1'
     dec_con_count = res["decConCount", '0'] == '1'
     if kill_signs or dec_con_count:
@@ -390,7 +389,7 @@ def res_cust_output(inst, res):
 
 def res_cust_antline(inst, res):
     '''Customise the output antline texture, toggle instances.
-    
+
     This allows adding extra outputs between the instance and the toggle.
     '''
     over_name = '@' + inst['targetname'] + '_indicator'
@@ -400,9 +399,9 @@ def res_cust_antline(inst, res):
         random.seed(over['origin'])
         new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
         set_antline_mat(over, new_tex)
-        
+
     # allow replacing the indicator_toggle instance
-    if res.value['instance']: 
+    if res.value['instance']:
         for toggle in VMF.iter_ents(classname='func_instance'):
             if toggle.fixup['indicator_name', ''] == over_name:
                 toggle['file'] = res.value['instance']
@@ -414,7 +413,7 @@ def res_cust_antline(inst, res):
                         # Allow adding extra outputs to customly trigger the toggle
                         add_output(inst, out, toggle['targetname'])
                 break # Stop looking!
-                        
+
 def res_faith_mods(inst, res):
     '''Modify the trigger_catrapult that is created for ItemFaithPlate items.'''
     # Get data about the trigger this instance uses for flinging
@@ -437,7 +436,7 @@ def res_faith_mods(inst, res):
             else:
                 continue # Check the next trigger
             break # If we got here, we've found the output - stop scanning
-            
+
 def res_cust_fizzler(base_inst, res):
     '''Modify a fizzler item to allow for custom brush ents.'''
     model_name = res['modelname', None]
@@ -445,7 +444,7 @@ def res_cust_fizzler(base_inst, res):
     fizz_name = base_inst['targetname','']
     if make_unique:
         unique_ind = 0
-        
+
     # search for the model instances
     model_targetnames = (
         fizz_name + '_modelStart',
@@ -465,14 +464,14 @@ def res_cust_fizzler(base_inst, res):
             if make_unique:
                 unique_ind += 1
                 inst['targetname'] += str(unique_id)
-                
+
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
-                
+
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) > 0:
         for orig_brush in VMF.iter_ents(
-                classname='trigger_portal_cleanser', 
+                classname='trigger_portal_cleanser',
                 targetname=fizz_name + '_brush',
                 ):
             VMF.remove_ent(orig_brush)
@@ -484,14 +483,14 @@ def res_cust_fizzler(base_inst, res):
                 new_brush['targetname'] = fizz_name + '-' + config['name', 'brush']
                 # All ents must have a classname!
                 new_brush['classname'] = 'trigger_portal_cleanser'
-                
+
                 for prop in config['keys', []]:
                     new_brush[prop.name] = prop.value
-                
+
                 laserfield_conf = config.find_key('MakeLaserField', None)
                 if laserfield_conf.value is not None:
                     # Resize the brush into a laserfield format, without
-                    # the 128*64 parts. If the brush is 128x128, we can 
+                    # the 128*64 parts. If the brush is 128x128, we can
                     # skip the resizing since it's already correct.
                     laser_tex = laserfield_conf['texture', 'effects/laserplane']
                     nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
@@ -501,12 +500,12 @@ def res_cust_fizzler(base_inst, res):
                         if side.mat.casefold() == 'effects/fizzler':
                             is_short = True
                             break
-                    
+
                     if is_short:
                         for side in new_brush.sides():
                             if side.mat.casefold() == 'effects/fizzler':
                                 side.mat = laser_tex
-                                
+
                                 uaxis = side.uaxis.split(" ")
                                 vaxis = side.vaxis.split(" ")
                                 # the format is like "[1 0 0 -393.4] 0.25"
@@ -525,7 +524,7 @@ def res_cust_fizzler(base_inst, res):
                         except (KeyError, IndexError):
                             # If we fail, just use the original textures
                             pass
-                            
+
 def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
     '''Convert a fizzler into a laserfield func_brush.
     We need to stretch the brush to get rid of the side sections.
@@ -538,7 +537,7 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
     # The origin isn't in the center, but it still works as long as it's in-between the outermost coordinates
     origin = Vec(*[int(v) for v in brush['origin'].split(' ')])
     bbox_min, bbox_max = brush.get_bbox()
-    
+
     # we only want the middle one with the center, the others are
     # useless. PeTI happens to always have that in the middle.
     brush.solids = [brush.solids[1]]
@@ -551,7 +550,7 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
                     v[ax] = str(bbox_max[ax])
                 else:
                     v[ax] = str(bbox_min[ax])
-                    
+
         # Determine the shape of this plane.
         bounds_min, bounds_max = side.get_bbox()
         dimensions = [0,0,0]
@@ -563,7 +562,7 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
         else:
             side.mat = laser_tex
             # Now we figure out the corrrect u/vaxis values for the texture.
-            
+
             uaxis = side.uaxis.split(" ")
             vaxis = side.vaxis.split(" ")
             # the format is like "[1 0 0 -393.4] 0.25"
@@ -581,8 +580,8 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
                 )
             # heightwise it's always the same
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
-                
-       
+
+
 FLAG_LOOKUP = {
     'and': flag_and,
     'or': flag_or,

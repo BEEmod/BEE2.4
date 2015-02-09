@@ -115,7 +115,7 @@ def parse(posfile, propfile, path):
     name = "Unnamed"
     opts = {}
     for option in props:
-        if option.name.casefold() == "name":
+        if option.name == "name":
             name = option.value
         else:
             opts[option.name.casefold()] = option.value

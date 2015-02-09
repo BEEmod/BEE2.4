@@ -424,9 +424,9 @@ def get_map_info():
 def process_packer(f_list):
     "Read packer commands from settings."
     for cmd in f_list:
-        if cmd.name.casefold()=="add":
+        if cmd.name == "add":
             to_pack.append(cmd.value)
-        if cmd.name.casefold()=="add_list":
+        if cmd.name == "add_list":
             to_pack.append("|list|" + cmd.value)
 
 def calc_rand_seed():
