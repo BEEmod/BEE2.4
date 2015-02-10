@@ -66,28 +66,6 @@ def conv_bool(val, default=False):
         return default
 
 
-def conv_vec(val, x=0, y=0, z=0):
-    '''Convert a string in the form '(4 6 -4)' into a vector.
-
-     If the string is unparsable, this uses the defaults (x,y,z).
-     '''
-    parts = val.split(' ')
-    if len(parts) == 3:
-        # strip off the brackets if present
-        if parts[0][0] in '({[<':
-            parts[0] = parts[0][1:]
-        if parts[2][-1] in ')}]>':
-            parts[2] = parts[2][:-1]
-        try:
-            return Vec(
-                float(parts[0]),
-                float(parts[1]),
-                float(parts[2]),
-            )
-        except ValueError:
-            return Vec(x, y, z)
-
-
 class VMF:
     '''Represents a VMF file, and holds counters for various IDs used.
 
@@ -159,7 +137,9 @@ class VMF:
 
     def create_ent(self, **kargs):
         '''Quick method to allow creating point entities.'''
-        self.add_ent(Entity(self, keys=kargs))
+        ent = Entity(self, keys=kargs)
+        self.add_ent(ent)
+        return ent
 
     @staticmethod
     def parse(tree):
@@ -393,7 +373,7 @@ class Camera:
     def targ_ent(self, ent):
         '''Point the camera at an entity.'''
         if ent['origin']:
-            self.target = conv_vec(ent['origin'], 0, 0, 0)
+            self.target = Vec.from_str(ent['origin'], 0, 0, 0)
 
     def is_active(self):
         '''Is this camera in use?'''
@@ -410,8 +390,8 @@ class Camera:
     @staticmethod
     def parse(map, tree):
         '''Read a camera from a property_parser tree.'''
-        pos = conv_vec(tree.find_key('position', '_').value, 0, 0, 0)
-        targ = conv_vec(tree.find_key('look', '_').value, 0, 64, 0)
+        pos = Vec.from_str(tree.find_key('position', '_').value, 0, 0, 0)
+        targ = Vec.from_str(tree.find_key('look', '_').value, 0, 64, 0)
         return Camera(map, pos, targ)
 
     def copy(self):
@@ -446,8 +426,8 @@ class Cordon:
         name = tree['name', 'cordon']
         is_active = conv_bool(tree['active', '0'], False)
         bounds = tree.find_key('box', [])
-        min_ = conv_vec(bounds['mins', '(0 0 0)'], 0, 0, 0)
-        max_ = conv_vec(bounds['maxs', '(128 128 128)'], 128, 128, 128)
+        min_ = Vec.from_str(bounds['mins', '(0 0 0)'], 0, 0, 0)
+        max_ = Vec.from_str(bounds['maxs', '(128 128 128)'], 128, 128, 128)
         return Cordon(map, min_, max_, is_active, name)
 
     def export(self, buffer, ind=''):
@@ -661,7 +641,7 @@ class Side:
         self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
         if len(disp_data) > 0:
             self.disp_power = conv_int(disp_data.get('power', '_'), 4)
-            self.disp_pos = conv_vec(disp_data.get('pos', '_'), 0,0,0)
+            self.disp_pos = Vec.from_str(disp_data.get('pos', '_'), 0,0,0)
             self.disp_flags = conv_int(disp_data.get('flags', '_'), 0)
             self.disp_elev = conv_float(disp_data.get('elevation', '_'), 0)
             self.disp_is_subdiv = conv_bool(disp_data.get('subdiv', '_'), False)
@@ -824,6 +804,7 @@ class Side:
          This is for use in texture randomisation.
          '''
         return self.planes[0].join(' ') + self.planes[1].join(' ') + self.planes[2].join(' ')
+
 
 class Entity:
     '''A representation of either a point or brush entity.
@@ -1027,6 +1008,12 @@ class Entity:
         self.map.entities.remove(self)
         if self.id in self.map.ent_id:
             self.map.ent_id.remove(self.id)
+
+    def make_unique(self):
+        '''Append our entity ID to the targetname, so it is uniquely-named.
+        '''
+        self['targetname'] += str(self.id)
+        return self
 
     def __str__(self):
         '''Dump a user-friendly representation of the entity.'''

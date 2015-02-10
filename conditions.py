@@ -1,13 +1,12 @@
 import random
 from operator import itemgetter
 
-from property_parser import Property, NoKeyError
 from utils import Vec
 import vmfLib as VLib
 import utils
-import voiceLine
 
 GLOBAL_INSTANCES = []
+ALL_INST = []
 conditions = []
 
 TEX_FIZZLER = {
@@ -23,11 +22,6 @@ ANTLINES = {
     "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
     }
 
-def print(*args, print_=print, **kargs):
-    if 'flush' in kargs:
-        del kargs['flush']
-    print_(*[repr(arg) for arg in args], flush=True, **kargs)
-utils.con_log = print
 
 def add(prop_block):
     '''Add a condition to the list.'''
@@ -190,6 +184,7 @@ def resolve_inst_path(path):
 ## FLAGS ##
 ###########
 
+
 def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
@@ -197,45 +192,57 @@ def flag_and(inst, flag):
         # If the AND block is empty, return True
         return len(sub_flag.value) == 0
 
+
 def flag_or(inst, flag):
     for sub_flag in flag:
         if check_flag(sub_flag, inst):
             return True
     return False
 
+
 def flag_not(inst, flag):
     if len(flag.value) == 1:
         return not check_flag(flag[0], inst)
     return False
 
+
 def flag_nor(inst, flag):
     return not flag_or(inst,flag)
+
 
 def flag_nand(inst, flag):
     return not flag_and(inst,flag)
 
+
 def flag_file_equal(inst, flag):
     return inst['file'].casefold() == resolve_inst_path(flag.value)
+
 
 def flag_file_cont(inst, flag):
     return resolve_inst_path(flag.value) in inst['file'].casefold()
 
+
 def flag_has_inst(inst, flag):
     '''Return true if the filename is present anywhere in the map.'''
-    return resolve_inst_path(flag.value) in HAS_INST
+    return resolve_inst_path(flag.value) in ALL_INST
+
 
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
     return inst.fixup[bits[0]] == bits[1]
 
+
 def flag_stylevar(inst, flag):
     return bool(STYLE_VARS[flag.value.casefold()])
+
 
 def flag_voice_has(inst, flag):
     return bool(VOICE_ATTR[flag.value])
 
+
 def flag_music(inst, flag):
     return OPTIONS['music_id'] == flag.value
+
 
 def flag_option(inst, flag):
     bits = flag.value.split(' ')
@@ -245,19 +252,23 @@ def flag_option(inst, flag):
     else:
         return False
 
+
 def flag_game_mode(inst, flag):
-    return GAME_MODE.casefold() == val
+    return GAME_MODE.casefold() == flag
+
 
 def flag_is_preview(inst, flag):
-    return IS_PREVIEW == (val=="1")
+    return IS_PREVIEW == (flag == "1")
 
 #############
 ## RESULTS ##
 #############
 
+
 def res_change_instance(inst, res):
     '''Set the file to a value.'''
     inst['file'] = resolve_inst_path(res.value)
+
 
 def res_add_suffix(inst, res):
     '''Add the specified suffix to the filename.'''
@@ -279,8 +290,8 @@ def res_set_voice_attr(inst, res):
 
 def res_set_option(inst, res):
     for opt in res.value:
-        if opt.name in settings['options']:
-            settings['options'][opt.name] = opt.value
+        if opt.name in OPTIONS['options']:
+            OPTIONS['options'][opt.name] = opt.value
 
 def res_add_inst_var(inst, res):
     '''Append the value of an instance variable to the filename.
@@ -319,7 +330,7 @@ def res_add_global_inst(inst, res):
     '''
     if res.value is not None:
         if (res['file'] not in GLOBAL_INSTANCES or
-            res['allow_multiple', '0'] == '1'):
+                res['allow_multiple', '0'] == '1'):
             # By default we will skip adding the instance
             # if was already added - this is helpful for
             # items that add to original items, or to avoid

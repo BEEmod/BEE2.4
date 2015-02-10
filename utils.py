@@ -127,17 +127,86 @@ class Vec:
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_ang(cls, pitch, yaw):
-        '''Create a unit vector based on a Source rotational angle.'''
+    def from_str(cls, val, x=0, y=0, z=0):
+        '''Convert a string in the form '(4 6 -4)' into a vector.
+
+         If the string is unparsable, this uses the defaults (x,y,z).
+         The string can start with any of the (), {}, [], <> bracket
+         types.
+         '''
+        parts = val.split(' ')
+        if len(parts) == 3:
+            # strip off the brackets if present
+            if parts[0][0] in '({[<':
+                parts[0] = parts[0][1:]
+            if parts[2][-1] in ')}]>':
+                parts[2] = parts[2][:-1]
+            try:
+                return cls(
+                    float(parts[0]),
+                    float(parts[1]),
+                    float(parts[2]),
+                )
+            except ValueError:
+                return cls(x, y, z)
+
+    @staticmethod
+    def make_rot_matrix(pitch, yaw, roll):
+        '''Return a 3x3 rotation matrix for the given pitch-yaw-roll angles.
+
+        Pass to Vec.rotate() / Vec.unrotate() to prevent recalculating when
+        rotating many vectors by the same angle.
+        '''
         sin_pitch = math.sin(math.radians(pitch))
         cos_pitch = math.cos(math.radians(pitch))
         sin_yaw = math.sin(math.radians(-yaw))
         cos_yaw = math.cos(math.radians(-yaw))
-        return cls(
-            x=cos_pitch * cos_yaw,
-            y=sin_pitch * cos_yaw,
-            z=sin_yaw,
-            )
+        sin_roll = math.sin(math.radians(roll))
+        cos_roll = math.cos(math.radians(roll))
+
+        return [[
+            cos_pitch * cos_roll,
+            -sin_pitch * -sin_yaw,
+            cos_pitch * -sin_yaw * cos_roll,
+            ], [
+            cos_yaw * -sin_roll,
+            -sin_pitch * -sin_yaw * -sin_roll + cos_yaw*cos_roll,
+            cos_pitch * -sin_yaw * -sin_roll + sin_pitch*cos_roll,
+            ], [
+            sin_yaw,
+            -sin_pitch*cos_yaw,
+            cos_pitch*cos_yaw,
+            ]]
+
+    def rotate(self, pitch=0, yaw=0, roll=0, matrix=None):
+        '''Rotate a vector by a Source rotational angle.
+        Returns the vector, so you can use it in the form
+        val = Vec(0,1,0).rotate(p, y, r)
+        If matrix is passed, it will be used instead of
+        recalculating from the angles.
+        '''
+        if matrix is None:
+            matrix = self.make_rot_matrix(pitch, yaw, roll)
+        m = matrix
+        self.x = self.x*m[0][0] + self.y*m[0][1] + self.z*m[0][2]
+        self.y = self.x*m[1][0] + self.y*m[1][1] + self.z*m[1][2]
+        self.z = self.x*m[2][0] + self.y*m[2][1] + self.z*m[2][2]
+
+        return self
+
+    def unrotate(self, pitch=0, yaw=0, roll=0, matrix=None):
+        '''Do the exact inverse of Vec.rotate().
+        If matrix is passed, it will be used instead of
+        recalculating from the angles.
+        '''
+        if matrix is None:
+            matrix = self.make_rot_matrix(pitch, yaw, roll)
+        m = matrix
+        self.x = self.x*m[0][0] + self.y*m[1][0] + self.z*m[2][0]
+        self.y = self.x*m[0][1] + self.y*m[1][1] + self.z*m[2][1]
+        self.z = self.x*m[0][2] + self.y*m[1][2] + self.z*m[2][2]
+
+        return self
 
     def __add__(self, other):
         '''+ operation.
