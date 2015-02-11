@@ -1,4 +1,4 @@
-from BEE2_config import ConfigFile
+from BEE2_config import GEN_OPTS
 
 import UI
 import loadScreen
@@ -20,35 +20,32 @@ DEFAULT_SETTINGS = {
         },
     }
 
-settings = ConfigFile('config.cfg')
-settings.set_defaults(DEFAULT_SETTINGS)
-
-UI.load_settings(settings)
+UI.load_settings(GEN_OPTS)
 
 # If we have no games, gameMan will quit the app entirely.
 gameMan.load(UI.quit_application, loadScreen.win)
 
 gameMan.set_game_by_name(
-    settings.get_val('Last_Selected', 'Game', ''),
+    GEN_OPTS.get_val('Last_Selected', 'Game', ''),
     )
 
 print('Loading Packages...')
 UI.load_packages(
     packageLoader.load_packages(
-        settings['Directories']['package'],
-        not settings.get_bool('General', 'preserve_BEE2_resource_dir'),
+        GEN_OPTS['Directories']['package'],
+        not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'),
         )
     )
 print('Done!')
 
 print('Loading Palettes...')
 UI.load_palette(
-    paletteLoader.load_palettes(settings['Directories']['palette']),
+    paletteLoader.load_palettes(GEN_OPTS['Directories']['palette']),
     )
 print('Done!')
 
 print('Initialising UI...')
-UI.initMain()  # create all windows
+UI.init_windows()  # create all windows
 print('Done!')
 
 loadScreen.close_window()

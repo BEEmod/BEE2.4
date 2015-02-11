@@ -87,3 +87,19 @@ class ConfigFile(ConfigParser):
     add_section.__doc__ = ConfigParser.add_section.__doc__
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
     set.__doc__ = ConfigParser.set.__doc__
+
+
+DEFAULT_SETTINGS = {
+    'Directories': {
+        'palette': 'palettes\\',
+        'package': 'packages\\',
+        },
+    'General': {
+        'preserve_BEE2_resource_dir': '0',
+        'allow_any_folder_as_game': '0',
+        'mute_sounds': '0',
+        },
+    }
+
+GEN_OPTS = ConfigFile('config.cfg')
+GEN_OPTS.set_defaults(DEFAULT_SETTINGS)

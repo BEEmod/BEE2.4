@@ -212,14 +212,23 @@ class Game:
             vbsp_config += voice.config
 
         if skybox is not None:
-            vbsp_config.set_key(('Textures', 'Special', 'Sky'), skybox.material)
+            vbsp_config.set_key(
+                ('Textures', 'Special', 'Sky'),
+                skybox.material,
+            )
             vbsp_config += skybox.config
 
         if music is not None:
             if music.sound is not None:
-                vbsp_config.set_key(('Options', 'music_SoundScript'), music.sound)
+                vbsp_config.set_key(
+                    ('Options', 'music_SoundScript'),
+                    music.sound,
+                )
             if music.inst is not None:
-                vbsp_config.set_key(('Options', 'music_instance'), music.inst)
+                vbsp_config.set_key(
+                    ('Options', 'music_instance'),
+                    music.inst,
+                )
 
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
