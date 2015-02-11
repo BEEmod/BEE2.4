@@ -7,6 +7,7 @@ import itertools
 import operator
 
 import tkinter_png as png # png library for TKinter
+from SubPane import SubPane
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from selectorWin import selWin, Item as selWinItem
@@ -363,7 +364,9 @@ class PalItem(Label):
         return False
 
     def __eq__(self, other):
-        '''Two items are equal if they have the same overall item and sub-item index.'''
+        '''Two items are equal if they have the same item and sub-item index.
+
+        '''
         return self.id == other.id and self.subKey == other.subKey
 
     def copy(self, frame):
@@ -372,154 +375,6 @@ class PalItem(Label):
     def __repr__(self):
         return '<' + str(self.id) + ":" + str(self.subKey) + '>'
 
-class SubPane(Toplevel):
-    '''A Toplevel window that can be shown/hidden, and follows the main window when moved.'''
-    def __init__(
-            self,
-            parent,
-            tool_frame,
-            tool_img,
-            tool_col=0,
-            title='',
-            resize_x=False,
-            resize_y=False,
-            name='',
-            ):
-        self.visible = True
-        self.win_name = name
-        self.allow_snap = False
-        self.can_save = False
-        self.parent = parent
-        self.relX = 0
-        self.relY = 0
-        self.can_resize_x = resize_x
-        self.can_resize_y = resize_y
-        super().__init__(parent)
-
-        self.tool_button = ttk.Button(
-            tool_frame,
-            style='BG.TButton',
-            image=tool_img,
-            command=self.toggle_win)
-        self.tool_button.state(('pressed',))
-        self.tool_button.grid(row=0, column=tool_col, padx=(5,2))
-
-        self.transient(master=parent)
-        self.resizable(resize_x, resize_y)
-        self.title(title)
-        self.iconbitmap('BEE2.ico')
-
-        self.protocol("WM_DELETE_WINDOW", self.hide_win)
-        parent.bind('<Configure>', self.follow_main, add='+')
-        self.bind('<Configure>', self.snap_win)
-        self.bind('<FocusIn>', self.enable_snap)
-
-    def hide_win(self, play_snd=True):
-        '''Hide the window.'''
-        if play_snd:
-            snd.fx('config')
-        self.withdraw()
-        self.visible = False
-        self.save_conf()
-        self.tool_button.state(('!pressed',))
-
-    def show_win(self, play_snd=True):
-        '''Show the window.'''
-        if play_snd:
-            snd.fx('config')
-        self.deiconify()
-        self.visible = True
-        self.save_conf()
-        self.tool_button.state(('pressed',))
-        self.follow_main()
-
-    def toggle_win(self):
-        if self.visible:
-            self.hide_win()
-        else:
-            self.show_win()
-
-    def move(self, x=None, y=None, width=None, height=None):
-        '''Move the window to the specified position.
-
-        Effectively an easier-to-use form of Toplevel.geometry(), that
-        also updates relX and relY.
-        '''
-        if width is None:
-            width = self.winfo_reqwidth()
-        if height is None:
-            height = self.winfo_reqheight()
-        if x is None:
-            x = self.winfo_x()
-        if y is None:
-            y = self.winfo_y()
-
-        x, y = utils.adjust_inside_screen(x, y, win=self)
-        self.geometry(str(width) + 'x' + str(height) + '+' + str(x) + '+' + str(y))
-
-        self.relX = x - self.parent.winfo_x()
-        self.relY = y - self.parent.winfo_y()
-        self.save_conf()
-
-    def enable_snap(self, e=None):
-        self.allow_snap=True
-
-    def snap_win(self, e=None):
-        '''Callback for window movement, allows it to snap to the edge of the main window.'''
-        # TODO: Actually snap to edges of main window
-        if self.allow_snap:
-            self.relX=self.winfo_x()-self.parent.winfo_x()
-            self.relY=self.winfo_y()-self.parent.winfo_y()
-            self.save_conf()
-
-    def follow_main(self, e=None):
-        '''When the main window moves, sub-windows should move with it.'''
-        self.allow_snap=False
-        x, y = utils.adjust_inside_screen(
-            x=self.parent.winfo_x()+self.relX,
-            y=self.parent.winfo_y()+self.relY,
-            win=self
-            )
-        self.geometry('+'+str(x)+'+'+str(y))
-        self.parent.focus()
-
-    def save_conf(self):
-        if self.can_save:
-            gen_opts['win_state'][self.win_name + '_visible'] = utils.bool_as_int(self.visible)
-            gen_opts['win_state'][self.win_name + '_x'] = str(self.relX)
-            gen_opts['win_state'][self.win_name + '_y'] = str(self.relY)
-            if self.can_resize_x:
-                gen_opts['win_state'][self.win_name + '_width'] = str(self.winfo_width())
-            if self.can_resize_y:
-                gen_opts['win_state'][self.win_name + '_height'] = str(self.winfo_height())
-
-    def load_conf(self):
-        try:
-            if self.can_resize_x:
-                width = int(gen_opts['win_state'][self.win_name + '_width'])
-            else:
-                width = self.winfo_reqwidth()
-            if self.can_resize_y:
-                height = int(gen_opts['win_state'][self.win_name + '_height'])
-            else:
-                height = self.winfo_reqheight()
-            self.deiconify()
-
-            self.geometry(str(width) + 'x' + str(height))
-            self.sizefrom('user')
-
-            self.relX = int(gen_opts['win_state'][self.win_name + '_x'])
-            self.relY = int(gen_opts['win_state'][self.win_name + '_y'])
-
-            self.follow_main()
-            self.positionfrom('user')
-        except (ValueError, KeyError):
-            pass
-        if not gen_opts.get_bool('win_state',self.win_name + '_visible',True):
-            self.after(150, self.hide_win)
-
-        # Prevent this until here, so the <config> event won't erase our settings
-        self.can_save = True
 
 def quit_application():
     '''Do a last-minute save of our config files, and quit the app.'''
@@ -532,15 +387,18 @@ def quit_application():
     TK_ROOT.destroy()
     exit(0)
 
+
 def set_mute():
     '''Apply the muted setting based on the variable.'''
     snd.muted = (muted.get()==1)
     gen_opts['General']['mute_sounds'] = str(muted.get())
 
+
 def load_palette(data):
     '''Import in all defined palettes.'''
     global palettes
     palettes = data
+
 
 def load_settings(settings):
     '''Load options from the general config file.'''
@@ -564,6 +422,7 @@ def load_settings(settings):
     except (KeyError, ValueError):
         pass # It'll be set to the first palette by default, and then saved
     gen_opts.has_changed = False
+
 
 def load_packages(data):
     '''Import in the list of items and styles from the packages.
@@ -622,7 +481,6 @@ def load_packages(data):
                 desc=obj.desc))
             obj_list[obj.id] = obj
             loader.step("IMG")
-
 
     def win_callback(style_id, win_name):
         '''Callback for the selector windows.
@@ -721,6 +579,7 @@ def load_packages(data):
             ):
         sel_win.sel_item_id(gen_opts.get_val('Last_Selected', opt_name, default))
 
+
 def suggested_refresh():
     '''Enable or disable the suggestion setting button.'''
     if 'suggested_style' in UI:
@@ -732,6 +591,7 @@ def suggested_refresh():
             UI['suggested_style'].state(['disabled'])
         else:
             UI['suggested_style'].state(['!disabled'])
+
 
 def refresh_pal_ui():
     "Update the UI to show the correct palettes."
@@ -759,6 +619,7 @@ def refresh_pal_ui():
     else:
         UI['pal_remove'].state(('!disabled',))
         menus['pal'].entryconfigure(1, state=NORMAL)
+
 
 def export_editoritems(e=None):
     '''Export the selected Items and Style into the chosen game.'''
@@ -802,16 +663,20 @@ def export_editoritems(e=None):
     new_pal.save(allow_overwrite=True)
     refresh_pal_ui()
 
+
 def set_disp_name(name):
     UI['pre_disp_name'].configure(text='Item: '+name)
 
+
 def clear_disp_name(e=None):
     UI['pre_disp_name'].configure(text='')
+
 
 def conv_screen_to_grid(x,y):
     '''Returns the location of the item hovered over on the preview pane.'''
     return ((x-UI['pre_bg_img'].winfo_rootx()-8)//65,
            (y-UI['pre_bg_img'].winfo_rooty()-32)//65)
+
 
 def drag_start(e):
     "Start dragging a palette item."
@@ -851,6 +716,7 @@ def drag_start(e):
     drag_win.bind("<B1-Motion>", moveDrag)
     UI['pre_sel_line'].lift()
 
+
 def drag_stop(e):
     "User released the mouse button, complete the drag."
     global drag_item
@@ -885,6 +751,7 @@ def drag_stop(e):
         flowPreview() # always refresh
     drag_item = None
 
+
 def moveDrag(e):
     '''Update the position of dragged items as they move around.'''
     global drag_passedPal
@@ -902,6 +769,7 @@ def moveDrag(e):
         else:
             drag_win.configure(cursor='no')
         UI['pre_sel_line'].place_forget()
+
 
 def fastDrag(e):
     '''When shift-clicking an item will be immediately moved to the palette or deleted from it.'''
@@ -921,16 +789,19 @@ def fastDrag(e):
             snd.fx('error')
     flowPreview()
 
+
 def set_pal_radio():
     global selectedPalette
     selectedPalette = selectedPalette_radio.get()
     set_pal_listbox_selection()
     set_palette()
 
+
 def set_pal_listbox_selection(e=None):
     '''Select the currently chosen palette in the listbox.'''
     UI['palette'].selection_clear(0,len(palettes))
     UI['palette'].selection_set(selectedPalette)
+
 
 def set_palette(e=None):
     '''Select a palette.'''
@@ -954,12 +825,14 @@ def set_palette(e=None):
             print('Unknown item "' + item + '"!')
     flowPreview()
 
+
 def pal_clear():
     '''Empty the palette.'''
     for item in pal_picked:
         item.kill()
     pal_picked.clear()
     flowPreview()
+
 
 def pal_save_as(e=None):
     name = ""
@@ -984,11 +857,13 @@ def pal_save_as(e=None):
     paletteLoader.save_pal(pal_picked, name)
     refresh_pal_ui()
 
+
 def pal_save(e=None):
     pal=palettes[selectedPalette]
     pal.pos = [(it.id, it.subKey) for it in pal_picked]
     pal.save(allow_overwrite=True) # overwrite it
     refresh_pal_ui()
+
 
 def pal_remove():
     global selectedPalette
@@ -1005,6 +880,7 @@ def pal_remove():
             selectedPalette -= 1
             selectedPalette_radio.set(selectedPalette)
             refresh_pal_ui()
+
 
 def updateFilters():
 
@@ -1181,7 +1057,7 @@ def initStyleOpt(f):
     UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
     canFrame=ttk.Frame(UI['style_can'])
 
-    #This should automatically switch to match different styles
+    # This should automatically switch to match different styles
     frmAll=ttk.Labelframe(canFrame, text="All:")
     frmAll.grid(row=0, sticky='EW')
 
@@ -1668,14 +1544,14 @@ def initMain():
             pady=10,
             )
 
-    pickSplitFrame=Frame(UIbg, bg=ItemsBG)
-    pickSplitFrame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
+    picker_split_frame=Frame(UIbg, bg=ItemsBG)
+    picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
     UIbg.columnconfigure(5, weight=1)
 
     # This will sit on top of the palette section, spanning from left
     # to right
     frames['filter']=ttk.Frame(
-        pickSplitFrame,
+        picker_split_frame,
         padding=5,
         borderwidth=0,
         relief="raised",
@@ -1686,14 +1562,14 @@ def initMain():
     loader.step('UI')
 
     frames['picker']=ttk.Frame(
-        pickSplitFrame,
-        padding=(5,40,5,5),
+        picker_split_frame,
+        padding=(5, 40, 5, 5),
         borderwidth=4,
         relief="raised",
         )
     frames['picker'].grid(row=0, column=0, sticky="NSEW")
-    pickSplitFrame.rowconfigure(0, weight=1)
-    pickSplitFrame.columnconfigure(0, weight=1)
+    picker_split_frame.rowconfigure(0, weight=1)
+    picker_split_frame.columnconfigure(0, weight=1)
     initPicker(frames['picker'])
     loader.step('UI')
 
@@ -1708,8 +1584,9 @@ def initMain():
         )
     frames['toolMenu'].place(x=73, y=2)
 
-    windows['pal']=SubPane(
+    windows['pal'] = SubPane(
         TK_ROOT,
+        options=gen_opts,
         title='Palettes',
         name='pal',
         resize_x=True,
@@ -1720,8 +1597,9 @@ def initMain():
     initPalette(windows['pal'])
     loader.step('UI')
 
-    windows['opt']=SubPane(
+    windows['opt'] = SubPane(
         TK_ROOT,
+        options=gen_opts,
         title='Export Options',
         name='opt',
         resize_x=True,
@@ -1731,8 +1609,9 @@ def initMain():
     initOption(windows['opt'])
     loader.step('UI')
 
-    windows['style']=SubPane(
+    windows['style'] = SubPane(
         TK_ROOT,
+        options=gen_opts,
         title='Style Properties',
         name='style',
         resize_y=True,
