@@ -103,7 +103,7 @@ def make_pane(tool_frame):
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img=png.loadPng('icons/win_style'),
+        tool_img=png.loadPng('icons/win_stylevar'),
         tool_col=2,
     )
 

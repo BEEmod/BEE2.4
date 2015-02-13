@@ -1527,7 +1527,7 @@ def init_windows():
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
-        tool_img=png.loadPng('icons/win_pal'),
+        tool_img=png.loadPng('icons/win_palette'),
         tool_col=0)
     init_palette(windows['pal'])
     loader.step('UI')
@@ -1539,7 +1539,7 @@ def init_windows():
         name='opt',
         resize_x=True,
         tool_frame=frames['toolMenu'],
-        tool_img=png.loadPng('icons/win_opt'),
+        tool_img=png.loadPng('icons/win_options'),
         tool_col=1)
     init_option(windows['opt'])
     loader.step('UI')
