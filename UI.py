@@ -593,7 +593,7 @@ def suggested_refresh():
 
 def refresh_pal_ui():
     "Update the UI to show the correct palettes."
-    palettes.sort(key=str) # sort by name
+    palettes.sort(key=str)  # sort by name
     UI['palette'].delete(0, END)
     for i, pal in enumerate(palettes):
         UI['palette'].insert(i, pal.name)
@@ -619,7 +619,7 @@ def refresh_pal_ui():
         menus['pal'].entryconfigure(1, state=NORMAL)
 
 
-def export_editoritems(e=None):
+def export_editoritems(_=None):
     '''Export the selected Items and Style into the chosen game.'''
     style_vars = {
         key: (value.get() == 1)
@@ -666,11 +666,11 @@ def export_editoritems(e=None):
     refresh_pal_ui()
 
 
-def set_disp_name(item, e=None):
+def set_disp_name(item, _=None):
     UI['pre_disp_name'].configure(text='Item: '+item.name)
 
 
-def clear_disp_name(e=None):
+def clear_disp_name(_=None):
     UI['pre_disp_name'].configure(text='')
 
 
@@ -690,7 +690,7 @@ def drag_start(e):
     set_disp_name(drag_item)
     snd.fx('config')
     drag_passedPal = False
-    if drag_item.is_pre: # is the cursor over the preview pane?
+    if drag_item.is_pre:  # is the cursor over the preview pane?
         drag_item.kill()
         drag_onPal = True
 
@@ -974,7 +974,8 @@ def init_palette(f):
 
     ttk.Sizegrip(f).grid(row=2, column=1)
 
-def initOption(f):
+
+def init_option(f):
     '''Initialise the options pane.'''
     f.columnconfigure(0,weight=1)
     ttk.Button(
@@ -993,7 +994,7 @@ def initOption(f):
         command=export_editoritems,
         ).grid(row=2, sticky="EW", padx=5, pady=(0, 10))
 
-    props=ttk.LabelFrame(f, text="Properties", width="50")
+    props = ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=3, sticky="EW")
 
@@ -1119,7 +1120,8 @@ def init_preview(f):
 
     flow_preview()
 
-def initPicker(f):
+
+def init_picker(f):
     global frmScroll, pal_canvas
     ttk.Label(
         f,
@@ -1155,7 +1157,7 @@ def initPicker(f):
     for item in item_list.values():
         for i in range(0,item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
-    f.bind("<Configure>",flow_picker)
+    f.bind("<Configure>", flow_picker)
 
 
 def flow_picker(e=None):
@@ -1186,7 +1188,7 @@ def flow_picker(e=None):
         item.is_pre=False
         item.place(
             x=((i % width) * 65 + 1),
-            y=((i // width)* 65 + offset + 1),
+            y=((i // width) * 65 + offset + 1),
             )
 
     for item in (it for it in pal_items if not it.visible):
@@ -1215,10 +1217,11 @@ def flow_picker(e=None):
     for item in pal_items_fake[width:]:
         item.place_forget()
 
-def initFilterCol(cat, f):
-    FilterBoxes[cat]={}
-    FilterVars[cat]={}
-    FilterVars_all[cat]=IntVar(value=1)
+
+def init_filter_col(cat, f):
+    FilterBoxes[cat] = {}
+    FilterVars[cat] = {}
+    FilterVars_all[cat] = IntVar(value=1)
 
     def filter_all_callback(col):
         '''Sets all items in a category to true/false.
@@ -1250,7 +1253,7 @@ def initFilterCol(cat, f):
             filter_data[cat].items(),
             key=operator.itemgetter(1),
             )):
-        FilterVars[cat][filt_id]=IntVar(value=1)
+        FilterVars[cat][filt_id] = IntVar(value=1)
         FilterBoxes[cat][filt_id] = ttk.Checkbutton(
             f,
             text=name,
@@ -1283,7 +1286,7 @@ def init_filter(f):
     f.columnconfigure(1, weight=1)
     f.columnconfigure(2, weight=1)
     f2 = ttk.Frame(f)
-    frames['filter_expanded']=f2
+    frames['filter_expanded'] = f2
     # Not added to window, we add it below the others to expand the
     # lists
 
@@ -1310,9 +1313,9 @@ def init_filter(f):
     pack.grid(row=2, column=1, sticky="NS")
     tags = ttk.Labelframe(f2, text="Tags")
     tags.grid(row=2, column=2, sticky="NS")
-    initFilterCol('author', auth)
-    initFilterCol('package', pack)
-    initFilterCol('tags', tags)
+    init_filter_col('author', auth)
+    init_filter_col('package', pack)
+    init_filter_col('tags', tags)
 
 
 def init_drag_icon():
@@ -1332,11 +1335,13 @@ def init_drag_icon():
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
+
 def set_game(game):
     TK_ROOT.title('BEEMOD 2.4 - ' + game.name)
     GEN_OPTS['Last_Selected']['game'] = game.name
 
-def initMenuBar(win):
+
+def init_menu_bar(win):
     bar = Menu(win)
     win['menu'] = bar
     # Suppress ability to make each menu a separate window - weird old
@@ -1425,7 +1430,7 @@ def init_windows():
     '''Initialise all windows and panes.
 
     '''
-    initMenuBar(TK_ROOT)
+    init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
@@ -1439,7 +1444,7 @@ def init_windows():
     TK_ROOT.rowconfigure(0, weight=1)
     UIbg.rowconfigure(0, weight=1)
 
-    style=ttk.Style()
+    style = ttk.Style()
     # Custom button style with correct background
     # Custom label style with correct background
     style.configure('BG.TButton', background=ItemsBG)
@@ -1458,7 +1463,7 @@ def init_windows():
     TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
-        ) # Prevent making the window smaller than the preview pane
+        )  # Prevent making the window smaller than the preview pane
     loader.step('UI')
 
     loader.step('UI')
@@ -1486,8 +1491,8 @@ def init_windows():
         borderwidth=0,
         relief="raised",
         )
-    frames['filter'].place(x=0,y=0, relwidth=1)
-    frames['filter'].expanded=False
+    frames['filter'].place(x=0, y=0, relwidth=1)
+    frames['filter'].expanded = False
     init_filter(frames['filter'])
     loader.step('UI')
 
@@ -1500,7 +1505,7 @@ def init_windows():
     frames['picker'].grid(row=0, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(0, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    initPicker(frames['picker'])
+    init_picker(frames['picker'])
     loader.step('UI')
 
     frames['filter'].lift()
@@ -1536,7 +1541,7 @@ def init_windows():
         tool_frame=frames['toolMenu'],
         tool_img=png.loadPng('icons/win_opt'),
         tool_col=1)
-    initOption(windows['opt'])
+    init_option(windows['opt'])
     loader.step('UI')
 
     StyleVarPane.make_pane(frames['toolMenu'])
@@ -1621,8 +1626,8 @@ def init_windows():
     # Default positions for sub-panes
     xpos = min(
         TK_ROOT.winfo_screenwidth()
-        - StyleVarPane.window.winfo_reqwidth()
-        ,
+        - StyleVarPane.window.winfo_reqwidth(),
+
         TK_ROOT.winfo_rootx()
         + TK_ROOT.winfo_reqwidth()
         + 25

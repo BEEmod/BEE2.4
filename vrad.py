@@ -2,37 +2,51 @@ import os
 import os.path
 import sys
 import subprocess
-import shutil
-import random
 
 import utils
+
 
 def quote(txt):
     return '"' + txt + '"'
 
+
 def run_vrad(args):
     "Execute the original VRAD."
-    args = [('"' + x + '"' if " " in x else x) for x in args] # put quotes around args which contain spaces
-    arg = '"' + os.path.normpath(os.path.join(os.getcwd(),"vrad_original")) + '" ' + " ".join(args)
+    joined_args = (
+        '"' + os.path.normpath(
+            os.path.join(os.getcwd(), "vrad_original")
+            ) +
+        '" ' +
+        " ".join(
+            # put quotes around args which contain spaces
+            (quote(x) if " " in x else x)
+            for x in args
+            )
+        )
     utils.con_log("Calling original VRAD...")
-    utils.con_log(arg)
-    code=subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
-    if code==0:
+    utils.con_log(joined_args)
+    code = subprocess.call(
+        joined_args,
+        stdout=None,
+        stderr=subprocess.PIPE,
+        shell=True,
+    )
+    if code == 0:
         utils.con_log("Done!")
     else:
         utils.con_log("VRAD failed! (" + str(code) + ")")
         sys.exit(code)
 
 # MAIN
-to_pack = [] # the file path for any items that we should be packing
-to_pack_inst = {} # items to pack for a specific instance
-to_pack_mat = {} # files to pack if material is used (by VBSP_styles only)
+to_pack = []  # the file path for any items that we should be packing
+to_pack_inst = {}  # items to pack for a specific instance
+to_pack_mat = {}  # files to pack if material is used (by VBSP_styles only)
 
 TK_ROOT = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
-new_args=sys.argv[1:]
-old_args=sys.argv[1:]
-path=""
+new_args = sys.argv[1:]
+old_args = sys.argv[1:]
+path = ""
 
 game_dir = ""
 next_is_game = False
@@ -42,11 +56,17 @@ for a in list(new_args):
         game_dir = os.path.normpath(a)
         new_args[new_args.index(a)] = game_dir
     elif "sdk_content\\maps\\" in os.path.normpath(a):
-        path=os.path.normpath(a)
-        new_args[new_args.index(a)]=path
+        path = os.path.normpath(a)
+        new_args[new_args.index(a)] = path
     elif a == "-game":
         next_is_game = True
-    elif a.casefold() in ("-both", "-final", "-staticproplighting", "-staticproppolys", "-textureshadows"):
+    elif a.casefold() in (
+            "-both",
+            "-final",
+            "-staticproplighting",
+            "-staticproppolys",
+            "-textureshadows",
+            ):
         # remove final parameters from the modified arguments
         new_args.remove(a)
     elif a in ('-force_peti', '-force_hammer'):
@@ -57,7 +77,8 @@ for a in list(new_args):
 new_args = ['-bounce', '2', '-noextra'] + new_args
 
 # Fast args: -bounce 2 -noextra -game $gamedir $path\$file
-# Final args: -both -final -staticproplighting -StaticPropPolys -textureshadows  -game $gamedir $path\$file
+# Final args: -both -final -staticproplighting -StaticPropPolys
+# -textureshadows  -game $gamedir $path\$file
 
 utils.con_log("Map path is " + path)
 if path == "":
@@ -89,14 +110,15 @@ pack_file = path[:-4] + '.filelist.txt'
 
 if os.path.isfile(pack_file):
     utils.con_log("Pack list found, packing files!")
-    arg_bits = [quote(os.path.normpath(os.path.join(os.getcwd(),"bspzip"))),
-            "-addlist",
-            quote(path),
-            quote(pack_file),
-            quote(path),
-            "-game",
-            quote(game_dir),
-          ]
+    arg_bits = [
+        quote(os.path.normpath(os.path.join(os.getcwd(), "bspzip"))),
+        "-addlist",
+        quote(path),
+        quote(pack_file),
+        quote(path),
+        "-game",
+        quote(game_dir),
+    ]
     arg = " ".join(arg_bits)
     utils.con_log(arg)
     subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
