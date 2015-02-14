@@ -22,6 +22,7 @@ import voiceEditor
 import contextWin
 import gameMan
 import StyleVarPane
+import CompilerPane
 
 
 # If image is not readable, use this instead
@@ -379,6 +380,7 @@ def quit_application():
 
     GEN_OPTS.save_check()
     item_opts.save_check()
+    CompilerPane.COMPILE_CFG.save_check()
     # Destroy the TK windows
     TK_ROOT.destroy()
     exit(0)
@@ -1547,6 +1549,9 @@ def init_windows():
     StyleVarPane.make_pane(frames['toolMenu'])
     loader.step('UI')
 
+    CompilerPane.make_pane(frames['toolMenu'])
+    loader.step('UI')
+
     # make scrollbar work globally
     TK_ROOT.bind(
         "<MouseWheel>",
@@ -1590,6 +1595,7 @@ def init_windows():
 
     TK_ROOT.update_idletasks()
     StyleVarPane.window.update_idletasks()
+    CompilerPane.window.update_idletasks()
     windows['opt'].update_idletasks()
     windows['pal'].update_idletasks()
 
@@ -1646,6 +1652,7 @@ def init_windows():
 
     # Load from config file
     StyleVarPane.window.load_conf()
+    CompilerPane.window.load_conf()
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 

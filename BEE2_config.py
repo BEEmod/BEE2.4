@@ -10,6 +10,10 @@ class ConfigFile(ConfigParser):
         '''
         super().__init__()
         self.filename = filename
+        self.load()
+        self.has_changed = False
+
+    def load(self):
         try:
             with open('config/' + self.filename, 'r') as conf:
                 self.read_file(conf)
@@ -37,7 +41,7 @@ class ConfigFile(ConfigParser):
                 self[sect] = {}
             for key, default in values.items():
                 if key not in self[sect]:
-                    self[sect][key] = default
+                    self[sect][key] = str(default)
         self.save_check()
 
     def get_val(self, section, value, default):
@@ -70,6 +74,22 @@ class ConfigFile(ConfigParser):
 
     get_bool = getboolean
 
+    def getint(self, section, value, default=0) -> int:
+        '''Get the value in the specified section, coercing to a Integer.
+
+            If either does not exist, set to the default and return it.
+            '''
+        if section not in self:
+            self[section] = {}
+        if value in self[section]:
+            return super().getint(section, value)
+        else:
+            self.has_changed = True
+            self[section][value] = str(int(default))
+            return default
+
+    get_int = getint
+
     def add_section(self, section):
         self.has_changed = True
         super().add_section(section)
@@ -82,7 +102,7 @@ class ConfigFile(ConfigParser):
         orig_val = self.get(section, option, fallback=None)
         if orig_val is None or orig_val is not value:
             self.has_changed = True
-            super().set(section, option, value)
+            super().set(section, option, str(value))
 
     add_section.__doc__ = ConfigParser.add_section.__doc__
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
