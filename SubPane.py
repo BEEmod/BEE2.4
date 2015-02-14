@@ -40,7 +40,7 @@ class SubPane(Toplevel):
             image=tool_img,
             command=self.toggle_win)
         self.tool_button.state(('pressed',))
-        self.tool_button.grid(row=0, column=tool_col, padx=(5,2))
+        self.tool_button.grid(row=0, column=tool_col, padx=(5, 2))
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
@@ -93,63 +93,80 @@ class SubPane(Toplevel):
             y = self.winfo_y()
 
         x, y = utils.adjust_inside_screen(x, y, win=self)
-        self.geometry(str(width) + 'x' + str(height) + '+' + str(x) + '+' + str(y))
+        self.geometry('{!s}x{!s}+{!s}+{!s}'.format(
+            str(width),
+            str(height),
+            str(x),
+            str(y),
+        ))
 
         self.relX = x - self.parent.winfo_x()
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e=None):
-        self.allow_snap=True
+    def enable_snap(self, _=None):
+        self.allow_snap = True
 
-    def snap_win(self, e=None):
-        '''Callback for window movement, allows it to snap to the edge of the main window.
+    def snap_win(self, _=None):
+        '''Callback for window movement.
 
+        This allows it to snap to the edge of the main window.
         '''
         # TODO: Actually snap to edges of main window
         if self.allow_snap:
-            self.relX=self.winfo_x()-self.parent.winfo_x()
-            self.relY=self.winfo_y()-self.parent.winfo_y()
+            self.relX = self.winfo_x() - self.parent.winfo_x()
+            self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, e=None):
+    def follow_main(self, _=None):
         '''When the main window moves, sub-windows should move with it.'''
-        self.allow_snap=False
+        self.allow_snap = False
         x, y = utils.adjust_inside_screen(
             x=self.parent.winfo_x()+self.relX,
             y=self.parent.winfo_y()+self.relY,
-            win=self
+            win=self,
             )
         self.geometry('+'+str(x)+'+'+str(y))
         self.parent.focus()
 
     def save_conf(self):
         if self.can_save:
-            self.config_file['win_state'][self.win_name + '_visible'] = utils.bool_as_int(self.visible)
+            self.config_file['win_state'][
+                self.win_name + '_visible'] = utils.bool_as_int(self.visible)
             self.config_file['win_state'][self.win_name + '_x'] = str(self.relX)
             self.config_file['win_state'][self.win_name + '_y'] = str(self.relY)
             if self.can_resize_x:
-                self.config_file['win_state'][self.win_name + '_width'] = str(self.winfo_width())
+                self.config_file['win_state'][
+                    self.win_name + '_width'] = str(self.winfo_width())
             if self.can_resize_y:
-                self.config_file['win_state'][self.win_name + '_height'] = str(self.winfo_height())
+                self.config_file['win_state'][
+                    self.win_name + '_height'] = str(self.winfo_height())
 
     def load_conf(self):
         try:
             if self.can_resize_x:
-                width = int(self.config_file['win_state'][self.win_name + '_width'])
+                width = int(
+                    self.config_file['win_state'][self.win_name + '_width']
+                )
             else:
                 width = self.winfo_reqwidth()
             if self.can_resize_y:
-                height = int(self.config_file['win_state'][self.win_name + '_height'])
+                height = int(
+                    self.config_file['win_state'][self.win_name + '_height']
+                )
             else:
                 height = self.winfo_reqheight()
             self.deiconify()
 
-            self.geometry(str(width) + 'x' + str(height))
+            self.geometry('{!s}x{!s}'.format(width, height))
             self.sizefrom('user')
 
-            self.relX = int(self.config_file['win_state'][self.win_name + '_x'])
-            self.relY = int(self.config_file['win_state'][self.win_name + '_y'])
+            self.relX = int(
+                self.config_file['win_state'][self.win_name + '_x']
+            )
+            self.relY = int(
+                self.config_file['win_state'][self.win_name + '_y']
+            )
 
             self.follow_main()
             self.positionfrom('user')
@@ -162,5 +179,6 @@ class SubPane(Toplevel):
                 ):
             self.after(150, self.hide_win)
 
-        # Prevent this until here, so the <config> event won't erase our settings
+        # Prevent this until here, so the <config> event won't erase our
+        #  settings
         self.can_save = True

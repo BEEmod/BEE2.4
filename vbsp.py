@@ -10,10 +10,12 @@ from collections import defaultdict
 
 from property_parser import Property
 from utils import Vec
+from BEE2_config import ConfigFile
 import vmfLib as VLib
 import conditions
 import utils
 import voiceLine
+
 
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
@@ -136,6 +138,8 @@ DEFAULTS = {
     "global_pti_ents":          "",
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
+    # The location of the BEE2 app that generated the config
+    "bee2_loc":                 "",
     }
 
 # These instances have to be specially handled / we want to identify them
@@ -203,11 +207,14 @@ settings = {
     "voice_data_coop": Property("Quotes_COOP", []),
     }
 
+BEE2_config = None
+
 # A list of sucessful AddGlobal commands, so we can prevent adding the same
 # instance twice.
 global_instances = []
 
 ###### UTIL functions #####
+
 
 def get_opt(name):
     return settings['options'][name.casefold()]
@@ -235,7 +242,7 @@ def alter_mat(face, seed=None):
         face.mat = get_tex(TEX_VALVE[mat])
         return True
     elif mat in BLACK_PAN or mat in WHITE_PAN:
-        type = 'white' if mat in WHITE_PAN else 'black'
+        surf_type = 'white' if mat in WHITE_PAN else 'black'
         orient = get_face_orient(face)
         if orient == ORIENT.wall:
             if (mat == 'metal/black_wall_metal_002b' or
@@ -250,7 +257,7 @@ def alter_mat(face, seed=None):
             orient = 'floor'
         elif orient == ORIENT.ceiling:
             orient = 'ceiling'
-        face.mat = get_tex(type + '.' + orient)
+        face.mat = get_tex(surf_type + '.' + orient)
         return True
     elif mat in TEX_FIZZLER:
         face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
@@ -262,6 +269,7 @@ def alter_mat(face, seed=None):
 
 def load_settings():
     '''Load in all our settings from vbsp_config.'''
+    global BEE2_config
     try:
         with open("bee2/vbsp_config.cfg", "r") as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
@@ -312,7 +320,8 @@ def load_settings():
 
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
-            settings['style_vars'][var.name.casefold()] = VLib.conv_bool(var.value)
+            settings['style_vars'][
+                var.name.casefold()] = VLib.conv_bool(var.value)
 
     for pack_block in conf.find_all('packer'):
         for pack_cmd in pack_block:
@@ -337,12 +346,17 @@ def load_settings():
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
 
+    if get_opt('BEE2_loc') != '':
+        BEE2_config = ConfigFile(get_opt('BEE2_loc'))
+    else:
+        BEE2_config = ConfigFile('')
+
     utils.con_log("Settings Loaded!")
 
 
 def load_map(map_path):
     global VMF
-    with open(map_path, "r") as file:
+    with open(map_path) as file:
         utils.con_log("Parsing Map...")
         props = Property.parse(file, map_path)
     file.close()
@@ -506,9 +520,9 @@ def make_bottomless_pit(solids):
                 for x in range(int(bbox_min.x), int(bbox_max.x), 128):
                     for y in range(int(bbox_min.y), int(bbox_max.y), 128):
                         # Remove the pillar from the center of the item
-                        edges[x,y] = None
+                        edges[x, y] = None
                         for i, xoff, yoff, angle in dirs:
-                            side = edges[x+xoff,y+yoff]
+                            side = edges[x+xoff, y+yoff]
                             if side is not None:
                                 side[i] = origin.z - 13
 
@@ -654,20 +668,23 @@ def random_walls():
                 face.vaxis = " ".join(split)
             alter_mat(face, face_seed(face))
 
+
 def clump_walls():
     '''A wall style where textures are used in small groups near each other, clumped together.
 
     '''
     walls = {}
-    others = {} # we keep a list for the others, so we can nodraw them if needed
+    others = {}  # we keep a list for the others, so we can nodraw them if needed
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
-            mat=face.mat.casefold()
-            if face.mat in ('glass/glasswindow007a_less_shiny',
-                             'metal/metalgrate018',
-                             'anim_wp/framework/squarebeams',
-                             'tools/toolsnodraw'):
+            mat = face.mat.casefold()
+            if face.mat in (
+                    'glass/glasswindow007a_less_shiny',
+                    'metal/metalgrate018',
+                    'anim_wp/framework/squarebeams',
+                    'tools/toolsnodraw',
+                    ):
                 # These textures aren't always on grid, ignore them..
                 alter_mat(face)
                 continue
@@ -962,12 +979,12 @@ def make_static_pan(ent, type):
     if get_opt("staticPan") == "NONE":
         return False  # no conversion allowed!
 
-    angle="00"
+    angle = "00"
     if ent.fixup['animation'] is not None:
         # the 5:7 is the number in "ramp_45_deg_open"
         angle = ent.fixup['animation'][5:7]
     if ent.fixup['start_deployed'] == "0":
-        angle = "00" # different instance flat with the wall
+        angle = "00"  # different instance flat with the wall
     if ent.fixup['connectioncount', '0'] != "0":
         return False
     # something like "static_pan/45_white.vmf"
@@ -1049,7 +1066,7 @@ def fix_inst():
             if inst['angles'] in FIZZLER_ANGLE_FIX:
                 inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
-        elif "ccflag_comball_base" in inst['file']: # Rexaura Flux Fields
+        elif "ccflag_comball_base" in inst['file']:  # Rexaura Flux Fields
             # find the triggers that match this entity and mod them
             for trig in VMF.iter_ents(
                     classname='trigger_portal_cleanser',
