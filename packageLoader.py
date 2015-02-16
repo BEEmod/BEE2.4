@@ -645,6 +645,66 @@ class StyleVar:
         return '<StyleVar ' + self.id + '>'
 
 
+class ElevatorVid:
+    '''
+    An elevator video definition.
+
+    This is mainly defined just for Valve's items.
+    '''
+    def __init__(
+            self,
+            id,
+            ico,
+            name,
+            auth,
+            desc,
+            video,
+            short_name=None,
+            vert_video=None,
+            ):
+        self.id = id
+        self.icon = ico
+        self.auth = auth
+        self.short_name = name if short_name is None else short_name
+        self.desc = desc
+        if vert_video is None:
+            self.has_orient = False
+            self.horiz_video = video
+            self.vert_video = video
+        else:
+            self.has_orient = True
+            self.horiz_video = video
+            self.vert_video = vert_video
+
+    @classmethod
+    def parse(cls, zip_file, elev_id, info):
+        name, short_name, auth, icon, desc = get_selitem_data(info)
+
+        if 'vert_video' in info:
+            video = info['horiz_video']
+            vert_video = info['vert_video']
+        else:
+            video = info['video']
+            vert_video = None
+
+        return cls(
+            elev_id,
+            icon,
+            name,
+            auth,
+            desc,
+            video,
+            short_name,
+            vert_video
+        )
+
+    def add_over(self, override, zip):
+        pass
+
+    def __repr__(self):
+        return '<ElevatorVid ' + self.id + '>'
+
+
 def desc_parse(info):
     '''Parse the description blocks, to create data which matches richTextBox.
 
@@ -687,6 +747,7 @@ obj_types = {
     'Goo':       Goo,
     'Music':     Music,
     'StyleVar':  StyleVar,
+    'Elevator':  ElevatorVid,
     }
 
 if __name__ == '__main__':
