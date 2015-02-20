@@ -227,7 +227,7 @@ class Property:
             if prop.name is not None and prop.name == keys[0]:
                 if depth > 1:
                     if prop.has_children():
-                        yield from Property.find_all(prop.value, *keys[1:])
+                        yield from Property.find_all(prop, *keys[1:])
                 else:
                     yield prop
 
@@ -284,9 +284,9 @@ class Property:
         '''Deep copy this Property tree and return it.'''
         if self.has_children():
             # This recurses if needed
-            return Property(self.name, [child.copy() for child in self.value])
+            return Property(self.real_name, [child.copy() for child in self.value])
         else:
-            return Property(self.name, self.value)
+            return Property(self.real_name, self.value)
 
     def as_dict(self):
         '''Convert this property tree into a tree of dictionaries.
