@@ -1,7 +1,13 @@
+"""
+A dialog used to select an item for things like Styles, Quotes, Music.
+
+It appears as a textbox-like widget with a ... button to open the selection window.
+Each item has a description, author, and icon.
+"""
 from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
-from functools import partial as func_partial
+import functools
 import math
 
 import tkinter_png as png  # png library for TKinter
@@ -19,7 +25,14 @@ def _NO_OP(*args):
 
 class Item:
     '''An item on the panel.
-
+    
+    name: The item ID, used to distinguish it from others.
+    longName: The full item name. This can be very long. If not set, 
+       this will be the same as the short name.
+    shortName: A shortened version of the full name. This should be <= 20 characters.
+    icon: The path for the item icon. The icon should be 96x96 pixels large.
+    desc: A list of tuples, following the richTextBox text format.
+    authors: A list of the item's authors.
     '''
     __slots__ = [
         'name',
@@ -60,7 +73,21 @@ class Item:
 
 
 class selWin:
-    '''The selection window for skyboxes, music, goo and voice packs.'''
+    '''The selection window for skyboxes, music, goo and voice packs. 
+    Optionally an aditional 'None' item can be added, which indicates 
+    that no item is to be used.
+    The string "<NONE>" is used for the none item's ID.
+    
+    Attributes:
+    - selected_id: The currently-selected item ID. If set to None, the 
+      None Item is chosen.
+    - callback: A function called whenever an item is chosen. The first argument is the selected ID.
+    - callback_params: A list of additional parameters given to the callback.
+   
+    - wid: The Toplevel window for this selector dialog.
+    - suggested: The Item which is 
+    
+    '''
     def __init__(
             self,
             tk,
@@ -70,21 +97,21 @@ class selWin:
             none_desc=[('line', 'Do not add anything.')],
             title='BEE2',
             callback=_NO_OP,
-            callback_params=[],
+            callback_params=(),
             full_context=False
                 ):
         '''Create a window object.
 
         Read from .selected_id to get the currently-chosen Item name, or None if the <none> Item is selected.
         Args:
-        - tk must be a Toplevel window, either the tk() root or another window if needed.
-        - lst is a list of Item objects, defining the visible items.
+        - tk: Must be a Toplevel window, either the tk() root or another window if needed.
+        - lst: A list of Item objects, defining the visible items.
         - If has_none is True, a <none> item will be added to the beginning of the list.
         - If has_def is True, the 'Reset to Default' button will appear, which resets to the suggested item.
         - none_desc holds an optional description for the <none> Item, which can be used to describe what it results in.
         - title is the title of the selector window.
         - callback is a function to be called whenever the selected item changes.
-        - callback_params is a list of values which will be passed to the callback function.
+        - callback_params is a list of additional values which will be passed to the callback function.
           The first arguement to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the context menu.
         '''
@@ -251,13 +278,13 @@ class selWin:
                     )
             self.context_menu.add_radiobutton(
                 label=item.context_lbl,
-                command=func_partial(self.sel_item_id, item.name),
+                command=functools.partial(self.sel_item_id, item.name),
                 var=self.context_var,
                 value=ind,
                 )
 
             item.win = self.win
-            item.button.bind("<Button-1>", func_partial(self.sel_item, item))
+            item.button.bind("<Button-1>", functools.partial(self.sel_item, item))
             item.button.bind("<Double-Button-1>", self.save)
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
@@ -325,6 +352,7 @@ class selWin:
         self.sel_item(self.selected)
 
     def open_context(self, e):
+        '''Dislay the context window at the text widget.'''
         self.context_menu.post(
             self.display.winfo_rootx(),
             self.display.winfo_rooty() + self.display.winfo_height())
@@ -335,6 +363,7 @@ class selWin:
             self.sel_item(self.suggested)
 
     def do_callback(self):
+        '''Call the callback function.'''
         self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item_id(self, id):
@@ -375,12 +404,16 @@ class selWin:
                 self.prop_reset.state(('!disabled',))
 
     def flow_items(self, e=None):
+        '''Reposition all the items to fit in the current geometry.
+        
+        Called on the <Configure> event.
+        '''
         self.pal_frame.update_idletasks()
-        self.pal_frame['width']=self.wid_canvas.winfo_width()
+        self.pal_frame['width'] = self.wid_canvas.winfo_width()
         self.prop_name['wraplength'] = self.prop_desc.winfo_width()
         width=(self.wid_canvas.winfo_width()-10) // ITEM_WIDTH
         if width <1:
-            width=1 # we got way too small, prevent division by zero
+            width = 1 # we got way too small, prevent division by zero
         itemNum = len(self.item_list)
         self.wid_canvas['scrollregion'] = (
             0, 0,
@@ -462,7 +495,10 @@ if __name__ == '__main__': # test the window if directly executing this file
             longName = "Darkness",
             icon = "skies/black",
             authors = ["Valve"],
-            desc = [('line', 'Pure black darkness. Nothing to see here.')]),
+            desc = [
+                ('line', 'Pure black darkness. Nothing to see here.'),
+                   ],
+            ),
         Item(
             "SKY_BTS",
             "BTS",
@@ -475,12 +511,14 @@ if __name__ == '__main__': # test the window if directly executing this file
                          'carrying objects throughout the facility.'),
                 ('rule', ''),
                 ('line', 'Abandoned offices can often be found here.')
-                   ])
+                   ],
+            ),
           ]
 
     def done(x):
         print(x)
         TK_ROOT.withdraw()
-    window = selWin(TK_ROOT, lst, has_none=True, has_def=True)
+        
+    window = selWin(TK_ROOT, lst, has_none=True, has_def=True, callback=done)
     window.widget(TK_ROOT).grid(1, 0)
     window.set_suggested("SKY_BLACK")
