@@ -68,6 +68,7 @@ voices = {}
 styles = {}
 musics = {}
 goos = {}
+elevators = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -428,7 +429,7 @@ def load_packages(data):
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     '''
-    global skybox_win, voice_win, music_win, goo_win, style_win
+    global skybox_win, voice_win, music_win, goo_win, style_win, elev_win
     global item_list, filter_data
     global selected_style
 
@@ -458,6 +459,7 @@ def load_packages(data):
     style_list = []
     goo_list = []
     music_list = []
+    elev_list = []
 
     # These don't need special-casing, and act the same.
     obj_types = [
@@ -466,6 +468,7 @@ def load_packages(data):
         (style_list, styles, 'Style'),
         (goo_list, goos, 'Goo'),
         (music_list, musics, 'Music'),
+        (elev_list, elevators, 'Elevator'),
         ]
     for sel_list, obj_list, name in obj_types:
         # Extract the display properties out of the object, and create
@@ -477,7 +480,8 @@ def load_packages(data):
                 longName=obj.name,
                 icon=obj.icon,
                 authors=obj.auth,
-                desc=obj.desc))
+                desc=obj.desc,
+            ))
             obj_list[obj.id] = obj
             # Every item has an image
             loader.step("IMG")
@@ -558,6 +562,17 @@ def load_packages(data):
         has_def=False,
         )
 
+    elev_win = selWin(
+        TK_ROOT,
+        elev_list,
+        title='Select Elevator Video',
+        has_none=True,
+        has_def=True,
+        none_desc='Chose a random video.',
+        callback=win_callback,
+        callback_params=['Elevator'],
+    )
+
     last_style = GEN_OPTS.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
     if last_style in style_win:
         style_win.sel_item_id(last_style)
@@ -571,6 +586,7 @@ def load_packages(data):
         (music_win, 'Music'),
         (skybox_win, 'Skybox'),
         (goo_win, 'Goo'),
+        (elev_win, 'Elevator'),
         ]
     for (sel_win, opt_name), default in zip(
             obj_types,
@@ -584,10 +600,13 @@ def load_packages(data):
 def suggested_refresh():
     '''Enable or disable the suggestion setting button.'''
     if 'suggested_style' in UI:
-        if (voice_win.is_suggested() and
+        if (
+                voice_win.is_suggested() and
                 music_win.is_suggested() and
                 skybox_win.is_suggested() and
-                goo_win.is_suggested()):
+                goo_win.is_suggested() and
+                elev_win.is_suggested()
+                ):
             UI['suggested_style'].state(['disabled'])
         else:
             UI['suggested_style'].state(['!disabled'])
@@ -635,6 +654,7 @@ def export_editoritems(_=None):
         skybox=skyboxes.get(skybox_win.chosen_id, None),
         goo=goos.get(goo_win.chosen_id, None),
         voice=voices.get(voice_win.chosen_id, None),
+        elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
         )
     messagebox.showinfo(
@@ -912,9 +932,9 @@ def update_filters():
                 # make it the half-selected state, since they don't
                 # match
                 FilterBoxes_all[cat].state(['alternate'])
-                no_alt=False
+                no_alt = False
                 break
-        if no_alt: # no alternate if they are all the same
+        if no_alt:  # no alternate if they are all the same
             FilterBoxes_all[cat].state(['!alternate'])
             FilterVars_all[cat].set(value)
     show_beta = show_beta_items.get()
@@ -1005,7 +1025,7 @@ def init_option(f):
 
         '''
         sugg = styles[selected_style].suggested
-        win_types = (voice_win, music_win, skybox_win, goo_win)
+        win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
@@ -1023,12 +1043,19 @@ def init_option(f):
         chosen = voices.get(voice_win.chosen_id, None)
         if chosen is not None:
             voiceEditor.show(chosen)
-
-    ttk.Label(props, text="Style: ").grid(row=0)
-    ttk.Label(props, text="Music: ").grid(row=2)
-    ttk.Label(props, text="Voice: ").grid(row=3)
-    ttk.Label(props, text="Skybox: ").grid(row=4)
-    ttk.Label(props, text="Goo: ").grid(row=5)
+    for ind, name in enumerate([
+            "Style",
+            None,
+            "Music",
+            "Voice",
+            "Skybox",
+            "Goo",
+            "Elev Vid",
+            ]):
+        if name is None:
+            # This is the "Suggested" button!
+            continue
+        ttk.Label(props, text=name+': ').grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1046,7 +1073,7 @@ def init_option(f):
     voice_frame.grid(row=3, column=1, sticky='EW')
     skybox_win.widget(props).grid(row=4, column=1, sticky='EW')
     goo_win.widget(props).grid(row=5, column=1, sticky='EW')
-
+    elev_win.widget(props).grid(row=6, column=1, sticky='EW')
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
 
     ttk.Sizegrip(
@@ -1669,7 +1696,7 @@ def init_windows():
             item.load_data()  # Refresh everything
 
         sugg = styles[selected_style].suggested
-        win_types = (voice_win, music_win, skybox_win, goo_win)
+        win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()

@@ -315,10 +315,11 @@ class Style:
 
         sugg = info.find_key('suggested', [])
         sugg = (
-            sugg['quote', None],
-            sugg['music', None],
+            sugg['quote', '<NONE>'],
+            sugg['music', '<NONE>'],
             sugg['skybox', 'SKY_BLACK'],
             sugg['goo', 'GOO_NORM'],
+            sugg['elev', '<NONE>'],
             )
 
         if short_name == '':
@@ -653,7 +654,7 @@ class ElevatorVid:
     '''
     def __init__(
             self,
-            id,
+            elev_id,
             ico,
             name,
             auth,
@@ -662,9 +663,10 @@ class ElevatorVid:
             short_name=None,
             vert_video=None,
             ):
-        self.id = id
+        self.id = elev_id
         self.icon = ico
         self.auth = auth
+        self.name = name
         self.short_name = name if short_name is None else short_name
         self.desc = desc
         if vert_video is None:

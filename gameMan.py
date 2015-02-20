@@ -180,7 +180,17 @@ class Game:
             except (IOError, shutil.Error):
                 pass
 
-    def export(self, style, all_items, music, skybox, goo, voice, style_vars):
+    def export(
+            self,
+            style,
+            all_items,
+            music,
+            skybox,
+            goo,
+            voice,
+            style_vars,
+            elevator,
+        ):
         '''Generate the editoritems.txt and vbsp_config.
 
         '''
@@ -191,6 +201,7 @@ class Game:
         print('Goo =', goo)
         print('Voice =', voice)
         print('Skybox =', skybox)
+        print('Elevator = ', elevator)
         print('Style Vars:\n  {')
         for key, val in style_vars.items():
             print('  ' + key + ' = ' + str(val))
@@ -242,9 +253,12 @@ class Game:
                                    'StyleVars',
                                    'Textures')
 
-
         vbsp_config.ensure_exists('StyleVars')
-        vbsp_config['StyleVars'] += [Property(key, utils.bool_as_int(val)) for key,val in style_vars.items()]
+        vbsp_config['StyleVars'] += [
+            Property(key, utils.bool_as_int(val))
+            for key, val in
+            style_vars.items()
+        ]
 
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -268,7 +282,8 @@ class Game:
 
         print('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
-        with open(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
+        with open(self.abs_path(
+                'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
 
@@ -291,11 +306,12 @@ def find_steam_info(game_dir):
     for folder in os.listdir(game_dir):
         info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
         if os.path.isfile(info_path):
-            with open(info_path, 'r') as file:
+            with open(info_path) as file:
                 for line in file:
-                    clean_line = utils.clean_line(line).replace('\t',' ')
+                    clean_line = utils.clean_line(line).replace('\t', ' ')
                     if not found_id and 'steamappid' in clean_line.casefold():
-                        ID = clean_line.casefold().replace('steamappid', '').strip()
+                        ID = clean_line.casefold().replace(
+                            'steamappid', '').strip()
                         try:
                             game_id = int(ID)
                         except ValueError:
@@ -326,7 +342,11 @@ def load(ui_quit_func, load_screen_window):
     for gm in config:
         if gm != 'DEFAULT':
             try:
-                new_game = Game(gm, int(config[gm]['SteamID']), config[gm]['Dir'])
+                new_game = Game(
+                    gm,
+                    int(config[gm]['SteamID']),
+                    config[gm]['Dir'],
+                )
             except ValueError:
                 pass
             else:
@@ -444,7 +464,12 @@ def add_menu_opts(menu, callback=None):
             menu.delete(ind)
 
     for val, game in enumerate(all_games):
-        menu.add_radiobutton(label=game.name, variable=selectedGame_radio, value=val, command=setGame)
+        menu.add_radiobutton(
+            label=game.name,
+            variable=selectedGame_radio,
+            value=val,
+            command=setGame,
+        )
     setGame()
 
 

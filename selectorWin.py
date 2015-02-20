@@ -1,20 +1,21 @@
-from tkinter import * # ui library
+from tkinter import *  # ui library
 from tkinter import font
-from tkinter import ttk # themed ui components that match the OS
+from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
 import math
 
-import tkinter_png as png # png library for TKinter
+import tkinter_png as png  # png library for TKinter
 from richTextBox import tkRichText
 
-ICON_SIZE=96
-ITEM_WIDTH=ICON_SIZE+16
-ITEM_HEIGHT=ICON_SIZE+51
+ICON_SIZE = 96 # Size of the selector win icons
+ITEM_WIDTH = ICON_SIZE+16
+ITEM_HEIGHT = ICON_SIZE+51
 
 
 def _NO_OP(*args):
     '''The default callback, triggered whenever the chosen item is changed.'''
     pass
+
 
 class Item:
     '''An item on the panel.
@@ -31,14 +32,15 @@ class Item:
         'win',
         'context_lbl',
         ]
+
     def __init__(
             self,
             name,
             shortName,
-            longName = None,
-            icon = None,
-            authors = None,
-            desc = ""):
+            longName=None,
+            icon=None,
+            authors=None,
+            desc=""):
         self.name = name
         self.shortName = shortName
         self.longName = shortName if longName is None else longName
@@ -55,6 +57,7 @@ class Item:
 
     def __repr__(self):
         return '<Item:' + self.name + '>'
+
 
 class selWin:
     '''The selection window for skyboxes, music, goo and voice packs.'''
@@ -200,7 +203,7 @@ class selWin:
             ).grid(
                 row=5,
                 column=0,
-                padx=(8,8),
+                padx=(8, 8),
                 )
 
         if self.has_def:
@@ -247,11 +250,11 @@ class selWin:
                     compound='top',
                     )
             self.context_menu.add_radiobutton(
-            label=item.context_lbl,
-            command=func_partial(self.sel_item_id, item.name),
-            var=self.context_var,
-            value=ind,
-            )
+                label=item.context_lbl,
+                command=func_partial(self.sel_item_id, item.name),
+                var=self.context_var,
+                value=ind,
+                )
 
             item.win = self.win
             item.button.bind("<Button-1>", func_partial(self.sel_item, item))
@@ -263,7 +266,9 @@ class selWin:
         self.pane_win.add(self.prop_frm)
 
     def widget(self, frame):
-        '''Create and return the special textbox used to open the selector window.'''
+        '''Create and return the special textbox used to open the selector window.
+
+        '''
 
         self.display = ttk.Entry(frame, textvariable=self.disp_label, cursor='arrow')
         self.display.bind("<Button-1>", self.open_win)
@@ -376,14 +381,24 @@ class selWin:
         width=(self.wid_canvas.winfo_width()-10) // ITEM_WIDTH
         if width <1:
             width=1 # we got way too small, prevent division by zero
-        itemNum=len(self.item_list)
-        self.wid_canvas['scrollregion'] = (0, 0, width*ITEM_WIDTH, math.ceil(itemNum/width)*ITEM_HEIGHT+20)
+        itemNum = len(self.item_list)
+        self.wid_canvas['scrollregion'] = (
+            0, 0,
+            width*ITEM_WIDTH,
+            math.ceil(itemNum/width)*ITEM_HEIGHT+20
+        )
         self.pal_frame['height']=(math.ceil(itemNum/width)*ITEM_HEIGHT+20)
-        for i,item in enumerate(self.item_list):
+        for i, item in enumerate(self.item_list):
             if item == self.suggested:
-                self.sugg_lbl.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT))
+                self.sugg_lbl.place(
+                    x=((i % width) * ITEM_WIDTH + 1),
+                    y=((i // width) * ITEM_HEIGHT)
+                )
                 self.sugg_lbl['width'] = item.button.winfo_width()
-            item.button.place(x=((i%width) *ITEM_WIDTH+1),y=((i//width)*ITEM_HEIGHT+20))
+            item.button.place(
+                x=((i % width) * ITEM_WIDTH + 1),
+                y=((i // width) * ITEM_HEIGHT + 20)
+            )
             item.button.lift()
 
     def __contains__(self, obj):
@@ -408,14 +423,14 @@ class selWin:
         If the ID is None or does not exist, the suggested item will be cleared.
         If the ID is "<NONE>", it will be set to the None item.
         '''
-
+        print('Setting suggested for {!s} to {}'.format(self, suggested))
         if self.suggested is not None:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
                 font='TkMenuFont')
             # Remove the font from the last suggested item
 
-        if suggested == None:
+        if suggested is None:
             self.suggested = None
         elif suggested == "<NONE>":
             self.suggested = self.noneItem
@@ -424,15 +439,15 @@ class selWin:
                 if item.name == suggested:
                     self.suggested=item
                     break
-            else: # Not found
+            else:  # Not found
                 self.suggested = None
 
         if self.suggested is not None:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
                 font=self.sugg_font)
-        self.set_disp() # Update the textbox if needed
-        self.flow_items() # Refresh
+        self.set_disp()  # Update the textbox if needed
+        self.flow_items()  # Refresh
 
 if __name__ == '__main__': # test the window if directly executing this file
     TK_ROOT=Tk()
@@ -467,5 +482,5 @@ if __name__ == '__main__': # test the window if directly executing this file
         print(x)
         TK_ROOT.withdraw()
     window = selWin(TK_ROOT, lst, has_none=True, has_def=True)
-    window.init_display(TK_ROOT, 1, 0)
+    window.widget(TK_ROOT).grid(1, 0)
     window.set_suggested("SKY_BLACK")

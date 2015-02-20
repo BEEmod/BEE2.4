@@ -6,7 +6,7 @@ import paletteLoader
 import packageLoader
 import gameMan
 
-loadScreen.length('UI', 8)
+loadScreen.length('UI', 9)
 
 DEFAULT_SETTINGS = {
     'Directories': {
