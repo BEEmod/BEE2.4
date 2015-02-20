@@ -31,7 +31,8 @@ __pycache__/
 .LSOverride
 
 # Icon must ends with two \r.
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -62,7 +63,6 @@ preview_styled.vmf
 
 #These folders are generated automatically by the BEE2
 images/cache/
-cache/
 inst_cache/
 source_cache/
 
@@ -70,5 +70,5 @@ source_cache/
 config/item_configs.cfg
 config/config.cfg
 config/games.cfg
-config/compiler.cfg
+config/compile.cfg
 config/voice/
