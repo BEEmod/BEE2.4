@@ -8,10 +8,11 @@ def add_sorted(lst, new_item):
     '''
     for ind, val in enumerate(lst):
         if val > new_item:
-            lst.insert(ind,new_item)
+            lst.insert(ind, new_item)
             break
     else:
-        list.append(new_item)
+        lst.append(new_item)
+
 
 def clean_line(line: str):
     '''Removes extra spaces and comments from the input.'''
@@ -102,7 +103,10 @@ def center_win(window):
 
 
 class Vec:
-    '''A 3D Vector. This has most standard Vector functions.'''
+    '''A 3D Vector. This has most standard Vector functions.
+
+    Many of the functions will accept a 3-tuple for comparison purposes.
+    '''
     __slots__ = ('x', 'y', 'z')
 
     def __init__(self, x=0.0, y=0.0, z=0.0):
@@ -246,14 +250,22 @@ class Vec:
             return Vec(self.x * other, self.y * other, self.z * other)
 
     def __div__(self, other):
-        '''Divide the Vector by a scalar.'''
+        '''Divide the Vector by a scalar.
+
+        If any axis is equal to zero, it will be kept as zero as long
+        as the magnitude is greater than zero
+        '''
         if isinstance(other, Vec):
             return NotImplemented
         else:
             return Vec(self.x / other, self.y / other, self.z / other)
 
     def __floordiv__(self, other):
-        '''Divide the Vector by a scalar, discarding the remainder.'''
+        '''Divide the Vector by a scalar, discarding the remainder.
+
+        If any axis is equal to zero, it will be kept as zero as long
+        as the magnitude is greater than zero
+        '''
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -273,7 +285,10 @@ class Vec:
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return self // other, self % other
+            x1, x2 = divmod(self.x, other)
+            y1, y2 = divmod(self.y, other)
+            z1, z2 = divmod(self.y, other)
+            return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
     def __iadd__(self, other):
         '''+= operation.
@@ -333,6 +348,10 @@ class Vec:
             self.z /= other
             return self
 
+    def __bool__(self):
+        '''Vectors are True if any axis is non-zero.'''
+        return self.x != 0 or self.y != 0 or self.z != 0
+
     def __eq__(self, other):
         '''Equality test.
 
@@ -342,7 +361,7 @@ class Vec:
         '''
         if isinstance(other, Vec):
             return other.x == self.x and other.y == self.y and other.z == self.z
-        elif isinstance(other, tuple):
+        elif isinstance(other, abc.Sequence):
             return (
                 self.x == other[0] and
                 self.y == other[1] and
@@ -537,27 +556,32 @@ class Vec:
             return self.x**2 + self.y**2 + self.z**2
 
     def __len__(self):
-        '''The len() of a vector is the number of non-zero axis.'''
+        '''The len() of a vector is the number of non-zero axes.'''
         return sum(1 for axis in (self.x, self.y, self.z) if axis != 0)
 
-    def __contains__(self, key):
-        '''Vectors contain the three axes.'''
-        return key in 'xyz'
+    def __contains__(self, val):
+        '''Check to see if an axis is set to the given value.
+        '''
+        return val == self.x or val == self.y or val == self.z
 
-    def __reversed__(self):
-        '''The reversed form of a Vector has inverted axes.'''
+    def __neg__(self):
+        '''The inverted form of a Vector has inverted axes.'''
         return Vec(-self.x, -self.y, -self.z)
+
+    def __pos__(self):
+        '''+ on a Vector simply copies it.'''
+        return Vec(self.x, self.y, self.z)
 
     def norm(self):
         '''Normalise the Vector.
 
          This is done by transforming it to have a magnitude of 1 but the same
          direction.
-         The vector is left unchange if it is equal to (0,0,0)
+         The vector is left unchanged if it is equal to (0,0,0)
          '''
         if self.x == 0 and self.y == 0 and self.z == 0:
-            # Don't do anything for this, and don't copy
-            return self
+            # Don't do anything for this - otherwise we'd get
+            return self.copy()
         else:
             return self / self.mag()
 
