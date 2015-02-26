@@ -1,7 +1,7 @@
 import random
-from operator import itemgetter
 
 from utils import Vec
+from vbsp import set_antline_mat, TEX_FIZZLER, ANTLINES
 import vmfLib as VLib
 import utils
 
@@ -9,45 +9,100 @@ GLOBAL_INSTANCES = []
 ALL_INST = []
 conditions = []
 
-TEX_FIZZLER = {
-    "effects/fizzler_center" : "center",
-    "effects/fizzler_l"      : "left",
-    "effects/fizzler_r"      : "right",
-    "effects/fizzler"        : "short",
-    "tools/toolsnodraw"      : "nodraw",
-    }
 
-ANTLINES = {
-    "signage/indicator_lights/indicator_lights_floor" : "antline",
-    "signage/indicator_lights/indicator_lights_corner_floor" : "antlinecorner"
-    }
+class Condition:
+    __slots__ = ['flags', 'results', 'else_results', 'priority', 'valid']
+
+    def __init__(self, flags=None, results=None, else_results=None, priority=0):
+        self.flags = flags or []
+        self.results = results or []
+        self.else_results = else_results or []
+        self.priority = priority
+        self.valid = len(results) > 0  # is it valid?
+
+    @classmethod
+    def parse(cls, prop_block):
+        flags = []
+        results = []
+        else_results = []
+        priority = 0
+        for prop in prop_block:
+            if prop.name == 'result':
+                results.extend(prop.value)  # join multiple ones together
+            elif prop.name == 'else':
+                else_results.extend(prop.value)
+            elif prop.name == 'priority':
+                priority = VLib.conv_int(prop.value, priority)
+            else:
+                flags.append(prop)
+
+        return cls(
+            flags=flags,
+            results=results,
+            else_results=else_results,
+            priority=priority,
+        )
+
+    def setup_res(self):
+        """Some results need some pre-processing before they can be used.
+
+        """
+        for res in self.results[:]:
+            if res.name == 'variant':
+                res.value = variant_weight(res)
+            elif res.name == 'custantline':
+                result = {
+                    'instance': res.find_key('instance', '').value,
+                    'antline': [p.value for p in res.find_all('straight')],
+                    'antlinecorner': [p.value for p in res.find_all('corner')],
+                    'outputs': list(res.find_all('addOut'))
+                    }
+                if (
+                        len(result['antline']) == 0 or
+                        len(result['antlinecorner']) == 0
+                        ):
+                    self.results.remove(res)  # invalid
+                else:
+                    res.value = result
+            elif res.name == 'condition':
+                res.value = Condition.parse(res)
+
+    def __lt__(self, other):
+        '''Condition items sort by priority.'''
+        if hasattr(other, 'priority'):
+            return self.priority < other.priority
+        return NotImplemented
+
+    def __lr__(self, other):
+        '''Condition items sort by priority.'''
+        if hasattr(other, 'priority'):
+            return self.priority <= other.priority
+        return NotImplemented
+
+    def __gt__(self, other):
+        '''Condition items sort by priority.'''
+        if hasattr(other, 'priority'):
+            return self.priority > other.priority
+        return NotImplemented
+
+    def __ge__(self, other):
+        '''Condition items sort by priority.'''
+        if hasattr(other, 'priority'):
+            return self.priority >= other.priority
+        return NotImplemented
 
 
 def add(prop_block):
     '''Add a condition to the list.'''
-    flags = []
-    results = []
-    priority = 0
-    for prop in prop_block:
-        if prop.name == 'result':
-            results.extend(prop.value) # join multiple ones together
-        elif prop.name == 'priority':
-            priority = VLib.conv_int(prop.value, priority)
-        else:
-            flags.append(prop)
-
-    if len(results) > 0: # is it valid?
-        con = {
-            "flags" : flags,
-            "results" : results,
-            "priority": priority,
-            }
+    con = Condition(prop_block)
+    if con.valid:
         conditions.append(con)
+
 
 def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
     # Get a bunch of values from VBSP, since we can't import directly.
     global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW
-    global GAME_MODE, ALL_INST, INST_FILES
+    global GAME_MODE, ALL_INST, INST_FILE
     VMF = vmf
     STYLE_VARS = settings['style_vars']
     VOICE_ATTR = settings['has_attr']
@@ -56,32 +111,41 @@ def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
     IS_PREVIEW = preview
     GAME_MODE = mode
     ALL_INST = inst_list
-    INST_FILES = {key.casefold(): value for key,value in inst_files.items()}
+    INST_FILE = {key.casefold(): value for key, value in inst_files.items()}
 
     # Sort by priority, where higher = done earlier
-    conditions.sort(key=itemgetter('priority'), reverse=True)
+    conditions.sort(reverse=True)
     setup_cond()
+
 
 def check_all():
     '''Check all conditions.'''
 
     utils.con_log('Checking Conditions...')
     for condition in conditions:
-        for inst in VMF.iter_ents(classname='func_instance'):
-            run_cond(inst, condition)
-            if len(condition['results']) == 0:
-                break
+        if condition.valid:
+            for inst in VMF.iter_ents(classname='func_instance'):
+                run_cond(inst, condition)
+                if len(condition['results']) == 0:
+                    break
     remove_blank_inst()
 
-    utils.con_log('Map has attributes: ', [key for key,value in VOICE_ATTR.items() if value])
+    utils.con_log('Map has attributes: ', [
+        key
+        for key, value in
+        VOICE_ATTR.items()
+        if value
+    ])
     utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
     utils.con_log('Global instances: ', GLOBAL_INSTANCES)
+
 
 def check_inst(inst):
     '''Run all condtions on a given instance.'''
     for condition in conditions:
         run_cond(inst, condition)
     remove_blank_inst()
+
 
 def remove_blank_inst():
     '''Remove instances with blank file attr.
@@ -91,42 +155,45 @@ def remove_blank_inst():
     for inst in VMF.iter_ents(classname='func_instance', file=''):
         VMF.remove_ent(inst)
 
+
 def setup_cond():
     '''Some conditions require setup logic before they are run.'''
     for cond in conditions:
-        for res in cond['results'][:]:
-            if res.name == 'variant':
-                res.value = variant_weight(res)
-            elif res.name == 'custantline':
-                res.value = {
-                    'instance' : res.find_key('instance', '').value,
-                    'antline' : [p.value for p in res.find_all('straight')],
-                    'antlinecorner' : [p.value for p in res.find_all('corner')],
-                    'outputs' : list(res.find_all('addOut'))
-                    }
-                if len(res.value['antline']) == 0 or len(res.value['antlinecorner']) == 0:
-                    cond['results'].remove(res) # invalid
+        cond.setup_res()
+
 
 def run_cond(inst, cond):
     '''Try to satisfy this condition on the given instance.'''
+    if not cond.valid:
+        return
+    success = True
     for flag in cond['flags']:
         if not check_flag(flag, inst):
-            return
+            success = False
+            break
 
-    inst['file'] = inst['file', ''][:-4] # our suffixes won't touch the .vmf extension
-    for res in cond['results']:
+    # our suffixes won't touch the .vmf extension
+    inst['file'] = inst['file', ''][:-4]
+
+    results = cond.results if success else cond.else_results
+    for res in results:
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            utils.con_log('"' + flag.name + '" is not a valid condition result!')
+            utils.con_log('"' + res.name + '" is not a valid condition result!')
         else:
             func(inst, res)
+
     if not inst['file'].endswith('vmf'):
         inst['file'] += '.vmf'
 
 
 def check_flag(flag, inst):
-    print('checking ' + flag.name + '(' + str(flag.value) + ') on ' + inst['file'])
+    print('Checking {type} ({val!s} on {inst}'.format(
+        type=flag.real_name,
+        val=flag.value,
+        inst=inst['file'],
+    ))
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
@@ -135,6 +202,8 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
+
 def variant_weight(var):
     '''Read variant commands from settings and create the weight list.'''
     count = var['number', '']
@@ -143,46 +212,56 @@ def variant_weight(var):
         weight = var['weights', '']
         if weight == '' or ',' not in weight:
             utils.con_log('Invalid weight! (' + weight + ')')
-            weight = [str(i) for i in range(1,count + 1)]
+            weight = [str(i) for i in range(1, count + 1)]
         else:
-            vals=weight.split(',')
-            weight=[]
+            # Parse the weight
+            vals = weight.split(',')
+            weight = []
             if len(vals) == count:
-                for i,val in enumerate(vals):
+                for i, val in enumerate(vals):
                     if val.isdecimal():
-                        weight.extend([str(i+1) for tmp in range(1,int(val)+1)]) # repeat the index the correct number of times
+                        # repeat the index the correct number of times
+                        weight.extend(
+                            str(i+1)
+                            for _ in
+                            range(1, int(val)+1)
+                        )
                     else:
+                        # Abandon parsing
                         break
             if len(weight) == 0:
-                utils.con_log('Failed parsing weight! (' + weight + ')')
-                weight = [str(i) for i in range(1,count + 1)]
-        # random.choice(weight) will now give an index with the correct probabilities.
+                utils.con_log('Failed parsing weight! ({!s})'.format(weight))
+                weight = [str(i) for i in range(1, count + 1)]
+        # random.choice(weight) will now give an index with the correct
+        # probabilities.
         return weight
     else:
-        return [''] # This won't append anything to the file
+        return ['']  # This won't append anything to the file
+
 
 def add_output(inst, prop, target):
     '''Add a customisable output to an instance.'''
     inst.add_out(VLib.Output(
-        prop['output',''],
+        prop['output', ''],
         target,
-        prop['input',''],
-        inst_in=prop['targ_in',''],
-        inst_out=prop['targ_out',''],
+        prop['input', ''],
+        inst_in=prop['targ_in', ''],
+        inst_out=prop['targ_out', ''],
         ))
+
 
 def resolve_inst_path(path):
     '''Allow referring to the instFile section in condtion parameters.'''
     if path.startswith('<') and path.endswith('>'):
         try:
-            path = INST_FILES[path[1:-1].casefold()]
+            path = INST_FILE[path[1:-1].casefold()]
         except KeyError:
             utils.con_log(path + ' not found in instanceFiles block!')
     return path.casefold()
 
-###########
-## FLAGS ##
-###########
+#########
+# FLAGS #
+#########
 
 
 def flag_and(inst, flag):
@@ -207,11 +286,11 @@ def flag_not(inst, flag):
 
 
 def flag_nor(inst, flag):
-    return not flag_or(inst,flag)
+    return not flag_or(inst, flag)
 
 
 def flag_nand(inst, flag):
-    return not flag_and(inst,flag)
+    return not flag_and(inst, flag)
 
 
 def flag_file_equal(inst, flag):
@@ -222,7 +301,7 @@ def flag_file_cont(inst, flag):
     return resolve_inst_path(flag.value) in inst['file'].casefold()
 
 
-def flag_has_inst(inst, flag):
+def flag_has_inst(_, flag):
     '''Return true if the filename is present anywhere in the map.'''
     return resolve_inst_path(flag.value) in ALL_INST
 
@@ -232,19 +311,19 @@ def flag_instvar(inst, flag):
     return inst.fixup[bits[0]] == bits[1]
 
 
-def flag_stylevar(inst, flag):
+def flag_stylevar(_, flag):
     return bool(STYLE_VARS[flag.value.casefold()])
 
 
-def flag_voice_has(inst, flag):
+def flag_voice_has(_, flag):
     return bool(VOICE_ATTR[flag.value])
 
 
-def flag_music(inst, flag):
+def flag_music(_, flag):
     return OPTIONS['music_id'] == flag.value
 
 
-def flag_option(inst, flag):
+def flag_option(_, flag):
     bits = flag.value.split(' ')
     key = bits[0].casefold()
     if key in OPTIONS:
@@ -253,16 +332,16 @@ def flag_option(inst, flag):
         return False
 
 
-def flag_game_mode(inst, flag):
+def flag_game_mode(_, flag):
     return GAME_MODE.casefold() == flag
 
 
-def flag_is_preview(inst, flag):
+def flag_is_preview(_, flag):
     return IS_PREVIEW == (flag == "1")
 
-#############
-## RESULTS ##
-#############
+###########
+# RESULTS #
+###########
 
 
 def res_change_instance(inst, res):
@@ -274,24 +353,28 @@ def res_add_suffix(inst, res):
     '''Add the specified suffix to the filename.'''
     inst['file'] += '_' + res.value
 
-def res_set_style_var(inst, res):
+
+def res_set_style_var(_, res):
     for opt in res.value:
         if opt.name == 'settrue':
             STYLE_VARS[opt.value.casefold()] = True
         elif opt.name == 'setfalse':
             STYLE_VARS[opt.value.casefold()] = False
 
-def res_set_voice_attr(inst, res):
+
+def res_set_voice_attr(_, res):
     for opt in res.value:
         if opt.value.casefold() == '1':
             VOICE_ATTR[opt.name] = True
         elif opt.value.casefold() == '0':
             VOICE_ATTR[opt.name] = False
 
-def res_set_option(inst, res):
+
+def res_set_option(_, res):
     for opt in res.value:
         if opt.name in OPTIONS['options']:
             OPTIONS['options'][opt.name] = opt.value
+
 
 def res_add_inst_var(inst, res):
     '''Append the value of an instance variable to the filename.
@@ -301,14 +384,15 @@ def res_add_inst_var(inst, res):
     '''
     if res.has_children():
         val = inst.fixup[res['variable', '']]
-        for rep in res: # lookup the number to determine the appending value
+        for rep in res:  # lookup the number to determine the appending value
             if rep.name == 'variable':
-                continue # this isn't a lookup command!
+                continue  # this isn't a lookup command!
             if rep.name == val:
                 inst['file'] += '_' + rep.value
                 break
-    else: # append the value
+    else:  # append the value
         inst['file'] += '_' + inst.fixup[res.value, '']
+
 
 def res_add_variant(inst, res):
     '''This allows using a random instance from a weighted group.
@@ -323,7 +407,8 @@ def res_add_variant(inst, res):
         random.seed(inst['targetname'])
     inst['file'] += "_var" + random.choice(res.value)
 
-def res_add_global_inst(inst, res):
+
+def res_add_global_inst(_, res):
     '''Add one instance in a location.
 
     Once this is executed, it will be ignored thereafter.
@@ -336,30 +421,33 @@ def res_add_global_inst(inst, res):
             # items that add to original items, or to avoid
             # bugs.
             new_inst = VLib.Entity(VMF, keys={
-                "classname" : "func_instance",
-                "targetname" : res['name', ''],
-                "file" : resolve_inst_path(res['file']),
-                "angles" : res['angles', '0 0 0'],
-                "origin" : res['position', '0 0 -10000'],
-                "fixup_style" : res['fixup_style', '0'],
+                "classname": "func_instance",
+                "targetname": res['name', ''],
+                "file": resolve_inst_path(res['file']),
+                "angles": res['angles', '0 0 0'],
+                "origin": res['position', '0 0 -10000'],
+                "fixup_style": res['fixup_style', '0'],
                 })
             GLOBAL_INSTANCES.append(res['file'])
             if new_inst['targetname'] == '':
-                new_inst['targetname'] = "inst_"+str(unique_id())
+                new_inst['targetname'] = "inst_"
+                new_inst.make_unique()
             VMF.add_ent(new_inst)
-            res.value = None # Disable this
+            res.value = None  # Disable this
+
+
 def res_add_overlay_inst(inst, res):
     '''Add another instance on top of this one.'''
     print('adding overlay', res['file'])
-    new_inst = VLib.Entity(VMF, keys={
-        "classname" : "func_instance",
-        "targetname" : inst['targetname'],
-        "file" : resolve_inst_path(res['file', '']),
-        "angles" : inst['angles'],
-        "origin" : inst['origin'],
-        "fixup_style" : res['fixup_style', '0'],
-        })
-    VMF.add_ent(new_inst)
+    VMF.create_ent(
+        classname='func_instance',
+        targetname=inst['targetname'],
+        file=resolve_inst_path(res['file', '']),
+        angles=inst['angles'],
+        origin=inst['origin'],
+        fixup_style=res['fixup_style', '0'],
+    )
+
 
 def res_cust_output(inst, res):
     '''Add an additional output to the instance with any values.
@@ -372,7 +460,7 @@ def res_cust_output(inst, res):
             toggle_name = toggle['targetname']
             break
     else:
-        toggle_name = '' # we want to ignore the toggle instance, if it exists
+        toggle_name = ''  # we want to ignore the toggle instance, if it exists
 
     # Make this a set to ignore repeated targetnames
     targets = {o.target for o in inst.outputs if o.target != toggle_name}
@@ -382,21 +470,27 @@ def res_cust_output(inst, res):
     if kill_signs or dec_con_count:
         for con_inst in VMF.iter_ents(classname='func_instance'):
             if con_inst['targetname'] in targets:
-                if kill_signs and (con_inst['file'] == INST_FILE['indPanTimer'] or
-                                   con_inst['file'] == INST_FILE['indPanCheck']):
+                if kill_signs and (
+                        con_inst['file'] == INST_FILE['indPanTimer'] or
+                        con_inst['file'] == INST_FILE['indPanCheck']
+                        ):
                     VMF.remove_ent(con_inst)
                 if dec_con_count and 'connectioncount' in con_inst:
-                # decrease ConnectionCount on the ents,
-                # so they can still process normal inputs
+                    # decrease ConnectionCount on the ents,
+                    # so they can still process normal inputs
                     try:
                         val = int(con_inst.fixup['connectioncount'])
                         con_inst.fixup['connectioncount'] = str(val-1)
                     except ValueError:
                         # skip if it's invalid
-                        utils.con_log(con_inst['targetname'] + ' has invalid ConnectionCount!')
+                        utils.con_log(
+                            con_inst['targetname'] +
+                            ' has invalid ConnectionCount!'
+                        )
     for targ in targets:
         for out in res.find_all('addOut'):
             add_output(inst, out, targ)
+
 
 def res_cust_antline(inst, res):
     '''Customise the output antline texture, toggle instances.
@@ -408,7 +502,13 @@ def res_cust_antline(inst, res):
             classname='info_overlay',
             targetname=over_name):
         random.seed(over['origin'])
-        new_tex = random.choice(res.value[ANTLINES[over['material'].casefold()]])
+        new_tex = random.choice(
+            res.value[
+                ANTLINES[
+                    over['material'].casefold()
+                ]
+            ]
+        )
         set_antline_mat(over, new_tex)
 
     # allow replacing the indicator_toggle instance
@@ -419,14 +519,19 @@ def res_cust_antline(inst, res):
                 if len(res.value['outputs']) > 0:
                     for out in inst.outputs[:]:
                         if out.target == toggle['targetname']:
-                            inst.outputs.remove(out) # remove the original outputs
+                            # remove the original outputs
+                            inst.outputs.remove(out)
                     for out in res.value['outputs']:
-                        # Allow adding extra outputs to customly trigger the toggle
+                        # Allow adding extra outputs to customly
+                        # trigger the toggle
                         add_output(inst, out, toggle['targetname'])
-                break # Stop looking!
+                break  # Stop looking!
+
 
 def res_faith_mods(inst, res):
-    '''Modify the trigger_catrapult that is created for ItemFaithPlate items.'''
+    '''Modify the trigger_catrapult that is created for ItemFaithPlate items.
+
+    '''
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
     for trig in VMF.iter_ents(classname="trigger_catapult"):
@@ -439,22 +544,23 @@ def res_faith_mods(inst, res):
                         inst.fixup[fixup_var] = 'angled'
                     break
                 elif out.inst_in == 'animate_straightup_relay':
-                    out.inst_in = res['straight_targ', 'animate_straightup_relay']
+                    out.inst_in = res[
+                        'straight_targ', 'animate_straightup_relay'
+                    ]
                     out.input = res['straight_in', 'Trigger']
                     if fixup_var:
                         inst.fixup[fixup_var] = 'straight'
                     break
             else:
-                continue # Check the next trigger
-            break # If we got here, we've found the output - stop scanning
+                continue  # Check the next trigger
+            break  # If we got here, we've found the output - stop scanning
+
 
 def res_cust_fizzler(base_inst, res):
     '''Modify a fizzler item to allow for custom brush ents.'''
     model_name = res['modelname', None]
     make_unique = res['UniqueModel', '0'] == '1'
-    fizz_name = base_inst['targetname','']
-    if make_unique:
-        unique_ind = 0
+    fizz_name = base_inst['targetname', '']
 
     # search for the model instances
     model_targetnames = (
@@ -471,10 +577,13 @@ def res_cust_fizzler(base_inst, res):
                 if model_name == '':
                     inst['targetname'] = base_inst['targetname']
                 else:
-                    inst['targetname'] = base_inst['targetname'] + '-' + model_name
+                    inst['targetname'] = (
+                        base_inst['targetname'] +
+                        '-' +
+                        model_name
+                    )
             if make_unique:
-                unique_ind += 1
-                inst['targetname'] += str(unique_id)
+                inst.make_unique()
 
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
@@ -489,9 +598,13 @@ def res_cust_fizzler(base_inst, res):
             for config in new_brush_config:
                 new_brush = orig_brush.copy()
                 VMF.add_ent(new_brush)
-                new_brush.keys.clear() # Wipe the original keyvalues
+                new_brush.keys.clear()  # Wipe the original keyvalues
                 new_brush['origin'] = orig_brush['origin']
-                new_brush['targetname'] = fizz_name + '-' + config['name', 'brush']
+                new_brush['targetname'] = (
+                    fizz_name +
+                    '-' +
+                    config['name', 'brush']
+                )
                 # All ents must have a classname!
                 new_brush['classname'] = 'trigger_portal_cleanser'
 
@@ -505,7 +618,9 @@ def res_cust_fizzler(base_inst, res):
                     # skip the resizing since it's already correct.
                     laser_tex = laserfield_conf['texture', 'effects/laserplane']
                     nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                    tex_width = VLib.conv_int(laserfield_conf['texwidth', '512'], 512)
+                    tex_width = VLib.conv_int(
+                        laserfield_conf['texwidth', '512'], 512
+                    )
                     is_short = False
                     for side in new_brush.sides():
                         if side.mat.casefold() == 'effects/fizzler':
@@ -526,7 +641,12 @@ def res_cust_fizzler(base_inst, res):
                                 side.mat = nodraw_tex
                     else:
                         # The hard part - stretching the brush.
-                        convert_to_laserfield(new_brush, laser_tex, nodraw_tex, tex_width)
+                        convert_to_laserfield(
+                            new_brush,
+                            laser_tex,
+                            nodraw_tex,
+                            tex_width
+                        )
                 else:
                     # Just change the textures
                     for side in new_brush.sides():
@@ -535,6 +655,7 @@ def res_cust_fizzler(base_inst, res):
                         except (KeyError, IndexError):
                             # If we fail, just use the original textures
                             pass
+
 
 def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
     '''Convert a fizzler into a laserfield func_brush.
@@ -545,7 +666,8 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
     '''
 
     # Get the origin and bbox.
-    # The origin isn't in the center, but it still works as long as it's in-between the outermost coordinates
+    # The origin isn't in the center, but it still works as long as it's
+    # in-between the outermost coordinates
     origin = Vec(*[int(v) for v in brush['origin'].split(' ')])
     bbox_min, bbox_max = brush.get_bbox()
 
@@ -554,7 +676,8 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
     brush.solids = [brush.solids[1]]
 
     for side in brush.solids[0].sides:
-        # For every coordinate, set to the maximum if it's larger than the origin.
+        # For every coordinate, set to the maximum if it's larger than the
+        # origin.
         for v in side.planes:
             for ax in 'xyz':
                 if int(v[ax]) > origin[ax]:
@@ -564,10 +687,9 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
 
         # Determine the shape of this plane.
         bounds_min, bounds_max = side.get_bbox()
-        dimensions = [0,0,0]
-        for i in range(3):
-            dimensions[i] = bounds_max[i] - bounds_min[i]
-        if 2 in dimensions: # The front/back won't have this dimension
+        dimensions = bounds_max - bounds_min
+
+        if 2 in dimensions:  # The front/back won't have this dimension
             # This must be a side of the brush.
             side.mat = nodraw_tex
         else:
@@ -587,10 +709,17 @@ def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
                 " ".join(uaxis[:3]) + " " +
                 # texture offset to fit properly
                 str(tex_width/size * -offset) + "] " +
-                str(size/tex_width) # scaling
+                str(size/tex_width)  # scaling
                 )
             # heightwise it's always the same
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
+
+
+def res_sub_condition(base_inst, res):
+    """Check a different condition if the outer block is true.
+
+    """
+    run_cond(base_inst, res.value)
 
 
 FLAG_LOOKUP = {
@@ -625,4 +754,5 @@ RESULT_LOOKUP = {
     "stylevar": res_set_style_var,
     "has": res_set_voice_attr,
     "setoption": res_set_option,
+    "condition": res_sub_condition,
     }

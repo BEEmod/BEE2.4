@@ -162,8 +162,9 @@ INST_FILE = {
     "indPanCheck":  "indicator_panel.vmf",
     "indPanTimer":  "indicator_panel.vmf",
 }
-for key, value in INST_FILE:
-    # Add the patth to all the default values
+
+for key, value in INST_FILE.items():
+    # Add the patt to all the default values
     INST_FILE[key] = 'instances/p2editor/' + value
 
 # angles needed to ensure fizzlers are not upside-down
@@ -186,6 +187,7 @@ TEX_FIZZLER = {
     "effects/fizzler_l": "left",
     "effects/fizzler_r": "right",
     "effects/fizzler": "short",
+    "tools/toolsnodraw": "nodraw",
     }
 
 FIZZ_OPTIONS = {
