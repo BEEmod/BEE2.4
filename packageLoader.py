@@ -99,7 +99,7 @@ def load_packages(pak_dir, load_res):
                             obj_id,
                             info_block,
                             )
-                        object_.add_over(override, zip_file)
+                        object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
         if load_res:
@@ -170,6 +170,7 @@ def parse_package(zip, info, pak_id, dispName):
         loader.length("RES", res_count)
     return objects
 
+
 def setup_style_tree(data):
     '''Modify all items so item inheritance is properly handled.
 
@@ -191,7 +192,7 @@ def setup_style_tree(data):
         base = []
         b_style = style
         while b_style is not None:
-            #Recursively find all the base styles for this one
+            # Recursively find all the base styles for this one
             base.append(b_style)
             b_style = all_styles.get(b_style.base_style, None)
             # Just append the style.base_style to the list,
@@ -230,7 +231,6 @@ def setup_style_tree(data):
 
 def parse_item_folder(folders, zip_file):
     for fold in folders:
-        files = zip_file.namelist()
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -248,29 +248,34 @@ def parse_item_folder(folders, zip_file):
 
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
-            'auth':     sep_values(props['authors', ''],','),
-            'tags':     sep_values(props['tags', ''],';'),
+            'auth':     sep_values(props['authors', ''], ','),
+            'tags':     sep_values(props['tags', ''], ';'),
             'desc':     list(desc_parse(props)),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
-            'icons':    {p.name:p.value for p in props['icon', []]},
+            'icons':    {p.name: p.value for p in props['icon', []]},
             'all_name': props['all_name', None],
             'all_icon': props['all_icon', None],
             'vbsp':     Property(None, []),
 
             # The first Item block found
-            'editor' : next(editor_iter),
+            'editor': next(editor_iter),
             # Any extra blocks (offset catchers, extent items)
             'editor_extra': list(editor_iter),
-           }
+        }
 
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
-        if (0 < ((folders[fold]['all_name'] is not None)
-                + (folders[fold]['all_icon'] is not None)
-                + ('all' in folders[fold]['icons']))
-                < 3):
-            print('Warning: "'  + prop_path + '" has incomplete grouping icon definition!')
+        num_group_parts = (
+            (folders[fold]['all_name'] is not None)
+            + (folders[fold]['all_icon'] is not None)
+            + ('all' in folders[fold]['icons'])
+        )
+        if 0 < num_group_parts < 3:
+            print(
+                'Warning: "{}" has incomplete grouping icon definition!'.format(
+                    prop_path)
+            )
 
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
@@ -282,7 +287,7 @@ def parse_item_folder(folders, zip_file):
 class Style:
     def __init__(
             self,
-            id,
+            style_id,
             name,
             author,
             desc,
@@ -293,7 +298,7 @@ class Style:
             short_name=None,
             suggested=None
             ):
-        self.id = id
+        self.id = style_id
         self.auth = author
         self.name = name
         self.desc = desc
@@ -349,7 +354,7 @@ class Style:
             suggested=sugg
             )
 
-    def add_over(self, override, zip_file):
+    def add_over(self, override):
         '''Add the additional commands to ourselves.'''
         self.editor.extend(override.editor)
         self.config.extend(override.config)
@@ -357,6 +362,7 @@ class Style:
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
+
 
 class Item:
     def __init__(self, item_id, versions, def_version):
@@ -404,7 +410,7 @@ class Item:
 
         return cls(item_id, versions, def_version)
 
-    def add_over(self, override, zip_file):
+    def add_over(self, override):
         '''Add the other item data to ourselves.'''
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
@@ -433,7 +439,7 @@ class Item:
 class QuotePack:
     def __init__(
             self,
-            id,
+            quote_id,
             name,
             config,
             icon,
@@ -441,7 +447,7 @@ class QuotePack:
             auth=None,
             short_name=None,
             ):
-        self.id = id
+        self.id = quote_id
         self.name = name
         self.icon = icon
         self.short_name = name if short_name is None else short_name
@@ -450,15 +456,15 @@ class QuotePack:
         self.config = config
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, quote_id, info):
         '''Parse a voice line definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         path = 'voice/' + info['file'] + '.voice'
-        with zip.open(path, 'r') as conf:
+        with zip_file.open(path, 'r') as conf:
             config = Property.parse(conf, path)
 
         return cls(
-            id,
+            quote_id,
             name,
             config,
             icon,
@@ -467,7 +473,7 @@ class QuotePack:
             short_name=short_name
             )
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         '''Add the additional lines to ourselves.'''
         pass
 
@@ -478,7 +484,7 @@ class QuotePack:
 class Skybox:
     def __init__(
             self,
-            id,
+            sky_id,
             name,
             ico,
             config,
@@ -487,7 +493,7 @@ class Skybox:
             desc,
             short_name=None,
             ):
-        self.id = id
+        self.id = sky_id
         self.short_name = name if short_name is None else short_name
         self.name = name
         self.icon = ico
@@ -502,7 +508,7 @@ class Skybox:
         config_dir = info['config', '']
         name, short_name, auth, icon, desc = get_selitem_data(info)
         mat = info['material', 'sky_black']
-        if config_dir == '': # No config at all
+        if config_dir == '':  # No config at all
             config = Property(None, [])
         else:
             path = 'skybox/' + name + '.cfg'
@@ -514,7 +520,7 @@ class Skybox:
                 config = Property(None, [])
         return cls(item_id, name, icon, config, mat, auth, desc, short_name)
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         '''Add the additional vbsp_config commands to ourselves.'''
         self.auth.extend(override.auth)
         self.config.extend(override.config)
@@ -522,10 +528,11 @@ class Skybox:
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
 
+
 class Goo:
     def __init__(
             self,
-            id,
+            goo_id,
             name,
             ico,
             mat,
@@ -535,7 +542,7 @@ class Goo:
             short_name=None,
             config=None,
             ):
-        self.id=id
+        self.id = goo_id
         self.short_name = name if short_name is None else short_name
         self.name = name
         self.icon = ico
@@ -546,22 +553,32 @@ class Goo:
         self.config = config or Property(None, [])
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, goo_id, info):
         '''Parse a goo definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         mat = info['material', 'nature/toxicslime_a2_bridge_intro']
         mat_cheap = info['material_cheap', mat]
 
         config_dir = 'goo/' + info['config', '']
-        if config_dir in zip.namelist():
-            with zip.open(config_dir, 'r') as conf:
+        if config_dir in zip_file.namelist():
+            with zip_file.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
             config = Property(None, [])
 
-        return cls(id, name, icon, mat, mat_cheap, auth, desc, short_name, config)
+        return cls(
+            goo_id,
+            name,
+            icon,
+            mat,
+            mat_cheap,
+            auth,
+            desc,
+            short_name,
+            config,
+        )
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         '''Add the additional vbsp_config commands to ourselves.'''
         self.config.extend(override.config)
         self.auth.extend(override.auth)
@@ -569,10 +586,11 @@ class Goo:
     def __repr__(self):
         return '<Goo ' + self.id + '>'
 
+
 class Music:
     def __init__(
             self,
-            id,
+            music_id,
             name,
             ico,
             auth,
@@ -582,7 +600,7 @@ class Music:
             inst=None,
             sound=None,
             ):
-        self.id = id
+        self.id = music_id
         self.short_name = name if short_name is None else short_name
         self.name = name
         self.icon = ico
@@ -593,20 +611,20 @@ class Music:
         self.config = config or Property(None, [])
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, music_id, info):
         '''Parse a music definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         inst = info['instance', None]
         sound = info['soundscript', None]
 
         config_dir = 'music/' + info['config', '']
-        if config_dir in zip.namelist():
-            with zip.open(config_dir, 'r') as conf:
+        if config_dir in zip_file.namelist():
+            with zip_file.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
             config = Property(None, [])
         return cls(
-            id,
+            music_id,
             name,
             icon,
             auth,
@@ -617,7 +635,7 @@ class Music:
             config=config,
             )
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         '''Add the additional vbsp_config commands to ourselves.'''
         self.config.extend(override.config)
         self.auth.extend(override.auth)
@@ -625,21 +643,22 @@ class Music:
     def __repr__(self):
         return '<Music ' + self.id + '>'
 
+
 class StyleVar:
-    def __init__(self, id, name, styles, default=False):
-        self.id = id
+    def __init__(self, var_id, name, styles, default=False):
+        self.id = var_id
         self.name = name
         self.styles = styles
         self.default = default
 
     @classmethod
-    def parse(cls, zip, id, info):
+    def parse(cls, zip_file, var_id, info):
         name = info['name']
         styles = [prop.value for prop in info.find_all('Style')]
         default = info['enabled', '0'] == '1'
-        return cls(id, name, styles, default)
+        return cls(var_id, name, styles, default)
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         self.styles.extend(override.styles)
 
     def __repr__(self):
@@ -700,7 +719,7 @@ class ElevatorVid:
             vert_video
         )
 
-    def add_over(self, override, zip):
+    def add_over(self, override):
         pass
 
     def __repr__(self):
@@ -730,16 +749,20 @@ def get_selitem_data(info):
     icon = info['icon', '_blank']
     return name, short_name, auth, icon, desc
 
-def sep_values(str, delimiter):
+
+def sep_values(string, delimiter):
     '''Split a string by a delimiter, and then strip whitespace.
 
     '''
-    if str == '':
+    if string == '':
         return []
     else:
-        vals = str.split(delimiter)
-        return [stripped for stripped in
-            (val.strip() for val in vals) if stripped]
+        vals = string.split(delimiter)
+        return [
+            stripped for stripped in
+            (val.strip() for val in vals)
+            if stripped
+        ]
 
 obj_types = {
     'Style':     Style,
