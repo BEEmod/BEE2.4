@@ -273,7 +273,7 @@ def load_settings():
     '''Load in all our settings from vbsp_config.'''
     global BEE2_config
     try:
-        with open("bee2/vbsp_config.cfg", "r") as config:
+        with open("bee2/vbsp_config.cfg") as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
     except FileNotFoundError:
         conf = Property(None, [])
@@ -349,9 +349,9 @@ def load_settings():
             settings['pit']['side'] = [""]
 
     if get_opt('BEE2_loc') != '':
-        BEE2_config = ConfigFile(get_opt('BEE2_loc'))
+        BEE2_config = ConfigFile('/config/compile.cfg', root=get_opt('BEE2_loc'))
     else:
-        BEE2_config = ConfigFile('')
+        BEE2_config = ConfigFile(None)
 
     utils.con_log("Settings Loaded!")
 
@@ -1038,6 +1038,7 @@ def change_ents():
             if 'panel_top' in out.target:
                 VMF.remove_ent(auto)
 
+
 def fix_inst():
     '''Fix some different bugs with instances, especially fizzler models.
 
@@ -1046,8 +1047,8 @@ def fix_inst():
     utils.con_log("Editing Instances...")
     for inst in VMF.iter_ents(classname='func_instance'):
         # Fizzler model names end with this special string
-        if ("_modelStart" in inst['targetname'] or
-                "_modelEnd" in inst['targetname']):
+        if ("_modelStart" in inst['targetname',''] or
+                "_modelEnd" in inst['targetname','']):
 
             # strip off the extra numbers on the end, so fizzler
             # models recieve inputs correctly (Valve bug!)
@@ -1068,7 +1069,7 @@ def fix_inst():
             if inst['angles'] in FIZZLER_ANGLE_FIX:
                 inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
-        elif "ccflag_comball_base" in inst['file']:  # Rexaura Flux Fields
+        elif "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
             # find the triggers that match this entity and mod them
             for trig in VMF.iter_ents(
                     classname='trigger_portal_cleanser',
@@ -1249,7 +1250,7 @@ def save():
     utils.con_log("Saving New Map...")
     os.makedirs(os.path.dirname(new_path), exist_ok=True)
     with open(new_path, 'w') as f:
-        VMF.export(file=f, inc_version=True)
+        VMF.export(dest_file=f, inc_version=True)
     utils.con_log("Complete!")
 
 

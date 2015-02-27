@@ -1,21 +1,26 @@
+import os.path
+
 from configparser import ConfigParser
 
 
 class ConfigFile(ConfigParser):
-    def __init__(self, filename):
+    def __init__(self, filename, root='config/'):
         '''Initialise the config file.
 
-        Filename is the name of the config file, in the config/ directory.
+        filename is the name of the config file, in the 'root' directory.
         This file will immediately be read and parsed.
         '''
         super().__init__()
-        self.filename = filename
+        self.filename = root+filename
         self.load()
         self.has_changed = False
 
     def load(self):
+        if self.filename is None:
+            return
+
         try:
-            with open('config/' + self.filename, 'r') as conf:
+            with open(self.filename, 'r') as conf:
                 self.read_file(conf)
         except FileNotFoundError:
             print('Config "' + self.filename + '" not found! Using defaults...')
@@ -24,8 +29,10 @@ class ConfigFile(ConfigParser):
 
     def save(self):
         '''Write our values out to disk.'''
+        if self.filename is None:
+            return
         self.has_changed = False
-        with open('config/' + self.filename, 'w') as conf:
+        with open(self.filename, 'w') as conf:
             self.write(conf)
 
     def save_check(self):

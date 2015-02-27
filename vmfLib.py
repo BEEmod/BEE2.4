@@ -1298,7 +1298,7 @@ class EntityFixup:
                     ):
                 # we end up with (key, val, index) and we want to sort
                 # by the index
-                buffer.write(ind + '\t"replace{}" "${}"\n'.format(
+                buffer.write(ind + '\t"replace{}" "${} {}"\n'.format(
                     index, key, value))
 
 

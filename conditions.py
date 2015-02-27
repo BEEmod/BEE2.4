@@ -18,7 +18,17 @@ class Condition:
         self.results = results or []
         self.else_results = else_results or []
         self.priority = priority
-        self.valid = len(results) > 0  # is it valid?
+        self.valid = len(self.results) > 0  # is it valid?
+
+    def __repr__(self):
+        return ('Condition(flags={!r}, '
+                'results={!r}, else_results={!r},'
+                'priority={!r}'.format(
+            self.flags,
+            self.results,
+            self.else_results,
+            self.priority,
+        ))
 
     @classmethod
     def parse(cls, prop_block):
@@ -94,7 +104,7 @@ class Condition:
 
 def add(prop_block):
     '''Add a condition to the list.'''
-    con = Condition(prop_block)
+    con = Condition.parse(prop_block)
     if con.valid:
         conditions.append(con)
 
@@ -126,8 +136,10 @@ def check_all():
         if condition.valid:
             for inst in VMF.iter_ents(classname='func_instance'):
                 run_cond(inst, condition)
-                if len(condition['results']) == 0:
+                utils.con_log('-------------------')
+                if len(condition.results) == 0:
                     break
+
     remove_blank_inst()
 
     utils.con_log('Map has attributes: ', [
@@ -162,18 +174,20 @@ def setup_cond():
         cond.setup_res()
 
 
-def run_cond(inst, cond):
+def run_cond(inst, cond, remove_vmf=True):
     '''Try to satisfy this condition on the given instance.'''
     if not cond.valid:
         return
     success = True
-    for flag in cond['flags']:
+    for flag in cond.flags:
+        utils.con_log('Flag: ' + repr(flag))
         if not check_flag(flag, inst):
             success = False
             break
-
-    # our suffixes won't touch the .vmf extension
-    inst['file'] = inst['file', ''][:-4]
+        utils.con_log(success)
+    if remove_vmf:
+        # our suffixes won't touch the .vmf extension
+        inst['file'] = inst['file', ''][:-4]
 
     results = cond.results if success else cond.else_results
     for res in results:
@@ -184,7 +198,7 @@ def run_cond(inst, cond):
         else:
             func(inst, res)
 
-    if not inst['file'].endswith('vmf'):
+    if remove_vmf and not inst['file'].endswith('vmf'):
         inst['file'] += '.vmf'
 
 
@@ -645,7 +659,7 @@ def res_cust_fizzler(base_inst, res):
                             new_brush,
                             laser_tex,
                             nodraw_tex,
-                            tex_width
+                            tex_width,
                         )
                 else:
                     # Just change the textures
@@ -719,7 +733,7 @@ def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true.
 
     """
-    run_cond(base_inst, res.value)
+    run_cond(base_inst, res.value, remove_vmf=False)
 
 
 FLAG_LOOKUP = {

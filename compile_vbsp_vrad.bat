@@ -1,1 +1,0 @@
-python compile_vbsp_vrad.py build
