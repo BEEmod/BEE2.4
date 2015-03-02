@@ -7,7 +7,7 @@ import shutil
 from zipfile import ZipFile
 
 
-from property_parser import Property
+from property_parser import Property, NoKeyError
 import loadScreen as loader
 import utils
 
@@ -31,6 +31,27 @@ data = {}
 res_count = -1
 
 
+def reraise_keyerror(err, obj_id):
+    '''Replace NoKeyErrors with a nicer one, giving the item that failed.
+    '''
+    if isinstance(err, IndexError):
+        if isinstance(err.__cause__, NoKeyError):
+            # Property.__getitem__ raises IndexError from
+            # NoKeyError, so read from the original
+            key_error = err.__cause__
+        else:
+            # We shouldn't have caught this
+            raise err
+    else:
+        key_error = err
+    raise Exception(
+        'No "{key}" in {id!s} object!'.format(
+            key=key_error.key,
+            id=obj_id,
+        )
+    ) from err
+
+
 def load_packages(pak_dir, load_res):
     '''Scan and read in all packages in the specified directory.'''
     global res_count
@@ -44,16 +65,16 @@ def load_packages(pak_dir, load_res):
     else:
         loader.skip_stage("RES")
 
-    zips=[]
+    zips = []
     try:
         for name in contents:
-            print('Reading package file "'+name+'"')
+            print('Reading package file "' + name + '"')
             name = os.path.join(pak_dir, name)
             if name.endswith('.zip') and not os.path.isdir(name):
-                zip_file = ZipFile(name, 'r')
+                zip_file = ZipFile(name)
                 zips.append(zip_file)
                 if 'info.txt' in zip_file.namelist():  # Is it valid?
-                    with zip_file.open('info.txt', 'r') as info_file:
+                    with zip_file.open('info.txt') as info_file:
                         info = Property.parse(info_file, name + ':info.txt')
                     pak_id = info['ID']
                     disp_name = info['Name', pak_id]
@@ -69,7 +90,7 @@ def load_packages(pak_dir, load_res):
         objects = 0
         for pak_id, zip_file, info, name, dispName in packages.values():
             print("Scanning package '" + pak_id + "'")
-            new_objs= parse_package(zip_file, info, pak_id, dispName)
+            new_objs = parse_package(zip_file, info, pak_id, dispName)
             objects += new_objs
             loader.step("PAK")
             print("Done!")
@@ -85,11 +106,15 @@ def load_packages(pak_dir, load_res):
             for obj_id, obj_data in objs.items():
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
                 # parse through the object and return the resultant class
-                object_ = obj_types[obj_type].parse(
-                    obj_data[0],
-                    obj_id,
-                    obj_data[1],
-                    )
+                try:
+                    object_ = obj_types[obj_type].parse(
+                        obj_data[0],
+                        obj_id,
+                        obj_data[1],
+                        )
+                except (NoKeyError, IndexError) as e:
+                    reraise_keyerror(e, obj_id)
+
                 object_.pak_id = obj_data[2]
                 object_.pak_name = obj_data[3]
                 if obj_id in obj_override[obj_type]:
@@ -121,16 +146,21 @@ def load_packages(pak_dir, load_res):
                 shutil.move("cache/resources/instances", "inst_cache/")
             for file_type in ("materials", "models", "sounds", "scripts"):
                 if os.path.isdir("cache/resources/" + file_type):
-                    shutil.move("cache/resources/" + file_type, "source_cache/" +file_type)
+                    shutil.move(
+                        "cache/resources/" + file_type,
+                        "source_cache/" + file_type,
+                    )
 
             shutil.rmtree('cache/', ignore_errors=True)
             print('Done!')
 
     finally:
-        for z in zips: # close them all, we've already read the contents.
+        # close them all, we've already read the contents.
+        for z in zips:
             z.close()
-    setup_style_tree(data)
+    setup_style_tree(data['Item'], data['Style'])
     return data
+
 
 def parse_package(zip, info, pak_id, dispName):
     "Parse through the given package to find all the components."
@@ -156,7 +186,7 @@ def parse_package(zip, info, pak_id, dispName):
                 if obj_id in obj_override[comp_type]:
                     obj_override[comp_type][obj_id].append((zip, obj))
                 else:
-                    obj_override[comp_type][obj_id] = [(zip,obj)]
+                    obj_override[comp_type][obj_id] = [(zip, obj)]
             else:
                 if obj_id in all_obj[comp_type]:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
@@ -171,7 +201,7 @@ def parse_package(zip, info, pak_id, dispName):
     return objects
 
 
-def setup_style_tree(data):
+def setup_style_tree(item_data, style_data):
     '''Modify all items so item inheritance is properly handled.
 
     This will guarantee that all items have a definition for each
@@ -185,7 +215,7 @@ def setup_style_tree(data):
     '''
     all_styles = {}
 
-    for style in data['Style']:
+    for style in style_data:
         all_styles[style.id] = style
 
     for style in all_styles.values():
@@ -204,7 +234,7 @@ def setup_style_tree(data):
 
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
-    for item in data['Item']:
+    for item in item_data:
         all_ver = list(item.versions.values())
         # Move default version to the beginning, so it's read first
         all_ver.remove(item.def_ver)
@@ -212,7 +242,7 @@ def setup_style_tree(data):
         for vers in all_ver:
             for sty_id, style in all_styles.items():
                 if sty_id in vers['styles']:
-                    continue # We already have a definition
+                    continue  # We already have a definition
                 for base_style in style.bases:
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
@@ -236,7 +266,9 @@ def parse_item_folder(folders, zip_file):
         config_path = 'items/' + fold + '/vbsp_config.cfg'
         try:
             with zip_file.open(prop_path, 'r') as prop_file:
-                props = Property.parse(prop_file, prop_path).find_key('Properties')
+                props = Property.parse(
+                    prop_file, prop_path,
+                ).find_key('Properties')
             with zip_file.open(editor_path, 'r') as editor_file:
                 editor = Property.parse(editor_file, editor_path)
         except KeyError as err:
@@ -652,7 +684,7 @@ class StyleVar:
         self.default = default
 
     @classmethod
-    def parse(cls, zip_file, var_id, info):
+    def parse(cls, _, var_id, info):
         name = info['name']
         styles = [prop.value for prop in info.find_all('Style')]
         default = info['enabled', '0'] == '1'
@@ -698,7 +730,7 @@ class ElevatorVid:
             self.vert_video = vert_video
 
     @classmethod
-    def parse(cls, zip_file, elev_id, info):
+    def parse(cls, _, elev_id, info):
         name, short_name, auth, icon, desc = get_selitem_data(info)
 
         if 'vert_video' in info:

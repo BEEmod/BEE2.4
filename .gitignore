@@ -57,6 +57,9 @@ packages/
 # The auto-generated palette
 palettes/LAST_EXPORT.zip
 
+# Error file
+BEE2-error.log
+
 # Ignore dev output
 test_out.vmf
 preview_styled.vmf
@@ -66,7 +69,7 @@ images/cache/
 inst_cache/
 source_cache/
 
-# The config files automaticall regenerate with the defaults.
+# The config files automatically regenerate with the defaults.
 config/item_configs.cfg
 config/config.cfg
 config/games.cfg
