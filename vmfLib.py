@@ -1,5 +1,6 @@
 ''' VMF Library
-Wraps property_parser tree in a set of classes which smartly handle specifics of VMF files.
+Wraps property_parser tree in a set of classes which smartly handle
+specifics of VMF files.
 '''
 import io
 
@@ -215,7 +216,7 @@ class VMF:
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
 
 
-        map_obj = VMF(map_info = map_info)
+        map_obj = VMF(map_info=map_info)
 
         for c in cam_props:
             if c.name != 'activecamera':
@@ -290,7 +291,6 @@ class VMF:
                         str(self.grid_spacing) + '"\n')
         dest_file.write('\t"bShow3DGrid" "' +
                         utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
-
 
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(dest_file, ent_name='world')
@@ -409,17 +409,18 @@ class VMF:
                         if out.target == name:  # target
                             yield out
 
+
 class Camera:
-    def __init__(self, map, pos, targ):
+    def __init__(self, vmf_file, pos, targ):
         self.pos = pos
         self.target = targ
-        self.map = map
-        map.cameras.append(self)
+        self.map = vmf_file
+        vmf_file.cameras.append(self)
 
     def targ_ent(self, ent):
         '''Point the camera at an entity.'''
         if ent['origin']:
-            self.target = Vec.from_str(ent['origin'], 0, 0, 0)
+            self.target = Vec.from_str(ent['origin'])
 
     def is_active(self):
         '''Is this camera in use?'''
@@ -434,11 +435,11 @@ class Camera:
         self.map.active_cam = -1
 
     @staticmethod
-    def parse(map, tree):
+    def parse(vmf_file, tree):
         '''Read a camera from a property_parser tree.'''
-        pos = Vec.from_str(tree.find_key('position', '_').value, 0, 0, 0)
-        targ = Vec.from_str(tree.find_key('look', '_').value, 0, 64, 0)
-        return Camera(map, pos, targ)
+        pos = Vec.from_str(tree.find_key('position', '_').value)
+        targ = Vec.from_str(tree.find_key('look', '_').value, y=64)
+        return Camera(vmf_file, pos, targ)
 
     def copy(self):
         '''Duplicate this camera object.'''
@@ -457,24 +458,25 @@ class Camera:
         buffer.write(ind + '\t"look" "[' + self.target.join(' ') + ']"\n')
         buffer.write(ind + '}\n')
 
+
 class Cordon:
     '''Represents one cordon volume.'''
-    def __init__(self, map, min_, max_, is_active=True, name='Cordon'):
-        self.map = map
+    def __init__(self, vmf_file, min_, max_, is_active=True, name='Cordon'):
+        self.map = vmf_file
         self.name = name
         self.bounds_min = min_
         self.bounds_max = max_
         self.active = is_active
-        map.cordons.append(self)
+        vmf_file.cordons.append(self)
 
     @staticmethod
-    def parse(map, tree):
+    def parse(vmf_file, tree):
         name = tree['name', 'cordon']
         is_active = conv_bool(tree['active', '0'], False)
         bounds = tree.find_key('box', [])
         min_ = Vec.from_str(bounds['mins', '(0 0 0)'])
         max_ = Vec.from_str(bounds['maxs', '(128 128 128)'], 128, 128, 128)
-        return Cordon(map, min_, max_, is_active, name)
+        return Cordon(vmf_file, min_, max_, is_active, name)
 
     def export(self, buffer, ind=''):
         buffer.write(ind + 'cordon\n')
@@ -680,7 +682,7 @@ class Side:
 
     def __init__(
             self,
-            VMF,
+            vmf_file,
             planes=[
                 (0, 0, 0),
                 (0, 0, 0),
@@ -690,9 +692,9 @@ class Side:
             des_id=-1,
             disp_data={},
             ):
-        self.map = VMF
+        self.map = vmf_file
         self.planes = [Vec(), Vec(), Vec()]
-        self.id = VMF.get_face_id(des_id)
+        self.id = vmf_file.get_face_id(des_id)
         for i, pln in enumerate(planes):
             self.planes[i] = Vec(x=pln[0], y=pln[1], z=pln[2])
         self.lightmap = opt.get("lightmap", 16)
@@ -932,7 +934,7 @@ class Entity:
     def copy(self, des_id=-1):
         '''Duplicate this entity entirely, including solids and outputs.'''
         new_keys = {}
-        new_fixup = self.fixup._fixup.copy()
+        new_fixup = self.fixup.copy_dict()
         new_editor = {}
         for key, value in self.keys.items():
             new_keys[key] = value
@@ -956,7 +958,7 @@ class Entity:
             hidden=self.hidden)
 
     @staticmethod
-    def parse(map, tree_list, hidden=False):
+    def parse(vmf_file, tree_list, hidden=False):
         '''Parse a property tree into an Entity object.'''
         ent_id = -1
         solids = []
@@ -976,7 +978,7 @@ class Entity:
                 fixup[var.casefold()] = (var, value, index)
             elif name == "solid":
                 if item.has_children():
-                    solids.append(Solid.parse(map, item))
+                    solids.append(Solid.parse(vmf_file, item))
                 else:
                     keys[item.name] = item.value
             elif name == "connections" and item.has_children():
@@ -985,7 +987,7 @@ class Entity:
             elif name == "hidden":
                 if item.has_children():
                     solids.extend(
-                        Solid.parse(map, br, hidden=True)
+                        Solid.parse(vmf_file, br, hidden=True)
                         for br in
                         item
                     )
@@ -1017,7 +1019,7 @@ class Entity:
                 keys[item.name] = item.value
 
         return Entity(
-            map,
+            vmf_file,
             keys=keys,
             ent_id=ent_id,
             solids=solids,
@@ -1136,10 +1138,13 @@ class Entity:
     def __getitem__(self, key, default=None):
         '''Allow using [] syntax to search for keyvalues.
 
-        - This will return None instead of KeyError if the value is not found.
-        - It ignores case-matching, but will use the first given version of a key.
+        - This will return None instead of KeyError if the value is not
+          found.
+        - It ignores case-matching, but will use the first given version
+          of a key.
         - If used via Entity.get() the default argument is available.
-        - A tuple can be passed for the default to be set, inside the [] syntax.
+        - A tuple can be passed for the default to be set, inside the
+          [] syntax.
         '''
         if isinstance(key, tuple):
             default = key[1]
@@ -1235,6 +1240,9 @@ class EntityFixup:
             return self._fixup[folded_var][1]  # don't return the index
         else:
             return default
+
+    def copy_dict(self):
+        return self._fixup.copy()
 
     def __contains__(self, var: str):
         '''Determine if this instance has the named $replace variable.'''

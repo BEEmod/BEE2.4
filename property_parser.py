@@ -284,7 +284,14 @@ class Property:
         '''Deep copy this Property tree and return it.'''
         if self.has_children():
             # This recurses if needed
-            return Property(self.real_name, [child.copy() for child in self.value])
+            return Property(
+                self.real_name,
+                [
+                    child.copy()
+                    for child in
+                    self.value
+                ]
+            )
         else:
             return Property(self.real_name, self.value)
 
@@ -299,7 +306,9 @@ class Property:
             return self.value
 
     def make_invalid(self):
-        '''Soft delete this property tree, so it does not appear in any output.'''
+        '''Soft delete this property tree, so it does not appear in any output.
+
+        '''
         self.valid = False
         self.value = None # Dump this if it exists
         self.name = None
@@ -312,14 +321,16 @@ class Property:
             return self.value == other # Just compare values
 
     def __ne__(self, other):
-        "Not-Equal To comparison. This ignores names."
+        '''Not-Equal To comparison. This ignores names.
+        '''
         if isinstance(other, Property):
             return self.value != other.value
         else:
             return self.value != other # Just compare values
 
     def __lt__(self, other):
-        "Less-Than comparison. This ignores names."
+        '''Less-Than comparison. This ignores names.
+        '''
         if isinstance(other, Property):
             return self.value < other.value
         else:
@@ -361,7 +372,9 @@ class Property:
             return 0
 
     def __iter__(self):
-        '''Iterate through the value list, or loop once through the single value.'''
+        '''Iterate through the value list, or loop once through the single value.
+
+        '''
         if self.has_children():
             yield from self.value
         else:

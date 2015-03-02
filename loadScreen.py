@@ -1,7 +1,7 @@
 '''Displays a loading menu while packages, palettes, etc are being loaded.'''
-from tkinter import * # ui library
+from tkinter import *  # ui library
 from tk_root import TK_ROOT
-from tkinter import ttk # themed ui components that match the OS
+from tkinter import ttk  # themed ui components that match the OS
 
 STAGES = [
     ('PAK', 'Packages'),
@@ -41,10 +41,10 @@ ttk.Separator(
     orient=HORIZONTAL,
     ).grid(row=1, sticky="EW", columnspan=2)
 
-for ind, (st_id, stage) in enumerate(STAGES):
+for ind, (st_id, stage_name) in enumerate(STAGES):
     ttk.Label(
         win,
-        text=stage + ':',
+        text=stage_name + ':',
         ).grid(
             row=ind*2+2,
             columnspan=2,
@@ -69,6 +69,7 @@ loc_x = (win.winfo_screenwidth()-win.winfo_reqwidth())//2
 loc_y = (win.winfo_screenheight()-win.winfo_reqheight())//2
 win.geometry('+' + str(loc_x) + '+' + str(loc_y))
 win.update()
+
 
 def length(stage, num):
     if active:

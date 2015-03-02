@@ -164,7 +164,7 @@ INST_FILE = {
 }
 
 for key, value in INST_FILE.items():
-    # Add the patt to all the default values
+    # Add the path to all the default values
     INST_FILE[key] = 'instances/p2editor/' + value
 
 # angles needed to ensure fizzlers are not upside-down
@@ -179,7 +179,7 @@ FIZZLER_ANGLE_FIX = {
     "90 180 0":   "-90 0 0",
     "90 -90 0":   "-90 90 0",
     "-90 180 0":  "90 0 0",
-    "-90 -90 0":  "90 90 0"
+    "-90 -90 0":  "90 90 0",
     }
 
 TEX_FIZZLER = {
@@ -215,7 +215,9 @@ BEE2_config = None
 # instance twice.
 global_instances = []
 
-###### UTIL functions #####
+##################
+# UTIL functions #
+##################
 
 
 def get_opt(name):
@@ -349,7 +351,10 @@ def load_settings():
             settings['pit']['side'] = [""]
 
     if get_opt('BEE2_loc') != '':
-        BEE2_config = ConfigFile('/config/compile.cfg', root=get_opt('BEE2_loc'))
+        BEE2_config = ConfigFile(
+            '/config/compile.cfg',
+            root=get_opt('BEE2_loc'),
+        )
     else:
         BEE2_config = ConfigFile(None)
 
@@ -445,6 +450,7 @@ def get_map_info():
     utils.con_log("Is Preview: " + str(is_preview))
 
     return is_preview, game_mode, voice_timer_pos, inst_files
+
 
 def process_packer(f_list):
     "Read packer commands from settings."
@@ -647,6 +653,7 @@ def face_seed(face):
             origin[axis] = origin[axis] // 128 + 64
     return origin.join()
 
+
 def random_walls():
     '''The original wall style, with completely randomised walls.'''
     scale_walls = get_opt("random_blackwall_scale") == "1"
@@ -661,7 +668,7 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(("0.25", "0.5", "1"))
-                split=face.uaxis.split(" ")
+                split = face.uaxis.split(" ")
                 split[-1] = scale
                 face.uaxis = " ".join(split)
 
@@ -672,11 +679,15 @@ def random_walls():
 
 
 def clump_walls():
-    '''A wall style where textures are used in small groups near each other, clumped together.
+    '''A wall style where textures are used in small groups near each other.
 
+    This replicates the Old Aperture maps, which are cobbled together
+    from many different materials.
     '''
     walls = {}
-    others = {}  # we keep a list for the others, so we can nodraw them if needed
+
+    # we keep a list for the others, so we can nodraw them if needed
+    others = {}
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
@@ -703,7 +714,7 @@ def clump_walls():
                     # The only time two textures will be in the same
                     # place is if they are covering each other -
                     # nodraw them both and ignore them
-                    face.mat  = "tools/toolsnodraw"
+                    face.mat = "tools/toolsnodraw"
                     walls[origin].mat = "tools/toolsnodraw"
                     del walls[origin]
                 else:
@@ -726,7 +737,7 @@ def clump_walls():
     clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
     wall_pos = sorted(list(walls.keys()))
     random.seed(map_seed)
-    for i in range(clump_numb):
+    for _ in range(clump_numb):
         pos = random.choice(wall_pos)
         wall_type = walls[pos].mat
         state = random.getstate()  # keep using the map_seed for the clumps
@@ -735,7 +746,7 @@ def clump_walls():
             pos_min = [0, 0, 0]
             pos_max = [0, 0, 0]
             # these are long strips extended in one direction
-            direction = random.randint(0,2)
+            direction = random.randint(0, 2)
             for i in range(3):
                 if i == direction:
                     pos_min[i] = int(
@@ -850,7 +861,7 @@ def change_overlays():
             set_antline_mat(over, new_tex)
 
         if (over['targetname'] == 'exitdoor_stickman' or
-             over['tagetnamme'] == 'exitdoor_arrow'):
+                over['tagetnamme'] == 'exitdoor_arrow'):
             if get_opt("remove_exit_signs") == "1":
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
@@ -884,11 +895,11 @@ def add_extra_ents(mode):
     if sound != '':
         VMF.add_ent(VLib.Entity(VMF, keys={
             'classname': 'ambient_generic',
-            'spawnflags': '17', # Looping, Infinite Range, Starts Silent
+            'spawnflags': '17',  # Looping, Infinite Range, Starts Silent
             'targetname': '@music',
             'origin': loc,
             'message': sound,
-            'health': '10', # Volume
+            'health': '10',  # Volume
             }))
 
     if inst != '':
@@ -917,6 +928,7 @@ def add_extra_ents(mode):
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
         VMF.add_ent(global_pti_ents)
+
 
 def change_func_brush():
     "Edit func_brushes."
@@ -959,7 +971,7 @@ def change_func_brush():
             inst['file'] = grating_inst
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
-            targ='-'.join(parent.split("-")[:-1])
+            targ = '-'.join(parent.split("-")[:-1])
             for ins in VMF.iter_ents(
                     classname='func_instance',
                     targetname=targ,
@@ -974,7 +986,7 @@ def change_func_brush():
                         )
 
 
-def make_static_pan(ent, type):
+def make_static_pan(ent, pan_type):
     '''Convert a regular panel into a static version
 
     This is done to save entities and improve lighting.'''
@@ -990,7 +1002,7 @@ def make_static_pan(ent, type):
     if ent.fixup['connectioncount', '0'] != "0":
         return False
     # something like "static_pan/45_white.vmf"
-    ent["file"] = get_opt("staticPan") + angle + "_" + type + ".vmf"
+    ent["file"] = get_opt("staticPan") + angle + "_" + pan_type + ".vmf"
     return True
 
 
@@ -1047,8 +1059,8 @@ def fix_inst():
     utils.con_log("Editing Instances...")
     for inst in VMF.iter_ents(classname='func_instance'):
         # Fizzler model names end with this special string
-        if ("_modelStart" in inst['targetname',''] or
-                "_modelEnd" in inst['targetname','']):
+        if ("_modelStart" in inst['targetname', ''] or
+                "_modelEnd" in inst['targetname', '']):
 
             # strip off the extra numbers on the end, so fizzler
             # models recieve inputs correctly (Valve bug!)
@@ -1141,7 +1153,7 @@ def hammer_pack_scan():
 
     '''
     global to_pack
-    to_pack=[] # We aren't using the ones found in vbsp_config
+    to_pack = []  # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
     for ent in VMF.entities:
         com = ent.editor.get('comments', '')
@@ -1183,7 +1195,7 @@ def make_packlist(vmf_path):
                 item = os.path.join(os.getcwd(), "pack_lists", item[6:])
                 print('Opening "' + item + '"!')
                 if os.path.isfile(item):
-                    with open(item, 'r') as lst:
+                    with open(item) as lst:
                         for line in lst:
                             # get rid of carriage returns etc
                             line = line.strip()
@@ -1302,8 +1314,10 @@ def run_vbsp(vbsp_args, do_swap):
                     path.replace(".vmf", ext),
                 )
 
-# Main program code
-if __name__ == '__main__':
+
+def main():
+    '''Main program code.'''
+    global path, new_path, root, map_seed, to_pack, IS_PREVIEW, GAME_MODE
     utils.con_log("BEE2 VBSP hook initiallised.")
 
     to_pack = []  # the file path for any items that we should be packing
@@ -1402,3 +1416,7 @@ if __name__ == '__main__':
         make_packlist(path)  # VRAD will access the original BSP location
 
     utils.con_log("BEE2 VBSP hook finished!")
+
+
+if __name__ == '__main__':
+    main()
