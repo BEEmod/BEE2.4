@@ -124,7 +124,7 @@ class Item:
     def load_data(self):
         '''Load data from the item.'''
         version = self.item.versions[self.selected_ver]
-        self.data=version['styles'].get(
+        self.data = version['styles'].get(
             selected_style,
             self.def_data,
             )
@@ -287,8 +287,17 @@ class PalItem(Label):
         self.bind("<Button-3>", contextWin.open_event)
         self.bind("<Button-1>", drag_start)
         self.bind("<Shift-Button-1>", drag_fast)
-        self.bind("<Enter>", func_partial(set_disp_name, self))
-        self.bind("<Leave>", clear_disp_name)
+        self.bind("<Enter>", self.rollover)
+        self.bind("<Leave>", self.rollout)
+
+    def rollover(self, _):
+        set_disp_name(self)
+        self.lift()
+        self['relief'] = 'ridge'
+
+    def rollout(self, _):
+        clear_disp_name()
+        self['relief'] = 'flat'
 
     def change_subtype(self, ind):
         '''Change the subtype of this icon.
