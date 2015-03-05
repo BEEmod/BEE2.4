@@ -3,6 +3,7 @@ Wraps property_parser tree in a set of classes which smartly handle
 specifics of VMF files.
 '''
 import io
+from collections import defaultdict
 
 from property_parser import Property
 from utils import Vec
@@ -94,11 +95,28 @@ def find_empty_id(used_id, desired=-1):
                 return poss_id
 
 
+class CopySet(set):
+    '''Modified version of a Set which allows modification during iteration.
+
+    '''
+    __slots__ = [] # No extra vars
+
+    def __iter__(self):
+        cur_items = set(self)
+
+        yield from cur_items
+        # after iterating through ourselves, iterate through any new ents.
+        yield from (self - cur_items)
+
+
 class VMF:
     '''Represents a VMF file, and holds counters for various IDs used.
 
     Has functions for searching for specific entities or brushes, and
     converts to/from a property_parser tree.
+
+    The dictionaries by_target and by_class allow quickly getting a set
+    of entities with the given class or targetname.
     '''
     def __init__(
             self,
@@ -110,15 +128,24 @@ class VMF:
             cordons=None,
             visgroups=None):
         self.solid_id = []  # All occupied solid ids
-        self.face_id = []
-        self.ent_id = []
-        self.entities = [] if entities is None else entities
-        self.brushes = [] if brushes is None else brushes
-        self.cameras = [] if cameras is None else cameras
-        self.cordons = [] if cordons is None else cordons
-        self.visgroups = [] if visgroups is None else visgroups
+        self.face_id = []  # Ditto for faces
+        self.ent_id = []  # Same for entities
 
-        self.spawn = Entity(self, []) if spawn is None else spawn
+        # Allow quick searching for particular groups, without checking
+        # the whole map
+        self.by_target = defaultdict(CopySet)
+        self.by_class = defaultdict(CopySet)
+
+        self.entities = []
+        self.add_ents(entities or [])  # need to set the by_ dicts too.
+        self.brushes = brushes or []
+        self.cameras = cameras or []
+        self.cordons = cordons or []
+        self.visgroups = visgroups or []
+
+        # mapspawn entity, which is the entity world brushes are saved
+        # to.
+        self.spawn = spawn or Entity(self, [])
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
 
@@ -126,7 +153,7 @@ class VMF:
         self.cordon_enabled = conv_bool(map_info.get('cordons_on'), False)
         self.map_ver = conv_int(map_info.get('mapversion'))
         if 'mapversion' in self.spawn:
-            # This is saved only in the main VMF object.
+            # This is saved only in the main VMF object, delete the copy.
             del self.spawn['mapversion']
 
         # These three are mostly useless for us, but we'll preserve them anyway
@@ -146,17 +173,29 @@ class VMF:
         self.active_cam = conv_int(map_info.get('active_cam'), -1)
         self.quickhide_count = conv_int(map_info.get('quickhide'), -1)
 
+
     def add_brush(self, item):
+        '''Add a world brush to this map.'''
         self.brushes.append(item)
 
     def remove_brush(self, item):
+        '''Remove a world brush from this map.'''
         self.brushes.remove(item)
 
     def add_ent(self, item):
         self.entities.append(item)
+        self.by_class[item['classname', None]].add(item)
+        self.by_target[item['targetname', None]].add(item)
 
     def remove_ent(self, item):
+        '''Remove an entity from the map.
+
+        After this is called, the entity will no longer by exported.
+        The object still exists, so it can be reused.
+        '''
         self.entities.remove(item)
+        self.by_class[item['classname', None]].remove(item)
+        self.by_target[item['targetname', None]].remove(item)
 
     def add_brushes(self, item):
         for i in item:
@@ -167,7 +206,11 @@ class VMF:
             self.add_ent(i)
 
     def create_ent(self, **kargs):
-        '''Quick method to allow creating point entities.'''
+        '''Quick method to allow creating point entities.
+
+        This constructs an entity, adds it to the map, and then returns
+        it.
+        '''
         ent = Entity(self, keys=kargs)
         self.add_ent(ent)
         return ent
@@ -225,18 +268,18 @@ class VMF:
         for ent in cordons.find_all('cordon'):
             Cordon.parse(map_obj, ent)
 
-        map_obj.entities = [
+        map_obj.add_ents(
             Entity.parse(map_obj, ent, hidden=False)
             for ent in
             tree.find_all('Entity')
-        ]
+        )
         # find hidden entities
         for hidden_ent in tree.find_all('hidden'):
-            map_obj.entities.extend([
+            map_obj.add_ents(
                 Entity.parse(map_obj, ent, hidden=True)
                 for ent in
                 hidden_ent
-            ])
+            )
 
         map_spawn = tree.find_key('world', [])
         if map_spawn is None:
@@ -522,9 +565,9 @@ class Solid:
             hidden=False,
             ):
         self.map = vmf_file
-        self.sides = [] if sides is None else sides
+        self.sides = sides or []
         self.id = vmf_file.get_brush_id(des_id)
-        self.editor = {} if editor is None else editor
+        self.editor = editor or {}
         self.hidden = hidden
 
     def copy(self, des_id=-1):
@@ -914,13 +957,13 @@ class Entity:
             editor=None,
             hidden=False):
         self.map = vmf_file
-        self.keys = {} if keys is None else keys
-        self.fixup = EntityFixup({} if fixup is None else fixup)
-        self.outputs = [] if outputs is None else outputs
-        self.solids = [] if solids is None else solids
+        self.keys = keys or {}
+        self.fixup = EntityFixup(fixup or {})
+        self.outputs = outputs or []
+        self.solids = solids or []
         self.id = vmf_file.get_ent_id(ent_id)
         self.hidden = hidden
-        self.editor = {'visgroup': []} if editor is None else editor
+        self.editor = editor or {'visgroup': []}
 
         if 'logicalpos' not in self.editor:
             self.editor['logicalpos'] = '[0 ' + str(self.id) + ']'
@@ -1452,7 +1495,7 @@ if __name__ == '__main__':
     # Test the VMF parser by duplicating a test file
     print('parsing...')
     map_file = VMF.parse('test.vmf')
-    print(len(map_file.face_id))
+
     print('saving...')
 
     with open('test_out.vmf', 'w') as test_file:
