@@ -412,7 +412,7 @@ def get_map_info():
     FILE_SP_EXIT_CORR = INST_FILE['spExitCorr']
     FILE_OBS = INST_FILE['largeObs']
     FILE_COOP_ENTRY = INST_FILE['coopEntry']
-    for item in VMF.iter_ents(classname='func_instance'):
+    for item in VMF.by_class['func_instance']:
         file = item['file']
         if file == FILE_COOP_EXIT:
             game_mode = 'COOP'
@@ -466,13 +466,12 @@ def calc_rand_seed():
 
      This ensures textures remain the same when the map is recompiled.
     '''
+    amb_light = INST_FILE['ambLight']
     lst = [
         inst['targetname']
         for inst in
-        VMF.iter_ents(
-            classname='func_instance',
-            file=INST_FILE['ambLight'],
-            )
+        VMF.by_class['func_instance']
+        if inst['file'] == amb_light
         ]
     if len(lst) == 0:
         # Very small maps won't have any ambient light entities at all.
@@ -514,32 +513,33 @@ def make_bottomless_pit(solids):
     if teleport:
         # transform the skybox physics triggers into teleports to move cubes
             # into the skybox zone
-        for trig in VMF.iter_ents(classname='trigger_multiple', wait='0.1'):
-            bbox_min, bbox_max = trig.get_bbox()
-            origin = (bbox_min + bbox_max)/2
-            # We only modify triggers which are below the given z-index
-            if origin.z < pit_height:
-                trig['classname'] = 'trigger_teleport'
-                trig['spawnflags'] = '4106'  # Physics and npcs
-                trig['landmark'] = tele_ref
-                trig['target'] = tele_dest
-                trig.outputs.clear()
-                print('box:', trig.get_bbox())
-                for x in range(int(bbox_min.x), int(bbox_max.x), 128):
-                    for y in range(int(bbox_min.y), int(bbox_max.y), 128):
-                        # Remove the pillar from the center of the item
-                        edges[x, y] = None
-                        for i, xoff, yoff, angle in dirs:
-                            side = edges[x+xoff, y+yoff]
-                            if side is not None:
-                                side[i] = origin.z - 13
+        for trig in VMF.by_class['trigger_multiple']:
+            if trig['wait'] == 0.1:
+                bbox_min, bbox_max = trig.get_bbox()
+                origin = (bbox_min + bbox_max)/2
+                # We only modify triggers which are below the given z-index
+                if origin.z < pit_height:
+                    trig['classname'] = 'trigger_teleport'
+                    trig['spawnflags'] = '4106'  # Physics and npcs
+                    trig['landmark'] = tele_ref
+                    trig['target'] = tele_dest
+                    trig.outputs.clear()
+                    print('box:', trig.get_bbox())
+                    for x in range(int(bbox_min.x), int(bbox_max.x), 128):
+                        for y in range(int(bbox_min.y), int(bbox_max.y), 128):
+                            # Remove the pillar from the center of the item
+                            edges[x, y] = None
+                            for i, xoff, yoff, angle in dirs:
+                                side = edges[x+xoff, y+yoff]
+                                if side is not None:
+                                    side[i] = origin.z - 13
 
-                # The triggers are 26 high, make them 10 units thick to
-                # make it harder to see the teleport
-                for side in trig.sides():
-                    for plane in side.planes:
-                        if plane.z > origin.z:
-                            plane.z -= 16
+                    # The triggers are 26 high, make them 10 units thick to
+                    # make it harder to see the teleport
+                    for side in trig.sides():
+                        for plane in side.planes:
+                            if plane.z > origin.z:
+                                plane.z -= 16
 
     file_opts = settings['pit']['side']
     for (x, y), mask in edges.items():
@@ -577,7 +577,7 @@ def change_brush():
 
     if get_opt('remove_pedestal_plat'):
         # Remove the pedestal platforms
-        for ent in VMF.iter_ents(classname='func_detail'):
+        for ent in VMF.by_class['func_detail']:
             for side in ent.sides():
                 if side.mat.casefold() == 'plastic/plasticwall004a':
                     VMF.remove_ent(ent)
@@ -834,7 +834,7 @@ def change_overlays():
     sign_inst = get_opt('signInst')
     if sign_inst == "NONE":
         sign_inst = None
-    for over in VMF.iter_ents(classname='info_overlay'):
+    for over in VMF.by_class['info_overlay']:
         if over['material'].casefold() in TEX_VALVE:
             sign_type = TEX_VALVE[over['material'].casefold()]
             if sign_inst is not None:
@@ -875,7 +875,7 @@ def change_overlays():
 def change_trig():
     "Check the triggers and fizzlers."
     utils.con_log("Editing Triggers...")
-    for trig in VMF.iter_ents(classname='trigger_portal_cleanser'):
+    for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
             alter_mat(side)
         trig['useScanline'] = settings["fizzler"]["scanline"]
@@ -934,9 +934,9 @@ def change_func_brush():
     "Edit func_brushes."
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("gratingInst")
-    for brush in itertools.chain(
-            VMF.iter_ents(classname='func_brush'),
-            VMF.iter_ents(classname='func_door_rotating'),
+    for brush in (
+            VMF.by_class['func_brush'] |
+            VMF.by_class['func_door_rotating']
             ):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
@@ -972,9 +972,9 @@ def change_func_brush():
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
-            for ins in VMF.iter_ents(
-                    classname='func_instance',
-                    targetname=targ,
+            for ins in (
+                    VMF.by_class['func_instance'] &
+                    VMF.by_target[targ]
                     ):
                 if make_static_pan(ins, brush_type):
                     # delete the brush, we don't want it if we made a static one
@@ -1041,9 +1041,9 @@ def change_ents():
     if get_opt("remove_info_lighting") == "1":
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
-        for ent in VMF.iter_ents(classname='info_lighting'):
+        for ent in VMF.by_class['info_lighting']:
             ent.remove()
-    for auto in VMF.iter_ents(classname='logic_auto'):
+    for auto in VMF.by_class['logic_auto']:
         # Remove all the logic_autos that set attachments, we can
         # replicate this in the instance
         for out in auto.outputs:
@@ -1057,7 +1057,7 @@ def fix_inst():
     '''
 
     utils.con_log("Editing Instances...")
-    for inst in VMF.iter_ents(classname='func_instance'):
+    for inst in VMF.by_class['func_instance']:
         # Fizzler model names end with this special string
         if ("_modelStart" in inst['targetname', ''] or
                 "_modelEnd" in inst['targetname', '']):

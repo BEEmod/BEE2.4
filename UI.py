@@ -95,6 +95,7 @@ class Item:
         'url',
         'can_group',
         ]
+
     def __init__(self, item):
         self.ver_list = sorted(item.versions.keys())
 
@@ -1008,7 +1009,7 @@ def init_palette(f):
 
 def init_option(f):
     '''Initialise the options pane.'''
-    f.columnconfigure(0,weight=1)
+    f.columnconfigure(0, weight=1)
     ttk.Button(
         f,
         text="Save Palette...",
@@ -1179,7 +1180,7 @@ def init_picker(f):
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
 
-    pal_canvas=Canvas(cframe)
+    pal_canvas = Canvas(cframe)
     # need to use a canvas to allow scrolling
     pal_canvas.grid(row=0, column=0, sticky="NSEW")
     cframe.rowconfigure(0, weight=1)
@@ -1459,9 +1460,9 @@ def init_menu_bar(win):
         variable=show_beta_items,
         )
 
-    menus['help'] = Menu(bar, name='help') # Name for Mac-specific stuff
+    menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
     bar.add_cascade(menu=menus['help'], label='Help')
-    menus['help'].add_command(label='About') # Authors etc
+    menus['help'].add_command(label='About')  # Authors etc
 
 
 def init_windows():
@@ -1476,8 +1477,8 @@ def init_windows():
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
     TK_ROOT.iconbitmap('BEE2.ico')  # set the window icon
 
-    UIbg=Frame(TK_ROOT, bg=ItemsBG)
-    UIbg.grid(row=0,column=0, sticky='NSEW')
+    UIbg = Frame(TK_ROOT, bg=ItemsBG)
+    UIbg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
     UIbg.rowconfigure(0, weight=1)

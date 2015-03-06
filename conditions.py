@@ -134,7 +134,7 @@ def check_all():
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         if condition.valid:
-            for inst in VMF.iter_ents(classname='func_instance'):
+            for inst in VMF.by_class['func_instance']:
                 run_cond(inst, condition)
                 utils.con_log('-------------------')
                 if len(condition.results) == 0:
@@ -164,8 +164,9 @@ def remove_blank_inst():
 
     This allows conditions to strip the instances when requested.
     '''
-    for inst in VMF.iter_ents(classname='func_instance', file=''):
-        VMF.remove_ent(inst)
+    for inst in VMF.by_class['func_instance']:
+        if inst['file', ''] == '':
+            VMF.remove_ent(inst)
 
 
 def setup_cond():
@@ -469,7 +470,7 @@ def res_cust_output(inst, res):
     Always points to the targeted item.
     '''
     over_name = '@' + inst['targetname'] + '_indicator'
-    for toggle in VMF.iter_ents(classname='func_instance'):
+    for toggle in VMF.by_class['func_instance']:
         if toggle.fixup['indicator_name', ''] == over_name:
             toggle_name = toggle['targetname']
             break
@@ -482,7 +483,7 @@ def res_cust_output(inst, res):
     kill_signs = res["remIndSign", '0'] == '1'
     dec_con_count = res["decConCount", '0'] == '1'
     if kill_signs or dec_con_count:
-        for con_inst in VMF.iter_ents(classname='func_instance'):
+        for con_inst in VMF.by_class['func_instance']:
             if con_inst['targetname'] in targets:
                 if kill_signs and (
                         con_inst['file'] == INST_FILE['indPanTimer'] or
@@ -512,9 +513,10 @@ def res_cust_antline(inst, res):
     This allows adding extra outputs between the instance and the toggle.
     '''
     over_name = '@' + inst['targetname'] + '_indicator'
-    for over in VMF.iter_ents(
-            classname='info_overlay',
-            targetname=over_name):
+    for over in (
+            VMF.by_class['func_instance'] &
+            VMF.by_target[over_name]
+            ):
         random.seed(over['origin'])
         new_tex = random.choice(
             res.value[
@@ -527,7 +529,7 @@ def res_cust_antline(inst, res):
 
     # allow replacing the indicator_toggle instance
     if res.value['instance']:
-        for toggle in VMF.iter_ents(classname='func_instance'):
+        for toggle in VMF.by_class['func_instance']:
             if toggle.fixup['indicator_name', ''] == over_name:
                 toggle['file'] = res.value['instance']
                 if len(res.value['outputs']) > 0:
@@ -548,7 +550,7 @@ def res_faith_mods(inst, res):
     '''
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
-    for trig in VMF.iter_ents(classname="trigger_catapult"):
+    for trig in VMF.by_class['trigger_catapult']:
         if inst['targetname'] in trig['targetname']:
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
@@ -581,7 +583,7 @@ def res_cust_fizzler(base_inst, res):
         fizz_name + '_modelStart',
         fizz_name + '_modelEnd',
         )
-    for inst in VMF.iter_ents(classname='func_instance'):
+    for inst in VMF.by_class['func_instance']:
         if inst['targetname', ''] in model_targetnames:
             if inst.fixup['skin', '0'] == '2':
                 # This is a laserfield! We can't edit that!
@@ -604,9 +606,9 @@ def res_cust_fizzler(base_inst, res):
 
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) > 0:
-        for orig_brush in VMF.iter_ents(
-                classname='trigger_portal_cleanser',
-                targetname=fizz_name + '_brush',
+        for orig_brush in (
+                VMF.by_class['func_instance'] &
+                VMF.by_target[fizz_name + '_brush']
                 ):
             VMF.remove_ent(orig_brush)
             for config in new_brush_config:
