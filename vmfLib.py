@@ -4,6 +4,7 @@ specifics of VMF files.
 '''
 import io
 from collections import defaultdict
+from contextlib import suppress
 
 from property_parser import Property
 from utils import Vec
@@ -173,7 +174,6 @@ class VMF:
         self.active_cam = conv_int(map_info.get('active_cam'), -1)
         self.quickhide_count = conv_int(map_info.get('quickhide'), -1)
 
-
     def add_brush(self, item):
         '''Add a world brush to this map.'''
         self.brushes.append(item)
@@ -183,6 +183,10 @@ class VMF:
         self.brushes.remove(item)
 
     def add_ent(self, item):
+        '''Add an entity to the map.
+
+        The entity should have been created with this VMF as a parent.
+        '''
         self.entities.append(item)
         self.by_class[item['classname', None]].add(item)
         self.by_target[item['targetname', None]].add(item)
@@ -998,7 +1002,8 @@ class Entity:
             outputs=outs,
             solids=new_solids,
             editor=new_editor,
-            hidden=self.hidden)
+            hidden=self.hidden,
+        )
 
     @staticmethod
     def parse(vmf_file, tree_list, hidden=False):
@@ -1205,14 +1210,31 @@ class Entity:
         - It is case-insensitive, so it will overwrite a key which only
           differs by case.
         '''
+        if isinstance(key, tuple):
+            # Allow using += syntax with default
+            key, default = key
+        else:
+            default = None
         key_fold = key.casefold()
         for k in self.keys:
             if k.casefold() == key_fold:
                 # Check case-insensitively for this key first
+                orig_val = self.keys.get(k, default)
                 self.keys[k] = val
                 break
         else:
+            orig_val = self.keys.get(key, default)
             self.keys[key] = val
+
+        # Update the by_class/target dicts with our new value
+        if key_fold == 'classname':
+            with suppress(KeyError):
+                self.map.by_class[orig_val].remove(self)
+            self.map.by_class[val].add(self)
+        elif key_fold == 'targetname':
+            with suppress(KeyError):
+                self.map.by_target[orig_val].remove(self)
+            self.map.by_target[val].add(self)
 
     def __delitem__(self, key):
         key = key.casefold()
