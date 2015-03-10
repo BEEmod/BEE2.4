@@ -5,6 +5,7 @@ import time
 
 from BEE2_config import GEN_OPTS
 
+from tk_root import TK_ROOT
 import UI
 import loadScreen
 import paletteLoader
@@ -74,13 +75,16 @@ try:
 except Exception as e:
     # Grab Python's traceback, and record it
     # This way we have a log.
+    loadScreen.close_window()
+
     err = traceback.format_exc()
     if DEBUG_MODE:
         # Put it onscreen
         messagebox.showinfo(
             title='BEE2 Error!',
-            message=str(e),
+            message=str(e).strip('".')+'!',
             icon=messagebox.ERROR,
+            parent=TK_ROOT,
             )
 
     # Weekday Date Month Year HH:MM:SS AM/PM

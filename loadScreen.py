@@ -100,11 +100,14 @@ def skip_stage(stage):
 
 def close_window():
     '''Shutdown the loading screen, we're done!'''
-    global widgets, maxes, active
+    global widgets, maxes, active, close_window
     win.destroy()
     del widgets
     del maxes
     active = False
+
+    def close_window():
+        pass
 
 if __name__ == '__main__':
     TK_ROOT.mainloop()
