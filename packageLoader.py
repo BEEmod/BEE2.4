@@ -328,7 +328,8 @@ class Style:
             config=None,
             base_style=None,
             short_name=None,
-            suggested=None
+            suggested=None,
+            has_video=True,
             ):
         self.id = style_id
         self.auth = author
@@ -339,6 +340,7 @@ class Style:
         self.editor = editor
         self.base_style = base_style
         self.suggested = suggested or {}
+        self.has_video = has_video
         if config is None:
             self.config = Property(None, [])
         else:
@@ -349,6 +351,7 @@ class Style:
         '''Parse a style definition.'''
         name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', 'NONE']
+        has_video = info['has_video', '1'] == '1'
 
         sugg = info.find_key('suggested', [])
         sugg = (
@@ -374,16 +377,17 @@ class Style:
         else:
             vbsp = None
         return cls(
-            style_id,
-            name,
-            auth,
-            desc,
-            icon,
-            items,
-            vbsp,
-            base,
+            style_id=style_id,
+            name=name,
+            author=auth,
+            desc=desc,
+            icon=icon,
+            editor=items,
+            config=vbsp,
+            base_style=base,
             short_name=short_name,
-            suggested=sugg
+            suggested=sugg,
+            has_video=has_video,
             )
 
     def add_over(self, override):
@@ -507,7 +511,12 @@ class QuotePack:
 
     def add_over(self, override):
         '''Add the additional lines to ourselves.'''
-        pass
+        self.auth += override.auth
+        self.config += override.config
+        self.config.merge_children(
+            'quotes_sp',
+            'quotes_coop',
+        )
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'

@@ -120,8 +120,8 @@ DEFAULTS = {
     "force_paint":              "0",  # Force paintinmap = 1
     "sky":                      "sky_black",  # Change the skybox
     "glass_scale":              "0.15",
-    "staticPan":                "NONE",
-    "signInst":                 "NONE",
+    "staticPan":                "NONE",  # folder for static panels
+    "signInst":                 "NONE",  # adds this instance on all the signs.
     "glassInst":                "NONE",
     "gratingInst":              "NONE",
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm

@@ -100,7 +100,7 @@ class CopySet(set):
     '''Modified version of a Set which allows modification during iteration.
 
     '''
-    __slots__ = [] # No extra vars
+    __slots__ = []  # No extra vars
 
     def __iter__(self):
         cur_items = set(self)
@@ -353,7 +353,6 @@ class VMF:
         for cam in self.cameras:
             cam.export(dest_file, '\t')
         dest_file.write('}\n')
-
 
         dest_file.write('cordons\n{\n')
         if len(self.cordons) > 0:

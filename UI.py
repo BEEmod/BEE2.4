@@ -1705,6 +1705,9 @@ def init_windows():
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything
 
+        # Disable this if the style doesn't have elevators
+        elev_win.readonly = not styles[selected_style].has_video
+
         sugg = styles[selected_style].suggested
         win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
