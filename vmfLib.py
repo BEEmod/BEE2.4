@@ -102,7 +102,7 @@ class CopySet(set):
     """
     __slots__ = []  # No extra vars
 
-    def __iter__(self) -> Entity:
+    def __iter__(self):
         cur_items = set(self)
 
         yield from cur_items

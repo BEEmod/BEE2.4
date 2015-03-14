@@ -467,6 +467,13 @@ class Vec:
         if self.z > other.z:
             self.z = other.z
 
+    def __round__(self, n=0):
+        return Vec(
+            round(self.x, n),
+            round(self.y, n),
+            round(self.z, n),
+        )
+
     def mag(self):
         """Compute the distance from the vector and the origin."""
         if self.z == 0:

@@ -4,7 +4,6 @@ import sys
 import subprocess
 import shutil
 import random
-import itertools
 from enum import Enum
 from collections import defaultdict
 
@@ -121,7 +120,7 @@ DEFAULTS = {
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
     "sky":                      "sky_black",  # Change the skybox
-    "glass_scale":              "0.15", # Scale of glass texture
+    "glass_scale":              "0.15",  # Scale of glass texture
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
 
@@ -141,7 +140,7 @@ DEFAULTS = {
     "music_location_coop":      "-2000 -2000 0",
     # BEE2 sets this to tell conditions what music is selected
     "music_id":                 "<NONE>",
-    "global_pti_ents":          "", # Instance used
+    "global_pti_ents":          "",  # Instance used for pti_ents
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
     # The file path of the BEE2 app that generated the config
@@ -238,17 +237,17 @@ def get_tex(name):
 
 
 def alter_mat(face, seed=None):
-    '''Randomise the texture used for a face, based on configured textures.
+    """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
     uses the face orientation to determine the wall direction - the
     PeTI often uses textures on the wrong sides for various reasons.
-    '''
+    """
     mat = face.mat.casefold()
     if seed:
         random.seed(seed)
 
-    if mat in TEX_VALVE: # should we convert it?
+    if mat in TEX_VALVE:  # should we convert it?
         face.mat = get_tex(TEX_VALVE[mat])
         return True
     elif mat in BLACK_PAN or mat in WHITE_PAN:
@@ -278,7 +277,7 @@ def alter_mat(face, seed=None):
 
 
 def load_settings():
-    '''Load in all our settings from vbsp_config.'''
+    """Load in all our settings from vbsp_config."""
     global BEE2_config
     try:
         with open("bee2/vbsp_config.cfg") as config:
@@ -341,7 +340,7 @@ def load_settings():
         conditions.add(cond)
 
     if get_opt('bottomless_pit') == "1":
-        pit = conf.find_key("bottomless_pit",[])
+        pit = conf.find_key("bottomless_pit", [])
         settings['pit'] = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
@@ -481,10 +480,10 @@ def process_packer(f_list):
 
 
 def calc_rand_seed():
-    '''Use the ambient light entities to create a map seed.
+    """Use the ambient light entities to create a map seed.
 
      This ensures textures remain the same when the map is recompiled.
-    '''
+    """
     amb_light = INST_FILE['ambLight']
     lst = [
         inst['targetname']
@@ -500,7 +499,7 @@ def calc_rand_seed():
 
 
 def make_bottomless_pit(solids):
-    '''Transform all the goo pits into bottomless pits.'''
+    """Transform all the goo pits into bottomless pits."""
     tex_sky = settings['pit']['tex_sky']
     teleport = settings['pit']['should_tele']
     tele_ref = settings['pit']['tele_ref']
@@ -536,6 +535,7 @@ def make_bottomless_pit(solids):
             if trig['wait'] == 0.1:
                 bbox_min, bbox_max = trig.get_bbox()
                 origin = (bbox_min + bbox_max)/2
+                ''':type :Vec'''
                 # We only modify triggers which are below the given z-index
                 if origin.z < pit_height:
                     trig['classname'] = 'trigger_teleport'
@@ -579,6 +579,8 @@ def make_bottomless_pit(solids):
                                 ),
                             angles=angle
                         ).make_unique()
+
+
 
 
 def change_brush():
@@ -631,11 +633,12 @@ def change_brush():
                 split_v[-1] = glass_scale
                 face.uaxis = " ".join(split_u)
                 face.vaxis = " ".join(split_v)
-
+                settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
             inst = find_glass_inst(solid.get_origin())
-            inst['file'] = glass_inst
+            if inst:
+                inst['file'] = glass_inst
     if is_bottomless:
         utils.con_log('Creating Bottomless Pits!')
         make_bottomless_pit(pit_solids)
@@ -648,24 +651,35 @@ def change_brush():
 
 
 def find_glass_inst(origin):
-    '''Find the glass instance placed on the specified origin.'''
-    loc = Vec(origin.x//128*128 + 64,
-              origin.y//128*128 + 64,
-              origin.z//128*128 + 64)
-    print('loc', origin, (loc-origin).norm())
-    for inst in VMF.iter_ents(classname='func_instance',
-                              origin=loc.join(' '),
-                              file=INST_FILE['glass']):
-        print('angle', inst['angles', ''])
+    """Find the glass instance placed in the specified location."""
+    loc = Vec(
+        origin.x//128 * 128 + 64,
+        origin.y//128 * 128 + 64,
+        origin.z//128 * 128 + 64,
+        )
+    direction = (origin-loc).norm()
+    ang_vec = Vec(-1, 0, 0)  # The brush parts are on this side!
+    loc_str = loc.join(' ')
+    gls_file = INST_FILE['glass']
+    for inst in VMF.by_class['func_instance']:
+        if inst['origin', ''] == loc_str and inst['file', ''] == gls_file:
+            # (45, 45, 45) will never match any of the directions, so we
+            # effectively skip instances without angles
+            inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
+            rot = ang_vec.rotate(inst_ang.x, inst_ang.y, inst_ang.z)
+            print(rot, direction)
+            if round(rot) == direction:
+                return inst
+
     # TODO - make this actually work
-    return {'file': ''}
+    return None
 
 
 def face_seed(face):
-    '''Create a seed unique to this brush face.
+    """Create a seed unique to this brush face.
 
     This is the same regardless of side direction.
-    '''
+    """
     origin = face.get_origin()
     for axis in "xyz":
         if origin[axis] % 128 < 2:
@@ -676,7 +690,7 @@ def face_seed(face):
 
 
 def random_walls():
-    '''The original wall style, with completely randomised walls.'''
+    """The original wall style, with completely randomised walls."""
     scale_walls = get_opt("random_blackwall_scale") == "1"
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -766,7 +780,7 @@ def clump_walls():
     clump_wid = int(get_opt("clump_width"))
     clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
     wall_pos = sorted(list(walls.keys()))
-    random.seed(map_seed)
+    random.seed(MAP_SEED)
     for _ in range(clump_numb):
         pos = random.choice(wall_pos)
         wall_type = walls[pos].mat
@@ -964,6 +978,9 @@ def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("gratingInst")
+
+    if grating_inst == "NONE":
+        grating_inst = None
     for brush in (
             VMF.by_class['func_brush'] |
             VMF.by_class['func_door_rotating']
@@ -997,8 +1014,10 @@ def change_func_brush():
                     is_grating = True
                 alter_mat(side)  # for gratings, laserfields and some others
         if is_grating and grating_inst is not None:
+            settings['has_attr']['grating'] = True
             inst = find_glass_inst(brush.get_origin())
-            inst['file'] = grating_inst
+            if inst:
+                inst['file'] = grating_inst
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
@@ -1170,7 +1189,7 @@ def fix_inst():
 
 
 def fix_worldspawn():
-    "Adjust some properties on WorldSpawn."
+    """Adjust some properties on WorldSpawn."""""
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # if PeTI thinks there should be paint, don't touch it
@@ -1179,9 +1198,9 @@ def fix_worldspawn():
 
 
 def hammer_pack_scan():
-    '''Look through entities to see if any packer commands exist, and add if needed.
+    """Look through entities to see if any packer commands exist, and add if needed.
 
-    '''
+    """
     global to_pack
     to_pack = []  # We aren't using the ones found in vbsp_config
     utils.con_log("Searching for packer commands...")
@@ -1213,10 +1232,10 @@ def hammer_pack_scan():
     print(to_pack)
 
 
-def make_packlist(vmf_path):
+def make_packlist(vmf_path, root):
     """Create the required packer file for BSPzip to use."""
     pack_file = vmf_path[:-4] + ".filelist.txt"
-    folders = get_valid_folders()
+    folders = get_valid_folders(root)
     utils.con_log("Creating Pack list...")
     has_items = False
     with open(pack_file, 'w') as fil:
@@ -1230,7 +1249,7 @@ def make_packlist(vmf_path):
                             # get rid of carriage returns etc
                             line = line.strip()
                             utils.con_log("Adding " + line)
-                            full = expand_source_name(line, folders)
+                            full = expand_source_name(line, folders, root)
                             if full:
                                 fil.write(line + "\n")
                                 fil.write(full + "\n")
@@ -1238,7 +1257,7 @@ def make_packlist(vmf_path):
                 else:
                     utils.con_log("Error: File not found, skipping...")
             else:
-                full = expand_source_name(item, folders)
+                full = expand_source_name(item, folders, root)
                 if full:
                     fil.write(item + "\n")
                     fil.write(full + "\n")
@@ -1249,8 +1268,8 @@ def make_packlist(vmf_path):
     utils.con_log("Done!")
 
 
-def get_valid_folders():
-    "Look through our game path to find folders in order of priority"
+def get_valid_folders(root):
+    """Look through our game path to find folders in order of priority."""
     dlc_count = 1
     priority = ["portal2"]
     while os.path.isdir(os.path.join(root, "portal2_dlc" + str(dlc_count))):
@@ -1277,7 +1296,7 @@ def get_valid_folders():
     return in_order
 
 
-def expand_source_name(file, folders):
+def expand_source_name(file, folders, root):
     """Determine the full path for an item with a truncated path."""
     for f in folders:
         poss = os.path.normpath(os.path.join(root, f, file))
@@ -1287,18 +1306,18 @@ def expand_source_name(file, folders):
     return False
 
 
-def save():
-    "Save the modified map back to the correct location."
+def save(path):
+    """Save the modified map back to the correct location.
+    """
     utils.con_log("Saving New Map...")
-    os.makedirs(os.path.dirname(new_path), exist_ok=True)
-    with open(new_path, 'w') as f:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w') as f:
         VMF.export(dest_file=f, inc_version=True)
     utils.con_log("Complete!")
 
 
-def run_vbsp(vbsp_args, do_swap):
-    '''Execute the original VBSP, copying files around so it works correctly.
-     '''
+def run_vbsp(vbsp_args, do_swap, path, new_path):
+    """Execute the original VBSP, copying files around so it works correctly."""
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
@@ -1346,8 +1365,10 @@ def run_vbsp(vbsp_args, do_swap):
 
 
 def main():
-    '''Main program code.'''
-    global path, new_path, root, map_seed, to_pack, IS_PREVIEW, GAME_MODE
+    """Main program code.
+
+    """
+    global MAP_SEED, to_pack, IS_PREVIEW, GAME_MODE
     utils.con_log("BEE2 VBSP hook initiallised.")
 
     to_pack = []  # the file path for any items that we should be packing
@@ -1402,14 +1423,19 @@ def main():
         is_hammer = "-entity_limit 1750" not in args
     if is_hammer:
         utils.con_log("Hammer map detected! skipping conversion..")
-        run_vbsp(old_args, False)
-        make_packlist(path)
+        run_vbsp(
+            vbsp_args=old_args,
+            do_swap=False,
+            path=path,
+            new_path=new_path,
+        )
+        make_packlist(path, root)
     else:
         utils.con_log("PeTI map detected!")
 
         load_map(path)
 
-        map_seed = calc_rand_seed()
+        MAP_SEED = calc_rand_seed()
 
         (
             IS_PREVIEW,
@@ -1419,13 +1445,11 @@ def main():
         ) = get_map_info()
 
         conditions.init(
-            settings=settings,
-            vmf=VMF,
-            seed=map_seed,
-            preview=IS_PREVIEW,
-            mode=GAME_MODE,
+            seed=MAP_SEED,
             inst_list=all_inst,
-            inst_files=INST_FILE,
+            vmf_file=VMF,
+            game_mode=GAME_MODE,
+            is_pre=IS_PREVIEW,
             )
 
         fix_inst()
@@ -1440,10 +1464,15 @@ def main():
 
         fix_worldspawn()
         add_voice(voice_timer_pos, GAME_MODE)
-        save()
+        save(new_path)
 
-        run_vbsp(new_args, True)
-        make_packlist(path)  # VRAD will access the original BSP location
+        run_vbsp(
+            vbsp_args=new_args,
+            do_swap=True,
+            path=path,
+            new_path=new_path,
+        )
+        make_packlist(path, root)  # VRAD will access the original BSP location
 
     utils.con_log("BEE2 VBSP hook finished!")
 
