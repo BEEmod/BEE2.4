@@ -1,13 +1,22 @@
 import random
 
 from utils import Vec
-from vbsp import set_antline_mat, TEX_FIZZLER, ANTLINES
+import vbsp
 import vmfLib as VLib
 import utils
 
 GLOBAL_INSTANCES = []
 ALL_INST = []
 conditions = []
+
+STYLE_VARS = vbsp.settings['style_vars']
+VOICE_ATTR = vbsp.settings['has_attr']
+
+class SkipCondition(Exception):
+    """Raised to skip to the next instance, from the SkipInstance result.
+
+    """
+    pass
 
 
 class Condition:
@@ -21,17 +30,20 @@ class Condition:
         self.valid = len(self.results) > 0  # is it valid?
 
     def __repr__(self):
-        return ('Condition(flags={!r}, '
-                'results={!r}, else_results={!r},'
-                'priority={!r}'.format(
+        return (
+            'Condition(flags={!r}, '
+            'results={!r}, else_results={!r}, '
+            'priority={!r}'
+        ).format(
             self.flags,
             self.results,
             self.else_results,
             self.priority,
-        ))
+        )
 
     @classmethod
     def parse(cls, prop_block):
+        """Create a condition from a Property block."""
         flags = []
         results = []
         else_results = []
@@ -78,50 +90,50 @@ class Condition:
                 res.value = Condition.parse(res)
 
     def __lt__(self, other):
-        '''Condition items sort by priority.'''
+        """Condition items sort by priority."""
         if hasattr(other, 'priority'):
             return self.priority < other.priority
         return NotImplemented
 
     def __lr__(self, other):
-        '''Condition items sort by priority.'''
+        """Condition items sort by priority."""
         if hasattr(other, 'priority'):
             return self.priority <= other.priority
         return NotImplemented
 
     def __gt__(self, other):
-        '''Condition items sort by priority.'''
+        """Condition items sort by priority."""
         if hasattr(other, 'priority'):
             return self.priority > other.priority
         return NotImplemented
 
     def __ge__(self, other):
-        '''Condition items sort by priority.'''
+        """Condition items sort by priority."""
         if hasattr(other, 'priority'):
             return self.priority >= other.priority
         return NotImplemented
 
 
 def add(prop_block):
-    '''Add a condition to the list.'''
+    """Add a condition to the list."""
     con = Condition.parse(prop_block)
     if con.valid:
         conditions.append(con)
 
 
-def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
-    # Get a bunch of values from VBSP, since we can't import directly.
-    global VMF, STYLE_VARS, VOICE_ATTR, OPTIONS, MAP_RAND_SEED, IS_PREVIEW
-    global GAME_MODE, ALL_INST, INST_FILE
-    VMF = vmf
-    STYLE_VARS = settings['style_vars']
-    VOICE_ATTR = settings['has_attr']
-    OPTIONS = settings['options']
+def init(seed, inst_list, vmf_file, is_pre, game_mode):
+    # Get a bunch of values from VBSP
+    global MAP_RAND_SEED, ALL_INST, INST_FILE, VMF, IS_PREVIEW, GAME_MODE
+    IS_PREVIEW = is_pre
+    GAME_MODE = game_mode
+    VMF = vmf_file
     MAP_RAND_SEED = seed
-    IS_PREVIEW = preview
-    GAME_MODE = mode
     ALL_INST = inst_list
-    INST_FILE = {key.casefold(): value for key, value in inst_files.items()}
+    INST_FILE = {
+        key.casefold(): value
+        for key, value in
+        vbsp.INST_FILE.items()
+    }
 
     # Sort by priority, where higher = done earlier
     conditions.sort(reverse=True)
@@ -129,16 +141,21 @@ def init(settings, vmf, seed, preview, mode, inst_list, inst_files):
 
 
 def check_all():
-    '''Check all conditions.'''
+    """Check all conditions."""
 
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         if condition.valid:
             for inst in VMF.by_class['func_instance']:
-                run_cond(inst, condition)
-                utils.con_log('-------------------')
-                if len(condition.results) == 0:
-                    break
+                    try:
+                        run_cond(inst, condition)
+                    except SkipCondition:
+                        # This is raised to immediately stop running
+                        # this condition, and skip to the next instance.
+                        pass
+                    utils.con_log('-------------------')
+                    if len(condition.results) == 0:
+                        break
 
     remove_blank_inst()
 
@@ -153,30 +170,30 @@ def check_all():
 
 
 def check_inst(inst):
-    '''Run all condtions on a given instance.'''
+    """Run all condtions on a given instance."""
     for condition in conditions:
         run_cond(inst, condition)
     remove_blank_inst()
 
 
 def remove_blank_inst():
-    '''Remove instances with blank file attr.
+    """Remove instances with blank file attr.
 
     This allows conditions to strip the instances when requested.
-    '''
+    """
     for inst in VMF.by_class['func_instance']:
         if inst['file', ''] == '':
             VMF.remove_ent(inst)
 
 
 def setup_cond():
-    '''Some conditions require setup logic before they are run.'''
+    """Some conditions require setup logic before they are run."""
     for cond in conditions:
         cond.setup_res()
 
 
 def run_cond(inst, cond, remove_vmf=True):
-    '''Try to satisfy this condition on the given instance.'''
+    """Try to satisfy this condition on the given instance."""
     if not cond.valid:
         return
     success = True
@@ -220,7 +237,7 @@ def check_flag(flag, inst):
 
 
 def variant_weight(var):
-    '''Read variant commands from settings and create the weight list.'''
+    """Read variant commands from settings and create the weight list."""
     count = var['number', '']
     if count.isdecimal():
         count = int(count)
@@ -335,14 +352,14 @@ def flag_voice_has(_, flag):
 
 
 def flag_music(_, flag):
-    return OPTIONS['music_id'] == flag.value
+    return vbsp.settings['options']['music_id'] == flag.value
 
 
 def flag_option(_, flag):
     bits = flag.value.split(' ')
     key = bits[0].casefold()
-    if key in OPTIONS:
-        return OPTIONS[key] == bits[1]
+    if key in vbsp.settings['options']:
+        return vbsp.settings['options'][key] == bits[1]
     else:
         return False
 
@@ -387,8 +404,8 @@ def res_set_voice_attr(_, res):
 
 def res_set_option(_, res):
     for opt in res.value:
-        if opt.name in OPTIONS['options']:
-            OPTIONS['options'][opt.name] = opt.value
+        if opt.name in vbsp.settings['options']:
+            vbsp.settings['options'][opt.name] = opt.value
 
 
 def res_add_inst_var(inst, res):
@@ -508,10 +525,10 @@ def res_cust_output(inst, res):
 
 
 def res_cust_antline(inst, res):
-    '''Customise the output antline texture, toggle instances.
+    """Customise the output antline texture, toggle instances.
 
     This allows adding extra outputs between the instance and the toggle.
-    '''
+    """
     over_name = '@' + inst['targetname'] + '_indicator'
     for over in (
             VMF.by_class['func_instance'] &
@@ -520,12 +537,12 @@ def res_cust_antline(inst, res):
         random.seed(over['origin'])
         new_tex = random.choice(
             res.value[
-                ANTLINES[
+                vbsp.ANTLINES[
                     over['material'].casefold()
                 ]
             ]
         )
-        set_antline_mat(over, new_tex)
+        vbsp.set_antline_mat(over, new_tex)
 
     # allow replacing the indicator_toggle instance
     if res.value['instance']:
@@ -545,9 +562,9 @@ def res_cust_antline(inst, res):
 
 
 def res_faith_mods(inst, res):
-    '''Modify the trigger_catrapult that is created for ItemFaithPlate items.
+    """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
-    '''
+    """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
     for trig in VMF.by_class['trigger_catapult']:
@@ -573,7 +590,7 @@ def res_faith_mods(inst, res):
 
 
 def res_cust_fizzler(base_inst, res):
-    '''Modify a fizzler item to allow for custom brush ents.'''
+    """Modify a fizzler item to allow for custom brush ents."""
     model_name = res['modelname', None]
     make_unique = res['UniqueModel', '0'] == '1'
     fizz_name = base_inst['targetname', '']
@@ -667,19 +684,31 @@ def res_cust_fizzler(base_inst, res):
                     # Just change the textures
                     for side in new_brush.sides():
                         try:
-                            side.mat = config[TEX_FIZZLER[side.mat.casefold()]]
+                            side.mat = config[vbsp.TEX_FIZZLER[side.mat.casefold()]]
                         except (KeyError, IndexError):
                             # If we fail, just use the original textures
                             pass
 
 
-def convert_to_laserfield(brush, laser_tex, nodraw_tex, tex_width):
-    '''Convert a fizzler into a laserfield func_brush.
+def convert_to_laserfield(
+        brush: VLib.Entity,
+        laser_tex: str,
+        nodraw_tex: str,
+        tex_width: int,
+    ):
+    """Convert a fizzler into a laserfield func_brush.
+
     We need to stretch the brush to get rid of the side sections.
     This is the same as moving all the solids to match the
-     bounding box. We first get the origin, used to figure out if
-     a point should be set to the max or min axis.
-    '''
+    bounding box. We first get the origin, used to figure out if
+    a point should be set to the max or min axis.
+
+    :param brush: The trigger_portal_cleanser to modify.
+    :param tex_width: The pixel width of the laserfield texture, used
+                       to rescale it appropriately.
+    :param laser_tex: The replacement laserfield texture.
+    :param nodraw_tex: A replacement version of tools/nodraw.
+    """
 
     # Get the origin and bbox.
     # The origin isn't in the center, but it still works as long as it's
@@ -738,6 +767,13 @@ def res_sub_condition(base_inst, res):
     run_cond(base_inst, res.value, remove_vmf=False)
 
 
+def res_break(base_inst, res):
+    """Skip to the next instance.
+
+    """
+    raise SkipCondition
+
+
 FLAG_LOOKUP = {
     'and': flag_and,
     'or': flag_or,
@@ -771,4 +807,5 @@ RESULT_LOOKUP = {
     "has": res_set_voice_attr,
     "setoption": res_set_option,
     "condition": res_sub_condition,
+    "nextinstance": res_break,
     }
