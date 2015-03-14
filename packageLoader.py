@@ -1,6 +1,6 @@
-'''
-Handles scanning through the zip packages to find all items, styles, voice lines, etc.
-'''
+"""
+Handles scanning through the zip packages to find all items, styles, etc.
+"""
 import os
 import os.path
 import shutil
@@ -8,7 +8,7 @@ from zipfile import ZipFile
 
 
 from property_parser import Property, NoKeyError
-import loadScreen as loader
+import loadScreen
 import utils
 
 __all__ = [
@@ -32,8 +32,7 @@ res_count = -1
 
 
 def reraise_keyerror(err, obj_id):
-    '''Replace NoKeyErrors with a nicer one, giving the item that failed.
-    '''
+    """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
             # Property.__getitem__ raises IndexError from
@@ -53,17 +52,17 @@ def reraise_keyerror(err, obj_id):
 
 
 def load_packages(pak_dir, load_res):
-    '''Scan and read in all packages in the specified directory.'''
+    """Scan and read in all packages in the specified directory."""
     global res_count
     pak_dir = os.path.join(os.getcwd(), pak_dir)
     contents = os.listdir(pak_dir)  # this is both files and dirs
 
-    loader.length("PAK", len(contents))
+    loadScreen.length("PAK", len(contents))
 
     if load_res:
         res_count = 0
     else:
-        loader.skip_stage("RES")
+        loadScreen.skip_stage("RES")
 
     zips = []
     try:
@@ -92,14 +91,14 @@ def load_packages(pak_dir, load_res):
             print("Scanning package '" + pak_id + "'")
             new_objs = parse_package(zip_file, info, pak_id, dispName)
             objects += new_objs
-            loader.step("PAK")
+            loadScreen.step("PAK")
             print("Done!")
 
-        loader.length("OBJ", objects)
+        loadScreen.length("OBJ", objects)
 
         # Except for StyleVars, each object will have at least 1 image -
         # in UI.py we step the progress once per object.
-        loader.length("IMG", objects - len(all_obj['StyleVar']))
+        loadScreen.length("IMG", objects - len(all_obj['StyleVar']))
 
         print(objects)
         for obj_type, objs in all_obj.items():
@@ -126,14 +125,14 @@ def load_packages(pak_dir, load_res):
                             )
                         object_.add_over(override)
                 data[obj_type].append(object_)
-                loader.step("OBJ")
+                loadScreen.step("OBJ")
         if load_res:
             print('Extracting Resources...')
             for zip_file in zips:
                 for path in zip_file.namelist():
                     loc = os.path.normcase(path)
                     if loc.startswith("resources"):
-                        loader.step("RES")
+                        loadScreen.step("RES")
                         zip_file.extract(path, path="cache/")
 
             shutil.rmtree('images/cache', ignore_errors=True)
@@ -162,8 +161,8 @@ def load_packages(pak_dir, load_res):
     return data
 
 
-def parse_package(zip, info, pak_id, dispName):
-    "Parse through the given package to find all the components."
+def parse_package(zip_file, info, pak_id, disp_name):
+    """Parse through the given package to find all the components."""
     global res_count
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
@@ -184,25 +183,25 @@ def parse_package(zip, info, pak_id, dispName):
             is_sub = obj['overrideOrig', '0'] == '1'
             if is_sub:
                 if obj_id in obj_override[comp_type]:
-                    obj_override[comp_type][obj_id].append((zip, obj))
+                    obj_override[comp_type][obj_id].append((zip_file, obj))
                 else:
-                    obj_override[comp_type][obj_id] = [(zip, obj)]
+                    obj_override[comp_type][obj_id] = [(zip_file, obj)]
             else:
                 if obj_id in all_obj[comp_type]:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
                 objects += 1
-                all_obj[comp_type][obj_id] = (zip, obj, pak_id, dispName)
+                all_obj[comp_type][obj_id] = (zip_file, obj, pak_id, disp_name)
 
     if res_count != -1:
-        for item in zip.namelist():
+        for item in zip_file.namelist():
             if item.startswith("resources"):
                 res_count += 1
-        loader.length("RES", res_count)
+        loadScreen.length("RES", res_count)
     return objects
 
 
 def setup_style_tree(item_data, style_data):
-    '''Modify all items so item inheritance is properly handled.
+    """Modify all items so item inheritance is properly handled.
 
     This will guarantee that all items have a definition for each
     combination of item and version.
@@ -212,7 +211,7 @@ def setup_style_tree(item_data, style_data):
     - Grandparent (etc) style
     - First version's style
     - First style of first version
-    '''
+    """
     all_styles = {}
 
     for style in style_data:
@@ -348,7 +347,7 @@ class Style:
 
     @classmethod
     def parse(cls, zip_file, style_id, info):
-        '''Parse a style definition.'''
+        """Parse a style definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', 'NONE']
         has_video = info['has_video', '1'] == '1'
@@ -391,7 +390,7 @@ class Style:
             )
 
     def add_over(self, override):
-        '''Add the additional commands to ourselves.'''
+        """Add the additional commands to ourselves."""
         self.editor.extend(override.editor)
         self.config.extend(override.config)
         self.auth.extend(override.auth)
@@ -409,7 +408,7 @@ class Item:
 
     @classmethod
     def parse(cls, zip_file, item_id, info):
-        '''Parse an item definition.'''
+        """Parse an item definition."""
         versions = {}
         def_version = None
         folders = {}
@@ -447,7 +446,7 @@ class Item:
         return cls(item_id, versions, def_version)
 
     def add_over(self, override):
-        '''Add the other item data to ourselves.'''
+        """Add the other item data to ourselves."""
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
                 # We don't have that version!
@@ -493,7 +492,7 @@ class QuotePack:
 
     @classmethod
     def parse(cls, zip_file, quote_id, info):
-        '''Parse a voice line definition.'''
+        """Parse a voice line definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
         path = 'voice/' + info['file'] + '.voice'
         with zip_file.open(path, 'r') as conf:
@@ -510,7 +509,7 @@ class QuotePack:
             )
 
     def add_over(self, override):
-        '''Add the additional lines to ourselves.'''
+        """Add the additional lines to ourselves."""
         self.auth += override.auth
         self.config += override.config
         self.config.merge_children(
@@ -545,7 +544,7 @@ class Skybox:
 
     @classmethod
     def parse(cls, zip_file, item_id, info):
-        '''Parse a skybox definition.'''
+        """Parse a skybox definition."""
         config_dir = info['config', '']
         name, short_name, auth, icon, desc = get_selitem_data(info)
         mat = info['material', 'sky_black']
@@ -562,7 +561,7 @@ class Skybox:
         return cls(item_id, name, icon, config, mat, auth, desc, short_name)
 
     def add_over(self, override):
-        '''Add the additional vbsp_config commands to ourselves.'''
+        """Add the additional vbsp_config commands to ourselves."""
         self.auth.extend(override.auth)
         self.config.extend(override.config)
 
@@ -595,7 +594,7 @@ class Goo:
 
     @classmethod
     def parse(cls, zip_file, goo_id, info):
-        '''Parse a goo definition.'''
+        """Parse a goo definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
         mat = info['material', 'nature/toxicslime_a2_bridge_intro']
         mat_cheap = info['material_cheap', mat]
@@ -620,7 +619,7 @@ class Goo:
         )
 
     def add_over(self, override):
-        '''Add the additional vbsp_config commands to ourselves.'''
+        """Add the additional vbsp_config commands to ourselves."""
         self.config.extend(override.config)
         self.auth.extend(override.auth)
 
@@ -653,7 +652,7 @@ class Music:
 
     @classmethod
     def parse(cls, zip_file, music_id, info):
-        '''Parse a music definition.'''
+        """Parse a music definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
         inst = info['instance', None]
         sound = info['soundscript', None]
@@ -677,7 +676,7 @@ class Music:
             )
 
     def add_over(self, override):
-        '''Add the additional vbsp_config commands to ourselves.'''
+        """Add the additional vbsp_config commands to ourselves."""
         self.config.extend(override.config)
         self.auth.extend(override.auth)
 
@@ -707,11 +706,11 @@ class StyleVar:
 
 
 class ElevatorVid:
-    '''
+    """
     An elevator video definition.
 
     This is mainly defined just for Valve's items.
-    '''
+    """
     def __init__(
             self,
             elev_id,
@@ -768,9 +767,9 @@ class ElevatorVid:
 
 
 def desc_parse(info):
-    '''Parse the description blocks, to create data which matches richTextBox.
+    """Parse the description blocks, to create data which matches richTextBox.
 
-    '''
+    """
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
@@ -780,9 +779,9 @@ def desc_parse(info):
 
 
 def get_selitem_data(info):
-    '''Return the common data for all item types - name, author, description.
+    """Return the common data for all item types - name, author, description.
 
-    '''
+    """
     auth = sep_values(info['authors', ''], ',')
     desc = list(desc_parse(info))
     short_name = info['shortName', None]
@@ -792,9 +791,9 @@ def get_selitem_data(info):
 
 
 def sep_values(string, delimiter):
-    '''Split a string by a delimiter, and then strip whitespace.
+    """Split a string by a delimiter, and then strip whitespace.
 
-    '''
+    """
     if string == '':
         return []
     else:
