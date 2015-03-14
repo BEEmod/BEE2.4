@@ -110,23 +110,28 @@ DEFAULTS = {
     "bottomless_pit":           "0",  # Convert goo into bottomless pits
     "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
     "remove_pedestal_plat":     "0",  # Remove pedestal button platforms
-    "fix_glass":                "0",
-    "fix_portal_bump":          "0",  # P1 style randomly sized black walls
-    "random_blackwall_scale":   "0",
-    "no_mid_voices":            "0",  # Remove the midpoint voice lines
-    "force_fizz_reflect":       "0",
-    "force_brush_reflect":      "0",
     "remove_exit_signs":        "0",  # Remove the exit sign overlays
+    "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
+
+    "fix_glass":                "0",
+    "fix_portal_bump":          "0",
+
+    "no_mid_voices":            "0",  # Remove the midpoint voice lines
+    "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
+    "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
     "sky":                      "sky_black",  # Change the skybox
-    "glass_scale":              "0.15",
+    "glass_scale":              "0.15", # Scale of glass texture
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
+
+    # If set, use these as the glass/grating 128x128 instances
     "glassInst":                "NONE",
     "gratingInst":              "NONE",
+
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
-    "clump_size":               "4",  # The maximum dimensions of a clump
-    "clump_width":              "2",
+    "clump_size":               "4",  # The maximum length of a clump
+    "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
@@ -134,11 +139,12 @@ DEFAULTS = {
     # be enclosed
     "music_location_sp":        "-2000 2000 0",
     "music_location_coop":      "-2000 -2000 0",
-    "music_id":                  "<NONE>",
-    "global_pti_ents":          "",
+    # BEE2 sets this to tell conditions what music is selected
+    "music_id":                 "<NONE>",
+    "global_pti_ents":          "", # Instance used
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
-    # The location of the BEE2 app that generated the config
+    # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
     }
 
@@ -342,8 +348,8 @@ def load_settings():
             'should_tele': pit['teleport', '0'] == '1',
             'tele_dest': pit['tele_target', '@goo_targ'],
             'tele_ref': pit['tele_ref', '@goo_ref'],
-            'off_x': VLib.conv_int(pit['off_x', '0'], 0),
-            'off_y': VLib.conv_int(pit['off_y', '0'], 0),
+            'off_x': VLib.conv_int(pit['off_x', '0']),
+            'off_y': VLib.conv_int(pit['off_y', '0']),
             'height': VLib.conv_int(pit['max_height', '386'], 386),
             'side': [prop.value for prop in pit.find_all("side_inst")],
             }
@@ -392,53 +398,54 @@ def add_voice(voice_config, mode):
 
 
 def get_map_info():
-    '''Determine various attributes about the map.
+    """Determine various attributes about the map.
 
     - SP/COOP status
     - if in preview mode
     - timer values for entry/exit corridors
-    '''
+    """
     game_mode = 'ERR'
     is_preview = 'ERR'
 
     # Timer_delay values for the entry/exit corridors, needed for quotes
     voice_timer_pos = {}
 
-    inst_files = [] # Get a list of every instance in the map.
-    FILE_COOP_EXIT = INST_FILE['coopExit']
-    FILE_SP_EXIT = INST_FILE['spExit']
-    FILE_COOP_CORR = INST_FILE['coopCorr']
-    FILE_SP_ENTRY_CORR = INST_FILE['spEntryCorr']
-    FILE_SP_EXIT_CORR = INST_FILE['spExitCorr']
-    FILE_OBS = INST_FILE['largeObs']
-    FILE_COOP_ENTRY = INST_FILE['coopEntry']
+    inst_files = []  # Get a list of every instance in the map.
+    file_coop_exit = INST_FILE['coopExit']
+    file_sp_exit = INST_FILE['spExit']
+    file_coop_corr = INST_FILE['coopCorr']
+    file_sp_entry_corr = INST_FILE['spEntryCorr']
+    file_sp_exit_corr = INST_FILE['spExitCorr']
+    file_obs = INST_FILE['largeObs']
+    file_coop_entry = INST_FILE['coopEntry']
+
     for item in VMF.by_class['func_instance']:
         file = item['file']
-        if file == FILE_COOP_EXIT:
+        if file == file_coop_exit:
             game_mode = 'COOP'
-        elif file == FILE_SP_EXIT:
+        elif file == file_sp_exit:
             game_mode = 'SP'
         elif file == INST_FILE['spEntry']:
             is_preview = item.fixup['no_player_start'] == '0'
 
-        elif file.startswith(FILE_COOP_CORR):
+        elif file.startswith(file_coop_corr):
             is_preview = item.fixup['no_player_start'] == '0'
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file.startswith(FILE_SP_ENTRY_CORR):
+        elif file.startswith(file_sp_entry_corr):
             voice_timer_pos['entry'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file.startswith(FILE_SP_EXIT_CORR):
+        elif file.startswith(file_sp_exit_corr):
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file == FILE_COOP_ENTRY:
+        elif file == file_coop_entry:
             voice_timer_pos['entry'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file == FILE_OBS:
+        elif file == file_obs:
             voice_timer_pos['obs'] = (
                 item.fixup['timer_delay', '0']
                 )
@@ -449,11 +456,23 @@ def get_map_info():
     utils.con_log("Game Mode: " + game_mode)
     utils.con_log("Is Preview: " + str(is_preview))
 
+    if game_mode == 'ERR':
+        raise Exception(
+            'Unknown game mode - Map missing exit room!'
+            '\nCheck for incorect InstanceFiles definition.'
+        )
+    if is_preview == 'ERR':
+        raise Exception(
+            "Can't determine if preview is enabled "
+            '- Map likely missing entry room!'
+            '\nCheck for incorect InstanceFiles definition.'
+        )
+
     return is_preview, game_mode, voice_timer_pos, inst_files
 
 
 def process_packer(f_list):
-    "Read packer commands from settings."
+    """Read packer commands from settings."""
     for cmd in f_list:
         if cmd.name == "add":
             to_pack.append(cmd.value)
@@ -563,7 +582,7 @@ def make_bottomless_pit(solids):
 
 
 def change_brush():
-    "Alter all world/detail brush textures to use the configured ones."
+    """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glassInst')
     glass_scale = get_opt('glass_scale')
@@ -587,8 +606,10 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
+
     if glass_inst == "NONE":
         glass_inst = None
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
@@ -679,11 +700,20 @@ def random_walls():
 
 
 def clump_walls():
-    '''A wall style where textures are used in small groups near each other.
+    """A wall style where textures are used in small groups near each other.
 
     This replicates the Old Aperture maps, which are cobbled together
     from many different materials.
-    '''
+    """
+    # For this, we ignore all of Valve's wall textures.
+    # We then start making clumps.
+    # These are 2x2x4 maximum rectangular areas (configurable), which all get
+    #  the same texture. We don't overwrite previously-set ones though.
+    # After that, we fill in any unset textures with the white/black_gap ones.
+    # This makes it look like those areas were patched up
+    # The floor and ceiling are made normally.
+
+    # Additionally, we are able to nodraw all attached faces.
     walls = {}
 
     # we keep a list for the others, so we can nodraw them if needed
@@ -791,7 +821,7 @@ def clump_walls():
 
 
 def get_face_orient(face):
-    '''Determine the orientation of an on-grid face.'''
+    """Determine the orientation of an on-grid face."""
     if face.planes[0]['z'] == face.planes[1]['z'] == face.planes[2]['z']:
         if face.planes[0]['y'] < face.planes[2]['y']:
             return ORIENT.ceiling
@@ -802,7 +832,7 @@ def get_face_orient(face):
 
 
 def set_antline_mat(over, mat):
-    '''Set the material on an overlay to the given value, applying options.
+    """Set the material on an overlay to the given value, applying options.
 
     The material is split into 3 parts, separated by '|':
     - Scale: the u-axis width of the material, used for clean antlines.
@@ -812,7 +842,7 @@ def set_antline_mat(over, mat):
       entity fromt the compiled map.
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
-    '''
+    """
     mat = mat.split('|')
     if len(mat) == 2:
         # rescale antlines if needed
@@ -829,7 +859,7 @@ def set_antline_mat(over, mat):
 
 
 def change_overlays():
-    "Alter the overlays."
+    """Alter the overlays."""
     utils.con_log("Editing Overlays...")
     sign_inst = get_opt('signInst')
     if sign_inst == "NONE":
@@ -873,7 +903,7 @@ def change_overlays():
 
 
 def change_trig():
-    "Check the triggers and fizzlers."
+    """Check the triggers and fizzlers."""
     utils.con_log("Editing Triggers...")
     for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
@@ -883,7 +913,7 @@ def change_trig():
 
 
 def add_extra_ents(mode):
-    '''Add the various extra instances to the map.'''
+    """Add the various extra instances to the map."""
     utils.con_log("Adding Music...")
     if mode == "COOP":
         loc = get_opt('music_location_coop')
@@ -931,7 +961,7 @@ def add_extra_ents(mode):
 
 
 def change_func_brush():
-    "Edit func_brushes."
+    """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("gratingInst")
     for brush in (
@@ -987,9 +1017,9 @@ def change_func_brush():
 
 
 def make_static_pan(ent, pan_type):
-    '''Convert a regular panel into a static version
+    """Convert a regular panel into a static version.
 
-    This is done to save entities and improve lighting.'''
+    This is done to save entities and improve lighting."""
     if get_opt("staticPan") == "NONE":
         return False  # no conversion allowed!
 
@@ -1007,9 +1037,9 @@ def make_static_pan(ent, pan_type):
 
 
 def make_static_pist(ent):
-    '''Convert a regular piston into a static version.
+    """Convert a regular piston into a static version.
 
-    This is done to save entities and improve lighting.'''
+    This is done to save entities and improve lighting."""
     if get_opt("staticPan") == "NONE":
         return False  # no conversion allowed!
 
@@ -1036,7 +1066,7 @@ def make_static_pist(ent):
 
 
 def change_ents():
-    "Edit misc entities."
+    """Edit misc entities."""
     utils.con_log("Editing Other Entities...")
     if get_opt("remove_info_lighting") == "1":
         # Styles with brush-based glass edges don't need the info_lighting,
@@ -1052,9 +1082,9 @@ def change_ents():
 
 
 def fix_inst():
-    '''Fix some different bugs with instances, especially fizzler models.
+    """Fix some different bugs with instances, especially fizzler models.
 
-    '''
+    """
 
     utils.con_log("Editing Instances...")
     for inst in VMF.by_class['func_instance']:
@@ -1184,7 +1214,7 @@ def hammer_pack_scan():
 
 
 def make_packlist(vmf_path):
-    "Create the required packer file for BSPzip to use."
+    """Create the required packer file for BSPzip to use."""
     pack_file = vmf_path[:-4] + ".filelist.txt"
     folders = get_valid_folders()
     utils.con_log("Creating Pack list...")
@@ -1248,7 +1278,7 @@ def get_valid_folders():
 
 
 def expand_source_name(file, folders):
-    "Determine the full path for an item with a truncated path."
+    """Determine the full path for an item with a truncated path."""
     for f in folders:
         poss = os.path.normpath(os.path.join(root, f, file))
         if os.path.isfile(poss):
