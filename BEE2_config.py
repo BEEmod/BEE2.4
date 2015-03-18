@@ -5,11 +5,11 @@ from configparser import ConfigParser
 
 class ConfigFile(ConfigParser):
     def __init__(self, filename, root='config/'):
-        '''Initialise the config file.
+        """Initialise the config file.
 
         filename is the name of the config file, in the 'root' directory.
         This file will immediately be read and parsed.
-        '''
+        """
         super().__init__()
         self.filename = root+filename
         self.load()
@@ -28,7 +28,7 @@ class ConfigFile(ConfigParser):
         self.has_changed = False
 
     def save(self):
-        '''Write our values out to disk.'''
+        """Write our values out to disk."""
         if self.filename is None:
             return
         self.has_changed = False
@@ -36,13 +36,13 @@ class ConfigFile(ConfigParser):
             self.write(conf)
 
     def save_check(self):
-        '''Check to see if we have different values, and save if needed.'''
+        """Check to see if we have different values, and save if needed."""
         if self.has_changed:
             print('Saving changes in config "' + self.filename + '"!')
             self.save()
 
     def set_defaults(self, def_settings):
-        '''Set the default values if the settings file has no values defined.'''
+        """Set the default values if the settings file has no values defined."""
         for sect, values in def_settings.items():
             if sect not in self:
                 self[sect] = {}
@@ -52,10 +52,10 @@ class ConfigFile(ConfigParser):
         self.save_check()
 
     def get_val(self, section, value, default):
-        '''Get the value in the specifed section.
+        """Get the value in the specifed section.
 
         If either does not exist, set to the default and return it.
-        '''
+        """
         if section not in self:
             self[section] = {}
         if value in self[section]:
@@ -66,10 +66,10 @@ class ConfigFile(ConfigParser):
             return default
 
     def getboolean(self, section, value, default=False) -> bool:
-        '''Get the value in the specified section, coercing to a Boolean.
+        """Get the value in the specified section, coercing to a Boolean.
 
             If either does not exist, set to the default and return it.
-            '''
+            """
         if section not in self:
             self[section] = {}
         if value in self[section]:
@@ -82,10 +82,10 @@ class ConfigFile(ConfigParser):
     get_bool = getboolean
 
     def getint(self, section, value, default=0) -> int:
-        '''Get the value in the specified section, coercing to a Integer.
+        """Get the value in the specified section, coercing to a Integer.
 
             If either does not exist, set to the default and return it.
-            '''
+            """
         if section not in self:
             self[section] = {}
         if value in self[section]:

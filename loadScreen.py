@@ -1,4 +1,4 @@
-'''Displays a loading menu while packages, palettes, etc are being loaded.'''
+"""Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
 from tk_root import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
@@ -91,7 +91,7 @@ def set_nums(stage):
 
 
 def skip_stage(stage):
-    '''Skip over this stage of the loading process.'''
+    """Skip over this stage of the loading process."""
     if active:
         labels[stage]['text'] = 'Skipped!'
         bar_var[stage].set(1000)
@@ -99,7 +99,7 @@ def skip_stage(stage):
 
 
 def close_window():
-    '''Shutdown the loading screen, we're done!'''
+    """Shutdown the loading screen, we're done!"""
     global widgets, maxes, active, close_window
     win.destroy()
     del widgets

@@ -6,10 +6,10 @@ import sound as snd
 
 
 class SubPane(Toplevel):
-    '''A Toplevel window that can be shown/hidden.
+    """A Toplevel window that can be shown/hidden.
 
      This follows the main window when moved.
-    '''
+    """
     def __init__(
             self,
             parent,
@@ -53,7 +53,7 @@ class SubPane(Toplevel):
         self.bind('<FocusIn>', self.enable_snap)
 
     def hide_win(self, play_snd=True):
-        '''Hide the window.'''
+        """Hide the window."""
         if play_snd:
             snd.fx('config')
         self.withdraw()
@@ -62,7 +62,7 @@ class SubPane(Toplevel):
         self.tool_button.state(('!pressed',))
 
     def show_win(self, play_snd=True):
-        '''Show the window.'''
+        """Show the window."""
         if play_snd:
             snd.fx('config')
         self.deiconify()
@@ -78,11 +78,11 @@ class SubPane(Toplevel):
             self.show_win()
 
     def move(self, x=None, y=None, width=None, height=None):
-        '''Move the window to the specified position.
+        """Move the window to the specified position.
 
         Effectively an easier-to-use form of Toplevel.geometry(), that
         also updates relX and relY.
-        '''
+        """
         if width is None:
             width = self.winfo_reqwidth()
         if height is None:
@@ -108,10 +108,10 @@ class SubPane(Toplevel):
         self.allow_snap = True
 
     def snap_win(self, _=None):
-        '''Callback for window movement.
+        """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
-        '''
+        """
         # TODO: Actually snap to edges of main window
         if self.allow_snap:
             self.relX = self.winfo_x() - self.parent.winfo_x()
@@ -119,7 +119,7 @@ class SubPane(Toplevel):
             self.save_conf()
 
     def follow_main(self, _=None):
-        '''When the main window moves, sub-windows should move with it.'''
+        """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = utils.adjust_inside_screen(
             x=self.parent.winfo_x()+self.relX,

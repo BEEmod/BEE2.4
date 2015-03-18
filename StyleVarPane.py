@@ -35,10 +35,10 @@ UI = {}
 
 
 def add_vars(data):
-    '''
+    """
     Add the given stylevars to our list.
 
-    '''
+    """
     global var_list
     var_list = sorted(data, key=operator.attrgetter('id'))
 
@@ -47,16 +47,16 @@ def add_vars(data):
 
 
 def set_stylevar(var):
-    '''Save the value for a particular stylevar.'''
+    """Save the value for a particular stylevar."""
     val = str(tk_vars[var].get())
     GEN_OPTS['StyleVar'][var] = val
 
 
 def refresh(selected_style):
-    '''Move the stylevars to the correct position.
+    """Move the stylevars to the correct position.
 
     This depends on which apply to the current style.
-    '''
+    """
     en_row = 0
     dis_row = 0
     for var in var_list:
@@ -92,9 +92,9 @@ def flow_stylevar(e=None):
 
 
 def make_pane(tool_frame):
-    '''Create the styleVar pane.
+    """Create the styleVar pane.
 
-    '''
+    """
     global window
     window = SubPane(
         TK_ROOT,

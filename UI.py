@@ -76,7 +76,7 @@ item_opts = ConfigFile('item_configs.cfg')
 
 
 class Item:
-    '''Represents an item that can appear on the list.'''
+    """Represents an item that can appear on the list."""
     __slots__ = [
         'ver_list',
         'selected_ver',
@@ -123,7 +123,7 @@ class Item:
         self.set_properties(self.get_properties())
 
     def load_data(self):
-        '''Load data from the item.'''
+        """Load data from the item."""
         version = self.item.versions[self.selected_ver]
         self.data = version['styles'].get(
             selected_style,
@@ -140,13 +140,13 @@ class Item:
                           self.data['all_icon'] is not None)
 
     def get_icon(self, subKey, allow_single=False, single_num=1):
-        '''Get an icon for the given subkey.
+        """Get an icon for the given subkey.
 
         If allow_single is true, the grouping icon can be returned
         instead if only one item is on the palette.
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
-        '''
+        """
         icons = self.data['icons']
         num_picked = sum(
             1 for item in
@@ -161,15 +161,15 @@ class Item:
             return png.loadIcon(icons[str(subKey)])
 
     def properties(self):
-        '''Iterate through all properties for this item.'''
+        """Iterate through all properties for this item."""
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
                 yield prop.name
 
     def get_properties(self):
-        '''Return a dictionary of properties and the current value for them.
+        """Return a dictionary of properties and the current value for them.
 
-        '''
+        """
         result = {}
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
@@ -184,7 +184,7 @@ class Item:
         return result
 
     def set_properties(self, props):
-        '''Apply the properties to the item.'''
+        """Apply the properties to the item."""
         for prop, value in props.items():
             for def_prop in self.data['editor'].find_all(
                     "Properties",
@@ -195,9 +195,9 @@ class Item:
             item_opts[self.id]['PROP_' + prop] = str(value)
 
     def refresh_subitems(self):
-        '''Call load_data() on all our subitems, so they reload icons and names.
+        """Call load_data() on all our subitems, so they reload icons and names.
 
-        '''
+        """
         for refresh_cmd, subitem_list in [
                 (flow_preview, pal_picked),
                 (flow_picker, pal_items),
@@ -214,7 +214,7 @@ class Item:
         self.refresh_subitems()
 
     def get_version_names(self):
-        '''Get a list of the names and corresponding IDs for the item.'''
+        """Get a list of the names and corresponding IDs for the item."""
         vers = []
         for ver_id in self.ver_list:
             ver = self.item.versions[ver_id]
@@ -233,9 +233,9 @@ class Item:
         return self.ver_list, vers
 
     def export(self):
-        '''Generate the editoritems and vbsp_config data for this item.
+        """Generate the editoritems and vbsp_config data for this item.
 
-        '''
+        """
         self.load_data()
 
         palette_items = {}
@@ -269,7 +269,7 @@ class Item:
 
 
 class PalItem(Label):
-    '''The icon and associated data for a single subitem.'''
+    """The icon and associated data for a single subitem."""
     def __init__(self, frame, item, sub, is_pre):
         "Create a label to show an item onscreen."
         super().__init__(
@@ -301,10 +301,10 @@ class PalItem(Label):
         self['relief'] = 'flat'
 
     def change_subtype(self, ind):
-        '''Change the subtype of this icon.
+        """Change the subtype of this icon.
 
         This removes duplicates from the palette if needed.
-        '''
+        """
         for item in pal_picked[:]:
             if item.id == self.id and item.subKey == ind:
                 item.kill()
@@ -314,9 +314,9 @@ class PalItem(Label):
         flow_preview()
 
     def open_menu_at_sub(self, ind):
-        '''Make the contextWin open itself at the indicated subitem.
+        """Make the contextWin open itself at the indicated subitem.
 
-        '''
+        """
         if self.is_pre:
             items_list = pal_picked[:]
         else:
@@ -328,10 +328,10 @@ class PalItem(Label):
                 break
 
     def load_data(self):
-        '''Refresh our icon and name.
+        """Refresh our icon and name.
 
         Call whenever the style changes, so the icons update.
-        '''
+        """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
         self.name = gameMan.translate(self.item.names[self.subKey])
         self['image'] = self.img
@@ -344,10 +344,10 @@ class PalItem(Label):
             self['text'] = None
 
     def clear(self):
-        '''Remove any items matching ourselves from the palette.
+        """Remove any items matching ourselves from the palette.
 
         This prevents adding two copies.
-        '''
+        """
         found = False
         for item in pal_picked[:]:
             # remove the item off of the palette if it's on there, this
@@ -358,23 +358,23 @@ class PalItem(Label):
         return found
 
     def kill(self):
-        '''Hide and destroy this widget.'''
+        """Hide and destroy this widget."""
         if self in pal_picked:
             pal_picked.remove(self)
         self.place_forget()
         self.destroy()
 
     def on_pal(self):
-        '''Determine if this item is on the palette.'''
+        """Determine if this item is on the palette."""
         for item in pal_picked:
             if self == item:
                 return True
         return False
 
     def __eq__(self, other):
-        '''Two items are equal if they have the same item and sub-item index.
+        """Two items are equal if they have the same item and sub-item index.
 
-        '''
+        """
         return self.id == other.id and self.subKey == other.subKey
 
     def copy(self, frame):
@@ -385,7 +385,7 @@ class PalItem(Label):
 
 
 def quit_application():
-    '''Do a last-minute save of our config files, and quit the app.'''
+    """Do a last-minute save of our config files, and quit the app."""
     GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
     GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
@@ -398,19 +398,19 @@ def quit_application():
 
 
 def set_mute():
-    '''Apply the muted setting based on the variable.'''
+    """Apply the muted setting based on the variable."""
     snd.muted = (muted.get() == 1)
     GEN_OPTS['General']['mute_sounds'] = str(muted.get())
 
 
 def load_palette(data):
-    '''Import in all defined palettes.'''
+    """Import in all defined palettes."""
     global palettes
     palettes = data
 
 
 def load_settings(settings):
-    '''Load options from the general config file.'''
+    """Load options from the general config file."""
     global GEN_OPTS
     GEN_OPTS = settings
 
@@ -434,11 +434,11 @@ def load_settings(settings):
 
 
 def load_packages(data):
-    '''Import in the list of items and styles from the packages.
+    """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
-    '''
+    """
     global skybox_win, voice_win, music_win, goo_win, style_win, elev_win
     global item_list, filter_data
     global selected_style
@@ -497,20 +497,20 @@ def load_packages(data):
             loader.step("IMG")
 
     def win_callback(style_id, win_name):
-        '''Callback for the selector windows.
+        """Callback for the selector windows.
 
         This saves into the config file the last selected item.
-        '''
+        """
         if style_id is None:
             style_id = '<NONE>'
         GEN_OPTS['Last_Selected'][win_name] = style_id
         suggested_refresh()
 
     def voice_callback(style_id):
-        '''Special callback for the voice selector window.
+        """Special callback for the voice selector window.
 
         The configuration button is disabled whin no music is selected.
-        '''
+        """
         try:
             if style_id is None:
                 style_id = '<NONE>'
@@ -608,7 +608,7 @@ def load_packages(data):
 
 
 def suggested_refresh():
-    '''Enable or disable the suggestion setting button.'''
+    """Enable or disable the suggestion setting button."""
     if 'suggested_style' in UI:
         if (
                 voice_win.is_suggested() and
@@ -651,7 +651,7 @@ def refresh_pal_ui():
 
 
 def export_editoritems(_=None):
-    '''Export the selected Items and Style into the chosen game.'''
+    """Export the selected Items and Style into the chosen game."""
     style_vars = {
         key: (value.get() == 1)
         for key, value in
@@ -707,7 +707,7 @@ def clear_disp_name(_=None):
 
 
 def conv_screen_to_grid(x, y):
-    '''Returns the location of the item hovered over on the preview pane.'''
+    """Returns the location of the item hovered over on the preview pane."""
     return (
         (x-UI['pre_bg_img'].winfo_rootx()-8) // 65,
         (y-UI['pre_bg_img'].winfo_rooty()-32) // 65,
@@ -791,7 +791,7 @@ def drag_stop(e):
 
 
 def drag_move(e):
-    '''Update the position of dragged items as they move around.'''
+    """Update the position of dragged items as they move around."""
     global drag_passedPal
     drag_win = windows['drag_win']
     set_disp_name(drag_item)
@@ -810,11 +810,11 @@ def drag_move(e):
 
 
 def drag_fast(e):
-    '''Implement shift-clicking.
+    """Implement shift-clicking.
 
      When shift-clicking, an item will be immediately moved to the
      palette or deleted from it.
-    '''
+    """
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     e.widget.clear()
     # Is the cursor over the preview pane?
@@ -840,13 +840,13 @@ def set_pal_radio():
 
 
 def set_pal_listbox_selection(e=None):
-    '''Select the currently chosen palette in the listbox.'''
+    """Select the currently chosen palette in the listbox."""
     UI['palette'].selection_clear(0,len(palettes))
     UI['palette'].selection_set(selectedPalette)
 
 
 def set_palette(e=None):
-    '''Select a palette.'''
+    """Select a palette."""
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
     menus['pal'].entryconfigure(
@@ -869,7 +869,7 @@ def set_palette(e=None):
 
 
 def pal_clear():
-    '''Empty the palette.'''
+    """Empty the palette."""
     for item in pal_picked:
         item.kill()
     pal_picked.clear()
@@ -1008,7 +1008,7 @@ def init_palette(f):
 
 
 def init_option(f):
-    '''Initialise the options pane.'''
+    """Initialise the options pane."""
     f.columnconfigure(0, weight=1)
     ttk.Button(
         f,
@@ -1031,9 +1031,9 @@ def init_option(f):
     props.grid(row=3, sticky="EW")
 
     def suggested_style_set():
-        '''Set music, skybox, voices, etc to the settings defined for a style.
+        """Set music, skybox, voices, etc to the settings defined for a style.
 
-        '''
+        """
         sugg = styles[selected_style].suggested
         win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
@@ -1049,7 +1049,7 @@ def init_option(f):
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
 
     def configure_voice():
-        '''Open the voiceEditor window to configure a Quote Pack.'''
+        """Open the voiceEditor window to configure a Quote Pack."""
         chosen = voices.get(voice_win.chosen_id, None)
         if chosen is not None:
             voiceEditor.show(chosen)
@@ -1098,10 +1098,10 @@ def init_option(f):
 
 
 def flow_preview():
-    '''Position all the preview icons based on the array.
+    """Position all the preview icons based on the array.
 
     Run to refresh if items are moved around.
-    '''
+    """
     for i, item in enumerate(pal_picked):
         # these can be referred to to figure out where it is
         item.pre_x = i % 4
@@ -1122,10 +1122,10 @@ def flow_preview():
 
 
 def init_preview(f):
-    '''Generate the preview pane.
+    """Generate the preview pane.
 
      This shows the items that will export to the palette.
-    '''
+    """
     global pal_picked_fake
     UI['pre_bg_img']=Label(
         f,
@@ -1200,11 +1200,11 @@ def init_picker(f):
 
 
 def flow_picker(e=None):
-    '''Update the picker box so all items are positioned corrctly.
+    """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
     window changes shape.
-    '''
+    """
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
     if frames['filter'].expanded:
@@ -1263,9 +1263,9 @@ def init_filter_col(cat, f):
     FilterVars_all[cat] = IntVar(value=1)
 
     def filter_all_callback(col):
-        '''Sets all items in a category to true/false.
+        """Sets all items in a category to true/false.
 
-        '''
+        """
         val = FilterVars_all[col].get()
         for i in FilterVars[col]:
             FilterVars[col][i].set(val)
@@ -1466,9 +1466,9 @@ def init_menu_bar(win):
 
 
 def init_windows():
-    '''Initialise all windows and panes.
+    """Initialise all windows and panes.
 
-    '''
+    """
     init_menu_bar(TK_ROOT)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
@@ -1697,7 +1697,7 @@ def init_windows():
     refresh_pal_ui()
 
     def style_select_callback(style_id):
-        '''Callback whenever a new style is chosen.'''
+        """Callback whenever a new style is chosen."""
         global selected_style
         selected_style = style_id
         GEN_OPTS['Last_Selected']['Style'] = style_id

@@ -1,9 +1,9 @@
-'''
+"""
 This module provides a wrapper around PyGame, in order to play sounds easily.
 To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
-'''
+"""
 muted = False
 
 try:
@@ -14,10 +14,10 @@ try:
 except Exception:
     print('ERROR:SOUNDS NOT INITIALISED!')
     def fx(*args):
-        '''Pygame has failed to initialise!
-        
+        """Pygame has failed to initialise!
+
         No sounds will be played.
-        '''
+        """
     initiallised = False
 else:
     # Succeeded

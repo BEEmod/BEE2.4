@@ -535,7 +535,7 @@ def make_bottomless_pit(solids):
             if trig['wait'] == 0.1:
                 bbox_min, bbox_max = trig.get_bbox()
                 origin = (bbox_min + bbox_max)/2
-                ''':type :Vec'''
+                """:type :Vec"""
                 # We only modify triggers which are below the given z-index
                 if origin.z < pit_height:
                     trig['classname'] = 'trigger_teleport'

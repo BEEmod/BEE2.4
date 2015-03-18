@@ -98,7 +98,7 @@ enable_tim_callback = True
 
 
 def callback(name):
-    '''Do nothing by default!'''
+    """Do nothing by default!"""
     pass
 
 
@@ -108,11 +108,11 @@ def reset_sfx():
 
 
 def sfx(sound):
-    '''Play a sound effect.
+    """Play a sound effect.
 
     This waits for a certain amount of time between retriggering sounds
     so they don't overlap.
-    '''
+    """
     global play_sound
     if play_sound is True:
         snd.fx(sound)
@@ -227,7 +227,7 @@ def exit_win():
 
 
 def can_edit(prop_list):
-    '''Determine if any of these properties are changeable.'''
+    """Determine if any of these properties are changeable."""
     for prop in prop_list:
         if prop in PROP_TYPES:
             return True

@@ -12,7 +12,7 @@ PAL_DIR = "palettes\\"
 pal_list = []
 
 class Palette:
-    '''A palette, saving an arrangement of items for editoritems.txt'''
+    """A palette, saving an arrangement of items for editoritems.txt"""
     def __init__(self, name, pos, options=None, filename=None):
         self.opt = {} if options is None else options
         self.name = name
@@ -23,7 +23,7 @@ class Palette:
         return self.name
 
     def save(self, allow_overwrite, name=None):
-        '''Save the palette file into the specified location.'''
+        """Save the palette file into the specified location."""
         print('Saving "' + self.name + '"!')
         if name is None:
             name = self.filename
@@ -63,7 +63,7 @@ class Palette:
             prop_file.close()
 
     def delete_from_disk(self, name=None):
-        '''Delete this palette from disk.'''
+        """Delete this palette from disk."""
         if name is None:
             name = self.filename
         is_zip = name.endswith('.zip')
@@ -139,7 +139,7 @@ def parse(posfile, propfile, path):
     return Palette(name, pos, opts, filename=path)
 
 def save_pal(items, name):
-    '''Save a palette under the specified name.'''
+    """Save a palette under the specified name."""
     pos = [(it.id, it.subKey) for it in items]
     print(name, pos, name, [])
     new_palette = Palette(name, pos)

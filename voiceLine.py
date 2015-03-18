@@ -8,7 +8,7 @@ INST_PREFIX = 'instances/BEE2/voice/'
 
 
 def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
-    '''Add a voice line to the map.'''
+    """Add a voice line to the map."""
     print('Adding Voice!')
     if len(voice_data.value) == 0:
         print('No Data!')
@@ -32,7 +32,7 @@ def add_voice(voice_data, map_attr, style_vars, VMF, config={}):
     mid_quotes = []
 
     def sort_func(quote):
-        '''The quotes will be sorted by their priority value.'''
+        """The quotes will be sorted by their priority value."""
         try:
             return float(quote[0])
         except ValueError:

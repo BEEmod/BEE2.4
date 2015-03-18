@@ -1,6 +1,6 @@
-'''
+"""
 Handles locating parts of a given game, and modifying GameInfo to support our special content folder.
-'''
+"""
 import os
 import os.path
 import shutil
@@ -74,14 +74,14 @@ class Game:
         self.root = folder
 
     def dlc_priority(self):
-        '''Iterate through all subfolders, in order of high to low priority.
+        """Iterate through all subfolders, in order of high to low priority.
 
         We assume the priority follows:
         1. update,
         2. portal2_dlc99, ..., portal2_dlc2, portal2_dlc1
         3. portal2,
         4. <all others>
-        '''
+        """
         dlc_count = 1
         priority = ["portal2"]
         while os.path.isdir(self.abs_path("portal2_dlc" + str(dlc_count))):
@@ -105,10 +105,10 @@ class Game:
         return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
 
     def edit_gameinfo(self, add_line=False):
-        '''Modify all gameinfo.txt files to add or remove our line.
+        """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
-        '''
+        """
 
         if self.is_modded() == add_line:
             # It's already in the correct state!
@@ -164,7 +164,7 @@ class Game:
             self.clear_cache()
 
     def refresh_cache(self):
-        '''Copy over the resource files into this game.'''
+        """Copy over the resource files into this game."""
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
             try:
@@ -191,9 +191,9 @@ class Game:
             style_vars,
             elevator,
         ):
-        '''Generate the editoritems.txt and vbsp_config.
+        """Generate the editoritems.txt and vbsp_config.
 
-        '''
+        """
         print('--------------------')
         print('Exporting Items and Style for "' + self.name + '"!')
         print('Style =', style)
@@ -295,10 +295,10 @@ class Game:
 
 
 def find_steam_info(game_dir):
-    '''Determine the steam ID and game name of this folder, if it has one.
+    """Determine the steam ID and game name of this folder, if it has one.
 
     This only works on Source games!
-    '''
+    """
     game_id = -1
     name = "ERR"
     found_name = False
@@ -365,7 +365,7 @@ def load(ui_quit_func, load_screen_window):
 
 
 def add_game(e=None, refresh_menu=True):
-    '''Ask for, and load in a game to export to.'''
+    """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
         message='Select the folder where the game executable is located '
@@ -424,7 +424,7 @@ def add_game(e=None, refresh_menu=True):
 
 
 def remove_game(e=None):
-    '''Remove the currently-chosen game from the game list.'''
+    """Remove the currently-chosen game from the game list."""
     global selected_game, selectedGame_radio
     confirm = messagebox.askyesno(
         title="BEE2",
@@ -452,7 +452,7 @@ def remove_game(e=None):
 
 
 def add_menu_opts(menu, callback=None):
-    '''Add the various games to the menu.'''
+    """Add the various games to the menu."""
     global selectedGame_radio, setgame_callback
     if callback is not None:
         setgame_callback = callback

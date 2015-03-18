@@ -1,4 +1,4 @@
-'''
+"""
 The rightclick pane which shows item descriptions,and allows changing
 various item properties.
 - init() creates all the required widgets, and is called with the root window.
@@ -6,7 +6,7 @@ various item properties.
 - hideProps() hides the screen.
 - open_event is the TK callback version of showProps(), which gets the
   clicked widget from the event
-'''
+"""
 from tkinter import *
 from tk_root import TK_ROOT
 from tkinter import ttk
@@ -58,7 +58,7 @@ ROT_TYPES = {
 
 
 def pos_for_item():
-    '''Get the index the selected item is located at.'''
+    """Get the index the selected item is located at."""
     pos = SUBITEM_POS[selected_item.num_sub]
     sub_key = selected_sub_item.subKey
     for ind, sub in enumerate(pos):
@@ -82,7 +82,7 @@ def sub_sel_enter(ind, e=None):
 
 
 def sub_sel(ind, e=None):
-    '''Change the currently-selected sub-item.'''
+    """Change the currently-selected sub-item."""
     # Can only change the subitem on the preview window
     if selected_sub_item.is_pre:
         pos = SUBITEM_POS[selected_item.num_sub][ind]
@@ -94,7 +94,7 @@ def sub_sel(ind, e=None):
 
 
 def sub_open(ind, e=None):
-    '''Move the context window to apply to the given item.'''
+    """Move the context window to apply to the given item."""
     pos = SUBITEM_POS[selected_item.num_sub][ind]
     if pos != -1 and pos != selected_sub_item.subKey:
         snd.fx('expand')
@@ -128,18 +128,18 @@ def moreInfo_hideURL(e):
 
 
 def open_event(e):
-    '''Read data from the event, and show the window.'''
+    """Read data from the event, and show the window."""
     wid = e.widget
     snd.fx('expand')
     showProps(wid)
 
 
 def showProps(widget, warp_cursor=False):
-    '''Show the properties window for an item.
+    """Show the properties window for an item.
 
     wid should be the UI.PalItem widget that represents the item.
     If warp_cursor is  true, the cursor will be moved relative to this window so it stays on top of the selected subitem.
-    '''
+    """
     global selected_item, selected_sub_item, is_open
     if warp_cursor and is_open:
         cursor_x, cursor_y = prop_window.winfo_pointerxy()
@@ -181,7 +181,7 @@ def set_item_version(e=None):
 
 
 def load_item_data():
-    '''Refresh the window to use the selected item's data.'''
+    """Refresh the window to use the selected item's data."""
     global version_lookup
     item_data = selected_item.data
 
@@ -300,15 +300,15 @@ def load_item_data():
 
 
 def follow_main(e=None):
-    '''Move the properties window to keep a relative offset to the main window.
+    """Move the properties window to keep a relative offset to the main window.
 
-    '''
+    """
     prop_window.geometry('+'+str(prop_window.relX+TK_ROOT.winfo_x())+
                          '+'+str(prop_window.relY+TK_ROOT.winfo_y()))
 
 
 def hide_context(e=None):
-    '''Hide the properties window, if it's open.'''
+    """Hide the properties window, if it's open."""
     global is_open
     if is_open:
         is_open=False
@@ -317,7 +317,7 @@ def hide_context(e=None):
 
 
 def init_widgets():
-    '''Initiallise all the window components.'''
+    """Initiallise all the window components."""
     global prop_window, moreinfo_win
     prop_window=Toplevel(TK_ROOT)
     prop_window.overrideredirect(1)

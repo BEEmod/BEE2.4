@@ -3,8 +3,8 @@ from tkinter.font import Font as tkFont
 from tkinter import ttk
 
 class tkRichText(Text):
-    '''A version of the TK Text widget with some options to allow writing with special formatting.
-    
+    """A version of the TK Text widget with some options to allow writing with special formatting.
+
     The format for the text is a list of tuples, where each tuple is (type, text).
     Types:
      - "line" : standard line, with carriage return after.
@@ -12,20 +12,20 @@ class tkRichText(Text):
      - "list" : indented with "1. " at the beggining, the number increasing
      - "break" : A carriage return. This ignores the text part."
      - "rule" : A horizontal line. This ignores the text part.
-    '''
+    """
     def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
         super().__init__(parent, width=width, height=height, wrap="word", font=font)
         self.tag_config("indent", lmargin1="10", lmargin2="25")
         self.tag_config("hrule", relief="sunken", borderwidth=1, font=tkFont(size=1))
         self['state'] = "disabled"
-    
+
     _insert = Text.insert
-    
+
     def insert(*args, **kwargs):
         pass
-        
+
     def set_text(self, desc):
-        '''Write the rich-text into the textbox.'''
+        """Write the rich-text into the textbox."""
         self['state']="normal"
         self.delete(1.0, END)
         if isinstance(desc, str):
@@ -35,9 +35,9 @@ class tkRichText(Text):
             for data in desc:
                 lineType=data[0].casefold()
                 if lineType == "line":
-                    super().insert("end", data[1] + "\n") 
+                    super().insert("end", data[1] + "\n")
                 elif lineType == "bullet":
-                    super().insert("end", '\x07 ' + data[1] + "\n", "indent") 
+                    super().insert("end", '\x07 ' + data[1] + "\n", "indent")
                 elif lineType == "list":
                     super().insert("end", str(list_ind) + ". " + data[1] + "\n", "indent")
                     list_ind += 1

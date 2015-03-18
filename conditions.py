@@ -272,7 +272,7 @@ def variant_weight(var):
 
 
 def add_output(inst, prop, target):
-    '''Add a customisable output to an instance.'''
+    """Add a customisable output to an instance."""
     inst.add_out(VLib.Output(
         prop['output', ''],
         target,
@@ -283,7 +283,7 @@ def add_output(inst, prop, target):
 
 
 def resolve_inst_path(path):
-    '''Allow referring to the instFile section in condtion parameters.'''
+    """Allow referring to the instFile section in condtion parameters."""
     if path.startswith('<') and path.endswith('>'):
         try:
             path = INST_FILE[path[1:-1].casefold()]
@@ -334,7 +334,7 @@ def flag_file_cont(inst, flag):
 
 
 def flag_has_inst(_, flag):
-    '''Return true if the filename is present anywhere in the map.'''
+    """Return true if the filename is present anywhere in the map."""
     return resolve_inst_path(flag.value) in ALL_INST
 
 
@@ -377,12 +377,12 @@ def flag_is_preview(_, flag):
 
 
 def res_change_instance(inst, res):
-    '''Set the file to a value.'''
+    """Set the file to a value."""
     inst['file'] = resolve_inst_path(res.value)
 
 
 def res_add_suffix(inst, res):
-    '''Add the specified suffix to the filename.'''
+    """Add the specified suffix to the filename."""
     inst['file'] += '_' + res.value
 
 
@@ -409,11 +409,11 @@ def res_set_option(_, res):
 
 
 def res_add_inst_var(inst, res):
-    '''Append the value of an instance variable to the filename.
+    """Append the value of an instance variable to the filename.
 
     Pass either the variable name, or a set of value:suffix pairs for a
     lookup.
-    '''
+    """
     if res.has_children():
         val = inst.fixup[res['variable', '']]
         for rep in res:  # lookup the number to determine the appending value
@@ -427,10 +427,10 @@ def res_add_inst_var(inst, res):
 
 
 def res_add_variant(inst, res):
-    '''This allows using a random instance from a weighted group.
+    """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form "_var4".
-    '''
+    """
     if inst['targetname', ''] == '':
         # some instances don't get names, so use the global
         # seed instead for stuff like elevators.
@@ -441,10 +441,10 @@ def res_add_variant(inst, res):
 
 
 def res_add_global_inst(_, res):
-    '''Add one instance in a location.
+    """Add one instance in a location.
 
     Once this is executed, it will be ignored thereafter.
-    '''
+    """
     if res.value is not None:
         if (res['file'] not in GLOBAL_INSTANCES or
                 res['allow_multiple', '0'] == '1'):
@@ -469,7 +469,7 @@ def res_add_global_inst(_, res):
 
 
 def res_add_overlay_inst(inst, res):
-    '''Add another instance on top of this one.'''
+    """Add another instance on top of this one."""
     print('adding overlay', res['file'])
     VMF.create_ent(
         classname='func_instance',
@@ -482,10 +482,10 @@ def res_add_overlay_inst(inst, res):
 
 
 def res_cust_output(inst, res):
-    '''Add an additional output to the instance with any values.
+    """Add an additional output to the instance with any values.
 
     Always points to the targeted item.
-    '''
+    """
     over_name = '@' + inst['targetname'] + '_indicator'
     for toggle in VMF.by_class['func_instance']:
         if toggle.fixup['indicator_name', ''] == over_name:

@@ -91,9 +91,9 @@ def set_screen_type():
 
 
 def make_pane(tool_frame):
-    '''Create the compiler options pane.
+    """Create the compiler options pane.
 
-    '''
+    """
     global window
     window = SubPane(
         TK_ROOT,

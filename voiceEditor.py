@@ -110,7 +110,7 @@ def init_widgets():
     pane.rowconfigure(1, minsize=100)
 
 def quote_sort_func(quote):
-    '''The quotes will be sorted by their priority value.'''
+    """The quotes will be sorted by their priority value."""
     try:
         return float(quote['priority', '0'])
     except ValueError:
@@ -142,7 +142,7 @@ def show_trans(e):
 
 
 def check_toggled(var, config_section, quote_id):
-    '''Update the config file to match the checkbox.'''
+    """Update the config file to match the checkbox."""
     config_section[quote_id] = utils.bool_as_int(var.get())
 
 
@@ -208,7 +208,7 @@ def refresh(e=None):
     notebook.select(current_tab)
 
 def show(quote_pack):
-    '''Display the editing window.'''
+    """Display the editing window."""
     global voice_item, config_sp, config_coop, config_mid_sp, config_mid_coop
     voice_item = quote_pack
 
@@ -252,7 +252,7 @@ def show(quote_pack):
 
 
 def add_tabs(quote_data, section, tab_dict, config):
-    '''Add all the tabs for one of the game modes.'''
+    """Add all the tabs for one of the game modes."""
     for group in quote_data.find_all(section, 'group'):
         make_tab(
             group,
@@ -273,7 +273,7 @@ def add_tabs(quote_data, section, tab_dict, config):
 
 
 def make_tab(group, tab_dict, config, is_mid=False):
-    '''Create all the widgets for a tab.'''
+    """Create all the widgets for a tab."""
     group_name = group['name', 'No Name!']
     group_desc = group['desc', '']
     # This is just to hold the canvas and scrollbar
