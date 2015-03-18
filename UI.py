@@ -487,7 +487,7 @@ def load_packages(data):
             sel_list.append(selWinItem(
                 obj.id,
                 obj.short_name,
-                longName=obj.name,
+                long_name=obj.name,
                 icon=obj.icon,
                 authors=obj.auth,
                 desc=obj.desc,
@@ -652,11 +652,20 @@ def refresh_pal_ui():
 
 def export_editoritems(_=None):
     """Export the selected Items and Style into the chosen game."""
+
+    # Convert IntVar to boolean, and only export values in the selected style
+    style_vals = StyleVarPane.tk_vars
     style_vars = {
-        key: (value.get() == 1)
-        for key, value in
-        StyleVarPane.tk_vars.items()
+        var.id: (style_vals[var.id].get() == 1)
+        for var in
+        StyleVarPane.var_list
+        if selected_style in var.styles
     }
+
+    for var_id, _, __ in StyleVarPane.styleOptions:
+        style_vars[var_id] = style_vals[var_id].get() == 1
+
+
     gameMan.selected_game.export(
         styles[selected_style],
         item_list,
