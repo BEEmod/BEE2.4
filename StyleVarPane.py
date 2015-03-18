@@ -60,7 +60,7 @@ def refresh(selected_style):
     en_row = 0
     dis_row = 0
     for var in var_list:
-        if selected_style in var.styles:
+        if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
                 row=en_row,
                 sticky="W",

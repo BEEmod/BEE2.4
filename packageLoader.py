@@ -338,6 +338,7 @@ class Style:
         self.short_name = name if short_name is None else short_name
         self.editor = editor
         self.base_style = base_style
+        self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
         if config is None:
@@ -704,10 +705,22 @@ class StyleVar:
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
 
+    def applies_to_style(self, style):
+        """Check to see if this will apply for the given style.
+
+        """
+        if style.id in self.styles:
+            return True
+
+        return any(
+            base in self.styles
+            for base in
+            style.bases
+        )
+
 
 class ElevatorVid:
-    """
-    An elevator video definition.
+    """An elevator video definition.
 
     This is mainly defined just for Valve's items.
     """

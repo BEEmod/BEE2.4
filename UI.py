@@ -655,11 +655,12 @@ def export_editoritems(_=None):
 
     # Convert IntVar to boolean, and only export values in the selected style
     style_vals = StyleVarPane.tk_vars
+    chosen_style = styles[selected_style]
     style_vars = {
         var.id: (style_vals[var.id].get() == 1)
         for var in
         StyleVarPane.var_list
-        if selected_style in var.styles
+        if var.applies_to_style(chosen_style)
     }
 
     for var_id, _, __ in StyleVarPane.styleOptions:
@@ -667,7 +668,7 @@ def export_editoritems(_=None):
 
 
     gameMan.selected_game.export(
-        styles[selected_style],
+        chosen_style,
         item_list,
         music=musics.get(music_win.chosen_id, None),
         skybox=skyboxes.get(skybox_win.chosen_id, None),
@@ -1711,18 +1712,20 @@ def init_windows():
         selected_style = style_id
         GEN_OPTS['Last_Selected']['Style'] = style_id
 
+        style_obj = styles[selected_style]
+
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything
 
         # Disable this if the style doesn't have elevators
-        elev_win.readonly = not styles[selected_style].has_video
+        elev_win.readonly = not style_obj.has_video
 
-        sugg = styles[selected_style].suggested
+        sugg = style_obj.suggested
         win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()
-        StyleVarPane.refresh(selected_style)
+        StyleVarPane.refresh(style_obj)
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
