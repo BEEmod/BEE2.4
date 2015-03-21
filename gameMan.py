@@ -1,14 +1,18 @@
 """
-Handles locating parts of a given game, and modifying GameInfo to support our special content folder.
+Does stuff related to the actual games.
+- Adding and removing games
+- Handles locating parts of a given game,
+- Modifying GameInfo to support our special content folder.
+- Generating and saving editoritems/vbsp_config
 """
 import os
 import os.path
 import shutil
 from BEE2_config import ConfigFile
 
-from tkinter import * # ui library
-from tkinter import messagebox # simple, standard modal dialogs
-from tkinter import filedialog # open/save as dialog creator
+from tkinter import *  # ui library
+from tkinter import messagebox  # simple, standard modal dialogs
+from tkinter import filedialog  # open/save as dialog creator
 from tk_root import TK_ROOT
 
 from query_dialogs import ask_string
@@ -28,6 +32,13 @@ FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
     ('VBSP',        'bin/vbsp',                         '.exe'),
     ('VRAD',        'bin/vrad',                         '.exe')
+]
+
+VOICE_PATHS = [
+    ('SP', 'SP'),
+    ('COOP', 'Coop'),
+    ('MID_SP', 'Mid SP'),
+    ('MID_COOP', 'Mid Coop'),
 ]
 
 _UNLOCK_ITEMS = [
@@ -117,7 +128,7 @@ class Game:
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
-                with open(info_path, 'r') as file:
+                with open(info_path) as file:
                     data = list(file)
 
                 for line_num, line in reversed(enumerate(data)):
@@ -190,9 +201,12 @@ class Game:
             voice,
             style_vars,
             elevator,
-        ):
+            ):
         """Generate the editoritems.txt and vbsp_config.
 
+        - If no backup is present, the original editoritems is backed up
+        - We unlock the mandatory items if specified
+        -
         """
         print('--------------------')
         print('Exporting Items and Style for "' + self.name + '"!')
@@ -204,7 +218,7 @@ class Game:
         print('Elevator = ', elevator)
         print('Style Vars:\n  {')
         for key, val in style_vars.items():
-            print('  ' + key + ' = ' + str(val))
+            print('  {} = {!s}'.format(key, val))
         print('  }')
 
         vbsp_config = style.config.copy()
@@ -293,6 +307,17 @@ class Game:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
 
+        for prefix, pretty in VOICE_PATHS:
+            path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
+            if os.path.isfile(path):
+                shutil.copy(
+                    path,
+                    self.abs_path('bin/bee2/{}.cfg'.format(prefix))
+                )
+                print('Written "{}.cfg"'.format(prefix))
+            else:
+                print('No ' + pretty + ' voice config!')
+
 
 def find_steam_info(game_dir):
     """Determine the steam ID and game name of this folder, if it has one.
@@ -310,10 +335,10 @@ def find_steam_info(game_dir):
                 for line in file:
                     clean_line = utils.clean_line(line).replace('\t', ' ')
                     if not found_id and 'steamappid' in clean_line.casefold():
-                        ID = clean_line.casefold().replace(
+                        raw_id = clean_line.casefold().replace(
                             'steamappid', '').strip()
                         try:
-                            game_id = int(ID)
+                            game_id = int(raw_id)
                         except ValueError:
                             pass
                     elif not found_name and 'game ' in clean_line.casefold():
@@ -364,7 +389,7 @@ def load(ui_quit_func, load_screen_window):
     selected_game = all_games[0]
 
 
-def add_game(e=None, refresh_menu=True):
+def add_game(_=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
@@ -380,8 +405,8 @@ def add_game(e=None, refresh_menu=True):
         )
     if exe_loc:
         folder = os.path.dirname(exe_loc)
-        id, name = find_steam_info(folder)
-        if name == "ERR" or id == -1:
+        gm_id, name = find_steam_info(folder)
+        if name == "ERR" or gm_id == -1:
             messagebox.showinfo(
                 message='This does not appear to be a valid game folder!',
                 parent=TK_ROOT,
@@ -414,7 +439,7 @@ def add_game(e=None, refresh_menu=True):
             else:
                 break
 
-        new_game = Game(name, id, folder)
+        new_game = Game(name, gm_id, folder)
         new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
         if refresh_menu:
@@ -423,7 +448,7 @@ def add_game(e=None, refresh_menu=True):
         return True
 
 
-def remove_game(e=None):
+def remove_game(_=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game, selectedGame_radio
     confirm = messagebox.askyesno(
@@ -491,11 +516,11 @@ def set_game_by_name(name):
 if __name__ == '__main__':
     Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
     Button(TK_ROOT, text='Remove', command=remove_game).grid(row=0, column=1)
-    menu = Menu(TK_ROOT)
-    dropdown = Menu(menu)
-    menu.add_cascade(menu=dropdown, label='Game')
+    test_menu = Menu(TK_ROOT)
+    dropdown = Menu(test_menu)
+    test_menu.add_cascade(menu=dropdown, label='Game')
     dropdown.game_pos = 0
-    TK_ROOT['menu'] = menu
+    TK_ROOT['menu'] = test_menu
 
     init_trans()
     load(quit, Toplevel())
