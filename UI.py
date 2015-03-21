@@ -267,7 +267,7 @@ class Item:
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item, sub, is_pre):
-        "Create a label to show an item onscreen."
+        """Create a label to show an item onscreen."""
         super().__init__(
             frame,
             font=("Courier", 24, "bold"),
@@ -619,7 +619,7 @@ def suggested_refresh():
 
 
 def refresh_pal_ui():
-    "Update the UI to show the correct palettes."
+    """Update the UI to show the correct palettes."""
     palettes.sort(key=str)  # sort by name
     UI['palette'].delete(0, END)
     for i, pal in enumerate(palettes):
@@ -661,7 +661,6 @@ def export_editoritems(_=None):
 
     for var_id, _, __ in StyleVarPane.styleOptions:
         style_vars[var_id] = style_vals[var_id].get() == 1
-
 
     gameMan.selected_game.export(
         chosen_style,
@@ -721,7 +720,7 @@ def conv_screen_to_grid(x, y):
 
 
 def drag_start(e):
-    "Start dragging a palette item."
+    """Start dragging a palette item."""
     global drag_onPal, drag_item, drag_passedPal
     drag_win = windows['drag_win']
     drag_item = e.widget
@@ -742,7 +741,7 @@ def drag_start(e):
             allow_single=False,
             )
     else:
-        drag_onPal=drag_item.on_pal()
+        drag_onPal = drag_item.on_pal()
         UI['drag_lbl']['image'] = drag_item.item.get_icon(
             drag_item.subKey,
             allow_single=True,
@@ -761,7 +760,7 @@ def drag_start(e):
 
 
 def drag_stop(e):
-    "User released the mouse button, complete the drag."
+    """User released the mouse button, complete the drag."""
     global drag_item
     drag_win = windows['drag_win']
     drag_win.withdraw()
@@ -771,7 +770,7 @@ def drag_stop(e):
     UI['pre_sel_line'].place_forget()
     snd.fx('config')
 
-    pos_x, pos_y = conv_screen_to_grid(e.x_root,e.y_root)
+    pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     ind = pos_x+pos_y*4
 
     # this prevents a single click on the picker from clearing items
@@ -828,7 +827,7 @@ def drag_fast(e):
         snd.fx('delete')
         e.widget.kill()  # remove the clicked item
     else:  # over the picker
-        if len(pal_picked) < 32: # can't copy if there isn't room
+        if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
             new_item = e.widget.copy(frames['preview'])
             new_item.is_pre = True
@@ -845,13 +844,13 @@ def set_pal_radio():
     set_palette()
 
 
-def set_pal_listbox_selection(e=None):
+def set_pal_listbox_selection(_=None):
     """Select the currently chosen palette in the listbox."""
-    UI['palette'].selection_clear(0,len(palettes))
+    UI['palette'].selection_clear(0, len(palettes))
     UI['palette'].selection_set(selectedPalette)
 
 
-def set_palette(e=None):
+def set_palette(_=None):
     """Select a palette."""
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
@@ -882,7 +881,7 @@ def pal_clear():
     flow_preview()
 
 
-def pal_save_as(e=None):
+def pal_save_as(_=None):
     name = ""
     while True:
         name = ask_string(
@@ -906,10 +905,10 @@ def pal_save_as(e=None):
     refresh_pal_ui()
 
 
-def pal_save(e=None):
-    pal=palettes[selectedPalette]
+def pal_save(_=None):
+    pal = palettes[selectedPalette]
     pal.pos = [(it.id, it.subKey) for it in pal_picked]
-    pal.save(allow_overwrite=True) # overwrite it
+    pal.save(allow_overwrite=True)  # overwrite it
     refresh_pal_ui()
 
 
@@ -920,7 +919,7 @@ def pal_remove():
         if messagebox.askyesno(
                 title='BEE2',
                 message='Are you sure you want to delete "'
-                    + pal.name + '"?',
+                        + pal.name + '"?',
                 parent=TK_ROOT,
                 ):
             pal.delete_from_disk()
@@ -992,7 +991,7 @@ def init_palette(f):
     UI['palette'] = Listbox(f, width=10)
     UI['palette'].grid(row=1, sticky="NSEW")
 
-    def set_pal_listbox(e=None):
+    def set_pal_listbox(_=None):
         global selectedPalette
         selectedPalette = int(UI['palette'].curselection()[0])
         selectedPalette_radio.set(selectedPalette)
@@ -1112,7 +1111,7 @@ def flow_preview():
         # these can be referred to to figure out where it is
         item.pre_x = i % 4
         item.pre_y = i // 4
-        item.place(x=(i%4*65+4),y=(i//4*65+32))
+        item.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
         # Check to see if this should use the single-icon
         item.load_data()
         item.lift()
@@ -1133,19 +1132,19 @@ def init_preview(f):
      This shows the items that will export to the palette.
     """
     global pal_picked_fake
-    UI['pre_bg_img']=Label(
+    UI['pre_bg_img'] = Label(
         f,
         bg=ItemsBG,
         image=png.png('BEE2/menu'),
         )
-    UI['pre_bg_img'].grid(row=0,column=0)
+    UI['pre_bg_img'].grid(row=0, column=0)
 
     UI['pre_disp_name'] = ttk.Label(
         f,
         text="Item: Button",
         style='BG.TLabel',
         )
-    UI['pre_disp_name'].place(x=10,y=552)
+    UI['pre_disp_name'].place(x=10, y=552)
 
     UI['pre_sel_line'] = Label(
         f,
@@ -1177,7 +1176,7 @@ def init_picker(f):
             column=0,
             sticky="EW",
             )
-    cframe=ttk.Frame(
+    cframe = ttk.Frame(
         f,
         borderwidth=4,
         relief="sunken",
@@ -1197,15 +1196,15 @@ def init_picker(f):
     pal_canvas['yscrollcommand'] = scroll.set
 
     # add another frame inside to place labels on
-    frmScroll=ttk.Frame(pal_canvas)
+    frmScroll = ttk.Frame(pal_canvas)
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
     for item in item_list.values():
-        for i in range(0,item.num_sub):
+        for i in range(0, item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(e=None):
+def flow_picker(_=None):
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1230,7 +1229,7 @@ def flow_picker(e=None):
     vis_items = [it for it in pal_items if it.visible]
     num_items = len(vis_items)
     for i, item in enumerate(vis_items):
-        item.is_pre=False
+        item.is_pre = False
         item.place(
             x=((i % width) * 65 + 1),
             y=((i // width) * 65 + offset + 1),
@@ -1335,14 +1334,14 @@ def init_filter(f):
     # Not added to window, we add it below the others to expand the
     # lists
 
-    def expand(e):
+    def expand(_):
         frames['filter_expanded'].grid(row=2, column=0, columnspan=3)
         frames['filter']['borderwidth'] = 4
         frames['filter'].expanded = True
         snd.fx('expand')
         flow_picker()
 
-    def contract(e):
+    def contract(_):
         frames['filter_expanded'].grid_remove()
         frames['filter']['borderwidth'] = 0
         frames['filter'].expanded = False
@@ -1423,7 +1422,6 @@ def init_menu_bar(win):
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game)
     gameMan.game_menu = menus['file']
-
 
     menus['pal'] = Menu(bar)
     pal_menu = menus['pal']
