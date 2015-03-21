@@ -5,7 +5,7 @@ from tkinter import ttk
 import functools
 import operator
 
-import tkinter_png as png
+import BEE_png as png
 
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane
@@ -103,7 +103,7 @@ def make_pane(tool_frame):
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
-        tool_img=png.loadPng('icons/win_stylevar'),
+        tool_img=png.png('icons/win_stylevar'),
         tool_col=2,
     )
 

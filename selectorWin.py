@@ -10,7 +10,7 @@ from tkinter import ttk  # themed ui components that match the OS
 import functools
 import math
 
-import tkinter_png as png  # png library for TKinter
+import BEE_png as png  # png library for TKinter
 from richTextBox import tkRichText
 
 ICON_SIZE = 96  # Size of the selector win icons
@@ -65,10 +65,10 @@ class Item:
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = png.loadPng('BEE2/blank_96')
+            self.icon = png.png('BEE2/blank_96')
             self.ico_file = 'BEE2/blank_96'
         else:
-            self.icon = png.loadPng(icon)
+            self.icon = png.png(icon)
             self.ico_file = icon
         self.desc = desc
         self.authors = [] if authors is None else authors
@@ -143,7 +143,7 @@ class selWin:
           context menu.
         """
         self.noneItem = Item('NONE', '', desc=none_desc)
-        self.noneItem.icon = png.loadPng('BEE2/none_96')
+        self.noneItem.icon = png.png('BEE2/none_96')
         self.disp_label = StringVar()
         self.display = None
         self.disp_btn = None
@@ -220,7 +220,7 @@ class selWin:
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = png.loadPng('BEE2/blank')
+        self.prop_icon.img = png.png('BEE2/blank')
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column=0)
 
@@ -574,7 +574,7 @@ if __name__ == '__main__':  # test the window if directly executing this file
     from tk_root import TK_ROOT
     lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
     lbl.grid()
-    png.img_error = png.loadPng('BEE2/error')
+    png.img_error = png.png('BEE2/error')
     TK_ROOT.geometry("+500+500")
 
     test_list = [

@@ -15,7 +15,7 @@ from functools import partial as func_partial
 import webbrowser
 
 from richTextBox import tkRichText
-import tkinter_png as png
+import BEE_png as png
 import sound as snd
 import itemPropWin
 import utils
@@ -187,7 +187,7 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem'][ind]['image'] = png.loadPng('BEE2/alpha_64')
+            wid['subitem'][ind]['image'] = png.png('BEE2/alpha_64')
         else:
             wid['subitem'][ind]['image'] = selected_item.get_icon(pos)
         wid['subitem'][ind]['relief'] = 'flat'
@@ -266,26 +266,26 @@ def load_item_data():
 
     if has_inputs:
         if has_polarity:
-            wid['sprite'][0]['image'] = png.loadSpr('in_polarity')
+            wid['sprite'][0]['image'] = png.spr('in_polarity')
         else:
-            wid['sprite'][0]['image'] = png.loadSpr('in_norm')
+            wid['sprite'][0]['image'] = png.spr('in_norm')
     else:
-        wid['sprite'][0]['image'] = png.loadSpr('in_none')
+        wid['sprite'][0]['image'] = png.spr('in_none')
 
     if has_outputs:
         if has_timer:
-            wid['sprite'][1]['image'] = png.loadSpr('out_tim')
+            wid['sprite'][1]['image'] = png.spr('out_tim')
         else:
-            wid['sprite'][1]['image'] = png.loadSpr('out_norm')
+            wid['sprite'][1]['image'] = png.spr('out_norm')
     else:
-        wid['sprite'][1]['image'] = png.loadSpr('out_none')
+        wid['sprite'][1]['image'] = png.spr('out_none')
 
-    wid['sprite'][2]['image'] = png.loadSpr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
+    wid['sprite'][2]['image'] = png.spr(ROT_TYPES.get(rot_type.casefold(), 'rot_none'))
 
     if is_embed:
-        wid['sprite'][3]['image'] = png.loadSpr('space_embed')
+        wid['sprite'][3]['image'] = png.spr('space_embed')
     else:
-        wid['sprite'][3]['image'] = png.loadSpr('space_none')
+        wid['sprite'][3]['image'] = png.spr('space_none')
 
     face_spr = "surf"
     if not surf_wall:
@@ -296,7 +296,7 @@ def load_item_data():
         face_spr += "_ceil"
     if face_spr == "surf":
         face_spr += "_none"
-    wid['sprite'][4]['image'] = png.loadSpr(face_spr)
+    wid['sprite'][4]['image'] = png.spr(face_spr)
 
 
 def follow_main(e=None):
@@ -350,7 +350,7 @@ def init_widgets():
         text="2",
         anchor="e",
         compound="left",
-        image=png.loadSpr('gear_ent'),
+        image=png.spr('gear_ent'),
         )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
 
@@ -362,7 +362,7 @@ def init_widgets():
     for i, _ in enumerate(wid['subitem']):
         wid['subitem'][i] = ttk.Label(
             sub_frame,
-            image=png.loadPng('BEE2/alpha_64'),
+            image=png.png('BEE2/alpha_64'),
         )
         wid['subitem'][i].grid(row=0, column=i)
         wid['subitem'][i].bind('<Button-1>', func_partial(sub_sel, i))
@@ -383,7 +383,7 @@ def init_widgets():
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
     for i in range(5):
-        spr=png.loadSpr('ap_grey')
+        spr=png.spr('ap_grey')
         wid['sprite'][i] = ttk.Label(spr_frame, image=spr, relief="raised")
         wid['sprite'][i].grid(row=0, column=i)
 

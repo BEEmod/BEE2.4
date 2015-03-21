@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 from os import path
 
-import tkinter_png as png
+import BEE_png as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from SubPane import SubPane
@@ -103,7 +103,7 @@ def make_pane(tool_frame):
         resize_x=False,
         resize_y=False,
         tool_frame=tool_frame,
-        tool_img=png.loadPng('icons/win_compiler'),
+        tool_img=png.png('icons/win_compiler'),
         tool_col=3,
     )
     window.columnconfigure(0, weight=1)
@@ -248,7 +248,7 @@ def make_pane(tool_frame):
 
     ttk.Button(
         count_frame,
-        image=png.loadPng('icons/tool_sub'),
+        image=png.png('icons/tool_sub'),
         command=refresh_counts,
     ).grid(row=3, column=1)
 

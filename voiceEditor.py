@@ -8,7 +8,7 @@ import itertools
 import functools
 
 from BEE2_config import ConfigFile
-import tkinter_png as png
+import BEE_png as png
 import utils
 
 voice_item = None
@@ -186,7 +186,7 @@ def refresh(e=None):
                 notebook.tab(
                     tab,
                     compound='image',
-                    image=png.loadPng('icons/mid_quote'),
+                    image=png.png('icons/mid_quote'),
                     )
             else:
                 notebook.tab(tab, text=tab.nb_text)
@@ -198,7 +198,7 @@ def refresh(e=None):
                 notebook.tab(
                     tab,
                     compound='image',
-                    image=png.loadPng('icons/mid_quote'),
+                    image=png.png('icons/mid_quote'),
                     )
             else:
                 notebook.tab(tab, text=tab.nb_text)

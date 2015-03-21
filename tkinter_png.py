@@ -1,7 +1,5 @@
-from array import *
 from tkinter import *
 import png
-import os.path
 
 # tkinter-png - example of using tkinter and pypng to display pngs (albeit reduced quality)
 # in nothing but pure python. Can use RGBA images, but alpha is opaque or transparent only.
@@ -14,11 +12,11 @@ class PhotoImage(PhotoImage):
   def transGet(self, x, y):
     """Returns a boolean if pixel at (x,y) is transparent"""
     return self.tk.call(self.name, "transparency", "get", x, y)
-  
+
   def transSet(self, x, y, alpha):
     """Makes the pixel at (x,y) transparent if alpha is is true or opaque otherwise"""
     self.tk.call(self.name, "transparency", "set", x, y, alpha)
-  
+
   # tkinter already has a gimped version of copy, but it's pretty useless
   # this version is still lacking and doesn't have all options, but is actually usable
   def copy(self, sourceImage, fromBox=None, toBox=None):
@@ -33,11 +31,11 @@ class PhotoImage(PhotoImage):
         toBox = toBox[1:]
       args = args + ("-to",) + tuple(toBox)
     self.tk.call(args)
-  
+
   def redither(self):
     """Recalculate dithering used in PhotoImages to fix errors that may occur if image data was supplied in chunks"""
     self.tk.call(self.name, "redither")
-  
+
   def data(self, bg=None, fromBox=None, grey=None):
     """Returns image data in the form of a string"""
     args = (self.name, "data")
@@ -79,7 +77,7 @@ class PngImageTk(object):
     rep += "Greyscale:", self.meta["greyscale"], "\n"
     rep += "Alpha:", self.meta["alpha"], "\n"
     return rep
-    
+
   # Used to split each row into pairs of RGB or RGBA values
   def chunks(self, l, n):
     return [l[i:i+n] for i in range(0, len(l), n)]
@@ -93,9 +91,9 @@ class PngImageTk(object):
     else:
       values = 3
       alphapixels = False
-      
+
     pixelrows = []
-    
+
     # Possible optimisation by minimising re-evaluation of dot notation in loops
     p_append = pixelrows.append
     pixeldata = self.pixeldata
@@ -107,74 +105,29 @@ class PngImageTk(object):
     h = self.h
     put = self.image.put
     transSet = self.image.transSet
-    
+
     for row in pixeldata:
       row = row.tolist() #convert from array to list
       chunked = chunks(row, values) #RGB/RGBA format = 3/4 values
-            
+
       for item in chunked:
         if alpha == True:
           # if 100% transparent, remember this pixel so we can make it transparent later
           if item[3] == 0:
             a_append((x, y))
           del item[-1] #remove alpha bit
-          
+
           # Increment position, used for tracking coordinates of transparent pixels
           x += 1
           if x == w:
             y += 1
             x = 0
-            
+
       p_append(["#%02x%02x%02x" % tuple(item) for item in chunked])
-    
+
     pixelrows = tuple(tuple(x) for x in pixelrows) #convert our list of lists into a tuple of tuples
     put(pixelrows,(0,0, w,h)) #pixels are finally written to the PhotoImage
     # If we have alphapixels, set each stored coordinate to transparent
     if alphapixels:
       for item in alphapixels:
-        transSet(item[0],item[1], "True")
-
-# BEE2 png handlers
-
-loaded_png = {}
-loaded_spr = {}
-
-def loadPng(path):
-    "Loads in and converts a png for use in TKinter."
-    if not path.casefold().endswith(".png"):
-        path=path+".png"
-    orig_path = path
-    if path in loaded_png:
-        return loaded_png[path]
-    else:
-        if not os.path.isfile("images/" + path):
-            # If not in the main folder, load from the zip-cache
-            path = os.path.join("cache/", path)
-        path = os.path.normpath(os.path.join("images", path))
-        if not os.path.isfile(path):
-            print('ERROR: "images\\' + orig_path + '" does not exist!')
-            return img_error
-        tmp=PngImageTk(path)
-        #print('Loading "' + path + '"')
-        tmp.convert() # NOTE - this command would use CPU a lot, try to avoid running unnecessarily!
-        loaded_png[orig_path] = tmp.image
-        return tmp.image
-
-def loadSpr(name):
-  "load in the property icons and automatically double the dimensions."
-  if name in loaded_spr:
-    return loaded_spr[name]
-  else:
-      ico=loadPng('icons/'+name).zoom(2)
-      loaded_spr[name] = ico
-      return ico
-
-def loadIcon(name): 
-  "Load in a palette icon, ensuring the correct size."
-  name= "items/" + name
-  img=loadPng(name)
-  if img.width() != 64 or img.height() != 64:
-    print("ERROR: \"" + name + "\" is not 64x64!")
-    return img_error
-  else:
-    return img
+        transSet(item[0], item[1], "True")
