@@ -121,7 +121,7 @@ class VMF:
     """
     def __init__(
             self,
-            map_info={},
+            map_info=utils.EmptyMapping,
             spawn=None,
             entities=None,
             brushes=None,
@@ -261,7 +261,6 @@ class VMF:
         cam_props = tree.find_key('cameras', [])
         map_info['active_cam'] = conv_int((cam_props['activecamera', '']), -1)
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
-
 
         map_obj = VMF(map_info=map_info)
 
@@ -410,7 +409,7 @@ class VMF:
             else:
                 yield ent
 
-    def iter_ents_tags(self, vals={}, tags={}):
+    def iter_ents_tags(self, vals=utils.EmptyMapping, tags=utils.EmptyMapping):
         """Iterate through all entities.
 
         The returned entities must have exactly the given keyvalue values,
@@ -734,7 +733,7 @@ class Side:
                 (0, 0, 0),
                 (0, 0, 0)
                 ],
-            opt={},
+            opt=utils.EmptyMapping,
             des_id=-1,
             disp_data={},
             ):
@@ -1159,7 +1158,7 @@ class Entity:
                     yield face
 
     def add_out(self, output):
-        "Add the output to our list."
+        """Add the output to our list."""
         self.outputs.append(output)
 
     def remove(self):
@@ -1413,7 +1412,7 @@ class Output:
 
     @staticmethod
     def parse(prop):
-        "Convert the VMF Property into an Output object."
+        """Convert the VMF Property into an Output object."""
         if chr(27) in prop.value:
             sep = False
             vals = prop.value.split(chr(27))

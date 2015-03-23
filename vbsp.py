@@ -168,9 +168,9 @@ INST_FILE = {
     "indPanTimer":  "indicator_panel.vmf",
 }
 
-for key, value in INST_FILE.items():
+for inst_key, inst_value in INST_FILE.items():
     # Add the path to all the default values
-    INST_FILE[key] = 'instances/p2editor/' + value
+    INST_FILE[inst_key] = 'instances/p2editor/' + inst_value
 
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
@@ -273,7 +273,9 @@ def alter_mat(face, seed=None):
     else:
         return False
 
-##### MAIN functions ######
+##################
+# MAIN functions #
+##################
 
 
 def load_settings():
@@ -288,10 +290,10 @@ def load_settings():
 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
 
-    for item, key in tex_defaults: # collect textures from config
+    for item, key in tex_defaults:  # collect textures from config
         cat, name = key.split(".")
         value = [prop.value for prop in conf.find_all('textures', cat, name)]
-        if len(value)==0:
+        if len(value) == 0:
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
@@ -314,7 +316,7 @@ def load_settings():
         for item, key in TEX_FIZZLER.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
-        for key,item in FIZZ_OPTIONS.items():
+        for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
     for prop in conf.find_all('instancefiles'):
@@ -389,10 +391,11 @@ def add_voice(voice_config, mode):
 
     voiceLine.add_voice(
         voice_data=data,
-        map_attr=settings['has_attr'],
-        style_vars=settings['style_vars'],
-        VMF=VMF,
-        config=voice_config,
+        has_items=settings['has_attr'],
+        style_vars_=settings['style_vars'],
+        vmf_file=VMF,
+        timer_config=voice_config,
+        mode=mode,
         )
 
 
@@ -579,8 +582,6 @@ def make_bottomless_pit(solids):
                                 ),
                             angles=angle
                         ).make_unique()
-
-
 
 
 def change_brush():

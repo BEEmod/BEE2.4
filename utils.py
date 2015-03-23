@@ -102,6 +102,44 @@ def center_win(window):
     window.geometry('+' + str(x) + '+' + str(y))
 
 
+class EmptyMapping(abc.Mapping):
+    """A Mapping class which is always empty."""
+    __slots__ = []
+
+    def __call__(self):
+        return EmptyMapping
+
+
+    def __getitem__(self, item):
+        raise KeyError
+
+    def __contains__(self, item):
+        return False
+
+    def get(self, item, default=None):
+        return default
+
+    def __next__(self):
+        raise StopIteration
+
+    def __len__(self):
+        return 0
+
+    def __iter__(self):
+        return self
+
+    def items(self):
+        return self
+
+    def values(self):
+        return self
+
+    def keys(self):
+        return self
+
+EmptyMapping = EmptyMapping()
+
+
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
 
