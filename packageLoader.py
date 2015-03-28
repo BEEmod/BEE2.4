@@ -5,6 +5,7 @@ import os
 import os.path
 import shutil
 from zipfile import ZipFile
+from collections import defaultdict
 
 
 from property_parser import Property, NoKeyError
@@ -83,14 +84,14 @@ def load_packages(pak_dir, load_res):
 
         for obj_type in obj_types:
             all_obj[obj_type] = {}
-            obj_override[obj_type] = {}
+            obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
         objects = 0
         for pak_id, zip_file, info, name, dispName in packages.values():
             print("Scanning package '" + pak_id + "'")
-            new_objs = parse_package(zip_file, info, pak_id, dispName)
-            objects += new_objs
+            obj_count = parse_package(zip_file, info, pak_id, dispName)
+            objects += obj_count
             loadScreen.step("PAK")
             print("Done!")
 
@@ -116,14 +117,14 @@ def load_packages(pak_dir, load_res):
 
                 object_.pak_id = obj_data[2]
                 object_.pak_name = obj_data[3]
-                if obj_id in obj_override[obj_type]:
-                    for zip_file, info_block in obj_override[obj_type][obj_id]:
-                        override = obj_types[obj_type].parse(
-                            zip_file,
-                            obj_id,
-                            info_block,
-                            )
-                        object_.add_over(override)
+                for zip_file, info_block in \
+                        obj_override[obj_type].get(obj_id, []):
+                    override = obj_types[obj_type].parse(
+                        zip_file,
+                        obj_id,
+                        info_block,
+                        )
+                    object_.add_over(override)
                 data[obj_type].append(object_)
                 loadScreen.step("OBJ")
         if load_res:
@@ -178,19 +179,19 @@ def parse_package(zip_file, info, pak_id, disp_name):
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in obj_types:
+        # Look for overrides
+        for obj in info.find_all("Overrides", comp_type):
+            obj_id = obj['id']
+            obj_override[comp_type][obj_id].append(
+                (zip_file, obj)
+            )
+
         for obj in info.find_all(comp_type):
             obj_id = obj['id']
-            is_sub = obj['overrideOrig', '0'] == '1'
-            if is_sub:
-                if obj_id in obj_override[comp_type]:
-                    obj_override[comp_type][obj_id].append((zip_file, obj))
-                else:
-                    obj_override[comp_type][obj_id] = [(zip_file, obj)]
-            else:
-                if obj_id in all_obj[comp_type]:
-                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
-                objects += 1
-                all_obj[comp_type][obj_id] = (zip_file, obj, pak_id, disp_name)
+            if obj_id in all_obj[comp_type]:
+                raise Exception('ERROR! "' + obj_id + '" defined twice!')
+            objects += 1
+            all_obj[comp_type][obj_id] = (zip_file, obj, pak_id, disp_name)
 
     if res_count != -1:
         for item in zip_file.namelist():
@@ -239,6 +240,7 @@ def setup_style_tree(item_data, style_data):
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
         for vers in all_ver:
+            print(item.id, vers['styles'].keys())
             for sty_id, style in all_styles.items():
                 if sty_id in vers['styles']:
                     continue  # We already have a definition
@@ -256,6 +258,7 @@ def setup_style_tree(item_data, style_data):
                         # For versions other than the first, use
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
+            print(item.id, vers['styles'].keys())
 
 
 def parse_item_folder(folders, zip_file):
@@ -350,7 +353,7 @@ class Style:
     def parse(cls, zip_file, style_id, info):
         """Parse a style definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
-        base = info['base', 'NONE']
+        base = info['base', '']
         has_video = info['has_video', '1'] == '1'
 
         sugg = info.find_key('suggested', [])
@@ -364,7 +367,7 @@ class Style:
 
         if short_name == '':
             short_name = None
-        if base == 'NONE':
+        if base == '':
             base = None
         files = zip_file.namelist()
         folder = 'styles/' + info['folder']
@@ -427,7 +430,7 @@ class Item:
                 for sty in sty_list:
                     if vals['def_style'] is None:
                         vals['def_style'] = sty.value
-                    vals['styles'][sty.name] = sty.value
+                    vals['styles'][sty.real_name] = sty.value
                     folders[sty.value] = True
             versions[vals['id']] = vals
             if def_version is None:
