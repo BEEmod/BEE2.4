@@ -198,11 +198,11 @@ def run_cond(inst, cond, remove_vmf=True):
         return
     success = True
     for flag in cond.flags:
-        utils.con_log('Flag: ' + repr(flag))
+        # utils.con_log('Flag: ' + repr(flag))
         if not check_flag(flag, inst):
             success = False
             break
-        utils.con_log(success)
+        # utils.con_log(success)
     if remove_vmf:
         # our suffixes won't touch the .vmf extension
         inst['file'] = inst['file', ''][:-4]
@@ -221,11 +221,11 @@ def run_cond(inst, cond, remove_vmf=True):
 
 
 def check_flag(flag, inst):
-    print('Checking {type} ({val!s} on {inst}'.format(
-        type=flag.real_name,
-        val=flag.value,
-        inst=inst['file'],
-    ))
+    # print('Checking {type} ({val!s} on {inst}'.format(
+    #     type=flag.real_name,
+    #     val=flag.value,
+    #     inst=inst['file'],
+    # ))
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:

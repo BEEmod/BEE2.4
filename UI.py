@@ -784,7 +784,7 @@ def drag_stop(e):
             if ind >= len(pal_picked):
                 pal_picked.append(new_item)
             else:
-                pal_picked.insert(ind,new_item)
+                pal_picked.insert(ind, new_item)
             # delete the item - it's fallen off the palette
             if len(pal_picked) > 32:
                 pal_picked.pop().kill()

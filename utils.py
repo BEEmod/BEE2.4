@@ -201,6 +201,8 @@ class Vec:
                 )
             except ValueError:
                 return cls(x, y, z)
+        else:
+            return cls(x, y, z)
 
     @staticmethod
     def make_rot_matrix(pitch, yaw, roll):
@@ -210,25 +212,25 @@ class Vec:
         rotating many vectors by the same angle.
         """
 
-        sin_pitch = math.sin(math.radians(pitch))
-        cos_pitch = math.cos(math.radians(pitch))
+        sin_pitch = math.sin(math.radians(-pitch))
+        cos_pitch = math.cos(math.radians(-pitch))
         sin_yaw = math.sin(math.radians(-yaw))
         cos_yaw = math.cos(math.radians(-yaw))
-        sin_roll = math.sin(math.radians(roll))
-        cos_roll = math.cos(math.radians(roll))
+        sin_roll = math.sin(math.radians(-roll))
+        cos_roll = math.cos(math.radians(-roll))
 
         return [[
-            cos_pitch * cos_roll,
-            -sin_pitch * -sin_yaw,
-            cos_pitch * -sin_yaw * cos_roll,
+            cos_roll * cos_pitch,
+            -sin_roll * -sin_yaw,
+            cos_roll * -sin_yaw * cos_pitch,
             ], [
-            cos_yaw * -sin_roll,
-            -sin_pitch * -sin_yaw * -sin_roll + cos_yaw*cos_roll,
-            cos_pitch * -sin_yaw * -sin_roll + sin_pitch*cos_roll,
+            cos_yaw * -sin_pitch,
+            -sin_roll * -sin_yaw * -sin_pitch + cos_yaw*cos_pitch,
+            cos_roll * -sin_yaw * -sin_pitch + sin_roll*cos_pitch,
             ], [
             sin_yaw,
-            -sin_pitch*cos_yaw,
-            cos_pitch*cos_yaw,
+            -sin_roll*cos_yaw,
+            cos_roll*cos_yaw,
             ]]
 
     def rotate(self, pitch=0, yaw=0, roll=0, matrix=None):
@@ -240,10 +242,9 @@ class Vec:
         """
         if matrix is None:
             matrix = self.make_rot_matrix(pitch, yaw, roll)
-        m = matrix
-        self.x = self.x*m[0][0] + self.y*m[0][1] + self.z*m[0][2]
-        self.y = self.x*m[1][0] + self.y*m[1][1] + self.z*m[1][2]
-        self.z = self.x*m[2][0] + self.y*m[2][1] + self.z*m[2][2]
+        self.x = self.x*matrix[0][0] + self.y*matrix[0][1] + self.z*matrix[0][2]
+        self.y = self.x*matrix[1][0] + self.y*matrix[1][1] + self.z*matrix[1][2]
+        self.z = self.x*matrix[2][0] + self.y*matrix[2][1] + self.z*matrix[2][2]
 
         return self
 
@@ -254,10 +255,9 @@ class Vec:
         """
         if matrix is None:
             matrix = self.make_rot_matrix(pitch, yaw, roll)
-        m = matrix
-        self.x = self.x*m[0][0] + self.y*m[1][0] + self.z*m[2][0]
-        self.y = self.x*m[0][1] + self.y*m[1][1] + self.z*m[2][1]
-        self.z = self.x*m[0][2] + self.y*m[1][2] + self.z*m[2][2]
+        self.x = self.x*matrix[0][0] + self.y*matrix[1][0] + self.z*matrix[2][0]
+        self.y = self.x*matrix[0][1] + self.y*matrix[1][1] + self.z*matrix[2][1]
+        self.z = self.x*matrix[0][2] + self.y*matrix[1][2] + self.z*matrix[2][2]
 
         return self
 

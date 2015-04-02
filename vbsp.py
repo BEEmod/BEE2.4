@@ -69,7 +69,9 @@ TEX_DEFAULTS = [
     ('0.25|signage/indicator_lights/indicator_lights_floor',
         'overlay.antline'),
     ('1|signage/indicator_lights/indicator_lights_corner_floor',
-        'overlay.antlinecorner')
+        'overlay.antlinecorner'),
+    ('', 'overlay.antlinecornerfloor'),
+    ('', 'overlay.antlinefloor'),
     ]
 
 
@@ -102,7 +104,7 @@ GOO_TEX = [
 
 ANTLINES = {
     "signage/indicator_lights/indicator_lights_floor": "antline",
-    "signage/indicator_lights/indicator_lights_corner_floor": "antlinecorner"
+    "signage/indicator_lights/indicator_lights_corner_floor": "antlinecorner",
     }  # these need to be handled separately to accommodate the scale-changing
 
 DEFAULTS = {
@@ -858,6 +860,18 @@ def set_antline_mat(over, mat):
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
+    if get_tex('overlay.' + mat + 'floor') != '':
+        # For P1 style, check to see if the antline is on the floor or
+        # walls.
+        ang = Vec.from_str(over['angles'])
+        direction = round(Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z))
+        utils.con_log('Ant dir: ', over['angles'], direction)
+        if direction == Vec(0, 0, 1) or direction == Vec(0, 0, -1):
+            mat += 'floor'
+            utils.con_log('Floor!')
+
+    mat = get_tex('overlay.' + mat)
+
     mat = mat.split('|')
     if len(mat) == 2:
         # rescale antlines if needed
@@ -880,6 +894,18 @@ def change_overlays():
     if sign_inst == "NONE":
         sign_inst = None
     for over in VMF.by_class['info_overlay']:
+        if (over['targetname'] == 'exitdoor_stickman' or
+                over['targetname'] == 'exitdoor_arrow'):
+            if get_opt("remove_exit_signs") == "1":
+                # Some styles have instance-based ones, remove the
+                # originals if needed to ensure it looks nice.
+                VMF.remove_ent(over)
+                continue  # Break out, to make sure the instance isn't added
+            else:
+                # blank the targetname, so we don't get the
+                # useless info_overlay_accessors for these signs.
+                del over['targetname']
+
         if over['material'].casefold() in TEX_VALVE:
             sign_type = TEX_VALVE[over['material'].casefold()]
             if sign_inst is not None:
@@ -895,26 +921,17 @@ def change_overlays():
 
             over['material'] = get_tex(sign_type)
         if over['material'].casefold() in ANTLINES:
-            angle = over['angles'].split(" ")  # get the three parts
+            # if get_tex('overlay.antlinecorner')
             # TODO: analyse this, determine whether the antline is on
             # the floor or wall (for P1 style)
 
-            new_tex = get_tex(
-                'overlay.' +
-                ANTLINES[over['material'].casefold()]
-                )
-            set_antline_mat(over, new_tex)
+            # new_tex = get_tex(
+            #     'overlay.' +
+            #     ANTLINES[over['material'].casefold()]
+            #     )
+            set_antline_mat(over, ANTLINES[over['material'].casefold()])
 
-        if (over['targetname'] == 'exitdoor_stickman' or
-                over['tagetnamme'] == 'exitdoor_arrow'):
-            if get_opt("remove_exit_signs") == "1":
-                # Some styles have instance-based ones, remove the
-                # originals if needed to ensure it looks nice.
-                VMF.remove_ent(over)
-            else:
-                # blank the targetname, so we don't get the
-                # useless info_overlay_accessors for these signs.
-                del over['targetname']
+
 
 
 def change_trig():
