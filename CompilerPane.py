@@ -19,6 +19,7 @@ COMPILE_DEFAULTS = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
+        'player_model': 'PETI',
         },
     'General': {
         'spawn_elev': 'True',
@@ -30,6 +31,15 @@ COMPILE_DEFAULTS = {
         },
     }
 
+PLAYER_MODELS = {
+    'ATLAS': 'ATLAS',
+    'PBODY': 'P-Body',
+    'SP': 'Chell',
+    'PETI': 'Bendy',
+}
+PLAYER_MODEL_ORDER = ['Bendy', 'Chell', 'ATLAS', 'P-Body']
+PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
+
 COMPILE_CFG = ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window = None
@@ -38,6 +48,12 @@ UI = {}
 chosen_thumb = StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
+player_model_var = StringVar(
+    value=PLAYER_MODELS.get(
+        COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
+        PLAYER_MODELS['PETI'],
+    )
+)
 start_in_elev = IntVar(value=0)
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = StringVar(value='')
@@ -45,6 +61,7 @@ cust_file_loc_var = StringVar(value='')
 count_brush = IntVar(value=0)
 count_ents = IntVar(value=0)
 count_overlay = IntVar(value=0)
+
 
 
 def refresh_counts(reload=True):
@@ -101,6 +118,12 @@ def set_screen_type():
     COMPILE_CFG.save()
 
 
+def set_model(_=None):
+    text = player_model_var.get()
+    COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
+    COMPILE_CFG.save()
+
+
 def make_pane(tool_frame):
     """Create the compiler options pane.
 
@@ -118,9 +141,6 @@ def make_pane(tool_frame):
         tool_col=3,
     )
     window.columnconfigure(0, weight=1)
-
-    UI['game_label'] = ttk.Label(window, text='For: ', font='TkHeadingFont')
-    UI['game_label'].grid(row=0, column=0, sticky=EW)
 
     thumb_frame = ttk.LabelFrame(
         window,
@@ -206,6 +226,24 @@ def make_pane(tool_frame):
 
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
     UI['elev_elevator'].grid(row=0, column=1, sticky=W)
+
+    model_frame = ttk.LabelFrame(
+        window,
+        text='Player Model (SP):',
+        labelanchor=N,
+    )
+    model_frame.grid(row=2, column=0, sticky=EW)
+    UI['player_mdl'] = ttk.Combobox(
+        model_frame,
+        exportselection=0,
+        textvariable=player_model_var,
+        values=PLAYER_MODEL_ORDER,
+    )
+    # Users can only use the dropdown
+    UI['player_mdl'].state(['readonly'])
+    UI['player_mdl'].grid(row=0, column=0, sticky=EW)
+
+    UI['player_mdl'].bind('<<ComboboxSelected>>', set_model)
 
     count_frame = ttk.LabelFrame(
         window,
