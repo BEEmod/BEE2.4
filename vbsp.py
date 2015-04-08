@@ -145,6 +145,8 @@ DEFAULTS = {
     "global_pti_ents":          "",  # Instance used for pti_ents
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
+    # Location of the model changer instance if needed
+    "model_changer_loc":        "-2400 -2800 -256",
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
     }
@@ -909,26 +911,16 @@ def change_overlays():
         if over['material'].casefold() in TEX_VALVE:
             sign_type = TEX_VALVE[over['material'].casefold()]
             if sign_inst is not None:
-                new_inst = VLib.Entity(VMF, keys={
-                    'classname': 'func_instance',
-                    'origin': over['origin'],
-                    'angles': over['angles', '0 0 0'],
-                    'file': sign_inst,
-                    })
+                new_inst = VMF.create_ent(
+                    classname='func_instance',
+                    origin=over['origin'],
+                    angles=over['angles', '0 0 0'],
+                    file=sign_inst,
+                )
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
-                VMF.add_ent(new_inst)
-                conditions.check_inst(new_inst)
 
             over['material'] = get_tex(sign_type)
         if over['material'].casefold() in ANTLINES:
-            # if get_tex('overlay.antlinecorner')
-            # TODO: analyse this, determine whether the antline is on
-            # the floor or wall (for P1 style)
-
-            # new_tex = get_tex(
-            #     'overlay.' +
-            #     ANTLINES[over['material'].casefold()]
-            #     )
             set_antline_mat(over, ANTLINES[over['material'].casefold()])
 
 
@@ -955,41 +947,54 @@ def add_extra_ents(mode):
     sound = get_opt('music_soundscript')
     inst = get_opt('music_instance')
     if sound != '':
-        VMF.add_ent(VLib.Entity(VMF, keys={
-            'classname': 'ambient_generic',
-            'spawnflags': '17',  # Looping, Infinite Range, Starts Silent
-            'targetname': '@music',
-            'origin': loc,
-            'message': sound,
-            'health': '10',  # Volume
-            }))
+        VMF.create_ent(
+            classname='ambient_generic',
+            spawnflags='17',  # Looping, Infinite Range, Starts Silent
+            targetname='@music',
+            origin=loc,
+            message=sound,
+            health='10',  # Volume
+            )
 
     if inst != '':
-        VMF.add_ent(VLib.Entity(VMF, keys={
-            'classname': 'func_instance',
-            'targetname': 'music',
-            'angles': '0 0 0',
-            'origin': loc,
-            'file': inst,
-            'fixup_style': '0',
-            }))
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='music',
+            angles='0 0 0',
+            origin=loc,
+            file=inst,
+            fixup_style='0',
+            )
     pti_file = get_opt("global_pti_ents")
     pti_loc = get_opt("global_pti_ents_loc")
     if pti_file != '':
         utils.con_log('Adding Global PTI Ents')
-        global_pti_ents = VLib.Entity(VMF, keys={
-            'classname': 'func_instance',
-            'targetname': 'global_pti_ents',
-            'angles': '0 0 0',
-            'origin': pti_loc,
-            'file': pti_file,
-            'fixup_style': '0',
-            })
+        global_pti_ents = VMF.create_ent(
+            classname='func_instance',
+            targetname='global_pti_ents',
+            angles='0 0 0',
+            origin=pti_loc,
+            file=pti_file,
+            fixup_style='0',
+            )
         has_cave = settings['style_vars'].get('multiversecave', '1') == '1'
         global_pti_ents.fixup[
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
         VMF.add_ent(global_pti_ents)
+
+    model_changer_loc = get_opt('model_changer_loc')
+    chosen_model = BEE2_config['General']['player_model']
+    # We don't change the player model in Coop, or if Bendy is selected.
+    if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '' :
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='model_changer',
+            angles='0 0 0',
+            origin=model_changer_loc,
+            file='instances/BEE2/logic/model_changer/' + chosen_model + '.vmf',
+            fixup_style='0',
+        )
 
 
 def change_func_brush():

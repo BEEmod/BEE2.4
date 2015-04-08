@@ -19,10 +19,10 @@ COMPILE_DEFAULTS = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
-        'player_model': 'PETI',
         },
     'General': {
         'spawn_elev': 'True',
+        'player_model': 'PETI',
         },
     'Counts': {
         'brush': '0',
