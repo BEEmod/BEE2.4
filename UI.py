@@ -1381,7 +1381,11 @@ def init_drag_icon():
 
 
 def set_game(game):
-    TK_ROOT.title('BEEMOD 2.4 - ' + game.name)
+    """Callback for when the game is changed.
+
+    This updates the title bar to match, and saves it into the config.
+    """
+    TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION,game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
 
 

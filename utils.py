@@ -2,6 +2,8 @@ import math
 import string
 import collections.abc as abc
 
+BEE_VERSION = "2.4"
+
 
 def add_sorted(lst, new_item):
     """Add an item to a sorted list while keeping the list sorted.

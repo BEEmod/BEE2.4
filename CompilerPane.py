@@ -3,7 +3,7 @@ from tk_root import TK_ROOT
 from tkinter import ttk
 from tkinter import filedialog
 
-from os import path
+import os
 
 import BEE_png as png
 
@@ -40,7 +40,7 @@ chosen_thumb = StringVar(
 )
 start_in_elev = IntVar(value=0)
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
-cust_file_loc_var = StringVar(value=cust_file_loc)
+cust_file_loc_var = StringVar(value='')
 
 count_brush = IntVar(value=0)
 count_ents = IntVar(value=0)
@@ -57,6 +57,7 @@ def refresh_counts(reload=True):
 
 def find_screenshot(_=None):
     global cust_file_loc
+    cust_file_loc = ''
     file_name = filedialog.askopenfilename(
         title='Find Game Exe',
         filetypes=[
@@ -65,23 +66,33 @@ def find_screenshot(_=None):
         initialdir='C:',
     )
     if file_name:
-        chosen_thumb.set('CUST')
         cust_file_loc = file_name
         COMPILE_CFG['Screenshot']['LOC'] = file_name
-        COMPILE_CFG.save()
         set_screenshot_text()
+        UI['thumb_custom'].invoke()
     else:
         cust_file_loc = ''
+        cust_file_loc_var.set('')
         COMPILE_CFG['Screenshot']['LOC'] = ''
-        COMPILE_CFG.save()
+        # Set to this instead!
+        if chosen_thumb.get() == 'CUST':
+            UI['thumb_auto'].invoke()
+    COMPILE_CFG.save_check()
 
 
 def set_screenshot_text(_=None):
-    cust_file_loc_var.set(path.basename(cust_file_loc))
+    if len(cust_file_loc) > 20:
+        if cust_file_loc[-18] in r'\/':
+            # We don't whant it to start with "../"!
+            cust_file_loc_var.set('...' + cust_file_loc[-17:])
+        else:
+            cust_file_loc_var.set('..' + cust_file_loc[-18:])
+    else:
+        cust_file_loc_var.set(cust_file_loc)
 
 
 def set_elev_type():
-    COMPILE_CFG['General']['spawn_elev'] = 'True' if start_in_elev else 'False'
+    COMPILE_CFG['General']['spawn_elev'] = str(start_in_elev.get())
     COMPILE_CFG.save()
 
 
@@ -108,15 +119,15 @@ def make_pane(tool_frame):
     )
     window.columnconfigure(0, weight=1)
 
-    UI['Game_label'] = ttk.Label(window, text='Game: ', font='TkHeadingFont')
-    UI['Game_label'].grid(row=0, column=0, sticky=EW)
+    UI['game_label'] = ttk.Label(window, text='For: ', font='TkHeadingFont')
+    UI['game_label'].grid(row=0, column=0, sticky=EW)
 
     thumb_frame = ttk.LabelFrame(
         window,
         text='Thumbnail',
         labelanchor=N,
     )
-    thumb_frame.grid(row=1, column=0, sticky=EW)
+    thumb_frame.grid(row=0, column=0, sticky=EW)
     thumb_frame.columnconfigure(0, weight=1)
 
     UI['thumb_auto'] = ttk.Radiobutton(
@@ -163,8 +174,8 @@ def make_pane(tool_frame):
     )
 
     UI['thumb_auto'].grid(row=0, column=0, sticky=W)
-    UI['thumb_peti'].grid(row=1, column=0, sticky=W)
-    cust_frame.grid(row=2, column=0, sticky=EW)
+    UI['thumb_peti'].grid(row=0, column=1, sticky=W)
+    cust_frame.grid(row=1, column=0, columnspan=2, sticky=EW)
     UI['thumb_custom'].grid(row=0, column=0, sticky=W)
     UI['thumb_custom_file'].grid(row=0, column=1, sticky=EW)
     UI['thumb_custom_btn'].grid(row=0, column=2, sticky=EW)
@@ -175,7 +186,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    elev_frame.grid(row=2, column=0, sticky=EW)
+    elev_frame.grid(row=1, column=0, sticky=EW)
 
     UI['elev_preview'] = ttk.Radiobutton(
         elev_frame,
@@ -194,15 +205,7 @@ def make_pane(tool_frame):
     )
 
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
-    UI['elev_elevator'].grid(row=1, column=0, sticky=W)
-
-    UI['view_logs'] = ttk.Button(
-        window,
-        text='View Logs',
-
-    )
-
-    UI['view_logs'].grid(row=3, column=0)
+    UI['elev_elevator'].grid(row=0, column=1, sticky=W)
 
     count_frame = ttk.LabelFrame(
         window,
@@ -266,4 +269,13 @@ def make_pane(tool_frame):
     )
     UI['count_brush'].grid(row=3, column=2, sticky=EW, padx=5)
 
+    UI['view_logs'] = ttk.Button(
+        count_frame,
+        text='View Logs',
+    )
+    UI['view_logs'].grid(row=4, column=0, columnspan=3, sticky=EW)
+
     refresh_counts(reload=False)
+
+# Set the text to the previously saved value
+set_screenshot_text()
