@@ -117,6 +117,11 @@ class Property:
 
     @property
     def name(self):
+        """Name automatically casefolds() any given names.
+
+        This ensures comparisons are always case-sensitive.
+        Read .real_name to get the original value
+        """
         return self._folded_name
 
     @name.setter
@@ -148,7 +153,7 @@ class Property:
                 # Skip blank lines!
                 continue
 
-            if freshline.startswith('"'): # data string
+            if freshline.startswith('"'):   # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
                 if not utils.is_identifier(name):

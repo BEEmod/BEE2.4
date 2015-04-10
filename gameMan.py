@@ -56,6 +56,9 @@ CACHE_LOC = [
     ('source_cache/', 'BEE2/'),
     ]
 
+# The line we inject to add our BEE2 folder into the game search path.
+# We always add ours such that it's the highest priority.
+GAMEINFO_LINE = 'Game\t"BEE2"'
 
 def init_trans():
     global trans_data
@@ -74,9 +77,6 @@ def translate(string):
 def setgame_callback(selected_game):
     pass
 
-# The line we inject to add our BEE2 folder into the game search path.
-# We always add ours such that it's the highest priority.
-GAMEINFO_LINE = 'Game\t"BEE2"'
 
 class Game:
     def __init__(self, name, steam_id, folder):
@@ -97,7 +97,7 @@ class Game:
         priority = ["portal2"]
         while os.path.isdir(self.abs_path("portal2_dlc" + str(dlc_count))):
             priority.append("portal2_dlc" + str(dlc_count))
-            dlc_count+=1
+            dlc_count += 1
         if os.path.isdir(self.abs_path("update")):
             priority.append("update")
         # files are definitely not here
@@ -135,7 +135,7 @@ class Game:
                     clean_line = utils.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
-                            break # Already added!
+                            break  # Already added!
                         elif '|gameinfo_path|' in clean_line:
                             print("Adding gameinfo hook to " + info_path)
                             # Match the line's indentation
@@ -151,9 +151,10 @@ class Game:
                             break
                 else:
                     if add_line:
-                        print('Failed editing "' +
-                              info_path +
-                              '" to add our special folder!'
+                        print(
+                            'Failed editing "' +
+                            info_path +
+                            '" to add our special folder!'
                         )
                     continue
 
