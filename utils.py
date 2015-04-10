@@ -4,6 +4,14 @@ import collections.abc as abc
 
 BEE_VERSION = "2.4"
 
+BOOL_LOOKUP = {
+    '1': True,
+    '0': False,
+    'true': True,
+    'false': False,
+    'yes': True,
+    'no': False,
+}
 
 def add_sorted(lst, new_item):
     """Add an item to a sorted list while keeping the list sorted.
@@ -71,11 +79,44 @@ def con_log(*text):
 def bool_as_int(val):
     """Convert a True/False value into '1' or '0'.
 
+    Valve uses these strings for True/False in editoritems and other
+    config files.
     """
     if val:
         return '1'
     else:
         return '0'
+
+
+def conv_bool(val, default=False):
+    """Converts a string to a boolean, using a default if it fails.
+
+    Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1.
+    """
+    if isinstance(val, (int, bool)):
+        return bool(val)
+    else:
+        return BOOL_LOOKUP.get(val.casefold(), default)
+
+
+def conv_float(val, default=0):
+    """Converts a string to an float, using a default if it fails.
+
+    """
+    try:
+        return float(val)
+    except ValueError:
+        return float(default)
+
+
+def conv_int(val, default=0):
+    """Converts a string to an integer, using a default if it fails.
+
+    """
+    try:
+        return int(val)
+    except ValueError:
+        return int(default)
 
 
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):

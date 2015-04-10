@@ -54,7 +54,7 @@ class Condition:
             elif prop.name == 'else':
                 else_results.extend(prop.value)
             elif prop.name == 'priority':
-                priority = VLib.conv_int(prop.value, priority)
+                priority = utils.conv_int(prop.value, priority)
             else:
                 flags.append(prop)
 
@@ -369,7 +369,7 @@ def flag_game_mode(_, flag):
 
 
 def flag_is_preview(_, flag):
-    return IS_PREVIEW == (flag == "1")
+    return IS_PREVIEW == utils.conv_bool(flag, False)
 
 ###########
 # RESULTS #
@@ -396,10 +396,9 @@ def res_set_style_var(_, res):
 
 def res_set_voice_attr(_, res):
     for opt in res.value:
-        if opt.value.casefold() == '1':
-            VOICE_ATTR[opt.name] = True
-        elif opt.value.casefold() == '0':
-            VOICE_ATTR[opt.name] = False
+        val = utils.conv_bool(opt.value, default=None)
+        if val is not None:
+            VOICE_ATTR[opt.name] = val
 
 
 def res_set_option(_, res):
@@ -447,7 +446,7 @@ def res_add_global_inst(_, res):
     """
     if res.value is not None:
         if (res['file'] not in GLOBAL_INSTANCES or
-                res['allow_multiple', '0'] == '1'):
+                utils.conv_bool(res['allow_multiple', '0'], True)):
             # By default we will skip adding the instance
             # if was already added - this is helpful for
             # items that add to original items, or to avoid
@@ -497,8 +496,8 @@ def res_cust_output(inst, res):
     # Make this a set to ignore repeated targetnames
     targets = {o.target for o in inst.outputs if o.target != toggle_name}
 
-    kill_signs = res["remIndSign", '0'] == '1'
-    dec_con_count = res["decConCount", '0'] == '1'
+    kill_signs = utils.conv_bool(res["remIndSign", '0'], False)
+    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
     if kill_signs or dec_con_count:
         for con_inst in VMF.by_class['func_instance']:
             if con_inst['targetname'] in targets:
@@ -592,7 +591,7 @@ def res_faith_mods(inst, res):
 def res_cust_fizzler(base_inst, res):
     """Modify a fizzler item to allow for custom brush ents."""
     model_name = res['modelname', None]
-    make_unique = res['UniqueModel', '0'] == '1'
+    make_unique = utils.conv_bool(res['UniqueModel', '0'])
     fizz_name = base_inst['targetname', '']
 
     # search for the model instances
@@ -651,7 +650,7 @@ def res_cust_fizzler(base_inst, res):
                     # skip the resizing since it's already correct.
                     laser_tex = laserfield_conf['texture', 'effects/laserplane']
                     nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                    tex_width = VLib.conv_int(
+                    tex_width = utils.conv_int(
                         laserfield_conf['texwidth', '512'], 512
                     )
                     is_short = False

@@ -354,7 +354,7 @@ class Style:
         """Parse a style definition."""
         name, short_name, auth, icon, desc = get_selitem_data(info)
         base = info['base', '']
-        has_video = info['has_video', '1'] == '1'
+        has_video = utils.conv_bool(info['has_video', '1'])
 
         sugg = info.find_key('suggested', [])
         sugg = (
@@ -419,11 +419,11 @@ class Item:
 
         for ver in info.find_all('version'):
             vals = {
-                'name':     ver['name', 'Regular'],
-                'id':       ver['ID', 'VER_DEFAULT'],
-                'is_beta':  ver['beta', '0'] == '1',
-                'is_dep':   ver['deprecated', '0'] == '1',
-                'styles':   {},
+                'name':    ver['name', 'Regular'],
+                'id':      ver['ID', 'VER_DEFAULT'],
+                'is_beta': utils.conv_bool(ver['beta', '0']),
+                'is_dep':  utils.conv_bool(ver['deprecated', '0']),
+                'styles':  {},
                 'def_style': None,
                 }
             for sty_list in ver.find_all('styles'):
@@ -699,7 +699,7 @@ class StyleVar:
     def parse(cls, _, var_id, info):
         name = info['name']
         styles = [prop.value for prop in info.find_all('Style')]
-        default = info['enabled', '0'] == '1'
+        default = utils.conv_bool(info['enabled', '0'])
         return cls(var_id, name, styles, default)
 
     def add_over(self, override):

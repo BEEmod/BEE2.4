@@ -34,45 +34,6 @@ _DISP_ROWS = (
 )
 
 
-def conv_int(val, default=0):
-    """Converts a string to an integer, using a default if it fails.
-
-    """
-    try:
-        return int(val)
-    except ValueError:
-        return int(default)
-
-
-def conv_float(val, default=0):
-    """Converts a string to an float, using a default if it fails.
-
-    """
-    try:
-        return float(val)
-    except ValueError:
-        return float(default)
-
-
-def conv_bool(val, default=False):
-    """Converts a string to a boolean, using a default if it fails.
-
-    Accepts either '0', '1', 'false', 'true'
-    """
-    if isinstance(val, bool):  # True, False
-        return val
-    elif val == '1':
-        return True
-    elif val == '0':
-        return False
-    elif val.casefold() == 'false':
-        return False
-    elif val.casefold() == 'true':
-        return True
-    else:
-        return default
-
-
 def find_empty_id(used_id, desired=-1):
         """Ensure this item has a unique ID.
 
@@ -150,29 +111,36 @@ class VMF:
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
 
-        self.is_prefab = conv_bool(map_info.get('prefab'), False)
-        self.cordon_enabled = conv_bool(map_info.get('cordons_on'), False)
-        self.map_ver = conv_int(map_info.get('mapversion'))
+        self.is_prefab = utils.conv_bool(map_info.get('prefab'), False)
+        self.cordon_enabled = utils.conv_bool(map_info.get('cordons_on'), False)
+        self.map_ver = utils.conv_int(map_info.get('mapversion'))
         if 'mapversion' in self.spawn:
             # This is saved only in the main VMF object, delete the copy.
             del self.spawn['mapversion']
 
         # These three are mostly useless for us, but we'll preserve them anyway
-        self.format_ver = conv_int(
+        self.format_ver = utils.conv_int(
             map_info.get('formatversion'), 100)
-        self.hammer_ver = conv_int(
+        self.hammer_ver = utils.conv_int(
             map_info.get('editorversion'), CURRENT_HAMMER_VERSION)
-        self.hammer_build = conv_int(
+        self.hammer_build = utils.conv_int(
             map_info.get('editorbuild'), CURRENT_HAMMER_BUILD)
 
         # Various Hammer settings
-        self.show_grid = conv_bool(map_info.get('showgrid'), True)
-        self.show_3d_grid = conv_bool(map_info.get('show3dgrid'), False)
-        self.snap_grid = conv_bool(map_info.get('snaptogrid'), True)
-        self.show_logic_grid = conv_bool(map_info.get('showlogicalgrid'), False)
-        self.grid_spacing = conv_int(map_info.get('gridspacing'), 64)
-        self.active_cam = conv_int(map_info.get('active_cam'), -1)
-        self.quickhide_count = conv_int(map_info.get('quickhide'), -1)
+        self.show_grid = utils.conv_bool(
+            map_info.get('showgrid'), True)
+        self.show_3d_grid = utils.conv_bool(
+            map_info.get('show3dgrid'), False)
+        self.snap_grid = utils.conv_bool(
+            map_info.get('snaptogrid'), True)
+        self.show_logic_grid = utils.conv_bool(
+            map_info.get('showlogicalgrid'), False)
+        self.grid_spacing = utils.conv_int(
+            map_info.get('gridspacing'), 64)
+        self.active_cam = utils.conv_int(
+            map_info.get('active_cam'), -1)
+        self.quickhide_count = utils.conv_int(
+            map_info.get('quickhide'), -1)
 
     def add_brush(self, item):
         """Add a world brush to this map."""
@@ -259,7 +227,8 @@ class VMF:
         map_info['cordons_on'] = cordons['active', '0']
 
         cam_props = tree.find_key('cameras', [])
-        map_info['active_cam'] = conv_int((cam_props['activecamera', '']), -1)
+        map_info['active_cam'] = utils.conv_int(
+            (cam_props['activecamera', '']), -1)
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
 
         map_obj = VMF(map_info=map_info)
@@ -517,7 +486,7 @@ class Cordon:
     @staticmethod
     def parse(vmf_file, tree):
         name = tree['name', 'cordon']
-        is_active = conv_bool(tree['active', '0'], False)
+        is_active = utils.conv_bool(tree['active', '0'], False)
         bounds = tree.find_key('box', [])
         min_ = Vec.from_str(bounds['mins', '(0 0 0)'])
         max_ = Vec.from_str(bounds['maxs', '(128 128 128)'], 128, 128, 128)
@@ -592,7 +561,7 @@ class Solid:
     @staticmethod
     def parse(vmf_file, tree, hidden=False):
         """Parse a Property tree into a Solid object."""
-        solid_id = conv_int(tree["id", '-1'])
+        solid_id = utils.conv_int(tree["id", '-1'])
         try:
             solid_id = int(solid_id)
         except TypeError:
@@ -604,15 +573,15 @@ class Solid:
         editor = {'visgroup': []}
         for v in tree.find_key("editor", []):
             if v.name in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
-                editor[v.name] = conv_bool(v.value, default=True)
+                editor[v.name] = utils.conv_bool(v.value, default=True)
             elif v.name == 'color' and ' ' in v.value:
                 editor['color'] = v.value
             elif v.name == 'group':
-                editor[v.name] = conv_int(v.value, default=-1)
+                editor[v.name] = utils.conv_int(v.value, default=-1)
                 if editor[v.name] == -1:
                     del editor[v.name]
             elif v.name == 'visgroupid':
-                val = conv_int(v.value, default=-1)
+                val = utils.conv_int(v.value, default=-1)
                 if val:
                     editor['visgroup'].append(val)
         if len(editor['visgroup']) == 0:
@@ -752,11 +721,16 @@ class Side:
         self.uaxis = opt.get("uaxis", "[0 1 0 0] 0.25")
         self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
         if len(disp_data) > 0:
-            self.disp_power = conv_int(disp_data.get('power', '_'), 4)
-            self.disp_pos = Vec.from_str(disp_data.get('pos', '_'))
-            self.disp_flags = conv_int(disp_data.get('flags', '_'))
-            self.disp_elev = conv_float(disp_data.get('elevation', '_'))
-            self.disp_is_subdiv = conv_bool(disp_data.get('subdiv', '_'), False)
+            self.disp_power = utils.conv_int(
+                disp_data.get('power', '_'), 4)
+            self.disp_pos = Vec.from_str(
+                disp_data.get('pos', '_'))
+            self.disp_flags = utils.conv_int(
+                disp_data.get('flags', '_'))
+            self.disp_elev = utils.conv_float(
+                disp_data.get('elevation', '_'))
+            self.disp_is_subdiv = utils.conv_bool(
+                disp_data.get('subdiv', '_'), False)
             self.disp_allowed_verts = disp_data.get('allowed_verts', {})
             self.disp_data = {}
             for v in _DISP_ROWS:
@@ -770,7 +744,7 @@ class Side:
         """Parse the property tree into a Side object."""
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
         verts = tree["plane", "(0 0 0) (0 0 0) (0 0 0)"][1:-1].split(") (")
-        side_id = conv_int(tree["id", '-1'])
+        side_id = utils.conv_int(tree["id", '-1'])
         planes = [0, 0, 0]
         for i, v in enumerate(verts):
             if i > 3:
@@ -789,11 +763,11 @@ class Side:
             'material': tree['material', ''],
             'uaxis': tree['uaxis', '[0 1  0 0] 0.25'],
             'vaxis': tree['vaxis', '[0 0 -1 0] 0.25'],
-            'rotation': conv_int(
+            'rotation': utils.conv_int(
                 tree['rotation', '0']),
-            'lightmap': conv_int(
+            'lightmap': utils.conv_int(
                 tree['lightmapscale', '16'], 16),
-            'smoothing': conv_int(
+            'smoothing': utils.conv_int(
                 tree['smoothing_groups', '0']),
             }
         disp_tree = tree.find_key('dispinfo', [])
@@ -810,7 +784,7 @@ class Side:
             for v in _DISP_ROWS:
                 rows = disp_tree[v, []]
                 if len(rows) > 0:
-                    rows.sort(key=lambda x: conv_int(x.name[3:]))
+                    rows.sort(key=lambda x: utils.conv_int(x.name[3:]))
                     disp_data[v] = [v.value for v in rows]
         return Side(
             vmf_file,
@@ -1045,7 +1019,7 @@ class Entity:
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
-                        editor[v.name] = conv_bool(v.value, default=True)
+                        editor[v.name] = utils.conv_bool(v.value, default=True)
                     elif v.name == 'color' and ' ' in v.value:
                         editor['color'] = v.value
                     elif (
@@ -1057,11 +1031,11 @@ class Entity:
                     elif v.name == 'comments':
                         editor['comments'] = v.value
                     elif v.name == 'group':
-                        editor[v.name] = conv_int(v.value, default=-1)
+                        editor[v.name] = utils.conv_int(v.value, default=-1)
                         if editor[v.name] == -1:
                             del editor[v.name]
                     elif v.name == 'visgroupid':
-                        val = conv_int(v.value, default=-1)
+                        val = utils.conv_int(v.value, default=-1)
                         if val:
                             editor['visgroup'].append(val)
             else:

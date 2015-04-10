@@ -233,6 +233,10 @@ def get_opt(name):
     return settings['options'][name.casefold()]
 
 
+def get_bool_opt(name, default=False):
+    return utils.conv_bool(get_opt(name), default)
+
+
 def get_tex(name):
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
@@ -336,7 +340,7 @@ def load_settings():
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][
-                var.name.casefold()] = VLib.conv_bool(var.value)
+                var.name.casefold()] = utils.conv_bool(var.value)
 
     for pack_block in conf.find_all('packer'):
         for pack_cmd in pack_block:
@@ -345,17 +349,17 @@ def load_settings():
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    if get_opt('bottomless_pit') == "1":
+    if get_bool_opt('bottomless_pit'):
         pit = conf.find_key("bottomless_pit", [])
         settings['pit'] = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
-            'should_tele': pit['teleport', '0'] == '1',
+            'should_tele': utils.conv_bool(pit['teleport', '0']),
             'tele_dest': pit['tele_target', '@goo_targ'],
             'tele_ref': pit['tele_ref', '@goo_ref'],
-            'off_x': VLib.conv_int(pit['off_x', '0']),
-            'off_y': VLib.conv_int(pit['off_y', '0']),
-            'height': VLib.conv_int(pit['max_height', '386'], 386),
+            'off_x': utils.conv_int(pit['off_x', '0']),
+            'off_y': utils.conv_int(pit['off_y', '0']),
+            'height': utils.conv_int(pit['max_height', '386'], 386),
             'side': [prop.value for prop in pit.find_all("side_inst")],
             }
         if len(settings['pit']['side']) == 0:
@@ -593,10 +597,10 @@ def change_brush():
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glassInst')
     glass_scale = get_opt('glass_scale')
-    is_bottomless = get_opt('bottomless_pit') == "1"
+    is_bottomless = get_bool_opt('bottomless_pit')
 
     # Check the clump algorithm has all its arguements
-    can_clump = (get_opt("clump_wall_tex") == "1" and
+    can_clump = (get_bool_opt("clump_wall_tex") and
                  get_opt("clump_size").isnumeric() and
                  get_opt("clump_width").isnumeric() and
                  get_opt("clump_number").isnumeric())
@@ -696,7 +700,7 @@ def face_seed(face):
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
-    scale_walls = get_opt("random_blackwall_scale") == "1"
+    scale_walls = get_bool_opt("random_blackwall_scale")
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
             orient = get_face_orient(face)
@@ -898,7 +902,7 @@ def change_overlays():
     for over in VMF.by_class['info_overlay']:
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
-            if get_opt("remove_exit_signs") == "1":
+            if get_bool_opt("remove_exit_signs"):
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
                 VMF.remove_ent(over)
@@ -978,6 +982,9 @@ def add_extra_ents(mode):
             fixup_style='0',
             )
         has_cave = settings['style_vars'].get('multiversecave', '1') == '1'
+        has_cave = utils.conv_bool(
+            settings['style_vars'].get('multiversecave', '1')
+        )
         global_pti_ents.fixup[
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
@@ -986,7 +993,7 @@ def add_extra_ents(mode):
     model_changer_loc = get_opt('model_changer_loc')
     chosen_model = BEE2_config['General']['player_model']
     # We don't change the player model in Coop, or if Bendy is selected.
-    if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '' :
+    if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
         VMF.create_ent(
             classname='func_instance',
             targetname='model_changer',
@@ -1098,7 +1105,7 @@ def make_static_pist(ent):
             get_opt("staticPan") + "pist_"
             + (
                 ent.fixup['top_level', '1']
-                if ent.fixup['start_up'] == "1"
+                if utils.conv_bool(ent.fixup['start_up'], False)
                 else bottom_pos
                 )
             + ".vmf"
@@ -1110,7 +1117,7 @@ def make_static_pist(ent):
 def change_ents():
     """Edit misc entities."""
     utils.con_log("Editing Other Entities...")
-    if get_opt("remove_info_lighting") == "1":
+    if get_bool_opt("remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
         for ent in VMF.by_class['info_lighting']:

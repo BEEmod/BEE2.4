@@ -354,15 +354,15 @@ def show_window(used_props, parent, item_name):
     is_open = True
     spec_row = 1
 
-    start_up = used_props.get('startup', '0') == '1'
+    start_up = utils.conv_bool(used_props.get('startup', '0'))
     values['startup'] = start_up
     for prop, value in used_props.items():
         if prop in PROP_TYPES and value is not None:
             prop_type = PROP_TYPES[prop][0]
             if prop_type == 'checkbox':
-                values[prop].set(value == '1')
+                values[prop].set(utils.conv_bool(value))
             elif prop_type == 'railLift':
-                values[prop].set(value == '1')
+                values[prop].set(utils.conv_bool(value))
                 save_rail(prop)
             elif prop_type == 'gelType':
                 values[prop].set(value)
