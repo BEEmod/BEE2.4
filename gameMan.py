@@ -178,11 +178,13 @@ class Game:
         """Copy over the resource files into this game."""
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
+            print('Copying to "' + dest + '" ...')
             try:
                 shutil.rmtree(dest)
-                shutil.copytree(source, dest)
+                os.mkdir(dest)
             except (IOError, shutil.Error):
                 pass
+                shutil.copytree(source, dest)
 
     def clear_cache(self):
         for source, dest in CACHE_LOC:
