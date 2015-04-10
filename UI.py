@@ -112,7 +112,9 @@ class Item:
             )
         self.authors = self.def_data['auth']
         self.tags = self.def_data['tags']
+
         self.load_data()
+
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
@@ -131,6 +133,9 @@ class Item:
         self.is_dep = version['is_dep']
         self.is_beta = version['is_beta']
         self.url = self.data['url']
+
+        # This checks to see if all the data is present to enable
+        # grouped items
         self.can_group = ('all' in self.data['icons'] and
                           self.data['all_name'] is not None and
                           self.data['all_icon'] is not None)
@@ -234,16 +239,26 @@ class Item:
         """
         self.load_data()
 
-        palette_items = {}
-        for item in pal_picked:
-            if item.id == self.id:
-                palette_items[item.subKey] = item
+        # Build a dictionary of this item's palette positions,
+        # if any exist.
+        palette_items = {
+            item.subKey: item
+            for item in pal_picked
+            if item.id == self.id
+        }
 
         new_editor = self.data['editor'].copy()
+
+        new_editor['type'] = self.id # Set the item ID to match our item
+        # This allows the folders to be reused for different items if needed.
+
         for index, editor_section in enumerate(
                 new_editor.find_all("Editor", "Subtype")):
+            # For each subtype, see if it's on the palette
             for editor_sec_index, pal_section in enumerate(
                     editor_section):
+                # We need to manually loop so we get the index of the palette
+                # property block in the section
                 if pal_section.name == "palette":
                     if index in palette_items:
                         if len(palette_items) == 1:
@@ -252,13 +267,12 @@ class Item:
                                 pal_section['Tooltip'] = self.data['all_name']
                             if self.data['all_icon'] is not None:
                                 pal_section['Image'] = self.data['all_icon']
-
                         pal_section['Position'] = (
                             str(palette_items[index].pre_x) + " " +
                             str(palette_items[index].pre_y) + " 0"
                             )
                     else:
-                        del editor_section.value[editor_sec_index]
+                        del editor_section[editor_sec_index]
                         break
 
         return new_editor, self.data['editor_extra'], self.data['vbsp']
@@ -1385,7 +1399,7 @@ def set_game(game):
 
     This updates the title bar to match, and saves it into the config.
     """
-    TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION,game.name))
+    TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
 
 
@@ -1485,11 +1499,11 @@ def init_windows():
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
     TK_ROOT.iconbitmap('BEE2.ico')  # set the window icon
 
-    UIbg = Frame(TK_ROOT, bg=ItemsBG)
-    UIbg.grid(row=0, column=0, sticky='NSEW')
+    ui_bg = Frame(TK_ROOT, bg=ItemsBG)
+    ui_bg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
-    UIbg.rowconfigure(0, weight=1)
+    ui_bg.rowconfigure(0, weight=1)
 
     style = ttk.Style()
     # Custom button style with correct background
@@ -1497,7 +1511,7 @@ def init_windows():
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
-    frames['preview'] = Frame(UIbg, bg=ItemsBG)
+    frames['preview'] = Frame(ui_bg, bg=ItemsBG)
     frames['preview'].grid(
         row=0,
         column=3,
@@ -1516,7 +1530,7 @@ def init_windows():
     loader.step('UI')
 
     ttk.Separator(
-        UIbg,
+        ui_bg,
         orient=VERTICAL,
         ).grid(
             row=0,
@@ -1526,9 +1540,9 @@ def init_windows():
             pady=10,
             )
 
-    picker_split_frame = Frame(UIbg, bg=ItemsBG)
+    picker_split_frame = Frame(ui_bg, bg=ItemsBG)
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
-    UIbg.columnconfigure(5, weight=1)
+    ui_bg.columnconfigure(5, weight=1)
 
     # This will sit on top of the palette section, spanning from left
     # to right
@@ -1575,7 +1589,8 @@ def init_windows():
         resize_y=True,
         tool_frame=frames['toolMenu'],
         tool_img=png.png('icons/win_palette'),
-        tool_col=0)
+        tool_col=0,
+    )
     init_palette(windows['pal'])
     loader.step('UI')
 
@@ -1587,7 +1602,8 @@ def init_windows():
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img=png.png('icons/win_options'),
-        tool_col=1)
+        tool_col=1,
+    )
     init_option(windows['opt'])
     loader.step('UI')
 
