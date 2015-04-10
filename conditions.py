@@ -1,5 +1,4 @@
 import random
-
 from utils import Vec
 import vbsp
 import vmfLib as VLib
@@ -12,10 +11,9 @@ conditions = []
 STYLE_VARS = vbsp.settings['style_vars']
 VOICE_ATTR = vbsp.settings['has_attr']
 
-class SkipCondition(Exception):
-    """Raised to skip to the next instance, from the SkipInstance result.
 
-    """
+class SkipCondition(Exception):
+    """Raised to skip to the next instance, from the SkipInstance result."""
     pass
 
 
@@ -621,72 +619,75 @@ def res_cust_fizzler(base_inst, res):
                 inst.fixup[key] = value
 
     new_brush_config = list(res.find_all('brush'))
-    if len(new_brush_config) > 0:
-        for orig_brush in (
-                VMF.by_class['func_instance'] &
-                VMF.by_target[fizz_name + '_brush']
-                ):
-            VMF.remove_ent(orig_brush)
-            for config in new_brush_config:
-                new_brush = orig_brush.copy()
-                VMF.add_ent(new_brush)
-                new_brush.keys.clear()  # Wipe the original keyvalues
-                new_brush['origin'] = orig_brush['origin']
-                new_brush['targetname'] = (
-                    fizz_name +
-                    '-' +
-                    config['name', 'brush']
-                )
-                # All ents must have a classname!
-                new_brush['classname'] = 'trigger_portal_cleanser'
+    if len(new_brush_config) == 0:
+        return  # No brush modifications
+    for orig_brush in (
+            VMF.by_class['func_instance'] &
+            VMF.by_target[fizz_name + '_brush']
+            ):
+        VMF.remove_ent(orig_brush)
+        for config in new_brush_config:
+            new_brush = orig_brush.copy()
+            VMF.add_ent(new_brush)
+            new_brush.keys.clear()  # Wipe the original keyvalues
+            new_brush['origin'] = orig_brush['origin']
+            new_brush['targetname'] = (
+                fizz_name +
+                '-' +
+                config['name', 'brush']
+            )
+            # All ents must have a classname!
+            new_brush['classname'] = 'trigger_portal_cleanser'
 
-                for prop in config['keys', []]:
-                    new_brush[prop.name] = prop.value
+            for prop in config['keys', []]:
+                new_brush[prop.name] = prop.value
 
-                laserfield_conf = config.find_key('MakeLaserField', None)
-                if laserfield_conf.value is not None:
-                    # Resize the brush into a laserfield format, without
-                    # the 128*64 parts. If the brush is 128x128, we can
-                    # skip the resizing since it's already correct.
-                    laser_tex = laserfield_conf['texture', 'effects/laserplane']
-                    nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
+            laserfield_conf = config.find_key('MakeLaserField', None)
+            if laserfield_conf.value is not None:
+                # Resize the brush into a laserfield format, without
+                # the 128*64 parts. If the brush is 128x128, we can
+                # skip the resizing since it's already correct.
+                laser_tex = laserfield_conf['texture', 'effects/laserplane']
+                nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
                     tex_width = utils.conv_int(
                         laserfield_conf['texwidth', '512'], 512
-                    )
-                    is_short = False
+                )
+                is_short = False
+                for side in new_brush.sides():
+                    if side.mat.casefold() == 'effects/fizzler':
+                        is_short = True
+                        break
+
+                if is_short:
                     for side in new_brush.sides():
                         if side.mat.casefold() == 'effects/fizzler':
-                            is_short = True
-                            break
+                            side.mat = laser_tex
 
-                    if is_short:
-                        for side in new_brush.sides():
-                            if side.mat.casefold() == 'effects/fizzler':
-                                side.mat = laser_tex
-
-                                uaxis = side.uaxis.split(" ")
-                                vaxis = side.vaxis.split(" ")
-                                # the format is like "[1 0 0 -393.4] 0.25"
-                                side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
-                                side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
-                            else:
-                                side.mat = nodraw_tex
-                    else:
-                        # The hard part - stretching the brush.
-                        convert_to_laserfield(
-                            new_brush,
-                            laser_tex,
-                            nodraw_tex,
-                            tex_width,
-                        )
+                            uaxis = side.uaxis.split(" ")
+                            vaxis = side.vaxis.split(" ")
+                            # the format is like "[1 0 0 -393.4] 0.25"
+                            side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
+                            side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
+                        else:
+                            side.mat = nodraw_tex
                 else:
-                    # Just change the textures
-                    for side in new_brush.sides():
-                        try:
-                            side.mat = config[vbsp.TEX_FIZZLER[side.mat.casefold()]]
-                        except (KeyError, IndexError):
-                            # If we fail, just use the original textures
-                            pass
+                    # The hard part - stretching the brush.
+                    convert_to_laserfield(
+                        new_brush,
+                        laser_tex,
+                        nodraw_tex,
+                        tex_width,
+                    )
+            else:
+                # Just change the textures
+                for side in new_brush.sides():
+                    try:
+                        side.mat = config[
+                            vbsp.TEX_FIZZLER[side.mat.casefold()]
+                        ]
+                    except (KeyError, IndexError):
+                        # If we fail, just use the original textures
+                        pass
 
 
 def convert_to_laserfield(
@@ -694,7 +695,7 @@ def convert_to_laserfield(
         laser_tex: str,
         nodraw_tex: str,
         tex_width: int,
-    ):
+        ):
     """Convert a fizzler into a laserfield func_brush.
 
     We need to stretch the brush to get rid of the side sections.

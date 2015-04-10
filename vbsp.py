@@ -928,8 +928,6 @@ def change_overlays():
             set_antline_mat(over, ANTLINES[over['material'].casefold()])
 
 
-
-
 def change_trig():
     """Check the triggers and fizzlers."""
     utils.con_log("Editing Triggers...")
@@ -981,7 +979,6 @@ def add_extra_ents(mode):
             file=pti_file,
             fixup_style='0',
             )
-        has_cave = settings['style_vars'].get('multiversecave', '1') == '1'
         has_cave = utils.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
         )

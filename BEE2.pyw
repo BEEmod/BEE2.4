@@ -96,7 +96,7 @@ except Exception as e:
     with open('BEE2-error.log', 'a') as log:
         log.write(ERR_FORMAT.format(
             time=cur_time,
-            underline='='*len(cur_time),
+            underline='=' * len(cur_time),
             exception=err,
         ))
     # We still want to crash!
