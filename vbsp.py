@@ -342,10 +342,6 @@ def load_settings():
             settings['style_vars'][
                 var.name.casefold()] = utils.conv_bool(var.value)
 
-    for pack_block in conf.find_all('packer'):
-        for pack_cmd in pack_block:
-            process_packer(pack_cmd.value)
-
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
@@ -479,15 +475,6 @@ def get_map_info():
         )
 
     return is_preview, game_mode, voice_timer_pos, inst_files
-
-
-def process_packer(f_list):
-    """Read packer commands from settings."""
-    for cmd in f_list:
-        if cmd.name == "add":
-            to_pack.append(cmd.value)
-        if cmd.name == "add_list":
-            to_pack.append("|list|" + cmd.value)
 
 
 def calc_rand_seed():
@@ -1224,115 +1211,6 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
-def hammer_pack_scan():
-    """Look through entities to see if any packer commands exist, and add if needed.
-
-    """
-    global to_pack
-    to_pack = []  # We aren't using the ones found in vbsp_config
-    utils.con_log("Searching for packer commands...")
-    for ent in VMF.entities:
-        com = ent.editor.get('comments', '')
-        if "packer_" in com:
-            parts = com.split()
-            last_op = -1  # 1=item, 2=file
-            print(parts)
-            for frag in parts:
-                # space between command and file
-                if frag.endswith("packer_additem:"):
-                    last_op = 1
-                elif frag.endswith("packer_addfile:"):
-                    last_op = 2
-                # has no space between command and file
-                elif "packer_additem:" in frag:
-                    last_op = -1
-                    to_pack.append(frag.split("packer_additem:")[1])
-                elif "packer_addfile:" in frag:
-                    last_op = -1
-                    to_pack.append("|list|" + frag.split("packer_addfile:")[1])
-                # the file by itself
-                else:
-                    if last_op == 1:
-                        to_pack.append(frag)
-                    elif last_op == 2:
-                        to_pack.append("|list|" + frag)
-    print(to_pack)
-
-
-def make_packlist(vmf_path, root):
-    """Create the required packer file for BSPzip to use."""
-    pack_file = vmf_path[:-4] + ".filelist.txt"
-    folders = get_valid_folders(root)
-    utils.con_log("Creating Pack list...")
-    has_items = False
-    with open(pack_file, 'w') as fil:
-        for item in to_pack:
-            if item.startswith("|list|"):
-                item = os.path.join(os.getcwd(), "pack_lists", item[6:])
-                print('Opening "' + item + '"!')
-                if os.path.isfile(item):
-                    with open(item) as lst:
-                        for line in lst:
-                            # get rid of carriage returns etc
-                            line = line.strip()
-                            utils.con_log("Adding " + line)
-                            full = expand_source_name(line, folders, root)
-                            if full:
-                                fil.write(line + "\n")
-                                fil.write(full + "\n")
-                                has_items = True
-                else:
-                    utils.con_log("Error: File not found, skipping...")
-            else:
-                full = expand_source_name(item, folders, root)
-                if full:
-                    fil.write(item + "\n")
-                    fil.write(full + "\n")
-                    has_items = True
-    if not has_items:
-        utils.con_log("No packed files!")
-        os.remove(pack_file)  # delete it if we aren't storing anything
-    utils.con_log("Done!")
-
-
-def get_valid_folders(root):
-    """Look through our game path to find folders in order of priority."""
-    dlc_count = 1
-    priority = ["portal2"]
-    while os.path.isdir(os.path.join(root, "portal2_dlc" + str(dlc_count))):
-        priority.append("portal2_dlc" + str(dlc_count))
-        dlc_count += 1
-    if os.path.isdir(os.path.join(root, "update")):
-        priority.append("update")
-
-    # files are definitely not here
-    blacklist = [
-        "bin",
-        "Soundtrack",
-        "sdk_tools",
-        "sdk_content",
-        ]
-
-    all_folders = [
-        f for f in os.listdir(root)
-        if os.path.isdir(os.path.join(root, f)) and
-        f not in priority and
-        f not in blacklist
-    ]
-    in_order = [x for x in reversed(priority)] + all_folders
-    return in_order
-
-
-def expand_source_name(file, folders, root):
-    """Determine the full path for an item with a truncated path."""
-    for f in folders:
-        poss = os.path.normpath(os.path.join(root, f, file))
-        if os.path.isfile(poss):
-            return poss
-    utils.con_log(file + " not found!")
-    return False
-
-
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -1395,12 +1273,9 @@ def main():
     """Main program code.
 
     """
-    global MAP_SEED, to_pack, IS_PREVIEW, GAME_MODE
+    global MAP_SEED, IS_PREVIEW, GAME_MODE
     utils.con_log("BEE2 VBSP hook initiallised.")
 
-    to_pack = []  # the file path for any items that we should be packing
-
-    root = os.path.dirname(os.getcwd())
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
@@ -1456,7 +1331,6 @@ def main():
             path=path,
             new_path=new_path,
         )
-        make_packlist(path, root)
     else:
         utils.con_log("PeTI map detected!")
 
@@ -1499,7 +1373,6 @@ def main():
             path=path,
             new_path=new_path,
         )
-        make_packlist(path, root)  # VRAD will access the original BSP location
 
     utils.con_log("BEE2 VBSP hook finished!")
 
