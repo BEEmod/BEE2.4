@@ -44,22 +44,14 @@ to_pack_mat = {}  # files to pack if material is used (by VBSP_styles only)
 
 TK_ROOT = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
-new_args = sys.argv[1:]
-old_args = sys.argv[1:]
+fast_args = sys.argv[1:]
+full_args = sys.argv[1:]
 path = ""
 
-game_dir = ""
-next_is_game = False
-for a in list(new_args):
-    if next_is_game:
-        next_is_game = False
-        game_dir = os.path.normpath(a)
-        new_args[new_args.index(a)] = game_dir
-    elif "sdk_content\\maps\\" in os.path.normpath(a):
+for a in fast_args[:]:
+    if "sdk_content\\maps\\" in os.path.normpath(a):
         path = os.path.normpath(a)
-        new_args[new_args.index(a)] = path
-    elif a == "-game":
-        next_is_game = True
+        fast_args[fast_args.index(a)] = path
     elif a.casefold() in (
             "-both",
             "-final",
@@ -68,13 +60,13 @@ for a in list(new_args):
             "-textureshadows",
             ):
         # remove final parameters from the modified arguments
-        new_args.remove(a)
+        fast_args.remove(a)
     elif a in ('-force_peti', '-force_hammer', '-no_pack'):
         # we need to strip these out, otherwise VBSP will get confused
-        new_args.remove(a)
-        old_args.remove(a)
+        fast_args.remove(a)
+        full_args.remove(a)
 
-new_args = ['-bounce', '2', '-noextra'] + new_args
+fast_args = ['-bounce', '2', '-noextra'] + fast_args
 
 # Fast args: -bounce 2 -noextra -game $gamedir $path\$file
 # Final args: -both -final -staticproplighting -StaticPropPolys
@@ -101,23 +93,25 @@ else:
     is_peti = os.path.basename(path) == "preview.bsp"
 if is_peti:
     utils.con_log("PeTI map detected!")
-    run_vrad(new_args)
+    run_vrad(fast_args)
 else:
     utils.con_log("Hammer map detected! Not forcing cheap lighting..")
-    run_vrad(old_args)
+    run_vrad(full_args)
 
 pack_file = path[:-4] + '.filelist.txt'
 
 if '-no_pack' not in args:
-    utils.con_log("Pack list found, packing files!")
+    utils.con_log("Running PakRat!")
     arg_bits = [
-        quote(os.path.normpath(os.path.join(os.getcwd(), "bspzip"))),
-        "-addlist",
+        quote(os.path.normpath(os.path.join(os.getcwd(), "bee2/pakrat.jar"))),
+        "-auto",
+        quote(os.path.normpath(
+            os.path.join(
+                os.path.dirname(os.getcwd()),
+                'bee2/',
+            )
+        )),
         quote(path),
-        quote(pack_file),
-        quote(path),
-        "-game",
-        quote(game_dir),
     ]
     arg = " ".join(arg_bits)
     utils.con_log(arg)
