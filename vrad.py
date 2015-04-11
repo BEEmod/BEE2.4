@@ -69,7 +69,7 @@ for a in list(new_args):
             ):
         # remove final parameters from the modified arguments
         new_args.remove(a)
-    elif a in ('-force_peti', '-force_hammer'):
+    elif a in ('-force_peti', '-force_hammer', '-no_pack'):
         # we need to strip these out, otherwise VBSP will get confused
         new_args.remove(a)
         old_args.remove(a)
@@ -108,7 +108,7 @@ else:
 
 pack_file = path[:-4] + '.filelist.txt'
 
-if os.path.isfile(pack_file):
+if '-no_pack' not in args:
     utils.con_log("Pack list found, packing files!")
     arg_bits = [
         quote(os.path.normpath(os.path.join(os.getcwd(), "bspzip"))),

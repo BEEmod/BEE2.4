@@ -54,6 +54,7 @@ _UNLOCK_ITEMS = [
 CACHE_LOC = [
     ('inst_cache/', 'sdk_content/maps/instances/BEE2'),
     ('source_cache/', 'BEE2/'),
+    ('packrat/', 'bin/bee2'),
     ]
 
 # The line we inject to add our BEE2 folder into the game search path.
@@ -179,20 +180,26 @@ class Game:
         """Copy over the resource files into this game."""
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
-            print('Copying to "' + dest + '" ...')
+            print('Copying to "' + dest + '" ...', end='')
             try:
                 shutil.rmtree(dest)
                 os.mkdir(dest)
             except (IOError, shutil.Error):
                 pass
                 shutil.copytree(source, dest)
+            print(' Done!')
+        print('Copying PakRat...', end='')
+        shutil.copy('pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
+        print(' Done!')
 
     def clear_cache(self):
+        """Remove all resources from the game."""
         for source, dest in CACHE_LOC:
             try:
                 shutil.rmtree(self.abs_path(dest))
             except (IOError, shutil.Error):
                 pass
+        shutil.rmtree(self.abs_path('bin/bee2/'))
 
     def export(
             self,
