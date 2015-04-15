@@ -52,6 +52,10 @@ def set_stylevar(var):
     GEN_OPTS['StyleVar'][var] = val
 
 
+def scroll(delta):
+    UI['style_can'].yview_scroll(delta, "units")
+
+
 def refresh(selected_style):
     """Move the stylevars to the correct position.
 
@@ -183,3 +187,17 @@ def make_pane(tool_frame):
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
+
+    # Scroll globally even if canvas is not selected.
+    window.bind(
+        "<MouseWheel>",
+        lambda e: scroll(int(-1*(e.delta/120))),
+        )
+    window.bind(
+        "<Button-4>",
+        lambda e: scroll(1),
+        )
+    window.bind(
+        "<Button-5>",
+        lambda e: scroll(-1),
+        )
