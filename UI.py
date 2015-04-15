@@ -127,9 +127,12 @@ class Item:
             selected_style,
             self.def_data,
             )
-        self.names = [prop['name', ''] for prop in
-                      self.data['editor'].find_all("Editor", "Subtype")
-                      if prop['Palette', None] is not None]
+        self.names = [
+            gameMan.translate(prop['name', ''])
+            for prop in
+            self.data['editor'].find_all("Editor", "Subtype")
+            if prop['Palette', None] is not None
+        ]
         self.is_dep = version['is_dep']
         self.is_beta = version['is_beta']
         self.url = self.data['url']

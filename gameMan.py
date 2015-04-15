@@ -62,11 +62,20 @@ CACHE_LOC = [
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
 def init_trans():
+    """Load a copy of basemodui, used to translate item strings.
+
+    Valve's items use special translation strings which would look ugly
+    if we didn't convert them.
+    """
     global trans_data
     try:
         with open('config/basemodui.txt', "r") as trans:
             trans_data = Property.parse(trans, 'config/basemodui.txt')
-        trans_data = trans_data.as_dict()['lang']['Tokens']
+        trans_data = {
+            item.real_name: item.value
+            for item in
+            trans_data.find_key("lang", []).find_key("tokens", [])
+        }
     except IOError:
         pass
 

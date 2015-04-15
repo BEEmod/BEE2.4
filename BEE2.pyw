@@ -65,6 +65,10 @@ try:
         )
     print('Done!')
 
+    print('Loading Item Translations...', end='')
+    gameMan.init_trans()
+    print('Done')
+
     print('Initialising UI...')
     UI.init_windows()  # create all windows
     print('Done!')
