@@ -89,11 +89,11 @@ def load_packages(pak_dir, load_res):
 
         objects = 0
         for pak_id, zip_file, info, name, dispName in packages.values():
-            print("Scanning package '" + pak_id + "'")
+            print("Scanning package '" + pak_id + "'...", end='')
             obj_count = parse_package(zip_file, info, pak_id, dispName)
             objects += obj_count
             loadScreen.step("PAK")
-            print("Done!")
+            print(" Done!")
 
         loadScreen.length("OBJ", objects)
 
@@ -101,7 +101,6 @@ def load_packages(pak_dir, load_res):
         # in UI.py we step the progress once per object.
         loadScreen.length("IMG", objects - len(all_obj['StyleVar']))
 
-        print(objects)
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
@@ -240,7 +239,6 @@ def setup_style_tree(item_data, style_data):
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
         for vers in all_ver:
-            print(item.id, vers['styles'].keys())
             for sty_id, style in all_styles.items():
                 if sty_id in vers['styles']:
                     continue  # We already have a definition
@@ -258,7 +256,6 @@ def setup_style_tree(item_data, style_data):
                         # For versions other than the first, use
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
-            print(item.id, vers['styles'].keys())
 
 
 def parse_item_folder(folders, zip_file):

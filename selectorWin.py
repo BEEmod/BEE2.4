@@ -544,7 +544,6 @@ class selWin:
         If the ID is None or does not exist, the suggested item will be cleared.
         If the ID is "<NONE>", it will be set to the None item.
         """
-        print('Setting suggested for {!s} to {}'.format(self, suggested))
         if self.suggested is not None:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
