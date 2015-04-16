@@ -921,8 +921,18 @@ def change_trig():
     for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
             alter_mat(side)
+        target = trig['targetname']
+        # Change this so the base instance can directly modify the brush.
+        if target.endswith('_brush'):
+            trig['targetname'] = target[:-6] + '-br_fizz'
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
+
+    for trig in VMF.by_class['trigger_hurt']:
+        target = trig['targetname']
+        # Change this so the base instance can directly modify the brush.
+        if target.endswith('_brush'):
+            trig['targetname'] = target[:-6] + '-br_hurt'
 
 
 def add_extra_ents(mode):
@@ -1003,10 +1013,17 @@ def change_func_brush():
         parent = brush['parentname', '']
         brush_type = ""
 
+        target = brush['targetname']
+        # Fizzlers need their custom outputs.
+        # Change this so the base instance can directly modify the brush.
+        if target.endswith('_brush'):
+            brush['targetname'] = target[:-6] + '-br_brush'
+
         # Func_brush/func_rotating (for angled panels and flip panels)
         # often use different textures, so let the style do that.
 
         is_grating = False
+        delete_brush = False
         for side in brush.sides():
             if (side.mat.casefold() == "anim_wp/framework/squarebeams" and
                     "special.edge" in settings['textures']):
@@ -1027,6 +1044,16 @@ def change_func_brush():
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
                 alter_mat(side)  # for gratings, laserfields and some others
+
+            # The style blanked the material, so delete the brush
+            if side.mat == '':
+                delete_brush = True
+                break
+
+        if delete_brush:
+            VMF.remove_ent(brush)
+            continue
+
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
             inst = find_glass_inst(brush.get_origin())
