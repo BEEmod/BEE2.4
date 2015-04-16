@@ -254,27 +254,27 @@ class Vec:
         Pass to Vec.rotate() / Vec.unrotate() to prevent recalculating when
         rotating many vectors by the same angle.
         """
+        sin_x = math.sin(math.radians(-roll))
+        cos_x = math.cos(math.radians(-roll))
+        sin_y = math.sin(math.radians(-pitch))
+        cos_y = math.cos(math.radians(-pitch))
+        sin_z = math.sin(math.radians(-yaw))
+        cos_z = math.cos(math.radians(-yaw))
 
-        sin_pitch = math.sin(math.radians(-pitch))
-        cos_pitch = math.cos(math.radians(-pitch))
-        sin_yaw = math.sin(math.radians(-yaw))
-        cos_yaw = math.cos(math.radians(-yaw))
-        sin_roll = math.sin(math.radians(-roll))
-        cos_roll = math.cos(math.radians(-roll))
+        return {
+            'a': cos_y * cos_z,
+            'b': -sin_x * -sin_y * cos_z + cos_x * sin_z,
+            'c': cos_x * -sin_y * cos_z + sin_x * sin_z,
 
-        return [[
-            cos_roll * cos_pitch,
-            -sin_roll * -sin_yaw,
-            cos_roll * -sin_yaw * cos_pitch,
-            ], [
-            cos_yaw * -sin_pitch,
-            -sin_roll * -sin_yaw * -sin_pitch + cos_yaw*cos_pitch,
-            cos_roll * -sin_yaw * -sin_pitch + sin_roll*cos_pitch,
-            ], [
-            sin_yaw,
-            -sin_roll*cos_yaw,
-            cos_roll*cos_yaw,
-            ]]
+            'd': cos_y * -sin_z,
+            'e': -sin_x * -sin_y * -sin_z + cos_x * cos_z,
+            'f': cos_x * -sin_y * -sin_z + sin_x * cos_z,
+
+            'g': sin_y,
+            'h': -sin_x * cos_x,
+            'i': cos_x * cos_y,
+        }
+
 
     def rotate(self, pitch=0, yaw=0, roll=0, matrix=None):
         """Rotate a vector by a Source rotational angle.
@@ -285,9 +285,9 @@ class Vec:
         """
         if matrix is None:
             matrix = self.make_rot_matrix(pitch, yaw, roll)
-        self.x = self.x*matrix[0][0] + self.y*matrix[0][1] + self.z*matrix[0][2]
-        self.y = self.x*matrix[1][0] + self.y*matrix[1][1] + self.z*matrix[1][2]
-        self.z = self.x*matrix[2][0] + self.y*matrix[2][1] + self.z*matrix[2][2]
+        self.x = self.x*matrix['a'] + self.y*matrix['b'] + self.z*matrix['c']
+        self.y = self.x*matrix['d'] + self.y*matrix['e'] + self.z*matrix['f']
+        self.z = self.x*matrix['g'] + self.y*matrix['h'] + self.z*matrix['i']
 
         return self
 
@@ -298,9 +298,9 @@ class Vec:
         """
         if matrix is None:
             matrix = self.make_rot_matrix(pitch, yaw, roll)
-        self.x = self.x*matrix[0][0] + self.y*matrix[1][0] + self.z*matrix[2][0]
-        self.y = self.x*matrix[0][1] + self.y*matrix[1][1] + self.z*matrix[2][1]
-        self.z = self.x*matrix[0][2] + self.y*matrix[1][2] + self.z*matrix[2][2]
+        self.x = self.x*matrix['a'] + self.y*matrix['d'] + self.z*matrix['g']
+        self.y = self.x*matrix['b'] + self.y*matrix['e'] + self.z*matrix['h']
+        self.z = self.x*matrix['c'] + self.y*matrix['f'] + self.z*matrix['i']
 
         return self
 
@@ -580,18 +580,23 @@ class Vec:
         else:
             z = self.z
         # convert to int to strip off .0 at end if whole number
-        return str(x) + delim + str(y) + delim + str(z)
+        return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
+            x=x,
+            y=y,
+            z=z,
+            delim=delim,
+        )
+
 
     def __str__(self):
         """Return a user-friendly representation of this vector."""
-        if self.z == 0:
-            return "(" + str(self.x) + ", " + str(self.y) + ")"
-        else:
-            return "(" + self.join() + ")"
+        return "(" + self.join() + ")"
+
 
     def __repr__(self):
         """Code required to reproduce this vector."""
-        return "Vec(" + self.join() + ")"
+        return self.__class__.__name__ + "(" + self.join() + ")"
+
 
     def __iter__(self):
         """Allow iterating through the dimensions."""
