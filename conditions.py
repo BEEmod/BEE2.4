@@ -13,6 +13,8 @@ STYLE_VARS = vbsp.settings['style_vars']
 VOICE_ATTR = vbsp.settings['has_attr']
 
 
+
+
 class SkipCondition(Exception):
     """Raised to skip to the next instance, from the SkipInstance result."""
     pass
@@ -774,6 +776,81 @@ def res_break(base_inst, res):
     """
     raise SkipCondition
 
+# For each direction, the two perpendicular axes and the axis it is pointing in.
+PAIR_AXES = {
+    (1, 0, 0):  'yz' 'x',
+    (-1, 0, 0): 'yz' 'x',
+    (0, 1, 0):  'xz' 'y',
+    (0, -1, 0): 'xz' 'y',
+    (0, 0, 1):  'xy' 'z',
+    (0, 0, -1): 'xy' 'z',
+}
+
+
+def res_fizzler_pair(begin_inst, res):
+    """Modify the instance of a fizzler to link with its pair."""
+    orig_target = begin_inst['targetname']
+
+    if 'modelEnd' in orig_target:
+        return  # We only execute starting from the start side.
+
+    orig_target = orig_target[:-11]  # remove "_modelStart"
+    end_name = orig_target + '_modelEnd' # What we search for
+
+    # The name all these instances get
+    pair_name = orig_target + '-model' + str(begin_inst.id)
+
+    orig_file = begin_inst['file']
+
+    begin_file = res['StartInst', orig_file]
+    end_file = res['EndInst', orig_file]
+    mid_file = res['MidInst', '']
+
+    begin_inst['file'] = begin_file
+    begin_inst['targetname'] = pair_name
+
+    angles = Vec.from_str(begin_inst['angles'])
+    # We round it to get rid of 0.00001 inprecision from the calculations.
+    direction = round(Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z))
+    ':type direction: utils.Vec'
+    print(end_name, direction)
+
+    begin_pos = Vec.from_str(begin_inst['origin'])
+    axis_1, axis_2, main_axis = PAIR_AXES[direction.as_tuple()]
+    for end_inst in VMF.by_class['func_instance']:
+        if end_inst['targetname', ''] != end_name:
+            # Only examine this barrier hazard's instances!
+            continue
+        end_pos = Vec.from_str(end_inst['origin'])
+        if (
+                begin_pos[axis_1] == end_pos[axis_1] and
+                begin_pos[axis_2] == end_pos[axis_2]
+                ):
+            length = int(end_pos[main_axis] - begin_pos[main_axis])
+            break
+    else:
+        utils.con_log('No matching pair for {}!!'.format(orig_target))
+        return
+    end_inst['targetname'] = pair_name
+    end_inst['file'] = end_file
+
+    if mid_file != '':
+        # Go 64 from each side, and always have at least 1 section
+        # A 128 gap will have length = 0
+        for dis in range(0, abs(length) + 1, 128):
+            new_pos = begin_pos + direction*dis
+            VMF.create_ent(
+                classname='func_instance',
+                targetname=pair_name,
+                angles=begin_inst['angles'],
+                file=mid_file,
+                origin=new_pos.join(' '),
+            )
+
+
+def res_clear_outputs(inst, res):
+    inst.outputs.clear()
+
 
 FLAG_LOOKUP = {
     'and': flag_and,
@@ -781,32 +858,43 @@ FLAG_LOOKUP = {
     'not': flag_not,
     'nor': flag_nor,
     'nand': flag_nand,
+
     'instance': flag_file_equal,
     'instpart': flag_file_cont,
     'instvar': flag_instvar,
     'hasinst': flag_has_inst,
+
     'stylevar': flag_stylevar,
+
     'has': flag_voice_has,
     'hasmusic': flag_music,
+
     'ifmode': flag_game_mode,
     'ifpreview': flag_is_preview,
     'ifoption': flag_option,
     }
 
 RESULT_LOOKUP = {
+    "nextinstance": res_break,
+    "condition": res_sub_condition,
+
+    "setoption": res_set_option,
+    "has": res_set_voice_attr,
+    "stylevar": res_set_style_var,
+    "clearoutputs": res_clear_outputs,
+
     "changeinstance": res_change_instance,
-    'suffix': res_add_suffix,
-    'instvar': res_add_inst_var,
-    "variant": res_add_variant,
     "addglobal": res_add_global_inst,
     "addoverlay": res_add_overlay_inst,
+
+    "suffix": res_add_suffix,
+    "variant": res_add_variant,
+    "instvar": res_add_inst_var,
+
     "custoutput": res_cust_output,
     "custantline": res_cust_antline,
-    "custfizzler": res_cust_fizzler,
     "faithmods": res_faith_mods,
-    "stylevar": res_set_style_var,
-    "has": res_set_voice_attr,
-    "setoption": res_set_option,
-    "condition": res_sub_condition,
-    "nextinstance": res_break,
+
+    "fizzlermodelpair": res_fizzler_pair,
+    "custfizzler": res_cust_fizzler,
     }
