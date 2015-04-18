@@ -19,7 +19,6 @@ __all__ = [
     'QuotePack',
     'Skybox',
     'Music',
-    'Goo',
     'StyleVar',
     ]
 
@@ -570,64 +569,6 @@ class Skybox:
         return '<Skybox ' + self.id + '>'
 
 
-class Goo:
-    def __init__(
-            self,
-            goo_id,
-            name,
-            ico,
-            mat,
-            mat_cheap,
-            auth,
-            desc,
-            short_name=None,
-            config=None,
-            ):
-        self.id = goo_id
-        self.short_name = name if short_name is None else short_name
-        self.name = name
-        self.icon = ico
-        self.material = mat
-        self.cheap_material = mat_cheap
-        self.auth = auth
-        self.desc = desc
-        self.config = config or Property(None, [])
-
-    @classmethod
-    def parse(cls, zip_file, goo_id, info):
-        """Parse a goo definition."""
-        name, short_name, auth, icon, desc = get_selitem_data(info)
-        mat = info['material', 'nature/toxicslime_a2_bridge_intro']
-        mat_cheap = info['material_cheap', mat]
-
-        config_dir = 'goo/' + info['config', '']
-        if config_dir in zip_file.namelist():
-            with zip_file.open(config_dir, 'r') as conf:
-                config = Property.parse(conf, config_dir)
-        else:
-            config = Property(None, [])
-
-        return cls(
-            goo_id,
-            name,
-            icon,
-            mat,
-            mat_cheap,
-            auth,
-            desc,
-            short_name,
-            config,
-        )
-
-    def add_over(self, override):
-        """Add the additional vbsp_config commands to ourselves."""
-        self.config.extend(override.config)
-        self.auth.extend(override.auth)
-
-    def __repr__(self):
-        return '<Goo ' + self.id + '>'
-
-
 class Music:
     def __init__(
             self,
@@ -822,7 +763,6 @@ obj_types = {
     'Item':      Item,
     'QuotePack': QuotePack,
     'Skybox':    Skybox,
-    'Goo':       Goo,
     'Music':     Music,
     'StyleVar':  StyleVar,
     'Elevator':  ElevatorVid,

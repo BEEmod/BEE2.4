@@ -63,7 +63,6 @@ skyboxes = {}
 voices = {}
 styles = {}
 musics = {}
-goos = {}
 elevators = {}
 
 item_opts = ConfigFile('item_configs.cfg')
@@ -452,7 +451,7 @@ def load_packages(data):
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
-    global skybox_win, voice_win, music_win, goo_win, style_win, elev_win
+    global skybox_win, voice_win, music_win, style_win, elev_win
     global item_list, filter_data
     global selected_style
 
@@ -480,7 +479,6 @@ def load_packages(data):
     sky_list = []
     voice_list = []
     style_list = []
-    goo_list = []
     music_list = []
     elev_list = []
 
@@ -489,7 +487,6 @@ def load_packages(data):
         (sky_list, skyboxes, 'Skybox'),
         (voice_list, voices, 'QuotePack'),
         (style_list, styles, 'Style'),
-        (goo_list, goos, 'Goo'),
         (music_list, musics, 'Music'),
         (elev_list, elevators, 'Elevator'),
         ]
@@ -566,17 +563,6 @@ def load_packages(data):
         callback_params=['Music'],
         )
 
-    goo_win = selWin(
-        TK_ROOT,
-        goo_list,
-        title='Select Goo Appearance',
-        has_none=True,
-        none_desc='Use a Bottomless Pit instead. This changes appearance'
-                  'depending on the skybox that is chosen.',
-        callback=win_callback,
-        callback_params=['Goo'],
-        )
-
     style_win = selWin(
         TK_ROOT,
         style_list,
@@ -608,7 +594,6 @@ def load_packages(data):
         (voice_win, 'Voice'),
         (music_win, 'Music'),
         (skybox_win, 'Skybox'),
-        (goo_win, 'Goo'),
         (elev_win, 'Elevator'),
         ]
     for (sel_win, opt_name), default in zip(
@@ -627,7 +612,6 @@ def suggested_refresh():
                 voice_win.is_suggested() and
                 music_win.is_suggested() and
                 skybox_win.is_suggested() and
-                goo_win.is_suggested() and
                 elev_win.is_suggested()
                 ):
             UI['suggested_style'].state(['disabled'])
@@ -684,7 +668,6 @@ def export_editoritems(_=None):
         item_list,
         music=musics.get(music_win.chosen_id, None),
         skybox=skyboxes.get(skybox_win.chosen_id, None),
-        goo=goos.get(goo_win.chosen_id, None),
         voice=voices.get(voice_win.chosen_id, None),
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
@@ -1057,7 +1040,7 @@ def init_option(f):
 
         """
         sugg = styles[selected_style].suggested
-        win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
+        win_types = (voice_win, music_win, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
@@ -1081,7 +1064,6 @@ def init_option(f):
             "Music",
             "Voice",
             "Skybox",
-            "Goo",
             "Elev Vid",
             ]):
         if name is None:
@@ -1104,8 +1086,7 @@ def init_option(f):
     music_win.widget(props).grid(row=2, column=1, sticky='EW')
     voice_frame.grid(row=3, column=1, sticky='EW')
     skybox_win.widget(props).grid(row=4, column=1, sticky='EW')
-    goo_win.widget(props).grid(row=5, column=1, sticky='EW')
-    elev_win.widget(props).grid(row=6, column=1, sticky='EW')
+    elev_win.widget(props).grid(row=5, column=1, sticky='EW')
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
 
     ttk.Sizegrip(
@@ -1738,7 +1719,7 @@ def init_windows():
         elev_win.readonly = not style_obj.has_video
 
         sugg = style_obj.suggested
-        win_types = (voice_win, music_win, skybox_win, goo_win, elev_win)
+        win_types = (voice_win, music_win, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()

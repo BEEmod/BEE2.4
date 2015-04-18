@@ -216,7 +216,6 @@ class Game:
             all_items,
             music,
             skybox,
-            goo,
             voice,
             style_vars,
             elevator,
@@ -231,7 +230,6 @@ class Game:
         print('Exporting Items and Style for "' + self.name + '"!')
         print('Style =', style)
         print('Music =', music)
-        print('Goo =', goo)
         print('Voice =', voice)
         print('Skybox =', skybox)
         print('Elevator = ', elevator)
