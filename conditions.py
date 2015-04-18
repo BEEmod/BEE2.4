@@ -183,7 +183,8 @@ def remove_blank_inst():
     This allows conditions to strip the instances when requested.
     """
     for inst in VMF.by_class['func_instance']:
-        if inst['file', ''] == '':
+        # If set to "" in editoritems, we get ".vmf" instead
+        if inst['file', ''] in ('', '.vmf'):
             VMF.remove_ent(inst)
 
 
