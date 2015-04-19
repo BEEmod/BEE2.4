@@ -6,15 +6,31 @@ import shutil
 import random
 from enum import Enum
 from collections import defaultdict
+from decimal import Decimal
 
 from property_parser import Property
 from utils import Vec
 from BEE2_config import ConfigFile
 import vmfLib as VLib
-import conditions
 import utils
 import voiceLine
 
+# Configuration data extracted from VBSP_config
+settings = {
+    "textures":       {},
+    "fizzler":        {},
+    "options":        {},
+    "pit":            {},
+    "deathfield":     {},
+
+    "style_vars":      defaultdict(bool),
+    "has_attr":        defaultdict(bool),
+
+    "voice_data_sp":   Property("Quotes_SP", []),
+    "voice_data_coop": Property("Quotes_COOP", []),
+    }
+
+import conditions
 
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
@@ -203,21 +219,6 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-# Configuration data extracted from VBSP_config
-settings = {
-    "textures":       {},
-    "fizzler":        {},
-    "options":        {},
-    "pit":            {},
-    "deathfield":     {},
-
-    "style_vars":      defaultdict(bool),
-    "has_attr":        defaultdict(bool),
-
-    "voice_data_sp":   Property("Quotes_SP", []),
-    "voice_data_coop": Property("Quotes_COOP", []),
-    }
-
 BEE2_config = None
 
 # A list of sucessful AddGlobal commands, so we can prevent adding the same
@@ -361,6 +362,9 @@ def load_settings():
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
 
+        if len(settings['pit']['pillar']) == 0:
+            settings['pit']['pillar'] = [""]
+
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
             '/config/compile.cfg',
@@ -369,6 +373,7 @@ def load_settings():
     else:
         BEE2_config = ConfigFile(None)
 
+    utils.con_log(settings['pit'])
     utils.con_log("Settings Loaded!")
 
 
@@ -507,7 +512,7 @@ def make_bottomless_pit(solids):
     for solid, wat_face in solids:
         wat_face.mat = tex_sky
         for vec in wat_face.planes:
-            vec.z = float(str(int(vec.z)-96) + ".5")
+            vec.z = float(Decimal(vec.z) - Decimal('95.5'))
             # subtract 95.5 from z axis to make it 0.5 units thick
             # we do the decimal with strings to ensure it adds floats precisely
     pit_height = settings['pit']['height']
@@ -530,7 +535,7 @@ def make_bottomless_pit(solids):
         # transform the skybox physics triggers into teleports to move cubes
             # into the skybox zone
         for trig in VMF.by_class['trigger_multiple']:
-            if trig['wait'] == 0.1:
+            if trig['wait'] == '0.1':
                 bbox_min, bbox_max = trig.get_bbox()
                 origin = (bbox_min + bbox_max)/2
                 """:type :Vec"""
@@ -558,25 +563,49 @@ def make_bottomless_pit(solids):
                             if plane.z > origin.z:
                                 plane.z -= 16
 
-    file_opts = settings['pit']['side']
+    side_opts = settings['pit']['side']
+    pillar_opts = settings['pit']['pillar']
+
+    utils.con_log('Pillar:', pillar_opts)
     for (x, y), mask in edges.items():
-        if mask is not None:
-            for i, xoff, yoff, angle in dirs:
-                if mask[i] is not None:
-                    random.seed(str(x) + str(y) + angle)
-                    file = random.choice(file_opts)
-                    if file != '':
-                        VMF.create_ent(
-                            classname='func_instance',
-                            file=file,
-                            targetname='goo_side',
-                            origin='{!s} {!s} {!s}'.format(
-                                x+tele_off_x,
-                                y+tele_off_y,
-                                mask[i],
-                                ),
-                            angles=angle
-                        ).make_unique()
+        if mask is None:
+            continue
+        for i, xoff, yoff, angle in dirs:
+            if mask[i] is None:
+                continue
+            random.seed(str(x) + str(y) + angle)
+            file = random.choice(side_opts)
+            if file != '':
+                VMF.create_ent(
+                    classname='func_instance',
+                    file=file,
+                    targetname='goo_side',
+                    origin='{!s} {!s} {!s}'.format(
+                        x+tele_off_x,
+                        y+tele_off_y,
+                        mask[i],
+                        ),
+                    angles=angle
+                ).make_unique()
+        random.seed(str(x) + str(y) + '-pillar')
+        file = random.choice(pillar_opts)
+        if file != '':
+            VMF.create_ent(
+                classname='func_instance',
+                file=file,
+                targetname='goo_side',
+                angles='0 0 0',
+                origin='{!s} {!s} {!s}'.format(
+                    x+tele_off_x,
+                    y+tele_off_y,
+                    max(
+                        x
+                        for x in mask
+                        if x is not None
+                    ),
+                ),
+            ).make_unique()
+
 
 
 def change_brush():
@@ -921,7 +950,7 @@ def change_trig():
     for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
             alter_mat(side)
-        target = trig['targetname']
+        target = trig['targetname', '']
         # Change this so the base instance can directly modify the brush.
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_fizz'
