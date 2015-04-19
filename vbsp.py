@@ -484,7 +484,7 @@ def calc_rand_seed():
     """
     amb_light = INST_FILE['ambLight']
     lst = [
-        inst['targetname']
+        inst['targetname'] or '-'  # If no targ
         for inst in
         VMF.by_class['func_instance']
         if inst['file'] == amb_light
@@ -929,7 +929,7 @@ def change_trig():
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
     for trig in VMF.by_class['trigger_hurt']:
-        target = trig['targetname']
+        target = trig['targetname', '']
         # Change this so the base instance can directly modify the brush.
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_hurt'
@@ -1013,7 +1013,7 @@ def change_func_brush():
         parent = brush['parentname', '']
         brush_type = ""
 
-        target = brush['targetname']
+        target = brush['targetname', '']
         # Fizzlers need their custom outputs.
         # Change this so the base instance can directly modify the brush.
         if target.endswith('_brush'):
@@ -1154,7 +1154,7 @@ def fix_inst():
 
             # strip off the extra numbers on the end, so fizzler
             # models recieve inputs correctly (Valve bug!)
-            if "_modelStart" in inst['targetname']:
+            if "_modelStart" in inst['targetname', '']:
 
                 inst['targetname'] = (
                     inst['targetname'].split("_modelStart")[0] +
