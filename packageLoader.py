@@ -5,7 +5,7 @@ import os
 import os.path
 import shutil
 from zipfile import ZipFile
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 
 from property_parser import Property, NoKeyError
@@ -29,6 +29,9 @@ packages = {}
 data = {}
 
 res_count = -1
+
+ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
+ParseData = namedtuple('ParseData', 'zip_file, id, info')
 
 
 def reraise_keyerror(err, obj_id):
@@ -66,6 +69,10 @@ def load_packages(pak_dir, load_res):
 
     zips = []
     try:
+        package_data = namedtuple(
+            'package_data',
+            'zip_file, info, name, disp_name',
+        )
         for name in contents:
             print('Reading package file "' + name + '"')
             name = os.path.join(pak_dir, name)
@@ -77,7 +84,12 @@ def load_packages(pak_dir, load_res):
                         info = Property.parse(info_file, name + ':info.txt')
                     pak_id = info['ID']
                     disp_name = info['Name', pak_id]
-                    packages[pak_id] = (pak_id, zip_file, info, name, disp_name)
+                    packages[pak_id] = package_data(
+                        zip_file,
+                        info,
+                        name,
+                        disp_name,
+                    )
                 else:
                     print("ERROR: Bad package'"+name+"'!")
 
@@ -87,7 +99,7 @@ def load_packages(pak_dir, load_res):
             data[obj_type] = []
 
         objects = 0
-        for pak_id, zip_file, info, name, dispName in packages.values():
+        for pak_id, (zip_file, info, name, dispName) in packages.items():
             print("Scanning package '" + pak_id + "'...", end='')
             obj_count = parse_package(zip_file, info, pak_id, dispName)
             objects += obj_count
@@ -106,22 +118,26 @@ def load_packages(pak_dir, load_res):
                 # parse through the object and return the resultant class
                 try:
                     object_ = obj_types[obj_type].parse(
-                        obj_data[0],
-                        obj_id,
-                        obj_data[1],
+                        ParseData(
+                            obj_data.zip_file,
+                            obj_id,
+                            obj_data.info_block,
                         )
+                    )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
 
-                object_.pak_id = obj_data[2]
-                object_.pak_name = obj_data[3]
+                object_.pak_id = obj_data.pak_id
+                object_.pak_name = obj_data.disp_name
                 for zip_file, info_block in \
                         obj_override[obj_type].get(obj_id, []):
                     override = obj_types[obj_type].parse(
-                        zip_file,
-                        obj_id,
-                        info_block,
+                        ParseData(
+                            zip_file,
+                            obj_id,
+                            info_block,
                         )
+                    )
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loadScreen.step("OBJ")
@@ -189,7 +205,12 @@ def parse_package(zip_file, info, pak_id, disp_name):
             if obj_id in all_obj[comp_type]:
                 raise Exception('ERROR! "' + obj_id + '" defined twice!')
             objects += 1
-            all_obj[comp_type][obj_id] = (zip_file, obj, pak_id, disp_name)
+            all_obj[comp_type][obj_id] = ObjData(
+                zip_file,
+                obj,
+                pak_id,
+                disp_name,
+            )
 
     if res_count != -1:
         for item in zip_file.namelist():
@@ -346,9 +367,10 @@ class Style:
             self.config = config
 
     @classmethod
-    def parse(cls, zip_file, style_id, info):
+    def parse(cls, data):
         """Parse a style definition."""
-        name, short_name, auth, icon, desc = get_selitem_data(info)
+        info = data.info
+        selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = utils.conv_bool(info['has_video', '1'])
 
@@ -361,26 +383,25 @@ class Style:
             sugg['elev', '<NONE>'],
             )
 
-        if short_name == '':
-            short_name = None
+        short_name = selitem_data.short_name or None
         if base == '':
             base = None
-        files = zip_file.namelist()
+        files = data.zip_file.namelist()
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
-        with zip_file.open(folder + '/items.txt', 'r') as item_data:
+        with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
             items = Property.parse(item_data, folder+'/items.txt')
         if config in files:
-            with zip_file.open(config, 'r') as vbsp_config:
+            with data.zip_file.open(config, 'r') as vbsp_config:
                 vbsp = Property.parse(vbsp_config, config)
         else:
             vbsp = None
         return cls(
-            style_id=style_id,
-            name=name,
-            author=auth,
-            desc=desc,
-            icon=icon,
+            style_id=data.id,
+            name=selitem_data.name,
+            author=selitem_data.auth,
+            desc=selitem_data.desc,
+            icon=selitem_data.icon,
             editor=items,
             config=vbsp,
             base_style=base,
@@ -407,13 +428,13 @@ class Item:
         self.def_data = def_version['def_style']
 
     @classmethod
-    def parse(cls, zip_file, item_id, info):
+    def parse(cls, data):
         """Parse an item definition."""
         versions = {}
         def_version = None
         folders = {}
 
-        for ver in info.find_all('version'):
+        for ver in data.info.find_all('version'):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
@@ -432,7 +453,7 @@ class Item:
             if def_version is None:
                 def_version = vals
 
-        parse_item_folder(folders, zip_file)
+        parse_item_folder(folders, data.zip_file)
 
         for ver in versions.values():
             if ver['def_style'] in folders:
@@ -441,9 +462,9 @@ class Item:
                 ver['styles'][sty] = folders[fold]
 
         if not versions:
-            raise ValueError('Item "' + item_id + '" has no versions!')
+            raise ValueError('Item "' + data.id + '" has no versions!')
 
-        return cls(item_id, versions, def_version)
+        return cls(data.id, versions, def_version)
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
@@ -491,21 +512,21 @@ class QuotePack:
         self.config = config
 
     @classmethod
-    def parse(cls, zip_file, quote_id, info):
+    def parse(cls, data):
         """Parse a voice line definition."""
-        name, short_name, auth, icon, desc = get_selitem_data(info)
-        path = 'voice/' + info['file'] + '.voice'
-        with zip_file.open(path, 'r') as conf:
+        selitem_data = get_selitem_data(data.info)
+        path = 'voice/' + data.info['file'] + '.voice'
+        with data.zip_file.open(path, 'r') as conf:
             config = Property.parse(conf, path)
 
         return cls(
-            quote_id,
-            name,
+            data.id,
+            selitem_data.name,
             config,
-            icon,
-            desc,
-            auth=auth,
-            short_name=short_name
+            selitem_data.icon,
+            selitem_data.desc,
+            auth=selitem_data.auth,
+            short_name=selitem_data.short_name
             )
 
     def add_over(self, override):
@@ -543,22 +564,31 @@ class Skybox:
         self.desc = desc
 
     @classmethod
-    def parse(cls, zip_file, item_id, info):
+    def parse(cls, data):
         """Parse a skybox definition."""
-        config_dir = info['config', '']
-        name, short_name, auth, icon, desc = get_selitem_data(info)
-        mat = info['material', 'sky_black']
+        config_dir = data.info['config', '']
+        selitem_data = get_selitem_data(data.info)
+        mat = data.info['material', 'sky_black']
         if config_dir == '':  # No config at all
             config = Property(None, [])
         else:
-            path = 'skybox/' + name + '.cfg'
-            if path in zip_file.namelist():
-                with zip_file.open(name, 'r') as conf:
+            path = 'skybox/' + config_dir + '.cfg'
+            if path in data.zip_file.namelist():
+                with data.zip_file.open(path, 'r') as conf:
                     config = Property.parse(conf)
             else:
-                print(name + '.cfg not in zip!')
+                print(config_dir + '.cfg not in zip!')
                 config = Property(None, [])
-        return cls(item_id, name, icon, config, mat, auth, desc, short_name)
+        return cls(
+            data.id,
+            selitem_data.name,
+            selitem_data.icon,
+            config,
+            mat,
+            selitem_data.auth,
+            selitem_data.desc,
+            selitem_data.short_name,
+        )
 
     def add_over(self, override):
         """Add the additional vbsp_config commands to ourselves."""
@@ -593,25 +623,25 @@ class Music:
         self.config = config or Property(None, [])
 
     @classmethod
-    def parse(cls, zip_file, music_id, info):
+    def parse(cls, data):
         """Parse a music definition."""
-        name, short_name, auth, icon, desc = get_selitem_data(info)
-        inst = info['instance', None]
-        sound = info['soundscript', None]
+        selitem_data = get_selitem_data(data.info)
+        inst = data.info['instance', None]
+        sound = data.info['soundscript', None]
 
-        config_dir = 'music/' + info['config', '']
-        if config_dir in zip_file.namelist():
-            with zip_file.open(config_dir, 'r') as conf:
+        config_dir = 'music/' + data.info['config', '']
+        if config_dir in data.zip_file.namelist():
+            with data.zip_file.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
             config = Property(None, [])
         return cls(
-            music_id,
-            name,
-            icon,
-            auth,
-            desc,
-            short_name=short_name,
+            data.id,
+            selitem_data.name,
+            selitem_data.icon,
+            selitem_data.auth,
+            selitem_data.desc,
+            short_name=selitem_data.short_name,
             inst=inst,
             sound=sound,
             config=config,
@@ -634,11 +664,14 @@ class StyleVar:
         self.default = default
 
     @classmethod
-    def parse(cls, _, var_id, info):
-        name = info['name']
-        styles = [prop.value for prop in info.find_all('Style')]
-        default = utils.conv_bool(info['enabled', '0'])
-        return cls(var_id, name, styles, default)
+    def parse(cls, data):
+        name = data.info['name']
+        styles = [
+            prop.value
+            for prop in data.info.find_all('Style')
+        ]
+        default = utils.conv_bool(data.info['enabled', '0'])
+        return cls(data.id, name, styles, default)
 
     def add_over(self, override):
         self.styles.extend(override.styles)
@@ -692,8 +725,9 @@ class ElevatorVid:
             self.vert_video = vert_video
 
     @classmethod
-    def parse(cls, _, elev_id, info):
-        name, short_name, auth, icon, desc = get_selitem_data(info)
+    def parse(cls, data):
+        info = data.info
+        selitem_data = get_selitem_data(info)
 
         if 'vert_video' in info:
             video = info['horiz_video']
@@ -703,14 +737,14 @@ class ElevatorVid:
             vert_video = None
 
         return cls(
-            elev_id,
-            icon,
-            name,
-            auth,
-            desc,
+            data.id,
+            selitem_data.icon,
+            selitem_data.name,
+            selitem_data.auth,
+            selitem_data.desc,
             video,
-            short_name,
-            vert_video
+            selitem_data.short_name,
+            vert_video,
         )
 
     def add_over(self, override):
@@ -732,6 +766,9 @@ def desc_parse(info):
             yield ("line", prop.value)
 
 
+SelitemData = namedtuple('SelitemData', 'name, short_name, auth, icon, desc')
+
+
 def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
 
@@ -741,7 +778,7 @@ def get_selitem_data(info):
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
-    return name, short_name, auth, icon, desc
+    return SelitemData(name, short_name, auth, icon, desc)
 
 
 def sep_values(string, delimiter):

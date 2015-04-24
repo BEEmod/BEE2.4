@@ -358,6 +358,7 @@ def load_settings():
             'off_y': utils.conv_int(pit['off_y', '0']),
             'height': utils.conv_int(pit['max_height', '386'], 386),
             'side': [prop.value for prop in pit.find_all("side_inst")],
+            'pillar': [prop.value for prop in pit.find_all("pillar_inst")],
             }
         if len(settings['pit']['side']) == 0:
             settings['pit']['side'] = [""]
@@ -514,7 +515,7 @@ def make_bottomless_pit(solids):
         for vec in wat_face.planes:
             vec.z = float(Decimal(vec.z) - Decimal('95.5'))
             # subtract 95.5 from z axis to make it 0.5 units thick
-            # we do the decimal with strings to ensure it adds floats precisely
+            # we do the calc with Decimal to ensure precision
     pit_height = settings['pit']['height']
 
     # To figure out what positions need edge pieces, we use a dict
