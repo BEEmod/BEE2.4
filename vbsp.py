@@ -422,7 +422,7 @@ def get_map_info():
     # Timer_delay values for the entry/exit corridors, needed for quotes
     voice_timer_pos = {}
 
-    inst_files = []  # Get a list of every instance in the map.
+    inst_files = set()  # Get a set of every instance in the map.
     file_coop_exit = INST_FILE['coopExit']
     file_sp_exit = INST_FILE['spExit']
     file_coop_corr = INST_FILE['coopCorr']
@@ -438,17 +438,19 @@ def get_map_info():
         elif file == file_sp_exit:
             game_mode = 'SP'
         elif file == INST_FILE['spEntry']:
-            is_preview = item.fixup['no_player_start'] == '0'
-
+            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
+            game_mode = 'SP'
         elif file.startswith(file_coop_corr):
-            is_preview = item.fixup['no_player_start'] == '0'
+            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
                 )
+            game_mode = 'COOP'
         elif file.startswith(file_sp_entry_corr):
             voice_timer_pos['entry'] = (
                 item.fixup['timer_delay', '0']
                 )
+            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
         elif file.startswith(file_sp_exit_corr):
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
@@ -462,8 +464,7 @@ def get_map_info():
                 item.fixup['timer_delay', '0']
                 )
 
-        if item['file'] not in inst_files:
-            inst_files.append(item['file'])
+        inst_files.add(item['file'])
 
     utils.con_log("Game Mode: " + game_mode)
     utils.con_log("Is Preview: " + str(is_preview))
