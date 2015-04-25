@@ -15,10 +15,15 @@ from SubPane import SubPane
 # in every style.
 styleOptions = [
     # ID, Name, default value
+    # Do the DLC2 Cave lines play?
     ('MultiverseCave', 'Multiverse Cave', 1),
+    # Add bumpers to glass
     ('FixPortalBump', 'Prevent Portal Bump  (glass)', 0),
+    # Add bumpers to fizzler
     ('FixFizzlerBump', 'Prevent Portal Bump  (fizzler)', 0),
+    # Disable voice lines in the mid-chamber catagory
     ('NoMidVoices', 'Suppress Mid-Chamber Dialogue', 0),
+    # Allow removing and placing exit doors, obs rooms
     ('UnlockDefault', 'Unlock Default Items', 0),
     ]
 
@@ -32,6 +37,10 @@ var_list = []
 window = None
 
 UI = {}
+
+
+def update_filter():
+    pass
 
 
 def add_vars(data):
@@ -50,6 +59,8 @@ def set_stylevar(var):
     """Save the value for a particular stylevar."""
     val = str(tk_vars[var].get())
     GEN_OPTS['StyleVar'][var] = val
+    if var == 'UnlockDefault':
+        update_filter()
 
 
 def scroll(delta):

@@ -296,6 +296,7 @@ class PalItem(Label):
         self.visible = True
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
+        self.needs_unlock = item.item.needs_unlock
         self.load_data()
         self.bind("<Button-3>", contextWin.open_event)
         self.bind("<Button-1>", drag_start)
@@ -953,6 +954,7 @@ def update_filters():
             FilterBoxes_all[cat].state(['!alternate'])
             FilterVars_all[cat].set(value)
     show_beta = show_beta_items.get()
+    style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
     for item in pal_items:
         item.visible = (
             # Items are hidden if it's a beta item and the option is
@@ -969,6 +971,8 @@ def update_filters():
                 )
             # The package is selected
             and FilterVars['package'][item.item.pak_id].get()
+            # Items like the elevator that need the unlocked stylevar
+            and (not item.needs_unlock or style_unlocked)
             )
     flow_picker()
 
@@ -1488,6 +1492,7 @@ def init_windows():
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
     ui_bg.rowconfigure(0, weight=1)
+    StyleVarPane.update_filter = update_filters
 
     style = ttk.Style()
     # Custom button style with correct background
