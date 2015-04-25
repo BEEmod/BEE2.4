@@ -1234,6 +1234,12 @@ class Entity:
 
     get = __getitem__
 
+    def clear_keys(self):
+        """Remove all keyvalues from an item."""
+        del self['targetname']
+        del self['classname']
+        self.keys.clear()
+
     def __contains__(self, key: str):
         """Determine if a value exists for the given key."""
         key = key.casefold()
