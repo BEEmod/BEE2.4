@@ -154,7 +154,6 @@ def check_all():
                         # This is raised to immediately stop running
                         # this condition, and skip to the next instance.
                         pass
-                    utils.con_log('-------------------')
                     if len(condition.results) == 0:
                         break
 
@@ -427,6 +426,12 @@ def res_add_inst_var(inst, res):
         inst['file'] += '_' + inst.fixup[res.value, '']
 
 
+def res_set_inst_var(inst, res):
+    """Set an instance variable to the given value."""
+    var_name, val = res.value.split(' ')
+    inst.fixup[var_name] = val
+
+
 def res_add_variant(inst, res):
     """This allows using a random instance from a weighted group.
 
@@ -621,7 +626,6 @@ def res_cust_fizzler(base_inst, res):
 
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
-
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) == 0:
         return  # No brush modifications
@@ -891,6 +895,7 @@ RESULT_LOOKUP = {
     "suffix": res_add_suffix,
     "variant": res_add_variant,
     "instvar": res_add_inst_var,
+    "setinstvar": res_set_inst_var,
 
     "custoutput": res_cust_output,
     "custantline": res_cust_antline,
