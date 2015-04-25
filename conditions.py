@@ -350,7 +350,7 @@ def flag_stylevar(_, flag):
 
 
 def flag_voice_has(_, flag):
-    return bool(VOICE_ATTR[flag.value])
+    return bool(VOICE_ATTR[flag.value.casefold()])
 
 
 def flag_music(_, flag):
@@ -626,14 +626,14 @@ def res_cust_fizzler(base_inst, res):
     if len(new_brush_config) == 0:
         return  # No brush modifications
     for orig_brush in (
-            VMF.by_class['func_instance'] &
-            VMF.by_target[fizz_name + '_brush']
-            ):
+            VMF.by_class['trigger_portal_cleanser'] &
+            VMF.by_target[fizz_name + '_brush']):
+        print(orig_brush)
         VMF.remove_ent(orig_brush)
         for config in new_brush_config:
             new_brush = orig_brush.copy()
             VMF.add_ent(new_brush)
-            new_brush.keys.clear()  # Wipe the original keyvalues
+            new_brush.clear_keys()  # Wipe the original keyvalues
             new_brush['origin'] = orig_brush['origin']
             new_brush['targetname'] = (
                 fizz_name +

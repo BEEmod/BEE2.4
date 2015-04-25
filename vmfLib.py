@@ -1213,6 +1213,20 @@ class Entity:
 
     def __delitem__(self, key):
         key = key.casefold()
+        if key == 'targetname':
+            with suppress(KeyError):
+                self.map.by_target[
+                    self.keys.get('targetname', None)
+                ].remove(self)
+            self.map.by_target[None].add(self)
+
+        if key == 'classname':
+            with suppress(KeyError):
+                self.map.by_class[
+                    self.keys.get('classname', None)
+                ].remove(self)
+            self.map.by_class[None].add(self)
+
         for k in self.keys:
             if k.casefold() == key:
                 del self.keys[k]
