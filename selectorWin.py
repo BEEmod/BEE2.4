@@ -17,6 +17,8 @@ ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE+16
 ITEM_HEIGHT = ICON_SIZE+51
 
+err_icon = png.png('BEE2/error_96')
+
 
 def _NO_OP(*args):
     """The default callback, triggered whenever the chosen item is changed."""
@@ -65,10 +67,10 @@ class Item:
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = png.png('BEE2/blank_96')
+            self.icon = png.png('BEE2/blank_96', error=err_icon)
             self.ico_file = 'BEE2/blank_96'
         else:
-            self.icon = png.png(icon)
+            self.icon = png.png(icon, error=err_icon)
             self.ico_file = icon
         self.desc = desc
         self.authors = [] if authors is None else authors
@@ -220,7 +222,7 @@ class selWin:
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = png.png('BEE2/blank')
+        self.prop_icon.img = png.png('BEE2/blank_96')
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column=0)
 
@@ -573,7 +575,6 @@ if __name__ == '__main__':  # test the window if directly executing this file
     from tk_root import TK_ROOT
     lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
     lbl.grid()
-    png.img_error = png.png('BEE2/error')
     TK_ROOT.geometry("+500+500")
 
     test_list = [

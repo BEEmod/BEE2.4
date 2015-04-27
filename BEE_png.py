@@ -11,7 +11,7 @@ import tkinter_png
 loaded_png = {}
 loaded_spr = {}
 
-def png(path):
+def png(path, error=None):
     """Loads in and converts a png for use in TKinter."""
     if not path.casefold().endswith(".png"):
         path=path+".png"
@@ -25,30 +25,36 @@ def png(path):
         path = os.path.normpath(os.path.join("images", path))
         if not os.path.isfile(path):
             print('ERROR: "images\\' + orig_path + '" does not exist!')
-            return img_error
+            if error is not None:
+                return error
+            else:
+                return img_error
         tmp = tkinter_png.PngImageTk(path)
         tmp.convert()
         loaded_png[orig_path] = tmp.image
         return tmp.image
 
 
-def spr(name):
+def spr(name, error=None):
     """Load in the property icons and automatically double the dimensions."""
     if name in loaded_spr:
         return loaded_spr[name]
     else:
-        ico = png('icons/'+name).zoom(2)
+        ico = png('icons/'+name, error=error).zoom(2)
         loaded_spr[name] = ico
         return ico
 
 
-def icon(name):
+def icon(name, error=None):
     """Load in a palette icon, ensuring the correct size."""
     name = "items/" + name
-    img = png(name)
+    img = png(name, error=error)
     if img.width() != 64 or img.height() != 64:
         print("ERROR: \"" + name + "\" is not 64x64!")
-        return img_error
+        if error is not None:
+            return error
+        else:
+            return img_error
     else:
         return img
 
