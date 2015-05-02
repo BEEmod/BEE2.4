@@ -26,22 +26,29 @@ DEFAULT_SETTINGS = {
     'Directories': {
         'palette': 'palettes\\',
         'package': 'packages\\',
-        },
+    },
     'General': {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
         'mute_sounds': '0',
-        'debug_mode': '0',
-        },
-    }
+    },
+    'Debug': {
+        # Show execptions in dialog box when crash occurs
+        'show_errors': '0',
+        # Log whenever items fallback to the parent style
+        'log_item_fallbacks': '0',
+        # Print message for items that have no match for a style
+        'log_missing_styles': '0',
+    },
+}
 
-DEBUG_MODE = False
+show_errors = False
 
 try:
 
     UI.load_settings(GEN_OPTS)
 
-    DEBUG_MODE = GEN_OPTS.get_bool('General', 'debug_mode')
+    show_errors = GEN_OPTS.get_bool('debug', 'show_errors')
 
     # If we have no games, gameMan will quit the app entirely.
     gameMan.load(UI.quit_application, loadScreen.win)
@@ -55,6 +62,8 @@ try:
         packageLoader.load_packages(
             GEN_OPTS['Directories']['package'],
             not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'),
+            GEN_OPTS.get_bool('debug', 'log_item_fallbacks'),
+            GEN_OPTS.get_bool('debug', 'log_missing_styles'),
             )
         )
     print('Done!')
@@ -82,7 +91,7 @@ except Exception as e:
     loadScreen.close_window()
 
     err = traceback.format_exc()
-    if DEBUG_MODE:
+    if show_errors:
         # Put it onscreen
         messagebox.showinfo(
             title='BEE2 Error!',

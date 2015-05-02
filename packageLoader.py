@@ -33,7 +33,6 @@ res_count = -1
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info')
 
-
 def reraise_keyerror(err, obj_id):
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
@@ -54,7 +53,12 @@ def reraise_keyerror(err, obj_id):
     ) from err
 
 
-def load_packages(pak_dir, load_res):
+def load_packages(
+        pak_dir,
+        load_res,
+        log_item_fallbacks,
+        log_missing_styles,
+        ):
     """Scan and read in all packages in the specified directory."""
     global res_count
     pak_dir = os.path.join(os.getcwd(), pak_dir)
@@ -172,7 +176,15 @@ def load_packages(pak_dir, load_res):
         # close them all, we've already read the contents.
         for z in zips:
             z.close()
-    setup_style_tree(data['Item'], data['Style'])
+
+    print('Allocating styled items...')
+    setup_style_tree(
+        data['Item'],
+        data['Style'],
+        log_item_fallbacks,
+        log_missing_styles,
+    )
+    print('Done!')
     return data
 
 
@@ -220,7 +232,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
     return objects
 
 
-def setup_style_tree(item_data, style_data):
+def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
     """Modify all items so item inheritance is properly handled.
 
     This will guarantee that all items have a definition for each
@@ -266,12 +278,29 @@ def setup_style_tree(item_data, style_data):
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
                         vers['styles'][sty_id] = vers['styles'][base_style.id]
+                        if log_fallbacks:
+                            print(
+                                'Item "{item}" using parent '
+                                '"{rep}" for "{style}"!'.format(
+                                    item=item.id,
+                                    rep=base_style.id,
+                                    style=sty_id,
+                                )
+                            )
                         break
                 else:
                     # For the base version, use the first style if
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
+                        if log_missing_styles:
+                            print(
+                                'Item "{item}" using '
+                                'inappropriate style for "{style}"!'.format(
+                                item=item.id,
+                                style=sty_id,
+                                )
+                            )
                     else:
                         # For versions other than the first, use
                         # the base version's definition
