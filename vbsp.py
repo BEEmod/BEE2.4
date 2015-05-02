@@ -79,6 +79,7 @@ TEX_DEFAULTS = [
     ('',                             'special.black'),
     ('',                             'special.white_gap'),
     ('',                             'special.black_gap'),
+    ('',                             'special.goo_wall'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -470,11 +471,15 @@ def get_map_info():
     utils.con_log("Is Preview: " + str(is_preview))
 
     if game_mode == 'ERR':
+        utils.con_log('Instances:', inst_files)
+        utils.con_log('InstanceFiles:', INST_FILE)
         raise Exception(
             'Unknown game mode - Map missing exit room!'
             '\nCheck for incorect InstanceFiles definition.'
         )
     if is_preview == 'ERR':
+        utils.con_log('Instances:', inst_files)
+        utils.con_log('InstanceFiles:', INST_FILE)
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
@@ -548,7 +553,6 @@ def make_bottomless_pit(solids):
                     trig['landmark'] = tele_ref
                     trig['target'] = tele_dest
                     trig.outputs.clear()
-                    print('box:', trig.get_bbox())
                     for x in range(int(bbox_min.x), int(bbox_max.x), 128):
                         for y in range(int(bbox_min.y), int(bbox_max.y), 128):
                             # Remove the pillar from the center of the item
@@ -608,6 +612,50 @@ def make_bottomless_pit(solids):
                 ),
             ).make_unique()
 
+
+def change_goo_sides():
+    """Replace the textures on the sides of goo with specific ones.
+
+    """
+    if len(settings['textures']['special.goo_wall']) == 0:
+        return
+    utils.con_log("Changing goo sides...")
+    face_dict = {}
+    for solid in VMF.iter_wbrushes(world=True, detail=False):
+        for face in solid:
+            if face.mat.casefold() != 'tools/toolsnodraw':
+                # Don't record the goo textured brushes
+                x, y, z = face.get_origin()
+                face_dict[x, y, z] = face
+
+    dirs = [
+        # x, y, z
+        (0, 64, 0),  # North
+        (0, -64, 0),  # South
+        (64, 0, 0),  # East
+        (-64, 0, 0),  # West
+        (0, 0, -64),  # Down
+    ]
+    for trig in VMF.by_class['trigger_multiple']:
+        if trig['wait'] != '0.1':
+            continue
+        bbox_min, bbox_max = trig.get_bbox()
+        z = int(bbox_min.z + 64)
+        for x in range(int(bbox_min.x)+64, int(bbox_max.x), 128):
+            for y in range(int(bbox_min.y)+64, int(bbox_max.y), 128):
+                for xoff, yoff, zoff in dirs:
+                    try:
+                        face = face_dict[x+xoff, y+yoff, z+zoff]
+                    except KeyError:
+                        pass
+                    else:
+                        utils.con_log('Success: ', face.mat.casefold())
+                        if (
+                                face.mat.casefold() in BLACK_PAN or
+                                face.mat.casefold() == 'tools/toolsnodraw'
+                                ):
+                            face.mat = get_tex('special.goo_wall')
+    utils.con_log("Done!")
 
 
 def change_brush():
@@ -772,6 +820,12 @@ def clump_walls():
                 # These textures aren't always on grid, ignore them..
                 alter_mat(face)
                 continue
+
+            if face.mat in GOO_TEX:
+                # For goo textures, don't add them to the dicts
+                # or floors will be nodrawed.
+                alter_mat(face)
+                break
 
             origin = face.get_origin().as_tuple()
             orient = get_face_orient(face)
@@ -1416,6 +1470,7 @@ def main():
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
+        change_goo_sides()  # Must be done before!
         change_brush()
         change_overlays()
         change_trig()
