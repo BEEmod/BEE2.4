@@ -926,9 +926,10 @@ def get_face_orient(face):
         return ORIENT.wall
 
 
-def set_antline_mat(over, mat):
+def set_antline_mat(over, mat, raw_mat=False):
     """Set the material on an overlay to the given value, applying options.
 
+    If raw_mat is set to 1, use the given texture directly.
     The material is split into 3 parts, separated by '|':
     - Scale: the u-axis width of the material, used for clean antlines.
     - Material: the material
@@ -938,17 +939,18 @@ def set_antline_mat(over, mat):
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
-    if get_tex('overlay.' + mat + 'floor') != '':
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        ang = Vec.from_str(over['angles'])
-        direction = round(Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z))
-        utils.con_log('Ant dir: ', over['angles'], direction)
-        if direction == Vec(0, 0, 1) or direction == Vec(0, 0, -1):
-            mat += 'floor'
-            utils.con_log('Floor!')
+    if not raw_mat:
+        if get_tex('overlay.' + mat + 'floor') != '':
+            # For P1 style, check to see if the antline is on the floor or
+            # walls.
+            ang = Vec.from_str(over['angles'])
+            direction = round(Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z))
+            utils.con_log('Ant dir: ', over['angles'], direction)
+            if direction == Vec(0, 0, 1) or direction == Vec(0, 0, -1):
+                mat += 'floor'
+                utils.con_log('Floor!')
 
-    mat = get_tex('overlay.' + mat)
+        mat = get_tex('overlay.' + mat)
 
     mat = mat.split('|')
     if len(mat) == 2:
@@ -1466,7 +1468,7 @@ def main():
             )
 
         fix_inst()
-        conditions.check_all()
+        conditions.check_all(inst_files=INST_FILE)
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()

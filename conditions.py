@@ -87,8 +87,43 @@ class Condition:
                     self.results.remove(res)  # invalid
                 else:
                     res.value = result
+            elif res.name == 'custoutput':
+                for sub_res in res:
+                    if sub_res.name == 'targcondition':
+                        sub_res.value = Condition.parse(sub_res)
             elif res.name == 'condition':
                 res.value = Condition.parse(res)
+
+    def test(self, inst, remove_vmf=True):
+        """Try to satisfy this condition on the given instance."""
+        if not self.valid:
+            return
+        success = True
+        for flag in self.flags:
+            # utils.con_log('Flag: ' + repr(flag))
+            if not check_flag(flag, inst):
+                success = False
+                break
+            # utils.con_log(success)
+        if remove_vmf:
+            # our suffixes won't touch the .vmf extension
+            inst['file'] = inst['file', ''][:-4]
+
+        results = self.results if success else self.else_results
+        for res in results:
+            try:
+                func = RESULT_LOOKUP[res.name]
+            except KeyError:
+                utils.con_log(
+                    '"{}" is not a valid condition result!'.format(
+                        res.real_name,
+                    )
+                )
+            else:
+                func(inst, res)
+
+        if remove_vmf and not inst['file'].endswith('vmf'):
+            inst['file'] += '.vmf'
 
     def __lt__(self, other):
         """Condition items sort by priority."""
@@ -124,32 +159,33 @@ def add(prop_block):
 
 def init(seed, inst_list, vmf_file, is_pre, game_mode):
     # Get a bunch of values from VBSP
-    global MAP_RAND_SEED, ALL_INST, INST_FILE, VMF, IS_PREVIEW, GAME_MODE
+    global MAP_RAND_SEED, ALL_INST, VMF, IS_PREVIEW, GAME_MODE
     IS_PREVIEW = is_pre
     GAME_MODE = game_mode
     VMF = vmf_file
     MAP_RAND_SEED = seed
     ALL_INST = inst_list
-    INST_FILE = {
-        key.casefold(): value
-        for key, value in
-        vbsp.INST_FILE.items()
-    }
 
     # Sort by priority, where higher = done earlier
     conditions.sort(reverse=True)
     setup_cond()
 
 
-def check_all():
+def check_all(inst_files):
     """Check all conditions."""
-
+    global INST_FILE
+    INST_FILE = {
+        key.casefold(): value
+        for key, value in
+        inst_files.items()
+    }
+    print('conditions: ', INST_FILE)
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         if condition.valid:
             for inst in VMF.by_class['func_instance']:
                     try:
-                        run_cond(inst, condition)
+                        condition.test(inst)
                     except SkipCondition:
                         # This is raised to immediately stop running
                         # this condition, and skip to the next instance.
@@ -170,9 +206,9 @@ def check_all():
 
 
 def check_inst(inst):
-    """Run all condtions on a given instance."""
+    """Run all conditions on a given instance."""
     for condition in conditions:
-        run_cond(inst, condition)
+        condition.test(inst)
     remove_blank_inst()
 
 
@@ -192,33 +228,6 @@ def setup_cond():
     for cond in conditions:
         cond.setup_res()
 
-
-def run_cond(inst, cond, remove_vmf=True):
-    """Try to satisfy this condition on the given instance."""
-    if not cond.valid:
-        return
-    success = True
-    for flag in cond.flags:
-        # utils.con_log('Flag: ' + repr(flag))
-        if not check_flag(flag, inst):
-            success = False
-            break
-        # utils.con_log(success)
-    if remove_vmf:
-        # our suffixes won't touch the .vmf extension
-        inst['file'] = inst['file', ''][:-4]
-
-    results = cond.results if success else cond.else_results
-    for res in results:
-        try:
-            func = RESULT_LOOKUP[res.name]
-        except KeyError:
-            utils.con_log('"' + res.name + '" is not a valid condition result!')
-        else:
-            func(inst, res)
-
-    if remove_vmf and not inst['file'].endswith('vmf'):
-        inst['file'] += '.vmf'
 
 
 def check_flag(flag, inst):
@@ -366,7 +375,7 @@ def flag_option(_, flag):
 
 
 def flag_game_mode(_, flag):
-    return GAME_MODE.casefold() == flag
+    return GAME_MODE.casefold() == flag.value.casefold()
 
 
 def flag_is_preview(_, flag):
@@ -505,15 +514,20 @@ def res_cust_output(inst, res):
 
     kill_signs = utils.conv_bool(res["remIndSign", '0'], False)
     dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
-    if kill_signs or dec_con_count:
+    targ_conditions = list(res.find_all("targCondition"))
+
+    if kill_signs or dec_con_count or targ_conditions:
         for con_inst in VMF.by_class['func_instance']:
             if con_inst['targetname'] in targets:
                 if kill_signs and (
-                        con_inst['file'] == INST_FILE['indPanTimer'] or
-                        con_inst['file'] == INST_FILE['indPanCheck']
+                        con_inst['file'] == INST_FILE['indpantimer'] or
+                        con_inst['file'] == INST_FILE['indpancheck']
                         ):
                     VMF.remove_ent(con_inst)
-                if dec_con_count and 'connectioncount' in con_inst:
+                if targ_conditions:
+                    for cond in targ_conditions:
+                        cond.value.test(con_inst)
+                if dec_con_count and 'connectioncount' in con_inst.fixup:
                     # decrease ConnectionCount on the ents,
                     # so they can still process normal inputs
                     try:
@@ -537,7 +551,7 @@ def res_cust_antline(inst, res):
     """
     over_name = '@' + inst['targetname'] + '_indicator'
     for over in (
-            VMF.by_class['func_instance'] &
+            VMF.by_class['info_overlay'] &
             VMF.by_target[over_name]
             ):
         random.seed(over['origin'])
@@ -548,7 +562,7 @@ def res_cust_antline(inst, res):
                 ]
             ]
         )
-        vbsp.set_antline_mat(over, new_tex)
+        vbsp.set_antline_mat(over, new_tex, raw_mat=True)
 
     # allow replacing the indicator_toggle instance
     if res.value['instance']:
@@ -769,10 +783,8 @@ def convert_to_laserfield(
 
 
 def res_sub_condition(base_inst, res):
-    """Check a different condition if the outer block is true.
-
-    """
-    run_cond(base_inst, res.value, remove_vmf=False)
+    """Check a different condition if the outer block is true."""
+    res.value.test(base_inst, remove_vmf=False)
 
 
 def res_break(base_inst, res):
@@ -800,7 +812,7 @@ def res_fizzler_pair(begin_inst, res):
         return  # We only execute starting from the start side.
 
     orig_target = orig_target[:-11]  # remove "_modelStart"
-    end_name = orig_target + '_modelEnd' # What we search for
+    end_name = orig_target + '_modelEnd'  # What we search for
 
     # The name all these instances get
     pair_name = orig_target + '-model' + str(begin_inst.id)
@@ -854,6 +866,7 @@ def res_fizzler_pair(begin_inst, res):
 
 
 def res_clear_outputs(inst, res):
+    """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
