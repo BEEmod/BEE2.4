@@ -671,7 +671,7 @@ def change_brush():
                  get_opt("clump_width").isnumeric() and
                  get_opt("clump_number").isnumeric())
 
-    if get_opt('remove_pedestal_plat'):
+    if utils.conv_bool(get_opt('remove_pedestal_plat')):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
             for side in ent.sides():
