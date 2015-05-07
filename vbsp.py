@@ -1069,7 +1069,6 @@ def add_extra_ents(mode):
         global_pti_ents.fixup[
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
-        VMF.add_ent(global_pti_ents)
 
     model_changer_loc = get_opt('model_changer_loc')
     chosen_model = BEE2_config['General']['player_model']
