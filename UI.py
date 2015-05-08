@@ -337,7 +337,7 @@ class PalItem(Label):
         # Open on the palette, but also open on the item picker if needed
         for item in itertools.chain(items_list, pal_items):
             if item.id == self.id and item.subKey == ind:
-                contextWin.showProps(item, warp_cursor=True)
+                contextWin.show_prop(item, warp_cursor=True)
                 break
 
     def load_data(self):
