@@ -6,6 +6,7 @@ A Portal 2  Mod tool
 - BEE2: Main application script, starts up the application.
 - config: Subclass of ConfigParser, with some useful tweaks
 - contextWin: Implements the rightclick context menu for items.
+- FakeZip: simulates a ZipFile object based on a directory. Used to allow packageLoader to load either, without needing to check the type every time.
 - gameMan: Manages adding and removing games as well as exporting editoritems.
 - itemPropWin: A window which allows changing the default properties for an item.
 - loadScreen: Shows a window with loading bars during the startup process.
@@ -24,7 +25,7 @@ A Portal 2  Mod tool
 
 - png
 - tkinter_png: Libraries to read PNG files into Tkinter-compatible formats.  
- Additionally contains some BEE2-specific helper functions that do the conversion, and cache calls so an image is only read once.
+  Additionally contains some BEE2-specific helper functions that do the conversion, and cache calls so an image is only read once.
 
 Intended features:
 

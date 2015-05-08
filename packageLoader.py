@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 
 
 from property_parser import Property, NoKeyError
+from FakeZip import FakeZip
 import loadScreen
 import utils
 
@@ -32,6 +33,17 @@ res_count = -1
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info')
+
+
+def zip_names(zip):
+    """For FakeZips, use the generator instead of the zip file.
+
+    """
+    if hasattr(zip, 'names'):
+        return zip.names()
+    else:
+        return zip.namelist()
+
 
 def reraise_keyerror(err, obj_id):
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
@@ -80,22 +92,24 @@ def load_packages(
         for name in contents:
             print('Reading package file "' + name + '"')
             name = os.path.join(pak_dir, name)
-            if name.endswith('.zip') and not os.path.isdir(name):
+            if name.endswith('.zip') and os.path.isfile(name):
                 zip_file = ZipFile(name)
                 zips.append(zip_file)
-                if 'info.txt' in zip_file.namelist():  # Is it valid?
-                    with zip_file.open('info.txt') as info_file:
-                        info = Property.parse(info_file, name + ':info.txt')
-                    pak_id = info['ID']
-                    disp_name = info['Name', pak_id]
-                    packages[pak_id] = package_data(
-                        zip_file,
-                        info,
-                        name,
-                        disp_name,
-                    )
-                else:
-                    print("ERROR: Bad package'"+name+"'!")
+            elif os.path.isdir(name):
+                zip_file = FakeZip(name)
+            if 'info.txt' in zip_file.namelist():  # Is it valid?
+                with zip_file.open('info.txt') as info_file:
+                    info = Property.parse(info_file, name + ':info.txt')
+                pak_id = info['ID']
+                disp_name = info['Name', pak_id]
+                packages[pak_id] = package_data(
+                    zip_file,
+                    info,
+                    name,
+                    disp_name,
+                )
+            else:
+                print('ERROR: Bad package "{}"!'.format(name))
 
         for obj_type in obj_types:
             all_obj[obj_type] = {}
@@ -148,7 +162,7 @@ def load_packages(
         if load_res:
             print('Extracting Resources...')
             for zip_file in zips:
-                for path in zip_file.namelist():
+                for path in zip_names(zip_file):
                     loc = os.path.normcase(path)
                     if loc.startswith("resources"):
                         loadScreen.step("RES")
@@ -225,7 +239,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
             )
 
     if res_count != -1:
-        for item in zip_file.namelist():
+        for item in zip_names(zip_file):
             if item.startswith("resources"):
                 res_count += 1
         loadScreen.length("RES", res_count)
@@ -297,8 +311,8 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                             print(
                                 'Item "{item}" using '
                                 'inappropriate style for "{style}"!'.format(
-                                item=item.id,
-                                style=sty_id,
+                                    item=item.id,
+                                    style=sty_id,
                                 )
                             )
                     else:
@@ -466,7 +480,6 @@ class Item:
 
         needs_unlock = utils.conv_bool(data.info['needsUnlock', '0'])
 
-
         for ver in data.info.find_all('version'):
             vals = {
                 'name':    ver['name', 'Regular'],
@@ -606,7 +619,7 @@ class Skybox:
             config = Property(None, [])
         else:
             path = 'skybox/' + config_dir + '.cfg'
-            if path in data.zip_file.namelist():
+            if path in zip_names(data.zip_file):
                 with data.zip_file.open(path, 'r') as conf:
                     config = Property.parse(conf)
             else:
@@ -663,7 +676,7 @@ class Music:
         sound = data.info['soundscript', None]
 
         config_dir = 'music/' + data.info['config', '']
-        if config_dir in data.zip_file.namelist():
+        if config_dir in zip_names(data.zip_file):
             with data.zip_file.open(config_dir, 'r') as conf:
                 config = Property.parse(conf, config_dir)
         else:
