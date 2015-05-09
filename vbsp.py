@@ -617,7 +617,7 @@ def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
 
     """
-    if len(settings['textures']['special.goo_wall']) == 0:
+    if settings['textures']['special.goo_wall'] == ['']:
         return
     utils.con_log("Changing goo sides...")
     face_dict = {}
