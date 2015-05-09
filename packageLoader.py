@@ -429,15 +429,15 @@ class Style:
         short_name = selitem_data.short_name or None
         if base == '':
             base = None
-        files = data.zip_file.namelist()
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
         with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
             items = Property.parse(item_data, folder+'/items.txt')
-        if config in files:
+
+        try:
             with data.zip_file.open(config, 'r') as vbsp_config:
                 vbsp = Property.parse(vbsp_config, config)
-        else:
+        except KeyError:
             vbsp = None
         return cls(
             style_id=data.id,
@@ -619,10 +619,10 @@ class Skybox:
             config = Property(None, [])
         else:
             path = 'skybox/' + config_dir + '.cfg'
-            if path in zip_names(data.zip_file):
+            try:
                 with data.zip_file.open(path, 'r') as conf:
                     config = Property.parse(conf)
-            else:
+            except KeyError:
                 print(config_dir + '.cfg not in zip!')
                 config = Property(None, [])
         return cls(
@@ -676,10 +676,10 @@ class Music:
         sound = data.info['soundscript', None]
 
         config_dir = 'music/' + data.info['config', '']
-        if config_dir in zip_names(data.zip_file):
-            with data.zip_file.open(config_dir, 'r') as conf:
+        try:
+            with data.zip_file.open(config_dir) as conf:
                 config = Property.parse(conf, config_dir)
-        else:
+        except KeyError:
             config = Property(None, [])
         return cls(
             data.id,
