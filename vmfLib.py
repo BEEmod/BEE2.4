@@ -3,7 +3,7 @@ Wraps property_parser tree in a set of classes which smartly handle
 specifics of VMF files.
 """
 import io
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from contextlib import suppress
 
 from property_parser import Property
@@ -998,7 +998,7 @@ class Entity:
                 var = vals[0][1:]  # Strip the $ sign
                 value = vals[1]
                 index = item.name[-2:]  # Index is the last 2 digits
-                fixup[var.casefold()] = (var, value, index)
+                fixup[var.casefold()] = FixupTuple(var, value, index)
             elif name == "solid":
                 if item.has_children():
                     solids.append(Solid.parse(vmf_file, item))
@@ -1278,6 +1278,7 @@ class Entity:
         else:
             return Vec(self['origin'].split(" "))
 
+FixupTuple = namedtuple('FixupTuple', 'var value id')
 
 class EntityFixup:
     """A speciallised mapping which keeps track of the variable indexes.
@@ -1323,16 +1324,16 @@ class EntityFixup:
         folded_var = var.casefold()
         if folded_var not in self._fixup:
             max_id = 1
-            for i in self._fixup.values():
-                if int(i[1]) > max_id:
-                    max_id = int(i[1])
+            for fixup in self._fixup.values():
+                if int(fixup.id) > max_id:
+                    max_id = int(fixup.id)
             if max_id < 9:
                 max_id = "0" + str(max_id)
             else:
                 max_id = str(max_id)
-            self._fixup[folded_var] = (var, val, max_id)
+            self._fixup[folded_var] = FixupTuple(var, val, max_id)
         else:
-            self._fixup[folded_var] = (var, val, self._fixup[var][2])
+            self._fixup[folded_var] = FixupTuple(var, val, self._fixup[var].id)
 
     def __delitem__(self, var):
         """Delete a instance $replace variable."""
@@ -1345,18 +1346,18 @@ class EntityFixup:
     def keys(self):
         """Iterate over all set variable names."""
         for value in self._fixup.values():
-            yield value[0]
+            yield value.var
 
     __iter__ = keys
 
     def items(self):
         """Iterate over all variable-value pairs."""
         for value in self._fixup.values():
-            yield value[0], value[1]
+            yield value.var, value.value
 
     def values(self):
         for value in self._fixup.values():
-            yield value[1]
+            yield value.value
 
     def export(self, buffer, ind):
         """Export all the replace values into the VMF."""
