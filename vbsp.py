@@ -140,6 +140,7 @@ DEFAULTS = {
     "force_paint":              "0",  # Force paintinmap = 1
     "sky":                      "sky_black",  # Change the skybox
     "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
 
@@ -1088,6 +1089,7 @@ def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("gratingInst")
+    grating_scale = get_opt("grating_scale")
 
     if grating_inst == "NONE":
         grating_inst = None
@@ -1129,6 +1131,12 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
+                    split_u = side.uaxis.split(" ")
+                    split_v = side.vaxis.split(" ")
+                    split_u[-1] = grating_scale  # apply the glass scaling option
+                    split_v[-1] = grating_scale
+                    side.uaxis = " ".join(split_u)
+                    side.vaxis = " ".join(split_v)
                 alter_mat(side)  # for gratings, laserfields and some others
 
             # The style blanked the material, so delete the brush
