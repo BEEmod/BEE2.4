@@ -33,6 +33,7 @@ res_count = -1
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info')
+PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 
 
 def zip_names(zip):
@@ -64,6 +65,40 @@ def reraise_keyerror(err, obj_id):
         )
     ) from err
 
+def find_packages(pak_dir, zips):
+    """Search a folder for packages, recursing if necessary."""
+    found_pak = False
+    for name in os.listdir(pak_dir): # Both files and dirs
+        name = os.path.join(pak_dir, name)
+        is_dir = os.path.isdir(name)
+        if name.endswith('.zip') and os.path.isfile(name):
+            zip_file = ZipFile(name)
+        elif is_dir:
+            zip_file = FakeZip(name)
+        if 'info.txt' in zip_file.namelist():  # Is it valid?
+            zips.append(zip_file)
+            print('Reading package "' + name + '"')
+            with zip_file.open('info.txt') as info_file:
+                info = Property.parse(info_file, name + ':info.txt')
+            pak_id = info['ID']
+            disp_name = info['Name', pak_id]
+            packages[pak_id] = PackageData(
+                zip_file,
+                info,
+                name,
+                disp_name,
+            )
+            found_pak = True
+        else:
+            if is_dir:
+                # This isn't a package, so check the subfolders too...
+                print('Checking subdir "{}" for packages...'.format(name))
+                find_packages(name, zips)
+            else:
+                zip.close()
+                print('ERROR: Bad package "{}"!'.format(name))
+    if not found_pak:
+        print('No packages in folder!')
 
 def load_packages(
         pak_dir,
@@ -74,10 +109,6 @@ def load_packages(
     """Scan and read in all packages in the specified directory."""
     global res_count
     pak_dir = os.path.join(os.getcwd(), pak_dir)
-    contents = os.listdir(pak_dir)  # this is both files and dirs
-
-    loadScreen.length("PAK", len(contents))
-
     if load_res:
         res_count = 0
     else:
@@ -85,31 +116,9 @@ def load_packages(
 
     zips = []
     try:
-        package_data = namedtuple(
-            'package_data',
-            'zip_file, info, name, disp_name',
-        )
-        for name in contents:
-            print('Reading package file "' + name + '"')
-            name = os.path.join(pak_dir, name)
-            if name.endswith('.zip') and os.path.isfile(name):
-                zip_file = ZipFile(name)
-                zips.append(zip_file)
-            elif os.path.isdir(name):
-                zip_file = FakeZip(name)
-            if 'info.txt' in zip_file.namelist():  # Is it valid?
-                with zip_file.open('info.txt') as info_file:
-                    info = Property.parse(info_file, name + ':info.txt')
-                pak_id = info['ID']
-                disp_name = info['Name', pak_id]
-                packages[pak_id] = package_data(
-                    zip_file,
-                    info,
-                    name,
-                    disp_name,
-                )
-            else:
-                print('ERROR: Bad package "{}"!'.format(name))
+        find_packages(pak_dir, zips)
+
+        loadScreen.length("PAK", len(packages))
 
         for obj_type in obj_types:
             all_obj[obj_type] = {}
@@ -118,11 +127,11 @@ def load_packages(
 
         objects = 0
         for pak_id, (zip_file, info, name, dispName) in packages.items():
-            print("Scanning package '" + pak_id + "'...", end='')
+            print(("Reading objects from '" + pak_id + "'...").ljust(50), end='')
             obj_count = parse_package(zip_file, info, pak_id, dispName)
             objects += obj_count
             loadScreen.step("PAK")
-            print(" Done!")
+            print("Done!")
 
         loadScreen.length("OBJ", objects)
 
