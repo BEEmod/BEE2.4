@@ -74,8 +74,12 @@ class FakeZip:
     def extract(self, member, path=None, pwd=None):
         if path is None:
             path = os.getcwd()
-
-        shutil.copy(self.folder + member, path)
+        dest = os.path.join(path, member)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copyfile(
+            os.path.join(self.folder, member),
+            dest,
+        )
 
     def write(self, filename, arcname=None, compress_type=None):
         """Save the given file into the directory.
@@ -90,8 +94,8 @@ class FakeZip:
         shutil.copy(filename, self.folder + arcname)
 
     def writestr(self, zinfo_or_arcname, data, *comp):
-        zinfo_or_arcname = str(zinfo_or_arcname)
-        with open(self.folder + zinfo_or_arcname, self.wr_mode) as f:
+        dest = str(zinfo_or_arcname)
+        with open(os.path.join(self.folder, dest), self.wr_mode) as f:
             f.write(data)
 
     def setpassword(self, pwd):
