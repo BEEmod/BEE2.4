@@ -17,7 +17,7 @@ ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE+16
 ITEM_HEIGHT = ICON_SIZE+51
 
-err_icon = png.png('BEE2/error_96')
+err_icon = png.png('BEE2/error_96', resize_to=96)
 
 
 def _NO_OP(*args):
@@ -67,10 +67,10 @@ class Item:
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = png.png('BEE2/blank_96', error=err_icon)
+            self.icon = png.png('BEE2/blank_96', error=err_icon, resize_to=96)
             self.ico_file = 'BEE2/blank_96'
         else:
-            self.icon = png.png(icon, error=err_icon)
+            self.icon = png.png(icon, error=err_icon, resize_to=96)
             self.ico_file = icon
         self.desc = desc
         self.authors = [] if authors is None else authors
