@@ -47,13 +47,13 @@ def find_empty_id(used_id, desired=-1):
             desired = 1
         else:
             desired = int(desired)
-
+        used_id.sort()
         if len(used_id) == 0 or desired not in used_id:
-            utils.add_sorted(used_id, desired)
+            used_id.append(desired)
             return desired
         for poss_id in range(used_id[-1]+1):
             if poss_id not in used_id:
-                utils.add_sorted(used_id, poss_id)
+                used_id.append(poss_id)
                 return poss_id
 
 
@@ -812,7 +812,7 @@ class Side:
         buffer.write(ind + 'side\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
-        pl_str = ['(' + p.join(' ') + ')' for p in self.planes]
+        pl_str = ('(' + p.join(' ') + ')' for p in self.planes)
         buffer.write(ind + '\t"plane" "' + ' '.join(pl_str) + '"\n')
         buffer.write(ind + '\t"material" "' + self.mat + '"\n')
         buffer.write(ind + '\t"uaxis" "' + self.uaxis + '"\n')

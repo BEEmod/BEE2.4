@@ -13,17 +13,6 @@ BOOL_LOOKUP = {
     'no': False,
 }
 
-def add_sorted(lst, new_item):
-    """Add an item to a sorted list while keeping the list sorted.
-    """
-    for ind, val in enumerate(lst):
-        if val > new_item:
-            lst.insert(ind, new_item)
-            break
-    else:
-        lst.append(new_item)
-
-
 def clean_line(line: str):
     """Removes extra spaces and comments from the input."""
     if isinstance(line, bytes):
