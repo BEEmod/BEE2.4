@@ -95,7 +95,7 @@ def find_packages(pak_dir, zips):
                 print('Checking subdir "{}" for packages...'.format(name))
                 find_packages(name, zips)
             else:
-                zip.close()
+                zip_file.close()
                 print('ERROR: Bad package "{}"!'.format(name))
     if not found_pak:
         print('No packages in folder!')
@@ -103,17 +103,20 @@ def find_packages(pak_dir, zips):
 def load_packages(
         pak_dir,
         load_res,
-        log_item_fallbacks,
-        log_missing_styles,
+        log_item_fallbacks=False,
+        log_missing_styles=False,
+        log_missing_ent_count=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global res_count
+    global res_count, LOG_ENT_COUNT
     pak_dir = os.path.join(os.getcwd(), pak_dir)
     if load_res:
         res_count = 0
     else:
         loadScreen.skip_stage("RES")
 
+    LOG_ENT_COUNT = log_missing_ent_count
+    print('ENT_COUNT:', LOG_ENT_COUNT)
     zips = []
     try:
         find_packages(pak_dir, zips)
@@ -366,6 +369,9 @@ def parse_item_folder(folders, zip_file):
             # Any extra blocks (offset catchers, extent items)
             'editor_extra': list(editor_iter),
         }
+
+        if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
+            print('Warning: "{}" has missing entity count!'.format(prop_path))
 
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.

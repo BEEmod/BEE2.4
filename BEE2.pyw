@@ -39,8 +39,11 @@ DEFAULT_SETTINGS = {
         'log_item_fallbacks': '0',
         # Print message for items that have no match for a style
         'log_missing_styles': '0',
+        # Print message for items that are missing ent_count values
+        'log_missing_ent_count': '0',
     },
 }
+GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
 show_errors = False
 
@@ -48,7 +51,7 @@ try:
 
     UI.load_settings(GEN_OPTS)
 
-    show_errors = GEN_OPTS.get_bool('debug', 'show_errors')
+    show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
     # If we have no games, gameMan will quit the app entirely.
     gameMan.load(UI.quit_application, loadScreen.win)
@@ -61,9 +64,15 @@ try:
     UI.load_packages(
         packageLoader.load_packages(
             GEN_OPTS['Directories']['package'],
-            not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'),
-            GEN_OPTS.get_bool('debug', 'log_item_fallbacks'),
-            GEN_OPTS.get_bool('debug', 'log_missing_styles'),
+            load_res=not GEN_OPTS.get_bool(
+                'General', 'preserve_BEE2_resource_dir'
+            ),
+            log_item_fallbacks=GEN_OPTS.get_bool(
+                'Debug', 'log_item_fallbacks'),
+            log_missing_styles=GEN_OPTS.get_bool(
+                'Debug', 'log_missing_styles'),
+            log_missing_ent_count=GEN_OPTS.get_bool(
+                'Debug', 'log_missing_ent_count'),
             )
         )
     print('Done!')
