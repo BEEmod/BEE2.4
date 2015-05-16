@@ -9,8 +9,15 @@ from PIL import ImageTk, Image
 
 cached_img = {}
 
-def png(path, resize_to=None, error=None):
-    """Loads in an image for use in TKinter."""
+def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
+    """Loads in an image for use in TKinter.
+
+    - The .png suffix will automatically be added.
+    - Images will be loaded from both the inbuilt files and the extracted
+    zip cache.
+    - If resize_to is set, the image will be resized to that size using the algo
+    algorithm.
+    """
     if not path.casefold().endswith(".png"):
         path = path + ".png"
     orig_path = path
@@ -30,7 +37,7 @@ def png(path, resize_to=None, error=None):
         return error or img_error
 
     if resize_to:
-        image = image.resize((resize_to, resize_to), Image.LANCZOS)
+        image = image.resize((resize_to, resize_to), algo)
 
     img = ImageTk.PhotoImage(image=image)
     cached_img[path, resize_to] = img
@@ -38,7 +45,9 @@ def png(path, resize_to=None, error=None):
 
 def spr(name, error=None):
     """Load in the property icons with the correct size."""
-    return png('icons/'+name, error=error, resize_to=32)
+    # We're doubling the icon size, so use nearest-neighbour to keep
+    # image sharpness
+    return png('icons/'+name, error=error, resize_to=32, algo=Image.NEAREST)
 
 def icon(name, error=None):
     """Load in a palette icon, using the correct directory and size."""
