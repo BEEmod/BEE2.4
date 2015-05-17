@@ -8,7 +8,7 @@ Does stuff related to the actual games.
 import os
 import os.path
 import shutil
-from BEE2_config import ConfigFile
+from collections import defaultdict
 
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -16,6 +16,7 @@ from tkinter import filedialog  # open/save as dialog creator
 from tk_root import TK_ROOT
 
 from query_dialogs import ask_string
+from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
 
@@ -298,7 +299,20 @@ class Game:
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
 
+        # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
+
+        # Build a property tree listing all of the instances for each item
+        all_instances = Property("AllInstances", [])
+        for item in editoritems.find_all("Item"):
+            item_prop = Property(item['Type'], [])
+            all_instances.append(item_prop)
+            for inst_block in item.find_all("Exporting", "instances"):
+                for inst in inst_block:
+                    print(repr(inst))
+                    item_prop.append(
+                        Property('Instance', inst['Name'])
+                    )
 
         if style_vars.get('UnlockDefault', False):
             print('Unlocking Items!')
@@ -323,6 +337,11 @@ class Game:
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
+
+        print('Writing instance list!')
+        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
+            for line in all_instances.export():
+                inst_file.write(line)
 
         for prefix, pretty in VOICE_PATHS:
             path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
