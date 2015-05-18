@@ -80,22 +80,28 @@ def bool_as_int(val):
 def conv_bool(val, default=False):
     """Converts a string to a boolean, using a default if it fails.
 
-    Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1.
+    Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1, None.
     """
-    if isinstance(val, (int, bool)):
+    if val is False:
+        return False
+    elif val is True:
+        return True
+    elif val is None:
+        return default
+    elif isinstance(val, int):
         return bool(val)
     else:
         return BOOL_LOOKUP.get(val.casefold(), default)
 
 
-def conv_float(val, default=0):
+def conv_float(val, default=0.0):
     """Converts a string to an float, using a default if it fails.
 
     """
     try:
         return float(val)
     except ValueError:
-        return float(default)
+        return default
 
 
 def conv_int(val, default=0):
@@ -104,8 +110,8 @@ def conv_int(val, default=0):
     """
     try:
         return int(val)
-    except ValueError:
-        return int(default)
+    except (ValueError, TypeError):
+        return default
 
 
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
@@ -139,8 +145,8 @@ class EmptyMapping(abc.Mapping):
     __slots__ = []
 
     def __call__(self):
-        return EmptyMapping
-
+        # Just in case someone tries to instantiate this
+        return self
 
     def __getitem__(self, item):
         raise KeyError
@@ -169,7 +175,7 @@ class EmptyMapping(abc.Mapping):
     def keys(self):
         return self
 
-EmptyMapping = EmptyMapping()
+EmptyMapping = EmptyMapping() # We only need the one instance
 
 
 class Vec:
@@ -236,60 +242,59 @@ class Vec:
         else:
             return cls(x, y, z)
 
-    @staticmethod
-    def make_rot_matrix(pitch, yaw, roll):
-        """Return a 3x3 rotation matrix for the given pitch-yaw-roll angles.
+    def mat_mul(self, matrix):
+        """Multiply this vector by a 3x3 rotation matrix.
 
-        Pass to Vec.rotate() / Vec.unrotate() to prevent recalculating when
-        rotating many vectors by the same angle.
+        Used for Vec.rotate().
         """
-        sin_x = math.sin(math.radians(-roll))
-        cos_x = math.cos(math.radians(-roll))
-        sin_y = math.sin(math.radians(-pitch))
-        cos_y = math.cos(math.radians(-pitch))
-        sin_z = math.sin(math.radians(-yaw))
-        cos_z = math.cos(math.radians(-yaw))
+        [a, b, c], [d, e, f], [g, h, i] = matrix
+        x, y, z = self.x, self.y, self.z
 
-        return {
-            'a': cos_y * cos_z,
-            'b': -sin_x * -sin_y * cos_z + cos_x * sin_z,
-            'c': cos_x * -sin_y * cos_z + sin_x * sin_z,
+        self.x = x*a + y*b + z*c
+        self.y = x*d + y*e + z*f
+        self.z = x*g + y*h + z*i
+        return self
 
-            'd': cos_y * -sin_z,
-            'e': -sin_x * -sin_y * -sin_z + cos_x * cos_z,
-            'f': cos_x * -sin_y * -sin_z + sin_x * cos_z,
-
-            'g': sin_y,
-            'h': -sin_x * cos_x,
-            'i': cos_x * cos_y,
-        }
-
-
-    def rotate(self, pitch=0, yaw=0, roll=0, matrix=None):
+    def rotate(self, pitch=0, yaw=0, roll=0):
         """Rotate a vector by a Source rotational angle.
         Returns the vector, so you can use it in the form
         val = Vec(0,1,0).rotate(p, y, r)
-        If matrix is passed, it will be used instead of
-        recalculating from the angles.
         """
-        if matrix is None:
-            matrix = self.make_rot_matrix(pitch, yaw, roll)
-        self.x = self.x*matrix['a'] + self.y*matrix['b'] + self.z*matrix['c']
-        self.y = self.x*matrix['d'] + self.y*matrix['e'] + self.z*matrix['f']
-        self.z = self.x*matrix['g'] + self.y*matrix['h'] + self.z*matrix['i']
+        # pitch is in the y axis
+        # yaw is the z axis
+        # roll is the x axis
+        rad_pitch = math.radians(pitch)
+        rad_yaw = math.radians(yaw)
+        rad_roll = math.radians(roll)
+        cos_p = math.cos(rad_pitch)
+        cos_y = math.cos(rad_yaw)
+        cos_r = math.cos(rad_roll)
 
-        return self
+        sin_p = math.sin(rad_pitch)
+        sin_y = math.sin(rad_yaw)
+        sin_r = math.sin(rad_roll)
 
-    def unrotate(self, pitch=0, yaw=0, roll=0, matrix=None):
-        """Do the exact inverse of Vec.rotate().
-        If matrix is passed, it will be used instead of
-        recalculating from the angles.
-        """
-        if matrix is None:
-            matrix = self.make_rot_matrix(pitch, yaw, roll)
-        self.x = self.x*matrix['a'] + self.y*matrix['d'] + self.z*matrix['g']
-        self.y = self.x*matrix['b'] + self.y*matrix['e'] + self.z*matrix['h']
-        self.z = self.x*matrix['c'] + self.y*matrix['f'] + self.z*matrix['i']
+        mat_roll = (  # X
+            (1, 0, 0),
+            (0, cos_r, -sin_r),
+            (0, sin_r, cos_r),
+        )
+        mat_yaw = (  # Z
+            (cos_y, -sin_y, 0),
+            (sin_y, cos_y, 0),
+            (0, 0, 1),
+        )
+
+        mat_pitch = (  # Y
+            (cos_p, 0, sin_p),
+            (0, 1, 0),
+            (-sin_p, 0, cos_p),
+        )
+
+        # Need to do transformations in roll, pitch, yaw order
+        self.mat_mul(mat_roll)
+        self.mat_mul(mat_pitch)
+        self.mat_mul(mat_yaw)
 
         return self
 
