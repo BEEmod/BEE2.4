@@ -206,24 +206,24 @@ def load_item_data():
     else:
         wid['changedefaults'].state(['disabled'])
 
-    if selected_item.is_beta and selected_item.is_dep:
-        wid['beta_dep']['text'] = 'Beta, Deprecated Item!'
-    elif selected_item.is_beta:
-        wid['beta_dep']['text'] = 'Beta Item!'
+    if selected_item.is_wip and selected_item.is_dep:
+        wid['wip_dep']['text'] = 'WIP, Deprecated Item!'
+    elif selected_item.is_wip:
+        wid['wip_dep']['text'] = 'WIP Item!'
     elif selected_item.is_dep:
-        wid['beta_dep']['text'] = 'Deprecated Item!'
+        wid['wip_dep']['text'] = 'Deprecated Item!'
     else:
-        wid['beta_dep']['text'] = ''
+        wid['wip_dep']['text'] = ''
 
     version_lookup, version_names = selected_item.get_version_names()
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         wid['variant'].state(['disabled'])
-        # We want to display Beta / Dep tags still, so users know.
-        if selected_item.is_beta and selected_item.is_dep:
-            wid['variant']['values'] = ['[BETA] [DEP] No Alts!']
-        elif selected_item.is_beta:
-            wid['variant']['values'] = ['[BETA] No Alt Versions!']
+        # We want to display WIP / Dep tags still, so users know.
+        if selected_item.is_wip and selected_item.is_dep:
+            wid['variant']['values'] = ['[WIP] [DEP] No Alts!']
+        elif selected_item.is_wip:
+            wid['variant']['values'] = ['[WIP] No Alt Versions!']
         elif selected_item.is_dep:
             wid['variant']['values'] = ['[DEP] No Alt Versions!']
         else:
@@ -374,8 +374,8 @@ def init_widgets():
         wid['subitem'][i].bind('<Button-1>', functools.partial(sub_sel, i))
         wid['subitem'][i].bind('<Button-3>', functools.partial(sub_open, i))
 
-    wid['beta_dep'] = ttk.Label(f, text='', anchor="nw")
-    wid['beta_dep'].grid(row=4, column=0, sticky="NW")
+    wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
+    wid['wip_dep'].grid(row=4, column=0, sticky="NW")
 
     ttk.Label(f, text="Description:", anchor="sw").grid(
         row=4,

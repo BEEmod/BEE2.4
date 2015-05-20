@@ -499,7 +499,7 @@ class Item:
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_beta': utils.conv_bool(ver['beta', '0']),
+                'is_wip': utils.conv_bool(ver['wip', '0']),
                 'is_dep':  utils.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,

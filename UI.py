@@ -55,7 +55,7 @@ selectedPalette = 0
 selectedPalette_radio = IntVar(value=0)
 
 muted = IntVar(value=0)  # Is the sound fx muted?
-show_beta_items = IntVar(value=0)
+show_wip_items = IntVar(value=0)
 
 # All the stuff we've loaded in
 item_list = {}
@@ -86,7 +86,7 @@ class Item:
         'pak_name',
         'names',
         'is_dep',
-        'is_beta',
+        'is_wip',
         'url',
         'can_group',
         ]
@@ -133,7 +133,7 @@ class Item:
             if prop['Palette', None] is not None
         ]
         self.is_dep = version['is_dep']
-        self.is_beta = version['is_beta']
+        self.is_wip = version['is_wip']
         self.url = self.data['url']
 
         # This checks to see if all the data is present to enable
@@ -226,12 +226,12 @@ class Item:
             if ver['is_dep']:
                 name = '[DEP] ' + name
 
-            if ver['is_beta']:
+            if ver['is_wip']:
                 # We always display the currently selected version, so
                 # it's possible to deselect it.
-                if ver_id != self.selected_ver and not show_beta_items.get():
+                if ver_id != self.selected_ver and not show_wip_items.get():
                     continue
-                name = '[BETA] ' + name
+                name = '[WIP] ' + name
             vers.append(name)
         return self.ver_list, vers
 
@@ -427,9 +427,9 @@ def load_settings(settings):
     global GEN_OPTS
     GEN_OPTS = settings
 
-    show_beta_items.set(GEN_OPTS.get_bool(
+    show_wip_items.set(GEN_OPTS.get_bool(
         'General',
-        'show_beta_items',
+        'show_wip_items',
         False
         ))
 
@@ -953,13 +953,13 @@ def update_filters():
         if no_alt:  # no alternate if they are all the same
             FilterBoxes_all[cat].state(['!alternate'])
             FilterVars_all[cat].set(value)
-    show_beta = show_beta_items.get()
+    show_wip = show_wip_items.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
     for item in pal_items:
         item.visible = (
-            # Items are hidden if it's a beta item and the option is
+            # Items are hidden if it's a wip item and the option is
             # deselected
-            (show_beta or not item.item.is_beta)
+            (show_wip or not item.item.is_wip)
             # Visible if any of the author and tag checkboxes are checked
             and any(
                 FilterVars['author'][auth.casefold()].get()
@@ -1466,8 +1466,8 @@ def init_menu_bar(win):
             command=set_mute,
             )
     menus['tools'].add_checkbutton(
-        label='Show Beta Items',
-        variable=show_beta_items,
+        label='Show Work In Progress Items',
+        variable=show_wip_items,
         )
 
     menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
