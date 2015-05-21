@@ -76,9 +76,9 @@ class Palette:
 def load_palettes(pal_dir):
     "Scan and read in all palettes in the specified directory."
     global PAL_DIR, pal_list
-    PAL_DIR = pal_dir
+    PAL_DIR = os.path.abspath(os.path.join('..', pal_dir))
     full_dir = os.path.join(os.getcwd(), PAL_DIR)
-    contents = os.listdir(full_dir) # this is both files and dirs
+    contents = os.listdir(full_dir)  # this is both files and dirs
 
     pal_list = []
     for name in contents:
@@ -88,15 +88,15 @@ def load_palettes(pal_dir):
         try:
             if name.endswith('.zip'):
                 # Extract from a zip
-                with zipfile.ZipFile(path, 'r') as zip_file:
-                    pos_file = zip_file.open('positions.txt', 'r')
-                    prop_file = zip_file.open('properties.txt', 'r')
+                with zipfile.ZipFile(path, ) as zip_file:
+                    pos_file = zip_file.open('positions.txt',)
+                    prop_file = zip_file.open('properties.txt',)
             elif os.path.isdir(path):
                 # Open from the subfolder
-                pos_file = open(os.path.join(path, 'positions.txt'), 'r')
-                prop_file = open(os.path.join(path, 'properties.txt'), 'r')
+                pos_file = open(os.path.join(path, 'positions.txt'))
+                prop_file = open(os.path.join(path, 'properties.txt'))
         except (KeyError, FileNotFoundError):
-            #KeyError is returned by zipFile.open() if file is not present
+            #  KeyError is returned by zipFile.open() if file is not present
             print("ERROR: Bad palette file '"+name+"'!")
         else:
             pal = parse(pos_file, prop_file, name)

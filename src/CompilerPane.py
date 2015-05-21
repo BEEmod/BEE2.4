@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 import os
 
-import BEE_png as png
+import img as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from SubPane import SubPane

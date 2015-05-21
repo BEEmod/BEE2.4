@@ -241,7 +241,7 @@ def init(cback):
     win = Toplevel(TK_ROOT)
     win.title("BEE2")
     win.resizable(False, False)
-    win.iconbitmap(r'BEE2.ico')
+    win.iconbitmap('../BEE2.ico')
     win.protocol("WM_DELETE_WINDOW", exit_win)
     win.withdraw()
     labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')

@@ -6,7 +6,6 @@ from functools import partial as func_partial
 import itertools
 import operator
 
-import BEE_png as png
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
@@ -14,6 +13,7 @@ from BEE2_config import ConfigFile, GEN_OPTS
 import sound as snd
 import loadScreen as loader
 import paletteLoader
+import img
 import utils
 
 from SubPane import SubPane
@@ -159,9 +159,9 @@ class Item:
         if allow_single and self.can_group and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
-            return png.icon(icons['all'])
+            return img.icon(icons['all'])
         else:
-            return png.icon(icons[str(subKey)])
+            return img.icon(icons[str(subKey)])
 
     def properties(self):
         """Iterate through all properties for this item."""
@@ -526,10 +526,10 @@ def load_packages(data):
             if style_id is None:
                 style_id = '<NONE>'
                 UI['conf_voice'].state(['disabled'])
-                UI['conf_voice']['image'] = png.png('icons/gear_disabled')
+                UI['conf_voice']['image'] = img.png('icons/gear_disabled')
             else:
                 UI['conf_voice'].state(['!disabled'])
-                UI['conf_voice']['image'] = png.png('icons/gear')
+                UI['conf_voice']['image'] = img.png('icons/gear')
         except KeyError:
             # When first initialising, conf_voice won't exist!
             pass
@@ -1079,7 +1079,7 @@ def init_option(f):
     voice_frame.columnconfigure(1, weight=1)
     UI['conf_voice'] = ttk.Button(
         voice_frame,
-        image=png.png('icons/gear'),
+        image=img.png('icons/gear'),
         command=configure_voice,
         width=8,
         )
@@ -1137,7 +1137,7 @@ def init_preview(f):
     UI['pre_bg_img'] = Label(
         f,
         bg=ItemsBG,
-        image=png.png('BEE2/menu'),
+        image=img.png('BEE2/menu'),
         )
     UI['pre_bg_img'].grid(row=0, column=0)
 
@@ -1151,11 +1151,11 @@ def init_preview(f):
     UI['pre_sel_line'] = Label(
         f,
         bg="#F0F0F0",
-        image=png.png('BEE2/sel_bar'),
+        image=img.png('BEE2/sel_bar'),
         borderwidth=0,
         relief="solid",
         )
-    blank = png.png('BEE2/blank')
+    blank = img.png('BEE2/blank')
     pal_picked_fake = [
         ttk.Label(
             frames['preview'],
@@ -1249,7 +1249,7 @@ def flow_picker(_=None):
     frmScroll['height'] = height
 
     # this adds extra blank items on the end to finish the grid nicely.
-    blank_img = png.png('BEE2/blank')
+    blank_img = img.png('BEE2/blank')
 
     for i in range(width):
         if i not in pal_items_fake:
@@ -1376,7 +1376,7 @@ def init_drag_icon():
     drag_win.bind("<ButtonRelease-1>", drag_stop)
     UI['drag_lbl'] = Label(
         drag_win,
-        image=png.png('BEE2/blank'),
+        image=img.png('BEE2/blank'),
         )
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
@@ -1485,7 +1485,7 @@ def init_windows():
         height=TK_ROOT.winfo_screenheight(),
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    TK_ROOT.iconbitmap('BEE2.ico')  # set the window icon
+    TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
 
     ui_bg = Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
@@ -1577,7 +1577,7 @@ def init_windows():
         resize_x=True,
         resize_y=True,
         tool_frame=frames['toolMenu'],
-        tool_img=png.png('icons/win_palette'),
+        tool_img=img.png('icons/win_palette'),
         tool_col=0,
     )
     init_palette(windows['pal'])
@@ -1590,7 +1590,7 @@ def init_windows():
         name='opt',
         resize_x=True,
         tool_frame=frames['toolMenu'],
-        tool_img=png.png('icons/win_options'),
+        tool_img=img.png('icons/win_options'),
         tool_col=1,
     )
     init_option(windows['opt'])

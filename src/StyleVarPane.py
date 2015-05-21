@@ -5,7 +5,7 @@ from tkinter import ttk
 import functools
 import operator
 
-import BEE_png as png
+import img as png
 
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane

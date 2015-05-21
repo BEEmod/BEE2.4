@@ -4,14 +4,14 @@ from configparser import ConfigParser
 
 
 class ConfigFile(ConfigParser):
-    def __init__(self, filename, root='config/'):
+    def __init__(self, filename, root='config'):
         """Initialise the config file.
 
         filename is the name of the config file, in the 'root' directory.
         This file will immediately be read and parsed.
         """
         super().__init__()
-        self.filename = root+filename
+        self.filename = os.path.join('..', root, filename)
         self.load()
         self.has_changed = False
 

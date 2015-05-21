@@ -2,7 +2,7 @@ from tkinter import messagebox
 
 import traceback
 import time
-
+# BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
 from tk_root import TK_ROOT
@@ -115,7 +115,7 @@ except Exception as e:
     print('Logging ' + repr(e) + '!')
 
     # Always log the exception into a file.
-    with open('BEE2-error.log', 'a') as log:
+    with open('../config/BEE2-error.log', 'a') as log:
         log.write(ERR_FORMAT.format(
             time=cur_time,
             underline='=' * len(cur_time),

@@ -8,7 +8,7 @@ import itertools
 import functools
 
 from BEE2_config import ConfigFile
-import BEE_png as png
+import img
 import utils
 
 voice_item = None
@@ -25,7 +25,7 @@ QUOTE_FONT['weight'] = 'bold'
 win = Toplevel(TK_ROOT, name='voiceEditor')
 win.columnconfigure(0, weight=1)
 win.transient(master=TK_ROOT)
-win.iconbitmap('BEE2.ico')
+win.iconbitmap('../BEE2.ico')
 win.protocol("WM_DELETE_WINDOW", win.withdraw)
 win.bind("<Escape>", win.withdraw)
 win.withdraw()
@@ -186,7 +186,7 @@ def refresh(e=None):
                 notebook.tab(
                     tab,
                     compound='image',
-                    image=png.png('icons/mid_quote'),
+                    image=img.png('icons/mid_quote'),
                     )
             else:
                 notebook.tab(tab, text=tab.nb_text)
@@ -198,7 +198,7 @@ def refresh(e=None):
                 notebook.tab(
                     tab,
                     compound='image',
-                    image=png.png('icons/mid_quote'),
+                    image=img.png('icons/mid_quote'),
                     )
             else:
                 notebook.tab(tab, text=tab.nb_text)

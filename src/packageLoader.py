@@ -109,7 +109,7 @@ def load_packages(
         ):
     """Scan and read in all packages in the specified directory."""
     global res_count, LOG_ENT_COUNT
-    pak_dir = os.path.join(os.getcwd(), pak_dir)
+    pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
     if load_res:
         res_count = 0
     else:

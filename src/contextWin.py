@@ -15,7 +15,7 @@ import functools
 import webbrowser
 
 from richTextBox import tkRichText
-import BEE_png as png
+import img as png
 import sound as snd
 import itemPropWin
 import utils
