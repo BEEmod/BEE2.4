@@ -8,3 +8,6 @@ http://www.lfd.uci.edu/~gohlke/pythonlibs/#cx_freeze
 To compile run "compile_vbsp_vrad.py" with an argument of "-build".
 The files will be in build/. 
 VBSP also requires a copy of vbsp_config.cfg in the bin/ folder as well, with the originals named vbsp_original and vrad_original. Leave VVIS alone.
+
+It also uses PIL / Pillow for image reading:
+pip install pillow
