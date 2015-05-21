@@ -68,6 +68,7 @@ preview_styled.vmf
 images/cache/
 inst_cache/
 source_cache/
+cache/
 
 # The config files automatically regenerate with the defaults.
 config/item_configs.cfg
