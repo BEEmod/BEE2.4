@@ -7,11 +7,11 @@ import shutil
 from zipfile import ZipFile
 from collections import defaultdict, namedtuple
 
-
 from property_parser import Property, NoKeyError
-from FakeZip import FakeZip
+from FakeZip import FakeZip, zip_names
 import loadScreen
 import utils
+
 
 __all__ = [
     'load_packages',
@@ -36,16 +36,6 @@ ParseData = namedtuple('ParseData', 'zip_file, id, info')
 PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 
 
-def zip_names(zip):
-    """For FakeZips, use the generator instead of the zip file.
-
-    """
-    if hasattr(zip, 'names'):
-        return zip.names()
-    else:
-        return zip.namelist()
-
-
 def reraise_keyerror(err, obj_id):
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     if isinstance(err, IndexError):
@@ -65,7 +55,7 @@ def reraise_keyerror(err, obj_id):
         )
     ) from err
 
-def find_packages(pak_dir, zips):
+def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir): # Both files and dirs
@@ -77,6 +67,7 @@ def find_packages(pak_dir, zips):
             zip_file = FakeZip(name)
         if 'info.txt' in zip_file.namelist():  # Is it valid?
             zips.append(zip_file)
+            zip_name_lst.append(os.path.abspath(name))
             print('Reading package "' + name + '"')
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
@@ -93,7 +84,7 @@ def find_packages(pak_dir, zips):
             if is_dir:
                 # This isn't a package, so check the subfolders too...
                 print('Checking subdir "{}" for packages...'.format(name))
-                find_packages(name, zips)
+                find_packages(name, zips, zip_name_lst)
             else:
                 zip_file.close()
                 print('ERROR: Bad package "{}"!'.format(name))
@@ -118,8 +109,9 @@ def load_packages(
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
     zips = []
+    data['zips'] = []
     try:
-        find_packages(pak_dir, zips)
+        find_packages(pak_dir, zips, data['zips'])
 
         loadScreen.length("PAK", len(packages))
 
@@ -187,7 +179,7 @@ def load_packages(
             if os.path.isdir("../cache/resources/bee2"):
                 shutil.move("../cache/resources/bee2", "../images/cache")
             if os.path.isdir("../cache/resources/instances"):
-                shutil.move("../cache/resources/instances", "inst_cache/")
+                shutil.move("../cache/resources/instances", "../inst_cache/")
             for file_type in ("materials", "models", "sounds", "scripts"):
                 if os.path.isdir("../cache/resources/" + file_type):
                     shutil.move(
@@ -210,6 +202,7 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
+    print(data['zips'])
     print('Done!')
     return data
 

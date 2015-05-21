@@ -101,3 +101,13 @@ class FakeZip:
     def setpassword(self, pwd):
         """Fake ZipFiles don't care about the password."""
         pass
+
+
+def zip_names(zip):
+    """For FakeZips, use the generator instead of the zip file.
+
+    """
+    if hasattr(zip, 'names'):
+        return zip.names()
+    else:
+        return zip.namelist()
