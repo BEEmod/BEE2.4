@@ -19,8 +19,7 @@ ERR_FORMAT = '''
 {underline}
 {exception!s}
 '''
-
-loadScreen.length('UI', 9)
+loadScreen.main_loader.set_length('UI', 9)
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -54,7 +53,7 @@ try:
     show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
     # If we have no games, gameMan will quit the app entirely.
-    gameMan.load(UI.quit_application, loadScreen.win)
+    gameMan.load(UI.quit_application, loadScreen.main_loader)
 
     gameMan.set_game_by_name(
         GEN_OPTS.get_val('Last_Selected', 'Game', ''),
@@ -91,13 +90,13 @@ try:
     UI.init_windows()  # create all windows
     print('Done!')
 
-    loadScreen.close_window()
+    loadScreen.main_loader.destroy()
     UI.event_loop()
 
 except Exception as e:
     # Grab Python's traceback, and record it
     # This way we have a log.
-    loadScreen.close_window()
+    loadScreen.main_loader.destroy()
 
     err = traceback.format_exc()
     if show_errors:

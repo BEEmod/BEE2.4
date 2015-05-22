@@ -3,111 +3,126 @@ from tkinter import *  # ui library
 from tk_root import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 
-STAGES = [
+class LoadScreen(Toplevel):
+
+    def __init__(self, *stages):
+        self.stages = list(stages)
+        self.widgets = {}
+        self.labels = {}
+        self.bar_var = {}
+        self.bar_val = {}
+        self.maxes = {}
+        self.num_images = 0
+
+        self.active = True
+        # active determines whether the screen is on, and if False stops most
+        # functions from doing anything.
+
+        super().__init__(TK_ROOT, cursor='watch') # Initialise the window
+
+        # this prevents stuff like the title bar, normal borders etc from
+        # appearing in this window.
+        self.overrideredirect(1)
+        self.resizable(False, False)
+        self.attributes('-topmost', 1)
+        self.geometry('+200+200')
+        self.deiconify()
+
+        ttk.Label(
+            self,
+            text='Loading...',
+            font=("Helvetica", 12, "bold"),
+            ).grid(columnspan=2)
+        ttk.Separator(
+            self,
+            orient=HORIZONTAL,
+            ).grid(row=1, sticky="EW", columnspan=2)
+
+        for ind, (st_id, stage_name) in enumerate(self.stages):
+            ttk.Label(
+                self,
+                text=stage_name + ':',
+                ).grid(
+                    row=ind*2+2,
+                    columnspan=2,
+                    sticky="W",
+                    )
+            self.bar_var[st_id] = IntVar()
+            self.bar_val[st_id] = 0
+            self.maxes[st_id] = 10
+
+            self.widgets[st_id] = ttk.Progressbar(
+                self,
+                length=210,
+                maximum=1000,
+                variable=self.bar_var[st_id],
+                )
+            self.labels[st_id] = ttk.Label(self, text='0/??')
+            self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
+            self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
+        self.show()
+
+    def show(self):
+        """Display this loading screen."""
+        self.update()  # Force an update so the reqwidth is correct
+        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
+        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
+        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
+        self.update()  # Force an update of the window to position it
+
+    def set_length(self, stage, num):
+        """Set the number of items in a stage."""
+        if self.active:
+            self.maxes[stage] = num
+            self.set_nums(stage)
+
+    def step(self, stage):
+        """Increment a step by one."""
+        if self.active:
+            self.bar_val[stage] += 1
+            self.bar_var[stage].set(
+                1000 * self.bar_val[stage] / self.maxes[stage]
+            )
+            self.widgets[stage].update()
+            self.set_nums(stage)
+
+    def set_nums(self, stage):
+        self.labels[stage]['text'] = '{!s}/{!s}'.format(
+            self.bar_val[stage],
+            self.maxes[stage],
+        )
+
+    def skip_stage(self, stage):
+        """Skip over this stage of the loading process."""
+        if self.active:
+            self.labels[stage]['text'] = 'Skipped!'
+            self.bar_var[stage].set(1000)  # Make sure it fills to max
+            self.widgets[stage].update()
+
+    def reset(self):
+        """Hide the loading screen and reset all the progress bars."""
+        self.withdraw()
+        for stage, _ in self.stages:
+            self.maxes[stage] = 10
+            self.bar_val[stage] = 0
+            self.bar_var[stage].set(0)
+            self.labels[stage]['text'] = '0/??'
+            self.set_nums(stage)
+
+    def destroy(self):
+        """Delete all parts of the loading screen."""
+        if self.active:
+            super().destroy()
+            del self.widgets
+            del self.maxes
+            del self.bar_var
+            del self.bar_val
+            self.active = False
+
+main_loader = LoadScreen(
     ('PAK', 'Packages'),
     ('OBJ', 'Loading Objects'),
     ('RES', 'Extracting Resources'),
     ('IMG', 'Loading Images'),
     ('UI', 'Initialising UI'),
-    ]
-widgets = {}
-labels = {}
-bar_var = {}
-bar_val = {}
-maxes = {}
-num_images = 0
-
-
-active = True
-# active determines whether the screen is on, and if False stops most
-# functions from doing anything.
-
-win = Toplevel(TK_ROOT, cursor='watch')
-# this prevents stuff like the title bar, normal borders etc from
-# appearing in this window.
-win.overrideredirect(1)
-win.resizable(False, False)
-win.attributes('-topmost', 1)
-win.geometry('+200+200')
-win.deiconify()
-
-ttk.Label(
-    win,
-    text='Loading...',
-    font=("Helvetica", 12, "bold"),
-    ).grid(columnspan=2)
-ttk.Separator(
-    win,
-    orient=HORIZONTAL,
-    ).grid(row=1, sticky="EW", columnspan=2)
-
-for ind, (st_id, stage_name) in enumerate(STAGES):
-    ttk.Label(
-        win,
-        text=stage_name + ':',
-        ).grid(
-            row=ind*2+2,
-            columnspan=2,
-            sticky="W",
-            )
-    bar_var[st_id] = IntVar()
-    bar_val[st_id] = 0
-    maxes[st_id] = 10
-
-    widgets[st_id] = ttk.Progressbar(
-        win,
-        length=210,
-        maximum=1000,
-        variable=bar_var[st_id],
-        )
-    labels[st_id] = ttk.Label(win, text='0/??')
-    widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
-    labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
-
-win.update()
-loc_x = (win.winfo_screenwidth()-win.winfo_reqwidth())//2
-loc_y = (win.winfo_screenheight()-win.winfo_reqheight())//2
-win.geometry('+' + str(loc_x) + '+' + str(loc_y))
-win.update()
-
-
-def length(stage, num):
-    if active:
-        maxes[stage] = num
-        set_nums(stage)
-
-
-def step(stage):
-    if active:
-        prog_bar = widgets[stage]
-        bar_val[stage] += 1
-        bar_var[stage].set(1000*bar_val[stage]/maxes[stage])
-        prog_bar.update()
-        set_nums(stage)
-
-
-def set_nums(stage):
-    labels[stage]['text'] = str(bar_val[stage]) + '/' + str(maxes[stage])
-
-
-def skip_stage(stage):
-    """Skip over this stage of the loading process."""
-    if active:
-        labels[stage]['text'] = 'Skipped!'
-        bar_var[stage].set(1000)
-        widgets[stage].update()
-
-
-def close_window():
-    """Shutdown the loading screen, we're done!"""
-    global widgets, maxes, active, close_window
-    win.destroy()
-    del widgets
-    del maxes
-    active = False
-
-    def close_window():
-        pass
-
-if __name__ == '__main__':
-    TK_ROOT.mainloop()
+)

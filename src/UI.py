@@ -11,7 +11,7 @@ from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 
 import sound as snd
-import loadScreen as loader
+from loadScreen import main_loader as loader
 import paletteLoader
 import img
 import utils
@@ -35,7 +35,7 @@ pal_items = []  # array of the "all items" icons
 pal_picked_fake = []  # Labels used for the empty palette positions
 pal_items_fake = []  # Labels for empty picker positions
 
-drag_item = -1  # the item currently being moved
+drag_item = None  # the item currently being moved
 drag_orig_pos = -1
 drag_onPal = False  # are we dragging a palette item?
 drag_passedPal = False  # has the cursor passed over the palette

@@ -9,7 +9,7 @@ from collections import defaultdict, namedtuple
 
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
-import loadScreen
+from loadScreen import main_loader as loader
 import utils
 
 
@@ -104,7 +104,7 @@ def load_packages(
     if load_res:
         res_count = 0
     else:
-        loadScreen.skip_stage("RES")
+        loader.skip_stage("RES")
 
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
@@ -113,7 +113,7 @@ def load_packages(
     try:
         find_packages(pak_dir, zips, data['zips'])
 
-        loadScreen.length("PAK", len(packages))
+        loader.set_length("PAK", len(packages))
 
         for obj_type in obj_types:
             all_obj[obj_type] = {}
@@ -125,14 +125,14 @@ def load_packages(
             print(("Reading objects from '" + pak_id + "'...").ljust(50), end='')
             obj_count = parse_package(zip_file, info, pak_id, dispName)
             objects += obj_count
-            loadScreen.step("PAK")
+            loader.step("PAK")
             print("Done!")
 
-        loadScreen.length("OBJ", objects)
+        loader.set_length("OBJ", objects)
 
         # Except for StyleVars, each object will have at least 1 image -
         # in UI.py we step the progress once per object.
-        loadScreen.length("IMG", objects - len(all_obj['StyleVar']))
+        loader.set_length("IMG", objects - len(all_obj['StyleVar']))
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
@@ -162,14 +162,14 @@ def load_packages(
                     )
                     object_.add_over(override)
                 data[obj_type].append(object_)
-                loadScreen.step("OBJ")
+                loader.step("OBJ")
         if load_res:
             print('Extracting Resources...')
             for zip_file in zips:
                 for path in zip_names(zip_file):
                     loc = os.path.normcase(path)
                     if loc.startswith("resources"):
-                        loadScreen.step("RES")
+                        loader.step("RES")
                         zip_file.extract(path, path="../cache/")
 
             shutil.rmtree('../images/cache', ignore_errors=True)
@@ -247,7 +247,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
         for item in zip_names(zip_file):
             if item.startswith("resources"):
                 res_count += 1
-        loadScreen.length("RES", res_count)
+        loader.set_length("RES", res_count)
     return objects
 
 
