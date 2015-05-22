@@ -122,7 +122,7 @@ class LoadScreen(Toplevel):
 main_loader = LoadScreen(
     ('PAK', 'Packages'),
     ('OBJ', 'Loading Objects'),
-    ('RES', 'Extracting Resources'),
+    ('IMG_EX', 'Extracting Images'),
     ('IMG', 'Loading Images'),
     ('UI', 'Initialising UI'),
 )

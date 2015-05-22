@@ -18,6 +18,7 @@ import utils
 
 from SubPane import SubPane
 from selectorWin import selWin, Item as selWinItem
+import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
@@ -1029,15 +1030,25 @@ def init_option(f):
         text="Save Palette As...",
         command=pal_save_as,
         ).grid(row=1, sticky="EW", padx=5)
-    ttk.Button(
+    UI['export_button'] = ttk.Button(
         f,
         text="Export...",
         command=export_editoritems,
-        ).grid(row=2, sticky="EW", padx=5, pady=(0, 10))
+    )
+    UI['export_button'].state(['disabled'])
+    UI['export_button'].grid(row=2, sticky="EW", padx=5)
+
+    UI['extract_progress'] = ttk.Progressbar(
+        f,
+        length=200,
+        maximum=1000,
+        variable=extract_packages.progress_var,
+    )
+    UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
 
     props = ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1, weight=1)
-    props.grid(row=3, sticky="EW")
+    props.grid(row=4, sticky="EW")
 
     def suggested_style_set():
         """Set music, skybox, voices, etc to the settings defined for a style.
@@ -1397,7 +1408,6 @@ def init_menu_bar(win):
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', False)
-
     # Name is used to make this the special 'BEE2' menu item on Mac
     menus['file'] = Menu(bar, name='apple')
     file_menu = menus['file']
@@ -1407,8 +1417,8 @@ def init_menu_bar(win):
         label="Export",
         command=export_editoritems,
         accelerator='Ctrl-E',
+        state=DISABLED,
         )
-    win.bind_all('<Control-e>', export_editoritems)
 
     file_menu.add_command(
         label="Add Game",
@@ -1424,7 +1434,6 @@ def init_menu_bar(win):
         command=quit_application,
         )
     file_menu.add_separator()
-
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game)
     gameMan.game_menu = menus['file']
@@ -1730,7 +1739,12 @@ def init_windows():
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
 
+    def copy_done_callback():
+        UI['export_button'].state(['!disabled'])
+        menus['file'].entryconfigure(2, state=NORMAL)
+        TK_ROOT.bind_all('<Control-e>', export_editoritems)
+
+    extract_packages.done_callback = copy_done_callback
+
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
-
-event_loop = TK_ROOT.mainloop

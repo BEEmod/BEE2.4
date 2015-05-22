@@ -11,6 +11,7 @@ import loadScreen
 import paletteLoader
 import packageLoader
 import gameMan
+import extract_packages
 
 ERR_FORMAT = '''
 --------------
@@ -32,7 +33,7 @@ DEFAULT_SETTINGS = {
         'mute_sounds': '0',
     },
     'Debug': {
-        # Show execptions in dialog box when crash occurs
+        # Show exceptions in dialog box when crash occurs
         'show_errors': '0',
         # Log whenever items fallback to the parent style
         'log_item_fallbacks': '0',
@@ -60,20 +61,19 @@ try:
         )
 
     print('Loading Packages...')
-    UI.load_packages(
-        packageLoader.load_packages(
-            GEN_OPTS['Directories']['package'],
-            load_res=not GEN_OPTS.get_bool(
-                'General', 'preserve_BEE2_resource_dir'
-            ),
-            log_item_fallbacks=GEN_OPTS.get_bool(
-                'Debug', 'log_item_fallbacks'),
-            log_missing_styles=GEN_OPTS.get_bool(
-                'Debug', 'log_missing_styles'),
-            log_missing_ent_count=GEN_OPTS.get_bool(
-                'Debug', 'log_missing_ent_count'),
-            )
-        )
+    pack_data = packageLoader.load_packages(
+        GEN_OPTS['Directories']['package'],
+        load_res=not GEN_OPTS.get_bool(
+            'General', 'preserve_BEE2_resource_dir'
+        ),
+        log_item_fallbacks=GEN_OPTS.get_bool(
+            'Debug', 'log_item_fallbacks'),
+        log_missing_styles=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_styles'),
+        log_missing_ent_count=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_ent_count'),
+    )
+    UI.load_packages(pack_data)
     print('Done!')
 
     print('Loading Palettes...')
@@ -91,7 +91,13 @@ try:
     print('Done!')
 
     loadScreen.main_loader.destroy()
-    UI.event_loop()
+    if not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
+        TK_ROOT.after(
+            100,
+            extract_packages.start_copying,
+            pack_data['zips'],
+        )
+    TK_ROOT.mainloop()
 
 except Exception as e:
     # Grab Python's traceback, and record it
