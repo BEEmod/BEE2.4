@@ -53,9 +53,9 @@ _UNLOCK_ITEMS = [
 # The source and desination locations of resources that must be copied
 # into the game folder.
 CACHE_LOC = [
-    ('inst_cache/', 'sdk_content/maps/instances/BEE2'),
-    ('source_cache/', 'BEE2/'),
-    ('packrat/', 'bin/bee2'),
+    ('../inst_cache/', 'sdk_content/maps/instances/BEE2'),
+    ('../source_cache/', 'BEE2/'),
+    ('../packrat/', 'bin/bee2'),
     ]
 
 # The line we inject to add our BEE2 folder into the game search path.
@@ -142,7 +142,7 @@ class Game:
                 with open(info_path) as file:
                     data = list(file)
 
-                for line_num, line in reversed(enumerate(data)):
+                for line_num, line in reversed(list(enumerate(data))):
                     clean_line = utils.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
@@ -181,13 +181,23 @@ class Game:
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
-                if os.path.isfile(backup_path):
+                old_version = self.abs_path(file + '_styles' + ext)
+                if os.path.isfile(old_version):
+                    print("Restoring Stylechanger version of " + name + "!")
+                    shutil.copy(old_version, item_path)
+                elif os.path.isfile(backup_path):
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
+        messagebox.showinfo(
+            message='Now copying over resources. The BEE2 may be non-responsive'
+                    ' for a few seconds',
+            parent=TK_ROOT,
+            title='BEE2 - Exporting',
+        )
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
             print('Copying to "' + dest + '" ...', end='')
@@ -199,7 +209,7 @@ class Game:
                 shutil.copytree(source, dest)
             print(' Done!')
         print('Copying PakRat...', end='')
-        shutil.copy('pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
+        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
         print(' Done!')
 
     def clear_cache(self):
@@ -209,7 +219,7 @@ class Game:
                 shutil.rmtree(self.abs_path(dest))
             except (IOError, shutil.Error):
                 pass
-        shutil.rmtree(self.abs_path('bin/bee2/'))
+        shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
     def export(
             self,
