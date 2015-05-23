@@ -4,15 +4,14 @@ from utils import Vec
 import vbsp
 import vmfLib as VLib
 import utils
+from instanceLocs import resolve as resolve_inst
 
 GLOBAL_INSTANCES = []
-ALL_INST = []
+ALL_INST = set()
 conditions = []
 
 STYLE_VARS = vbsp.settings['style_vars']
 VOICE_ATTR = vbsp.settings['has_attr']
-
-
 
 
 class SkipCondition(Exception):
@@ -29,6 +28,7 @@ class Condition:
         self.else_results = else_results or []
         self.priority = priority
         self.valid = len(self.results) > 0  # is it valid?
+        self.setup()
 
     def __repr__(self):
         return (
@@ -66,7 +66,7 @@ class Condition:
             priority=priority,
         )
 
-    def setup_res(self):
+    def setup(self):
         """Some results need some pre-processing before they can be used.
 
         """
@@ -131,7 +131,7 @@ class Condition:
             return self.priority < other.priority
         return NotImplemented
 
-    def __lr__(self, other):
+    def __le__(self, other):
         """Condition items sort by priority."""
         if hasattr(other, 'priority'):
             return self.priority <= other.priority
@@ -164,22 +164,14 @@ def init(seed, inst_list, vmf_file, is_pre, game_mode):
     GAME_MODE = game_mode
     VMF = vmf_file
     MAP_RAND_SEED = seed
-    ALL_INST = inst_list
+    ALL_INST = set(inst_list)
 
     # Sort by priority, where higher = done earlier
     conditions.sort(reverse=True)
-    setup_cond()
 
 
-def check_all(inst_files):
+def check_all():
     """Check all conditions."""
-    global INST_FILE
-    INST_FILE = {
-        key.casefold(): value
-        for key, value in
-        inst_files.items()
-    }
-    print('conditions: ', INST_FILE)
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         if condition.valid:
@@ -221,12 +213,6 @@ def remove_blank_inst():
         # If set to "" in editoritems, we get ".vmf" instead
         if inst['file', ''] in ('', '.vmf'):
             VMF.remove_ent(inst)
-
-
-def setup_cond():
-    """Some conditions require setup logic before they are run."""
-    for cond in conditions:
-        cond.setup_res()
 
 
 
@@ -291,16 +277,6 @@ def add_output(inst, prop, target):
         inst_out=prop['targ_out', ''],
         ))
 
-
-def resolve_inst_path(path):
-    """Allow referring to the instFile section in condtion parameters."""
-    if path.startswith('<') and path.endswith('>'):
-        try:
-            path = INST_FILE[path[1:-1].casefold()]
-        except KeyError:
-            utils.con_log(path + ' not found in instanceFiles block!')
-    return path.casefold()
-
 #########
 # FLAGS #
 #########
@@ -336,16 +312,21 @@ def flag_nand(inst, flag):
 
 
 def flag_file_equal(inst, flag):
-    return inst['file'].casefold() == resolve_inst_path(flag.value)
+    return inst['file'].casefold() in resolve_inst(flag.value)
 
 
 def flag_file_cont(inst, flag):
-    return resolve_inst_path(flag.value) in inst['file'].casefold()
+    return flag.value in inst['file'].casefold()
 
 
 def flag_has_inst(_, flag):
     """Return true if the filename is present anywhere in the map."""
-    return resolve_inst_path(flag.value) in ALL_INST
+    flags = resolve_inst(flag.value)
+    return any(
+        inst in flags
+        for inst in
+        ALL_INST
+    )
 
 
 def flag_instvar(inst, flag):
@@ -388,7 +369,7 @@ def flag_is_preview(_, flag):
 
 def res_change_instance(inst, res):
     """Set the file to a value."""
-    inst['file'] = resolve_inst_path(res.value)
+    inst['file'] = resolve_inst(res.value)[0]
 
 
 def res_add_suffix(inst, res):
@@ -470,7 +451,7 @@ def res_add_global_inst(_, res):
             new_inst = VLib.Entity(VMF, keys={
                 "classname": "func_instance",
                 "targetname": res['name', ''],
-                "file": resolve_inst_path(res['file']),
+                "file": resolve_inst(res['file'])[0],
                 "angles": res['angles', '0 0 0'],
                 "origin": res['position', '0 0 -10000'],
                 "fixup_style": res['fixup_style', '0'],
@@ -489,7 +470,7 @@ def res_add_overlay_inst(inst, res):
     VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname'],
-        file=resolve_inst_path(res['file', '']),
+        file=resolve_inst(res['file', ''])[0],
         angles=inst['angles'],
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
@@ -516,13 +497,12 @@ def res_cust_output(inst, res):
     dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
     targ_conditions = list(res.find_all("targCondition"))
 
+    pan_files = resolve_inst('[indPan]')
+
     if kill_signs or dec_con_count or targ_conditions:
         for con_inst in VMF.by_class['func_instance']:
             if con_inst['targetname'] in targets:
-                if kill_signs and (
-                        con_inst['file'] == INST_FILE['indpantimer'] or
-                        con_inst['file'] == INST_FILE['indpancheck']
-                        ):
+                if kill_signs and con_inst in pan_files:
                     VMF.remove_ent(con_inst)
                 if targ_conditions:
                     for cond in targ_conditions:

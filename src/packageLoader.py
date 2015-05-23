@@ -860,4 +860,4 @@ obj_types = {
     }
 
 if __name__ == '__main__':
-    load_packages('packages\\', False)
+    load_packages('packages//', False)

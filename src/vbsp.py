@@ -14,6 +14,7 @@ from BEE2_config import ConfigFile
 import vmfLib as VLib
 import utils
 import voiceLine
+import instanceLocs
 
 # Configuration data extracted from VBSP_config
 settings = {
@@ -169,31 +170,6 @@ DEFAULTS = {
     "bee2_loc":                 "",
     }
 
-# These instances have to be specially handled / we want to identify them
-# The corridors are used as a startsWith match, others are exact only
-INST_FILE = {
-    "coopExit":    "coop_exit.vmf",
-    "coopEntry":   "door_entrance_coop_1.vmf",
-    "spExit":      "elevator_exit.vmf",
-    "spEntry":     "elevator_entrance.vmf",
-    "spExitCorr":  "door_exit_",
-    "spEntryCorr": "door_entrance_",
-    "coopCorr":    "door_exit_coop_",
-    "clearPanel":  "panel_clear.vmf",
-    "pistPlat":    "lift_standalone.vmf",
-    "ambLight":    "point_light.vmf",
-    "largeObs":    "observation_room_256x128_1.vmf",
-    "glass":        "glass_128x128.vmf",
-    # although unused, editoritems allows having different instances
-    # for toggle/timer panels
-    "indPanCheck":  "indicator_panel.vmf",
-    "indPanTimer":  "indicator_panel.vmf",
-}
-
-for inst_key, inst_value in INST_FILE.items():
-    # Add the path to all the default values
-    INST_FILE[inst_key] = 'instances/p2editor/' + inst_value
-
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
 FIZZLER_ANGLE_FIX = {
@@ -330,10 +306,6 @@ def load_settings():
         for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
-    for prop in conf.find_all('instancefiles'):
-        for key, val in INST_FILE.items():
-            INST_FILE[key] = prop[key, val]
-
     for quote_block in conf.find_all("quotes_sp"):
         settings['voice_data_sp'] += quote_block.value
 
@@ -370,11 +342,13 @@ def load_settings():
 
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
-            '/config/compile.cfg',
+            'config/compile.cfg',
             root=get_opt('BEE2_loc'),
         )
     else:
         BEE2_config = ConfigFile(None)
+
+    instanceLocs.load_conf()
 
     utils.con_log(settings['pit'])
     utils.con_log("Settings Loaded!")
@@ -425,43 +399,44 @@ def get_map_info():
     voice_timer_pos = {}
 
     inst_files = set()  # Get a set of every instance in the map.
-    file_coop_exit = INST_FILE['coopExit']
-    file_sp_exit = INST_FILE['spExit']
-    file_coop_corr = INST_FILE['coopCorr']
-    file_sp_entry_corr = INST_FILE['spEntryCorr']
-    file_sp_exit_corr = INST_FILE['spExitCorr']
-    file_obs = INST_FILE['largeObs']
-    file_coop_entry = INST_FILE['coopEntry']
+    file_coop_exit = instanceLocs.resolve('[coopExit]')
+    file_sp_exit = instanceLocs.resolve('[spExit]')
+    file_sp_entry = instanceLocs.resolve('[spEntry]')
+    file_coop_corr = instanceLocs.resolve('[coopCorr]')
+    file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
+    file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
+    file_obs = instanceLocs.resolve('<ITEM_OBSERVATION_ROOM>')
+    file_coop_entry = instanceLocs.resolve('[coopEntry]')
 
     for item in VMF.by_class['func_instance']:
-        file = item['file']
-        if file == file_coop_exit:
+        file = item['file'].casefold()
+        if file in file_coop_exit:
             game_mode = 'COOP'
-        elif file == file_sp_exit:
+        elif file in file_sp_exit:
             game_mode = 'SP'
-        elif file == INST_FILE['spEntry']:
+        elif file in file_sp_entry:
             is_preview = not utils.conv_bool(item.fixup['no_player_start'])
             game_mode = 'SP'
-        elif file.startswith(file_coop_corr):
+        elif file in file_coop_corr:
             is_preview = not utils.conv_bool(item.fixup['no_player_start'])
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
                 )
             game_mode = 'COOP'
-        elif file.startswith(file_sp_entry_corr):
+        elif file in file_sp_entry_corr:
             voice_timer_pos['entry'] = (
                 item.fixup['timer_delay', '0']
                 )
             is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-        elif file.startswith(file_sp_exit_corr):
+        elif file in file_sp_exit_corr:
             voice_timer_pos['exit'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file == file_coop_entry:
+        elif file in file_coop_entry:
             voice_timer_pos['entry'] = (
                 item.fixup['timer_delay', '0']
                 )
-        elif file == file_obs:
+        elif file in file_obs:
             voice_timer_pos['obs'] = (
                 item.fixup['timer_delay', '0']
                 )
@@ -472,19 +447,13 @@ def get_map_info():
     utils.con_log("Is Preview: " + str(is_preview))
 
     if game_mode == 'ERR':
-        utils.con_log('Instances:', inst_files)
-        utils.con_log('InstanceFiles:', INST_FILE)
         raise Exception(
             'Unknown game mode - Map missing exit room!'
-            '\nCheck for incorect InstanceFiles definition.'
         )
     if is_preview == 'ERR':
-        utils.con_log('Instances:', inst_files)
-        utils.con_log('InstanceFiles:', INST_FILE)
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
-            '\nCheck for incorect InstanceFiles definition.'
         )
 
     return is_preview, game_mode, voice_timer_pos, inst_files
@@ -495,12 +464,12 @@ def calc_rand_seed():
 
      This ensures textures remain the same when the map is recompiled.
     """
-    amb_light = INST_FILE['ambLight']
+    amb_light = instanceLocs.resolve('<ITEM_POINT_LIGHT>')
     lst = [
         inst['targetname'] or '-'  # If no targ
         for inst in
         VMF.by_class['func_instance']
-        if inst['file'] == amb_light
+        if inst['file'].casefold() in amb_light
         ]
     if len(lst) == 0:
         # Very small maps won't have any ambient light entities at all.
@@ -736,9 +705,9 @@ def find_glass_inst(origin):
     direction = (origin-loc).norm()
     ang_vec = Vec(-1, 0, 0)  # The brush parts are on this side!
     loc_str = loc.join(' ')
-    gls_file = INST_FILE['glass']
+    gls_file = instanceLocs.resolve('[glass_128]')
     for inst in VMF.by_class['func_instance']:
-        if inst['origin', ''] == loc_str and inst['file', ''] == gls_file:
+        if inst['origin', ''] == loc_str and inst['file', ''] in gls_file:
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
             inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
@@ -1072,7 +1041,7 @@ def add_extra_ents(mode):
             ] = utils.bool_as_int(not has_cave)
 
     model_changer_loc = get_opt('model_changer_loc')
-    chosen_model = BEE2_config['General']['player_model']
+    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI')
     # We don't change the player model in Coop, or if Bendy is selected.
     if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
         VMF.create_ent(
@@ -1133,8 +1102,8 @@ def change_func_brush():
                     is_grating = True
                     split_u = side.uaxis.split(" ")
                     split_v = side.vaxis.split(" ")
-                    split_u[-1] = grating_scale  # apply the glass scaling option
-                    split_v[-1] = grating_scale
+                    split_u[-1] = grating_scale  # apply the grtating
+                    split_v[-1] = grating_scale  # scaling option
                     side.uaxis = " ".join(split_u)
                     side.vaxis = " ".join(split_v)
                 alter_mat(side)  # for gratings, laserfields and some others
@@ -1239,6 +1208,8 @@ def fix_inst():
     """Fix some different bugs with instances, especially fizzler models.
 
     """
+    clear_pan_file = instanceLocs.resolve('<ITEM_PANEL_CLEAR>')
+    pist_plat_file = instanceLocs.resolve('<ITEM_PISTON_PLAT>')
 
     utils.con_log("Editing Instances...")
     for inst in VMF.by_class['func_instance']:
@@ -1316,10 +1287,10 @@ def fix_inst():
                     inst_out='out',
                     ))
 
-        elif inst['file'] == INST_FILE['clearPanel']:
+        elif inst['file'] in clear_pan_file:
             # white/black are found via the func_brush
             make_static_pan(inst, "glass")
-        elif inst['file'] == INST_FILE['pistPlat']:
+        elif inst['file'] in pist_plat_file:
             make_static_pist(inst)  # try to convert to static piston
 
 
@@ -1475,7 +1446,7 @@ def main():
             )
 
         fix_inst()
-        conditions.check_all(inst_files=INST_FILE)
+        conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()

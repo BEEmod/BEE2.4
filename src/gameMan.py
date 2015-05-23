@@ -8,7 +8,6 @@ Does stuff related to the actual games.
 import os
 import os.path
 import shutil
-from collections import defaultdict
 
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -71,11 +70,11 @@ def init_trans():
     global trans_data
     try:
         with open('../config/basemodui.txt', "r") as trans:
-            trans_data = Property.parse(trans, 'config/basemodui.txt')
+            trans_prop = Property.parse(trans, 'config/basemodui.txt')
         trans_data = {
             item.real_name: item.value
             for item in
-            trans_data.find_key("lang", []).find_key("tokens", [])
+            trans_prop.find_key("lang", []).find_key("tokens", [])
         }
     except IOError:
         pass
