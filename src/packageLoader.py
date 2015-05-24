@@ -180,7 +180,7 @@ def load_packages(
                 shutil.move("../cache/resources/bee2", "../images/cache")
             if os.path.isdir("../cache/resources/instances"):
                 shutil.move("../cache/resources/instances", "../inst_cache/")
-            for file_type in ("materials", "models", "sounds", "scripts"):
+            for file_type in ("materials", "models", "sound", "scripts"):
                 if os.path.isdir("../cache/resources/" + file_type):
                     shutil.move(
                         "../cache/resources/" + file_type,
