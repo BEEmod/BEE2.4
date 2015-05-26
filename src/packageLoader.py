@@ -347,8 +347,8 @@ def parse_item_folder(folders, zip_file):
 
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
-            'auth':     sep_values(props['authors', ''], ','),
-            'tags':     sep_values(props['tags', ''], ';'),
+            'auth':     sep_values(props['authors', '']),
+            'tags':     sep_values(props['tags', '']),
             'desc':     list(desc_parse(props)),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
@@ -827,7 +827,7 @@ def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
 
     """
-    auth = sep_values(info['authors', ''], ',')
+    auth = sep_values(info['authors', ''])
     desc = list(desc_parse(info))
     short_name = info['shortName', None]
     name = info['name']
@@ -835,19 +835,24 @@ def get_selitem_data(info):
     return SelitemData(name, short_name, auth, icon, desc)
 
 
-def sep_values(string, delimiter):
+def sep_values(string, delimiters=',;/'):
     """Split a string by a delimiter, and then strip whitespace.
 
+    Multiple delimiter characters can be passed.
     """
+    delim, *extra_del = delimiters
     if string == '':
         return []
-    else:
-        vals = string.split(delimiter)
-        return [
-            stripped for stripped in
-            (val.strip() for val in vals)
-            if stripped
-        ]
+
+    for extra in extra_del:
+        string = string.replace(extra, delim)
+
+    vals = string.split(delim)
+    return [
+        stripped for stripped in
+        (val.strip() for val in vals)
+        if stripped
+    ]
 
 obj_types = {
     'Style':     Style,
