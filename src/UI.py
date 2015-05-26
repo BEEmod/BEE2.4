@@ -725,6 +725,10 @@ def drag_start(e):
     drag_win.passed_over_pal = False
     if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
         drag_win.drag_item.kill()
+        UI['pre_moving'].place(
+            x=drag_win.drag_item.pre_x*65 + 4,
+            y=drag_win.drag_item.pre_y*65 + 32,
+        )
         drag_win.from_pal = True
 
         for item in pal_picked:
@@ -800,9 +804,21 @@ def drag_move(e):
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_win.passed_over_pal = True
         drag_win.configure(cursor='plus')
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
+        if not drag_win.passed_over_pal:
+            # If we've passed over the palette, replace identical items
+            # with movement icons to indicate they will move to the new location
+            for item in pal_picked:
+                if item == drag_win.drag_item:
+                    # We haven't removed the original, so we don't need the
+                    # special label for this.
+                    # The group item refresh will return this if nothing
+                    # changes.
+                    item['image'] = img.png('BEE2/item_moving')
+                    break
+
+        drag_win.passed_over_pal = True
     else:
         if drag_win.from_pal and drag_win.passed_over_pal:
             drag_win.configure(cursor='x_cursor')
@@ -1160,6 +1176,11 @@ def init_preview(f):
             )
         for _ in range(32)
         ]
+
+    UI['pre_moving'] = ttk.Label(
+        f,
+        image=img.png('BEE2/item_moving')
+    )
 
     flow_preview()
 
