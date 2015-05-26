@@ -996,12 +996,16 @@ def update_filters():
 
 
 def init_palette(f):
+    """Initialises the palette pane.
+
+    This lists all saved palettes and lets users choose from the list.
+    """
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
 
     ttk.Button(
         f,
-        text='Clear',
+        text='Clear Palette',
         command=pal_clear,
         ).grid(row=0, sticky="EW")
 
