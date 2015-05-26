@@ -35,10 +35,6 @@ pal_items = []  # array of the "all items" icons
 pal_picked_fake = []  # Labels used for the empty palette positions
 pal_items_fake = []  # Labels for empty picker positions
 
-drag_item = None  # the item currently being moved
-drag_orig_pos = -1
-drag_onPal = False  # are we dragging a palette item?
-drag_passedPal = False  # has the cursor passed over the palette
 
 FILTER_CATS = ('author', 'package', 'tags')
 FilterBoxes = {}  # the various checkboxes for the filters
@@ -722,29 +718,28 @@ def conv_screen_to_grid(x, y):
 
 def drag_start(e):
     """Start dragging a palette item."""
-    global drag_onPal, drag_item, drag_passedPal
     drag_win = windows['drag_win']
-    drag_item = e.widget
-    set_disp_name(drag_item)
+    drag_win.drag_item = e.widget
+    set_disp_name(drag_win.drag_item)
     snd.fx('config')
-    drag_passedPal = False
-    if drag_item.is_pre:  # is the cursor over the preview pane?
-        drag_item.kill()
-        drag_onPal = True
+    drag_win.passed_over_pal = False
+    if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
+        drag_win.drag_item.kill()
+        drag_win.from_pal = True
 
         for item in pal_picked:
-            if item.id == drag_item.id:
+            if item.id == drag_win.drag_item.id:
                 item.load_data()
 
         # When dragging off, switch to the single-only icon
-        UI['drag_lbl']['image'] = drag_item.item.get_icon(
-            drag_item.subKey,
+        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+            drag_win.drag_item.subKey,
             allow_single=False,
             )
     else:
-        drag_onPal = drag_item.on_pal()
-        UI['drag_lbl']['image'] = drag_item.item.get_icon(
-            drag_item.subKey,
+        drag_win.from_pal = False
+        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+            drag_win.drag_item.subKey,
             allow_single=True,
             single_num=0,
             )
@@ -762,7 +757,6 @@ def drag_start(e):
 
 def drag_stop(e):
     """User released the mouse button, complete the drag."""
-    global drag_item
     drag_win = windows['drag_win']
     drag_win.withdraw()
     drag_win.unbind("<B1-Motion>")
@@ -776,11 +770,11 @@ def drag_stop(e):
 
     # this prevents a single click on the picker from clearing items
     # off the palette
-    if drag_passedPal:
-        drag_item.clear()  # wipe duplicates off the palette first
+    if drag_win.passed_over_pal:
         # is the cursor over the preview pane?
         if 0 <= pos_x < 4:
-            new_item = drag_item.copy(frames['preview'])
+            drag_win.drag_item.clear()  # wipe duplicates off the palette first
+            new_item = drag_win.drag_item.copy(frames['preview'])
             new_item.is_pre = True
             if ind >= len(pal_picked):
                 pal_picked.append(new_item)
@@ -790,25 +784,27 @@ def drag_stop(e):
             if len(pal_picked) > 32:
                 pal_picked.pop().kill()
         else:  # drop the item
+            if drag_win.from_pal:
+                # Only remove if we started on the palette
+                drag_win.drag_item.clear()
             snd.fx('delete')
 
         flow_preview()  # always refresh
-    drag_item = None
+    drag_win.drag_item = None
 
 
 def drag_move(e):
     """Update the position of dragged items as they move around."""
-    global drag_passedPal
     drag_win = windows['drag_win']
-    set_disp_name(drag_item)
+    set_disp_name(drag_win.drag_item)
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_passedPal = True
+        drag_win.passed_over_pal = True
         drag_win.configure(cursor='plus')
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
     else:
-        if drag_onPal and drag_passedPal:
+        if drag_win.from_pal and drag_win.passed_over_pal:
             drag_win.configure(cursor='x_cursor')
         else:
             drag_win.configure(cursor='no')
@@ -826,7 +822,8 @@ def drag_fast(e):
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        e.widget.kill()  # remove the clicked item
+        print('flowing')
+        flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
@@ -1380,6 +1377,10 @@ def init_drag_icon():
         )
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
+
+    drag_win.passed_over_pal = False  # has the cursor passed over the palette
+    drag_win.from_pal = False  # are we dragging a palette item?
+    drag_win.drag_item = None  # the item currently being moved
 
 
 def set_game(game):
