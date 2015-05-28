@@ -49,7 +49,7 @@ Icon
 
 # Compiled application output
 build_BEE2/
-build_compiler/
+compiler/
 
 # Package source is in BEE2-items/
 packages/

@@ -23,8 +23,8 @@ loadScreen.main_loader.set_length('UI', 9)
 
 DEFAULT_SETTINGS = {
     'Directories': {
-        'palette': 'palettes\\',
-        'package': 'packages\\',
+        'palette': 'palettes/',
+        'package': 'packages/',
     },
     'General': {
         'preserve_BEE2_resource_dir': '0',

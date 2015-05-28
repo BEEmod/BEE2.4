@@ -8,7 +8,6 @@ Does stuff related to the actual games.
 import os
 import os.path
 import shutil
-from collections import defaultdict
 
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -55,7 +54,6 @@ _UNLOCK_ITEMS = [
 CACHE_LOC = [
     ('../inst_cache/', 'sdk_content/maps/instances/BEE2'),
     ('../source_cache/', 'BEE2/'),
-    ('../packrat/', 'bin/bee2'),
     ]
 
 # The line we inject to add our BEE2 folder into the game search path.
@@ -70,12 +68,12 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('config/basemodui.txt', "r") as trans:
-            trans_data = Property.parse(trans, 'config/basemodui.txt')
+        with open('../config/basemodui.txt', "r") as trans:
+            trans_prop = Property.parse(trans, 'config/basemodui.txt')
         trans_data = {
             item.real_name: item.value
             for item in
-            trans_data.find_key("lang", []).find_key("tokens", [])
+            trans_prop.find_key("lang", []).find_key("tokens", [])
         }
     except IOError:
         pass
@@ -203,10 +201,9 @@ class Game:
             print('Copying to "' + dest + '" ...', end='')
             try:
                 shutil.rmtree(dest)
-                os.mkdir(dest)
             except (IOError, shutil.Error):
                 pass
-                shutil.copytree(source, dest)
+            shutil.copytree(source, dest)
             print(' Done!')
         print('Copying PakRat...', end='')
         shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
@@ -319,7 +316,6 @@ class Game:
             all_instances.append(item_prop)
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block:
-                    print(repr(inst))
                     item_prop.append(
                         Property('Instance', inst['Name'])
                     )
@@ -352,6 +348,14 @@ class Game:
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
             for line in all_instances.export():
                 inst_file.write(line)
+
+        print('Copying Custom Compiler!')
+        for file in os.listdir('../compiler'):
+            print('\t* compiler/{0} -> bin/{0}'.format(file))
+            shutil.copy(
+                os.path.join('../compiler', file),
+                self.abs_path('bin/')
+            )
 
         for prefix, pretty in VOICE_PATHS:
             path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
