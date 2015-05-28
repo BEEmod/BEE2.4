@@ -9,7 +9,7 @@ setup(
     options={
         'build_exe':
             {
-                'build_exe': '../build_compiler'
+                'build_exe': '../compiler'
             }
     },
     description='BEE2 VBSP and VRAD compilation hooks, '

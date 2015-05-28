@@ -55,6 +55,7 @@ CACHE_LOC = [
     ('../inst_cache/', 'sdk_content/maps/instances/BEE2'),
     ('../source_cache/', 'BEE2/'),
     ('../packrat/', 'bin/bee2'),
+    ('../compiler/', 'bin/'),
     ]
 
 # The line we inject to add our BEE2 folder into the game search path.
