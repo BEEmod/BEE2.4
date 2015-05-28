@@ -12,7 +12,6 @@ setup(
     options={
         'build_exe': {
             'build_exe': '../build_BEE2/bin',
-            'include_files': ['bee2.ico'],
         },
     },
     executables=[
