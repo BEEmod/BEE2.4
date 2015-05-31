@@ -1,33 +1,40 @@
+# coding: utf-8
 import random
 
 from utils import Vec
-import vbsp
+from property_parser import Property
+from instanceLocs import resolve as resolve_inst
 import vmfLib as VLib
 import utils
-from instanceLocs import resolve as resolve_inst
 
+# Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = []
+OPTIONS = {}
 ALL_INST = set()
+
+
 conditions = []
+FLAG_LOOKUP = {}
+RESULT_LOOKUP = {}
 
-STYLE_VARS = vbsp.settings['style_vars']
-VOICE_ATTR = vbsp.settings['has_attr']
 
-
-class SkipCondition(Exception):
+class NextInstance(Exception):
     """Raised to skip to the next instance, from the SkipInstance result."""
+    pass
+
+class EndCondition(Exception):
+    """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
 
 class Condition:
-    __slots__ = ['flags', 'results', 'else_results', 'priority', 'valid']
+    __slots__ = ['flags', 'results', 'else_results', 'priority']
 
     def __init__(self, flags=None, results=None, else_results=None, priority=0):
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
         self.priority = priority
-        self.valid = len(self.results) > 0  # is it valid?
         self.setup()
 
     def __repr__(self):
@@ -96,21 +103,19 @@ class Condition:
 
     def test(self, inst, remove_vmf=True):
         """Try to satisfy this condition on the given instance."""
-        if not self.valid:
-            return
         success = True
         for flag in self.flags:
-            # utils.con_log('Flag: ' + repr(flag))
+            utils.con_log('Flag: ' + repr(flag))
             if not check_flag(flag, inst):
                 success = False
                 break
-            # utils.con_log(success)
+            utils.con_log(success)
         if remove_vmf:
             # our suffixes won't touch the .vmf extension
             inst['file'] = inst['file', ''][:-4]
 
         results = self.results if success else self.else_results
-        for res in results:
+        for res in results[:]:
             try:
                 func = RESULT_LOOKUP[res.name]
             except KeyError:
@@ -120,7 +125,9 @@ class Condition:
                     )
                 )
             else:
-                func(inst, res)
+                should_del = func(inst, res)
+                if should_del is True:
+                    results.remove(res)
 
         if remove_vmf and not inst['file'].endswith('vmf'):
             inst['file'] += '.vmf'
@@ -149,25 +156,75 @@ class Condition:
             return self.priority >= other.priority
         return NotImplemented
 
+def add_meta(func, priority, only_once=True):
+    """Add a metacondtion, which executes a function at a priority level.
+
+    Used to allow users to allow adding conditions before or after a
+    transformation like the adding of quotes.
+    """
+    # This adds a condition result like "func" (with quotes), which cannot
+    # be entered into property files.
+    # The qualname will be unique across modules.
+    name = '"' + func.__qualname__ + '"'
+    print("Adding metacondition (" + name + ")!")
+
+    # Don't pass the prop_block onto the function,
+    # it doesn't contain any useful data.
+    RESULT_LOOKUP[name] = lambda inst, val: func(inst)
+
+    cond = Condition(
+        results=[Property(name, '')],
+        priority=priority,
+    )
+
+    if only_once:
+        cond.results.append(
+            Property('endCondition', '')
+        )
+    conditions.append(cond)
+
+
+def meta_cond(priority=0, only_once=True):
+    """Decorator version of add_meta."""
+    def x(func):
+        add_meta(func, priority, only_once)
+        return func
+    return x
+
+def make_flag(name):
+    """Decorator to add flags to the lookup."""
+    def x(func):
+        FLAG_LOOKUP[name.casefold()] = func
+        return func
+    return x
+
+def make_result(name):
+    """Decorator to add results to the lookup."""
+    def x(func):
+        RESULT_LOOKUP[name.casefold()] = func
+        return func
+    return x
 
 def add(prop_block):
-    """Add a condition to the list."""
+    """Parse and add a condition to the list."""
     con = Condition.parse(prop_block)
-    if con.valid:
+    if con.results or con.else_results:
         conditions.append(con)
 
 
-def init(seed, inst_list, vmf_file, is_pre, game_mode):
+def init(seed, inst_list, vmf_file):
     # Get a bunch of values from VBSP
-    global MAP_RAND_SEED, ALL_INST, VMF, IS_PREVIEW, GAME_MODE
-    IS_PREVIEW = is_pre
-    GAME_MODE = game_mode
+    import vbsp
+    global MAP_RAND_SEED, ALL_INST, VMF, STYLE_VARS, VOICE_ATTR, OPTIONS
     VMF = vmf_file
     MAP_RAND_SEED = seed
     ALL_INST = set(inst_list)
+    OPTIONS = vbsp.settings
+    STYLE_VARS = vbsp.settings['style_vars']
+    VOICE_ATTR = vbsp.settings['has_attr']
 
-    # Sort by priority, where higher = done earlier
-    conditions.sort(reverse=True)
+    # Sort by priority, where higher = done later
+    conditions.sort()
 
 
 def check_all():
@@ -178,14 +235,16 @@ def check_all():
             for inst in VMF.by_class['func_instance']:
                     try:
                         condition.test(inst)
-                    except SkipCondition:
+                    except NextInstance:
                         # This is raised to immediately stop running
                         # this condition, and skip to the next instance.
                         pass
-                    if len(condition.results) == 0:
+                    except EndCondition:
+                        # This is raised to immediately stop running
+                        # this condition, and skip to the next condtion.
                         break
-
-    remove_blank_inst()
+                    if not condition.results and not condition.else_results:
+                        break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
         key
@@ -201,27 +260,15 @@ def check_inst(inst):
     """Run all conditions on a given instance."""
     for condition in conditions:
         condition.test(inst)
-    remove_blank_inst()
-
-
-def remove_blank_inst():
-    """Remove instances with blank file attr.
-
-    This allows conditions to strip the instances when requested.
-    """
-    for inst in VMF.by_class['func_instance']:
-        # If set to "" in editoritems, we get ".vmf" instead
-        if inst['file', ''] in ('', '.vmf'):
-            VMF.remove_ent(inst)
 
 
 
 def check_flag(flag, inst):
-    # print('Checking {type} ({val!s} on {inst}'.format(
-    #     type=flag.real_name,
-    #     val=flag.value,
-    #     inst=inst['file'],
-    # ))
+    print('Checking {type} ({val!s} on {inst}'.format(
+        type=flag.real_name,
+        val=flag.value,
+        inst=inst['file'],
+    ))
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
@@ -281,7 +328,7 @@ def add_output(inst, prop, target):
 # FLAGS #
 #########
 
-
+@make_flag('and')
 def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
@@ -290,35 +337,41 @@ def flag_and(inst, flag):
         return len(sub_flag.value) == 0
 
 
+@make_flag('or')
 def flag_or(inst, flag):
     for sub_flag in flag:
         if check_flag(sub_flag, inst):
             return True
     return False
 
-
+@make_flag('not')
 def flag_not(inst, flag):
     if len(flag.value) == 1:
         return not check_flag(flag[0], inst)
     return False
 
 
+@make_flag('nor')
 def flag_nor(inst, flag):
     return not flag_or(inst, flag)
 
 
+@make_flag('nand')
 def flag_nand(inst, flag):
     return not flag_and(inst, flag)
 
 
+@make_flag('instance')
 def flag_file_equal(inst, flag):
     return inst['file'].casefold() in resolve_inst(flag.value)
 
 
+@make_flag('InstFlag')
 def flag_file_cont(inst, flag):
     return flag.value in inst['file'].casefold()
 
 
+@make_flag('hasInst')
 def flag_has_inst(_, flag):
     """Return true if the filename is present anywhere in the map."""
     flags = resolve_inst(flag.value)
@@ -329,37 +382,46 @@ def flag_has_inst(_, flag):
     )
 
 
+@make_flag('instVar')
 def flag_instvar(inst, flag):
     bits = flag.value.split(' ')
     return inst.fixup[bits[0]] == bits[1]
 
 
+@make_flag('styleVar')
 def flag_stylevar(_, flag):
     return bool(STYLE_VARS[flag.value.casefold()])
 
 
+@make_flag('has')
 def flag_voice_has(_, flag):
     return bool(VOICE_ATTR[flag.value.casefold()])
 
 
+@make_flag('has_music')
 def flag_music(_, flag):
-    return vbsp.settings['options']['music_id'] == flag.value
+    return OPTIONS['music_id'] == flag.value
 
 
+@make_flag('ifOption')
 def flag_option(_, flag):
     bits = flag.value.split(' ')
     key = bits[0].casefold()
-    if key in vbsp.settings['options']:
-        return vbsp.settings['options'][key] == bits[1]
+    if key in OPTIONS:
+        return OPTIONS[key] == bits[1]
     else:
         return False
 
 
+@make_flag('ifMode')
 def flag_game_mode(_, flag):
+    from vbsp import GAME_MODE
     return GAME_MODE.casefold() == flag.value.casefold()
 
 
+@make_flag('ifPreview')
 def flag_is_preview(_, flag):
+    from vbsp import IS_PREVIEW
     return IS_PREVIEW == utils.conv_bool(flag, False)
 
 ###########
@@ -367,37 +429,47 @@ def flag_is_preview(_, flag):
 ###########
 
 
+@make_result('rename')
+@make_result('changeInstance')
 def res_change_instance(inst, res):
     """Set the file to a value."""
     inst['file'] = resolve_inst(res.value)[0]
 
 
+@make_result('suffix')
 def res_add_suffix(inst, res):
     """Add the specified suffix to the filename."""
     inst['file'] += '_' + res.value
 
 
+@make_result('styleVar')
 def res_set_style_var(_, res):
     for opt in res.value:
         if opt.name == 'settrue':
             STYLE_VARS[opt.value.casefold()] = True
         elif opt.name == 'setfalse':
             STYLE_VARS[opt.value.casefold()] = False
+    return True  # Remove this result
 
-
+@make_result('has')
 def res_set_voice_attr(_, res):
     for opt in res.value:
         val = utils.conv_bool(opt.value, default=None)
         if val is not None:
             VOICE_ATTR[opt.name] = val
+    return True  # Remove this result
 
 
+@make_result('setOption')
 def res_set_option(_, res):
     for opt in res.value:
-        if opt.name in vbsp.settings['options']:
-            vbsp.settings['options'][opt.name] = opt.value
+        if opt.name in OPTIONS:
+            OPTIONS[opt.name] = opt.value
+    return True  # Remove this result
 
 
+@make_result('instVar')
+@make_result('instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
 
@@ -416,12 +488,14 @@ def res_add_inst_var(inst, res):
         inst['file'] += '_' + inst.fixup[res.value, '']
 
 
+@make_result('setInstVar')
 def res_set_inst_var(inst, res):
     """Set an instance variable to the given value."""
     var_name, val = res.value.split(' ')
     inst.fixup[var_name] = val
 
 
+@make_result('variant')
 def res_add_variant(inst, res):
     """This allows using a random instance from a weighted group.
 
@@ -436,6 +510,7 @@ def res_add_variant(inst, res):
     inst['file'] += "_var" + random.choice(res.value)
 
 
+@make_result('addGlobal')
 def res_add_global_inst(_, res):
     """Add one instance in a location.
 
@@ -461,9 +536,10 @@ def res_add_global_inst(_, res):
                 new_inst['targetname'] = "inst_"
                 new_inst.make_unique()
             VMF.add_ent(new_inst)
-            res.value = None  # Disable this
+    return True  # Remove this result
 
 
+@make_result('addOverlay')
 def res_add_overlay_inst(inst, res):
     """Add another instance on top of this one."""
     print('adding overlay', res['file'])
@@ -477,6 +553,7 @@ def res_add_overlay_inst(inst, res):
     )
 
 
+@make_result('custOutput')
 def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
 
@@ -524,11 +601,14 @@ def res_cust_output(inst, res):
             add_output(inst, out, targ)
 
 
+@make_result('custAntline')
 def res_cust_antline(inst, res):
     """Customise the output antline texture, toggle instances.
 
     This allows adding extra outputs between the instance and the toggle.
     """
+    import vbsp
+
     over_name = '@' + inst['targetname'] + '_indicator'
     for over in (
             VMF.by_class['info_overlay'] &
@@ -561,6 +641,7 @@ def res_cust_antline(inst, res):
                 break  # Stop looking!
 
 
+@make_result('faithMods')
 def res_faith_mods(inst, res):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
@@ -589,8 +670,10 @@ def res_faith_mods(inst, res):
             break  # If we got here, we've found the output - stop scanning
 
 
+@make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
     """Modify a fizzler item to allow for custom brush ents."""
+    from vbsp import TEX_FIZZLER
     model_name = res['modelname', None]
     make_unique = utils.conv_bool(res['UniqueModel', '0'])
     fizz_name = base_inst['targetname', '']
@@ -685,7 +768,7 @@ def res_cust_fizzler(base_inst, res):
                 for side in new_brush.sides():
                     try:
                         side.mat = config[
-                            vbsp.TEX_FIZZLER[side.mat.casefold()]
+                            TEX_FIZZLER[side.mat.casefold()]
                         ]
                     except (KeyError, IndexError):
                         # If we fail, just use the original textures
@@ -762,16 +845,25 @@ def convert_to_laserfield(
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
 
 
+@make_result('condition')
 def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true."""
     res.value.test(base_inst, remove_vmf=False)
 
 
+@make_result('nextInstance')
 def res_break(base_inst, res):
     """Skip to the next instance.
 
     """
-    raise SkipCondition
+    raise NextInstance
+
+@make_result('endCondition')
+def res_end_condition(base_inst, res):
+    """Skip to the next condition
+
+    """
+    raise EndCondition
 
 # For each direction, the two perpendicular axes and the axis it is pointing in.
 PAIR_AXES = {
@@ -783,7 +875,7 @@ PAIR_AXES = {
     (0, 0, -1): 'xy' 'z',
 }
 
-
+@make_result('fizzlerModelPair')
 def res_fizzler_pair(begin_inst, res):
     """Modify the instance of a fizzler to link with its pair."""
     orig_target = begin_inst['targetname']
@@ -845,55 +937,19 @@ def res_fizzler_pair(begin_inst, res):
             )
 
 
+@make_result('clearOutputs')
+@make_result('clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
+@meta_cond(priority=1000, only_once=False)
+def remove_blank_inst(inst):
+    """Remove instances with blank file attr.
 
-FLAG_LOOKUP = {
-    'and': flag_and,
-    'or': flag_or,
-    'not': flag_not,
-    'nor': flag_nor,
-    'nand': flag_nand,
-
-    'instance': flag_file_equal,
-    'instpart': flag_file_cont,
-    'instvar': flag_instvar,
-    'hasinst': flag_has_inst,
-
-    'stylevar': flag_stylevar,
-
-    'has': flag_voice_has,
-    'hasmusic': flag_music,
-
-    'ifmode': flag_game_mode,
-    'ifpreview': flag_is_preview,
-    'ifoption': flag_option,
-    }
-
-RESULT_LOOKUP = {
-    "nextinstance": res_break,
-    "condition": res_sub_condition,
-
-    "setoption": res_set_option,
-    "has": res_set_voice_attr,
-    "stylevar": res_set_style_var,
-    "clearoutputs": res_clear_outputs,
-
-    "changeinstance": res_change_instance,
-    "addglobal": res_add_global_inst,
-    "addoverlay": res_add_overlay_inst,
-
-    "suffix": res_add_suffix,
-    "variant": res_add_variant,
-    "instvar": res_add_inst_var,
-    "setinstvar": res_set_inst_var,
-
-    "custoutput": res_cust_output,
-    "custantline": res_cust_antline,
-    "faithmods": res_faith_mods,
-
-    "fizzlermodelpair": res_fizzler_pair,
-    "custfizzler": res_cust_fizzler,
-    }
+    This allows conditions to strip the instances when requested.
+    """
+    # If editoritems instances are set to "", PeTI will autocorrect it to
+    # ".vmf" - we need to handle that too.
+    if inst['file', ''] in ('', '.vmf'):
+        VMF.remove_ent(inst)
