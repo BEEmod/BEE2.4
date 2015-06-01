@@ -646,8 +646,21 @@ def res_faith_mods(inst, res):
     """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
+    offset = utils.conv_int(res['raise_trig', '0'])
+    if offset:
+        angle = Vec.from_str(inst['angles', '0 0 0'])
+        offset = round(Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z))
+        ':type offset Vec'
     for trig in VMF.by_class['trigger_catapult']:
         if inst['targetname'] in trig['targetname']:
+            if offset:  # Edit both the normal and the helper trigger
+                trig['origin'] = (
+                    Vec.from_str(trig['origin']) +
+                    offset
+                ).join(' ')
+                for solid in trig.solids:
+                    solid.translate(offset)
+
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
                     out.inst_in = res['angled_targ', 'animate_angled_relay']
