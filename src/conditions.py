@@ -105,7 +105,6 @@ class Condition:
         """Try to satisfy this condition on the given instance."""
         success = True
         for flag in self.flags:
-            utils.con_log('Flag: ' + repr(flag))
             if not check_flag(flag, inst):
                 success = False
                 break
@@ -231,20 +230,19 @@ def check_all():
     """Check all conditions."""
     utils.con_log('Checking Conditions...')
     for condition in conditions:
-        if condition.valid:
-            for inst in VMF.by_class['func_instance']:
-                    try:
-                        condition.test(inst)
-                    except NextInstance:
-                        # This is raised to immediately stop running
-                        # this condition, and skip to the next instance.
-                        pass
-                    except EndCondition:
-                        # This is raised to immediately stop running
-                        # this condition, and skip to the next condtion.
-                        break
-                    if not condition.results and not condition.else_results:
-                        break  # Condition has run out of results, quit early
+        for inst in VMF.by_class['func_instance']:
+                try:
+                    condition.test(inst)
+                except NextInstance:
+                    # This is raised to immediately stop running
+                    # this condition, and skip to the next instance.
+                    pass
+                except EndCondition:
+                    # This is raised to immediately stop running
+                    # this condition, and skip to the next condtion.
+                    break
+                if not condition.results and not condition.else_results:
+                    break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
         key
@@ -665,10 +663,6 @@ def res_faith_mods(inst, res):
                     if fixup_var:
                         inst.fixup[fixup_var] = 'straight'
                     break
-            else:
-                continue  # Check the next trigger
-            break  # If we got here, we've found the output - stop scanning
-
 
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):

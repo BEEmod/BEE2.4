@@ -105,7 +105,6 @@ def add_voice(
         has_items,
         style_vars_,
         vmf_file,
-        timer_config=utils.EmptyMapping,
         mode='SP',
         ):
     """Add a voice line to the map."""
@@ -162,24 +161,10 @@ def add_voice(
         )
 
         if possible_quotes:
-            # If we have a timer value, we go that many back from the
-            # highest priority item. If it fails, default to the first.
-            timer_val = timer_config.get(
-                group['config', ''].casefold(),
-                '3')
-            try:
-                timer_val = int(timer_val) - 3
-            except ValueError:
-                timer_val = 0
 
             choreo_loc = group['choreo_loc', quote_loc]
 
-            utils.con_log('Timer value: ', timer_val)
-
-            try:
-                chosen = possible_quotes[timer_val][1]
-            except IndexError:
-                chosen = possible_quotes[0][1]
+            chosen = possible_quotes[0][1]
 
             utils.con_log('Chosen: {!r}'.format(chosen))
 

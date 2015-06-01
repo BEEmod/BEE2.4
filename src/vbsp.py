@@ -364,11 +364,11 @@ def load_map(map_path):
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(voice_config, mode):
-    if mode == 'COOP':
+def add_voice(inst):
+    if GAME_MODE == 'COOP':
         utils.con_log('Adding Coop voice lines!')
         data = settings['voice_data_coop']
-    elif mode == 'SP':
+    elif GAME_MODE == 'SP':
         utils.con_log('Adding Singleplayer voice lines!')
         data = settings['voice_data_sp']
     else:
@@ -379,8 +379,7 @@ def add_voice(voice_config, mode):
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        timer_config=voice_config,
-        mode=mode,
+        mode=GAME_MODE,
         )
 
 
