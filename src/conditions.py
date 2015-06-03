@@ -546,9 +546,9 @@ def res_add_overlay_inst(inst, res):
     print('adding overlay', res['file'])
     VMF.create_ent(
         classname='func_instance',
-        targetname=inst['targetname'],
+        targetname=inst['targetname', ''],
         file=resolve_inst(res['file', ''])[0],
-        angles=inst['angles'],
+        angles=inst['angles', '0 0 0'],
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
