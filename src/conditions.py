@@ -101,7 +101,7 @@ class Condition:
             elif res.name == 'condition':
                 res.value = Condition.parse(res)
 
-    def test(self, inst, remove_vmf=True):
+    def test(self, inst):
         """Try to satisfy this condition on the given instance."""
         success = True
         for flag in self.flags:
@@ -109,10 +109,6 @@ class Condition:
                 success = False
                 break
             utils.con_log(success)
-        if remove_vmf:
-            # our suffixes won't touch the .vmf extension
-            inst['file'] = inst['file', ''][:-4]
-
         results = self.results if success else self.else_results
         for res in results[:]:
             try:
@@ -127,9 +123,6 @@ class Condition:
                 should_del = func(inst, res)
                 if should_del is True:
                     results.remove(res)
-
-        if remove_vmf and not inst['file'].endswith('vmf'):
-            inst['file'] += '.vmf'
 
     def __lt__(self, other):
         """Condition items sort by priority."""
@@ -322,6 +315,15 @@ def add_output(inst, prop, target):
         inst_out=prop['targ_out', ''],
         ))
 
+
+def add_suffix(inst, suff):
+    """Append the given suffix to the instance.
+    """
+    file = inst['file']
+    utils.con_log(file)
+    old_name, dot, ext = file.partition('.')
+    inst['file'] = ''.join((old_name, suff, dot, ext))
+
 #########
 # FLAGS #
 #########
@@ -437,7 +439,7 @@ def res_change_instance(inst, res):
 @make_result('suffix')
 def res_add_suffix(inst, res):
     """Add the specified suffix to the filename."""
-    inst['file'] += '_' + res.value
+    add_suffix(inst, '_' + res.value)
 
 
 @make_result('styleVar')
@@ -480,10 +482,10 @@ def res_add_inst_var(inst, res):
             if rep.name == 'variable':
                 continue  # this isn't a lookup command!
             if rep.name == val:
-                inst['file'] += '_' + rep.value
+                add_suffix(inst, '_' + rep.value)
                 break
     else:  # append the value
-        inst['file'] += '_' + inst.fixup[res.value, '']
+        add_suffix(inst, '_' + inst.fixup[res.value, ''])
 
 
 @make_result('setInstVar')
@@ -505,7 +507,7 @@ def res_add_variant(inst, res):
         random.seed(MAP_RAND_SEED + inst['origin'] + inst['angles'])
     else:
         random.seed(inst['targetname'])
-    inst['file'] += "_var" + random.choice(res.value)
+    add_suffix(inst, "_var" + random.choice(res.value))
 
 
 @make_result('addGlobal')
@@ -856,7 +858,7 @@ def convert_to_laserfield(
 @make_result('condition')
 def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true."""
-    res.value.test(base_inst, remove_vmf=False)
+    res.value.test(base_inst)
 
 
 @make_result('nextInstance')
