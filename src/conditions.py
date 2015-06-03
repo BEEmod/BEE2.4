@@ -8,7 +8,7 @@ import vmfLib as VLib
 import utils
 
 # Stuff we get from VBSP in init()
-GLOBAL_INSTANCES = []
+GLOBAL_INSTANCES = set()
 OPTIONS = {}
 ALL_INST = set()
 
@@ -515,8 +515,9 @@ def res_add_global_inst(_, res):
     Once this is executed, it will be ignored thereafter.
     """
     if res.value is not None:
-        if (res['file'] not in GLOBAL_INSTANCES or
-                utils.conv_bool(res['allow_multiple', '0'], True)):
+        if (
+                utils.conv_bool(res['allow_multiple', '0']) or
+                res['file'] not in GLOBAL_INSTANCES):
             # By default we will skip adding the instance
             # if was already added - this is helpful for
             # items that add to original items, or to avoid
@@ -529,7 +530,7 @@ def res_add_global_inst(_, res):
                 "origin": res['position', '0 0 -10000'],
                 "fixup_style": res['fixup_style', '0'],
                 })
-            GLOBAL_INSTANCES.append(res['file'])
+            GLOBAL_INSTANCES.add(res['file'])
             if new_inst['targetname'] == '':
                 new_inst['targetname'] = "inst_"
                 new_inst.make_unique()
