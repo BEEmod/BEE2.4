@@ -255,11 +255,11 @@ def check_inst(inst):
 
 
 def check_flag(flag, inst):
-    print('Checking {type} ({val!s} on {inst}'.format(
-        type=flag.real_name,
-        val=flag.value,
-        inst=inst['file'],
-    ))
+    # print('Checking {type} ({val!s} on {inst}'.format(
+    #     type=flag.real_name,
+    #     val=flag.value,
+    #     inst=inst['file'],
+    # ))
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
@@ -952,6 +952,11 @@ def res_fizzler_pair(begin_inst, res):
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
+
+@make_result('removeFixup')
+def res_rem_fixup(inst, res):
+    """Remove a fixup from the instance."""
+    del inst.fixup['res']
 
 @meta_cond(priority=1000, only_once=False)
 def remove_blank_inst(inst):
