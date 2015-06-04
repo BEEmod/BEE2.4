@@ -1759,4 +1759,6 @@ def init_windows():
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
 
+    set_palette()
+
 event_loop = TK_ROOT.mainloop
