@@ -1,3 +1,4 @@
+#coding: utf-8
 from tkinter import *  # ui library
 from tk_root import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
@@ -54,8 +55,8 @@ PROP_POS = [
     'autorespawn',
     ]
 
-widgets = {} # holds the checkbox or other item used to manipulate the box
-labels = {} # holds the descriptive labels for each property
+widgets = {}  # holds the checkbox or other item used to manipulate the box
+labels = {}  # holds the descriptive labels for each property
 
 propList = []
 
@@ -153,8 +154,8 @@ def save_tim(key, val):
         enable_tim_callback = True
 
         labels[key]['text'] = (
-            'Timer Delay:\n        (' +
-            ('Inf' if new_val == 0 else str(new_val)) + ')'
+            'Timer Delay:\n        ({})'.format(
+                '∞' if new_val == 0 else str(new_val))
         )
 
         if new_val > values[key]:
