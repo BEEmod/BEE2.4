@@ -400,6 +400,7 @@ class Style:
             short_name=None,
             suggested=None,
             has_video=True,
+            corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
         self.auth = author
@@ -412,6 +413,11 @@ class Style:
         self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
+        self.corridor_names = {
+            'sp_entry': corridor_names.get('sp_entry', Property('', [])),
+            'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
+            'coop':     corridor_names.get('coop', Property('', [])),
+        }
         if config is None:
             self.config = Property(None, [])
         else:
@@ -433,6 +439,13 @@ class Style:
             sugg['goo', 'GOO_NORM'],
             sugg['elev', '<NONE>'],
             )
+
+        corridors = info.find_key('corridors', [])
+        corridors = {
+            'sp_entry': corridors.find_key('sp_entry', []),
+            'sp_exit':  corridors.find_key('sp_exit', []),
+            'coop':     corridors.find_key('coop', []),
+        }
 
         short_name = selitem_data.short_name or None
         if base == '':
@@ -459,6 +472,7 @@ class Style:
             short_name=short_name,
             suggested=sugg,
             has_video=has_video,
+            corridor_names=corridors,
             )
 
     def add_over(self, override):

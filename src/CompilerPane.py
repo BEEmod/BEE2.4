@@ -3,7 +3,7 @@ from tk_root import TK_ROOT
 from tkinter import ttk
 from tkinter import filedialog
 
-import os
+from functools import partial
 
 import img as png
 
@@ -24,6 +24,11 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         },
+    'Corridor': {
+        'sp_entry': '1',
+        'sp_exit': '1',
+        'coop': '1',
+    },
     'Counts': {
         'brush': '0',
         'ent': '0',
@@ -62,6 +67,42 @@ count_brush = IntVar(value=0)
 count_ents = IntVar(value=0)
 count_overlay = IntVar(value=0)
 
+CORRIDOR = {}
+
+def set_corr_values(group_name, props):
+    """Set the corrdors according to the passed prop_block."""
+    count = 7 if group_name == 'sp_entry' else 4
+    group = CORRIDOR[group_name] = ['Random'] + [
+        str(i) + ': Corridor'
+        for i in
+        range(1, count+1)
+    ]
+    for prop in props[group_name]:
+        try:
+            ind = int(prop.name)
+        except ValueError:
+            continue
+
+        if 0 < ind <= count:
+            group[ind] = '{!r}: {}'.format(ind, prop.value)
+
+
+def make_corr_combo(frm, corr_name, width):
+    set_corr_values(corr_name, {corr_name: []})
+    widget = ttk.Combobox(
+        frm,
+        values=CORRIDOR[corr_name],
+        width=width,
+        exportselection=0,
+    )
+    widget['postcommand'] = partial(set_corr_dropdown, corr_name, widget)
+    widget.state(['readonly'])
+    widget.bind(
+        '<<ComboboxSelected>>',
+        partial(set_corr, corr_name)
+    )
+    widget.current(COMPILE_CFG.get_int('Corridor', corr_name))
+    return widget
 
 
 def refresh_counts(reload=True):
@@ -123,6 +164,13 @@ def set_model(_=None):
     COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
     COMPILE_CFG.save()
 
+def set_corr(corr_name, e):
+    COMPILE_CFG['Corridor'][corr_name] = str(e.widget.current())
+    COMPILE_CFG.save()
+
+def set_corr_dropdown(corr_name, widget):
+    """Set the values in the dropdown when it's opened."""
+    widget['values'] = CORRIDOR[corr_name]
 
 def make_pane(tool_frame):
     """Create the compiler options pane.
@@ -132,9 +180,9 @@ def make_pane(tool_frame):
     window = SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Compile Options',
+        title='Compile Opt',
         name='compiler',
-        resize_x=False,
+        resize_x=True,
         resize_y=False,
         tool_frame=tool_frame,
         tool_img=png.png('icons/win_compiler'),
@@ -207,6 +255,8 @@ def make_pane(tool_frame):
     )
 
     elev_frame.grid(row=1, column=0, sticky=EW)
+    elev_frame.columnconfigure(0, weight=1)
+    elev_frame.columnconfigure(1, weight=1)
 
     UI['elev_preview'] = ttk.Radiobutton(
         elev_frame,
@@ -227,23 +277,71 @@ def make_pane(tool_frame):
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
     UI['elev_elevator'].grid(row=0, column=1, sticky=W)
 
+    corr_frame = ttk.LabelFrame(
+        window,
+        text='Corridor:',
+        labelanchor=N,
+    )
+    corr_frame.grid(row=2, column=0, sticky=EW)
+    corr_frame.columnconfigure(0, weight=1)
+    corr_frame.columnconfigure(1, weight=1)
+
+    UI['corr_sp_entry'] = make_corr_combo(
+        corr_frame,
+        'sp_entry',
+        width=9,
+    )
+
+    UI['corr_sp_exit'] = make_corr_combo(
+        corr_frame,
+        'sp_exit',
+        width=9,
+    )
+
+    UI['corr_coop'] = make_corr_combo(
+        corr_frame,
+        'coop',
+        width=9,
+    )
+
+    UI['corr_sp_entry'].grid(row=1, column=0, sticky=EW)
+    UI['corr_sp_exit'].grid(row=1, column=1, sticky=EW)
+    UI['corr_coop'].grid(row=2, column=1, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='SP Entry:',
+        anchor=CENTER,
+    ).grid(row=0, column=0, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='SP Exit:',
+        anchor=CENTER,
+    ).grid(row=0, column=1, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='Coop:',
+        anchor=CENTER,
+    ).grid(row=2, column=0, sticky=EW)
+
     model_frame = ttk.LabelFrame(
         window,
         text='Player Model (SP):',
         labelanchor=N,
     )
-    model_frame.grid(row=2, column=0, sticky=EW)
+    model_frame.grid(row=3, column=0, sticky=EW)
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,
         textvariable=player_model_var,
         values=PLAYER_MODEL_ORDER,
+        width=20,
     )
     # Users can only use the dropdown
     UI['player_mdl'].state(['readonly'])
     UI['player_mdl'].grid(row=0, column=0, sticky=EW)
 
     UI['player_mdl'].bind('<<ComboboxSelected>>', set_model)
+    model_frame.columnconfigure(0, weight=1)
 
     count_frame = ttk.LabelFrame(
         window,
@@ -251,7 +349,9 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    count_frame.grid(row=3, column=0)
+    count_frame.grid(row=4, column=0, sticky=EW)
+    count_frame.columnconfigure(0, weight=1)
+    count_frame.columnconfigure(2, weight=1)
 
     ttk.Label(
         count_frame,
@@ -273,7 +373,6 @@ def make_pane(tool_frame):
         padx=5,
     )
 
-
     ttk.Label(
         count_frame,
         text='Overlay',
@@ -292,7 +391,6 @@ def make_pane(tool_frame):
         image=png.png('icons/tool_sub'),
         command=refresh_counts,
     ).grid(row=3, column=1)
-
 
     ttk.Label(
         count_frame,
