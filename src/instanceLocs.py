@@ -95,7 +95,6 @@ def load_conf():
             for inst in
             prop
         ]
-
     INST_SPECIAL = {
         key.casefold(): resolve(val_string)
         for key, val_string in
@@ -136,7 +135,7 @@ def resolve(path) -> list:
                     '"{}" not a valid item!'.format(item)
                 )
                 return []
-            out = set()
+            out = []
             for val in subitem.split(','):
                 ind = SUBITEMS.get(
                     val.strip().casefold(),
@@ -144,8 +143,8 @@ def resolve(path) -> list:
                 )
                 # Only add if it's actually in range
                 if 0 <= ind < len(item_values):
-                    out.add(item_values[ind])
-            return list(out)
+                    out.append(item_values[ind])
+            return out
         else:
             try:
                 return INSTANCE_FILES[path]
