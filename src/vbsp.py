@@ -15,6 +15,7 @@ import vmfLib as VLib
 import utils
 import voiceLine
 import instanceLocs
+import conditions
 
 # Configuration data extracted from VBSP_config
 settings = {
@@ -31,7 +32,6 @@ settings = {
     "voice_data_coop": Property("Quotes_COOP", []),
     }
 
-import conditions
 
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
@@ -199,9 +199,8 @@ FIZZ_OPTIONS = {
 
 BEE2_config = None
 
-# A list of sucessful AddGlobal commands, so we can prevent adding the same
-# instance twice.
-global_instances = []
+GAME_MODE = 'ERR'
+IS_PREVIEW = 'ERR'
 
 ##################
 # UTIL functions #
@@ -364,12 +363,12 @@ def load_map(map_path):
     utils.con_log("Parsing complete!")
 
 
-def add_voice(voice_config, mode):
-    print(mode)
-    if mode == 'COOP':
+@conditions.meta_cond(priority=100)
+def add_voice(inst):
+    if GAME_MODE == 'COOP':
         utils.con_log('Adding Coop voice lines!')
         data = settings['voice_data_coop']
-    elif mode == 'SP':
+    elif GAME_MODE == 'SP':
         utils.con_log('Adding Singleplayer voice lines!')
         data = settings['voice_data_sp']
     else:
@@ -380,23 +379,20 @@ def add_voice(voice_config, mode):
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        timer_config=voice_config,
-        mode=mode,
+        mode=GAME_MODE,
         )
 
 
 def get_map_info():
     """Determine various attributes about the map.
 
+    This also set the 'preview in elevator' options and forces
+    a particular entry/exit hallway.
+
     - SP/COOP status
     - if in preview mode
-    - timer values for entry/exit corridors
     """
-    game_mode = 'ERR'
-    is_preview = 'ERR'
-
-    # Timer_delay values for the entry/exit corridors, needed for quotes
-    voice_timer_pos = {}
+    global GAME_MODE, IS_PREVIEW
 
     inst_files = set()  # Get a set of every instance in the map.
     file_coop_exit = instanceLocs.resolve('[coopExit]')
@@ -405,58 +401,70 @@ def get_map_info():
     file_coop_corr = instanceLocs.resolve('[coopCorr]')
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
-    file_obs = instanceLocs.resolve('<ITEM_OBSERVATION_ROOM>')
-    file_coop_entry = instanceLocs.resolve('[coopEntry]')
 
+    # Should we force the player to spawn in the elevator?
+    elev_override = BEE2_config.get_bool('General', 'spawn_elev')
+
+    if elev_override:
+        # Make conditions set appropriately
+        utils.con_log('Forcing elevator spawn!')
+        IS_PREVIEW = False
+
+    no_player_start_inst = (
+        # All the instances that have the no_player start value
+        file_sp_entry +
+        file_coop_corr +
+        file_sp_entry_corr +
+        file_sp_exit_corr
+    )
+    override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
+    override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
+    override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
+    utils.con_log(override_sp_exit, override_sp_entry, override_coop_corr)
     for item in VMF.by_class['func_instance']:
         file = item['file'].casefold()
-        if file in file_coop_exit:
-            game_mode = 'COOP'
-        elif file in file_sp_exit:
-            game_mode = 'SP'
-        elif file in file_sp_entry:
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-            game_mode = 'SP'
-        elif file in file_coop_corr:
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-            voice_timer_pos['exit'] = (
-                item.fixup['timer_delay', '0']
-                )
-            game_mode = 'COOP'
+        if file in no_player_start_inst:
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
+            else:
+                IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
+
+        if file in file_sp_exit_corr:
+            if override_sp_exit != 0:
+                utils.con_log('Setting exit to ' + str(override_sp_exit))
+                item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
-            voice_timer_pos['entry'] = (
-                item.fixup['timer_delay', '0']
-                )
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-        elif file in file_sp_exit_corr:
-            voice_timer_pos['exit'] = (
-                item.fixup['timer_delay', '0']
-                )
-        elif file in file_coop_entry:
-            voice_timer_pos['entry'] = (
-                item.fixup['timer_delay', '0']
-                )
-        elif file in file_obs:
-            voice_timer_pos['obs'] = (
-                item.fixup['timer_delay', '0']
-                )
+            if override_sp_entry != 0:
+                utils.con_log('Setting entry to ' + str(override_sp_entry))
+                item['file'] = file_sp_entry_corr[override_sp_entry-1]
+        elif file in file_coop_corr:
+            GAME_MODE = 'COOP'
+            if override_coop_corr != 0:
+                utils.con_log('Setting coop exit to ' + str(override_coop_corr))
+                item['file'] = file_coop_corr[override_coop_corr-1]
+        elif file in file_coop_exit:
+            GAME_MODE = 'COOP'
+        elif file in file_sp_exit:
+            GAME_MODE = 'SP'
+        elif file in file_sp_entry:
+            GAME_MODE = 'SP'
 
         inst_files.add(item['file'])
 
-    utils.con_log("Game Mode: " + game_mode)
-    utils.con_log("Is Preview: " + str(is_preview))
+    utils.con_log("Game Mode: " + GAME_MODE)
+    utils.con_log("Is Preview: " + str(IS_PREVIEW))
 
-    if game_mode == 'ERR':
+    if GAME_MODE == 'ERR':
         raise Exception(
             'Unknown game mode - Map missing exit room!'
         )
-    if is_preview == 'ERR':
+    if IS_PREVIEW == 'ERR':
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
         )
 
-    return is_preview, game_mode, voice_timer_pos, inst_files
+    return inst_files
 
 
 def calc_rand_seed():
@@ -1430,19 +1438,12 @@ def main():
 
         MAP_SEED = calc_rand_seed()
 
-        (
-            IS_PREVIEW,
-            GAME_MODE,
-            voice_timer_pos,
-            all_inst,
-        ) = get_map_info()
+        all_inst = get_map_info()
 
         conditions.init(
             seed=MAP_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
-            game_mode=GAME_MODE,
-            is_pre=IS_PREVIEW,
             )
 
         fix_inst()
@@ -1457,7 +1458,6 @@ def main():
         change_func_brush()
 
         fix_worldspawn()
-        add_voice(voice_timer_pos, GAME_MODE)
         save(new_path)
 
         run_vbsp(

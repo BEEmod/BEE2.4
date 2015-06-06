@@ -283,7 +283,9 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
 
-        vbsp_config.set_key(('Options', 'BEE2_loc'), os.getcwd())
+        vbsp_config.set_key(('Options', 'BEE2_loc'),
+            os.path.dirname(os.getcwd()) # Go up one dir to our actual location
+        )
 
         # If there are multiple of these blocks, merge them together
         vbsp_config.merge_children('Conditions',

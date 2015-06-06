@@ -1305,10 +1305,6 @@ class EntityFixup:
     def copy_dict(self):
         return self._fixup.copy()
 
-    def __contains__(self, var: str):
-        """Determine if this instance has the named $replace variable."""
-        return var.casefold() in self._fixup
-
     def __getitem__(self, key):
         if isinstance(key, tuple):
             return self.get(key[0], default=key[1])
@@ -1322,11 +1318,12 @@ class EntityFixup:
         if var[0] == '$':
             var = var[1:]
         folded_var = var.casefold()
-        if folded_var not in self._fixup:
-            max_id = 1
+        if folded_var not in self:
+            max_id = 0
             for fixup in self._fixup.values():
                 if int(fixup.id) > max_id:
                     max_id = int(fixup.id)
+            max_id += 1
             if max_id < 9:
                 max_id = "0" + str(max_id)
             else:

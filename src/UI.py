@@ -1749,6 +1749,10 @@ def init_windows():
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
+        CompilerPane.set_corr_values('sp_entry', style_obj.corridor_names)
+        CompilerPane.set_corr_values('sp_exit', style_obj.corridor_names)
+        CompilerPane.set_corr_values('coop', style_obj.corridor_names)
+
         sugg = style_obj.suggested
         win_types = (voice_win, music_win, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
@@ -1758,5 +1762,7 @@ def init_windows():
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
+
+    set_palette()
 
 event_loop = TK_ROOT.mainloop
