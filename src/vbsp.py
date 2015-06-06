@@ -386,9 +386,11 @@ def add_voice(inst):
 def get_map_info():
     """Determine various attributes about the map.
 
+    This also set the 'preview in elevator' options and forces
+    a particular entry/exit hallway.
+
     - SP/COOP status
     - if in preview mode
-    - timer values for entry/exit corridors
     """
     global GAME_MODE, IS_PREVIEW
 
@@ -400,22 +402,52 @@ def get_map_info():
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
 
+    # Should we force the player to spawn in the elevator?
+    elev_override = BEE2_config.get_bool('General', 'spawn_elev')
+
+    if elev_override:
+        # Make conditions set appropriately
+        utils.con_log('Forcing elevator spawn!')
+        IS_PREVIEW = False
+
+    no_player_start_inst = (
+        # All the instances that have the no_player start value
+        file_sp_entry +
+        file_coop_corr +
+        file_sp_entry_corr +
+        file_sp_exit_corr
+    )
+    override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
+    override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
+    override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
+    utils.con_log(override_sp_exit, override_sp_entry, override_coop_corr)
     for item in VMF.by_class['func_instance']:
         file = item['file'].casefold()
-        if file in file_coop_exit:
+        if file in no_player_start_inst:
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
+            else:
+                IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
+
+        if file in file_sp_exit_corr:
+            if override_sp_exit != 0:
+                utils.con_log('Setting exit to ' + str(override_sp_exit))
+                item['file'] = file_sp_exit_corr[override_sp_exit-1]
+        elif file in file_sp_entry_corr:
+            if override_sp_entry != 0:
+                utils.con_log('Setting entry to ' + str(override_sp_entry))
+                item['file'] = file_sp_entry_corr[override_sp_entry-1]
+        elif file in file_coop_corr:
+            GAME_MODE = 'COOP'
+            if override_coop_corr != 0:
+                utils.con_log('Setting coop exit to ' + str(override_coop_corr))
+                item['file'] = file_coop_corr[override_coop_corr-1]
+        elif file in file_coop_exit:
             GAME_MODE = 'COOP'
         elif file in file_sp_exit:
             GAME_MODE = 'SP'
         elif file in file_sp_entry:
-            IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
             GAME_MODE = 'SP'
-        elif file in file_coop_corr:
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-            GAME_MODE = 'COOP'
-        elif file in file_sp_entry_corr:
-            IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
-        elif file in file_sp_exit_corr:
-            IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
 
         inst_files.add(item['file'])
 
