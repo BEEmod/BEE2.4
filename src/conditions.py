@@ -285,6 +285,7 @@ def variant_weight(var):
             weight = []
             if len(vals) == count:
                 for i, val in enumerate(vals):
+                    val = val.strip()
                     if val.isdecimal():
                         # repeat the index the correct number of times
                         weight.extend(
