@@ -1,6 +1,7 @@
 import math
 import string
 import collections.abc as abc
+from collections import namedtuple
 
 BEE_VERSION = "2.4"
 
@@ -176,7 +177,7 @@ class EmptyMapping(abc.Mapping):
         return self
 
 EmptyMapping = EmptyMapping() # We only need the one instance
-
+Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
 
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
@@ -630,7 +631,7 @@ class Vec:
 
     def as_tuple(self):
         """Return the Vector as a tuple."""
-        return self.x, self.y, self.z
+        return Vec_tuple(self.x, self.y, self.z)
 
     def len_sq(self):
         """Return the magnitude squared, which is slightly faster."""
