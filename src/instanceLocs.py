@@ -137,10 +137,9 @@ def resolve(path) -> list:
                 return []
             out = []
             for val in subitem.split(','):
-                ind = SUBITEMS.get(
-                    val.strip().casefold(),
-                    int(val.strip()),
-                )
+                ind = SUBITEMS.get(val.strip().casefold(), None)
+                if ind is None:
+                    ind = int(val.strip())
                 # Only add if it's actually in range
                 if 0 <= ind < len(item_values):
                     out.append(item_values[ind])
