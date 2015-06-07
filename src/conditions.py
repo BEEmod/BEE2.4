@@ -17,6 +17,53 @@ conditions = []
 FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
 
+xp = utils.Vec_tuple(1, 0, 0)
+xn = utils.Vec_tuple(-1, 0, 0)
+yp = utils.Vec_tuple(0, 1, 0)
+yn = utils.Vec_tuple(0, -1, 0)
+zp = utils.Vec_tuple(0, 0, 1)
+zn = utils.Vec_tuple(0, 0, -1)
+DIRECTIONS = {
+    # Translate these words into a normal vector
+    '+x': xp,
+    '-x': xn,
+
+    '+y': yp,
+    '-y': yn,
+
+    '+z': zp,
+    '-z': zn,
+
+    'up': zp,
+    'dn': zp,
+    'down': zn,
+    'floor': zp,
+    'ceiling': zn,
+    'ceil': zn,
+
+    'n': yp,
+    'north': yp,
+    's': yn,
+    'south': yn,
+
+    'e': xp,
+    'east': xp,
+    'w': xn,
+    'west': xn,
+}
+
+INST_ANGLE = {
+    # The angles needed to point a PeTI instance in this direction
+    # IE up = zp = floor
+    xp: '90 0 0',
+    xn: '-90 180 0',
+    yp: '90 -90 0',
+    yn: '90 90 0',
+    zp: '0 0 0',
+    zn: '180 0 0',
+}
+
+del xp, xn, yp, yn, zp, zn
 
 class NextInstance(Exception):
     """Raised to skip to the next instance, from the SkipInstance result."""
