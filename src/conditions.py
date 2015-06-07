@@ -506,7 +506,9 @@ def res_add_variant(inst, res):
         # seed instead for stuff like elevators.
         random.seed(MAP_RAND_SEED + inst['origin'] + inst['angles'])
     else:
-        random.seed(inst['targetname'])
+        # We still need to use angles and origin, since things like
+        # fizzlers might not get unique names.
+        random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
     add_suffix(inst, "_var" + random.choice(res.value))
 
 
