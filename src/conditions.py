@@ -695,12 +695,11 @@ def res_cust_fizzler(base_inst, res):
         fizz_name + '_modelStart',
         fizz_name + '_modelEnd',
         )
+    is_laser = False
     for inst in VMF.by_class['func_instance']:
         if inst['targetname', ''] in model_targetnames:
             if inst.fixup['skin', '0'] == '2':
-                # This is a laserfield! We can't edit that!
-                utils.con_log('CustFizzler excecuted on LaserField!')
-                return
+                is_laser = True
             if model_name is not None:
                 if model_name == '':
                     inst['targetname'] = base_inst['targetname']
@@ -715,9 +714,16 @@ def res_cust_fizzler(base_inst, res):
 
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
+
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) == 0:
         return  # No brush modifications
+
+    if is_laser:
+        # This is a laserfield! We can't edit those brushes!
+        utils.con_log('CustFizzler excecuted on LaserField!')
+        return
+
     for orig_brush in (
             VMF.by_class['trigger_portal_cleanser'] &
             VMF.by_target[fizz_name + '_brush']):
