@@ -32,7 +32,7 @@ data = {}
 res_count = -1
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
-ParseData = namedtuple('ParseData', 'zip_file, id, info')
+ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
 PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 
 
@@ -144,6 +144,7 @@ def load_packages(
                             obj_data.zip_file,
                             obj_id,
                             obj_data.info_block,
+                            obj_data.pak_id,
                         )
                     )
                 except (NoKeyError, IndexError) as e:
@@ -151,14 +152,9 @@ def load_packages(
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
-                for zip_file, info_block in \
-                        obj_override[obj_type].get(obj_id, []):
+                for override_data in obj_override[obj_type].get(obj_id, []):
                     override = obj_types[obj_type].parse(
-                        ParseData(
-                            zip_file,
-                            obj_id,
-                            info_block,
-                        )
+                        override_data
                     )
                     object_.add_over(override)
                 data[obj_type].append(object_)
@@ -228,7 +224,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
         for obj in info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                (zip_file, obj)
+                ParseData(zip_file, obj_id, obj, pak_id)
             )
 
         for obj in info.find_all(comp_type):
@@ -326,7 +322,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
 
-def parse_item_folder(folders, zip_file):
+def parse_item_folder(folders, zip_file, pak_id):
     for fold in folders:
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
@@ -334,14 +330,16 @@ def parse_item_folder(folders, zip_file):
         try:
             with zip_file.open(prop_path, 'r') as prop_file:
                 props = Property.parse(
-                    prop_file, prop_path,
+                    prop_file, pak_id + ':' + prop_path,
                 ).find_key('Properties')
             with zip_file.open(editor_path, 'r') as editor_file:
-                editor = Property.parse(editor_file, editor_path)
+                editor = Property.parse(
+                    editor_file, pak_id + ':' + editor_path
+                )
         except KeyError as err:
             # Opening the files failed!
             raise IOError(
-                '"items/' + fold + '" not valid!'
+                '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
                 ) from err
 
@@ -364,7 +362,9 @@ def parse_item_folder(folders, zip_file):
         }
 
         if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
-            print('Warning: "{}" has missing entity count!'.format(prop_path))
+            print('Warning: "{}:{}" has missing entity count!'.format(
+                pak_id, prop_path,
+            ))
 
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
@@ -375,13 +375,18 @@ def parse_item_folder(folders, zip_file):
         )
         if 0 < num_group_parts < 3:
             print(
-                'Warning: "{}" has incomplete grouping icon definition!'.format(
-                    prop_path)
+                'Warning: "{}:{}" has incomplete grouping icon '
+                'definition!'.format(
+                    pak_id, prop_path
+                )
             )
 
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = Property.parse(vbsp_config, config_path)
+                folders[fold]['vbsp'] = Property.parse(
+                    vbsp_config,
+                    pak_id + ':' + config_path,
+                )
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
 
@@ -453,11 +458,17 @@ class Style:
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
         with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
-            items = Property.parse(item_data, folder+'/items.txt')
+            items = Property.parse(
+                item_data,
+                data.pak_id+':'+folder+'/items.txt'
+            )
 
         try:
             with data.zip_file.open(config, 'r') as vbsp_config:
-                vbsp = Property.parse(vbsp_config, config)
+                vbsp = Property.parse(
+                    vbsp_config,
+                    data.pak_id+':'+config,
+                )
         except KeyError:
             vbsp = None
         return cls(
@@ -521,7 +532,7 @@ class Item:
             if def_version is None:
                 def_version = vals
 
-        parse_item_folder(folders, data.zip_file)
+        parse_item_folder(folders, data.zip_file, data.pak_id)
 
         for ver in versions.values():
             if ver['def_style'] in folders:
@@ -585,7 +596,7 @@ class QuotePack:
         selitem_data = get_selitem_data(data.info)
         path = 'voice/' + data.info['file'] + '.voice'
         with data.zip_file.open(path, 'r') as conf:
-            config = Property.parse(conf, path)
+            config = Property.parse(conf, data.pak_id+':'+path)
 
         return cls(
             data.id,
@@ -643,7 +654,7 @@ class Skybox:
             path = 'skybox/' + config_dir + '.cfg'
             try:
                 with data.zip_file.open(path, 'r') as conf:
-                    config = Property.parse(conf)
+                    config = Property.parse(conf, data.pak_id+':'+path)
             except KeyError:
                 print(config_dir + '.cfg not in zip!')
                 config = Property(None, [])
@@ -697,10 +708,10 @@ class Music:
         inst = data.info['instance', None]
         sound = data.info['soundscript', None]
 
-        config_dir = 'music/' + data.info['config', '']
+        config_dir = 'music/' + data.info['config', ''] + '.cfg'
         try:
             with data.zip_file.open(config_dir) as conf:
-                config = Property.parse(conf, config_dir)
+                config = Property.parse(conf, data.pak_id+':'+config_dir)
         except KeyError:
             config = Property(None, [])
         return cls(
