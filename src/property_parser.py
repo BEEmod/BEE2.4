@@ -92,7 +92,10 @@ class Property:
           objects
         Values default to just ''.
         If INVALID is passed as the only parameter, an Property object
-        will be returned that has be marked as invalid.
+          will be returned that has be marked as invalid.
+        If the name is set to None, this is a root Property object - it
+          exports each of its children at the top-most indent level.
+        This is produced from Property.parse() calls.
         """
         if name == INVALID:
             self.real_name = None
@@ -142,8 +145,12 @@ class Property:
             self.value = value
 
     @staticmethod
-    def parse(file_contents, filename='') -> "List of Property objects":
-        """Returns list of Property objects parsed from given text"""
+    def parse(file_contents, filename='') -> "Property":
+        """Returns a Property tree parsed from given text.
+
+        filename, if set should be the source of the text for debug purposes.
+        file_contents should be an iterable of strings
+        """
         open_properties = [Property(None, [])]
 
         for line_num, line in enumerate(file_contents, start=1):
