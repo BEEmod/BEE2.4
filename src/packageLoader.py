@@ -55,6 +55,34 @@ def reraise_keyerror(err, obj_id):
         )
     ) from err
 
+def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
+    """Extract a config file refered to by the given property block.
+
+    Looks for the prop_name key in the given prop_block.
+    If the keyvalue has a value of "", an empty tree is returned.
+    If it has children, a copy of them is returned.
+    Otherwise the value is a filename in the zip which will be parsed.
+    """
+    prop_block = prop_block.find_key(prop_name, "")
+    if prop_block.has_children():
+        prop = prop_block.copy()
+        prop.name = None
+        return prop
+
+    if prop_block.value == '':
+        return Property(None, [])
+
+    path = os.path.join(folder, prop_block.value) + '.cfg'
+    try:
+        with zip_file.open(path) as f:
+            return Property.parse(f,
+            pak_id + ':' + path,
+            )
+    except KeyError:
+        print('"{}:{}" not in zip!'.format(pak_id, path))
+        return Property(None, [])
+
+
 def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
@@ -380,7 +408,6 @@ def parse_item_folder(folders, zip_file, pak_id):
                     pak_id, prop_path
                 )
             )
-
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
                 folders[fold]['vbsp'] = Property.parse(
@@ -594,9 +621,14 @@ class QuotePack:
     def parse(cls, data):
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
-        path = 'voice/' + data.info['file'] + '.voice'
-        with data.zip_file.open(path, 'r') as conf:
-            config = Property.parse(conf, data.pak_id+':'+path)
+        path = 'voice/' + data.info['file'] + '.cfg'
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'voice',
+            pak_id=data.pak_id,
+            prop_name='file',
+        )
 
         return cls(
             data.id,
@@ -648,16 +680,12 @@ class Skybox:
         config_dir = data.info['config', '']
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
-        if config_dir == '':  # No config at all
-            config = Property(None, [])
-        else:
-            path = 'skybox/' + config_dir + '.cfg'
-            try:
-                with data.zip_file.open(path, 'r') as conf:
-                    config = Property.parse(conf, data.pak_id+':'+path)
-            except KeyError:
-                print(config_dir + '.cfg not in zip!')
-                config = Property(None, [])
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'skybox',
+            pak_id=data.pak_id,
+        )
         return cls(
             data.id,
             selitem_data.name,
@@ -708,12 +736,12 @@ class Music:
         inst = data.info['instance', None]
         sound = data.info['soundscript', None]
 
-        config_dir = 'music/' + data.info['config', ''] + '.cfg'
-        try:
-            with data.zip_file.open(config_dir) as conf:
-                config = Property.parse(conf, data.pak_id+':'+config_dir)
-        except KeyError:
-            config = Property(None, [])
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'skybox',
+            pak_id=data.pak_id,
+        )
         return cls(
             data.id,
             selitem_data.name,
