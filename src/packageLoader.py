@@ -524,12 +524,20 @@ class Style:
 
 
 class Item:
-    def __init__(self, item_id, versions, def_version, needs_unlock):
+    def __init__(
+            self,
+            item_id,
+            versions,
+            def_version,
+            needs_unlock=False,
+            all_conf=None,
+            ):
         self.id = item_id
         self.versions = versions
         self.def_ver = def_version
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
+        self.all_conf = all_conf or Property(None, [])
 
     @classmethod
     def parse(cls, data):
@@ -537,6 +545,14 @@ class Item:
         versions = {}
         def_version = None
         folders = {}
+
+        all_config = get_config(
+            data.info,
+            data.zip_file,
+            'items',
+            pak_id=data.pak_id,
+            prop_name='all_conf',
+        )
 
         needs_unlock = utils.conv_bool(data.info['needsUnlock', '0'])
 
@@ -570,7 +586,7 @@ class Item:
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
 
-        return cls(data.id, versions, def_version, needs_unlock)
+        return cls(data.id, versions, def_version, needs_unlock, all_config)
 
     def add_over(self, override):
         """Add the other item data to ourselves."""

@@ -273,7 +273,11 @@ class Item:
                         del editor_section[editor_sec_index]
                         break
 
-        return new_editor, self.data['editor_extra'], self.data['vbsp']
+        return (
+            new_editor,
+            self.data['editor_extra'],
+            self.data['vbsp'] + self.item.all_conf,
+        )
 
 
 class PalItem(Label):
