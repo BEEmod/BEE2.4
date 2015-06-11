@@ -28,10 +28,11 @@ SPECIAL_INST = {
     'spExitCorr':  '<ITEM_EXIT_DOOR:0,1,2,3>',
     'spEntryCorr': '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'coopCorr':    '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
+    'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # although unused, editoritems allows having different instances
     # for toggle/timer panels
-    'indPanCheck':  '<ITEM_INDICATOR_TOGGLE>',
-    'indPanTimer':  '<ITEM_INDICATOR_PANEL>',
+    'indPanCheck':  '<ITEM_INDICATOR_PANEL>',
+    'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
     # 'indpan' is defined below from these two
 
     'exit_frame': '<ITEM_EXIT_DOOR:4,5>',
