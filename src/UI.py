@@ -23,6 +23,7 @@ import contextWin
 import gameMan
 import StyleVarPane
 import CompilerPane
+import optionWindow
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -49,9 +50,6 @@ selected_style = "BEE2_CLEAN"
 selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
-
-muted = IntVar(value=0)  # Is the sound fx muted?
-show_wip_items = IntVar(value=0)
 
 # All the stuff we've loaded in
 item_list = {}
@@ -225,7 +223,7 @@ class Item:
             if ver['is_wip']:
                 # We always display the currently selected version, so
                 # it's possible to deselect it.
-                if ver_id != self.selected_ver and not show_wip_items.get():
+                if ver_id != self.selected_ver and not optionWindow.SHOW_WIP.get():
                     continue
                 name = '[WIP] ' + name
             vers.append(name)
@@ -409,41 +407,21 @@ def quit_application():
     TK_ROOT.destroy()
     exit(0)
 
-
-def set_mute():
-    """Apply the muted setting based on the variable."""
-    snd.muted = (muted.get() == 1)
-    GEN_OPTS['General']['mute_sounds'] = str(muted.get())
-
-
 def load_palette(data):
     """Import in all defined palettes."""
     global palettes
     palettes = data
 
 
-def load_settings(settings):
+def load_settings():
     """Load options from the general config file."""
-    global GEN_OPTS
-    GEN_OPTS = settings
-
-    show_wip_items.set(GEN_OPTS.get_bool(
-        'General',
-        'show_wip_items',
-        False
-        ))
-
-    muted.set(GEN_OPTS.get_bool(
-        'General',
-        'mute_sounds',
-        False,
-        ))
-    set_mute()
     try:
         selectedPalette_radio.set(int(GEN_OPTS['Last_Selected']['palette']))
     except (KeyError, ValueError):
         pass  # It'll be set to the first palette by default, and then saved
     GEN_OPTS.has_changed = False
+
+    optionWindow.load()
 
 
 def load_packages(data):
@@ -604,6 +582,52 @@ def load_packages(data):
         sel_win.sel_item_id(
             GEN_OPTS.get_val('Last_Selected', opt_name, default)
         )
+
+def reposition_panes():
+    """Position all the panes in the default places around the main window."""
+    comp_win = CompilerPane.window
+    style_win = StyleVarPane.window
+    opt_win = windows['opt']
+    pal_win = windows['pal']
+    # The x-pos of the right side of the main window
+    xpos = min(
+        TK_ROOT.winfo_screenwidth()
+        - style_win.winfo_reqwidth(),
+
+        TK_ROOT.winfo_rootx()
+        + TK_ROOT.winfo_reqwidth()
+        + 25
+        )
+    # The x-pos for the palette and compiler panes
+    pal_x = TK_ROOT.winfo_rootx() - comp_win.winfo_reqwidth() - 25
+    pal_win.move(
+        x=pal_x,
+        y=(TK_ROOT.winfo_rooty() - 50),
+        height=(
+            TK_ROOT.winfo_reqheight() -
+            comp_win.winfo_reqheight() -
+            25
+        ),
+        width=comp_win.winfo_reqwidth(),
+    )
+    comp_win.move(
+        x=pal_x,
+        y=pal_win.winfo_rooty() + pal_win.winfo_reqheight(),
+    )
+    opt_win.move(
+        x=xpos,
+        y=TK_ROOT.winfo_rooty()-40,
+        width=style_win.winfo_reqwidth())
+    style_win.move(
+        x=xpos,
+        y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
+
+def reset_panes():
+    reposition_panes()
+    windows['pal'].save_conf()
+    windows['opt'].save_conf()
+    StyleVarPane.window.save_conf()
+    CompilerPane.window.save_conf()
 
 
 def suggested_refresh():
@@ -970,7 +994,7 @@ def update_filters():
         if no_alt:  # no alternate if they are all the same
             FilterBoxes_all[cat].state(['!alternate'])
             FilterVars_all[cat].set(value)
-    show_wip = show_wip_items.get()
+    show_wip = optionWindow.SHOW_WIP.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
     for item in pal_items:
         item.visible = (
@@ -1450,6 +1474,10 @@ def init_menu_bar(win):
         )
     file_menu.add_separator()
     file_menu.add_command(
+        label="Options",
+        command=optionWindow.show,
+    )
+    file_menu.add_command(
         label="Quit",
         command=quit_application,
         )
@@ -1486,19 +1514,6 @@ def init_menu_bar(win):
 
     win.bind_all('<Control-s>', pal_save)
     win.bind_all('<Control-Shift-s>', pal_save_as)
-
-    menus['tools'] = Menu(bar)
-    bar.add_cascade(menu=menus['tools'], label='Options')
-    if snd.initiallised:
-        menus['tools'].add_checkbutton(
-            label="Mute Sounds",
-            variable=muted,
-            command=set_mute,
-            )
-    menus['tools'].add_checkbutton(
-        label='Show Work In Progress Items',
-        variable=show_wip_items,
-        )
 
     menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
     bar.add_cascade(menu=menus['help'], label='Help')
@@ -1668,8 +1683,11 @@ def init_windows():
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
+    optionWindow.init_widgets()
     init_drag_icon()
     loader.step('UI')
+
+    optionWindow.reset_all_win = reposition_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
 
@@ -1709,28 +1727,10 @@ def init_windows():
         TK_ROOT.geometry('+' + str(start_x) + '+' + str(start_y))
     TK_ROOT.update_idletasks()
 
-    # Default positions for sub-panes
-    xpos = min(
-        TK_ROOT.winfo_screenwidth()
-        - StyleVarPane.window.winfo_reqwidth(),
-
-        TK_ROOT.winfo_rootx()
-        + TK_ROOT.winfo_reqwidth()
-        + 25
-        )
-    windows['pal'].move(
-        x=(TK_ROOT.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
-        y=(TK_ROOT.winfo_rooty() - 50),
-        height=TK_ROOT.winfo_reqheight() + 25)
-    windows['opt'].move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty()-40,
-        width=StyleVarPane.window.winfo_reqwidth())
-    StyleVarPane.window.move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
-
-    # Load from config file
+    # First move to default positions, then load the config.
+    # If the config is valid, this will move them to user-defined
+    # positions.
+    reposition_panes()
     StyleVarPane.window.load_conf()
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
@@ -1768,5 +1768,3 @@ def init_windows():
     style_select_callback(style_win.chosen_id)
 
     set_palette()
-
-event_loop = TK_ROOT.mainloop

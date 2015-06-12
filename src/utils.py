@@ -114,9 +114,11 @@ def conv_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
-
+DISABLE_ADJUST = False
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     """Adjust a window position to ensure it fits inside the screen."""
+    if DISABLE_ADJUST:  # Allow disabling this adjustment
+        return x, y     # for multi-window setups
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
     max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
 

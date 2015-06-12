@@ -30,6 +30,7 @@ DEFAULT_SETTINGS = {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
         'mute_sounds': '0',
+        'show_wip_items': '0',
     },
     'Debug': {
         # Show execptions in dialog box when crash occurs
@@ -48,7 +49,7 @@ show_errors = False
 
 try:
 
-    UI.load_settings(GEN_OPTS)
+    UI.load_settings()
 
     show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
@@ -91,7 +92,7 @@ try:
     print('Done!')
 
     loadScreen.main_loader.destroy()
-    UI.event_loop()
+    TK_ROOT.mainloop()
 
 except Exception as e:
     # Grab Python's traceback, and record it.
