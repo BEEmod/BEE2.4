@@ -433,12 +433,8 @@ class selWin:
         self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
 
-        x, y = utils.adjust_inside_screen(
-            self.parent.winfo_rootx()+30,
-            self.parent.winfo_rooty()+30,
-            self.win,
-        )
-        self.win.geometry('+{!s}+{!s}'.format(x, y))
+        utils.center_win(self.win, parent=self.parent)
+
         self.flow_items()
         self.sel_item(self.selected)
 

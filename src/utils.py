@@ -132,12 +132,16 @@ def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     return x, y
 
 
-def center_win(window):
+def center_win(window, parent=None):
     """Center a subwindow to be inside a parent window."""
-    parent = window.nametowidget(window.winfo_parent())
+    if parent is None:
+        parent = window.nametowidget(window.winfo_parent())
 
-    x = parent.winfo_rootx() + window.winfo_width()//2
-    y = parent.winfo_rooty() + window.winfo_height()//2
+    x = parent.winfo_rootx() + (parent.winfo_width()-window.winfo_width())//2
+    y = parent.winfo_rooty() + (parent.winfo_height()-window.winfo_height())//2
+
+    x, y = adjust_inside_screen(x, y, window)
+
     window.geometry('+' + str(x) + '+' + str(y))
 
 
