@@ -172,7 +172,10 @@ def refresh(e=None):
     is_coop = coop_selected
 
     # Save the current tab index so we can restore it after.
-    current_tab = notebook.index(notebook.select())
+    try:
+        current_tab = notebook.index(notebook.select())
+    except TclError:  # .index() will fail if the voice is empty,
+        current_tab = None  # in that case abandon remembering the tab.
 
     # Add or remove tabs so only the correct mode is visible.
     for name, tab in sorted(TABS_SP.items()):
@@ -205,7 +208,9 @@ def refresh(e=None):
 
         else:
             notebook.forget(tab)
-    notebook.select(current_tab)
+
+    if current_tab is not None:
+        notebook.select(current_tab)
 
 def show(quote_pack):
     """Display the editing window."""
@@ -222,6 +227,12 @@ def show(quote_pack):
     config_coop = ConfigFile('voice/COOP_' + quote_pack.id + '.cfg')
     config_mid_sp = ConfigFile('voice/MID_SP_' + quote_pack.id + '.cfg')
     config_mid_coop = ConfigFile('voice/MID_COOP_' + quote_pack.id + '.cfg')
+
+    # Clear the transcript textbox
+    text = UI['trans']
+    text['state'] = 'normal'
+    text.delete(1.0, END)
+    text['state'] = 'disabled'
 
     # Destroy all the old tabs
     for tab in itertools.chain(
@@ -402,7 +413,7 @@ if __name__ == '__main__':
     lab = ttk.Label(TK_ROOT, text='Root Window')
     lab.bind('<Button-1>', lambda e: show(d['BEE2_CAVE_50s']))
     lab.grid()
-    init(TK_ROOT)
+    init_widgets()
     d = {quote.id: quote for quote in data['QuotePack']}
     print(d)
     show(d['BEE2_GLADOS_CLEAN'])
