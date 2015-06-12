@@ -94,7 +94,7 @@ try:
     UI.event_loop()
 
 except Exception as e:
-    # Grab Python's traceback, and record it
+    # Grab Python's traceback, and record it.
     # This way we have a log.
     loadScreen.main_loader.destroy()
 
@@ -105,7 +105,6 @@ except Exception as e:
             title='BEE2 Error!',
             message=str(e).strip('".')+'!',
             icon=messagebox.ERROR,
-            parent=TK_ROOT,
             )
 
     # Weekday Date Month Year HH:MM:SS AM/PM
