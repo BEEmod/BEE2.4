@@ -34,8 +34,12 @@ DIRECTIONS = {
     '+z': zp,
     '-z': zn,
 
+    'x': xp, # For with allow_inverse
+    'y': yp,
+    'z': zp,
+
     'up': zp,
-    'dn': zp,
+    'dn': zn,
     'down': zn,
     'floor': zp,
     'ceiling': zn,
@@ -50,6 +54,8 @@ DIRECTIONS = {
     'east': xp,
     'w': xn,
     'west': xn,
+
+    'wall': 'WALL', # Special case, not wall/ceiling
 }
 
 INST_ANGLE = {
@@ -155,7 +161,6 @@ class Condition:
             if not check_flag(flag, inst):
                 success = False
                 break
-            utils.con_log(success)
         results = self.results if success else self.else_results
         for res in results[:]:
             try:
@@ -230,17 +235,19 @@ def meta_cond(priority=0, only_once=True):
         return func
     return x
 
-def make_flag(name):
+def make_flag(*names):
     """Decorator to add flags to the lookup."""
     def x(func):
-        FLAG_LOOKUP[name.casefold()] = func
+        for name in names:
+            FLAG_LOOKUP[name.casefold()] = func
         return func
     return x
 
-def make_result(name):
+def make_result(*names):
     """Decorator to add results to the lookup."""
     def x(func):
-        RESULT_LOOKUP[name.casefold()] = func
+        for name in names:
+            RESULT_LOOKUP[name.casefold()] = func
         return func
     return x
 
@@ -368,9 +375,29 @@ def add_suffix(inst, suff):
     """Append the given suffix to the instance.
     """
     file = inst['file']
-    utils.con_log(file)
     old_name, dot, ext = file.partition('.')
     inst['file'] = ''.join((old_name, suff, dot, ext))
+
+@make_flag('debug')
+def debug_flag(inst, props):
+    if props.has_children():
+        utils.con_log('Debug:')
+        utils.con_log(str(props))
+        utils.con_log(str(inst))
+    elif props.value.endswith('='):
+        utils.con_log('Debug: {props}{inst!s}'.format(
+            inst=inst,
+            props=props.value,
+        ))
+    else:
+        utils.con_log('Debug: ' + props.value)
+    return True # The flag is always true
+
+@make_result('debug')
+def debug_result(inst, props):
+    # Swallow the return value, so the flag isn't deleted
+    debug_flag(inst, props)
+
 
 #########
 # FLAGS #
@@ -463,22 +490,67 @@ def flag_option(_, flag):
 
 @make_flag('ifMode')
 def flag_game_mode(_, flag):
-    from vbsp import GAME_MODE
-    return GAME_MODE.casefold() == flag.value.casefold()
+    import vbsp
+    return vbsp.GAME_MODE.casefold() == flag.value.casefold()
 
 
 @make_flag('ifPreview')
 def flag_is_preview(_, flag):
-    from vbsp import IS_PREVIEW
-    return IS_PREVIEW == utils.conv_bool(flag, False)
+    import vbsp
+    return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
+
+@make_flag(
+    'rotation',
+    'angle',
+    'angles',
+    'orient',
+    'orientation',
+    'dir',
+    'direction',
+)
+def flag_angles(inst, flag):
+    """Check that a instance is pointed in a direction."""
+    angle = inst['angles', '0 0 0']
+
+    if flag.has_children():
+        targ_angle = flag['direction', '0 0 0']
+        from_dir = flag['from_dir', '0 0 1']
+        if from_dir.casefold() in DIRECTIONS:
+            from_dir = Vec(DIRECTIONS[from_dir.casefold()])
+        else:
+            from_dir = Vec.from_str(from_dir, 0, 0, 1)
+        allow_inverse = utils.conv_bool(flag['allow_inverse', '0'])
+    else:
+        targ_angle = flag.value
+        from_dir = Vec(0, 0, 1)
+        allow_inverse = False
+
+    if angle == targ_angle:
+        return True  # Check for exact match
+
+    normal = DIRECTIONS.get(targ_angle.casefold(), None)
+    if normal is None:
+        return False  # If it's not a special angle,
+        # so it failed the exact match
+
+    angle = Vec.from_str(angle, 0, 0, 0)
+    inst_normal = round(
+        from_dir.rotate(angle.x, angle.y, angle.z)
+    )
+    if normal == 'WALL':
+        # Special case - it's not on the floor or ceiling
+        return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
+    else:
+        return inst_normal == normal or (
+            allow_inverse and -inst_normal == normal
+        )
 
 ###########
 # RESULTS #
 ###########
 
 
-@make_result('rename')
-@make_result('changeInstance')
+@make_result('rename', 'changeInstance')
 def res_change_instance(inst, res):
     """Set the file to a value."""
     inst['file'] = resolve_inst(res.value)[0]
@@ -516,8 +588,7 @@ def res_set_option(_, res):
     return True  # Remove this result
 
 
-@make_result('instVar')
-@make_result('instVarSuffix')
+@make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
 
@@ -968,7 +1039,6 @@ def res_fizzler_pair(begin_inst, res):
     # We round it to get rid of 0.00001 inprecision from the calculations.
     direction = round(Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z))
     ':type direction: utils.Vec'
-    print(end_name, direction)
 
     begin_pos = Vec.from_str(begin_inst['origin'])
     axis_1, axis_2, main_axis = PAIR_AXES[direction.as_tuple()]
@@ -1003,8 +1073,7 @@ def res_fizzler_pair(begin_inst, res):
             )
 
 
-@make_result('clearOutputs')
-@make_result('clearOutput')
+@make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
     inst.outputs.clear()

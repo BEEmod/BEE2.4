@@ -16,6 +16,12 @@ SPECIAL_INST = {
     'glass_right_straight':      '<ITEM_BARRIER:6>',
     'glass_right_short':         '<ITEM_BARRIER:7>',
     'glass_right_convex_corner': '<ITEM_BARRIER:8>',
+    'glass_frames':              '<ITEM_BARRIER:1,2,3,4,5,6,7,8>',
+
+    'glass_corner':         '<ITEM_BARRIER:1,5>',
+    'glass_straight':       '<ITEM_BARRIER:2,6>',
+    'glass_short':          '<ITEM_BARRIER:3,7>',
+    'glass_convex_corner':  '<ITEM_BARRIER:4,8>',
 
     'coopExit':    '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':   '<ITEM_COOP_ENTRY_DOOR:0>',
@@ -107,10 +113,12 @@ def load_conf():
         INST_SPECIAL['indpantimer']
     )
     INST_SPECIAL['white_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:7>') + resolve('<ITEM_EXIT_DOOR:4>')
+        resolve('<ITEM_ENTRY_DOOR:7>') +
+        resolve('<ITEM_EXIT_DOOR:4>')
     )
     INST_SPECIAL['black_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:8>') + resolve('<ITEM_EXIT_DOOR:5>')
+        resolve('<ITEM_ENTRY_DOOR:8>') +
+        resolve('<ITEM_EXIT_DOOR:5>')
     )
 
 @lru_cache()
