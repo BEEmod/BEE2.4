@@ -274,7 +274,8 @@ class Item:
         return (
             new_editor,
             self.data['editor_extra'],
-            self.data['vbsp'] + self.item.all_conf,
+            # Add all_conf first so it's conditions run first by default
+            self.item.all_conf + self.data['vbsp'],
         )
 
 
