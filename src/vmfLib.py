@@ -169,6 +169,9 @@ class VMF:
         self.by_class[item['classname', None]].remove(item)
         self.by_target[item['targetname', None]].remove(item)
 
+        if item.id in self.ent_id:
+            self.ent_id.remove(item.id)
+
     def add_brushes(self, item):
         for i in item:
             self.add_brush(i)
@@ -1137,9 +1140,7 @@ class Entity:
 
     def remove(self):
         """Remove this entity from the map."""
-        self.map.entities.remove(self)
-        if self.id in self.map.ent_id:
-            self.map.ent_id.remove(self.id)
+        self.map.remove_ent(self)
 
     def make_unique(self):
         """Append our entity ID to the targetname, so it is uniquely-named.
@@ -1402,6 +1403,7 @@ class Output:
         self.times = times
         self.sep = ',' if comma_sep else chr(27)
 
+
     @staticmethod
     def parse(prop):
         """Convert the VMF Property into an Output object."""
@@ -1413,12 +1415,12 @@ class Output:
             vals = prop.value.split(',')
         if len(vals) == 5:
             if prop.name.startswith('instance:'):
-                out = prop.name.split(';')
+                out = prop.real_name.split(';')
                 inst_out = out[0][9:]
                 out = out[1]
             else:
                 inst_out = None
-                out = prop.name
+                out = prop.real_name
 
             if vals[1].startswith('instance:'):
                 inp = vals[1].split(';')
@@ -1450,6 +1452,17 @@ class Output:
             return 'instance:' + self.inst_in + ';' + self.input
         else:
             return self.input
+
+    def __repr__(self):
+        return (
+            '{cls}({s.output}, {s.target}, {s.input}, {s.params!r}'
+            '{s.delay!r}, {s.times!r}, {s.inst_out!r}, {s.inst_in!r},'
+            ' {comma})'.format(
+                s=self,
+                cls=self.__class__.__name__,
+                comma=(self.sep == ','),
+            )
+        )
 
     def __str__(self):
         """Generate a user-friendly representation of this output."""
