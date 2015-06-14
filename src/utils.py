@@ -29,8 +29,8 @@ class CONN_TYPES(Enum):
     triple = 4  # Points N-S-W
     all = 5  # Points N-S-E-W
 
-N = "0 270 0"
-S = "0 90 0"
+N = "0 90 0"
+S = "0 270 0"
 E = "0 0 0"
 W = "0 180 0"
 # Lookup values for joining things together.
