@@ -63,12 +63,14 @@ DIRECTIONS = {
 INST_ANGLE = {
     # The angles needed to point a PeTI instance in this direction
     # IE up = zp = floor
-    xp: '90 0 0',
-    xn: '-90 180 0',
-    yp: '90 -90 0',
-    yn: '90 90 0',
-    zp: '0 0 0',
-    zn: '180 0 0',
+    zp: "0 0 0",
+    zn: "0 0 0",
+
+    xn: "0 0 0",
+    yp: "0 90 0",
+    xp: "0 180 0",
+    yn: "0 270 0"
+
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -1095,6 +1097,17 @@ def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
     del inst.fixup['res']
 
+
+CATWALK_TYPES = {
+    utils.CONN_TYPES.straight: 'straight_128',
+    utils.CONN_TYPES.corner: 'corner',
+    utils.CONN_TYPES.all: 'crossjunction',
+    utils.CONN_TYPES.side: 'end',
+    utils.CONN_TYPES.triple: 'tjunction',
+    utils.CONN_TYPES.none: 'NONE',
+}
+
+
 @make_result('makeCatwalk')
 def res_make_catwalk(_, res):
     """Speciallised result to generate catwalks from markers.
@@ -1111,9 +1124,10 @@ def res_make_catwalk(_, res):
         (
             'straight_128', 'straight_256', 'straight_512',
             'corner', 'tjunction', 'crossjunction', 'end', 'stair',
-            'support_wall', 'support_ceil', 'support_floor',
+            'support_wall', 'support_ceil', 'support_floor', 'markerInst',
         )
     }
+    instances['NONE'] = '' # If there are no attachments
 
     connections = {}  # The directions this instance is connected by (NSEW)
     markers = {}
@@ -1122,7 +1136,8 @@ def res_make_catwalk(_, res):
         if inst['file'].casefold() not in marker:
             continue
         loc = Vec.from_str(inst['origin'])
-        connections[loc.as_tuple()] = [0, 0, 0, 0]
+        #                             [North, South, East,  West ]
+        connections[inst] = [False, False, False, False]
         markers[inst['targetname']] = inst
 
     if not markers:
@@ -1131,6 +1146,7 @@ def res_make_catwalk(_, res):
     utils.con_log('Conn:', connections)
     utils.con_log('Markers:', markers)
 
+    # First loop through all the markers, adding connecting sections
     for inst in markers.values():
         for conn in inst.outputs:
             if conn.output != output_target or conn.input != output_target:
@@ -1142,18 +1158,18 @@ def res_make_catwalk(_, res):
 
             inst2 = markers[conn.target]
             print(inst['targetname'], '<->', inst2['targetname'])
-            origin = Vec.from_str(inst['origin'])
+            origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
-            if origin.x != origin2.x and origin.y != origin2.y:
+            if origin1.x != origin2.x and origin1.y != origin2.y:
                 utils.con_log('Instances not aligned!')
                 continue
 
-            y_dir = origin.x == origin2.x # Which way the connection is
+            y_dir = origin1.x == origin2.x  # Which way the connection is
             if y_dir:
-                dist = abs(origin.y - origin2.y)
+                dist = abs(origin1.y - origin2.y)
             else:
-                dist = abs(origin.x - origin2.x)
-            vert_dist = origin.z - origin2.z
+                dist = abs(origin1.x - origin2.x)
+            vert_dist = origin1.z - origin2.z
 
             utils.con_log('Dist =', dist, ', Vert =', vert_dist)
 
@@ -1164,12 +1180,12 @@ def res_make_catwalk(_, res):
 
             if dist >= 128:
                 # add straight sections in between
-                x, y, z = str(origin.x), str(origin.y), str(origin.z)
+                x, y, z = str(origin1.x), str(origin1.y), str(origin1.z)
                 if y_dir:
                     for y in range(
                             # + 128 to skip the first location
-                            min(int(origin.y), int(origin2.y)) + 128,
-                            max(int(origin.y), int(origin2.y)),
+                            min(int(origin1.y), int(origin2.y)) + 128,
+                            max(int(origin1.y), int(origin2.y)),
                             128):
                         VMF.create_ent(
                             classname='func_instance',
@@ -1179,8 +1195,8 @@ def res_make_catwalk(_, res):
                         )
                 else:
                     for x in range(
-                            min(int(origin.x), int(origin2.x)) + 128,
-                            max(int(origin.x), int(origin2.x)),
+                            min(int(origin1.x), int(origin2.x)) + 128,
+                            max(int(origin1.x), int(origin2.x)),
                             128):
                         VMF.create_ent(
                             classname='func_instance',
@@ -1189,6 +1205,48 @@ def res_make_catwalk(_, res):
                             file=instances['straight_128'],
                         )
 
+            # Update the lists based on the directions that were set
+            conn_lst1 = connections[inst]
+            conn_lst2 = connections[inst2]
+            if origin1.x < origin2.x:
+                conn_lst1[2] = True  # E
+                conn_lst2[3] = True  # W
+            elif origin2.x < origin1.x:
+                conn_lst1[3] = True  # W
+                conn_lst2[2] = True  # E
+
+            if origin1.y < origin2.y:
+                conn_lst1[0] = True  # N
+                conn_lst2[1] = True  # S
+            elif origin2.y < origin1.y:
+                conn_lst1[1] = True  # S
+                conn_lst2[0] = True  # N
+
+    for inst, dir_mask in connections.items():
+        # Set the marker instances based on the attached walkways.
+        print(inst['targetname'], dir_mask)
+        angle = Vec.from_str(inst['angles'], 0, 0, 0)
+        new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
+        inst['file'] = instances[CATWALK_TYPES[new_type]]
+
+        if new_type is utils.CONN_TYPES.side:
+            continue  # End pieces don't get supports
+
+        normal = round(Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z))
+        if normal == (0, 0, 1):
+            supp = instances['support_floor']
+        elif normal == (0, 0, -1):
+            supp = instances['support_ceil']
+        else:
+            supp = instances['support_wall']
+
+        if supp:
+            VMF.create_ent(
+                classname='func_instance',
+                origin=inst['origin'],
+                angles=INST_ANGLE[normal.as_tuple()],
+                file=supp,
+            )
 
 
     utils.con_log('Finished catwalk generation!')
