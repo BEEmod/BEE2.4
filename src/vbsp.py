@@ -146,8 +146,8 @@ DEFAULTS = {
     "signInst":                 "NONE",  # adds this instance on all the signs.
 
     # If set, use these as the glass/grating 128x128 instances
-    "glassInst":                "NONE",
-    "gratingInst":              "NONE",
+    "glass_inst":                "NONE",
+    "grating_inst":              "NONE",
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_size":               "4",  # The maximum length of a clump
@@ -639,7 +639,7 @@ def change_goo_sides():
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
-    glass_inst = get_opt('glassInst')
+    glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
 
@@ -661,7 +661,7 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
-
+    print('Glass inst', glass_inst)
     if glass_inst == "NONE":
         glass_inst = None
 
@@ -715,7 +715,7 @@ def find_glass_inst(origin):
     loc_str = loc.join(' ')
     gls_file = instanceLocs.resolve('[glass_128]')
     for inst in VMF.by_class['func_instance']:
-        if inst['origin', ''] == loc_str and inst['file', ''] in gls_file:
+        if inst['origin', ''] == loc_str and inst['file', ''].casefold() in gls_file:
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
             inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
@@ -1065,7 +1065,7 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
-    grating_inst = get_opt("gratingInst")
+    grating_inst = get_opt("grating_inst")
     grating_scale = get_opt("grating_scale")
 
     if grating_inst == "NONE":
