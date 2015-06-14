@@ -1,7 +1,13 @@
 import math
 import string
 import collections.abc as abc
-from collections import namedtuple
+from collections import namedtuple, deque
+from sys import platform
+from enum import Enum
+
+WIN = platform.startswith('win')
+MAC = platform.startswith('darwin')
+LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
 
@@ -13,6 +19,48 @@ BOOL_LOOKUP = {
     'yes': True,
     'no': False,
 }
+
+
+class CONN_TYPES(Enum):
+    none = 0
+    side = 1  # Points E
+    straight = 2  # Points E-W
+    corner = 3  # Points N-W
+    triple = 4  # Points N-S-W
+    all = 5  # Points N-S-E-W
+
+N = "0 270 0"
+S = "0 90 0"
+E = "0 0 0"
+W = "0 180 0"
+# Lookup values for joining things together.
+CONN_LOOKUP = {
+    # N S  E  W : (Type, Rotation)
+    (1, 0, 0, 0): (CONN_TYPES.side, N),
+    (0, 1, 0, 0): (CONN_TYPES.side, S),
+    (0, 0, 1, 0): (CONN_TYPES.side, E),
+    (0, 0, 0, 1): (CONN_TYPES.side, W),
+
+    (1, 1, 0, 0): (CONN_TYPES.straight, S),
+    (0, 0, 1, 1): (CONN_TYPES.straight, E),
+
+    (0, 1, 0, 1): (CONN_TYPES.corner, N),
+    (1, 0, 1, 0): (CONN_TYPES.corner, S),
+    (1, 0, 0, 1): (CONN_TYPES.corner, E),
+    (0, 1, 1, 0): (CONN_TYPES.corner, W),
+
+    (0, 1, 1, 1): (CONN_TYPES.triple, N),
+    (1, 0, 1, 1): (CONN_TYPES.triple, S),
+    (1, 1, 0, 1): (CONN_TYPES.triple, E),
+    (1, 1, 1, 0): (CONN_TYPES.triple, W),
+
+    (1, 1, 1, 1): (CONN_TYPES.all, E),
+
+    (0, 0, 0, 0): (CONN_TYPES.none, E),
+}
+
+del N, S, E, W
+
 
 def clean_line(line: str):
     """Removes extra spaces and comments from the input."""
@@ -145,6 +193,32 @@ def center_win(window, parent=None):
     x, y = adjust_inside_screen(x, y, window)
 
     window.geometry('+' + str(x) + '+' + str(y))
+
+
+def append_bothsides(deq):
+    """Alternately add to each side of a deque."""
+    while True:
+        deq.append((yield))
+        deq.appendleft((yield))
+
+def fit(dist, obj):
+    """Figure out the smallest number of parts to stretch the distance."""
+    smallest = obj[-1]
+    items = deque()
+
+    # We use this so the small sections appear on both sides of the area.
+    adder = append_bothsides(items)
+    next(adder)
+
+    while dist >= smallest:
+        for item in obj:
+            if item <= dist:
+                adder.send(item)
+                dist -= item
+                break
+    if dist > 0:
+        adder.send(dist)
+    return list(items) # Dump the deque
 
 
 class EmptyMapping(abc.Mapping):

@@ -1,5 +1,7 @@
 # coding: utf-8
+from collections import defaultdict
 import random
+import itertools
 
 from utils import Vec
 from property_parser import Property
@@ -289,6 +291,7 @@ def check_all():
                     # this condition, and skip to the next condtion.
                     break
                 if not condition.results and not condition.else_results:
+                    utils.con_log('Exiting empty condition!')
                     break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
@@ -398,6 +401,16 @@ def debug_result(inst, props):
     # Swallow the return value, so the flag isn't deleted
     debug_flag(inst, props)
 
+@meta_cond(priority=1000, only_once=False)
+def remove_blank_inst(inst):
+    """Remove instances with blank file attr.
+
+    This allows conditions to strip the instances when requested.
+    """
+    # If editoritems instances are set to "", PeTI will autocorrect it to
+    # ".vmf" - we need to handle that too.
+    if inst['file', ''] in ('', '.vmf'):
+        VMF.remove_ent(inst)
 
 #########
 # FLAGS #
@@ -1072,7 +1085,6 @@ def res_fizzler_pair(begin_inst, res):
                 origin=new_pos.join(' '),
             )
 
-
 @make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
@@ -1083,13 +1095,101 @@ def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
     del inst.fixup['res']
 
-@meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst):
-    """Remove instances with blank file attr.
+@make_result('makeCatwalk')
+def res_make_catwalk(_, res):
+    """Speciallised result to generate catwalks from markers.
 
-    This allows conditions to strip the instances when requested.
+    Only runs once, and then quits the condition list.
     """
-    # If editoritems instances are set to "", PeTI will autocorrect it to
-    # ".vmf" - we need to handle that too.
-    if inst['file', ''] in ('', '.vmf'):
-        VMF.remove_ent(inst)
+    utils.con_log("Starting catwalk generator...")
+    marker = resolve_inst(res['markerInst'])
+    output_target = res['output_name', 'MARKER']
+
+    instances = {
+        name: resolve_inst(res[name, ''])[0]
+        for name in
+        (
+            'straight_128', 'straight_256', 'straight_512',
+            'corner', 'tjunction', 'crossjunction', 'end', 'stair',
+            'support_wall', 'support_ceil', 'support_floor',
+        )
+    }
+
+    connections = {}  # The directions this instance is connected by (NSEW)
+    markers = {}
+
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in marker:
+            continue
+        loc = Vec.from_str(inst['origin'])
+        connections[loc.as_tuple()] = [0, 0, 0, 0]
+        markers[inst['targetname']] = inst
+
+    if not markers:
+        return True  # No catwalks!
+
+    utils.con_log('Conn:', connections)
+    utils.con_log('Markers:', markers)
+
+    for inst in markers.values():
+        for conn in inst.outputs:
+            if conn.output != output_target or conn.input != output_target:
+                # Indicator toggles or similar, delete these
+                print('Removing ', conn.target)
+                for del_inst in VMF.by_target[conn.target]:
+                    del_inst.remove()
+                continue
+
+            inst2 = markers[conn.target]
+            print(inst['targetname'], '<->', inst2['targetname'])
+            origin = Vec.from_str(inst['origin'])
+            origin2 = Vec.from_str(inst2['origin'])
+            if origin.x != origin2.x and origin.y != origin2.y:
+                utils.con_log('Instances not aligned!')
+                continue
+
+            y_dir = origin.x == origin2.x # Which way the connection is
+            if y_dir:
+                dist = abs(origin.y - origin2.y)
+            else:
+                dist = abs(origin.x - origin2.x)
+            vert_dist = origin.z - origin2.z
+
+            utils.con_log('Dist =', dist, ', Vert =', vert_dist)
+
+            if dist//2 < vert_dist:
+                # The stairs are 2 long, 1 high.
+                utils.con_log('Not enough room for stairs!')
+                continue
+
+            if dist >= 128:
+                # add straight sections in between
+                x, y, z = str(origin.x), str(origin.y), str(origin.z)
+                if y_dir:
+                    for y in range(
+                            # + 128 to skip the first location
+                            min(int(origin.y), int(origin2.y)) + 128,
+                            max(int(origin.y), int(origin2.y)),
+                            128):
+                        VMF.create_ent(
+                            classname='func_instance',
+                            origin=(x + ' ' + str(y) + ' ' + z),
+                            angles='0 90 0',
+                            file=instances['straight_128'],
+                        )
+                else:
+                    for x in range(
+                            min(int(origin.x), int(origin2.x)) + 128,
+                            max(int(origin.x), int(origin2.x)),
+                            128):
+                        VMF.create_ent(
+                            classname='func_instance',
+                            origin=(str(x) + ' ' + y + ' ' + z),
+                            angles='0 0 0',
+                            file=instances['straight_128'],
+                        )
+
+
+
+    utils.con_log('Finished catwalk generation!')
+    return True  # Don't run this again
