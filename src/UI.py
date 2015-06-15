@@ -407,6 +407,7 @@ def quit_application():
     # Destroy the TK windows
     TK_ROOT.destroy()
     exit(0)
+gameMan.quit_app = quit_application
 
 def load_palette(data):
     """Import in all defined palettes."""

@@ -53,9 +53,7 @@ try:
 
     show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
-    # If we have no games, gameMan will quit the app entirely.
-    gameMan.load(UI.quit_application, loadScreen.main_loader)
-
+    gameMan.load()
     gameMan.set_game_by_name(
         GEN_OPTS.get_val('Last_Selected', 'Game', ''),
         )
