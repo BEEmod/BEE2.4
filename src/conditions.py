@@ -1,7 +1,6 @@
 # coding: utf-8
-from collections import defaultdict
+from decimal import Decimal
 import random
-import itertools
 
 from utils import Vec
 from property_parser import Property
@@ -18,6 +17,7 @@ ALL_INST = set()
 conditions = []
 FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
+RESULT_SETUP = {}
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -57,7 +57,7 @@ DIRECTIONS = {
     'w': xn,
     'west': xn,
 
-    'wall': 'WALL', # Special case, not wall/ceiling
+    'wall': 'WALL',  # Special case, not wall/ceiling
 }
 
 INST_ANGLE = {
@@ -87,7 +87,13 @@ class EndCondition(Exception):
 class Condition:
     __slots__ = ['flags', 'results', 'else_results', 'priority']
 
-    def __init__(self, flags=None, results=None, else_results=None, priority=0):
+    def __init__(
+            self,
+            flags=None,
+            results=None,
+            else_results=None,
+            priority=Decimal('0'),
+    ):
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
@@ -112,14 +118,17 @@ class Condition:
         flags = []
         results = []
         else_results = []
-        priority = 0
+        priority = Decimal('0')
         for prop in prop_block:
             if prop.name == 'result':
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
             elif prop.name == 'priority':
-                priority = utils.conv_int(prop.value, priority)
+                try:
+                    priority = Decimal(prop.value)
+                except ArithmeticError:
+                    pass
             else:
                 flags.append(prop)
 
@@ -135,28 +144,12 @@ class Condition:
 
         """
         for res in self.results[:]:
-            if res.name == 'variant':
-                res.value = variant_weight(res)
-            elif res.name == 'custantline':
-                result = {
-                    'instance': res.find_key('instance', '').value,
-                    'antline': [p.value for p in res.find_all('straight')],
-                    'antlinecorner': [p.value for p in res.find_all('corner')],
-                    'outputs': list(res.find_all('addOut'))
-                    }
-                if (
-                        len(result['antline']) == 0 or
-                        len(result['antlinecorner']) == 0
-                        ):
-                    self.results.remove(res)  # invalid
-                else:
-                    res.value = result
-            elif res.name == 'custoutput':
-                for sub_res in res:
-                    if sub_res.name == 'targcondition':
-                        sub_res.value = Condition.parse(sub_res)
-            elif res.name == 'condition':
-                res.value = Condition.parse(res)
+            func = RESULT_SETUP.get(res.name)
+            if func:
+                res.value = func(res)
+                if res.value is None:
+                    self.results.remove(res)
+
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -214,7 +207,10 @@ def add_meta(func, priority, only_once=True):
     # be entered into property files.
     # The qualname will be unique across modules.
     name = '"' + func.__qualname__ + '"'
-    print("Adding metacondition (" + name + ")!")
+    print("Adding metacondition ({}) with priority {!s}!".format(
+        name,
+        priority,
+    ))
 
     # Don't pass the prop_block onto the function,
     # it doesn't contain any useful data.
@@ -252,6 +248,14 @@ def make_result(*names):
     def x(func):
         for name in names:
             RESULT_LOOKUP[name.casefold()] = func
+        return func
+    return x
+
+def make_result_setup(*names):
+    """Decorator to do setup for this result."""
+    def x(func):
+        for name in names:
+            RESULT_SETUP[name.casefold()] = func
         return func
     return x
 
@@ -328,7 +332,7 @@ def check_flag(flag, inst):
         res = func(inst, flag)
         return res
 
-
+@make_result_setup('variant')
 def variant_weight(var):
     """Read variant commands from settings and create the weight list."""
     count = var['number', '']
@@ -690,6 +694,13 @@ def res_add_overlay_inst(inst, res):
     )
 
 
+@make_result_setup('custOutput')
+def res_cust_output_setup(res):
+    for sub_res in res:
+        if sub_res.name == 'targcondition':
+            sub_res.value = Condition.parse(sub_res)
+    return res.value
+
 @make_result('custOutput')
 def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
@@ -737,6 +748,21 @@ def res_cust_output(inst, res):
         for out in res.find_all('addOut'):
             add_output(inst, out, targ)
 
+@make_result_setup('custAntline')
+def res_cust_antline_setup(res):
+    result = {
+        'instance': res['instance', ''],
+        'antline': [p.value for p in res.find_all('straight')],
+        'antlinecorner': [p.value for p in res.find_all('corner')],
+        'outputs': list(res.find_all('addOut')),
+        }
+    if (
+            len(result['antline']) == 0 or
+            len(result['antlinecorner']) == 0
+            ):
+        return None # remove result
+    else:
+        return result
 
 @make_result('custAntline')
 def res_cust_antline(inst, res):
@@ -996,7 +1022,7 @@ def convert_to_laserfield(
             # heightwise it's always the same
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
 
-
+make_result_setup('condition')(Condition.parse)
 @make_result('condition')
 def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true."""
@@ -1251,3 +1277,40 @@ def res_make_catwalk(_, res):
 
     utils.con_log('Finished catwalk generation!')
     return True  # Don't run this again
+
+@make_result_setup('staticPiston')
+def make_static_pist_setup(res):
+    return {
+        name: resolve_inst(res[name, ''])[0]
+        for name in
+        (
+            'bottom_1', 'bottom_2', 'bottom_3',
+            'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        )
+    }
+
+@make_result('staticPiston')
+def make_static_pist(ent, res):
+    """Convert a regular piston into a static version.
+
+    This is done to save entities and improve lighting."""
+
+    bottom_pos = ent.fixup['bottom_level', '-1']
+
+    if (ent.fixup['connectioncount', '0'] != "0" or
+            ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
+        if int(bottom_pos) > 0:
+            # The piston doesn't go fully down, use alt instances.
+            val = res.value['bottom_' + bottom_pos]
+            if val:  # Only if defined
+                ent['file'] = val
+    else:  # we are static
+        val = res.value[
+            'static_' + (
+                ent.fixup['top_level', '1']
+                if utils.conv_bool(ent.fixup['start_up'], False)
+                else bottom_pos
+            )
+        ]
+        if val:
+            ent['file'] = val

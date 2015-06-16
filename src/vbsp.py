@@ -382,6 +382,113 @@ def add_voice(inst):
         mode=GAME_MODE,
         )
 
+@conditions.meta_cond(priority=-200, only_once=False)
+def fix_fizz_models(inst):
+    """Fix some bugs with fizzler model instances."""
+    # Fizzler model names end with this special string
+    if ("_modelStart" in inst['targetname', ''] or
+            "_modelEnd" in inst['targetname', '']):
+
+        # strip off the extra numbers on the end, so fizzler
+        # models recieve inputs correctly (Valve bug!)
+        if "_modelStart" in inst['targetname', '']:
+
+            inst['targetname'] = (
+                inst['targetname'].split("_modelStart")[0] +
+                "_modelStart"
+                )
+        else:
+            inst['targetname'] = (
+                inst['targetname'].split("_modelEnd")[0] +
+                "_modelEnd"
+                )
+
+        # one side of the fizzler models are rotated incorrectly
+        # (upsidown), fix that...
+        if inst['angles'] in FIZZLER_ANGLE_FIX:
+            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
+
+@conditions.meta_cond(priority=-100, only_once=False)
+def static_pan(inst):
+    if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
+        # white/black are found via the func_brush
+        make_static_pan(inst, "glass")
+
+@conditions.meta_cond(priority=200, only_once=True)
+def anti_fizz_bump(inst):
+    """Create portal_bumpers surrounding any fizzlers in the map.
+
+    This makes it more difficult to portal-bump through an active fizzler.
+    """
+    FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
+    # giving 32 in total: the width of a fizzler model.
+    if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
+        return True
+
+    ents = {}  # We use one entity per targetname, since more aren't needed.
+    utils.con_log('Adding Portal Bumpers to fizzlers...')
+    for cleanser in VMF.by_class['trigger_portal_cleanser']:
+        # Client bit flag = 1, triggers without it won't destroy portals
+        # - so don't add a bumper.
+        if int(cleanser['spawnflags']) & 1 != 1:
+            continue
+
+        fizz_name = cleanser['targetname']
+        if fizz_name.endswith('_brush'):
+            # Fizzlers will be changed to this in fix_func_brush()
+            fizz_name = fizz_name[:-6] + '-br_brush'
+
+        utils.con_log('name:', fizz_name)
+        if fizz_name not in ents:
+            bumper = ents[fizz_name] = VMF.create_ent(
+                classname='func_portal_bumper',
+                targetname=fizz_name,
+                origin=cleanser['origin'],
+                spawnflags='1',
+                # Start off, we can't really check if the original
+                # does, but that's usually handled by the instance anyway.
+            )
+        else:
+            bumper = ents[fizz_name]
+
+        bound_min, bound_max = cleanser.get_bbox()
+        origin = (bound_max + bound_min) / 2  # type: Vec
+        size = bound_max - bound_min
+        for axis in 'xyz':
+            # One of the directions will be thinner than 128, that's the fizzler
+            # direction.
+            if size[axis] < 128:
+                bound_max[axis] += FIZZ_OFF_WIDTH
+                bound_min[axis] -= FIZZ_OFF_WIDTH
+                break
+
+        # Copy one of the solids to use as a base, so the texture axes
+        # are correct.
+        new_solid = cleanser.solids[1].copy()
+        bumper.solids.append(new_solid)
+
+        for face in new_solid:
+            face.mat = 'tools/toolsinvisible'
+            # For every coordinate, set to the maximum if it's larger than the
+            # origin. This will expand the two sides.
+            for v in face.planes:
+                for axis in 'xyz':
+                    if v[axis] > origin[axis]:
+                        v[axis] = bound_max[axis]
+                    else:
+                        v[axis] = bound_min[axis]
+
+    for ent in ents.values():
+        if ent.is_brush():
+            noportal = ent.copy()
+            # Add a noportal_volume as well, of the same size.
+            noportal['classname'] = 'func_noportal_volume'
+            VMF.add_ent(noportal)
+        else:
+            ent.remove()  # Remove any entities without brushes
+
+
+    utils.con_log('Done!')
 
 def get_map_info():
     """Determine various attributes about the map.
@@ -1167,35 +1274,6 @@ def make_static_pan(ent, pan_type):
     return True
 
 
-def make_static_pist(ent):
-    """Convert a regular piston into a static version.
-
-    This is done to save entities and improve lighting."""
-    if get_opt("staticPan") == "NONE":
-        return False  # no conversion allowed!
-
-    print("Trying to make static...")
-    bottom_pos = ent.fixup['bottom_level', '-1']
-
-    if (ent.fixup['connectioncount', '0'] != "0" or
-            ent.fixup['disable_autodrop'] != "0"):  # can it move?
-        if int(bottom_pos) > 0:
-            # The piston doesn't go fully down, use alt instances.
-            ent['file'] = ent['file'][:-4] + "_" + bottom_pos + ".vmf"
-    else:  # we are static
-        ent['file'] = (
-            get_opt("staticPan") + "pist_"
-            + (
-                ent.fixup['top_level', '1']
-                if utils.conv_bool(ent.fixup['start_up'], False)
-                else bottom_pos
-                )
-            + ".vmf"
-            )
-        # something like "static_pan/pist_3.vmf"
-    return True
-
-
 def change_ents():
     """Edit misc entities."""
     utils.con_log("Editing Other Entities...")
@@ -1213,38 +1291,9 @@ def change_ents():
 
 
 def fix_inst():
-    """Fix some different bugs with instances, especially fizzler models.
-
-    """
-    clear_pan_file = instanceLocs.resolve('<ITEM_PANEL_CLEAR>')
-    pist_plat_file = instanceLocs.resolve('<ITEM_PISTON_PLAT>')
-
-    utils.con_log("Editing Instances...")
     for inst in VMF.by_class['func_instance']:
-        # Fizzler model names end with this special string
-        if ("_modelStart" in inst['targetname', ''] or
-                "_modelEnd" in inst['targetname', '']):
-
-            # strip off the extra numbers on the end, so fizzler
-            # models recieve inputs correctly (Valve bug!)
-            if "_modelStart" in inst['targetname', '']:
-
-                inst['targetname'] = (
-                    inst['targetname'].split("_modelStart")[0] +
-                    "_modelStart"
-                    )
-            else:
-                inst['targetname'] = (
-                    inst['targetname'].split("_modelEnd")[0] +
-                    "_modelEnd"
-                    )
-
-            # one side of the fizzler models are rotated incorrectly
-            # (upsidown), fix that...
-            if inst['angles'] in FIZZLER_ANGLE_FIX:
-                inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
-
-        elif "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
+        # TODO: remake this in a condition
+        if "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
             # find the triggers that match this entity and mod them
             for trig in VMF.iter_ents(
                     classname='trigger_portal_cleanser',
@@ -1294,12 +1343,6 @@ def fix_inst():
                     inst_in='in',
                     inst_out='out',
                     ))
-
-        elif inst['file'] in clear_pan_file:
-            # white/black are found via the func_brush
-            make_static_pan(inst, "glass")
-        elif inst['file'] in pist_plat_file:
-            make_static_pist(inst)  # try to convert to static piston
 
 
 def fix_worldspawn():
