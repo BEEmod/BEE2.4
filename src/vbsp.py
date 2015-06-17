@@ -127,23 +127,28 @@ ANTLINES = {
 
 DEFAULTS = {
     "bottomless_pit":           "0",  # Convert goo into bottomless pits
+    "goo_mist":                 "0",  # Add info_particle_systems to goo pits
+
     "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
     "remove_pedestal_plat":     "0",  # Remove pedestal button platforms
     "remove_exit_signs":        "0",  # Remove the exit sign overlays
+
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
-    "fix_glass":                "0",
-    "fix_portal_bump":          "0",
-
     "no_mid_voices":            "0",  # Remove the midpoint voice lines
+
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
+
     "sky":                      "sky_black",  # Change the skybox
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
+
+
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
+
+    "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
 
     # If set, use these as the glass/grating 128x128 instances
     "glass_inst":                "NONE",
@@ -153,6 +158,7 @@ DEFAULTS = {
     "clump_size":               "4",  # The maximum length of a clump
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
+
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
     # Default to the origin of the elevator instance - that's likely to
@@ -698,6 +704,72 @@ def make_bottomless_pit(solids):
             ).make_unique()
 
 
+def iter_grid(dist, stride=1):
+    for x in range(0, dist, stride):
+        for y in range(0, dist, stride):
+            yield x, y
+
+
+def add_goo_mist(sides):
+    needs_mist = set(sides)
+    for pos in sorted(sides):
+        if pos not in needs_mist:
+            continue  # We filled this space already
+
+        # First try a 128 size grid
+        for x, y in iter_grid(512, 128):
+            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
+                break  # Doesn't match
+        else:
+            VMF.create_ent(
+                classname='info_particle_system',
+                targetname='@goo_mist',
+                start_active='1',
+                effect_name='water_mist_512',
+                origin='{x!s} {y!s} {z!s}'.format(
+                    x=pos.x + 192,
+                    y=pos.y + 192,
+                    z=pos.z + 48,
+                )
+            )
+            for (x, y) in iter_grid(512, 128):
+                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+            continue  # Next side
+
+        # That failed, try a 256 size grid
+        for x, y in iter_grid(256, 128):
+            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
+                break  # Doesn't match
+        else:
+            VMF.create_ent(
+                classname='info_particle_system',
+                targetname='@goo_mist',
+                start_active='1',
+                effect_name='water_mist_256',
+                origin='{x!s} {y!s} {z!s}'.format(
+                    x=pos.x + 64,
+                    y=pos.y + 64,
+                    z=pos.z + 48,
+                )
+            )
+            for (x, y) in iter_grid(256, 128):
+                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+            continue  # Next side
+
+        # Both failed, use the 256 particle in the center.
+        VMF.create_ent(
+            classname='info_particle_system',
+            targetname='@goo_mist',
+            start_active='1',
+            effect_name='water_mist_256',
+            origin='{x!s} {y!s} {z!s}'.format(
+                x=pos.x,
+                y=pos.y,
+                z=pos.z + 48,
+            )
+        )
+
+
 def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
 
@@ -750,6 +822,10 @@ def change_brush():
     glass_scale = get_opt('glass_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
 
+    make_goo_mist = get_bool_opt('goo_mist')
+    utils.con_log(make_goo_mist)
+    mist_solids = set()
+
     # Check the clump algorithm has all its arguements
     can_clump = (get_bool_opt("clump_wall_tex") and
                  get_opt("clump_size").isnumeric() and
@@ -786,6 +862,14 @@ def change_brush():
                         pit_solids.append((solid, face))
                     else:
                         face.mat = pit_goo_tex
+                        if make_goo_mist:
+                            mist_solids.add(
+                                solid.get_origin().as_tuple()
+                            )
+                elif make_goo_mist:
+                    mist_solids.add(
+                        solid.get_origin().as_tuple()
+                    )
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
                 split_u = face.uaxis.split(" ")
                 split_v = face.vaxis.split(" ")
@@ -800,8 +884,13 @@ def change_brush():
             if inst:
                 inst['file'] = glass_inst
     if is_bottomless:
-        utils.con_log('Creating Bottomless Pits!')
+        utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids)
+        utils.con_log('Done!')
+
+    if make_goo_mist:
+        utils.con_log('Adding Goo Mist...')
+        add_goo_mist(mist_solids)
         utils.con_log('Done!')
 
     if can_clump:

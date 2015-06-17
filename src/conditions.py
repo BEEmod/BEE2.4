@@ -150,6 +150,13 @@ class Condition:
                 if res.value is None:
                     self.results.remove(res)
 
+        for res in self.else_results[:]:
+            func = RESULT_SETUP.get(res.name)
+            if func:
+                res.value = func(res)
+                if res.value is None:
+                    self.else_results.remove(res)
+
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -1259,6 +1266,7 @@ def res_make_catwalk(_, res):
             continue  # End pieces don't get supports
 
         normal = round(Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z))
+        ':type normal: Vec'
         if normal == (0, 0, 1):
             supp = instances['support_floor']
         elif normal == (0, 0, -1):
