@@ -20,6 +20,7 @@ except ImportError:
         No sounds will be played.
         """
     initiallised = False
+    pygame = None
 else:
     # Succeeded
     initiallised = True

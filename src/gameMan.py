@@ -18,6 +18,8 @@ from query_dialogs import ask_string
 from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
+import UI
+import loadScreen
 
 all_games = []
 selected_game = None
@@ -333,6 +335,9 @@ class Game:
                         if prop.name == 'deletable' or prop.name == 'copyable':
                             prop.value = '1'
 
+        print('Editing Gameinfo!')
+        self.edit_gameinfo(True)
+
         print('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path(
@@ -413,7 +418,7 @@ def save():
     config.save()
 
 
-def load(ui_quit_func, load_screen_window):
+def load():
     global selected_game
     all_games.clear()
     for gm in config:
@@ -431,13 +436,13 @@ def load(ui_quit_func, load_screen_window):
                 new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
-        load_screen_window.withdraw()
+        loadScreen.main_loader.withdraw()
 
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            ui_quit_func()
-        load_screen_window.deiconify()
+            UI.quit_application()
+        loadScreen.main_loader.deiconify()  # Show it again
     selected_game = all_games[0]
 
 
@@ -502,30 +507,32 @@ def add_game(_=None, refresh_menu=True):
 
 def remove_game(_=None):
     """Remove the currently-chosen game from the game list."""
-    global selected_game, selectedGame_radio
+    global selected_game
+    lastgame_mess = (
+        "\n (BEE2 will quit, this is the last game set!)"
+        if len(all_games) == 1 else
+        ""
+    )
     confirm = messagebox.askyesno(
         title="BEE2",
         message='Are you sure you want to delete "'
                 + selected_game.name
-                + '"?',
+                + '"?'
+                + lastgame_mess,
         )
     if confirm:
-        if len(all_games) <= 1:
-            messagebox.showerror(
-                message='You cannot remove every game from the list!',
-                title='BEE2',
-                parent=TK_ROOT,
-                )
-        else:
-            selected_game.edit_gameinfo(add_line=False)
+        selected_game.edit_gameinfo(add_line=False)
 
-            all_games.remove(selected_game)
-            config.remove_section(selected_game.name)
-            config.save()
+        all_games.remove(selected_game)
+        config.remove_section(selected_game.name)
+        config.save()
 
-            selected_game = all_games[0]
-            selectedGame_radio.set(0)
-            add_menu_opts(game_menu)
+        if not all_games:
+            UI.quit_application()  # If we have no games, nothing can be done
+
+        selected_game = all_games[0]
+        selectedGame_radio.set(0)
+        add_menu_opts(game_menu)
 
 
 def add_menu_opts(menu, callback=None):
@@ -575,5 +582,5 @@ if __name__ == '__main__':
     TK_ROOT['menu'] = test_menu
 
     init_trans()
-    load(quit, Toplevel())
+    load()
     add_menu_opts(dropdown, setgame_callback)

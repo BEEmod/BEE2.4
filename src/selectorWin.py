@@ -12,6 +12,7 @@ import math
 
 import img as png  # png library for TKinter
 from richTextBox import tkRichText
+import utils
 
 ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE+16
@@ -431,10 +432,9 @@ class selWin:
         self.win.lift(self.parent)
         self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
-        self.win.geometry(
-            '+' + str(self.parent.winfo_rootx()+30) +
-            '+' + str(self.parent.winfo_rooty()+30)
-        )
+
+        utils.center_win(self.win, parent=self.parent)
+
         self.flow_items()
         self.sel_item(self.selected)
 

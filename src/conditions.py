@@ -1,4 +1,5 @@
 # coding: utf-8
+from decimal import Decimal
 import random
 
 from utils import Vec
@@ -16,7 +17,63 @@ ALL_INST = set()
 conditions = []
 FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
+RESULT_SETUP = {}
 
+xp = utils.Vec_tuple(1, 0, 0)
+xn = utils.Vec_tuple(-1, 0, 0)
+yp = utils.Vec_tuple(0, 1, 0)
+yn = utils.Vec_tuple(0, -1, 0)
+zp = utils.Vec_tuple(0, 0, 1)
+zn = utils.Vec_tuple(0, 0, -1)
+DIRECTIONS = {
+    # Translate these words into a normal vector
+    '+x': xp,
+    '-x': xn,
+
+    '+y': yp,
+    '-y': yn,
+
+    '+z': zp,
+    '-z': zn,
+
+    'x': xp, # For with allow_inverse
+    'y': yp,
+    'z': zp,
+
+    'up': zp,
+    'dn': zn,
+    'down': zn,
+    'floor': zp,
+    'ceiling': zn,
+    'ceil': zn,
+
+    'n': yp,
+    'north': yp,
+    's': yn,
+    'south': yn,
+
+    'e': xp,
+    'east': xp,
+    'w': xn,
+    'west': xn,
+
+    'wall': 'WALL',  # Special case, not wall/ceiling
+}
+
+INST_ANGLE = {
+    # The angles needed to point a PeTI instance in this direction
+    # IE up = zp = floor
+    zp: "0 0 0",
+    zn: "0 0 0",
+
+    xn: "0 0 0",
+    yp: "0 90 0",
+    xp: "0 180 0",
+    yn: "0 270 0"
+
+}
+
+del xp, xn, yp, yn, zp, zn
 
 class NextInstance(Exception):
     """Raised to skip to the next instance, from the SkipInstance result."""
@@ -30,7 +87,13 @@ class EndCondition(Exception):
 class Condition:
     __slots__ = ['flags', 'results', 'else_results', 'priority']
 
-    def __init__(self, flags=None, results=None, else_results=None, priority=0):
+    def __init__(
+            self,
+            flags=None,
+            results=None,
+            else_results=None,
+            priority=Decimal('0'),
+    ):
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
@@ -55,14 +118,17 @@ class Condition:
         flags = []
         results = []
         else_results = []
-        priority = 0
+        priority = Decimal('0')
         for prop in prop_block:
             if prop.name == 'result':
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
             elif prop.name == 'priority':
-                priority = utils.conv_int(prop.value, priority)
+                try:
+                    priority = Decimal(prop.value)
+                except ArithmeticError:
+                    pass
             else:
                 flags.append(prop)
 
@@ -78,28 +144,19 @@ class Condition:
 
         """
         for res in self.results[:]:
-            if res.name == 'variant':
-                res.value = variant_weight(res)
-            elif res.name == 'custantline':
-                result = {
-                    'instance': res.find_key('instance', '').value,
-                    'antline': [p.value for p in res.find_all('straight')],
-                    'antlinecorner': [p.value for p in res.find_all('corner')],
-                    'outputs': list(res.find_all('addOut'))
-                    }
-                if (
-                        len(result['antline']) == 0 or
-                        len(result['antlinecorner']) == 0
-                        ):
-                    self.results.remove(res)  # invalid
-                else:
-                    res.value = result
-            elif res.name == 'custoutput':
-                for sub_res in res:
-                    if sub_res.name == 'targcondition':
-                        sub_res.value = Condition.parse(sub_res)
-            elif res.name == 'condition':
-                res.value = Condition.parse(res)
+            func = RESULT_SETUP.get(res.name)
+            if func:
+                res.value = func(res)
+                if res.value is None:
+                    self.results.remove(res)
+
+        for res in self.else_results[:]:
+            func = RESULT_SETUP.get(res.name)
+            if func:
+                res.value = func(res)
+                if res.value is None:
+                    self.else_results.remove(res)
+
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -108,7 +165,6 @@ class Condition:
             if not check_flag(flag, inst):
                 success = False
                 break
-            utils.con_log(success)
         results = self.results if success else self.else_results
         for res in results[:]:
             try:
@@ -158,7 +214,10 @@ def add_meta(func, priority, only_once=True):
     # be entered into property files.
     # The qualname will be unique across modules.
     name = '"' + func.__qualname__ + '"'
-    print("Adding metacondition (" + name + ")!")
+    print("Adding metacondition ({}) with priority {!s}!".format(
+        name,
+        priority,
+    ))
 
     # Don't pass the prop_block onto the function,
     # it doesn't contain any useful data.
@@ -183,17 +242,27 @@ def meta_cond(priority=0, only_once=True):
         return func
     return x
 
-def make_flag(name):
+def make_flag(*names):
     """Decorator to add flags to the lookup."""
     def x(func):
-        FLAG_LOOKUP[name.casefold()] = func
+        for name in names:
+            FLAG_LOOKUP[name.casefold()] = func
         return func
     return x
 
-def make_result(name):
+def make_result(*names):
     """Decorator to add results to the lookup."""
     def x(func):
-        RESULT_LOOKUP[name.casefold()] = func
+        for name in names:
+            RESULT_LOOKUP[name.casefold()] = func
+        return func
+    return x
+
+def make_result_setup(*names):
+    """Decorator to do setup for this result."""
+    def x(func):
+        for name in names:
+            RESULT_SETUP[name.casefold()] = func
         return func
     return x
 
@@ -235,6 +304,7 @@ def check_all():
                     # this condition, and skip to the next condtion.
                     break
                 if not condition.results and not condition.else_results:
+                    utils.con_log('Exiting empty condition!')
                     break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
@@ -269,7 +339,7 @@ def check_flag(flag, inst):
         res = func(inst, flag)
         return res
 
-
+@make_result_setup('variant')
 def variant_weight(var):
     """Read variant commands from settings and create the weight list."""
     count = var['number', '']
@@ -285,6 +355,7 @@ def variant_weight(var):
             weight = []
             if len(vals) == count:
                 for i, val in enumerate(vals):
+                    val = val.strip()
                     if val.isdecimal():
                         # repeat the index the correct number of times
                         weight.extend(
@@ -320,9 +391,39 @@ def add_suffix(inst, suff):
     """Append the given suffix to the instance.
     """
     file = inst['file']
-    utils.con_log(file)
     old_name, dot, ext = file.partition('.')
     inst['file'] = ''.join((old_name, suff, dot, ext))
+
+@make_flag('debug')
+def debug_flag(inst, props):
+    if props.has_children():
+        utils.con_log('Debug:')
+        utils.con_log(str(props))
+        utils.con_log(str(inst))
+    elif props.value.endswith('='):
+        utils.con_log('Debug: {props}{inst!s}'.format(
+            inst=inst,
+            props=props.value,
+        ))
+    else:
+        utils.con_log('Debug: ' + props.value)
+    return True # The flag is always true
+
+@make_result('debug')
+def debug_result(inst, props):
+    # Swallow the return value, so the flag isn't deleted
+    debug_flag(inst, props)
+
+@meta_cond(priority=1000, only_once=False)
+def remove_blank_inst(inst):
+    """Remove instances with blank file attr.
+
+    This allows conditions to strip the instances when requested.
+    """
+    # If editoritems instances are set to "", PeTI will autocorrect it to
+    # ".vmf" - we need to handle that too.
+    if inst['file', ''] in ('', '.vmf'):
+        VMF.remove_ent(inst)
 
 #########
 # FLAGS #
@@ -415,22 +516,67 @@ def flag_option(_, flag):
 
 @make_flag('ifMode')
 def flag_game_mode(_, flag):
-    from vbsp import GAME_MODE
-    return GAME_MODE.casefold() == flag.value.casefold()
+    import vbsp
+    return vbsp.GAME_MODE.casefold() == flag.value.casefold()
 
 
 @make_flag('ifPreview')
 def flag_is_preview(_, flag):
-    from vbsp import IS_PREVIEW
-    return IS_PREVIEW == utils.conv_bool(flag, False)
+    import vbsp
+    return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
+
+@make_flag(
+    'rotation',
+    'angle',
+    'angles',
+    'orient',
+    'orientation',
+    'dir',
+    'direction',
+)
+def flag_angles(inst, flag):
+    """Check that a instance is pointed in a direction."""
+    angle = inst['angles', '0 0 0']
+
+    if flag.has_children():
+        targ_angle = flag['direction', '0 0 0']
+        from_dir = flag['from_dir', '0 0 1']
+        if from_dir.casefold() in DIRECTIONS:
+            from_dir = Vec(DIRECTIONS[from_dir.casefold()])
+        else:
+            from_dir = Vec.from_str(from_dir, 0, 0, 1)
+        allow_inverse = utils.conv_bool(flag['allow_inverse', '0'])
+    else:
+        targ_angle = flag.value
+        from_dir = Vec(0, 0, 1)
+        allow_inverse = False
+
+    if angle == targ_angle:
+        return True  # Check for exact match
+
+    normal = DIRECTIONS.get(targ_angle.casefold(), None)
+    if normal is None:
+        return False  # If it's not a special angle,
+        # so it failed the exact match
+
+    angle = Vec.from_str(angle, 0, 0, 0)
+    inst_normal = round(
+        from_dir.rotate(angle.x, angle.y, angle.z)
+    )
+    if normal == 'WALL':
+        # Special case - it's not on the floor or ceiling
+        return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
+    else:
+        return inst_normal == normal or (
+            allow_inverse and -inst_normal == normal
+        )
 
 ###########
 # RESULTS #
 ###########
 
 
-@make_result('rename')
-@make_result('changeInstance')
+@make_result('rename', 'changeInstance')
 def res_change_instance(inst, res):
     """Set the file to a value."""
     inst['file'] = resolve_inst(res.value)[0]
@@ -468,8 +614,7 @@ def res_set_option(_, res):
     return True  # Remove this result
 
 
-@make_result('instVar')
-@make_result('instVarSuffix')
+@make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
 
@@ -506,7 +651,9 @@ def res_add_variant(inst, res):
         # seed instead for stuff like elevators.
         random.seed(MAP_RAND_SEED + inst['origin'] + inst['angles'])
     else:
-        random.seed(inst['targetname'])
+        # We still need to use angles and origin, since things like
+        # fizzlers might not get unique names.
+        random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
     add_suffix(inst, "_var" + random.choice(res.value))
 
 
@@ -553,6 +700,13 @@ def res_add_overlay_inst(inst, res):
         fixup_style=res['fixup_style', '0'],
     )
 
+
+@make_result_setup('custOutput')
+def res_cust_output_setup(res):
+    for sub_res in res:
+        if sub_res.name == 'targcondition':
+            sub_res.value = Condition.parse(sub_res)
+    return res.value
 
 @make_result('custOutput')
 def res_cust_output(inst, res):
@@ -601,6 +755,21 @@ def res_cust_output(inst, res):
         for out in res.find_all('addOut'):
             add_output(inst, out, targ)
 
+@make_result_setup('custAntline')
+def res_cust_antline_setup(res):
+    result = {
+        'instance': res['instance', ''],
+        'antline': [p.value for p in res.find_all('straight')],
+        'antlinecorner': [p.value for p in res.find_all('corner')],
+        'outputs': list(res.find_all('addOut')),
+        }
+    if (
+            len(result['antline']) == 0 or
+            len(result['antlinecorner']) == 0
+            ):
+        return None # remove result
+    else:
+        return result
 
 @make_result('custAntline')
 def res_cust_antline(inst, res):
@@ -693,12 +862,11 @@ def res_cust_fizzler(base_inst, res):
         fizz_name + '_modelStart',
         fizz_name + '_modelEnd',
         )
+    is_laser = False
     for inst in VMF.by_class['func_instance']:
         if inst['targetname', ''] in model_targetnames:
             if inst.fixup['skin', '0'] == '2':
-                # This is a laserfield! We can't edit that!
-                utils.con_log('CustFizzler excecuted on LaserField!')
-                return
+                is_laser = True
             if model_name is not None:
                 if model_name == '':
                     inst['targetname'] = base_inst['targetname']
@@ -713,9 +881,16 @@ def res_cust_fizzler(base_inst, res):
 
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
+
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) == 0:
         return  # No brush modifications
+
+    if is_laser:
+        # This is a laserfield! We can't edit those brushes!
+        utils.con_log('CustFizzler excecuted on LaserField!')
+        return
+
     for orig_brush in (
             VMF.by_class['trigger_portal_cleanser'] &
             VMF.by_target[fizz_name + '_brush']):
@@ -854,7 +1029,7 @@ def convert_to_laserfield(
             # heightwise it's always the same
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
 
-
+make_result_setup('condition')(Condition.parse)
 @make_result('condition')
 def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true."""
@@ -912,7 +1087,6 @@ def res_fizzler_pair(begin_inst, res):
     # We round it to get rid of 0.00001 inprecision from the calculations.
     direction = round(Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z))
     ':type direction: utils.Vec'
-    print(end_name, direction)
 
     begin_pos = Vec.from_str(begin_inst['origin'])
     axis_1, axis_2, main_axis = PAIR_AXES[direction.as_tuple()]
@@ -946,9 +1120,7 @@ def res_fizzler_pair(begin_inst, res):
                 origin=new_pos.join(' '),
             )
 
-
-@make_result('clearOutputs')
-@make_result('clearOutput')
+@make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
@@ -958,13 +1130,195 @@ def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
     del inst.fixup['res']
 
-@meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst):
-    """Remove instances with blank file attr.
 
-    This allows conditions to strip the instances when requested.
+CATWALK_TYPES = {
+    utils.CONN_TYPES.straight: 'straight_128',
+    utils.CONN_TYPES.corner: 'corner',
+    utils.CONN_TYPES.all: 'crossjunction',
+    utils.CONN_TYPES.side: 'end',
+    utils.CONN_TYPES.triple: 'tjunction',
+    utils.CONN_TYPES.none: 'NONE',
+}
+
+
+@make_result('makeCatwalk')
+def res_make_catwalk(_, res):
+    """Speciallised result to generate catwalks from markers.
+
+    Only runs once, and then quits the condition list.
     """
-    # If editoritems instances are set to "", PeTI will autocorrect it to
-    # ".vmf" - we need to handle that too.
-    if inst['file', ''] in ('', '.vmf'):
-        VMF.remove_ent(inst)
+    utils.con_log("Starting catwalk generator...")
+    marker = resolve_inst(res['markerInst'])
+    output_target = res['output_name', 'MARKER']
+
+    instances = {
+        name: resolve_inst(res[name, ''])[0]
+        for name in
+        (
+            'straight_128', 'straight_256', 'straight_512',
+            'corner', 'tjunction', 'crossjunction', 'end', 'stair',
+            'support_wall', 'support_ceil', 'support_floor', 'markerInst',
+        )
+    }
+    instances['NONE'] = '' # If there are no attachments
+
+    connections = {}  # The directions this instance is connected by (NSEW)
+    markers = {}
+
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in marker:
+            continue
+        loc = Vec.from_str(inst['origin'])
+        #                             [North, South, East,  West ]
+        connections[inst] = [False, False, False, False]
+        markers[inst['targetname']] = inst
+
+    if not markers:
+        return True  # No catwalks!
+
+    utils.con_log('Conn:', connections)
+    utils.con_log('Markers:', markers)
+
+    # First loop through all the markers, adding connecting sections
+    for inst in markers.values():
+        for conn in inst.outputs:
+            if conn.output != output_target or conn.input != output_target:
+                # Indicator toggles or similar, delete these
+                print('Removing ', conn.target)
+                for del_inst in VMF.by_target[conn.target]:
+                    del_inst.remove()
+                continue
+
+            inst2 = markers[conn.target]
+            print(inst['targetname'], '<->', inst2['targetname'])
+            origin1 = Vec.from_str(inst['origin'])
+            origin2 = Vec.from_str(inst2['origin'])
+            if origin1.x != origin2.x and origin1.y != origin2.y:
+                utils.con_log('Instances not aligned!')
+                continue
+
+            y_dir = origin1.x == origin2.x  # Which way the connection is
+            if y_dir:
+                dist = abs(origin1.y - origin2.y)
+            else:
+                dist = abs(origin1.x - origin2.x)
+            vert_dist = origin1.z - origin2.z
+
+            utils.con_log('Dist =', dist, ', Vert =', vert_dist)
+
+            if dist//2 < vert_dist:
+                # The stairs are 2 long, 1 high.
+                utils.con_log('Not enough room for stairs!')
+                continue
+
+            if dist >= 128:
+                # add straight sections in between
+                x, y, z = str(origin1.x), str(origin1.y), str(origin1.z)
+                if y_dir:
+                    for y in range(
+                            # + 128 to skip the first location
+                            min(int(origin1.y), int(origin2.y)) + 128,
+                            max(int(origin1.y), int(origin2.y)),
+                            128):
+                        VMF.create_ent(
+                            classname='func_instance',
+                            origin=(x + ' ' + str(y) + ' ' + z),
+                            angles='0 90 0',
+                            file=instances['straight_128'],
+                        )
+                else:
+                    for x in range(
+                            min(int(origin1.x), int(origin2.x)) + 128,
+                            max(int(origin1.x), int(origin2.x)),
+                            128):
+                        VMF.create_ent(
+                            classname='func_instance',
+                            origin=(str(x) + ' ' + y + ' ' + z),
+                            angles='0 0 0',
+                            file=instances['straight_128'],
+                        )
+
+            # Update the lists based on the directions that were set
+            conn_lst1 = connections[inst]
+            conn_lst2 = connections[inst2]
+            if origin1.x < origin2.x:
+                conn_lst1[2] = True  # E
+                conn_lst2[3] = True  # W
+            elif origin2.x < origin1.x:
+                conn_lst1[3] = True  # W
+                conn_lst2[2] = True  # E
+
+            if origin1.y < origin2.y:
+                conn_lst1[0] = True  # N
+                conn_lst2[1] = True  # S
+            elif origin2.y < origin1.y:
+                conn_lst1[1] = True  # S
+                conn_lst2[0] = True  # N
+
+    for inst, dir_mask in connections.items():
+        # Set the marker instances based on the attached walkways.
+        print(inst['targetname'], dir_mask)
+        angle = Vec.from_str(inst['angles'], 0, 0, 0)
+        new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
+        inst['file'] = instances[CATWALK_TYPES[new_type]]
+
+        if new_type is utils.CONN_TYPES.side:
+            continue  # End pieces don't get supports
+
+        normal = round(Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z))
+        ':type normal: Vec'
+        if normal == (0, 0, 1):
+            supp = instances['support_floor']
+        elif normal == (0, 0, -1):
+            supp = instances['support_ceil']
+        else:
+            supp = instances['support_wall']
+
+        if supp:
+            VMF.create_ent(
+                classname='func_instance',
+                origin=inst['origin'],
+                angles=INST_ANGLE[normal.as_tuple()],
+                file=supp,
+            )
+
+
+    utils.con_log('Finished catwalk generation!')
+    return True  # Don't run this again
+
+@make_result_setup('staticPiston')
+def make_static_pist_setup(res):
+    return {
+        name: resolve_inst(res[name, ''])[0]
+        for name in
+        (
+            'bottom_1', 'bottom_2', 'bottom_3',
+            'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        )
+    }
+
+@make_result('staticPiston')
+def make_static_pist(ent, res):
+    """Convert a regular piston into a static version.
+
+    This is done to save entities and improve lighting."""
+
+    bottom_pos = ent.fixup['bottom_level', '-1']
+
+    if (ent.fixup['connectioncount', '0'] != "0" or
+            ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
+        if int(bottom_pos) > 0:
+            # The piston doesn't go fully down, use alt instances.
+            val = res.value['bottom_' + bottom_pos]
+            if val:  # Only if defined
+                ent['file'] = val
+    else:  # we are static
+        val = res.value[
+            'static_' + (
+                ent.fixup['top_level', '1']
+                if utils.conv_bool(ent.fixup['start_up'], False)
+                else bottom_pos
+            )
+        ]
+        if val:
+            ent['file'] = val

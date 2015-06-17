@@ -16,6 +16,12 @@ SPECIAL_INST = {
     'glass_right_straight':      '<ITEM_BARRIER:6>',
     'glass_right_short':         '<ITEM_BARRIER:7>',
     'glass_right_convex_corner': '<ITEM_BARRIER:8>',
+    'glass_frames':              '<ITEM_BARRIER:1,2,3,4,5,6,7,8>',
+
+    'glass_corner':         '<ITEM_BARRIER:1,5>',
+    'glass_straight':       '<ITEM_BARRIER:2,6>',
+    'glass_short':          '<ITEM_BARRIER:3,7>',
+    'glass_convex_corner':  '<ITEM_BARRIER:4,8>',
 
     'coopExit':    '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':   '<ITEM_COOP_ENTRY_DOOR:0>',
@@ -28,10 +34,11 @@ SPECIAL_INST = {
     'spExitCorr':  '<ITEM_EXIT_DOOR:0,1,2,3>',
     'spEntryCorr': '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'coopCorr':    '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
+    'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # although unused, editoritems allows having different instances
     # for toggle/timer panels
-    'indPanCheck':  '<ITEM_INDICATOR_TOGGLE>',
-    'indPanTimer':  '<ITEM_INDICATOR_PANEL>',
+    'indPanCheck':  '<ITEM_INDICATOR_PANEL>',
+    'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
     # 'indpan' is defined below from these two
 
     'exit_frame': '<ITEM_EXIT_DOOR:4,5>',
@@ -106,10 +113,12 @@ def load_conf():
         INST_SPECIAL['indpantimer']
     )
     INST_SPECIAL['white_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:7>') + resolve('<ITEM_EXIT_DOOR:4>')
+        resolve('<ITEM_ENTRY_DOOR:7>') +
+        resolve('<ITEM_EXIT_DOOR:4>')
     )
     INST_SPECIAL['black_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:8>') + resolve('<ITEM_EXIT_DOOR:5>')
+        resolve('<ITEM_ENTRY_DOOR:8>') +
+        resolve('<ITEM_EXIT_DOOR:5>')
     )
 
 @lru_cache()
@@ -137,10 +146,9 @@ def resolve(path) -> list:
                 return []
             out = []
             for val in subitem.split(','):
-                ind = SUBITEMS.get(
-                    val.strip().casefold(),
-                    int(val.strip()),
-                )
+                ind = SUBITEMS.get(val.strip().casefold(), None)
+                if ind is None:
+                    ind = int(val.strip())
                 # Only add if it's actually in range
                 if 0 <= ind < len(item_values):
                     out.append(item_values[ind])

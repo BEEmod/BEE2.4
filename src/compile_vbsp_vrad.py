@@ -1,5 +1,6 @@
 from cx_Freeze import setup, Executable
 import os
+import utils
 
 ico_path = os.path.join(os.getcwd(), "../bee2.ico")
 
@@ -16,14 +17,16 @@ setup(
                 'for modifying PeTI maps during compilation.',
     executables=[
         Executable(
-            'vbsp.py',
+            'vbsp_launch.py',
             base='Console',
             icon=ico_path,
+            targetName='vbsp.exe' if utils.WIN else 'vbsp',
         ),
         Executable(
             'vrad.py',
             base='Console',
             icon=ico_path,
+            targetName='vrad.exe' if utils.WIN else 'vrad',
         )
     ]
 )
