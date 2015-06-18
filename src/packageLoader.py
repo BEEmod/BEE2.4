@@ -321,7 +321,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
                         vers['styles'][sty_id] = vers['styles'][base_style.id]
-                        if log_fallbacks:
+                        if log_fallbacks and not item.unstyled:
                             print(
                                 'Item "{item}" using parent '
                                 '"{rep}" for "{style}"!'.format(
@@ -336,7 +336,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
-                        if log_missing_styles:
+                        if log_missing_styles and not item.unstyled:
                             print(
                                 'Item "{item}" using '
                                 'inappropriate style for "{style}"!'.format(
@@ -531,6 +531,7 @@ class Item:
             def_version,
             needs_unlock=False,
             all_conf=None,
+            unstyled=False,
             ):
         self.id = item_id
         self.versions = versions
@@ -538,6 +539,7 @@ class Item:
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
+        self.unstyled = unstyled
 
     @classmethod
     def parse(cls, data):
@@ -545,6 +547,10 @@ class Item:
         versions = {}
         def_version = None
         folders = {}
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        if data.id == 'ITEM_GOO':
+            print(data.info)
 
         all_config = get_config(
             data.info,
@@ -586,7 +592,14 @@ class Item:
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
 
-        return cls(data.id, versions, def_version, needs_unlock, all_config)
+        return cls(
+            data.id,
+            versions,
+            def_version,
+            needs_unlock,
+            all_config,
+            unstyled,
+        )
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
