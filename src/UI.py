@@ -1019,6 +1019,9 @@ def update_filters():
             )
     flow_picker()
 
+# When exiting settings, we need to hide/show WIP items.
+optionWindow.refresh_callbacks.append(update_filters)
+
 
 # UI functions, each accepts the parent frame to place everything in.
 # initMainWind generates the main frames that hold all the panes to

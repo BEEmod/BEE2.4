@@ -4,7 +4,7 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
-muted = False
+play_sound = True
 
 try:
     import pygame
@@ -50,5 +50,5 @@ else:
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
-        if not muted and name in sounds:
+        if play_sound and name in sounds:
             sounds[name].play()
