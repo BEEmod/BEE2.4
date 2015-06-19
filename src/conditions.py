@@ -491,12 +491,12 @@ def flag_instvar(inst, flag):
 
 @make_flag('styleVar')
 def flag_stylevar(_, flag):
-    return bool(STYLE_VARS[flag.value.casefold()])
+    return STYLE_VARS[flag.value.casefold()]
 
 
 @make_flag('has')
 def flag_voice_has(_, flag):
-    return bool(VOICE_ATTR[flag.value.casefold()])
+    return VOICE_ATTR[flag.value.casefold()]
 
 
 @make_flag('has_music')
@@ -599,10 +599,11 @@ def res_set_style_var(_, res):
 
 @make_result('has')
 def res_set_voice_attr(_, res):
-    for opt in res.value:
-        val = utils.conv_bool(opt.value, default=None)
-        if val is not None:
-            VOICE_ATTR[opt.name] = val
+    if res.has_children():
+        for opt in res.value:
+            VOICE_ATTR[opt.name] = True
+    else:
+        VOICE_ATTR[res.value.casefold()] = 1
     return True  # Remove this result
 
 
