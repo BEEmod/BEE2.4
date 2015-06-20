@@ -872,6 +872,30 @@ def change_goo_sides():
                             face.mat = get_tex('special.goo_wall')
     utils.con_log("Done!")
 
+def collapse_goo_trig():
+    """Collapse the goo triggers to only use 2 entities for all pits."""
+    utils.con_log('Collapsing goo triggers...')
+
+    hurt_trig = None
+    cube_trig = None
+    for trig in VMF.by_class['trigger_multiple']:
+        if trig['wait'] == '0.1' and trig['targetname', ''] == '':
+            if cube_trig is None:
+                cube_trig = trig
+            else:
+                cube_trig.solids.extend(trig.solids)
+                trig.remove()
+
+    for trig in VMF.by_class['trigger_hurt']:
+        if trig['targetname', ''] == '':
+            if hurt_trig is None:
+                hurt_trig = trig
+            else:
+                hurt_trig.solids.extend(trig.solids)
+                trig.remove()
+
+    utils.con_log('Done!')
+
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
@@ -1649,10 +1673,11 @@ def main():
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
-        change_goo_sides()  # Must be done before!
+        change_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
         change_trig()
+        collapse_goo_trig() # Do after make_bottomless_pits
         change_func_brush()
 
         fix_worldspawn()
