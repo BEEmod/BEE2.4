@@ -38,8 +38,6 @@ TEX_VALVE = {
     # replacement keys:
     'signage/signage_exit': "overlay.exit",
     "signage/signage_overlay_arrow": "overlay.arrow",
-    "signage/signage_overlay_catapult1": "overlay.catapultfling",
-    "signage/signage_overlay_catapult2": "overlay.catapultland",
     "signage/shape01": "overlay.dot",
     "signage/shape02": "overlay.moon",
     "signage/shape03": "overlay.triangle",
