@@ -425,6 +425,17 @@ def remove_blank_inst(inst):
     if inst['file', ''] in ('', '.vmf'):
         VMF.remove_ent(inst)
 
+
+@meta_cond(priority=0, only_once=True)
+def fix_catapult_targets(inst):
+    """Set faith plate targets to transmit to clients.
+
+    This fixes some console spam in coop, and might improve trajectories
+    for faith plates.
+    """
+    for targ in VMF.by_class['info_target']:
+        targ['spawnflags'] = '3' # Transmit to client, ignoring PVS
+
 #########
 # FLAGS #
 #########
