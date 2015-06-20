@@ -336,14 +336,23 @@ def load_settings():
             'off_x': utils.conv_int(pit['off_x', '0']),
             'off_y': utils.conv_int(pit['off_y', '0']),
             'height': utils.conv_int(pit['max_height', '386'], 386),
-            'side': [prop.value for prop in pit.find_all("side_inst")],
-            'pillar': [prop.value for prop in pit.find_all("pillar_inst")],
-            }
-        if len(settings['pit']['side']) == 0:
-            settings['pit']['side'] = [""]
-
-        if len(settings['pit']['pillar']) == 0:
-            settings['pit']['pillar'] = [""]
+            'skybox': pit['sky_inst', ''],
+            'skybox_ceil': pit['sky_inst_ceil', ''],
+            'targ': pit['targ_inst', ''],
+        }
+        pit_inst = settings['pit']['inst'] = {}
+        for inst_type in (
+                'support',
+                'side',
+                'corner',
+                'double',
+                'triple',
+                'pillar',
+                ):
+            vals = [prop.value for prop in pit.find_all(inst_type + '_inst')]
+            if len(vals) == 0:
+                vals = [""]
+            pit_inst[inst_type] = vals
 
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
@@ -599,7 +608,7 @@ def calc_rand_seed():
         return '|'.join(lst)
 
 
-def make_bottomless_pit(solids):
+def make_bottomless_pit(solids, max_height):
     """Transform all the goo pits into bottomless pits."""
     tex_sky = settings['pit']['tex_sky']
     teleport = settings['pit']['should_tele']
@@ -615,6 +624,44 @@ def make_bottomless_pit(solids):
             # we do the calc with Decimal to ensure precision
     pit_height = settings['pit']['height']
 
+    if settings['pit']['skybox'] != '':
+        # Add in the actual skybox edges and triggers
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['skybox'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='{!s} {!s} 0'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+            ),
+        )
+
+    if settings['pit']['skybox_ceil'] != '':
+        # We dynamically add the ceiling so it resizes to match the map,
+        # and lighting won't be too far away.
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['skybox_ceil'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='{!s} {!s} {!s}'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+                max_height,
+            ),
+        )
+
+    if settings['pit']['targ'] != '':
+        # Add in the actual skybox edges and triggers
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['targ'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='0 0 0',
+        )
+
     # To figure out what positions need edge pieces, we use a dict
     # indexed by XY tuples. The four Nones match the NSEW directions.
     # For each trigger, we loop through the grid points it's in. We
@@ -623,11 +670,11 @@ def make_bottomless_pit(solids):
     # If a value = None, it is occupied by goo.
     edges = defaultdict(lambda: [None, None, None, None])
     dirs = [
-        # index, x, y, angles
-        (0, 0, 128,  '0 270 0'),  # North
-        (1, 0, -128, '0 90 0'),  # South
-        (2, 128, 0,  '0 180 0'),  # East
-        (3, -128, 0, '0 0 0')  # West
+        # x, y, offsets
+        (0, 128),   # North
+        (0, -128),  # South
+        (128, 0),   # East
+        (-128, 0)   # West
     ]
     if teleport:
         # transform the skybox physics triggers into teleports to move cubes
@@ -648,7 +695,7 @@ def make_bottomless_pit(solids):
                         for y in range(int(bbox_min.y), int(bbox_max.y), 128):
                             # Remove the pillar from the center of the item
                             edges[x, y] = None
-                            for i, xoff, yoff, angle in dirs:
+                            for i, (xoff, yoff) in enumerate(dirs):
                                 side = edges[x+xoff, y+yoff]
                                 if side is not None:
                                     side[i] = origin.z - 13
@@ -660,38 +707,35 @@ def make_bottomless_pit(solids):
                             if plane.z > origin.z:
                                 plane.z -= 16
 
-    side_opts = settings['pit']['side']
-    pillar_opts = settings['pit']['pillar']
+    instances = settings['pit']['inst']
 
-    utils.con_log('Pillar:', pillar_opts)
+    side_types = {
+        utils.CONN_TYPES.side: instances['side'],
+        utils.CONN_TYPES.corner: instances['corner'],
+        utils.CONN_TYPES.straight: instances['double'],
+        utils.CONN_TYPES.triple: instances['triple'],
+        utils.CONN_TYPES.all: instances['pillar'],
+        utils.CONN_TYPES.none: [''],  # Never add instance if no walls
+    }
+
+    utils.con_log('Pillar:', instances)
     for (x, y), mask in edges.items():
         if mask is None:
-            continue
-        for i, xoff, yoff, angle in dirs:
-            if mask[i] is None:
-                continue
-            random.seed(str(x) + str(y) + angle)
-            file = random.choice(side_opts)
-            if file != '':
-                VMF.create_ent(
-                    classname='func_instance',
-                    file=file,
-                    targetname='goo_side',
-                    origin='{!s} {!s} {!s}'.format(
-                        x+tele_off_x,
-                        y+tele_off_y,
-                        mask[i],
-                        ),
-                    angles=angle
-                ).make_unique()
-        random.seed(str(x) + str(y) + '-pillar')
-        file = random.choice(pillar_opts)
+            continue  # This is goo
+
+        random.seed(str(x) + str(y) + 'sides')
+
+        inst_type, angle = utils.CONN_LOOKUP[
+            tuple((val is not None) for val in mask)
+        ]
+
+        file = random.choice(side_types[inst_type])
+
         if file != '':
             VMF.create_ent(
                 classname='func_instance',
                 file=file,
                 targetname='goo_side',
-                angles='0 0 0',
                 origin='{!s} {!s} {!s}'.format(
                     x+tele_off_x,
                     y+tele_off_y,
@@ -700,6 +744,22 @@ def make_bottomless_pit(solids):
                         for x in mask
                         if x is not None
                     ),
+                ),
+                angles=angle,
+            ).make_unique()
+
+        random.seed(str(x) + str(y) + '-support')
+        file = random.choice(instances['support'])
+        if file != '':
+            VMF.create_ent(
+                classname='func_instance',
+                file=file,
+                targetname='goo_support',
+                angles='0 0 0',
+                origin='{!s} {!s} {!s}'.format(
+                    x+tele_off_x,
+                    y+tele_off_y,
+                    pit_height,
                 ),
             ).make_unique()
 
@@ -848,9 +908,17 @@ def change_brush():
     if glass_inst == "NONE":
         glass_inst = None
 
+    highest_brush = 0
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
+            highest_brush = max(
+                highest_brush,
+                face.planes[0].z,
+                face.planes[1].z,
+                face.planes[2].z,
+            )
             is_glass = False
             if face.mat.casefold() in GOO_TEX:
                 # Force this voice attribute on, since conditions can't
@@ -885,7 +953,7 @@ def change_brush():
                 inst['file'] = glass_inst
     if is_bottomless:
         utils.con_log('Creating Bottomless Pits...')
-        make_bottomless_pit(pit_solids)
+        make_bottomless_pit(pit_solids, highest_brush)
         utils.con_log('Done!')
 
     if make_goo_mist:
