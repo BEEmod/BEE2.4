@@ -862,14 +862,14 @@ def change_goo_sides():
                     try:
                         face = face_dict[x+xoff, y+yoff, z+zoff]
                     except KeyError:
-                        pass
-                    else:
-                        utils.con_log('Success: ', face.mat.casefold())
-                        if (
-                                face.mat.casefold() in BLACK_PAN or
-                                face.mat.casefold() == 'tools/toolsnodraw'
-                                ):
-                            face.mat = get_tex('special.goo_wall')
+                        continue
+
+                    utils.con_log('Success: ', face.mat.casefold())
+                    if (
+                            face.mat.casefold() in BLACK_PAN or
+                            face.mat.casefold() == 'tools/toolsnodraw'
+                            ):
+                        face.mat = get_tex('special.goo_wall')
     utils.con_log("Done!")
 
 def collapse_goo_trig():
@@ -893,6 +893,16 @@ def collapse_goo_trig():
             else:
                 hurt_trig.solids.extend(trig.solids)
                 trig.remove()
+
+    if hurt_trig is not None:
+        hurt_trig['damage'] = '99999'
+        hurt_trig.outputs.append(
+            VLib.Output(
+                'OnHurtPlayer',
+                '@goo_fade',
+                'Fade',
+            ),
+        )
 
     utils.con_log('Done!')
 
