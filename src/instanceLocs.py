@@ -86,6 +86,17 @@ SUBITEMS = {
     'btn_sphere': 4,
     'btn_ball': 4,
     'btn_edgeless': 4,
+
+    # Track platform
+    'track_bottom_grate': 0,
+    'track_bottom': 1,
+    'track_middle': 2,
+    'track_top': 3,
+    'track_platform': 4,
+    'track_plat': 4,
+    'track_platform_oscillate': 5,
+    'track_plat_oscil': 5,
+    'track_single': 6
 }
 
 def load_conf():
