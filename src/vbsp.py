@@ -906,6 +906,21 @@ def collapse_goo_trig():
 
     utils.con_log('Done!')
 
+def remove_static_ind_toggles():
+    """Remove indicator_toggle instances that don't have assigned overlays.
+
+    If a style has static overlays, this will make antlines basically free.
+    """
+    utils.con_log('Removing static indicator toggles...')
+    toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in toggle_file:
+            continue
+
+        overlay = inst.fixup['$indicator_name', '']
+        if overlay == '' or len(VMF.by_target[overlay]) == 0:
+            inst.remove()
+    utils.con_log('Done!')
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
@@ -1687,8 +1702,9 @@ def main():
         change_brush()
         change_overlays()
         change_trig()
-        collapse_goo_trig() # Do after make_bottomless_pits
+        collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
+        remove_static_ind_toggles()
 
         fix_worldspawn()
         save(new_path)

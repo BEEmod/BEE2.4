@@ -58,6 +58,7 @@ DIRECTIONS = {
     'west': xn,
 
     'wall': 'WALL',  # Special case, not wall/ceiling
+    'walls': 'WALL',
 }
 
 INST_ANGLE = {
@@ -434,7 +435,7 @@ def fix_catapult_targets(inst):
     for faith plates.
     """
     for targ in VMF.by_class['info_target']:
-        targ['spawnflags'] = '3' # Transmit to client, ignoring PVS
+        targ['spawnflags'] = '3'  # Transmit to client, ignoring PVS
 
 #########
 # FLAGS #
