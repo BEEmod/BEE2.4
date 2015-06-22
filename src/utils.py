@@ -336,14 +336,18 @@ class Vec:
         self.z = x*g + y*h + z*i
         return self
 
-    def rotate(self, pitch=0, yaw=0, roll=0):
+    def rotate(self, pitch=0, yaw=0, roll=0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
         Returns the vector, so you can use it in the form
         val = Vec(0,1,0).rotate(p, y, r)
+
+        If round is True, all values will be rounded to 3 decimals
+        (since these calculations always have small inprecision.)
         """
         # pitch is in the y axis
         # yaw is the z axis
         # roll is the x axis
+
         rad_pitch = math.radians(pitch)
         rad_yaw = math.radians(yaw)
         rad_roll = math.radians(roll)
@@ -376,6 +380,11 @@ class Vec:
         self.mat_mul(mat_roll)
         self.mat_mul(mat_pitch)
         self.mat_mul(mat_yaw)
+
+        if round_vals:
+            self.x = round(self.x, 3)
+            self.y = round(self.y, 3)
+            self.z = round(self.z, 3)
 
         return self
 
