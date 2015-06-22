@@ -54,6 +54,8 @@ SUBITEMS = {
     'comp': 1,
 
     'reflect': 2,
+    'redirect': 2,
+    'reflection': 2,
     'redirection': 2,
     'laser': 2,
 
@@ -159,7 +161,20 @@ def resolve(path) -> list:
             for val in subitem.split(','):
                 ind = SUBITEMS.get(val.strip().casefold(), None)
                 if ind is None:
-                    ind = int(val.strip())
+                    try:
+                        ind = int(val.strip())
+                    except ValueError as e:
+                        utils.con_log('--------\nValid subitems:')
+                        utils.con_log('\n'.join(
+                            ('> ' + k + ' = ' + str(v))
+                            for k, v in
+                            SUBITEMS.items()
+                        ))
+                        utils.con_log('--------')
+                        raise Exception(
+                            '"' + val + '" is not a valid instance'
+                            ' subtype or index!'
+                        )
                 # Only add if it's actually in range
                 if 0 <= ind < len(item_values):
                     out.append(item_values[ind])
