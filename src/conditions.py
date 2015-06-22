@@ -572,9 +572,8 @@ def flag_angles(inst, flag):
         # so it failed the exact match
 
     angle = Vec.from_str(angle, 0, 0, 0)
-    inst_normal = round(
-        from_dir.rotate(angle.x, angle.y, angle.z)
-    )
+    inst_normal = from_dir.rotate(angle.x, angle.y, angle.z)
+
     if normal == 'WALL':
         # Special case - it's not on the floor or ceiling
         return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
@@ -834,7 +833,7 @@ def res_faith_mods(inst, res):
     offset = utils.conv_int(res['raise_trig', '0'])
     if offset:
         angle = Vec.from_str(inst['angles', '0 0 0'])
-        offset = round(Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z))
+        offset = Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z)
         ':type offset Vec'
     for trig in VMF.by_class['trigger_catapult']:
         if inst['targetname'] in trig['targetname']:
@@ -1098,7 +1097,7 @@ def res_fizzler_pair(begin_inst, res):
 
     angles = Vec.from_str(begin_inst['angles'])
     # We round it to get rid of 0.00001 inprecision from the calculations.
-    direction = round(Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z))
+    direction = Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z)
     ':type direction: utils.Vec'
 
     begin_pos = Vec.from_str(begin_inst['origin'])
@@ -1278,7 +1277,7 @@ def res_make_catwalk(_, res):
         if new_type is utils.CONN_TYPES.side:
             continue  # End pieces don't get supports
 
-        normal = round(Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z))
+        normal = Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z)
         ':type normal: Vec'
         if normal == (0, 0, 1):
             supp = instances['support_floor']
@@ -1335,3 +1334,170 @@ def make_static_pist(ent, res):
         ]
         if val:
             ent['file'] = val
+
+@make_result('trackPlatform')
+def res_track_plat(_, res):
+    """Logic specific to Track Platforms.
+
+    This allows switching the instances used depending on if the track
+    is horizontal or vertical and sets the track
+    targetnames to a useful value.
+    """
+    utils.con_log(resolve_inst(res['orig_item']))
+    # Get the instances from editoritems
+    (
+        inst_bot_grate, inst_bottom, inst_middle,
+        inst_top, inst_plat, inst_plat_oscil, inst_single
+    ) = resolve_inst(res['orig_item'])
+    single_plat_inst = res['single_plat', '']
+    track_targets = res['track_name', '']
+
+    track_files = [inst_bottom, inst_middle, inst_top, inst_single]
+    platforms = [inst_plat, inst_plat_oscil]
+
+    # All the track_set in the map, indexed by origin
+    track_instances = {
+        Vec.from_str(inst['origin']).as_tuple(): inst
+        for inst in
+        VMF.by_class['func_instance']
+        if inst['file'].casefold() in track_files
+    }
+    utils.con_log('Track instances:')
+    utils.con_log('\n'.join(
+        '{!s}: {}'.format(k, v['file'])
+        for k, v in
+        track_instances.items()
+    ))
+
+    # Now we loop through all platforms in the map, and then locate their
+    # track_set
+    for plat_inst in VMF.by_class['func_instance']:
+        if plat_inst['file'].casefold() not in platforms:
+            continue  # Not a platform!
+
+        utils.con_log('Modifying "' + plat_inst['targetname'] + '"!')
+
+        plat_loc = Vec.from_str(plat_inst['origin'])
+        angles = Vec.from_str(plat_inst['angles'])
+        # The direction away from the wall/floor/ceil
+        normal = Vec(0, 0, 1).rotate(
+            angles.x, angles.y, angles.z
+        )
+
+        for tr_origin, first_track in track_instances.items():
+            if plat_loc == tr_origin:
+                # Check direction
+
+                if normal == Vec(0, 0, 1).rotate(
+                        *Vec.from_str(first_track['angles'])
+                        ):
+                    break
+        else:
+            raise Exception('Platform "{}" has no track!'.format(
+                plat_inst['targetname']
+            ))
+
+        track_type = first_track['file'].casefold()
+        if track_type == inst_single:
+            # Track is one block long, use a single-only instance and
+            # remove track!
+            plat_inst['file'] = single_plat_inst
+            first_track.remove()
+            continue  # Next platform
+
+        track_set = set()
+        if track_type == inst_top or track_type == inst_middle:
+            # search left
+            track_scan(
+                track_set,
+                track_instances,
+                first_track,
+                middle_file=inst_middle,
+                x_dir=-1,
+            )
+        if track_type == inst_bottom or track_type == inst_middle:
+            # search right
+            track_scan(
+                track_set,
+                track_instances,
+                first_track,
+                middle_file=inst_middle,
+                x_dir=+1,
+            )
+
+        # Give every track a targetname matching the platform
+        for ind, track in enumerate(track_set, start=1):
+            if track_targets == '':
+                track['targetname'] = plat_inst['targetname']
+            else:
+                track['targetname'] = (
+                    plat_inst['targetname'] +
+                    '-' +
+                    track_targets + str(ind)
+                )
+
+        # Now figure out which way the track faces:
+
+        # The direction horizontal track is offset
+        side_dir = Vec(0, 1, 0).rotate(*Vec.from_str(first_track['angles']))
+
+        # The direction of the platform surface
+        facing = Vec(-1, 0, 0).rotate(
+            angles.x, angles.y, angles.z
+        )
+        if side_dir == facing:
+            track_facing = 'HORIZ'
+        elif side_dir == -facing:
+            track_facing = 'HORIZ_MIRR'
+        else:
+            track_facing = 'VERT'
+        # Now add the suffixes
+        if track_facing == 'VERT':
+            if utils.conv_bool(res['vert_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_vert')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_vert')
+        elif track_facing == 'HORIZ_MIRR':
+            if utils.conv_bool(res['horiz_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_horiz_mirrored')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_horiz')
+        else:  # == 'HORIZ'
+            if utils.conv_bool(res['horiz_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_horiz')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_horiz')
+    return True  # Only run once!
+
+
+def track_scan(
+        tr_set,
+        track_inst,
+        start_track: VLib.Entity,
+        middle_file: str,
+        x_dir: int,
+        ):
+    """Build a set of track instances extending from a point.
+    :param track_inst: A dictionary mapping origins to track instances
+    :param start_track: The instance we start on
+    :param middle_file: The file for the center track piece
+    :param x_dir: The direction to look (-1 or 1)
+    """
+    track = start_track
+    move_dir = Vec(x_dir*128, 0, 0).rotate(
+        *Vec.from_str(track['angles'])
+    )
+    while track:
+        tr_set.add(track)
+
+        next_pos = Vec.from_str(track['origin']) + move_dir
+        track = track_inst.get(next_pos.as_tuple(), None)
+        if track is None:
+            return
+        if track['file'].casefold() != middle_file:
+            # If the next piece is an end section, add it then quit
+            tr_set.add(track)
+            return
