@@ -165,7 +165,8 @@ DEFAULTS = {
     "music_location_coop":      "-2000 -2000 0",
     # BEE2 sets this to tell conditions what music is selected
     "music_id":                 "<NONE>",
-    "global_pti_ents":          "",  # Instance used for pti_ents
+    # Instance used for pti_ents
+    "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
     # Location of the model changer instance if needed
@@ -762,20 +763,76 @@ def make_bottomless_pit(solids, max_height):
             ).make_unique()
 
 
-def iter_grid(dist, stride=1):
-    for x in range(0, dist, stride):
-        for y in range(0, dist, stride):
+def iter_grid(dist_x, dist_y, stride=1):
+    """Loop over a rectangular grid area."""
+    for x in range(0, dist_x, stride):
+        for y in range(0, dist_y, stride):
             yield x, y
 
 
 def add_goo_mist(sides):
-    needs_mist = set(sides)
-    for pos in sorted(sides):
+    """Add water_mist* particle systems to goo.
+
+    This uses larger particles when needed to save ents.
+    """
+    needs_mist = sides  # Locations that still need mist
+    sides = sorted(sides)
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=1024,
+        grid_y=512,
+        particle='water_mist_1024_512',
+        angles='0 0 0',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=512,
+        grid_y=1024,
+        particle='water_mist_1024_512',
+        angles='0 90 0',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=512,
+        grid_y=512,
+        particle='water_mist_512',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=256,
+        grid_y=256,
+        particle='water_mist_256',
+    )
+
+    # There isn't a 128 particle so use 256 centered
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=128,
+        grid_y=128,
+        particle='water_mist_256',
+    )
+
+def fit_goo_mist(
+        sides,
+        needs_mist,
+        grid_x,
+        grid_y,
+        particle,
+        angles='0 0 0',
+        ):
+    """Try to add particles of the given size.
+
+    needs_mist is a set of all added sides, so we don't double-up on a space.
+    """
+    if grid_y is None:
+        grid_y = grid_x
+    for pos in sides:
         if pos not in needs_mist:
             continue  # We filled this space already
-
-        # First try a 128 size grid
-        for x, y in iter_grid(512, 128):
+        for x, y in iter_grid(grid_x, grid_y, 128):
             if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
                 break  # Doesn't match
         else:
@@ -783,50 +840,16 @@ def add_goo_mist(sides):
                 classname='info_particle_system',
                 targetname='@goo_mist',
                 start_active='1',
-                effect_name='water_mist_512',
+                effect_name=particle,
                 origin='{x!s} {y!s} {z!s}'.format(
-                    x=pos.x + 192,
-                    y=pos.y + 192,
+                    x=pos.x + (grid_x/2 - 64),
+                    y=pos.y + (grid_y/2 - 64),
                     z=pos.z + 48,
-                )
+                ),
+                angles=angles,
             )
-            for (x, y) in iter_grid(512, 128):
+            for (x, y) in iter_grid(grid_x, grid_y, 128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
-            continue  # Next side
-
-        # That failed, try a 256 size grid
-        for x, y in iter_grid(256, 128):
-            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
-                break  # Doesn't match
-        else:
-            VMF.create_ent(
-                classname='info_particle_system',
-                targetname='@goo_mist',
-                start_active='1',
-                effect_name='water_mist_256',
-                origin='{x!s} {y!s} {z!s}'.format(
-                    x=pos.x + 64,
-                    y=pos.y + 64,
-                    z=pos.z + 48,
-                )
-            )
-            for (x, y) in iter_grid(256, 128):
-                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
-            continue  # Next side
-
-        # Both failed, use the 256 particle in the center.
-        VMF.create_ent(
-            classname='info_particle_system',
-            targetname='@goo_mist',
-            start_active='1',
-            effect_name='water_mist_256',
-            origin='{x!s} {y!s} {z!s}'.format(
-                x=pos.x,
-                y=pos.y,
-                z=pos.z + 48,
-            )
-        )
-
 
 def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
