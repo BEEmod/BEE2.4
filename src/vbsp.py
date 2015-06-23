@@ -60,8 +60,10 @@ TEX_VALVE = {
     }
 
 TEX_DEFAULTS = [
-    # extra default replacements we need to specially handle. These
-    # have the same item so we can't store this in the regular dictionary.
+    # Extra default replacements we need to specially handle.
+
+    # These have the same item so we can't store this in the regular
+    # dictionary.
     ('metal/black_floor_metal_001c', 'black.floor'),
     ('tile/white_floor_tile002a',    'white.floor'),
     ('metal/black_floor_metal_001c', 'black.ceiling'),
@@ -74,11 +76,13 @@ TEX_DEFAULTS = [
     ('metal/black_wall_metal_002e',  'black.wall'),
     ('metal/black_wall_metal_002a',  'black.2x2'),
     ('metal/black_wall_metal_002b',  'black.4x4'),
-    ('',                             'special.white'),
-    ('',                             'special.black'),
-    ('',                             'special.white_gap'),
-    ('',                             'special.black_gap'),
-    ('',                             'special.goo_wall'),
+
+    # These replacements are deactivated when unset
+    ('', 'special.white'),
+    ('', 'special.black'),
+    ('', 'special.white_gap'),
+    ('', 'special.black_gap'),
+    ('', 'special.goo_wall'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -86,6 +90,9 @@ TEX_DEFAULTS = [
         'overlay.antline'),
     ('1|signage/indicator_lights/indicator_lights_corner_floor',
         'overlay.antlinecorner'),
+    # This is for the P1 style, where antlines use different textures
+    # on the floor and wall.
+    # We just use the regular version if unset.
     ('', 'overlay.antlinecornerfloor'),
     ('', 'overlay.antlinefloor'),
     ]
@@ -244,9 +251,14 @@ def alter_mat(face, seed=None):
     elif mat in BLACK_PAN or mat in WHITE_PAN:
         surf_type = 'white' if mat in WHITE_PAN else 'black'
         orient = get_face_orient(face)
+        # We need to handle specially the 4x4 and 2x4 variants.
+        # These are used in the embedface brushes, so they should
+        # remain having small tile size. Wall textures have 4x4 and 2x2,
+        # but floor/ceilings only have 4x4 sizes (since they usually
+        # just stay the same).
         if orient == ORIENT.wall:
             if (mat == 'metal/black_wall_metal_002b' or
-                    mat == 'tile/white_wall_tile_003f'):
+                    mat == 'tile/white_wall_tile003f'):
                 orient = '4x4'
             elif (mat == 'metal/black_wall_metal_002a' or
                     mat == 'tile/white_wall_tile003c'):
@@ -254,9 +266,23 @@ def alter_mat(face, seed=None):
             else:
                 orient = 'wall'
         elif orient == ORIENT.floor:
-            orient = 'floor'
+            if (
+                    mat == 'metal/black_wall_metal_002b' or
+                    mat == 'tile/white_wall_tile003f' or
+                    mat == 'metal/black_wall_metal_002a' or
+                    mat == 'tile/white_wall_tile003c'):
+                orient = '4x4_floor'
+            else:
+                orient = 'floor'
         elif orient == ORIENT.ceiling:
-            orient = 'ceiling'
+            if (
+                    mat == 'metal/black_wall_metal_002b' or
+                    mat == 'tile/white_wall_tile003f' or
+                    mat == 'metal/black_wall_metal_002a' or
+                    mat == 'tile/white_wall_tile003c'):
+                orient = '4x4_ceil'
+            else:
+                orient = 'ceiling'
         face.mat = get_tex(surf_type + '.' + orient)
         return True
     elif mat in TEX_FIZZLER:
@@ -283,8 +309,13 @@ def load_settings():
 
     for item, key in tex_defaults:  # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in conf.find_all('textures', cat, name)]
+        value = [
+            prop.value
+            for prop in
+            conf.find_all('textures', cat, name)
+        ]
         if len(value) == 0:
+            # If there are no values, just use the original value
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
@@ -1229,14 +1260,13 @@ def clump_walls():
 
 def get_face_orient(face):
     """Determine the orientation of an on-grid face."""
-    if face.planes[0]['z'] == face.planes[1]['z'] == face.planes[2]['z']:
-        if face.planes[0]['y'] < face.planes[2]['y']:
-            return ORIENT.ceiling
-        else:
-            return ORIENT.floor
-    else:
-        return ORIENT.wall
+    norm = face.normal()
+    if norm == (0, 0, -1):
+        return ORIENT.floor
 
+    if norm == (0, 0, 1):
+        return ORIENT.ceiling
+    return ORIENT.wall
 
 def set_antline_mat(over, mat, raw_mat=False):
     """Set the material on an overlay to the given value, applying options.
@@ -1256,11 +1286,9 @@ def set_antline_mat(over, mat, raw_mat=False):
             # For P1 style, check to see if the antline is on the floor or
             # walls.
             ang = Vec.from_str(over['angles'])
-            direction = round(Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z))
-            utils.con_log('Ant dir: ', over['angles'], direction)
-            if direction == Vec(0, 0, 1) or direction == Vec(0, 0, -1):
+            direction = Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z)
+            if direction == (0, 0, 1) or direction == (0, 0, -1):
                 mat += 'floor'
-                utils.con_log('Floor!')
 
         mat = get_tex('overlay.' + mat)
 
