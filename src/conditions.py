@@ -703,7 +703,7 @@ def res_add_global_inst(_, res):
 def res_add_overlay_inst(inst, res):
     """Add another instance on top of this one."""
     print('adding overlay', res['file'])
-    VMF.create_ent(
+    overlay_inst = VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=resolve_inst(res['file', ''])[0],
@@ -711,6 +711,10 @@ def res_add_overlay_inst(inst, res):
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
+    if utils.conv_bool(res['copy_fixup', '1']):
+        # Copy the fixup values across from the original instance
+        for fixup, value in inst.fixup.items():
+            overlay_inst.fixup[fixup] = value
 
 
 @make_result_setup('custOutput')
