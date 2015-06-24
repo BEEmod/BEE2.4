@@ -531,9 +531,8 @@ def anti_fizz_bump(inst):
             VMF.add_ent(noportal)
         else:
             ent.remove()  # Remove any entities without brushes
-
-
     utils.con_log('Done!')
+
 
 def get_map_info():
     """Determine various attributes about the map.
@@ -553,6 +552,7 @@ def get_map_info():
     file_coop_corr = instanceLocs.resolve('[coopCorr]')
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
+    file_sp_door_frame = instanceLocs.resolve('[door_frame]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -569,6 +569,13 @@ def get_map_info():
         file_sp_entry_corr +
         file_sp_exit_corr
     )
+
+    # Door frames use the same instance for both the entry and exit doors,
+    # and it'd be useful to disinguish between them. Add an instvar to help.
+    door_frames = []
+    entry_origin = None
+    exit_origin = None
+
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
@@ -600,7 +607,8 @@ def get_map_info():
             GAME_MODE = 'SP'
         elif file in file_sp_entry:
             GAME_MODE = 'SP'
-
+        elif file in file_sp_door_frame:
+            door_frames.append(item)
         inst_files.add(item['file'])
 
     utils.con_log("Game Mode: " + GAME_MODE)
@@ -615,6 +623,15 @@ def get_map_info():
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
         )
+
+    # Now check the door frames, to allow distinguishing between
+    # the entry and exit frames.
+    for door_frame in door_frames:
+        origin = Vec.from_str(door_frame['origin'])
+        if origin.x == entry_origin.x and origin.y == entry_origin.y:
+            door_frame.fixup['door_type'] = 'entry'
+        elif origin.x == exit_origin.x and origin.y == exit_origin.y:
+            door_frame.fixup['door_type'] = 'exit'
 
     return inst_files
 
