@@ -41,8 +41,10 @@ SPECIAL_INST = {
     'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
     # 'indpan' is defined below from these two
 
-    'exit_frame': '<ITEM_EXIT_DOOR:4,5>',
-    'entry_frame': '<ITEM_ENTRY_DOOR:7,8>',
+    # The values in ITEM_EXIT_DOOR aren't actually used!
+    'door_frame': '<ITEM_ENTRY_DOOR:7,8>',
+    'white_frame': '<ITEM_ENTRY_DOOR:7>',
+    'black_frame': '<ITEM_ENTRY_DOOR:8>',
 }
 
 # Gives names to reusable instance fields, so you don't need to remember
@@ -124,14 +126,6 @@ def load_conf():
     INST_SPECIAL['indpan'] = (
         INST_SPECIAL['indpancheck'] +
         INST_SPECIAL['indpantimer']
-    )
-    INST_SPECIAL['white_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:7>') +
-        resolve('<ITEM_EXIT_DOOR:4>')
-    )
-    INST_SPECIAL['black_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:8>') +
-        resolve('<ITEM_EXIT_DOOR:5>')
     )
 
 @lru_cache()
