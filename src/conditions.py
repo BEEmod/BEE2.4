@@ -36,7 +36,7 @@ DIRECTIONS = {
     '+z': zp,
     '-z': zn,
 
-    'x': xp, # For with allow_inverse
+    'x': xp,  # For with allow_inverse
     'y': yp,
     'z': zp,
 
@@ -1347,7 +1347,6 @@ def res_track_plat(_, res):
     is horizontal or vertical and sets the track
     targetnames to a useful value.
     """
-    utils.con_log(resolve_inst(res['orig_item']))
     # Get the instances from editoritems
     (
         inst_bot_grate, inst_bottom, inst_middle,

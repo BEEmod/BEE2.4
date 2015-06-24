@@ -266,23 +266,9 @@ def alter_mat(face, seed=None):
             else:
                 orient = 'wall'
         elif orient == ORIENT.floor:
-            if (
-                    mat == 'metal/black_wall_metal_002b' or
-                    mat == 'tile/white_wall_tile003f' or
-                    mat == 'metal/black_wall_metal_002a' or
-                    mat == 'tile/white_wall_tile003c'):
-                orient = '4x4_floor'
-            else:
-                orient = 'floor'
+            orient = 'floor'
         elif orient == ORIENT.ceiling:
-            if (
-                    mat == 'metal/black_wall_metal_002b' or
-                    mat == 'tile/white_wall_tile003f' or
-                    mat == 'metal/black_wall_metal_002a' or
-                    mat == 'tile/white_wall_tile003c'):
-                orient = '4x4_ceil'
-            else:
-                orient = 'ceiling'
+            orient = 'ceiling'
         face.mat = get_tex(surf_type + '.' + orient)
         return True
     elif mat in TEX_FIZZLER:
