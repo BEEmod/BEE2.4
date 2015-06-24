@@ -589,10 +589,12 @@ def get_map_info():
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
 
         if file in file_sp_exit_corr:
+            exit_origin = Vec.from_str(item['origin'])
             if override_sp_exit != 0:
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
+            entry_origin = Vec.from_str(item['origin'])
             if override_sp_entry != 0:
                 utils.con_log('Setting entry to ' + str(override_sp_entry))
                 item['file'] = file_sp_entry_corr[override_sp_entry-1]
@@ -1123,6 +1125,26 @@ def face_seed(face):
             origin[axis] = origin[axis] // 128 + 64
     return origin.join()
 
+def get_grid_sizes(face: VLib.Side):
+    """Determine the grid sizes that fits on this brush."""
+    bbox_min, bbox_max = face.get_bbox()
+    dim = bbox_max - bbox_min
+
+    if dim.x == 0:
+        u, v = dim.y, dim.z
+    elif dim.y == 0:
+        u, v = dim.x, dim.z
+    elif dim.z == 0:
+        u, v = dim.x, dim.y
+    else:
+        raise Exception(str(dim) + ' not on grid!')
+
+    if u % 128 == 0 and v % 128 == 0:  # regular square
+        return "0.25", "0.5", "1"
+    if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
+        return "0.5",
+    if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
+        return "0.25",
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
@@ -1134,10 +1156,11 @@ def random_walls():
             if (scale_walls and
                     face.mat.casefold() in BLACK_PAN and
                     orient is not ORIENT.floor):
+
                 random.seed(face_seed(face) + '_SCALE_VAL')
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
-                scale = random.choice(("0.25", "0.5", "1"))
+                scale = random.choice(get_grid_sizes(face))
                 split = face.uaxis.split(" ")
                 split[-1] = scale
                 face.uaxis = " ".join(split)
