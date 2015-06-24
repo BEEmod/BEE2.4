@@ -128,6 +128,21 @@ def load_conf():
         INST_SPECIAL['indpantimer']
     )
 
+    INST_SPECIAL['lasercatcher'] = (
+        resolve('<ITEM_LASER_CATCHER_CENTER>') +
+        resolve('<ITEM_LASER_CATCHER_OFFSET>')
+    )
+
+    INST_SPECIAL['laseremitter'] = (
+        resolve('<ITEM_LASER_EMITTER_CENTER>') +
+        resolve('<ITEM_LASER_EMITTER_OFFSET>')
+    )
+
+    INST_SPECIAL['laserrelay'] = (
+        resolve('<ITEM_LASER_RELAY_CENTER>') +
+        resolve('<ITEM_LASER_RELAY_OFFSET>')
+    )
+
 @lru_cache()
 def resolve(path) -> list:
     """Replace an instance path with the values it refers to.
