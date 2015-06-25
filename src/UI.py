@@ -687,6 +687,7 @@ def export_editoritems(_=None):
         if var.applies_to_style(chosen_style)
     }
 
+    # Add all of the special/hardcoded style vars
     for var_id, _, __ in StyleVarPane.styleOptions:
         style_vars[var_id] = style_vals[var_id].get() == 1
 
@@ -1099,6 +1100,16 @@ def init_option(f):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
 
+    def suggested_style_mousein(e):
+        """When mousing over the button, show the suggested items."""
+        for win in (voice_win, music_win, skybox_win, elev_win):
+            win.rollover_suggest()
+
+    def suggested_style_mouseout(e):
+        """Return text to the normal value on mouseout."""
+        for win in (voice_win, music_win, skybox_win, elev_win):
+            win.set_disp()
+
     UI['suggested_style'] = ttk.Button(
         props,
         # '\u2193' is the downward arrow symbol.
@@ -1106,6 +1117,8 @@ def init_option(f):
         command=suggested_style_set,
         )
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
+    UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
+    UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
 
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
