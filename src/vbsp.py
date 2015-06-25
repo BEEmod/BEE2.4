@@ -495,7 +495,12 @@ def anti_fizz_bump(inst):
 
         # Copy one of the solids to use as a base, so the texture axes
         # are correct.
-        new_solid = cleanser.solids[1].copy()
+        if len(cleanser.solids) == 1:
+            # It's a 128x128 brush, with only one solid
+            new_solid = cleanser.solids[0].copy()
+        else:
+            # It's a regular one, we want the middle/large section
+            new_solid = cleanser.solids[1].copy()
         bumper.solids.append(new_solid)
 
         for face in new_solid:
