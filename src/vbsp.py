@@ -456,7 +456,6 @@ def anti_fizz_bump(inst):
     if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
         return True
 
-    ents = {}  # We use one entity per targetname, since more aren't needed.
     utils.con_log('Adding Portal Bumpers to fizzlers...')
     for cleanser in VMF.by_class['trigger_portal_cleanser']:
         # Client bit flag = 1, triggers without it won't destroy portals
@@ -470,17 +469,16 @@ def anti_fizz_bump(inst):
             fizz_name = fizz_name[:-6] + '-br_brush'
 
         utils.con_log('name:', fizz_name)
-        if fizz_name not in ents:
-            bumper = ents[fizz_name] = VMF.create_ent(
-                classname='func_portal_bumper',
-                targetname=fizz_name,
-                origin=cleanser['origin'],
-                spawnflags='1',
-                # Start off, we can't really check if the original
-                # does, but that's usually handled by the instance anyway.
-            )
-        else:
-            bumper = ents[fizz_name]
+        # We can't combine the bumpers, since noportal_volumes
+        # don't work with concave areas
+        bumper = VMF.create_ent(
+            classname='func_portal_bumper',
+            targetname=fizz_name,
+            origin=cleanser['origin'],
+            spawnflags='1',
+            # Start off, we can't really check if the original
+            # does, but that's usually handled by the instance anyway.
+        )
 
         bound_min, bound_max = cleanser.get_bbox()
         origin = (bound_max + bound_min) / 2  # type: Vec
@@ -514,14 +512,11 @@ def anti_fizz_bump(inst):
                     else:
                         v[axis] = bound_min[axis]
 
-    for ent in ents.values():
-        if ent.is_brush():
-            noportal = ent.copy()
-            # Add a noportal_volume as well, of the same size.
-            noportal['classname'] = 'func_noportal_volume'
-            VMF.add_ent(noportal)
-        else:
-            ent.remove()  # Remove any entities without brushes
+        noportal = bumper.copy()
+        # Add a noportal_volume as well, of the same size.
+        noportal['classname'] = 'func_noportal_volume'
+        VMF.add_ent(noportal)
+
     utils.con_log('Done!')
 
 
