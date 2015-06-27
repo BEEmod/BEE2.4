@@ -68,9 +68,9 @@ INST_ANGLE = {
     zn: "0 0 0",
 
     xn: "0 0 0",
-    yp: "0 90 0",
+    yn: "0 90 0",
     xp: "0 180 0",
-    yn: "0 270 0"
+    yp: "0 270 0",
 
 }
 
@@ -1172,11 +1172,15 @@ def res_make_catwalk(_, res):
         for name in
         (
             'straight_128', 'straight_256', 'straight_512',
-            'corner', 'tjunction', 'crossjunction', 'end', 'stair',
-            'support_wall', 'support_ceil', 'support_floor', 'markerInst',
+            'corner', 'tjunction', 'crossjunction', 'end', 'stair', 'end_wall',
+            'support_wall', 'support_ceil', 'support_floor', 'single_wall',
+            'markerInst',
         )
     }
-    instances['NONE'] = '' # If there are no attachments
+    # If there are no attachments remove a catwalk piece
+    instances['NONE'] = ''
+    if instances['end_wall'] == '':
+        instances['end_wall'] = instances['end']
 
     connections = {}  # The directions this instance is connected by (NSEW)
     markers = {}
@@ -1278,11 +1282,33 @@ def res_make_catwalk(_, res):
         new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
 
-        if new_type is utils.CONN_TYPES.side:
-            continue  # End pieces don't get supports
-
         normal = Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z)
         ':type normal: Vec'
+
+        if new_type is utils.CONN_TYPES.side:
+            # If the end piece is pointing at a wall, switch the instance.
+            if normal.z == 0:
+                # Treat booleans as ints to get the direction the connection is
+                # in - True == 1, False == 0
+                conn_dir = Vec(
+                    x=dir_mask[2] - dir_mask[3],  # +E, -W
+                    y=dir_mask[0] - dir_mask[1],  # +N, -S,
+                    z=0,
+                )
+                if normal == conn_dir:
+                    inst['file'] = instances['end_wall']
+            continue  # We never have normal supports on end pieces
+        elif new_type is utils.CONN_TYPES.none:
+            # Unconnected catwalks on the wall switch to a special instance.
+            # This lets players stand next to a portal surface on the wall.
+            if normal.z == 0:
+                inst['file'] = instances['single_wall']
+                inst['angles'] = INST_ANGLE[normal.as_tuple()]
+            else:
+                inst.remove()
+            continue  # These don't get supports otherwise
+
+        # Add regular supports
         if normal == (0, 0, 1):
             supp = instances['support_floor']
         elif normal == (0, 0, -1):
@@ -1297,7 +1323,6 @@ def res_make_catwalk(_, res):
                 angles=INST_ANGLE[normal.as_tuple()],
                 file=supp,
             )
-
 
     utils.con_log('Finished catwalk generation!')
     return True  # Don't run this again
