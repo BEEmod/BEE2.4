@@ -202,14 +202,19 @@ def append_bothsides(deq):
         deq.appendleft((yield))
 
 def fit(dist, obj):
-    """Figure out the smallest number of parts to stretch the distance."""
+    """Figure out the smallest number of parts to stretch a distance."""
+    # If dist is a float the outputs will become floats as well
+    # so ensure it's an int.
+    dist = int(dist)
+    if dist <= 0:
+        return []
+    orig_dist = dist
     smallest = obj[-1]
     items = deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = append_bothsides(items)
     next(adder)
-
     while dist >= smallest:
         for item in obj:
             if item <= dist:
@@ -218,7 +223,9 @@ def fit(dist, obj):
                 break
     if dist > 0:
         adder.send(dist)
-    return list(items) # Dump the deque
+
+    assert sum(items) == orig_dist
+    return list(items)  # Dump the deque
 
 
 class EmptyMapping(abc.Mapping):
@@ -397,34 +404,99 @@ class Vec:
             return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
         else:
             return Vec(self.x + other, self.y + other, self.z + other)
+    __radd__ = __add__
 
     def __sub__(self, other):
         """- operation.
 
         This additionally works on scalars (adds to all axes).
         """
-        if isinstance(other, Vec):
-            return Vec(self.x - other.x, self.y - other.y, self.z - other.z)
-        else:
-            return Vec(self.x - other, self.y - other, self.z - other)
+        try:
+            if isinstance(other, Vec):
+                return Vec(
+                    self.x - other.x,
+                    self.y - other.y,
+                    self.z - other.z
+                )
+            else:
+                return Vec(
+                    self.x - other,
+                    self.y - other,
+                    self.z - other,
+                )
+        except TypeError:
+            return NotImplemented
+
+    def __rsub__(self, other):
+        """- operation.
+
+        This additionally works on scalars (adds to all axes).
+        """
+        try:
+            if isinstance(other, Vec):
+                return Vec(
+                    other.x - self.x,
+                    other.y - self.x,
+                    other.z - self.z
+                )
+            else:
+                return Vec(
+                    other - self.x,
+                    other - self.y,
+                    other - self.z
+                )
+        except TypeError:
+            return NotImplemented
 
     def __mul__(self, other):
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x * other, self.y * other, self.z * other)
+            try:
+                return Vec(
+                    self.x * other,
+                    self.y * other,
+                    self.z * other,
+                )
+            except TypeError:
+                return NotImplemented
+    __rmul__ = __mul__
+
 
     def __div__(self, other):
         """Divide the Vector by a scalar.
 
         If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero
+        as the magnitude is greater than zero.
         """
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x / other, self.y / other, self.z / other)
+            try:
+                return Vec(
+                    self.x / other,
+                    self.y / other,
+                    self.z / other,
+                )
+            except TypeError:
+                return NotImplemented
+
+    def __rdiv__(self, other):
+        """Divide a scalar by a Vector.
+
+        """
+        if isinstance(other, Vec):
+            return NotImplemented
+        else:
+            try:
+                return Vec(
+                    other / self.x,
+                    other / self.y,
+                    other / self.z,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __floordiv__(self, other):
         """Divide the Vector by a scalar, discarding the remainder.
@@ -435,14 +507,28 @@ class Vec:
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x // other, self.y // other, self.z // other)
+            try:
+                return Vec(
+                    self.x // other,
+                    self.y // other,
+                    self.z // other,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __mod__(self, other):
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x % other, self.y % other, self.z % other)
+            try:
+                return Vec(
+                    self.x % other,
+                    self.y % other,
+                    self.z % other,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __divmod__(self, other):
         """Divide the vector by a scalar, returning the result and remainder.
@@ -451,10 +537,15 @@ class Vec:
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            x1, x2 = divmod(self.x, other)
-            y1, y2 = divmod(self.y, other)
-            z1, z2 = divmod(self.y, other)
-            return Vec(x1, y1, z1), Vec(x2, y2, z2)
+            try:
+                x1, x2 = divmod(self.x, other)
+                y1, y2 = divmod(self.y, other)
+                z1, z2 = divmod(self.y, other)
+            except TypeError:
+                return NotImplemented
+            else:
+                return Vec(x1, y1, z1), Vec(x2, y2, z2)
+
 
     def __iadd__(self, other):
         """+= operation.
@@ -467,9 +558,16 @@ class Vec:
             self.z += other.z
             return self
         else:
-            self.x += other
-            self.y += other
-            self.z += other
+            orig = self.x, self.y, self.z
+            try:
+                self.x += other
+                self.y += other
+                self.z += other
+            except TypeError as e:
+                self.x, self.y, self.z = orig
+                raise TypeError(
+                    'Cannot add ' + type(other) + ' to Vector!'
+                ) from e
             return self
 
     def __isub__(self, other):
@@ -478,14 +576,21 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            self.x += other.x
-            self.y += other.y
-            self.z += other.z
+            self.x -= other.x
+            self.y -= other.y
+            self.z -= other.z
             return self
         else:
-            self.x += other
-            self.y += other
-            self.z += other
+            orig = self.x, self.y, self.z
+            try:
+                self.x -= other
+                self.y -= other
+                self.z -= other
+            except TypeError as e:
+                self.x, self.y, self.z = orig
+                raise TypeError(
+                    'Cannot subtract ' + type(other) + ' from Vector!'
+                ) from e
             return self
 
     def __imul__(self, other):
@@ -494,7 +599,7 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            return NotImplemented
+            raise TypeError("Cannot multiply 2 Vectors.")
         else:
             self.x *= other
             self.y *= other
@@ -507,11 +612,38 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            return NotImplemented
+            raise TypeError("Cannot divide 2 Vectors.")
         else:
             self.x /= other
             self.y /= other
             self.z /= other
+            return self
+
+
+    def __ifloordiv__(self, other):
+        """//= operation.
+
+        Like the normal one except without duplication.
+        """
+        if isinstance(other, Vec):
+            raise TypeError("Cannot divide 2 Vectors.")
+        else:
+            self.x //= other
+            self.y //= other
+            self.z //= other
+            return self
+
+    def __imod__(self, other):
+        """%= operation.
+
+        Like the normal one except without duplication.
+        """
+        if isinstance(other, Vec):
+            raise TypeError("Cannot modulus 2 Vectors.")
+        else:
+            self.x %= other
+            self.y %= other
+            self.z %= other
             return self
 
     def __bool__(self):
