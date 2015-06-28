@@ -1156,6 +1156,76 @@ CATWALK_TYPES = {
     utils.CONN_TYPES.none: 'NONE',
 }
 
+def place_catwalk_connections(instances, point_a, point_b):
+    """Place catwalk sections to connect two straight points."""
+    diff = point_b - point_a
+
+    # The horizontal unit vector in the direction we are placing catwalks
+    direction = diff.copy()
+    direction.z = 0
+    distance = direction.len() - 128
+    direction = direction.norm()
+
+    if diff.z > 0:
+        angle = INST_ANGLE[direction.as_tuple()]
+        # We need to add stairs
+        for stair_pos in range(0, int(diff.z), 128):
+            # Move twice the vertical horizontally
+            # plus 128 so we don't start in point A
+            loc = point_a + (2 * stair_pos + 128) * direction
+            # Do the vertical offset
+            loc.z += stair_pos
+            VMF.create_ent(
+                classname='func_instance',
+                origin=loc.join(' '),
+                angles=angle,
+                file=instances['stair'],
+            )
+        # This is the location we start flat sections at
+        point_a = loc + 128 * direction
+        point_a.z += 128
+    elif diff.z < 0:
+        # We need to add downward stairs
+        # They point opposite to normal ones
+        utils.con_log('down from', point_a)
+        angle = INST_ANGLE[(-direction).as_tuple()]
+        for stair_pos in range(0, -int(diff.z), 128):
+            utils.con_log(stair_pos)
+            # Move twice the vertical horizontally
+            loc = point_a + (2 * stair_pos + 256) * direction
+            # Do the vertical offset plus additional 128 units
+            # to account for the moved instance
+            loc.z -= (stair_pos + 128)
+            VMF.create_ent(
+                classname='func_instance',
+                origin=loc.join(' '),
+                angles=angle,
+                file=instances['stair'],
+            )
+        # Adjust point A to be at the end of the catwalks
+        point_a = loc
+    # Remove the space the stairs take up from the horiz distance
+    distance -= abs(diff.z) * 2
+
+    # Now do straight sections
+    utils.con_log('Stretching ', distance, direction)
+    angle = INST_ANGLE[direction.as_tuple()]
+    loc = point_a + (direction * 128)
+
+    # Figure out the most efficent number of sections
+    for segment_len in utils.fit(
+            distance,
+            [512, 256, 128]
+            ):
+        VMF.create_ent(
+            classname='func_instance',
+            origin=loc.join(' '),
+            angles=angle,
+            file=instances['straight_' + str(segment_len)],
+        )
+        utils.con_log(loc)
+        loc += (segment_len * direction)
+
 
 @make_result('makeCatwalk')
 def res_make_catwalk(_, res):
@@ -1188,8 +1258,7 @@ def res_make_catwalk(_, res):
     for inst in VMF.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
-        loc = Vec.from_str(inst['origin'])
-        #                             [North, South, East,  West ]
+        #                   [North, South, East,  West ]
         connections[inst] = [False, False, False, False]
         markers[inst['targetname']] = inst
 
@@ -1231,32 +1300,9 @@ def res_make_catwalk(_, res):
                 utils.con_log('Not enough room for stairs!')
                 continue
 
-            if dist >= 128:
+            if dist > 128:
                 # add straight sections in between
-                x, y, z = str(origin1.x), str(origin1.y), str(origin1.z)
-                if y_dir:
-                    for y in range(
-                            # + 128 to skip the first location
-                            min(int(origin1.y), int(origin2.y)) + 128,
-                            max(int(origin1.y), int(origin2.y)),
-                            128):
-                        VMF.create_ent(
-                            classname='func_instance',
-                            origin=(x + ' ' + str(y) + ' ' + z),
-                            angles='0 90 0',
-                            file=instances['straight_128'],
-                        )
-                else:
-                    for x in range(
-                            min(int(origin1.x), int(origin2.x)) + 128,
-                            max(int(origin1.x), int(origin2.x)),
-                            128):
-                        VMF.create_ent(
-                            classname='func_instance',
-                            origin=(str(x) + ' ' + y + ' ' + z),
-                            angles='0 0 0',
-                            file=instances['straight_128'],
-                        )
+                place_catwalk_connections(instances, origin1, origin2)
 
             # Update the lists based on the directions that were set
             conn_lst1 = connections[inst]
@@ -1274,6 +1320,8 @@ def res_make_catwalk(_, res):
             elif origin2.y < origin1.y:
                 conn_lst1[1] = True  # S
                 conn_lst2[0] = True  # N
+
+        inst.outputs.clear()  # Remove the outputs now, they're useless
 
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
