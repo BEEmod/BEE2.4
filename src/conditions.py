@@ -479,7 +479,7 @@ def flag_file_equal(inst, flag):
     return inst['file'].casefold() in resolve_inst(flag.value)
 
 
-@make_flag('InstFlag')
+@make_flag('InstFlag', 'instpart')
 def flag_file_cont(inst, flag):
     return flag.value in inst['file'].casefold()
 
@@ -526,13 +526,13 @@ def flag_option(_, flag):
         return False
 
 
-@make_flag('ifMode')
+@make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(_, flag):
     import vbsp
     return vbsp.GAME_MODE.casefold() == flag.value.casefold()
 
 
-@make_flag('ifPreview')
+@make_flag('ifPreview', 'preview')
 def flag_is_preview(_, flag):
     import vbsp
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
@@ -593,7 +593,7 @@ def res_change_instance(inst, res):
     inst['file'] = resolve_inst(res.value)[0]
 
 
-@make_result('suffix')
+@make_result('suffix', 'instSuffix')
 def res_add_suffix(inst, res):
     """Add the specified suffix to the filename."""
     add_suffix(inst, '_' + res.value)
@@ -699,7 +699,7 @@ def res_add_global_inst(_, res):
     return True  # Remove this result
 
 
-@make_result('addOverlay')
+@make_result('addOverlay', 'overlayinst')
 def res_add_overlay_inst(inst, res):
     """Add another instance on top of this one."""
     print('adding overlay', res['file'])
