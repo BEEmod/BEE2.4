@@ -41,8 +41,10 @@ SPECIAL_INST = {
     'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
     # 'indpan' is defined below from these two
 
-    'exit_frame': '<ITEM_EXIT_DOOR:4,5>',
-    'entry_frame': '<ITEM_ENTRY_DOOR:7,8>',
+    # The values in ITEM_EXIT_DOOR aren't actually used!
+    'door_frame': '<ITEM_ENTRY_DOOR:7,8>',
+    'white_frame': '<ITEM_ENTRY_DOOR:7>',
+    'black_frame': '<ITEM_ENTRY_DOOR:8>',
 }
 
 # Gives names to reusable instance fields, so you don't need to remember
@@ -54,6 +56,8 @@ SUBITEMS = {
     'comp': 1,
 
     'reflect': 2,
+    'redirect': 2,
+    'reflection': 2,
     'redirection': 2,
     'laser': 2,
 
@@ -86,6 +90,17 @@ SUBITEMS = {
     'btn_sphere': 4,
     'btn_ball': 4,
     'btn_edgeless': 4,
+
+    # Track platform
+    'track_bottom_grate': 0,
+    'track_bottom': 1,
+    'track_middle': 2,
+    'track_top': 3,
+    'track_platform': 4,
+    'track_plat': 4,
+    'track_platform_oscillate': 5,
+    'track_plat_oscil': 5,
+    'track_single': 6
 }
 
 def load_conf():
@@ -112,13 +127,20 @@ def load_conf():
         INST_SPECIAL['indpancheck'] +
         INST_SPECIAL['indpantimer']
     )
-    INST_SPECIAL['white_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:7>') +
-        resolve('<ITEM_EXIT_DOOR:4>')
+
+    INST_SPECIAL['lasercatcher'] = (
+        resolve('<ITEM_LASER_CATCHER_CENTER>') +
+        resolve('<ITEM_LASER_CATCHER_OFFSET>')
     )
-    INST_SPECIAL['black_frames'] = (
-        resolve('<ITEM_ENTRY_DOOR:8>') +
-        resolve('<ITEM_EXIT_DOOR:5>')
+
+    INST_SPECIAL['laseremitter'] = (
+        resolve('<ITEM_LASER_EMITTER_CENTER>') +
+        resolve('<ITEM_LASER_EMITTER_OFFSET>')
+    )
+
+    INST_SPECIAL['laserrelay'] = (
+        resolve('<ITEM_LASER_RELAY_CENTER>') +
+        resolve('<ITEM_LASER_RELAY_OFFSET>')
     )
 
 @lru_cache()
@@ -148,7 +170,20 @@ def resolve(path) -> list:
             for val in subitem.split(','):
                 ind = SUBITEMS.get(val.strip().casefold(), None)
                 if ind is None:
-                    ind = int(val.strip())
+                    try:
+                        ind = int(val.strip())
+                    except ValueError as e:
+                        utils.con_log('--------\nValid subitems:')
+                        utils.con_log('\n'.join(
+                            ('> ' + k + ' = ' + str(v))
+                            for k, v in
+                            SUBITEMS.items()
+                        ))
+                        utils.con_log('--------')
+                        raise Exception(
+                            '"' + val + '" is not a valid instance'
+                            ' subtype or index!'
+                        )
                 # Only add if it's actually in range
                 if 0 <= ind < len(item_values):
                     out.append(item_values[ind])

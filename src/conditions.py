@@ -36,7 +36,7 @@ DIRECTIONS = {
     '+z': zp,
     '-z': zn,
 
-    'x': xp, # For with allow_inverse
+    'x': xp,  # For with allow_inverse
     'y': yp,
     'z': zp,
 
@@ -58,6 +58,7 @@ DIRECTIONS = {
     'west': xn,
 
     'wall': 'WALL',  # Special case, not wall/ceiling
+    'walls': 'WALL',
 }
 
 INST_ANGLE = {
@@ -67,9 +68,9 @@ INST_ANGLE = {
     zn: "0 0 0",
 
     xn: "0 0 0",
-    yp: "0 90 0",
+    yn: "0 90 0",
     xp: "0 180 0",
-    yn: "0 270 0"
+    yp: "0 270 0",
 
 }
 
@@ -425,6 +426,17 @@ def remove_blank_inst(inst):
     if inst['file', ''] in ('', '.vmf'):
         VMF.remove_ent(inst)
 
+
+@meta_cond(priority=0, only_once=True)
+def fix_catapult_targets(inst):
+    """Set faith plate targets to transmit to clients.
+
+    This fixes some console spam in coop, and might improve trajectories
+    for faith plates.
+    """
+    for targ in VMF.by_class['info_target']:
+        targ['spawnflags'] = '3'  # Transmit to client, ignoring PVS
+
 #########
 # FLAGS #
 #########
@@ -467,7 +479,7 @@ def flag_file_equal(inst, flag):
     return inst['file'].casefold() in resolve_inst(flag.value)
 
 
-@make_flag('InstFlag')
+@make_flag('InstFlag', 'instpart')
 def flag_file_cont(inst, flag):
     return flag.value in inst['file'].casefold()
 
@@ -491,12 +503,12 @@ def flag_instvar(inst, flag):
 
 @make_flag('styleVar')
 def flag_stylevar(_, flag):
-    return bool(STYLE_VARS[flag.value.casefold()])
+    return STYLE_VARS[flag.value.casefold()]
 
 
 @make_flag('has')
 def flag_voice_has(_, flag):
-    return bool(VOICE_ATTR[flag.value.casefold()])
+    return VOICE_ATTR[flag.value.casefold()]
 
 
 @make_flag('has_music')
@@ -514,13 +526,13 @@ def flag_option(_, flag):
         return False
 
 
-@make_flag('ifMode')
+@make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(_, flag):
     import vbsp
     return vbsp.GAME_MODE.casefold() == flag.value.casefold()
 
 
-@make_flag('ifPreview')
+@make_flag('ifPreview', 'preview')
 def flag_is_preview(_, flag):
     import vbsp
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
@@ -560,9 +572,8 @@ def flag_angles(inst, flag):
         # so it failed the exact match
 
     angle = Vec.from_str(angle, 0, 0, 0)
-    inst_normal = round(
-        from_dir.rotate(angle.x, angle.y, angle.z)
-    )
+    inst_normal = from_dir.rotate(angle.x, angle.y, angle.z)
+
     if normal == 'WALL':
         # Special case - it's not on the floor or ceiling
         return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
@@ -582,7 +593,7 @@ def res_change_instance(inst, res):
     inst['file'] = resolve_inst(res.value)[0]
 
 
-@make_result('suffix')
+@make_result('suffix', 'instSuffix')
 def res_add_suffix(inst, res):
     """Add the specified suffix to the filename."""
     add_suffix(inst, '_' + res.value)
@@ -599,10 +610,11 @@ def res_set_style_var(_, res):
 
 @make_result('has')
 def res_set_voice_attr(_, res):
-    for opt in res.value:
-        val = utils.conv_bool(opt.value, default=None)
-        if val is not None:
-            VOICE_ATTR[opt.name] = val
+    if res.has_children():
+        for opt in res.value:
+            VOICE_ATTR[opt.name] = True
+    else:
+        VOICE_ATTR[res.value.casefold()] = 1
     return True  # Remove this result
 
 
@@ -687,11 +699,11 @@ def res_add_global_inst(_, res):
     return True  # Remove this result
 
 
-@make_result('addOverlay')
+@make_result('addOverlay', 'overlayinst')
 def res_add_overlay_inst(inst, res):
     """Add another instance on top of this one."""
     print('adding overlay', res['file'])
-    VMF.create_ent(
+    overlay_inst = VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=resolve_inst(res['file', ''])[0],
@@ -699,6 +711,10 @@ def res_add_overlay_inst(inst, res):
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
+    if utils.conv_bool(res['copy_fixup', '1']):
+        # Copy the fixup values across from the original instance
+        for fixup, value in inst.fixup.items():
+            overlay_inst.fixup[fixup] = value
 
 
 @make_result_setup('custOutput')
@@ -821,7 +837,7 @@ def res_faith_mods(inst, res):
     offset = utils.conv_int(res['raise_trig', '0'])
     if offset:
         angle = Vec.from_str(inst['angles', '0 0 0'])
-        offset = round(Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z))
+        offset = Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z)
         ':type offset Vec'
     for trig in VMF.by_class['trigger_catapult']:
         if inst['targetname'] in trig['targetname']:
@@ -1085,7 +1101,7 @@ def res_fizzler_pair(begin_inst, res):
 
     angles = Vec.from_str(begin_inst['angles'])
     # We round it to get rid of 0.00001 inprecision from the calculations.
-    direction = round(Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z))
+    direction = Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z)
     ':type direction: utils.Vec'
 
     begin_pos = Vec.from_str(begin_inst['origin'])
@@ -1140,6 +1156,76 @@ CATWALK_TYPES = {
     utils.CONN_TYPES.none: 'NONE',
 }
 
+def place_catwalk_connections(instances, point_a, point_b):
+    """Place catwalk sections to connect two straight points."""
+    diff = point_b - point_a
+
+    # The horizontal unit vector in the direction we are placing catwalks
+    direction = diff.copy()
+    direction.z = 0
+    distance = direction.len() - 128
+    direction = direction.norm()
+
+    if diff.z > 0:
+        angle = INST_ANGLE[direction.as_tuple()]
+        # We need to add stairs
+        for stair_pos in range(0, int(diff.z), 128):
+            # Move twice the vertical horizontally
+            # plus 128 so we don't start in point A
+            loc = point_a + (2 * stair_pos + 128) * direction
+            # Do the vertical offset
+            loc.z += stair_pos
+            VMF.create_ent(
+                classname='func_instance',
+                origin=loc.join(' '),
+                angles=angle,
+                file=instances['stair'],
+            )
+        # This is the location we start flat sections at
+        point_a = loc + 128 * direction
+        point_a.z += 128
+    elif diff.z < 0:
+        # We need to add downward stairs
+        # They point opposite to normal ones
+        utils.con_log('down from', point_a)
+        angle = INST_ANGLE[(-direction).as_tuple()]
+        for stair_pos in range(0, -int(diff.z), 128):
+            utils.con_log(stair_pos)
+            # Move twice the vertical horizontally
+            loc = point_a + (2 * stair_pos + 256) * direction
+            # Do the vertical offset plus additional 128 units
+            # to account for the moved instance
+            loc.z -= (stair_pos + 128)
+            VMF.create_ent(
+                classname='func_instance',
+                origin=loc.join(' '),
+                angles=angle,
+                file=instances['stair'],
+            )
+        # Adjust point A to be at the end of the catwalks
+        point_a = loc
+    # Remove the space the stairs take up from the horiz distance
+    distance -= abs(diff.z) * 2
+
+    # Now do straight sections
+    utils.con_log('Stretching ', distance, direction)
+    angle = INST_ANGLE[direction.as_tuple()]
+    loc = point_a + (direction * 128)
+
+    # Figure out the most efficent number of sections
+    for segment_len in utils.fit(
+            distance,
+            [512, 256, 128]
+            ):
+        VMF.create_ent(
+            classname='func_instance',
+            origin=loc.join(' '),
+            angles=angle,
+            file=instances['straight_' + str(segment_len)],
+        )
+        utils.con_log(loc)
+        loc += (segment_len * direction)
+
 
 @make_result('makeCatwalk')
 def res_make_catwalk(_, res):
@@ -1156,11 +1242,15 @@ def res_make_catwalk(_, res):
         for name in
         (
             'straight_128', 'straight_256', 'straight_512',
-            'corner', 'tjunction', 'crossjunction', 'end', 'stair',
-            'support_wall', 'support_ceil', 'support_floor', 'markerInst',
+            'corner', 'tjunction', 'crossjunction', 'end', 'stair', 'end_wall',
+            'support_wall', 'support_ceil', 'support_floor', 'single_wall',
+            'markerInst',
         )
     }
-    instances['NONE'] = '' # If there are no attachments
+    # If there are no attachments remove a catwalk piece
+    instances['NONE'] = ''
+    if instances['end_wall'] == '':
+        instances['end_wall'] = instances['end']
 
     connections = {}  # The directions this instance is connected by (NSEW)
     markers = {}
@@ -1168,8 +1258,7 @@ def res_make_catwalk(_, res):
     for inst in VMF.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
-        loc = Vec.from_str(inst['origin'])
-        #                             [North, South, East,  West ]
+        #                   [North, South, East,  West ]
         connections[inst] = [False, False, False, False]
         markers[inst['targetname']] = inst
 
@@ -1211,32 +1300,9 @@ def res_make_catwalk(_, res):
                 utils.con_log('Not enough room for stairs!')
                 continue
 
-            if dist >= 128:
+            if dist > 128:
                 # add straight sections in between
-                x, y, z = str(origin1.x), str(origin1.y), str(origin1.z)
-                if y_dir:
-                    for y in range(
-                            # + 128 to skip the first location
-                            min(int(origin1.y), int(origin2.y)) + 128,
-                            max(int(origin1.y), int(origin2.y)),
-                            128):
-                        VMF.create_ent(
-                            classname='func_instance',
-                            origin=(x + ' ' + str(y) + ' ' + z),
-                            angles='0 90 0',
-                            file=instances['straight_128'],
-                        )
-                else:
-                    for x in range(
-                            min(int(origin1.x), int(origin2.x)) + 128,
-                            max(int(origin1.x), int(origin2.x)),
-                            128):
-                        VMF.create_ent(
-                            classname='func_instance',
-                            origin=(str(x) + ' ' + y + ' ' + z),
-                            angles='0 0 0',
-                            file=instances['straight_128'],
-                        )
+                place_catwalk_connections(instances, origin1, origin2)
 
             # Update the lists based on the directions that were set
             conn_lst1 = connections[inst]
@@ -1255,6 +1321,8 @@ def res_make_catwalk(_, res):
                 conn_lst1[1] = True  # S
                 conn_lst2[0] = True  # N
 
+        inst.outputs.clear()  # Remove the outputs now, they're useless
+
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
         print(inst['targetname'], dir_mask)
@@ -1262,11 +1330,33 @@ def res_make_catwalk(_, res):
         new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
 
-        if new_type is utils.CONN_TYPES.side:
-            continue  # End pieces don't get supports
-
-        normal = round(Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z))
+        normal = Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z)
         ':type normal: Vec'
+
+        if new_type is utils.CONN_TYPES.side:
+            # If the end piece is pointing at a wall, switch the instance.
+            if normal.z == 0:
+                # Treat booleans as ints to get the direction the connection is
+                # in - True == 1, False == 0
+                conn_dir = Vec(
+                    x=dir_mask[2] - dir_mask[3],  # +E, -W
+                    y=dir_mask[0] - dir_mask[1],  # +N, -S,
+                    z=0,
+                )
+                if normal == conn_dir:
+                    inst['file'] = instances['end_wall']
+            continue  # We never have normal supports on end pieces
+        elif new_type is utils.CONN_TYPES.none:
+            # Unconnected catwalks on the wall switch to a special instance.
+            # This lets players stand next to a portal surface on the wall.
+            if normal.z == 0:
+                inst['file'] = instances['single_wall']
+                inst['angles'] = INST_ANGLE[normal.as_tuple()]
+            else:
+                inst.remove()
+            continue  # These don't get supports otherwise
+
+        # Add regular supports
         if normal == (0, 0, 1):
             supp = instances['support_floor']
         elif normal == (0, 0, -1):
@@ -1281,7 +1371,6 @@ def res_make_catwalk(_, res):
                 angles=INST_ANGLE[normal.as_tuple()],
                 file=supp,
             )
-
 
     utils.con_log('Finished catwalk generation!')
     return True  # Don't run this again
@@ -1322,3 +1411,169 @@ def make_static_pist(ent, res):
         ]
         if val:
             ent['file'] = val
+
+@make_result('trackPlatform')
+def res_track_plat(_, res):
+    """Logic specific to Track Platforms.
+
+    This allows switching the instances used depending on if the track
+    is horizontal or vertical and sets the track
+    targetnames to a useful value.
+    """
+    # Get the instances from editoritems
+    (
+        inst_bot_grate, inst_bottom, inst_middle,
+        inst_top, inst_plat, inst_plat_oscil, inst_single
+    ) = resolve_inst(res['orig_item'])
+    single_plat_inst = res['single_plat', '']
+    track_targets = res['track_name', '']
+
+    track_files = [inst_bottom, inst_middle, inst_top, inst_single]
+    platforms = [inst_plat, inst_plat_oscil]
+
+    # All the track_set in the map, indexed by origin
+    track_instances = {
+        Vec.from_str(inst['origin']).as_tuple(): inst
+        for inst in
+        VMF.by_class['func_instance']
+        if inst['file'].casefold() in track_files
+    }
+    utils.con_log('Track instances:')
+    utils.con_log('\n'.join(
+        '{!s}: {}'.format(k, v['file'])
+        for k, v in
+        track_instances.items()
+    ))
+
+    # Now we loop through all platforms in the map, and then locate their
+    # track_set
+    for plat_inst in VMF.by_class['func_instance']:
+        if plat_inst['file'].casefold() not in platforms:
+            continue  # Not a platform!
+
+        utils.con_log('Modifying "' + plat_inst['targetname'] + '"!')
+
+        plat_loc = Vec.from_str(plat_inst['origin'])
+        angles = Vec.from_str(plat_inst['angles'])
+        # The direction away from the wall/floor/ceil
+        normal = Vec(0, 0, 1).rotate(
+            angles.x, angles.y, angles.z
+        )
+
+        for tr_origin, first_track in track_instances.items():
+            if plat_loc == tr_origin:
+                # Check direction
+
+                if normal == Vec(0, 0, 1).rotate(
+                        *Vec.from_str(first_track['angles'])
+                        ):
+                    break
+        else:
+            raise Exception('Platform "{}" has no track!'.format(
+                plat_inst['targetname']
+            ))
+
+        track_type = first_track['file'].casefold()
+        if track_type == inst_single:
+            # Track is one block long, use a single-only instance and
+            # remove track!
+            plat_inst['file'] = single_plat_inst
+            first_track.remove()
+            continue  # Next platform
+
+        track_set = set()
+        if track_type == inst_top or track_type == inst_middle:
+            # search left
+            track_scan(
+                track_set,
+                track_instances,
+                first_track,
+                middle_file=inst_middle,
+                x_dir=-1,
+            )
+        if track_type == inst_bottom or track_type == inst_middle:
+            # search right
+            track_scan(
+                track_set,
+                track_instances,
+                first_track,
+                middle_file=inst_middle,
+                x_dir=+1,
+            )
+
+        # Give every track a targetname matching the platform
+        for ind, track in enumerate(track_set, start=1):
+            if track_targets == '':
+                track['targetname'] = plat_inst['targetname']
+            else:
+                track['targetname'] = (
+                    plat_inst['targetname'] +
+                    '-' +
+                    track_targets + str(ind)
+                )
+
+        # Now figure out which way the track faces:
+
+        # The direction horizontal track is offset
+        side_dir = Vec(0, 1, 0).rotate(*Vec.from_str(first_track['angles']))
+
+        # The direction of the platform surface
+        facing = Vec(-1, 0, 0).rotate(
+            angles.x, angles.y, angles.z
+        )
+        if side_dir == facing:
+            track_facing = 'HORIZ'
+        elif side_dir == -facing:
+            track_facing = 'HORIZ_MIRR'
+        else:
+            track_facing = 'VERT'
+        # Now add the suffixes
+        if track_facing == 'VERT':
+            if utils.conv_bool(res['vert_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_vert')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_vert')
+        elif track_facing == 'HORIZ_MIRR':
+            if utils.conv_bool(res['horiz_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_horiz_mirrored')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_horiz')
+        else:  # == 'HORIZ'
+            if utils.conv_bool(res['horiz_suffix', '']):
+                for inst in track_set:
+                    add_suffix(inst, '_horiz')
+                if utils.conv_bool(res['plat_suffix', '']):
+                    add_suffix(plat_inst, '_horiz')
+    return True  # Only run once!
+
+
+def track_scan(
+        tr_set,
+        track_inst,
+        start_track: VLib.Entity,
+        middle_file: str,
+        x_dir: int,
+        ):
+    """Build a set of track instances extending from a point.
+    :param track_inst: A dictionary mapping origins to track instances
+    :param start_track: The instance we start on
+    :param middle_file: The file for the center track piece
+    :param x_dir: The direction to look (-1 or 1)
+    """
+    track = start_track
+    move_dir = Vec(x_dir*128, 0, 0).rotate(
+        *Vec.from_str(track['angles'])
+    )
+    while track:
+        tr_set.add(track)
+
+        next_pos = Vec.from_str(track['origin']) + move_dir
+        track = track_inst.get(next_pos.as_tuple(), None)
+        if track is None:
+            return
+        if track['file'].casefold() != middle_file:
+            # If the next piece is an end section, add it then quit
+            tr_set.add(track)
+            return

@@ -321,7 +321,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
                         vers['styles'][sty_id] = vers['styles'][base_style.id]
-                        if log_fallbacks:
+                        if log_fallbacks and not item.unstyled:
                             print(
                                 'Item "{item}" using parent '
                                 '"{rep}" for "{style}"!'.format(
@@ -336,7 +336,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
-                        if log_missing_styles:
+                        if log_missing_styles and not item.unstyled:
                             print(
                                 'Item "{item}" using '
                                 'inappropriate style for "{style}"!'.format(
@@ -531,6 +531,7 @@ class Item:
             def_version,
             needs_unlock=False,
             all_conf=None,
+            unstyled=False,
             ):
         self.id = item_id
         self.versions = versions
@@ -538,6 +539,7 @@ class Item:
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
+        self.unstyled = unstyled
 
     @classmethod
     def parse(cls, data):
@@ -545,6 +547,10 @@ class Item:
         versions = {}
         def_version = None
         folders = {}
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        if data.id == 'ITEM_GOO':
+            print(data.info)
 
         all_config = get_config(
             data.info,
@@ -586,7 +592,14 @@ class Item:
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
 
-        return cls(data.id, versions, def_version, needs_unlock, all_config)
+        return cls(
+            data.id,
+            versions,
+            def_version,
+            needs_unlock,
+            all_config,
+            unstyled,
+        )
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
@@ -780,24 +793,41 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, default=False):
+    def __init__(self, var_id, name, styles, unstyled=False, default=False):
         self.id = var_id
         self.name = name
-        self.styles = styles
         self.default = default
+        if unstyled:
+            self.styles = None
+        else:
+            self.styles = styles
 
     @classmethod
     def parse(cls, data):
         name = data.info['name']
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+        default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
             for prop in data.info.find_all('Style')
         ]
-        default = utils.conv_bool(data.info['enabled', '0'])
-        return cls(data.id, name, styles, default)
+        return cls(
+            data.id,
+            name,
+            styles,
+            unstyled=unstyled,
+            default=default,
+        )
 
     def add_over(self, override):
-        self.styles.extend(override.styles)
+        """Override a stylevar to add more compatible styles."""
+        # Setting it to be unstyled overrides any other values!
+        if self.styles is None:
+            return
+        elif override.styles is None:
+            self.styles = None
+        else:
+            self.styles.extend(override.styles)
 
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
@@ -806,6 +836,9 @@ class StyleVar:
         """Check to see if this will apply for the given style.
 
         """
+        if self.styles is None:
+            return True  # Unstyled stylevar
+
         if style.id in self.styles:
             return True
 

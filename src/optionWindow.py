@@ -7,11 +7,15 @@ from BEE2_config import GEN_OPTS
 
 import sound
 import utils
+import contextWin
 
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
+refresh_callbacks = []  # functions called to apply settings.
+
+VARS = {}
 
 def reset_all_win():
     pass
@@ -24,37 +28,67 @@ win.withdraw()
 
 def show():
     win.deiconify()
+    contextWin.hide_context() # Ensure this closes
     utils.center_win(win)
 
 def load():
     """Load the current settings from config."""
-    PLAY_SOUND.set(not GEN_OPTS.get_bool(
-        'General',
-        'mute_sounds',
-        False,
-        ))
-
-    SHOW_WIP.set(GEN_OPTS.get_bool(
-        'General',
-        'show_wip_items',
-        False,
-        ))
+    for var in VARS.values():
+        var.load()
 
 def save():
-    """Save settings into the config."""
-    sound.muted = not PLAY_SOUND.get()
-    GEN_OPTS['General']['mute_sounds'] = utils.bool_as_int(
-        not PLAY_SOUND.get()
-    )
+    """Save settings into the config and apply them to other windows."""
+    for var in VARS.values():
+        var.save()
 
-    GEN_OPTS['General']['show_wip_items'] = utils.bool_as_int(
-        SHOW_WIP.get()
-    )
-
+    sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
-    GEN_OPTS['General']['keep_win_inside'] = utils.bool_as_int(
-        KEEP_WIN_INSIDE.get()
+
+    for func in refresh_callbacks:
+        func()
+
+def make_checkbox(frame, section, item, desc, default=False, var=None):
+    """Add a checkbox to the given frame which toggles an option.
+
+    section and item are the location in GEN_OPTS for this config.
+    If var is set, it'll be used instead of an auto-created variable.
+    desc is the text put next to the checkbox.
+    default is the default value of the variable, if var is None.
+    frame is the parent frame.
+    """
+    if var is None:
+        var = BooleanVar(
+            value=default,
+            name='opt_'+section.casefold()+'_'+item,
+        )
+        VARS[section, item] = var
+    else:
+        default = var.get()
+
+    def save_opt():
+        """Save the checkbox's values."""
+        GEN_OPTS[section][item] = utils.bool_as_int(
+            var.get()
+        )
+
+    def load_opt():
+        """Load the checkbox's values."""
+        var.set(GEN_OPTS.get_bool(
+            section,
+            item,
+            default,
+        ))
+    load_opt()
+
+    var.save = save_opt
+    var.load = load_opt
+    widget = ttk.Checkbutton(
+        frame,
+        variable=var,
+        text=desc,
     )
+    UI[section, item] = widget
+    return widget
 
 
 def init_widgets():
@@ -85,6 +119,12 @@ def init_widgets():
     nbook.add(fr_win, text='Windows')
     init_win_tab(fr_win)
 
+    UI['fr_dev'] = fr_dev = ttk.Frame(
+        nbook,
+    )
+    nbook.add(fr_dev, text='Development')
+    init_dev_tab(fr_dev)
+
     ok_cancel = ttk.Frame(
         win
     )
@@ -102,7 +142,7 @@ def init_widgets():
 
     def cancel():
         win.withdraw()
-        load() # Rollback changes
+        load()  # Rollback changes
 
     UI['ok_btn'] = ok_btn = ttk.Button(
         ok_cancel,
@@ -118,13 +158,17 @@ def init_widgets():
     cancel_btn.grid(row=0, column=1)
     win.protocol("WM_DELETE_WINDOW", cancel)
 
+    save()  # And ensure they are applied to other windows
+
 def init_gen_tab(f):
 
     if sound.initiallised:
-        UI['mute'] = mute = ttk.Checkbutton(
+        UI['mute'] = mute = make_checkbox(
             f,
-            variable=PLAY_SOUND,
-            text='Play Sounds',
+            section='General',
+            item='play_sounds',
+            desc='Play Sounds',
+            var=PLAY_SOUND,
         )
     else:
         UI['mute'] = mute = ttk.Checkbutton(
@@ -134,20 +178,23 @@ def init_gen_tab(f):
         )
     mute.grid(row=0, column=0, sticky=W)
 
-    UI['show_wip'] = show_wip = ttk.Checkbutton(
+    make_checkbox(
         f,
-        variable=SHOW_WIP,
-        text='Show WIP items',
-    )
-    show_wip.grid(row=1, column=0, sticky=W)
+        section='General',
+        item='show_wip_items',
+        desc='Show WIP items',
+        var=SHOW_WIP,
+    ).grid(row=1, column=0, sticky=W)
 
 
 def init_win_tab(f):
-    UI['keep_inside'] = keep_inside = ttk.Checkbutton(
+    UI['keep_inside'] = keep_inside = make_checkbox(
         f,
-        variable=KEEP_WIN_INSIDE,
-        text='Keep windows inside screen \n'
+        section='General',
+        item='keep_win_inside',
+        desc='Keep windows inside screen \n'
              '(disable for multi-monitor setups)',
+        var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=W)
 
@@ -158,3 +205,42 @@ def init_win_tab(f):
         command=lambda: reset_all_win(),
     )
     reset_win.grid(row=1, column=0, sticky=EW)
+
+def init_dev_tab(f):
+    f.columnconfigure(1, weight=1)
+    f.columnconfigure(2, weight=1)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='log_missing_ent_count',
+        desc='Log missing entity counts',
+    ).grid(row=0, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='log_missing_styles',
+        desc="Log when item doesn't have a style",
+    ).grid(row=1, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='log_item_fallbacks',
+        desc="Log when item uses parent's style",
+    ).grid(row=3, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='show_errors',
+        desc="Show detailed error message",
+    ).grid(row=0, column=1, sticky=W)
+
+    make_checkbox(
+        f,
+        section='General',
+        item='preserve_bee2_resource_dir',
+        desc='Preserve Game Directories',
+    ).grid(row=1, column=1, sticky=W)
