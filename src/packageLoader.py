@@ -793,24 +793,41 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, default=False):
+    def __init__(self, var_id, name, styles, unstyled=False, default=False):
         self.id = var_id
         self.name = name
-        self.styles = styles
         self.default = default
+        if unstyled:
+            self.styles = None
+        else:
+            self.styles = styles
 
     @classmethod
     def parse(cls, data):
         name = data.info['name']
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+        default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
             for prop in data.info.find_all('Style')
         ]
-        default = utils.conv_bool(data.info['enabled', '0'])
-        return cls(data.id, name, styles, default)
+        return cls(
+            data.id,
+            name,
+            styles,
+            unstyled=unstyled,
+            default=default,
+        )
 
     def add_over(self, override):
-        self.styles.extend(override.styles)
+        """Override a stylevar to add more compatible styles."""
+        # Setting it to be unstyled overrides any other values!
+        if self.styles is None:
+            return
+        elif override.styles is None:
+            self.styles = None
+        else:
+            self.styles.extend(override.styles)
 
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
@@ -819,6 +836,9 @@ class StyleVar:
         """Check to see if this will apply for the given style.
 
         """
+        if self.styles is None:
+            return True  # Unstyled stylevar
+
         if style.id in self.styles:
             return True
 
