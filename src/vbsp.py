@@ -380,7 +380,6 @@ def load_settings():
 
     instanceLocs.load_conf()
 
-    utils.con_log(settings['pit'])
     utils.con_log("Settings Loaded!")
 
 
@@ -559,41 +558,69 @@ def get_map_info():
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to disinguish between them. Add an instvar to help.
     door_frames = []
-    entry_origin = None
-    exit_origin = None
+    entry_origin = Vec(-999, -999, -999)
+    exit_origin = Vec(-999, -999, -999)
 
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
-    utils.con_log(override_sp_exit, override_sp_entry, override_coop_corr)
+
+    utils.con_log(file_sp_exit_corr)
     for item in VMF.by_class['func_instance']:
+        # Loop through all the instances in the map, looking for the entry/exit
+        # doors.
+        # - Read the $no_player_start var to see if we're in preview mode,
+        #   or override the value if specified in compile.cfg
+        # - Determine whether the map is SP or Coop by the
+        #   presence of certain instances.
+        # - Switch the entry/exit corridors to particular ones if specified
+        #   in compile.cfg
+        # Also build a set of all instances, to make a condition check easy
+        # later
+
         file = item['file'].casefold()
+        utils.con_log('File:', file)
         if file in no_player_start_inst:
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             else:
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
-
         if file in file_sp_exit_corr:
             exit_origin = Vec.from_str(item['origin'])
-            if override_sp_exit != 0:
+            if override_sp_exit == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(file_sp_exit_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
             entry_origin = Vec.from_str(item['origin'])
-            if override_sp_entry != 0:
+            if override_sp_entry == 0:
+                utils.con_log(
+                    'Using random entry (' +
+                    str(file_sp_entry_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting entry to ' + str(override_sp_entry))
                 item['file'] = file_sp_entry_corr[override_sp_entry-1]
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
-            if override_coop_corr != 0:
+            if override_coop_corr == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(override_coop_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting coop exit to ' + str(override_coop_corr))
                 item['file'] = file_coop_corr[override_coop_corr-1]
         elif file in file_coop_exit:
             GAME_MODE = 'COOP'
-        elif file in file_sp_exit:
-            GAME_MODE = 'SP'
-        elif file in file_sp_entry:
+        elif file in file_sp_exit or file in file_sp_entry:
             GAME_MODE = 'SP'
         elif file in file_sp_door_frame:
             door_frames.append(item)
@@ -621,6 +648,7 @@ def get_map_info():
         elif origin.x == exit_origin.x and origin.y == exit_origin.y:
             door_frame.fixup['door_type'] = 'exit'
 
+    # Return the set of all instances in the map.
     return inst_files
 
 
