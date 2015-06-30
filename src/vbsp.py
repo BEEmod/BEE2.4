@@ -1703,18 +1703,13 @@ def main():
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
-    new_path = ""
-    path = ""
+    path = sys.argv[-1]  # The path is the last argument to vbsp
+
+    # Add styled/ to the list of directories
+    path_dir, path_file = os.path.split(path)
+    new_path = os.path.join(path_dir, 'styled', path_file)
+
     for i, a in enumerate(new_args):
-        fixed_a = os.path.normpath(a)
-        if "sdk_content\\maps\\" in fixed_a:
-            new_args[i] = fixed_a.replace(
-                'sdk_content\\maps\\',
-                'sdk_content\\maps\styled\\',
-                1,
-                )
-            new_path = new_args[i]
-            path = a
         # We need to strip these out, otherwise VBSP will get confused.
         if a == '-force_peti' or a == '-force_hammer':
             new_args[i] = ''
@@ -1731,9 +1726,6 @@ def main():
     if not path.endswith(".vmf"):
         path += ".vmf"
         new_path += ".vmf"
-
-    utils.con_log("Loading settings...")
-    load_settings()
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1757,6 +1749,9 @@ def main():
         )
     else:
         utils.con_log("PeTI map detected!")
+
+        utils.con_log("Loading settings...")
+        load_settings()
 
         load_map(path)
 

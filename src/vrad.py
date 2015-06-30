@@ -46,13 +46,12 @@ TK_ROOT = os.path.dirname(os.getcwd())
 args = " ".join(sys.argv)
 fast_args = sys.argv[1:]
 full_args = sys.argv[1:]
-path = ""
+
+path = sys.argv[-1]  # The path is the last argument to vrad
+fast_args[-1] = os.path.normpath(path)
 
 for a in fast_args[:]:
-    if "sdk_content\\maps\\" in os.path.normpath(a):
-        path = os.path.normpath(a)
-        fast_args[fast_args.index(a)] = path
-    elif a.casefold() in (
+    if a.casefold() in (
             "-both",
             "-final",
             "-staticproplighting",
