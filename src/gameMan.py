@@ -70,8 +70,8 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('../config/basemodui.txt', "r") as trans:
-            trans_prop = Property.parse(trans, 'config/basemodui.txt')
+        with open('../basemodui.txt', "r") as trans:
+            trans_prop = Property.parse(trans, 'basemodui.txt')
         trans_data = {
             item.real_name: item.value
             for item in
