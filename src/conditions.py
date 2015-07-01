@@ -497,7 +497,7 @@ def flag_has_inst(_, flag):
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
-    bits = flag.value.split(' ')
+    bits = flag.value.split(' ', 1)
     return inst.fixup[bits[0]] == bits[1]
 
 
@@ -518,7 +518,7 @@ def flag_music(_, flag):
 
 @make_flag('ifOption')
 def flag_option(_, flag):
-    bits = flag.value.split(' ')
+    bits = flag.value.split(' ', 1)
     key = bits[0].casefold()
     if key in OPTIONS:
         return OPTIONS[key] == bits[1]
@@ -648,7 +648,7 @@ def res_add_inst_var(inst, res):
 @make_result('setInstVar')
 def res_set_inst_var(inst, res):
     """Set an instance variable to the given value."""
-    var_name, val = res.value.split(' ')
+    var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = val
 
 
