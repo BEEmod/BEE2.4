@@ -140,6 +140,10 @@ DEFAULTS = {
 
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
+    # Reset offsets for all white/black brushes, so embedface has correct
+    # texture matching
+    "tile_texture_lock":        "1",
+
     "no_mid_voices":            "0",  # Remove the midpoint voice lines
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
@@ -234,12 +238,15 @@ def get_tex(name):
         raise Exception('No texture "' + name + '"!')
 
 
-def alter_mat(face, seed=None):
+def alter_mat(face, seed=None, texture_lock=True):
     """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
     uses the face orientation to determine the wall direction - the
     PeTI often uses textures on the wrong sides for various reasons.
+
+    If texture_lock is false, the offset of the texture will be reset to 0,0.
+    That ensures embedface will have aligned textures.
     """
     mat = face.mat.casefold()
     if seed:
@@ -270,6 +277,10 @@ def alter_mat(face, seed=None):
         elif orient == ORIENT.ceiling:
             orient = 'ceiling'
         face.mat = get_tex(surf_type + '.' + orient)
+
+        if not texture_lock:
+            reset_tex_offset(face)
+
         return True
     elif mat in TEX_FIZZLER:
         face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
@@ -1134,10 +1145,19 @@ def face_seed(face):
     origin = face.get_origin()
     for axis in "xyz":
         if origin[axis] % 128 < 2:
-            origin[axis] //= 128  # This side
+            origin[axis] = (origin[axis] // 64) * 64
         else:
-            origin[axis] = origin[axis] // 128 + 64
-    return origin.join()
+            origin[axis] = (origin[axis] // 128) * 128 + 64
+    return origin.join(' ')
+
+def reset_tex_offset(face):
+    """Force all white/black walls to 0 offsets"""
+    uaxis = face.uaxis.split()
+    vaxis = face.vaxis.split()
+    uaxis[3] = '0]'
+    vaxis[3] = '0]'
+    face.uaxis = ' '.join(uaxis)
+    face.vaxis = ' '.join(vaxis)
 
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
@@ -1163,6 +1183,7 @@ def get_grid_sizes(face: VLib.Side):
 def random_walls():
     """The original wall style, with completely randomised walls."""
     scale_walls = get_bool_opt("random_blackwall_scale")
+    texture_lock = get_bool_opt('tile_texture_lock', True)
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
             orient = get_face_orient(face)
@@ -1175,14 +1196,14 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(get_grid_sizes(face))
-                split = face.uaxis.split(" ")
+                split = face.uaxis.split()
                 split[-1] = scale
                 face.uaxis = " ".join(split)
 
-                split = face.vaxis.split(" ")
+                split = face.vaxis.split()
                 split[-1] = scale
                 face.vaxis = " ".join(split)
-            alter_mat(face, face_seed(face))
+            alter_mat(face, face_seed(face), texture_lock)
 
 
 def clump_walls():
@@ -1204,17 +1225,23 @@ def clump_walls():
 
     # we keep a list for the others, so we can nodraw them if needed
     others = {}
+
+    texture_lock = get_bool_opt('tile_texture_lock', True)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
             mat = face.mat.casefold()
-            if face.mat in (
+            if mat in (
                     'glass/glasswindow007a_less_shiny',
                     'metal/metalgrate018',
                     'anim_wp/framework/squarebeams',
                     'tools/toolsnodraw',
+                    'anim_wp/framework/backpanels_cheap'
                     ):
-                # These textures aren't always on grid, ignore them..
+                # These textures aren't wall textures, and usually never
+                # use random textures. Don't add them here. They also aren't
+                # on grid.
                 alter_mat(face)
                 continue
 
@@ -1251,7 +1278,7 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
-                    alter_mat(face, face_seed(face))
+                    alter_mat(face, face_seed(face), texture_lock)
 
     todo_walls = len(walls)  # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -1262,35 +1289,33 @@ def clump_walls():
     for _ in range(clump_numb):
         pos = random.choice(wall_pos)
         wall_type = walls[pos].mat
+        pos = Vec(pos) // 128 * 128
+        ':type pos: Vec'
         state = random.getstate()  # keep using the map_seed for the clumps
         if wall_type == "WHITE" or wall_type == "BLACK":
-            random.seed(pos)
-            pos_min = [0, 0, 0]
-            pos_max = [0, 0, 0]
+            random.seed(pos.as_tuple())
+            pos_min = Vec()
+            pos_max = Vec()
             # these are long strips extended in one direction
             direction = random.randint(0, 2)
             for i in range(3):
                 if i == direction:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_size) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_size) * 128)
+                    dist = clump_size
                 else:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_wid) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_wid) * 128)
+                    dist = clump_wid
+                pos_min[i] = int(
+                    pos[i] - random.randint(0, dist) * 128)
+                pos_max[i] = int(
+                    pos[i] + random.randint(0, dist) * 128)
 
             tex = get_tex(wall_type.lower() + '.wall')
             # Loop though all these grid points, and set to the given
             # texture if they have the same wall type
-            for x in range(pos_min[0], pos_max[0], 128):
-                for y in range(pos_min[1], pos_max[1], 128):
-                    for z in range(pos_min[2], pos_max[2], 128):
-                        if (x, y, z) in walls:
-                            side = walls[x, y, z]
-                            if side.mat == wall_type:
-                                side.mat = tex
+            for pos, side in walls.items():
+                if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
+                    side.mat = tex
+                    if not texture_lock:
+                        reset_tex_offset(side)
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -1309,7 +1334,7 @@ def clump_walls():
             else:
                 face.mat = get_tex("black.wall")
         else:
-            alter_mat(face, seed=pos)
+            alter_mat(face, seed=pos, texture_lock=texture_lock)
 
 
 def get_face_orient(face):
@@ -1524,8 +1549,8 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split(" ")
-                    split_v = side.vaxis.split(" ")
+                    split_u = side.uaxis.split()
+                    split_v = side.vaxis.split()
                     split_u[-1] = grating_scale  # apply the grtating
                     split_v[-1] = grating_scale  # scaling option
                     side.uaxis = " ".join(split_u)
