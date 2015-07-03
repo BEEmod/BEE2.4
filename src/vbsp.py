@@ -1065,7 +1065,6 @@ def change_brush():
                 face.planes[1].z,
                 face.planes[2].z,
             )
-            is_glass = False
             if face.mat.casefold() in GOO_TEX:
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
@@ -1094,9 +1093,7 @@ def change_brush():
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
-            inst = find_glass_inst(solid.get_origin())
-            if inst:
-                inst['file'] = glass_inst
+            switch_glass_inst(solid.get_origin(), glass_inst)
     if is_bottomless:
         utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)
@@ -1113,29 +1110,49 @@ def change_brush():
         random_walls()
 
 
-def find_glass_inst(origin):
-    """Find the glass instance placed in the specified location."""
+def switch_glass_inst(origin, new_file):
+    """Find the glass instance placed in the specified location.
+
+    Also works with grating.
+    """
+    # Find the center point of this location to find where the instance
+    # will be.
     loc = Vec(
         origin.x//128 * 128 + 64,
         origin.y//128 * 128 + 64,
         origin.z//128 * 128 + 64,
         )
     direction = (origin-loc).norm()
-    ang_vec = Vec(-1, 0, 0)  # The brush parts are on this side!
+    ang_vec = Vec(-1, 0, 0)
     loc_str = loc.join(' ')
     gls_file = instanceLocs.resolve('[glass_128]')
+
+    # Sometimes PeTI generates more than one segment instance. We should
+    # delete the extras!
+    targ = None
+    gls_file.append(new_file)  # Also search for already-changed bits
+
     for inst in VMF.by_class['func_instance']:
-        if inst['origin', ''] == loc_str and inst['file', ''].casefold() in gls_file:
+        # Are they a glass file at the right location?
+        if (
+                inst['origin', ''] == loc_str and
+                inst['file', ''].casefold() in gls_file
+                ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
             inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
-            rot = ang_vec.rotate(inst_ang.x, inst_ang.y, inst_ang.z)
-            print(rot, direction)
-            if round(rot) == direction:
-                return inst
-
-    # TODO - make this actually work
-    return None
+            # The brush parts are on this side!
+            rot = Vec(-1, 0, 0).rotate(
+                inst_ang.x, inst_ang.y, inst_ang.z
+            )
+            if rot == direction:
+                if targ is None:
+                    targ = inst
+                else:
+                    # We already found one!
+                    inst.remove()
+    if targ is not None:
+        targ['file'] = new_file
 
 
 def face_seed(face):
@@ -1569,9 +1586,7 @@ def change_func_brush():
 
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
-            inst = find_glass_inst(brush.get_origin())
-            if inst:
-                inst['file'] = grating_inst
+            switch_glass_inst(brush.get_origin(), grating_inst)
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
