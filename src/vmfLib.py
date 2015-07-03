@@ -14,11 +14,14 @@ import utils
 CURRENT_HAMMER_VERSION = 400
 CURRENT_HAMMER_BUILD = 5304
 
-# $replace01, $replace02, ..., $replace15, $replace16
+
+# According to VBSP code, fixups don't appear to have a size limit
+# More than 50 shouldn't be needed, since Hammer only allows 10.
 _FIXUP_KEYS = (
     ["replace0" + str(i) for i in range(1, 10)] +
-    ["replace" + str(i) for i in range(10, 17)]
+    ["replace" + str(i) for i in range(10, 51)]
 )
+# = ['replace01', 'replace02', ..., 'replace50']
 
 # all the rows that displacements have, in the form
 # "row0" "???"
