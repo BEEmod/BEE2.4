@@ -1413,7 +1413,7 @@ def make_static_pist(ent, res):
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
             logic_ent.fixup['manager_a'] = utils.bool_as_int(
-                ent.fixup['connection_count', '0'] == '0'
+                ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
         val = res.value[
