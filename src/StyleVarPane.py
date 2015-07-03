@@ -25,6 +25,8 @@ styleOptions = [
     ('NoMidVoices', 'Suppress Mid-Chamber Dialogue', 0),
     # Allow removing and placing exit doors, obs rooms
     ('UnlockDefault', 'Unlock Default Items', 0),
+    # Enable adding mist to goo (some styles only)
+    ('AllowGooMist', 'Allow Adding Goo Mist', 1),
     ]
 
 checkbox_special = {}

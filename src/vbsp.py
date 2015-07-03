@@ -1026,9 +1026,10 @@ def change_brush():
     glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
-
-    make_goo_mist = get_bool_opt('goo_mist')
-    utils.con_log(make_goo_mist)
+    # Goo mist must be enabled by both the style and the user.
+    make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
+        settings['style_vars'].get('AllowGooMist', '1')
+    )
     mist_solids = set()
 
     # Check the clump algorithm has all its arguements
