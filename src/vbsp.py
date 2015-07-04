@@ -623,7 +623,7 @@ def get_map_info():
             if override_coop_corr == 0:
                 utils.con_log(
                     'Using random exit (' +
-                    str(override_coop_corr.index(file) + 1) +
+                    str(file_coop_corr.index(file) + 1) +
                     ')'
                 )
             else:
