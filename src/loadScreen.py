@@ -60,7 +60,6 @@ class LoadScreen(Toplevel):
             self.labels[st_id] = ttk.Label(self, text='0/??')
             self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
-        self.show()
 
     def show(self):
         """Display this loading screen."""

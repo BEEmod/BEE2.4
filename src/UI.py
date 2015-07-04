@@ -1792,11 +1792,31 @@ def init_windows():
         StyleVarPane.refresh(style_obj)
 
     def copy_done_callback():
+        """Callback run when all resources have been extracted."""
+
         UI['export_button'].state(['!disabled'])
+        UI['extract_progress'].grid_remove()
+        windows['opt'].save_conf()
+        # Reload the option window's position and sizing configuration,
+        # that way it resizes automatically.
+        windows['opt'].load_conf()
         menus['file'].entryconfigure(2, state=NORMAL)
         TK_ROOT.bind_all('<Control-e>', export_editoritems)
 
+    def make_extract_progress_infinite():
+        pr = UI['extract_progress']
+        pr.stop()
+        pr.configure(
+            mode='indeterminate',
+            # Decrease the number of 'steps' which exist,
+            # so the bar moves faster
+            maximum=25,
+        )
+        # Move 1/25 steps every 50 miliseconds
+        pr.start(50)
+
     extract_packages.done_callback = copy_done_callback
+    extract_packages.make_progress_infinite = make_extract_progress_infinite
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
