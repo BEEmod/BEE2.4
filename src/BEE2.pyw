@@ -92,12 +92,9 @@ if __name__ == '__main__':
 
         loadScreen.main_loader.destroy()
 
-        if not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
-            # TK_ROOT.after(
-            #     1000,
-            #     extract_packages.start_copying,
-            #     pack_data['zips'],
-            # )
+        if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
+            extract_packages.done_callback()
+        else:
             extract_packages.start_copying(pack_data['zips'])
 
         TK_ROOT.mainloop()
