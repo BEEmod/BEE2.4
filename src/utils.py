@@ -1,6 +1,13 @@
 import math
 import string
 import collections.abc as abc
+from collections import namedtuple, deque
+from sys import platform
+from enum import Enum
+
+WIN = platform.startswith('win')
+MAC = platform.startswith('darwin')
+LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
 
@@ -12,6 +19,48 @@ BOOL_LOOKUP = {
     'yes': True,
     'no': False,
 }
+
+
+class CONN_TYPES(Enum):
+    none = 0
+    side = 1  # Points E
+    straight = 2  # Points E-W
+    corner = 3  # Points N-W
+    triple = 4  # Points N-S-W
+    all = 5  # Points N-S-E-W
+
+N = "0 90 0"
+S = "0 270 0"
+E = "0 0 0"
+W = "0 180 0"
+# Lookup values for joining things together.
+CONN_LOOKUP = {
+    # N S  E  W : (Type, Rotation)
+    (1, 0, 0, 0): (CONN_TYPES.side, N),
+    (0, 1, 0, 0): (CONN_TYPES.side, S),
+    (0, 0, 1, 0): (CONN_TYPES.side, E),
+    (0, 0, 0, 1): (CONN_TYPES.side, W),
+
+    (1, 1, 0, 0): (CONN_TYPES.straight, S),
+    (0, 0, 1, 1): (CONN_TYPES.straight, E),
+
+    (0, 1, 0, 1): (CONN_TYPES.corner, N),
+    (1, 0, 1, 0): (CONN_TYPES.corner, S),
+    (1, 0, 0, 1): (CONN_TYPES.corner, E),
+    (0, 1, 1, 0): (CONN_TYPES.corner, W),
+
+    (0, 1, 1, 1): (CONN_TYPES.triple, N),
+    (1, 0, 1, 1): (CONN_TYPES.triple, S),
+    (1, 1, 0, 1): (CONN_TYPES.triple, E),
+    (1, 1, 1, 0): (CONN_TYPES.triple, W),
+
+    (1, 1, 1, 1): (CONN_TYPES.all, E),
+
+    (0, 0, 0, 0): (CONN_TYPES.none, E),
+}
+
+del N, S, E, W
+
 
 def clean_line(line: str):
     """Removes extra spaces and comments from the input."""
@@ -113,9 +162,11 @@ def conv_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
-
+DISABLE_ADJUST = False
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     """Adjust a window position to ensure it fits inside the screen."""
+    if DISABLE_ADJUST:  # Allow disabling this adjustment
+        return x, y     # for multi-window setups
     max_x = win.winfo_screenwidth() - win.winfo_width() - horiz_bound
     max_y = win.winfo_screenheight() - win.winfo_height() - vert_bound
 
@@ -131,13 +182,50 @@ def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     return x, y
 
 
-def center_win(window):
+def center_win(window, parent=None):
     """Center a subwindow to be inside a parent window."""
-    parent = window.nametowidget(window.winfo_parent())
+    if parent is None:
+        parent = window.nametowidget(window.winfo_parent())
 
-    x = parent.winfo_rootx() + window.winfo_width()//2
-    y = parent.winfo_rooty() + window.winfo_height()//2
+    x = parent.winfo_rootx() + (parent.winfo_width()-window.winfo_width())//2
+    y = parent.winfo_rooty() + (parent.winfo_height()-window.winfo_height())//2
+
+    x, y = adjust_inside_screen(x, y, window)
+
     window.geometry('+' + str(x) + '+' + str(y))
+
+
+def append_bothsides(deq):
+    """Alternately add to each side of a deque."""
+    while True:
+        deq.append((yield))
+        deq.appendleft((yield))
+
+def fit(dist, obj):
+    """Figure out the smallest number of parts to stretch a distance."""
+    # If dist is a float the outputs will become floats as well
+    # so ensure it's an int.
+    dist = int(dist)
+    if dist <= 0:
+        return []
+    orig_dist = dist
+    smallest = obj[-1]
+    items = deque()
+
+    # We use this so the small sections appear on both sides of the area.
+    adder = append_bothsides(items)
+    next(adder)
+    while dist >= smallest:
+        for item in obj:
+            if item <= dist:
+                adder.send(item)
+                dist -= item
+                break
+    if dist > 0:
+        adder.send(dist)
+
+    assert sum(items) == orig_dist
+    return list(items)  # Dump the deque
 
 
 class EmptyMapping(abc.Mapping):
@@ -176,7 +264,7 @@ class EmptyMapping(abc.Mapping):
         return self
 
 EmptyMapping = EmptyMapping() # We only need the one instance
-
+Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
 
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
@@ -255,14 +343,18 @@ class Vec:
         self.z = x*g + y*h + z*i
         return self
 
-    def rotate(self, pitch=0, yaw=0, roll=0):
+    def rotate(self, pitch=0, yaw=0, roll=0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
         Returns the vector, so you can use it in the form
         val = Vec(0,1,0).rotate(p, y, r)
+
+        If round is True, all values will be rounded to 3 decimals
+        (since these calculations always have small inprecision.)
         """
         # pitch is in the y axis
         # yaw is the z axis
         # roll is the x axis
+
         rad_pitch = math.radians(pitch)
         rad_yaw = math.radians(yaw)
         rad_roll = math.radians(roll)
@@ -296,6 +388,11 @@ class Vec:
         self.mat_mul(mat_pitch)
         self.mat_mul(mat_yaw)
 
+        if round_vals:
+            self.x = round(self.x, 3)
+            self.y = round(self.y, 3)
+            self.z = round(self.z, 3)
+
         return self
 
     def __add__(self, other):
@@ -307,34 +404,99 @@ class Vec:
             return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
         else:
             return Vec(self.x + other, self.y + other, self.z + other)
+    __radd__ = __add__
 
     def __sub__(self, other):
         """- operation.
 
         This additionally works on scalars (adds to all axes).
         """
-        if isinstance(other, Vec):
-            return Vec(self.x - other.x, self.y - other.y, self.z - other.z)
-        else:
-            return Vec(self.x - other, self.y - other, self.z - other)
+        try:
+            if isinstance(other, Vec):
+                return Vec(
+                    self.x - other.x,
+                    self.y - other.y,
+                    self.z - other.z
+                )
+            else:
+                return Vec(
+                    self.x - other,
+                    self.y - other,
+                    self.z - other,
+                )
+        except TypeError:
+            return NotImplemented
+
+    def __rsub__(self, other):
+        """- operation.
+
+        This additionally works on scalars (adds to all axes).
+        """
+        try:
+            if isinstance(other, Vec):
+                return Vec(
+                    other.x - self.x,
+                    other.y - self.x,
+                    other.z - self.z
+                )
+            else:
+                return Vec(
+                    other - self.x,
+                    other - self.y,
+                    other - self.z
+                )
+        except TypeError:
+            return NotImplemented
 
     def __mul__(self, other):
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x * other, self.y * other, self.z * other)
+            try:
+                return Vec(
+                    self.x * other,
+                    self.y * other,
+                    self.z * other,
+                )
+            except TypeError:
+                return NotImplemented
+    __rmul__ = __mul__
+
 
     def __div__(self, other):
         """Divide the Vector by a scalar.
 
         If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero
+        as the magnitude is greater than zero.
         """
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x / other, self.y / other, self.z / other)
+            try:
+                return Vec(
+                    self.x / other,
+                    self.y / other,
+                    self.z / other,
+                )
+            except TypeError:
+                return NotImplemented
+
+    def __rdiv__(self, other):
+        """Divide a scalar by a Vector.
+
+        """
+        if isinstance(other, Vec):
+            return NotImplemented
+        else:
+            try:
+                return Vec(
+                    other / self.x,
+                    other / self.y,
+                    other / self.z,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __floordiv__(self, other):
         """Divide the Vector by a scalar, discarding the remainder.
@@ -345,14 +507,28 @@ class Vec:
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x // other, self.y // other, self.z // other)
+            try:
+                return Vec(
+                    self.x // other,
+                    self.y // other,
+                    self.z // other,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __mod__(self, other):
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            return Vec(self.x % other, self.y % other, self.z % other)
+            try:
+                return Vec(
+                    self.x % other,
+                    self.y % other,
+                    self.z % other,
+                )
+            except TypeError:
+                return NotImplemented
 
     def __divmod__(self, other):
         """Divide the vector by a scalar, returning the result and remainder.
@@ -361,10 +537,15 @@ class Vec:
         if isinstance(other, Vec):
             return NotImplemented
         else:
-            x1, x2 = divmod(self.x, other)
-            y1, y2 = divmod(self.y, other)
-            z1, z2 = divmod(self.y, other)
-            return Vec(x1, y1, z1), Vec(x2, y2, z2)
+            try:
+                x1, x2 = divmod(self.x, other)
+                y1, y2 = divmod(self.y, other)
+                z1, z2 = divmod(self.y, other)
+            except TypeError:
+                return NotImplemented
+            else:
+                return Vec(x1, y1, z1), Vec(x2, y2, z2)
+
 
     def __iadd__(self, other):
         """+= operation.
@@ -377,9 +558,16 @@ class Vec:
             self.z += other.z
             return self
         else:
-            self.x += other
-            self.y += other
-            self.z += other
+            orig = self.x, self.y, self.z
+            try:
+                self.x += other
+                self.y += other
+                self.z += other
+            except TypeError as e:
+                self.x, self.y, self.z = orig
+                raise TypeError(
+                    'Cannot add ' + type(other) + ' to Vector!'
+                ) from e
             return self
 
     def __isub__(self, other):
@@ -388,14 +576,21 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            self.x += other.x
-            self.y += other.y
-            self.z += other.z
+            self.x -= other.x
+            self.y -= other.y
+            self.z -= other.z
             return self
         else:
-            self.x += other
-            self.y += other
-            self.z += other
+            orig = self.x, self.y, self.z
+            try:
+                self.x -= other
+                self.y -= other
+                self.z -= other
+            except TypeError as e:
+                self.x, self.y, self.z = orig
+                raise TypeError(
+                    'Cannot subtract ' + type(other) + ' from Vector!'
+                ) from e
             return self
 
     def __imul__(self, other):
@@ -404,7 +599,7 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            return NotImplemented
+            raise TypeError("Cannot multiply 2 Vectors.")
         else:
             self.x *= other
             self.y *= other
@@ -417,11 +612,38 @@ class Vec:
         Like the normal one except without duplication.
         """
         if isinstance(other, Vec):
-            return NotImplemented
+            raise TypeError("Cannot divide 2 Vectors.")
         else:
             self.x /= other
             self.y /= other
             self.z /= other
+            return self
+
+
+    def __ifloordiv__(self, other):
+        """//= operation.
+
+        Like the normal one except without duplication.
+        """
+        if isinstance(other, Vec):
+            raise TypeError("Cannot divide 2 Vectors.")
+        else:
+            self.x //= other
+            self.y //= other
+            self.z //= other
+            return self
+
+    def __imod__(self, other):
+        """%= operation.
+
+        Like the normal one except without duplication.
+        """
+        if isinstance(other, Vec):
+            raise TypeError("Cannot modulus 2 Vectors.")
+        else:
+            self.x %= other
+            self.y %= other
+            self.z %= other
             return self
 
     def __bool__(self):
@@ -630,7 +852,7 @@ class Vec:
 
     def as_tuple(self):
         """Return the Vector as a tuple."""
-        return self.x, self.y, self.z
+        return Vec_tuple(self.x, self.y, self.z)
 
     def len_sq(self):
         """Return the magnitude squared, which is slightly faster."""

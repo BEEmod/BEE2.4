@@ -14,6 +14,8 @@ from BEE2_config import ConfigFile
 import vmfLib as VLib
 import utils
 import voiceLine
+import instanceLocs
+import conditions
 
 # Configuration data extracted from VBSP_config
 settings = {
@@ -30,15 +32,12 @@ settings = {
     "voice_data_coop": Property("Quotes_COOP", []),
     }
 
-import conditions
 
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
     # replacement keys:
     'signage/signage_exit': "overlay.exit",
     "signage/signage_overlay_arrow": "overlay.arrow",
-    "signage/signage_overlay_catapult1": "overlay.catapultfling",
-    "signage/signage_overlay_catapult2": "overlay.catapultland",
     "signage/shape01": "overlay.dot",
     "signage/shape02": "overlay.moon",
     "signage/shape03": "overlay.triangle",
@@ -61,8 +60,10 @@ TEX_VALVE = {
     }
 
 TEX_DEFAULTS = [
-    # extra default replacements we need to specially handle. These
-    # have the same item so we can't store this in the regular dictionary.
+    # Extra default replacements we need to specially handle.
+
+    # These have the same item so we can't store this in the regular
+    # dictionary.
     ('metal/black_floor_metal_001c', 'black.floor'),
     ('tile/white_floor_tile002a',    'white.floor'),
     ('metal/black_floor_metal_001c', 'black.ceiling'),
@@ -75,11 +76,13 @@ TEX_DEFAULTS = [
     ('metal/black_wall_metal_002e',  'black.wall'),
     ('metal/black_wall_metal_002a',  'black.2x2'),
     ('metal/black_wall_metal_002b',  'black.4x4'),
-    ('',                             'special.white'),
-    ('',                             'special.black'),
-    ('',                             'special.white_gap'),
-    ('',                             'special.black_gap'),
-    ('',                             'special.goo_wall'),
+
+    # These replacements are deactivated when unset
+    ('', 'special.white'),
+    ('', 'special.black'),
+    ('', 'special.white_gap'),
+    ('', 'special.black_gap'),
+    ('', 'special.goo_wall'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -87,6 +90,9 @@ TEX_DEFAULTS = [
         'overlay.antline'),
     ('1|signage/indicator_lights/indicator_lights_corner_floor',
         'overlay.antlinecorner'),
+    # This is for the P1 style, where antlines use different textures
+    # on the floor and wall.
+    # We just use the regular version if unset.
     ('', 'overlay.antlinecornerfloor'),
     ('', 'overlay.antlinefloor'),
     ]
@@ -126,32 +132,42 @@ ANTLINES = {
 
 DEFAULTS = {
     "bottomless_pit":           "0",  # Convert goo into bottomless pits
+    "goo_mist":                 "0",  # Add info_particle_systems to goo pits
+
     "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
     "remove_pedestal_plat":     "0",  # Remove pedestal button platforms
     "remove_exit_signs":        "0",  # Remove the exit sign overlays
+
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
-    "fix_glass":                "0",
-    "fix_portal_bump":          "0",
+    # Reset offsets for all white/black brushes, so embedface has correct
+    # texture matching
+    "tile_texture_lock":        "1",
 
     "no_mid_voices":            "0",  # Remove the midpoint voice lines
+
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
+
     "sky":                      "sky_black",  # Change the skybox
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
+
+
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
 
+    "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
+
     # If set, use these as the glass/grating 128x128 instances
-    "glassInst":                "NONE",
-    "gratingInst":              "NONE",
+    "glass_inst":                "NONE",
+    "grating_inst":              "NONE",
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_size":               "4",  # The maximum length of a clump
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
+
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
     # Default to the origin of the elevator instance - that's likely to
@@ -160,7 +176,8 @@ DEFAULTS = {
     "music_location_coop":      "-2000 -2000 0",
     # BEE2 sets this to tell conditions what music is selected
     "music_id":                 "<NONE>",
-    "global_pti_ents":          "",  # Instance used for pti_ents
+    # Instance used for pti_ents
+    "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
     # Location of the model changer instance if needed
@@ -168,31 +185,6 @@ DEFAULTS = {
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
     }
-
-# These instances have to be specially handled / we want to identify them
-# The corridors are used as a startsWith match, others are exact only
-INST_FILE = {
-    "coopExit":    "coop_exit.vmf",
-    "coopEntry":   "door_entrance_coop_1.vmf",
-    "spExit":      "elevator_exit.vmf",
-    "spEntry":     "elevator_entrance.vmf",
-    "spExitCorr":  "door_exit_",
-    "spEntryCorr": "door_entrance_",
-    "coopCorr":    "door_exit_coop_",
-    "clearPanel":  "panel_clear.vmf",
-    "pistPlat":    "lift_standalone.vmf",
-    "ambLight":    "point_light.vmf",
-    "largeObs":    "observation_room_256x128_1.vmf",
-    "glass":        "glass_128x128.vmf",
-    # although unused, editoritems allows having different instances
-    # for toggle/timer panels
-    "indPanCheck":  "indicator_panel.vmf",
-    "indPanTimer":  "indicator_panel.vmf",
-}
-
-for inst_key, inst_value in INST_FILE.items():
-    # Add the path to all the default values
-    INST_FILE[inst_key] = 'instances/p2editor/' + inst_value
 
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
@@ -223,9 +215,8 @@ FIZZ_OPTIONS = {
 
 BEE2_config = None
 
-# A list of sucessful AddGlobal commands, so we can prevent adding the same
-# instance twice.
-global_instances = []
+GAME_MODE = 'ERR'
+IS_PREVIEW = 'ERR'
 
 ##################
 # UTIL functions #
@@ -247,12 +238,15 @@ def get_tex(name):
         raise Exception('No texture "' + name + '"!')
 
 
-def alter_mat(face, seed=None):
+def alter_mat(face, seed=None, texture_lock=True):
     """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
     uses the face orientation to determine the wall direction - the
     PeTI often uses textures on the wrong sides for various reasons.
+
+    If texture_lock is false, the offset of the texture will be reset to 0,0.
+    That ensures embedface will have aligned textures.
     """
     mat = face.mat.casefold()
     if seed:
@@ -264,9 +258,14 @@ def alter_mat(face, seed=None):
     elif mat in BLACK_PAN or mat in WHITE_PAN:
         surf_type = 'white' if mat in WHITE_PAN else 'black'
         orient = get_face_orient(face)
+        # We need to handle specially the 4x4 and 2x4 variants.
+        # These are used in the embedface brushes, so they should
+        # remain having small tile size. Wall textures have 4x4 and 2x2,
+        # but floor/ceilings only have 4x4 sizes (since they usually
+        # just stay the same).
         if orient == ORIENT.wall:
             if (mat == 'metal/black_wall_metal_002b' or
-                    mat == 'tile/white_wall_tile_003f'):
+                    mat == 'tile/white_wall_tile003f'):
                 orient = '4x4'
             elif (mat == 'metal/black_wall_metal_002a' or
                     mat == 'tile/white_wall_tile003c'):
@@ -278,6 +277,10 @@ def alter_mat(face, seed=None):
         elif orient == ORIENT.ceiling:
             orient = 'ceiling'
         face.mat = get_tex(surf_type + '.' + orient)
+
+        if not texture_lock:
+            reset_tex_offset(face)
+
         return True
     elif mat in TEX_FIZZLER:
         face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
@@ -303,8 +306,13 @@ def load_settings():
 
     for item, key in tex_defaults:  # collect textures from config
         cat, name = key.split(".")
-        value = [prop.value for prop in conf.find_all('textures', cat, name)]
+        value = [
+            prop.value
+            for prop in
+            conf.find_all('textures', cat, name)
+        ]
         if len(value) == 0:
+            # If there are no values, just use the original value
             settings['textures'][key] = [item]
         else:
             settings['textures'][key] = value
@@ -329,10 +337,6 @@ def load_settings():
 
         for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
-
-    for prop in conf.find_all('instancefiles'):
-        for key, val in INST_FILE.items():
-            INST_FILE[key] = prop[key, val]
 
     for quote_block in conf.find_all("quotes_sp"):
         settings['voice_data_sp'] += quote_block.value
@@ -359,24 +363,34 @@ def load_settings():
             'off_x': utils.conv_int(pit['off_x', '0']),
             'off_y': utils.conv_int(pit['off_y', '0']),
             'height': utils.conv_int(pit['max_height', '386'], 386),
-            'side': [prop.value for prop in pit.find_all("side_inst")],
-            'pillar': [prop.value for prop in pit.find_all("pillar_inst")],
-            }
-        if len(settings['pit']['side']) == 0:
-            settings['pit']['side'] = [""]
-
-        if len(settings['pit']['pillar']) == 0:
-            settings['pit']['pillar'] = [""]
+            'skybox': pit['sky_inst', ''],
+            'skybox_ceil': pit['sky_inst_ceil', ''],
+            'targ': pit['targ_inst', ''],
+        }
+        pit_inst = settings['pit']['inst'] = {}
+        for inst_type in (
+                'support',
+                'side',
+                'corner',
+                'double',
+                'triple',
+                'pillar',
+                ):
+            vals = [prop.value for prop in pit.find_all(inst_type + '_inst')]
+            if len(vals) == 0:
+                vals = [""]
+            pit_inst[inst_type] = vals
 
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
-            '/config/compile.cfg',
+            'config/compile.cfg',
             root=get_opt('BEE2_loc'),
         )
     else:
         BEE2_config = ConfigFile(None)
 
-    utils.con_log(settings['pit'])
+    instanceLocs.load_conf()
+
     utils.con_log("Settings Loaded!")
 
 
@@ -390,12 +404,12 @@ def load_map(map_path):
     utils.con_log("Parsing complete!")
 
 
-def add_voice(voice_config, mode):
-    print(mode)
-    if mode == 'COOP':
+@conditions.meta_cond(priority=100)
+def add_voice(inst):
+    if GAME_MODE == 'COOP':
         utils.con_log('Adding Coop voice lines!')
         data = settings['voice_data_coop']
-    elif mode == 'SP':
+    elif GAME_MODE == 'SP':
         utils.con_log('Adding Singleplayer voice lines!')
         data = settings['voice_data_sp']
     else:
@@ -406,88 +420,247 @@ def add_voice(voice_config, mode):
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        timer_config=voice_config,
-        mode=mode,
+        mode=GAME_MODE,
         )
+
+@conditions.meta_cond(priority=-200, only_once=False)
+def fix_fizz_models(inst):
+    """Fix some bugs with fizzler model instances."""
+    # Fizzler model names end with this special string
+    if ("_modelStart" in inst['targetname', ''] or
+            "_modelEnd" in inst['targetname', '']):
+
+        # strip off the extra numbers on the end, so fizzler
+        # models recieve inputs correctly (Valve bug!)
+        if "_modelStart" in inst['targetname', '']:
+
+            inst['targetname'] = (
+                inst['targetname'].split("_modelStart")[0] +
+                "_modelStart"
+                )
+        else:
+            inst['targetname'] = (
+                inst['targetname'].split("_modelEnd")[0] +
+                "_modelEnd"
+                )
+
+        # one side of the fizzler models are rotated incorrectly
+        # (upsidown), fix that...
+        if inst['angles'] in FIZZLER_ANGLE_FIX:
+            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
+
+@conditions.meta_cond(priority=-100, only_once=False)
+def static_pan(inst):
+    if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
+        # white/black are found via the func_brush
+        make_static_pan(inst, "glass")
+
+@conditions.meta_cond(priority=200, only_once=True)
+def anti_fizz_bump(inst):
+    """Create portal_bumpers surrounding any fizzlers in the map.
+
+    This makes it more difficult to portal-bump through an active fizzler.
+    """
+    FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
+    # giving 32 in total: the width of a fizzler model.
+    if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
+        return True
+
+    utils.con_log('Adding Portal Bumpers to fizzlers...')
+    for cleanser in VMF.by_class['trigger_portal_cleanser']:
+        # Client bit flag = 1, triggers without it won't destroy portals
+        # - so don't add a bumper.
+        if int(cleanser['spawnflags']) & 1 != 1:
+            continue
+
+        fizz_name = cleanser['targetname']
+        if fizz_name.endswith('_brush'):
+            # Fizzlers will be changed to this in fix_func_brush()
+            fizz_name = fizz_name[:-6] + '-br_brush'
+
+        utils.con_log('name:', fizz_name)
+        # We can't combine the bumpers, since noportal_volumes
+        # don't work with concave areas
+        bumper = VMF.create_ent(
+            classname='func_portal_bumper',
+            targetname=fizz_name,
+            origin=cleanser['origin'],
+            spawnflags='1',
+            # Start off, we can't really check if the original
+            # does, but that's usually handled by the instance anyway.
+        )
+
+        bound_min, bound_max = cleanser.get_bbox()
+        origin = (bound_max + bound_min) / 2  # type: Vec
+        size = bound_max - bound_min
+        for axis in 'xyz':
+            # One of the directions will be thinner than 128, that's the fizzler
+            # direction.
+            if size[axis] < 128:
+                bound_max[axis] += FIZZ_OFF_WIDTH
+                bound_min[axis] -= FIZZ_OFF_WIDTH
+                break
+
+        # Copy one of the solids to use as a base, so the texture axes
+        # are correct.
+        if len(cleanser.solids) == 1:
+            # It's a 128x128 brush, with only one solid
+            new_solid = cleanser.solids[0].copy()
+        else:
+            # It's a regular one, we want the middle/large section
+            new_solid = cleanser.solids[1].copy()
+        bumper.solids.append(new_solid)
+
+        for face in new_solid:
+            face.mat = 'tools/toolsinvisible'
+            # For every coordinate, set to the maximum if it's larger than the
+            # origin. This will expand the two sides.
+            for v in face.planes:
+                for axis in 'xyz':
+                    if v[axis] > origin[axis]:
+                        v[axis] = bound_max[axis]
+                    else:
+                        v[axis] = bound_min[axis]
+
+        noportal = bumper.copy()
+        # Add a noportal_volume as well, of the same size.
+        noportal['classname'] = 'func_noportal_volume'
+        VMF.add_ent(noportal)
+
+    utils.con_log('Done!')
 
 
 def get_map_info():
     """Determine various attributes about the map.
 
+    This also set the 'preview in elevator' options and forces
+    a particular entry/exit hallway.
+
     - SP/COOP status
     - if in preview mode
-    - timer values for entry/exit corridors
     """
-    game_mode = 'ERR'
-    is_preview = 'ERR'
-
-    # Timer_delay values for the entry/exit corridors, needed for quotes
-    voice_timer_pos = {}
+    global GAME_MODE, IS_PREVIEW
 
     inst_files = set()  # Get a set of every instance in the map.
-    file_coop_exit = INST_FILE['coopExit']
-    file_sp_exit = INST_FILE['spExit']
-    file_coop_corr = INST_FILE['coopCorr']
-    file_sp_entry_corr = INST_FILE['spEntryCorr']
-    file_sp_exit_corr = INST_FILE['spExitCorr']
-    file_obs = INST_FILE['largeObs']
-    file_coop_entry = INST_FILE['coopEntry']
+    file_coop_exit = instanceLocs.resolve('[coopExit]')
+    file_sp_exit = instanceLocs.resolve('[spExit]')
+    file_sp_entry = instanceLocs.resolve('[spEntry]')
+    file_coop_corr = instanceLocs.resolve('[coopCorr]')
+    file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
+    file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
+    file_sp_door_frame = instanceLocs.resolve('[door_frame]')
 
+    # Should we force the player to spawn in the elevator?
+    elev_override = BEE2_config.get_bool('General', 'spawn_elev')
+
+    if elev_override:
+        # Make conditions set appropriately
+        utils.con_log('Forcing elevator spawn!')
+        IS_PREVIEW = False
+
+    no_player_start_inst = (
+        # All the instances that have the no_player start value
+        file_sp_entry +
+        file_coop_corr +
+        file_sp_entry_corr +
+        file_sp_exit_corr
+    )
+
+    # Door frames use the same instance for both the entry and exit doors,
+    # and it'd be useful to disinguish between them. Add an instvar to help.
+    door_frames = []
+    entry_origin = Vec(-999, -999, -999)
+    exit_origin = Vec(-999, -999, -999)
+
+    override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
+    override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
+    override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
+
+    utils.con_log(file_sp_exit_corr)
     for item in VMF.by_class['func_instance']:
-        file = item['file']
-        if file == file_coop_exit:
-            game_mode = 'COOP'
-        elif file == file_sp_exit:
-            game_mode = 'SP'
-        elif file == INST_FILE['spEntry']:
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-            game_mode = 'SP'
-        elif file.startswith(file_coop_corr):
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-            voice_timer_pos['exit'] = (
-                item.fixup['timer_delay', '0']
-                )
-            game_mode = 'COOP'
-        elif file.startswith(file_sp_entry_corr):
-            voice_timer_pos['entry'] = (
-                item.fixup['timer_delay', '0']
-                )
-            is_preview = not utils.conv_bool(item.fixup['no_player_start'])
-        elif file.startswith(file_sp_exit_corr):
-            voice_timer_pos['exit'] = (
-                item.fixup['timer_delay', '0']
-                )
-        elif file == file_coop_entry:
-            voice_timer_pos['entry'] = (
-                item.fixup['timer_delay', '0']
-                )
-        elif file == file_obs:
-            voice_timer_pos['obs'] = (
-                item.fixup['timer_delay', '0']
-                )
+        # Loop through all the instances in the map, looking for the entry/exit
+        # doors.
+        # - Read the $no_player_start var to see if we're in preview mode,
+        #   or override the value if specified in compile.cfg
+        # - Determine whether the map is SP or Coop by the
+        #   presence of certain instances.
+        # - Switch the entry/exit corridors to particular ones if specified
+        #   in compile.cfg
+        # Also build a set of all instances, to make a condition check easy
+        # later
 
+        file = item['file'].casefold()
+        utils.con_log('File:', file)
+        if file in no_player_start_inst:
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
+            else:
+                IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
+        if file in file_sp_exit_corr:
+            exit_origin = Vec.from_str(item['origin'])
+            if override_sp_exit == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(file_sp_exit_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
+                utils.con_log('Setting exit to ' + str(override_sp_exit))
+                item['file'] = file_sp_exit_corr[override_sp_exit-1]
+        elif file in file_sp_entry_corr:
+            entry_origin = Vec.from_str(item['origin'])
+            if override_sp_entry == 0:
+                utils.con_log(
+                    'Using random entry (' +
+                    str(file_sp_entry_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
+                utils.con_log('Setting entry to ' + str(override_sp_entry))
+                item['file'] = file_sp_entry_corr[override_sp_entry-1]
+        elif file in file_coop_corr:
+            GAME_MODE = 'COOP'
+            if override_coop_corr == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(override_coop_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
+                utils.con_log('Setting coop exit to ' + str(override_coop_corr))
+                item['file'] = file_coop_corr[override_coop_corr-1]
+        elif file in file_coop_exit:
+            GAME_MODE = 'COOP'
+        elif file in file_sp_exit or file in file_sp_entry:
+            GAME_MODE = 'SP'
+        elif file in file_sp_door_frame:
+            door_frames.append(item)
         inst_files.add(item['file'])
 
-    utils.con_log("Game Mode: " + game_mode)
-    utils.con_log("Is Preview: " + str(is_preview))
+    utils.con_log("Game Mode: " + GAME_MODE)
+    utils.con_log("Is Preview: " + str(IS_PREVIEW))
 
-    if game_mode == 'ERR':
-        utils.con_log('Instances:', inst_files)
-        utils.con_log('InstanceFiles:', INST_FILE)
+    if GAME_MODE == 'ERR':
         raise Exception(
             'Unknown game mode - Map missing exit room!'
-            '\nCheck for incorect InstanceFiles definition.'
         )
-    if is_preview == 'ERR':
-        utils.con_log('Instances:', inst_files)
-        utils.con_log('InstanceFiles:', INST_FILE)
+    if IS_PREVIEW == 'ERR':
         raise Exception(
             "Can't determine if preview is enabled "
             '- Map likely missing entry room!'
-            '\nCheck for incorect InstanceFiles definition.'
         )
 
-    return is_preview, game_mode, voice_timer_pos, inst_files
+    # Now check the door frames, to allow distinguishing between
+    # the entry and exit frames.
+    for door_frame in door_frames:
+        origin = Vec.from_str(door_frame['origin'])
+        if origin.x == entry_origin.x and origin.y == entry_origin.y:
+            door_frame.fixup['door_type'] = 'entry'
+        elif origin.x == exit_origin.x and origin.y == exit_origin.y:
+            door_frame.fixup['door_type'] = 'exit'
+
+    # Return the set of all instances in the map.
+    return inst_files
 
 
 def calc_rand_seed():
@@ -495,12 +668,12 @@ def calc_rand_seed():
 
      This ensures textures remain the same when the map is recompiled.
     """
-    amb_light = INST_FILE['ambLight']
+    amb_light = instanceLocs.resolve('<ITEM_POINT_LIGHT>')
     lst = [
         inst['targetname'] or '-'  # If no targ
         for inst in
         VMF.by_class['func_instance']
-        if inst['file'] == amb_light
+        if inst['file'].casefold() in amb_light
         ]
     if len(lst) == 0:
         # Very small maps won't have any ambient light entities at all.
@@ -509,7 +682,7 @@ def calc_rand_seed():
         return '|'.join(lst)
 
 
-def make_bottomless_pit(solids):
+def make_bottomless_pit(solids, max_height):
     """Transform all the goo pits into bottomless pits."""
     tex_sky = settings['pit']['tex_sky']
     teleport = settings['pit']['should_tele']
@@ -525,6 +698,44 @@ def make_bottomless_pit(solids):
             # we do the calc with Decimal to ensure precision
     pit_height = settings['pit']['height']
 
+    if settings['pit']['skybox'] != '':
+        # Add in the actual skybox edges and triggers
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['skybox'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='{!s} {!s} 0'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+            ),
+        )
+
+    if settings['pit']['skybox_ceil'] != '':
+        # We dynamically add the ceiling so it resizes to match the map,
+        # and lighting won't be too far away.
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['skybox_ceil'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='{!s} {!s} {!s}'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+                max_height,
+            ),
+        )
+
+    if settings['pit']['targ'] != '':
+        # Add in the actual skybox edges and triggers
+        VMF.create_ent(
+            classname='func_instance',
+            file=settings['pit']['targ'],
+            targetname='skybox',
+            angles='0 0 0',
+            origin='0 0 0',
+        )
+
     # To figure out what positions need edge pieces, we use a dict
     # indexed by XY tuples. The four Nones match the NSEW directions.
     # For each trigger, we loop through the grid points it's in. We
@@ -533,11 +744,11 @@ def make_bottomless_pit(solids):
     # If a value = None, it is occupied by goo.
     edges = defaultdict(lambda: [None, None, None, None])
     dirs = [
-        # index, x, y, angles
-        (0, 0, 128,  '0 270 0'),  # North
-        (1, 0, -128, '0 90 0'),  # South
-        (2, 128, 0,  '0 180 0'),  # East
-        (3, -128, 0, '0 0 0')  # West
+        # x, y, offsets
+        (0, 128),   # North
+        (0, -128),  # South
+        (128, 0),   # East
+        (-128, 0)   # West
     ]
     if teleport:
         # transform the skybox physics triggers into teleports to move cubes
@@ -558,7 +769,7 @@ def make_bottomless_pit(solids):
                         for y in range(int(bbox_min.y), int(bbox_max.y), 128):
                             # Remove the pillar from the center of the item
                             edges[x, y] = None
-                            for i, xoff, yoff, angle in dirs:
+                            for i, (xoff, yoff) in enumerate(dirs):
                                 side = edges[x+xoff, y+yoff]
                                 if side is not None:
                                     side[i] = origin.z - 13
@@ -570,38 +781,35 @@ def make_bottomless_pit(solids):
                             if plane.z > origin.z:
                                 plane.z -= 16
 
-    side_opts = settings['pit']['side']
-    pillar_opts = settings['pit']['pillar']
+    instances = settings['pit']['inst']
 
-    utils.con_log('Pillar:', pillar_opts)
+    side_types = {
+        utils.CONN_TYPES.side: instances['side'],
+        utils.CONN_TYPES.corner: instances['corner'],
+        utils.CONN_TYPES.straight: instances['double'],
+        utils.CONN_TYPES.triple: instances['triple'],
+        utils.CONN_TYPES.all: instances['pillar'],
+        utils.CONN_TYPES.none: [''],  # Never add instance if no walls
+    }
+
+    utils.con_log('Pillar:', instances)
     for (x, y), mask in edges.items():
         if mask is None:
-            continue
-        for i, xoff, yoff, angle in dirs:
-            if mask[i] is None:
-                continue
-            random.seed(str(x) + str(y) + angle)
-            file = random.choice(side_opts)
-            if file != '':
-                VMF.create_ent(
-                    classname='func_instance',
-                    file=file,
-                    targetname='goo_side',
-                    origin='{!s} {!s} {!s}'.format(
-                        x+tele_off_x,
-                        y+tele_off_y,
-                        mask[i],
-                        ),
-                    angles=angle
-                ).make_unique()
-        random.seed(str(x) + str(y) + '-pillar')
-        file = random.choice(pillar_opts)
+            continue  # This is goo
+
+        random.seed(str(x) + str(y) + 'sides')
+
+        inst_type, angle = utils.CONN_LOOKUP[
+            tuple((val is not None) for val in mask)
+        ]
+
+        file = random.choice(side_types[inst_type])
+
         if file != '':
             VMF.create_ent(
                 classname='func_instance',
                 file=file,
                 targetname='goo_side',
-                angles='0 0 0',
                 origin='{!s} {!s} {!s}'.format(
                     x+tele_off_x,
                     y+tele_off_y,
@@ -611,8 +819,112 @@ def make_bottomless_pit(solids):
                         if x is not None
                     ),
                 ),
+                angles=angle,
             ).make_unique()
 
+        random.seed(str(x) + str(y) + '-support')
+        file = random.choice(instances['support'])
+        if file != '':
+            VMF.create_ent(
+                classname='func_instance',
+                file=file,
+                targetname='goo_support',
+                angles='0 0 0',
+                origin='{!s} {!s} {!s}'.format(
+                    x+tele_off_x,
+                    y+tele_off_y,
+                    pit_height,
+                ),
+            ).make_unique()
+
+
+def iter_grid(dist_x, dist_y, stride=1):
+    """Loop over a rectangular grid area."""
+    for x in range(0, dist_x, stride):
+        for y in range(0, dist_y, stride):
+            yield x, y
+
+
+def add_goo_mist(sides):
+    """Add water_mist* particle systems to goo.
+
+    This uses larger particles when needed to save ents.
+    """
+    needs_mist = sides  # Locations that still need mist
+    sides = sorted(sides)
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=1024,
+        grid_y=512,
+        particle='water_mist_1024_512',
+        angles='0 0 0',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=512,
+        grid_y=1024,
+        particle='water_mist_1024_512',
+        angles='0 90 0',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=512,
+        grid_y=512,
+        particle='water_mist_512',
+    )
+
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=256,
+        grid_y=256,
+        particle='water_mist_256',
+    )
+
+    # There isn't a 128 particle so use 256 centered
+    fit_goo_mist(
+        sides, needs_mist,
+        grid_x=128,
+        grid_y=128,
+        particle='water_mist_256',
+    )
+
+def fit_goo_mist(
+        sides,
+        needs_mist,
+        grid_x,
+        grid_y,
+        particle,
+        angles='0 0 0',
+        ):
+    """Try to add particles of the given size.
+
+    needs_mist is a set of all added sides, so we don't double-up on a space.
+    """
+    if grid_y is None:
+        grid_y = grid_x
+    for pos in sides:
+        if pos not in needs_mist:
+            continue  # We filled this space already
+        for x, y in iter_grid(grid_x, grid_y, 128):
+            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
+                break  # Doesn't match
+        else:
+            VMF.create_ent(
+                classname='info_particle_system',
+                targetname='@goo_mist',
+                start_active='1',
+                effect_name=particle,
+                origin='{x!s} {y!s} {z!s}'.format(
+                    x=pos.x + (grid_x/2 - 64),
+                    y=pos.y + (grid_y/2 - 64),
+                    z=pos.z + 48,
+                ),
+                angles=angles,
+            )
+            for (x, y) in iter_grid(grid_x, grid_y, 128):
+                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
@@ -648,23 +960,77 @@ def change_goo_sides():
                     try:
                         face = face_dict[x+xoff, y+yoff, z+zoff]
                     except KeyError:
-                        pass
-                    else:
-                        utils.con_log('Success: ', face.mat.casefold())
-                        if (
-                                face.mat.casefold() in BLACK_PAN or
-                                face.mat.casefold() == 'tools/toolsnodraw'
-                                ):
-                            face.mat = get_tex('special.goo_wall')
+                        continue
+
+                    utils.con_log('Success: ', face.mat.casefold())
+                    if (
+                            face.mat.casefold() in BLACK_PAN or
+                            face.mat.casefold() == 'tools/toolsnodraw'
+                            ):
+                        face.mat = get_tex('special.goo_wall')
     utils.con_log("Done!")
 
+def collapse_goo_trig():
+    """Collapse the goo triggers to only use 2 entities for all pits."""
+    utils.con_log('Collapsing goo triggers...')
+
+    hurt_trig = None
+    cube_trig = None
+    for trig in VMF.by_class['trigger_multiple']:
+        if trig['wait'] == '0.1' and trig['targetname', ''] == '':
+            if cube_trig is None:
+                cube_trig = trig
+            else:
+                cube_trig.solids.extend(trig.solids)
+                trig.remove()
+
+    for trig in VMF.by_class['trigger_hurt']:
+        if trig['targetname', ''] == '':
+            if hurt_trig is None:
+                hurt_trig = trig
+            else:
+                hurt_trig.solids.extend(trig.solids)
+                trig.remove()
+
+    if hurt_trig is not None:
+        hurt_trig['damage'] = '99999'
+        hurt_trig.outputs.append(
+            VLib.Output(
+                'OnHurtPlayer',
+                '@goo_fade',
+                'Fade',
+            ),
+        )
+
+    utils.con_log('Done!')
+
+def remove_static_ind_toggles():
+    """Remove indicator_toggle instances that don't have assigned overlays.
+
+    If a style has static overlays, this will make antlines basically free.
+    """
+    utils.con_log('Removing static indicator toggles...')
+    toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in toggle_file:
+            continue
+
+        overlay = inst.fixup['$indicator_name', '']
+        if overlay == '' or len(VMF.by_target[overlay]) == 0:
+            inst.remove()
+    utils.con_log('Done!')
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
-    glass_inst = get_opt('glassInst')
+    glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
+    # Goo mist must be enabled by both the style and the user.
+    make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
+        settings['style_vars'].get('AllowGooMist', '1')
+    )
+    mist_solids = set()
 
     # Check the clump algorithm has all its arguements
     can_clump = (get_bool_opt("clump_wall_tex") and
@@ -684,14 +1050,21 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
-
+    print('Glass inst', glass_inst)
     if glass_inst == "NONE":
         glass_inst = None
+
+    highest_brush = 0
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
-            is_glass = False
+            highest_brush = max(
+                highest_brush,
+                face.planes[0].z,
+                face.planes[1].z,
+                face.planes[2].z,
+            )
             if face.mat.casefold() in GOO_TEX:
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
@@ -702,6 +1075,14 @@ def change_brush():
                         pit_solids.append((solid, face))
                     else:
                         face.mat = pit_goo_tex
+                        if make_goo_mist:
+                            mist_solids.add(
+                                solid.get_origin().as_tuple()
+                            )
+                elif make_goo_mist:
+                    mist_solids.add(
+                        solid.get_origin().as_tuple()
+                    )
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
                 split_u = face.uaxis.split(" ")
                 split_v = face.vaxis.split(" ")
@@ -712,12 +1093,15 @@ def change_brush():
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
-            inst = find_glass_inst(solid.get_origin())
-            if inst:
-                inst['file'] = glass_inst
+            switch_glass_inst(solid.get_origin(), glass_inst)
     if is_bottomless:
-        utils.con_log('Creating Bottomless Pits!')
-        make_bottomless_pit(pit_solids)
+        utils.con_log('Creating Bottomless Pits...')
+        make_bottomless_pit(pit_solids, highest_brush)
+        utils.con_log('Done!')
+
+    if make_goo_mist:
+        utils.con_log('Adding Goo Mist...')
+        add_goo_mist(mist_solids)
         utils.con_log('Done!')
 
     if can_clump:
@@ -726,29 +1110,49 @@ def change_brush():
         random_walls()
 
 
-def find_glass_inst(origin):
-    """Find the glass instance placed in the specified location."""
+def switch_glass_inst(origin, new_file):
+    """Find the glass instance placed in the specified location.
+
+    Also works with grating.
+    """
+    # Find the center point of this location to find where the instance
+    # will be.
     loc = Vec(
         origin.x//128 * 128 + 64,
         origin.y//128 * 128 + 64,
         origin.z//128 * 128 + 64,
         )
     direction = (origin-loc).norm()
-    ang_vec = Vec(-1, 0, 0)  # The brush parts are on this side!
+    ang_vec = Vec(-1, 0, 0)
     loc_str = loc.join(' ')
-    gls_file = INST_FILE['glass']
+    gls_file = instanceLocs.resolve('[glass_128]')
+
+    # Sometimes PeTI generates more than one segment instance. We should
+    # delete the extras!
+    targ = None
+    gls_file.append(new_file)  # Also search for already-changed bits
+
     for inst in VMF.by_class['func_instance']:
-        if inst['origin', ''] == loc_str and inst['file', ''] == gls_file:
+        # Are they a glass file at the right location?
+        if (
+                inst['origin', ''] == loc_str and
+                inst['file', ''].casefold() in gls_file
+                ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
             inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
-            rot = ang_vec.rotate(inst_ang.x, inst_ang.y, inst_ang.z)
-            print(rot, direction)
-            if round(rot) == direction:
-                return inst
-
-    # TODO - make this actually work
-    return None
+            # The brush parts are on this side!
+            rot = Vec(-1, 0, 0).rotate(
+                inst_ang.x, inst_ang.y, inst_ang.z
+            )
+            if rot == direction:
+                if targ is None:
+                    targ = inst
+                else:
+                    # We already found one!
+                    inst.remove()
+    if targ is not None:
+        targ['file'] = new_file
 
 
 def face_seed(face):
@@ -759,15 +1163,45 @@ def face_seed(face):
     origin = face.get_origin()
     for axis in "xyz":
         if origin[axis] % 128 < 2:
-            origin[axis] //= 128  # This side
+            origin[axis] = (origin[axis] // 64) * 64
         else:
-            origin[axis] = origin[axis] // 128 + 64
-    return origin.join()
+            origin[axis] = (origin[axis] // 128) * 128 + 64
+    return origin.join(' ')
 
+def reset_tex_offset(face):
+    """Force all white/black walls to 0 offsets"""
+    uaxis = face.uaxis.split()
+    vaxis = face.vaxis.split()
+    uaxis[3] = '0]'
+    vaxis[3] = '0]'
+    face.uaxis = ' '.join(uaxis)
+    face.vaxis = ' '.join(vaxis)
+
+def get_grid_sizes(face: VLib.Side):
+    """Determine the grid sizes that fits on this brush."""
+    bbox_min, bbox_max = face.get_bbox()
+    dim = bbox_max - bbox_min
+
+    if dim.x == 0:
+        u, v = dim.y, dim.z
+    elif dim.y == 0:
+        u, v = dim.x, dim.z
+    elif dim.z == 0:
+        u, v = dim.x, dim.y
+    else:
+        raise Exception(str(dim) + ' not on grid!')
+
+    if u % 128 == 0 and v % 128 == 0:  # regular square
+        return "0.25", "0.5", "1"
+    if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
+        return "0.5",
+    if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
+        return "0.25",
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
     scale_walls = get_bool_opt("random_blackwall_scale")
+    texture_lock = get_bool_opt('tile_texture_lock', True)
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
             orient = get_face_orient(face)
@@ -775,18 +1209,19 @@ def random_walls():
             if (scale_walls and
                     face.mat.casefold() in BLACK_PAN and
                     orient is not ORIENT.floor):
+
                 random.seed(face_seed(face) + '_SCALE_VAL')
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
-                scale = random.choice(("0.25", "0.5", "1"))
-                split = face.uaxis.split(" ")
+                scale = random.choice(get_grid_sizes(face))
+                split = face.uaxis.split()
                 split[-1] = scale
                 face.uaxis = " ".join(split)
 
-                split = face.vaxis.split(" ")
+                split = face.vaxis.split()
                 split[-1] = scale
                 face.vaxis = " ".join(split)
-            alter_mat(face, face_seed(face))
+            alter_mat(face, face_seed(face), texture_lock)
 
 
 def clump_walls():
@@ -808,17 +1243,23 @@ def clump_walls():
 
     # we keep a list for the others, so we can nodraw them if needed
     others = {}
+
+    texture_lock = get_bool_opt('tile_texture_lock', True)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
             mat = face.mat.casefold()
-            if face.mat in (
+            if mat in (
                     'glass/glasswindow007a_less_shiny',
                     'metal/metalgrate018',
                     'anim_wp/framework/squarebeams',
                     'tools/toolsnodraw',
+                    'anim_wp/framework/backpanels_cheap'
                     ):
-                # These textures aren't always on grid, ignore them..
+                # These textures aren't wall textures, and usually never
+                # use random textures. Don't add them here. They also aren't
+                # on grid.
                 alter_mat(face)
                 continue
 
@@ -855,7 +1296,7 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
-                    alter_mat(face, face_seed(face))
+                    alter_mat(face, face_seed(face), texture_lock)
 
     todo_walls = len(walls)  # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -866,35 +1307,33 @@ def clump_walls():
     for _ in range(clump_numb):
         pos = random.choice(wall_pos)
         wall_type = walls[pos].mat
+        pos = Vec(pos) // 128 * 128
+        ':type pos: Vec'
         state = random.getstate()  # keep using the map_seed for the clumps
         if wall_type == "WHITE" or wall_type == "BLACK":
-            random.seed(pos)
-            pos_min = [0, 0, 0]
-            pos_max = [0, 0, 0]
+            random.seed(pos.as_tuple())
+            pos_min = Vec()
+            pos_max = Vec()
             # these are long strips extended in one direction
             direction = random.randint(0, 2)
             for i in range(3):
                 if i == direction:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_size) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_size) * 128)
+                    dist = clump_size
                 else:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_wid) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_wid) * 128)
+                    dist = clump_wid
+                pos_min[i] = int(
+                    pos[i] - random.randint(0, dist) * 128)
+                pos_max[i] = int(
+                    pos[i] + random.randint(0, dist) * 128)
 
             tex = get_tex(wall_type.lower() + '.wall')
             # Loop though all these grid points, and set to the given
             # texture if they have the same wall type
-            for x in range(pos_min[0], pos_max[0], 128):
-                for y in range(pos_min[1], pos_max[1], 128):
-                    for z in range(pos_min[2], pos_max[2], 128):
-                        if (x, y, z) in walls:
-                            side = walls[x, y, z]
-                            if side.mat == wall_type:
-                                side.mat = tex
+            for pos, side in walls.items():
+                if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
+                    side.mat = tex
+                    if not texture_lock:
+                        reset_tex_offset(side)
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -913,19 +1352,18 @@ def clump_walls():
             else:
                 face.mat = get_tex("black.wall")
         else:
-            alter_mat(face, seed=pos)
+            alter_mat(face, seed=pos, texture_lock=texture_lock)
 
 
 def get_face_orient(face):
     """Determine the orientation of an on-grid face."""
-    if face.planes[0]['z'] == face.planes[1]['z'] == face.planes[2]['z']:
-        if face.planes[0]['y'] < face.planes[2]['y']:
-            return ORIENT.ceiling
-        else:
-            return ORIENT.floor
-    else:
-        return ORIENT.wall
+    norm = face.normal()
+    if norm == (0, 0, -1):
+        return ORIENT.floor
 
+    if norm == (0, 0, 1):
+        return ORIENT.ceiling
+    return ORIENT.wall
 
 def set_antline_mat(over, mat, raw_mat=False):
     """Set the material on an overlay to the given value, applying options.
@@ -945,11 +1383,9 @@ def set_antline_mat(over, mat, raw_mat=False):
             # For P1 style, check to see if the antline is on the floor or
             # walls.
             ang = Vec.from_str(over['angles'])
-            direction = round(Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z))
-            utils.con_log('Ant dir: ', over['angles'], direction)
-            if direction == Vec(0, 0, 1) or direction == Vec(0, 0, -1):
+            direction = Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z)
+            if direction == (0, 0, 1) or direction == (0, 0, -1):
                 mat += 'floor'
-                utils.con_log('Floor!')
 
         mat = get_tex('overlay.' + mat)
 
@@ -1072,7 +1508,7 @@ def add_extra_ents(mode):
             ] = utils.bool_as_int(not has_cave)
 
     model_changer_loc = get_opt('model_changer_loc')
-    chosen_model = BEE2_config['General']['player_model']
+    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI')
     # We don't change the player model in Coop, or if Bendy is selected.
     if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
         VMF.create_ent(
@@ -1088,7 +1524,7 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
-    grating_inst = get_opt("gratingInst")
+    grating_inst = get_opt("grating_inst")
     grating_scale = get_opt("grating_scale")
 
     if grating_inst == "NONE":
@@ -1131,10 +1567,10 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split(" ")
-                    split_v = side.vaxis.split(" ")
-                    split_u[-1] = grating_scale  # apply the glass scaling option
-                    split_v[-1] = grating_scale
+                    split_u = side.uaxis.split()
+                    split_v = side.vaxis.split()
+                    split_u[-1] = grating_scale  # apply the grtating
+                    split_v[-1] = grating_scale  # scaling option
                     side.uaxis = " ".join(split_u)
                     side.vaxis = " ".join(split_v)
                 alter_mat(side)  # for gratings, laserfields and some others
@@ -1150,9 +1586,7 @@ def change_func_brush():
 
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
-            inst = find_glass_inst(brush.get_origin())
-            if inst:
-                inst['file'] = grating_inst
+            switch_glass_inst(brush.get_origin(), grating_inst)
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
@@ -1190,35 +1624,6 @@ def make_static_pan(ent, pan_type):
     return True
 
 
-def make_static_pist(ent):
-    """Convert a regular piston into a static version.
-
-    This is done to save entities and improve lighting."""
-    if get_opt("staticPan") == "NONE":
-        return False  # no conversion allowed!
-
-    print("Trying to make static...")
-    bottom_pos = ent.fixup['bottom_level', '-1']
-
-    if (ent.fixup['connectioncount', '0'] != "0" or
-            ent.fixup['disable_autodrop'] != "0"):  # can it move?
-        if int(bottom_pos) > 0:
-            # The piston doesn't go fully down, use alt instances.
-            ent['file'] = ent['file'][:-4] + "_" + bottom_pos + ".vmf"
-    else:  # we are static
-        ent['file'] = (
-            get_opt("staticPan") + "pist_"
-            + (
-                ent.fixup['top_level', '1']
-                if utils.conv_bool(ent.fixup['start_up'], False)
-                else bottom_pos
-                )
-            + ".vmf"
-            )
-        # something like "static_pan/pist_3.vmf"
-    return True
-
-
 def change_ents():
     """Edit misc entities."""
     utils.con_log("Editing Other Entities...")
@@ -1236,36 +1641,9 @@ def change_ents():
 
 
 def fix_inst():
-    """Fix some different bugs with instances, especially fizzler models.
-
-    """
-
-    utils.con_log("Editing Instances...")
     for inst in VMF.by_class['func_instance']:
-        # Fizzler model names end with this special string
-        if ("_modelStart" in inst['targetname', ''] or
-                "_modelEnd" in inst['targetname', '']):
-
-            # strip off the extra numbers on the end, so fizzler
-            # models recieve inputs correctly (Valve bug!)
-            if "_modelStart" in inst['targetname', '']:
-
-                inst['targetname'] = (
-                    inst['targetname'].split("_modelStart")[0] +
-                    "_modelStart"
-                    )
-            else:
-                inst['targetname'] = (
-                    inst['targetname'].split("_modelEnd")[0] +
-                    "_modelEnd"
-                    )
-
-            # one side of the fizzler models are rotated incorrectly
-            # (upsidown), fix that...
-            if inst['angles'] in FIZZLER_ANGLE_FIX:
-                inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
-
-        elif "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
+        # TODO: remake this in a condition
+        if "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
             # find the triggers that match this entity and mod them
             for trig in VMF.iter_ents(
                     classname='trigger_portal_cleanser',
@@ -1315,12 +1693,6 @@ def fix_inst():
                     inst_in='in',
                     inst_out='out',
                     ))
-
-        elif inst['file'] == INST_FILE['clearPanel']:
-            # white/black are found via the func_brush
-            make_static_pan(inst, "glass")
-        elif inst['file'] == INST_FILE['pistPlat']:
-            make_static_pist(inst)  # try to convert to static piston
 
 
 def fix_worldspawn():
@@ -1400,18 +1772,13 @@ def main():
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
-    new_path = ""
-    path = ""
+    path = sys.argv[-1]  # The path is the last argument to vbsp
+
+    # Add styled/ to the list of directories for the new location
+    path_dir, path_file = os.path.split(path)
+    new_args[-1] = new_path = os.path.join(path_dir, 'styled', path_file)
+
     for i, a in enumerate(new_args):
-        fixed_a = os.path.normpath(a)
-        if "sdk_content\\maps\\" in fixed_a:
-            new_args[i] = fixed_a.replace(
-                'sdk_content\\maps\\',
-                'sdk_content\\maps\styled\\',
-                1,
-                )
-            new_path = new_args[i]
-            path = a
         # We need to strip these out, otherwise VBSP will get confused.
         if a == '-force_peti' or a == '-force_hammer':
             new_args[i] = ''
@@ -1428,9 +1795,6 @@ def main():
     if not path.endswith(".vmf"):
         path += ".vmf"
         new_path += ".vmf"
-
-    utils.con_log("Loading settings...")
-    load_settings()
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1455,38 +1819,35 @@ def main():
     else:
         utils.con_log("PeTI map detected!")
 
+        utils.con_log("Loading settings...")
+        load_settings()
+
         load_map(path)
 
         MAP_SEED = calc_rand_seed()
 
-        (
-            IS_PREVIEW,
-            GAME_MODE,
-            voice_timer_pos,
-            all_inst,
-        ) = get_map_info()
+        all_inst = get_map_info()
 
         conditions.init(
             seed=MAP_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
-            game_mode=GAME_MODE,
-            is_pre=IS_PREVIEW,
             )
 
         fix_inst()
-        conditions.check_all(inst_files=INST_FILE)
+        conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
-        change_goo_sides()  # Must be done before!
+        change_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
         change_trig()
+        collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
+        remove_static_ind_toggles()
 
         fix_worldspawn()
-        add_voice(voice_timer_pos, GAME_MODE)
         save(new_path)
 
         run_vbsp(

@@ -24,13 +24,14 @@ loadScreen.main_loader.set_length('UI', 9)
 
 DEFAULT_SETTINGS = {
     'Directories': {
-        'palette': 'palettes\\',
-        'package': 'packages\\',
+        'palette': 'palettes/',
+        'package': 'packages/',
     },
     'General': {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
         'mute_sounds': '0',
+        'show_wip_items': '0',
     },
     'Debug': {
         # Show exceptions in dialog box when crash occurs
@@ -49,13 +50,11 @@ show_errors = False
 
 try:
 
-    UI.load_settings(GEN_OPTS)
+    UI.load_settings()
 
     show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
-    # If we have no games, gameMan will quit the app entirely.
-    gameMan.load(UI.quit_application, loadScreen.main_loader)
-
+    gameMan.load()
     gameMan.set_game_by_name(
         GEN_OPTS.get_val('Last_Selected', 'Game', ''),
         )
@@ -91,16 +90,16 @@ try:
     print('Done!')
 
     loadScreen.main_loader.destroy()
+    
     if not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
         TK_ROOT.after(
             100,
             extract_packages.start_copying,
             pack_data['zips'],
         )
-    TK_ROOT.mainloop()
 
 except Exception as e:
-    # Grab Python's traceback, and record it
+    # Grab Python's traceback, and record it.
     # This way we have a log.
     loadScreen.main_loader.destroy()
 
@@ -111,7 +110,6 @@ except Exception as e:
             title='BEE2 Error!',
             message=str(e).strip('".')+'!',
             icon=messagebox.ERROR,
-            parent=TK_ROOT,
             )
 
     # Weekday Date Month Year HH:MM:SS AM/PM

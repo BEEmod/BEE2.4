@@ -8,7 +8,6 @@ Does stuff related to the actual games.
 import os
 import os.path
 import shutil
-from collections import defaultdict
 
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -19,6 +18,8 @@ from query_dialogs import ask_string
 from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
+import UI
+import loadScreen
 
 all_games = []
 selected_game = None
@@ -53,9 +54,8 @@ _UNLOCK_ITEMS = [
 # The source and desination locations of resources that must be copied
 # into the game folder.
 CACHE_LOC = [
-    ('inst_cache/', 'sdk_content/maps/instances/BEE2'),
-    ('source_cache/', 'BEE2/'),
-    ('packrat/', 'bin/bee2'),
+    ('../inst_cache/', 'sdk_content/maps/instances/BEE2'),
+    ('../source_cache/', 'BEE2/'),
     ]
 
 # The line we inject to add our BEE2 folder into the game search path.
@@ -70,12 +70,12 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('config/basemodui.txt', "r") as trans:
-            trans_data = Property.parse(trans, 'config/basemodui.txt')
+        with open('../basemodui.txt', "r") as trans:
+            trans_prop = Property.parse(trans, 'basemodui.txt')
         trans_data = {
             item.real_name: item.value
             for item in
-            trans_data.find_key("lang", []).find_key("tokens", [])
+            trans_prop.find_key("lang", []).find_key("tokens", [])
         }
     except IOError:
         pass
@@ -142,7 +142,7 @@ class Game:
                 with open(info_path) as file:
                     data = list(file)
 
-                for line_num, line in reversed(enumerate(data)):
+                for line_num, line in reversed(list(enumerate(data))):
                     clean_line = utils.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
@@ -181,25 +181,34 @@ class Game:
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
-                if os.path.isfile(backup_path):
+                old_version = self.abs_path(file + '_styles' + ext)
+                if os.path.isfile(old_version):
+                    print("Restoring Stylechanger version of " + name + "!")
+                    shutil.copy(old_version, item_path)
+                elif os.path.isfile(backup_path):
                     print("Restoring original " + name + "!")
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
+        messagebox.showinfo(
+            message='Now copying over resources. The BEE2 may be non-responsive'
+                    ' for a few seconds',
+            parent=TK_ROOT,
+            title='BEE2 - Exporting',
+        )
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
             print('Copying to "' + dest + '" ...', end='')
             try:
                 shutil.rmtree(dest)
-                os.mkdir(dest)
             except (IOError, shutil.Error):
                 pass
-                shutil.copytree(source, dest)
+            shutil.copytree(source, dest)
             print(' Done!')
         print('Copying PakRat...', end='')
-        shutil.copy('pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
+        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
         print(' Done!')
 
     def clear_cache(self):
@@ -209,7 +218,7 @@ class Game:
                 shutil.rmtree(self.abs_path(dest))
             except (IOError, shutil.Error):
                 pass
-        shutil.rmtree(self.abs_path('bin/bee2/'))
+        shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
     def export(
             self,
@@ -276,7 +285,9 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
 
-        vbsp_config.set_key(('Options', 'BEE2_loc'), os.getcwd())
+        vbsp_config.set_key(('Options', 'BEE2_loc'),
+            os.path.dirname(os.getcwd()) # Go up one dir to our actual location
+        )
 
         # If there are multiple of these blocks, merge them together
         vbsp_config.merge_children('Conditions',
@@ -309,7 +320,6 @@ class Game:
             all_instances.append(item_prop)
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block:
-                    print(repr(inst))
                     item_prop.append(
                         Property('Instance', inst['Name'])
                     )
@@ -324,6 +334,9 @@ class Game:
                     for prop in item.find_key("Editor", []):
                         if prop.name == 'deletable' or prop.name == 'copyable':
                             prop.value = '1'
+
+        print('Editing Gameinfo!')
+        self.edit_gameinfo(True)
 
         print('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
@@ -342,6 +355,14 @@ class Game:
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
             for line in all_instances.export():
                 inst_file.write(line)
+
+        print('Copying Custom Compiler!')
+        for file in os.listdir('../compiler'):
+            print('\t* compiler/{0} -> bin/{0}'.format(file))
+            shutil.copy(
+                os.path.join('../compiler', file),
+                self.abs_path('bin/')
+            )
 
         for prefix, pretty in VOICE_PATHS:
             path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
@@ -397,7 +418,7 @@ def save():
     config.save()
 
 
-def load(ui_quit_func, load_screen_window):
+def load():
     global selected_game
     all_games.clear()
     for gm in config:
@@ -415,13 +436,13 @@ def load(ui_quit_func, load_screen_window):
                 new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
-        load_screen_window.withdraw()
+        loadScreen.main_loader.withdraw()
 
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            ui_quit_func()
-        load_screen_window.deiconify()
+            UI.quit_application()
+        loadScreen.main_loader.deiconify()  # Show it again
     selected_game = all_games[0]
 
 
@@ -486,30 +507,32 @@ def add_game(_=None, refresh_menu=True):
 
 def remove_game(_=None):
     """Remove the currently-chosen game from the game list."""
-    global selected_game, selectedGame_radio
+    global selected_game
+    lastgame_mess = (
+        "\n (BEE2 will quit, this is the last game set!)"
+        if len(all_games) == 1 else
+        ""
+    )
     confirm = messagebox.askyesno(
         title="BEE2",
         message='Are you sure you want to delete "'
                 + selected_game.name
-                + '"?',
+                + '"?'
+                + lastgame_mess,
         )
     if confirm:
-        if len(all_games) <= 1:
-            messagebox.showerror(
-                message='You cannot remove every game from the list!',
-                title='BEE2',
-                parent=TK_ROOT,
-                )
-        else:
-            selected_game.edit_gameinfo(add_line=False)
+        selected_game.edit_gameinfo(add_line=False)
 
-            all_games.remove(selected_game)
-            config.remove_section(selected_game.name)
-            config.save()
+        all_games.remove(selected_game)
+        config.remove_section(selected_game.name)
+        config.save()
 
-            selected_game = all_games[0]
-            selectedGame_radio.set(0)
-            add_menu_opts(game_menu)
+        if not all_games:
+            UI.quit_application()  # If we have no games, nothing can be done
+
+        selected_game = all_games[0]
+        selectedGame_radio.set(0)
+        add_menu_opts(game_menu)
 
 
 def add_menu_opts(menu, callback=None):
@@ -559,5 +582,5 @@ if __name__ == '__main__':
     TK_ROOT['menu'] = test_menu
 
     init_trans()
-    load(quit, Toplevel())
+    load()
     add_menu_opts(dropdown, setgame_callback)

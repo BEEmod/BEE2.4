@@ -33,7 +33,7 @@ data = {}
 res_count = -1
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
-ParseData = namedtuple('ParseData', 'zip_file, id, info')
+ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
 PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 
 
@@ -55,6 +55,34 @@ def reraise_keyerror(err, obj_id):
             id=obj_id,
         )
     ) from err
+
+def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
+    """Extract a config file refered to by the given property block.
+
+    Looks for the prop_name key in the given prop_block.
+    If the keyvalue has a value of "", an empty tree is returned.
+    If it has children, a copy of them is returned.
+    Otherwise the value is a filename in the zip which will be parsed.
+    """
+    prop_block = prop_block.find_key(prop_name, "")
+    if prop_block.has_children():
+        prop = prop_block.copy()
+        prop.name = None
+        return prop
+
+    if prop_block.value == '':
+        return Property(None, [])
+
+    path = os.path.join(folder, prop_block.value) + '.cfg'
+    try:
+        with zip_file.open(path) as f:
+            return Property.parse(f,
+            pak_id + ':' + path,
+            )
+    except KeyError:
+        print('"{}:{}" not in zip!'.format(pak_id, path))
+        return Property(None, [])
+
 
 def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
@@ -152,6 +180,7 @@ def load_packages(
                             obj_data.zip_file,
                             obj_id,
                             obj_data.info_block,
+                            obj_data.pak_id,
                         )
                     )
                 except (NoKeyError, IndexError) as e:
@@ -159,14 +188,9 @@ def load_packages(
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
-                for zip_file, info_block in \
-                        obj_override[obj_type].get(obj_id, []):
+                for override_data in obj_override[obj_type].get(obj_id, []):
                     override = obj_types[obj_type].parse(
-                        ParseData(
-                            zip_file,
-                            obj_id,
-                            info_block,
-                        )
+                        override_data
                     )
                     object_.add_over(override)
                 data[obj_type].append(object_)
@@ -223,7 +247,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
         for obj in info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                (zip_file, obj)
+                ParseData(zip_file, obj_id, obj, pak_id)
             )
 
         for obj in info.find_all(comp_type):
@@ -295,7 +319,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
                         vers['styles'][sty_id] = vers['styles'][base_style.id]
-                        if log_fallbacks:
+                        if log_fallbacks and not item.unstyled:
                             print(
                                 'Item "{item}" using parent '
                                 '"{rep}" for "{style}"!'.format(
@@ -310,7 +334,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
-                        if log_missing_styles:
+                        if log_missing_styles and not item.unstyled:
                             print(
                                 'Item "{item}" using '
                                 'inappropriate style for "{style}"!'.format(
@@ -324,7 +348,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
 
-def parse_item_folder(folders, zip_file):
+def parse_item_folder(folders, zip_file, pak_id):
     for fold in folders:
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
@@ -332,21 +356,23 @@ def parse_item_folder(folders, zip_file):
         try:
             with zip_file.open(prop_path, 'r') as prop_file:
                 props = Property.parse(
-                    prop_file, prop_path,
+                    prop_file, pak_id + ':' + prop_path,
                 ).find_key('Properties')
             with zip_file.open(editor_path, 'r') as editor_file:
-                editor = Property.parse(editor_file, editor_path)
+                editor = Property.parse(
+                    editor_file, pak_id + ':' + editor_path
+                )
         except KeyError as err:
             # Opening the files failed!
             raise IOError(
-                '"items/' + fold + '" not valid!'
+                '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
                 ) from err
 
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
-            'auth':     sep_values(props['authors', ''], ','),
-            'tags':     sep_values(props['tags', ''], ';'),
+            'auth':     sep_values(props['authors', '']),
+            'tags':     sep_values(props['tags', '']),
             'desc':     list(desc_parse(props)),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
@@ -362,7 +388,9 @@ def parse_item_folder(folders, zip_file):
         }
 
         if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
-            print('Warning: "{}" has missing entity count!'.format(prop_path))
+            print('Warning: "{}:{}" has missing entity count!'.format(
+                pak_id, prop_path,
+            ))
 
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
@@ -373,13 +401,17 @@ def parse_item_folder(folders, zip_file):
         )
         if 0 < num_group_parts < 3:
             print(
-                'Warning: "{}" has incomplete grouping icon definition!'.format(
-                    prop_path)
+                'Warning: "{}:{}" has incomplete grouping icon '
+                'definition!'.format(
+                    pak_id, prop_path
+                )
             )
-
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = Property.parse(vbsp_config, config_path)
+                folders[fold]['vbsp'] = Property.parse(
+                    vbsp_config,
+                    pak_id + ':' + config_path,
+                )
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
 
@@ -398,6 +430,7 @@ class Style:
             short_name=None,
             suggested=None,
             has_video=True,
+            corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
         self.auth = author
@@ -410,6 +443,11 @@ class Style:
         self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
+        self.corridor_names = {
+            'sp_entry': corridor_names.get('sp_entry', Property('', [])),
+            'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
+            'coop':     corridor_names.get('coop', Property('', [])),
+        }
         if config is None:
             self.config = Property(None, [])
         else:
@@ -432,17 +470,30 @@ class Style:
             sugg['elev', '<NONE>'],
             )
 
+        corridors = info.find_key('corridors', [])
+        corridors = {
+            'sp_entry': corridors.find_key('sp_entry', []),
+            'sp_exit':  corridors.find_key('sp_exit', []),
+            'coop':     corridors.find_key('coop', []),
+        }
+
         short_name = selitem_data.short_name or None
         if base == '':
             base = None
         folder = 'styles/' + info['folder']
         config = folder + '/vbsp_config.cfg'
         with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
-            items = Property.parse(item_data, folder+'/items.txt')
+            items = Property.parse(
+                item_data,
+                data.pak_id+':'+folder+'/items.txt'
+            )
 
         try:
             with data.zip_file.open(config, 'r') as vbsp_config:
-                vbsp = Property.parse(vbsp_config, config)
+                vbsp = Property.parse(
+                    vbsp_config,
+                    data.pak_id+':'+config,
+                )
         except KeyError:
             vbsp = None
         return cls(
@@ -457,6 +508,7 @@ class Style:
             short_name=short_name,
             suggested=sugg,
             has_video=has_video,
+            corridor_names=corridors,
             )
 
     def add_over(self, override):
@@ -470,12 +522,22 @@ class Style:
 
 
 class Item:
-    def __init__(self, item_id, versions, def_version, needs_unlock):
+    def __init__(
+            self,
+            item_id,
+            versions,
+            def_version,
+            needs_unlock=False,
+            all_conf=None,
+            unstyled=False,
+            ):
         self.id = item_id
         self.versions = versions
         self.def_ver = def_version
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
+        self.all_conf = all_conf or Property(None, [])
+        self.unstyled = unstyled
 
     @classmethod
     def parse(cls, data):
@@ -483,6 +545,18 @@ class Item:
         versions = {}
         def_version = None
         folders = {}
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        if data.id == 'ITEM_GOO':
+            print(data.info)
+
+        all_config = get_config(
+            data.info,
+            data.zip_file,
+            'items',
+            pak_id=data.pak_id,
+            prop_name='all_conf',
+        )
 
         needs_unlock = utils.conv_bool(data.info['needsUnlock', '0'])
 
@@ -505,7 +579,7 @@ class Item:
             if def_version is None:
                 def_version = vals
 
-        parse_item_folder(folders, data.zip_file)
+        parse_item_folder(folders, data.zip_file, data.pak_id)
 
         for ver in versions.values():
             if ver['def_style'] in folders:
@@ -516,7 +590,14 @@ class Item:
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
 
-        return cls(data.id, versions, def_version, needs_unlock)
+        return cls(
+            data.id,
+            versions,
+            def_version,
+            needs_unlock,
+            all_config,
+            unstyled,
+        )
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
@@ -567,9 +648,14 @@ class QuotePack:
     def parse(cls, data):
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
-        path = 'voice/' + data.info['file'] + '.voice'
-        with data.zip_file.open(path, 'r') as conf:
-            config = Property.parse(conf, path)
+        path = 'voice/' + data.info['file'] + '.cfg'
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'voice',
+            pak_id=data.pak_id,
+            prop_name='file',
+        )
 
         return cls(
             data.id,
@@ -621,16 +707,12 @@ class Skybox:
         config_dir = data.info['config', '']
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
-        if config_dir == '':  # No config at all
-            config = Property(None, [])
-        else:
-            path = 'skybox/' + config_dir + '.cfg'
-            try:
-                with data.zip_file.open(path, 'r') as conf:
-                    config = Property.parse(conf)
-            except KeyError:
-                print(config_dir + '.cfg not in zip!')
-                config = Property(None, [])
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'skybox',
+            pak_id=data.pak_id,
+        )
         return cls(
             data.id,
             selitem_data.name,
@@ -681,12 +763,12 @@ class Music:
         inst = data.info['instance', None]
         sound = data.info['soundscript', None]
 
-        config_dir = 'music/' + data.info['config', '']
-        try:
-            with data.zip_file.open(config_dir) as conf:
-                config = Property.parse(conf, config_dir)
-        except KeyError:
-            config = Property(None, [])
+        config = get_config(
+            data.info,
+            data.zip_file,
+            'skybox',
+            pak_id=data.pak_id,
+        )
         return cls(
             data.id,
             selitem_data.name,
@@ -709,24 +791,41 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, default=False):
+    def __init__(self, var_id, name, styles, unstyled=False, default=False):
         self.id = var_id
         self.name = name
-        self.styles = styles
         self.default = default
+        if unstyled:
+            self.styles = None
+        else:
+            self.styles = styles
 
     @classmethod
     def parse(cls, data):
         name = data.info['name']
+        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+        default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
             for prop in data.info.find_all('Style')
         ]
-        default = utils.conv_bool(data.info['enabled', '0'])
-        return cls(data.id, name, styles, default)
+        return cls(
+            data.id,
+            name,
+            styles,
+            unstyled=unstyled,
+            default=default,
+        )
 
     def add_over(self, override):
-        self.styles.extend(override.styles)
+        """Override a stylevar to add more compatible styles."""
+        # Setting it to be unstyled overrides any other values!
+        if self.styles is None:
+            return
+        elif override.styles is None:
+            self.styles = None
+        else:
+            self.styles.extend(override.styles)
 
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
@@ -735,6 +834,9 @@ class StyleVar:
         """Check to see if this will apply for the given style.
 
         """
+        if self.styles is None:
+            return True  # Unstyled stylevar
+
         if style.id in self.styles:
             return True
 
@@ -825,7 +927,7 @@ def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
 
     """
-    auth = sep_values(info['authors', ''], ',')
+    auth = sep_values(info['authors', ''])
     desc = list(desc_parse(info))
     short_name = info['shortName', None]
     name = info['name']
@@ -833,19 +935,24 @@ def get_selitem_data(info):
     return SelitemData(name, short_name, auth, icon, desc)
 
 
-def sep_values(string, delimiter):
+def sep_values(string, delimiters=',;/'):
     """Split a string by a delimiter, and then strip whitespace.
 
+    Multiple delimiter characters can be passed.
     """
+    delim, *extra_del = delimiters
     if string == '':
         return []
-    else:
-        vals = string.split(delimiter)
-        return [
-            stripped for stripped in
-            (val.strip() for val in vals)
-            if stripped
-        ]
+
+    for extra in extra_del:
+        string = string.replace(extra, delim)
+
+    vals = string.split(delim)
+    return [
+        stripped for stripped in
+        (val.strip() for val in vals)
+        if stripped
+    ]
 
 obj_types = {
     'Style':     Style,
@@ -858,4 +965,4 @@ obj_types = {
     }
 
 if __name__ == '__main__':
-    load_packages('packages\\', False)
+    load_packages('packages//', False)

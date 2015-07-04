@@ -12,6 +12,7 @@ import math
 
 import img as png  # png library for TKinter
 from richTextBox import tkRichText
+import utils
 
 ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE+16
@@ -304,9 +305,16 @@ class selWin:
 
         self.win.option_add('*tearOff', False)
         self.context_menu = Menu(self.win)
-        # Make a bold version of the context menu font
-        self.sugg_font = font.nametofont('TkMenuFont').copy()
-        self.sugg_font['weight'] = 'bold'
+
+        self.norm_font = font.nametofont('TkMenuFont')
+
+        # Make a font for showing suggested items in the context menu
+        self.sugg_font = self.norm_font.copy()
+        self.sugg_font['weight'] = font.BOLD
+
+        # Make a font for previewing the suggested item
+        self.mouseover_font = self.norm_font.copy()
+        self.mouseover_font['slant'] = font.ITALIC
         self.context_var = IntVar()
 
         for ind, item in enumerate(self.item_list):
@@ -410,7 +418,7 @@ class selWin:
             if self.is_suggested():
                 self.display['font'] = self.sugg_font
             else:
-                self.display['font'] = 'TkMenuFont'
+                self.display['font'] = self.norm_font
 
         if self.selected == self.noneItem:
             self.disp_label.set("<None>")
@@ -422,6 +430,15 @@ class selWin:
         self.context_var.set(self.item_list.index(self.selected))
         return "break"  # stop the entry widget from continuing with this event
 
+    def rollover_suggest(self):
+        """Show the suggested item when the  button is moused over."""
+        if self.is_suggested() or self.suggested is None:
+            # the suggested item is aready the suggested item
+            # or no suggested item
+            return
+        self.display['font'] = self.mouseover_font
+        self.disp_label.set(self.suggested.context_lbl)
+
     def open_win(self, _=None, force_open=False):
         if self._readonly and not force_open:
             TK_ROOT.bell()
@@ -431,10 +448,9 @@ class selWin:
         self.win.lift(self.parent)
         self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
-        self.win.geometry(
-            '+' + str(self.parent.winfo_rootx()+30) +
-            '+' + str(self.parent.winfo_rooty()+30)
-        )
+
+        utils.center_win(self.win, parent=self.parent)
+
         self.flow_items()
         self.sel_item(self.selected)
 
@@ -549,7 +565,7 @@ class selWin:
         if self.suggested is not None:
             self.context_menu.entryconfig(
                 self.item_list.index(self.suggested),
-                font='TkMenuFont')
+                font=self.norm_font)
             # Remove the font from the last suggested item
 
         if suggested is None:

@@ -24,6 +24,7 @@ import contextWin
 import gameMan
 import StyleVarPane
 import CompilerPane
+import optionWindow
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -36,10 +37,6 @@ pal_items = []  # array of the "all items" icons
 pal_picked_fake = []  # Labels used for the empty palette positions
 pal_items_fake = []  # Labels for empty picker positions
 
-drag_item = None  # the item currently being moved
-drag_orig_pos = -1
-drag_onPal = False  # are we dragging a palette item?
-drag_passedPal = False  # has the cursor passed over the palette
 
 FILTER_CATS = ('author', 'package', 'tags')
 FilterBoxes = {}  # the various checkboxes for the filters
@@ -54,9 +51,6 @@ selected_style = "BEE2_CLEAN"
 selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
-
-muted = IntVar(value=0)  # Is the sound fx muted?
-show_wip_items = IntVar(value=0)
 
 # All the stuff we've loaded in
 item_list = {}
@@ -230,7 +224,7 @@ class Item:
             if ver['is_wip']:
                 # We always display the currently selected version, so
                 # it's possible to deselect it.
-                if ver_id != self.selected_ver and not show_wip_items.get():
+                if ver_id != self.selected_ver and not optionWindow.SHOW_WIP.get():
                     continue
                 name = '[WIP] ' + name
             vers.append(name)
@@ -278,7 +272,12 @@ class Item:
                         del editor_section[editor_sec_index]
                         break
 
-        return new_editor, self.data['editor_extra'], self.data['vbsp']
+        return (
+            new_editor,
+            self.data['editor_extra'],
+            # Add all_conf first so it's conditions run first by default
+            self.item.all_conf + self.data['vbsp'],
+        )
 
 
 class PalItem(Label):
@@ -409,13 +408,7 @@ def quit_application():
     # Destroy the TK windows
     TK_ROOT.destroy()
     exit(0)
-
-
-def set_mute():
-    """Apply the muted setting based on the variable."""
-    snd.muted = (muted.get() == 1)
-    GEN_OPTS['General']['mute_sounds'] = str(muted.get())
-
+gameMan.quit_app = quit_application
 
 def load_palette(data):
     """Import in all defined palettes."""
@@ -423,28 +416,15 @@ def load_palette(data):
     palettes = data
 
 
-def load_settings(settings):
+def load_settings():
     """Load options from the general config file."""
-    global GEN_OPTS
-    GEN_OPTS = settings
-
-    show_wip_items.set(GEN_OPTS.get_bool(
-        'General',
-        'show_wip_items',
-        False
-        ))
-
-    muted.set(GEN_OPTS.get_bool(
-        'General',
-        'mute_sounds',
-        False,
-        ))
-    set_mute()
     try:
         selectedPalette_radio.set(int(GEN_OPTS['Last_Selected']['palette']))
     except (KeyError, ValueError):
         pass  # It'll be set to the first palette by default, and then saved
     GEN_OPTS.has_changed = False
+
+    optionWindow.load()
 
 
 def load_packages(data):
@@ -606,6 +586,52 @@ def load_packages(data):
             GEN_OPTS.get_val('Last_Selected', opt_name, default)
         )
 
+def reposition_panes():
+    """Position all the panes in the default places around the main window."""
+    comp_win = CompilerPane.window
+    style_win = StyleVarPane.window
+    opt_win = windows['opt']
+    pal_win = windows['pal']
+    # The x-pos of the right side of the main window
+    xpos = min(
+        TK_ROOT.winfo_screenwidth()
+        - style_win.winfo_reqwidth(),
+
+        TK_ROOT.winfo_rootx()
+        + TK_ROOT.winfo_reqwidth()
+        + 25
+        )
+    # The x-pos for the palette and compiler panes
+    pal_x = TK_ROOT.winfo_rootx() - comp_win.winfo_reqwidth() - 25
+    pal_win.move(
+        x=pal_x,
+        y=(TK_ROOT.winfo_rooty() - 50),
+        height=(
+            TK_ROOT.winfo_reqheight() -
+            comp_win.winfo_reqheight() -
+            25
+        ),
+        width=comp_win.winfo_reqwidth(),
+    )
+    comp_win.move(
+        x=pal_x,
+        y=pal_win.winfo_rooty() + pal_win.winfo_reqheight(),
+    )
+    opt_win.move(
+        x=xpos,
+        y=TK_ROOT.winfo_rooty()-40,
+        width=style_win.winfo_reqwidth())
+    style_win.move(
+        x=xpos,
+        y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
+
+def reset_panes():
+    reposition_panes()
+    windows['pal'].save_conf()
+    windows['opt'].save_conf()
+    StyleVarPane.window.save_conf()
+    CompilerPane.window.save_conf()
+
 
 def suggested_refresh():
     """Enable or disable the suggestion setting button."""
@@ -662,6 +688,7 @@ def export_editoritems(_=None):
         if var.applies_to_style(chosen_style)
     }
 
+    # Add all of the special/hardcoded style vars
     for var_id, _, __ in StyleVarPane.styleOptions:
         style_vars[var_id] = style_vals[var_id].get() == 1
 
@@ -723,29 +750,32 @@ def conv_screen_to_grid(x, y):
 
 def drag_start(e):
     """Start dragging a palette item."""
-    global drag_onPal, drag_item, drag_passedPal
     drag_win = windows['drag_win']
-    drag_item = e.widget
-    set_disp_name(drag_item)
+    drag_win.drag_item = e.widget
+    set_disp_name(drag_win.drag_item)
     snd.fx('config')
-    drag_passedPal = False
-    if drag_item.is_pre:  # is the cursor over the preview pane?
-        drag_item.kill()
-        drag_onPal = True
+    drag_win.passed_over_pal = False
+    if drag_win.drag_item.is_pre:  # is the cursor over the preview pane?
+        drag_win.drag_item.kill()
+        UI['pre_moving'].place(
+            x=drag_win.drag_item.pre_x*65 + 4,
+            y=drag_win.drag_item.pre_y*65 + 32,
+        )
+        drag_win.from_pal = True
 
         for item in pal_picked:
-            if item.id == drag_item.id:
+            if item.id == drag_win.drag_item.id:
                 item.load_data()
 
         # When dragging off, switch to the single-only icon
-        UI['drag_lbl']['image'] = drag_item.item.get_icon(
-            drag_item.subKey,
+        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+            drag_win.drag_item.subKey,
             allow_single=False,
             )
     else:
-        drag_onPal = drag_item.on_pal()
-        UI['drag_lbl']['image'] = drag_item.item.get_icon(
-            drag_item.subKey,
+        drag_win.from_pal = False
+        UI['drag_lbl']['image'] = drag_win.drag_item.item.get_icon(
+            drag_win.drag_item.subKey,
             allow_single=True,
             single_num=0,
             )
@@ -763,7 +793,6 @@ def drag_start(e):
 
 def drag_stop(e):
     """User released the mouse button, complete the drag."""
-    global drag_item
     drag_win = windows['drag_win']
     drag_win.withdraw()
     drag_win.unbind("<B1-Motion>")
@@ -777,11 +806,11 @@ def drag_stop(e):
 
     # this prevents a single click on the picker from clearing items
     # off the palette
-    if drag_passedPal:
-        drag_item.clear()  # wipe duplicates off the palette first
+    if drag_win.passed_over_pal:
         # is the cursor over the preview pane?
         if 0 <= pos_x < 4:
-            new_item = drag_item.copy(frames['preview'])
+            drag_win.drag_item.clear()  # wipe duplicates off the palette first
+            new_item = drag_win.drag_item.copy(frames['preview'])
             new_item.is_pre = True
             if ind >= len(pal_picked):
                 pal_picked.append(new_item)
@@ -791,25 +820,39 @@ def drag_stop(e):
             if len(pal_picked) > 32:
                 pal_picked.pop().kill()
         else:  # drop the item
+            if drag_win.from_pal:
+                # Only remove if we started on the palette
+                drag_win.drag_item.clear()
             snd.fx('delete')
 
         flow_preview()  # always refresh
-    drag_item = None
+    drag_win.drag_item = None
 
 
 def drag_move(e):
     """Update the position of dragged items as they move around."""
-    global drag_passedPal
     drag_win = windows['drag_win']
-    set_disp_name(drag_item)
+    set_disp_name(drag_win.drag_item)
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_passedPal = True
         drag_win.configure(cursor='plus')
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
+        if not drag_win.passed_over_pal:
+            # If we've passed over the palette, replace identical items
+            # with movement icons to indicate they will move to the new location
+            for item in pal_picked:
+                if item == drag_win.drag_item:
+                    # We haven't removed the original, so we don't need the
+                    # special label for this.
+                    # The group item refresh will return this if nothing
+                    # changes.
+                    item['image'] = img.png('BEE2/item_moving')
+                    break
+
+        drag_win.passed_over_pal = True
     else:
-        if drag_onPal and drag_passedPal:
+        if drag_win.from_pal and drag_win.passed_over_pal:
             drag_win.configure(cursor='x_cursor')
         else:
             drag_win.configure(cursor='no')
@@ -827,7 +870,8 @@ def drag_fast(e):
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        e.widget.kill()  # remove the clicked item
+        print('flowing')
+        flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
@@ -954,7 +998,7 @@ def update_filters():
         if no_alt:  # no alternate if they are all the same
             FilterBoxes_all[cat].state(['!alternate'])
             FilterVars_all[cat].set(value)
-    show_wip = show_wip_items.get()
+    show_wip = optionWindow.SHOW_WIP.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
     for item in pal_items:
         item.visible = (
@@ -977,6 +1021,9 @@ def update_filters():
             )
     flow_picker()
 
+# When exiting settings, we need to hide/show WIP items.
+optionWindow.refresh_callbacks.append(update_filters)
+
 
 # UI functions, each accepts the parent frame to place everything in.
 # initMainWind generates the main frames that hold all the panes to
@@ -984,12 +1031,16 @@ def update_filters():
 
 
 def init_palette(f):
+    """Initialises the palette pane.
+
+    This lists all saved palettes and lets users choose from the list.
+    """
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
 
     ttk.Button(
         f,
-        text='Clear',
+        text='Clear Palette',
         command=pal_clear,
         ).grid(row=0, sticky="EW")
 
@@ -1060,6 +1111,16 @@ def init_option(f):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
 
+    def suggested_style_mousein(e):
+        """When mousing over the button, show the suggested items."""
+        for win in (voice_win, music_win, skybox_win, elev_win):
+            win.rollover_suggest()
+
+    def suggested_style_mouseout(e):
+        """Return text to the normal value on mouseout."""
+        for win in (voice_win, music_win, skybox_win, elev_win):
+            win.set_disp()
+
     UI['suggested_style'] = ttk.Button(
         props,
         # '\u2193' is the downward arrow symbol.
@@ -1067,6 +1128,8 @@ def init_option(f):
         command=suggested_style_set,
         )
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
+    UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
+    UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
 
     def configure_voice():
         """Open the voiceEditor window to configure a Quote Pack."""
@@ -1174,6 +1237,11 @@ def init_preview(f):
             )
         for _ in range(32)
         ]
+
+    UI['pre_moving'] = ttk.Label(
+        f,
+        image=img.png('BEE2/item_moving')
+    )
 
     flow_preview()
 
@@ -1392,6 +1460,10 @@ def init_drag_icon():
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
+    drag_win.passed_over_pal = False  # has the cursor passed over the palette
+    drag_win.from_pal = False  # are we dragging a palette item?
+    drag_win.drag_item = None  # the item currently being moved
+
 
 def set_game(game):
     """Callback for when the game is changed.
@@ -1430,6 +1502,10 @@ def init_menu_bar(win):
         )
     file_menu.add_separator()
     file_menu.add_command(
+        label="Options",
+        command=optionWindow.show,
+    )
+    file_menu.add_command(
         label="Quit",
         command=quit_application,
         )
@@ -1465,19 +1541,6 @@ def init_menu_bar(win):
 
     win.bind_all('<Control-s>', pal_save)
     win.bind_all('<Control-Shift-s>', pal_save_as)
-
-    menus['tools'] = Menu(bar)
-    bar.add_cascade(menu=menus['tools'], label='Options')
-    if snd.initiallised:
-        menus['tools'].add_checkbutton(
-            label="Mute Sounds",
-            variable=muted,
-            command=set_mute,
-            )
-    menus['tools'].add_checkbutton(
-        label='Show Work In Progress Items',
-        variable=show_wip_items,
-        )
 
     menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
     bar.add_cascade(menu=menus['help'], label='Help')
@@ -1647,8 +1710,11 @@ def init_windows():
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
+    optionWindow.init_widgets()
     init_drag_icon()
     loader.step('UI')
+
+    optionWindow.reset_all_win = reposition_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
 
@@ -1688,28 +1754,10 @@ def init_windows():
         TK_ROOT.geometry('+' + str(start_x) + '+' + str(start_y))
     TK_ROOT.update_idletasks()
 
-    # Default positions for sub-panes
-    xpos = min(
-        TK_ROOT.winfo_screenwidth()
-        - StyleVarPane.window.winfo_reqwidth(),
-
-        TK_ROOT.winfo_rootx()
-        + TK_ROOT.winfo_reqwidth()
-        + 25
-        )
-    windows['pal'].move(
-        x=(TK_ROOT.winfo_rootx() - windows['pal'].winfo_reqwidth() - 50),
-        y=(TK_ROOT.winfo_rooty() - 50),
-        height=TK_ROOT.winfo_reqheight() + 25)
-    windows['opt'].move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty()-40,
-        width=StyleVarPane.window.winfo_reqwidth())
-    StyleVarPane.window.move(
-        x=xpos,
-        y=TK_ROOT.winfo_rooty() + windows['opt'].winfo_reqheight() + 25)
-
-    # Load from config file
+    # First move to default positions, then load the config.
+    # If the config is valid, this will move them to user-defined
+    # positions.
+    reposition_panes()
     StyleVarPane.window.load_conf()
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()
@@ -1732,6 +1780,10 @@ def init_windows():
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
+        CompilerPane.set_corr_values('sp_entry', style_obj.corridor_names)
+        CompilerPane.set_corr_values('sp_exit', style_obj.corridor_names)
+        CompilerPane.set_corr_values('coop', style_obj.corridor_names)
+
         sugg = style_obj.suggested
         win_types = (voice_win, music_win, skybox_win, elev_win)
         for win, sugg_val in zip(win_types, sugg):
@@ -1748,3 +1800,4 @@ def init_windows():
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
+    set_palette()
