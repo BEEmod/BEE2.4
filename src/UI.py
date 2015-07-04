@@ -1083,9 +1083,10 @@ def init_option(f):
         ).grid(row=1, sticky="EW", padx=5)
     UI['export_button'] = ttk.Button(
         f,
-        text="Export...",
+        textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
     )
+    extract_packages.export_btn_text.set('Export...')
     UI['export_button'].state(['disabled'])
     UI['export_button'].grid(row=2, sticky="EW", padx=5)
 
@@ -1796,12 +1797,14 @@ def init_windows():
 
         UI['export_button'].state(['!disabled'])
         UI['extract_progress'].grid_remove()
-        windows['opt'].save_conf()
+        windows['opt'].update_idletasks()
         # Reload the option window's position and sizing configuration,
         # that way it resizes automatically.
+        windows['opt'].save_conf()
         windows['opt'].load_conf()
         menus['file'].entryconfigure(2, state=NORMAL)
         TK_ROOT.bind_all('<Control-e>', export_editoritems)
+        print('Done extracting resources!')
 
     def make_extract_progress_infinite():
         pr = UI['extract_progress']

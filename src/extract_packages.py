@@ -13,7 +13,7 @@ from zipfile import ZipFile
 from FakeZip import zip_names, FakeZip
 from tk_root import TK_ROOT
 
-UPDATE_INTERVAL = 250  # Number of miliseconds between each progress check
+UPDATE_INTERVAL = 500  # Number of miliseconds between each progress check
 
 files_done = False
 res_count = -1
@@ -21,6 +21,7 @@ progress_var = tk.IntVar()
 zip_list = []
 currently_done = multiprocessing.Value('i')  # int value used to show status
 # in main window
+export_btn_text = tk.StringVar()
 
 def done_callback():
     pass
@@ -48,6 +49,8 @@ def do_copy(zip_list, done_files):
                         done_files.value += 1
 
     with currently_done.get_lock():
+        # Signal the main process to switch to an infinite
+        # progress bar
         done_files.value = -1
 
     shutil.rmtree('../inst_cache/', ignore_errors=True)
@@ -83,18 +86,29 @@ def update():
     # Flag to indicate it's now just copying the files to correct locations
     done_val = currently_done.value
     if done_val == -1:
-        make_progress_infinite()
         with currently_done.get_lock():
             # Set this to something else so we only do this once.
             currently_done.value = -2
+        make_progress_infinite()
+        export_btn_text.set(
+            'Organising files...'
+        )
     elif done_val == -2:
         pass
     else:
         progress_var.set(
             1000 * done_val / res_count,
         )
-    print(done_val, '/', res_count)
+        export_btn_text.set(
+            'Extracting Resources ({!s}/{!s})...'.format(
+                done_val,
+                res_count,
+            )
+        )
     if not copy_process.is_alive():
+        export_btn_text.set(
+            'Export...'
+        )
         done_callback()
     else:
         TK_ROOT.after(UPDATE_INTERVAL, update)
