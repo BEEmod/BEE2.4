@@ -1584,6 +1584,11 @@ def change_func_brush():
             VMF.remove_ent(brush)
             continue
 
+        if is_grating:
+            # Set solidbsp to true on grating brushes. This makes the
+            # correct footstep sounds play.
+            brush['solidbsp'] = '1'
+
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
             switch_glass_inst(brush.get_origin(), grating_inst)
