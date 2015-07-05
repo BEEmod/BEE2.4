@@ -10,6 +10,7 @@ from collections import defaultdict, namedtuple
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
 from loadScreen import main_loader as loader
+import extract_packages
 import utils
 
 
@@ -127,12 +128,8 @@ def load_packages(
         log_missing_ent_count=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global res_count, LOG_ENT_COUNT
+    global LOG_ENT_COUNT
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
-    if load_res:
-        res_count = 0
-    else:
-        loader.skip_stage("RES")
 
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
@@ -149,14 +146,25 @@ def load_packages(
             data[obj_type] = []
 
         objects = 0
+        images = 0
         for pak_id, (zip_file, info, name, dispName) in packages.items():
-            print(("Reading objects from '" + pak_id + "'...").ljust(50), end='')
-            obj_count = parse_package(zip_file, info, pak_id, dispName)
+            print(
+                ("Reading objects from '" + pak_id + "'...").ljust(50),
+                end=''
+            )
+            obj_count, img_count = parse_package(
+                zip_file,
+                info,
+                pak_id,
+                dispName,
+            )
             objects += obj_count
+            images += img_count
             loader.step("PAK")
             print("Done!")
 
         loader.set_length("OBJ", objects)
+        loader.set_length("IMG_EX", images)
 
         # Except for StyleVars, each object will have at least 1 image -
         # in UI.py we step the progress once per object.
@@ -187,32 +195,20 @@ def load_packages(
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
-        if load_res:
-            print('Extracting Resources...')
-            for zip_file in zips:
-                for path in zip_names(zip_file):
-                    loc = os.path.normcase(path)
-                    if loc.startswith("resources"):
-                        loader.step("RES")
-                        zip_file.extract(path, path="../cache/")
 
-            shutil.rmtree('../images/cache', ignore_errors=True)
-            shutil.rmtree('../inst_cache/', ignore_errors=True)
-            shutil.rmtree('../source_cache/', ignore_errors=True)
+        shutil.rmtree('../cache/', ignore_errors=True)
+        img_loc = os.path.join('resources', 'bee2')
+        for zip_file in zips:
+            for path in zip_names(zip_file):
+                loc = os.path.normcase(path)
+                if loc.startswith(img_loc):
+                    loader.step("IMG_EX")
+                    zip_file.extract(path, path="../cache/")
 
-            if os.path.isdir("../cache/resources/bee2"):
-                shutil.move("../cache/resources/bee2", "../images/cache")
-            if os.path.isdir("../cache/resources/instances"):
-                shutil.move("../cache/resources/instances", "../inst_cache/")
-            for file_type in ("materials", "models", "sound", "scripts"):
-                if os.path.isdir("../cache/resources/" + file_type):
-                    shutil.move(
-                        "../cache/resources/" + file_type,
-                        "../source_cache/" + file_type,
-                    )
-
-            shutil.rmtree('../cache/', ignore_errors=True)
-            print('Done!')
+        shutil.rmtree('../images/cache', ignore_errors=True)
+        if os.path.isdir("../cache/resources/bee2"):
+            shutil.move("../cache/resources/bee2", "../images/cache")
+        shutil.rmtree('../cache/', ignore_errors=True)
 
     finally:
         # close them all, we've already read the contents.
@@ -233,7 +229,6 @@ def load_packages(
 
 def parse_package(zip_file, info, pak_id, disp_name):
     """Parse through the given package to find all the components."""
-    global res_count
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
             utils.con_log(
@@ -267,12 +262,15 @@ def parse_package(zip_file, info, pak_id, disp_name):
                 disp_name,
             )
 
-    if res_count != -1:
-        for item in zip_names(zip_file):
-            if item.startswith("resources"):
-                res_count += 1
-        loader.set_length("RES", res_count)
-    return objects
+    img_count = 0
+    img_loc = os.path.join('resources', 'bee2')
+    for item in zip_names(zip_file):
+        item = os.path.normcase(item)
+        if item.startswith("resources"):
+            extract_packages.res_count += 1
+            if item.startswith(img_loc):
+                img_count += 1
+    return objects, img_count
 
 
 def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
