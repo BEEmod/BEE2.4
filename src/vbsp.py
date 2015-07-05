@@ -1025,6 +1025,7 @@ def change_brush():
                 face.planes[1].z,
                 face.planes[2].z,
             )
+            is_glass = False
             if face.mat.casefold() in GOO_TEX:
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
@@ -1093,6 +1094,7 @@ def find_glass_inst(origin):
             if round(rot) == direction:
                 return inst
 
+    # TODO - make this actually work
     return None
 
 
@@ -1510,11 +1512,6 @@ def change_func_brush():
         if delete_brush:
             VMF.remove_ent(brush)
             continue
-
-        if is_grating:
-            # Set solidbsp to true on grating brushes. This makes the
-            # correct footstep sounds play.
-            brush['solidbsp'] = '1'
 
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
