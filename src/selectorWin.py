@@ -10,7 +10,7 @@ from tkinter import ttk  # themed ui components that match the OS
 import functools
 import math
 
-import img as png  # png library for TKinter
+import img  # png library for TKinter
 from richTextBox import tkRichText
 import utils
 
@@ -18,7 +18,8 @@ ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE+16
 ITEM_HEIGHT = ICON_SIZE+51
 
-err_icon = png.png('BEE2/error_96', resize_to=96)
+# The larger error icon used if an image is not found
+err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 
 
 def _NO_OP(*args):
@@ -34,9 +35,16 @@ class Item:
       this will be the same as the short name.
     - shortName: A shortened version of the full name. This should be <= 20
       characters.
-    - icon: The path for the item icon. The icon should be 96x96 pixels large.
+    - context_lbl: The text shown on the rightclick menu. This is either
+      the short or long name, depending on the size of the long name.
+    - icon: The image object for the item icon. The icon should be 96x96
+      pixels large.
+    - ico_file: The file path for the image.
     - desc: A list of tuples, following the richTextBox text format.
     - authors: A list of the item's authors.
+    - group: Items with the same group name will be shown together.
+
+    - button, win: Set later, the button and window TK objects for this item
     """
     __slots__ = [
         'name',
@@ -45,6 +53,7 @@ class Item:
         'icon',
         'desc',
         'authors',
+        'group',
         'button',
         'win',
         'context_lbl',
@@ -59,22 +68,34 @@ class Item:
             icon=None,
             authors=None,
             desc=(('line', ''),),
+            group=None,
             ):
         self.name = name
         self.shortName = short_name
+        self.group = group
         self.longName = long_name or short_name
         if len(self.longName) > 20:
             self.context_lbl = self.shortName
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = png.png('BEE2/blank_96', error=err_icon, resize_to=96)
+            self.icon = img.png(
+                'BEE2/blank_96',
+                error=err_icon,
+                resize_to=ICON_SIZE,
+            )
             self.ico_file = 'BEE2/blank_96'
         else:
-            self.icon = png.png(icon, error=err_icon, resize_to=96)
+            self.icon = img.png(
+                icon,
+                error=err_icon,
+                resize_to=ICON_SIZE,
+            )
             self.ico_file = icon
         self.desc = desc
         self.authors = [] if authors is None else authors
+        self.button = None
+        self.win = None
 
     def __repr__(self):
         return (
@@ -109,7 +130,6 @@ class selWin:
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
-
     """
     def __init__(
             self,
@@ -146,7 +166,7 @@ class selWin:
           context menu.
         """
         self.noneItem = Item('NONE', '', desc=none_desc)
-        self.noneItem.icon = png.png('BEE2/none_96')
+        self.noneItem.icon = img.png('BEE2/none_96')
         self.disp_label = StringVar()
         self.display = None
         self.disp_btn = None
@@ -223,7 +243,7 @@ class selWin:
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = png.png('BEE2/blank_96')
+        self.prop_icon.img = img.png('BEE2/blank_96')
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column=0)
 
@@ -316,6 +336,21 @@ class selWin:
         self.mouseover_font = self.norm_font.copy()
         self.mouseover_font['slant'] = font.ITALIC
         self.context_var = IntVar()
+
+        # Re-order items appropriately.
+        #
+        self.item_list.sort(
+            # Alphabetical order
+            key=lambda it: it.longName
+        )
+        self.item_list.sort(
+            # Sort by group name
+            key=lambda it: it.group.casefold() if it.group else ''
+        )
+        self.item_list.sort(
+            # Make non-grouped items go first
+            key=lambda it: 2 if it.group else 1
+        )
 
         for ind, item in enumerate(self.item_list):
             if item == self.noneItem:
@@ -486,7 +521,7 @@ class selWin:
                     return True
             return False
 
-    def sel_item(self, item, _=None):
+    def sel_item(self, item: Item, _=None):
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''

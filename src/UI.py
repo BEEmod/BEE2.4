@@ -474,14 +474,19 @@ def load_packages(data):
     for sel_list, obj_list, name in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(data[name], key=operator.attrgetter('name')):
+        for obj in sorted(
+                data[name],
+                key=operator.attrgetter('selitem_data.name'),
+                ):
+            selitem_data = obj.selitem_data
             sel_list.append(selWinItem(
                 obj.id,
-                obj.short_name,
-                long_name=obj.name,
-                icon=obj.icon,
-                authors=obj.auth,
-                desc=obj.desc,
+                selitem_data.short_name,
+                long_name=selitem_data.name,
+                icon=selitem_data.icon,
+                authors=selitem_data.auth,
+                desc=selitem_data.desc,
+                group=selitem_data.group,
             ))
             obj_list[obj.id] = obj
             # Every item has an image
