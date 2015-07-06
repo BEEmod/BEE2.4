@@ -32,6 +32,11 @@ class ConfigFile(ConfigParser):
         if self.filename is None:
             return
         self.has_changed = False
+        # Make sure the directory exists
+        folder = os.path.dirname(self.filename)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
         with open(self.filename, 'w') as conf:
             self.write(conf)
 
