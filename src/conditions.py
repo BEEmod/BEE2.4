@@ -497,7 +497,7 @@ def flag_has_inst(_, flag):
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
-    bits = flag.value.split(' ')
+    bits = flag.value.split(' ', 1)
     return inst.fixup[bits[0]] == bits[1]
 
 
@@ -518,7 +518,7 @@ def flag_music(_, flag):
 
 @make_flag('ifOption')
 def flag_option(_, flag):
-    bits = flag.value.split(' ')
+    bits = flag.value.split(' ', 1)
     key = bits[0].casefold()
     if key in OPTIONS:
         return OPTIONS[key] == bits[1]
@@ -648,7 +648,7 @@ def res_add_inst_var(inst, res):
 @make_result('setInstVar')
 def res_set_inst_var(inst, res):
     """Set an instance variable to the given value."""
-    var_name, val = res.value.split(' ')
+    var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = val
 
 
@@ -1382,6 +1382,7 @@ def make_static_pist_setup(res):
         for name in
         (
             'bottom_1', 'bottom_2', 'bottom_3',
+            'logic_0', 'logic_1', 'logic_2', 'logic_3',
             'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
         )
     }
@@ -1401,6 +1402,19 @@ def make_static_pist(ent, res):
             val = res.value['bottom_' + bottom_pos]
             if val:  # Only if defined
                 ent['file'] = val
+        logic_file = res.value['logic_' + bottom_pos]
+        if logic_file:
+            # Overlay an additional logic file on top of the original
+            # piston. This allows easily splitting the piston logic
+            # from the styled components
+            logic_ent = ent.copy()
+            logic_ent['file'] = logic_file
+            VMF.add_ent(logic_ent)
+            # If no connections are present, set the 'enable' value in
+            # the logic to True so the piston can function
+            logic_ent.fixup['manager_a'] = utils.bool_as_int(
+                ent.fixup['connectioncount', '0'] == '0'
+            )
     else:  # we are static
         val = res.value[
             'static_' + (

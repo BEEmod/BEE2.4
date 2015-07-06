@@ -140,6 +140,10 @@ DEFAULTS = {
 
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
+    # Reset offsets for all white/black brushes, so embedface has correct
+    # texture matching
+    "tile_texture_lock":        "1",
+
     "no_mid_voices":            "0",  # Remove the midpoint voice lines
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
@@ -234,12 +238,15 @@ def get_tex(name):
         raise Exception('No texture "' + name + '"!')
 
 
-def alter_mat(face, seed=None):
+def alter_mat(face, seed=None, texture_lock=True):
     """Randomise the texture used for a face, based on configured textures.
 
     This uses the TEX_VALVE dict to identify the kind of texture, but
     uses the face orientation to determine the wall direction - the
     PeTI often uses textures on the wrong sides for various reasons.
+
+    If texture_lock is false, the offset of the texture will be reset to 0,0.
+    That ensures embedface will have aligned textures.
     """
     mat = face.mat.casefold()
     if seed:
@@ -270,6 +277,10 @@ def alter_mat(face, seed=None):
         elif orient == ORIENT.ceiling:
             orient = 'ceiling'
         face.mat = get_tex(surf_type + '.' + orient)
+
+        if not texture_lock:
+            reset_tex_offset(face)
+
         return True
     elif mat in TEX_FIZZLER:
         face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
@@ -380,7 +391,6 @@ def load_settings():
 
     instanceLocs.load_conf()
 
-    utils.con_log(settings['pit'])
     utils.con_log("Settings Loaded!")
 
 
@@ -559,41 +569,69 @@ def get_map_info():
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to disinguish between them. Add an instvar to help.
     door_frames = []
-    entry_origin = None
-    exit_origin = None
+    entry_origin = Vec(-999, -999, -999)
+    exit_origin = Vec(-999, -999, -999)
 
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
-    utils.con_log(override_sp_exit, override_sp_entry, override_coop_corr)
+
+    utils.con_log(file_sp_exit_corr)
     for item in VMF.by_class['func_instance']:
+        # Loop through all the instances in the map, looking for the entry/exit
+        # doors.
+        # - Read the $no_player_start var to see if we're in preview mode,
+        #   or override the value if specified in compile.cfg
+        # - Determine whether the map is SP or Coop by the
+        #   presence of certain instances.
+        # - Switch the entry/exit corridors to particular ones if specified
+        #   in compile.cfg
+        # Also build a set of all instances, to make a condition check easy
+        # later
+
         file = item['file'].casefold()
+        utils.con_log('File:', file)
         if file in no_player_start_inst:
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             else:
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
-
         if file in file_sp_exit_corr:
             exit_origin = Vec.from_str(item['origin'])
-            if override_sp_exit != 0:
+            if override_sp_exit == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(file_sp_exit_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
             entry_origin = Vec.from_str(item['origin'])
-            if override_sp_entry != 0:
+            if override_sp_entry == 0:
+                utils.con_log(
+                    'Using random entry (' +
+                    str(file_sp_entry_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting entry to ' + str(override_sp_entry))
                 item['file'] = file_sp_entry_corr[override_sp_entry-1]
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
-            if override_coop_corr != 0:
+            if override_coop_corr == 0:
+                utils.con_log(
+                    'Using random exit (' +
+                    str(file_coop_corr.index(file) + 1) +
+                    ')'
+                )
+            else:
                 utils.con_log('Setting coop exit to ' + str(override_coop_corr))
                 item['file'] = file_coop_corr[override_coop_corr-1]
         elif file in file_coop_exit:
             GAME_MODE = 'COOP'
-        elif file in file_sp_exit:
-            GAME_MODE = 'SP'
-        elif file in file_sp_entry:
+        elif file in file_sp_exit or file in file_sp_entry:
             GAME_MODE = 'SP'
         elif file in file_sp_door_frame:
             door_frames.append(item)
@@ -621,6 +659,7 @@ def get_map_info():
         elif origin.x == exit_origin.x and origin.y == exit_origin.y:
             door_frame.fixup['door_type'] = 'exit'
 
+    # Return the set of all instances in the map.
     return inst_files
 
 
@@ -987,9 +1026,10 @@ def change_brush():
     glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
-
-    make_goo_mist = get_bool_opt('goo_mist')
-    utils.con_log(make_goo_mist)
+    # Goo mist must be enabled by both the style and the user.
+    make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
+        settings['style_vars'].get('AllowGooMist', '1')
+    )
     mist_solids = set()
 
     # Check the clump algorithm has all its arguements
@@ -1025,7 +1065,6 @@ def change_brush():
                 face.planes[1].z,
                 face.planes[2].z,
             )
-            is_glass = False
             if face.mat.casefold() in GOO_TEX:
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
@@ -1054,9 +1093,7 @@ def change_brush():
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
-            inst = find_glass_inst(solid.get_origin())
-            if inst:
-                inst['file'] = glass_inst
+            switch_glass_inst(solid.get_origin(), glass_inst)
     if is_bottomless:
         utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)
@@ -1073,29 +1110,49 @@ def change_brush():
         random_walls()
 
 
-def find_glass_inst(origin):
-    """Find the glass instance placed in the specified location."""
+def switch_glass_inst(origin, new_file):
+    """Find the glass instance placed in the specified location.
+
+    Also works with grating.
+    """
+    # Find the center point of this location to find where the instance
+    # will be.
     loc = Vec(
         origin.x//128 * 128 + 64,
         origin.y//128 * 128 + 64,
         origin.z//128 * 128 + 64,
         )
     direction = (origin-loc).norm()
-    ang_vec = Vec(-1, 0, 0)  # The brush parts are on this side!
+    ang_vec = Vec(-1, 0, 0)
     loc_str = loc.join(' ')
     gls_file = instanceLocs.resolve('[glass_128]')
+
+    # Sometimes PeTI generates more than one segment instance. We should
+    # delete the extras!
+    targ = None
+    gls_file.append(new_file)  # Also search for already-changed bits
+
     for inst in VMF.by_class['func_instance']:
-        if inst['origin', ''] == loc_str and inst['file', ''].casefold() in gls_file:
+        # Are they a glass file at the right location?
+        if (
+                inst['origin', ''] == loc_str and
+                inst['file', ''].casefold() in gls_file
+                ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
             inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
-            rot = ang_vec.rotate(inst_ang.x, inst_ang.y, inst_ang.z)
-            print(rot, direction)
-            if round(rot) == direction:
-                return inst
-
-    # TODO - make this actually work
-    return None
+            # The brush parts are on this side!
+            rot = Vec(-1, 0, 0).rotate(
+                inst_ang.x, inst_ang.y, inst_ang.z
+            )
+            if rot == direction:
+                if targ is None:
+                    targ = inst
+                else:
+                    # We already found one!
+                    inst.remove()
+    if targ is not None:
+        targ['file'] = new_file
 
 
 def face_seed(face):
@@ -1106,10 +1163,19 @@ def face_seed(face):
     origin = face.get_origin()
     for axis in "xyz":
         if origin[axis] % 128 < 2:
-            origin[axis] //= 128  # This side
+            origin[axis] = (origin[axis] // 64) * 64
         else:
-            origin[axis] = origin[axis] // 128 + 64
-    return origin.join()
+            origin[axis] = (origin[axis] // 128) * 128 + 64
+    return origin.join(' ')
+
+def reset_tex_offset(face):
+    """Force all white/black walls to 0 offsets"""
+    uaxis = face.uaxis.split()
+    vaxis = face.vaxis.split()
+    uaxis[3] = '0]'
+    vaxis[3] = '0]'
+    face.uaxis = ' '.join(uaxis)
+    face.vaxis = ' '.join(vaxis)
 
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
@@ -1135,6 +1201,7 @@ def get_grid_sizes(face: VLib.Side):
 def random_walls():
     """The original wall style, with completely randomised walls."""
     scale_walls = get_bool_opt("random_blackwall_scale")
+    texture_lock = get_bool_opt('tile_texture_lock', True)
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
             orient = get_face_orient(face)
@@ -1147,14 +1214,14 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(get_grid_sizes(face))
-                split = face.uaxis.split(" ")
+                split = face.uaxis.split()
                 split[-1] = scale
                 face.uaxis = " ".join(split)
 
-                split = face.vaxis.split(" ")
+                split = face.vaxis.split()
                 split[-1] = scale
                 face.vaxis = " ".join(split)
-            alter_mat(face, face_seed(face))
+            alter_mat(face, face_seed(face), texture_lock)
 
 
 def clump_walls():
@@ -1176,17 +1243,23 @@ def clump_walls():
 
     # we keep a list for the others, so we can nodraw them if needed
     others = {}
+
+    texture_lock = get_bool_opt('tile_texture_lock', True)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
             mat = face.mat.casefold()
-            if face.mat in (
+            if mat in (
                     'glass/glasswindow007a_less_shiny',
                     'metal/metalgrate018',
                     'anim_wp/framework/squarebeams',
                     'tools/toolsnodraw',
+                    'anim_wp/framework/backpanels_cheap'
                     ):
-                # These textures aren't always on grid, ignore them..
+                # These textures aren't wall textures, and usually never
+                # use random textures. Don't add them here. They also aren't
+                # on grid.
                 alter_mat(face)
                 continue
 
@@ -1223,7 +1296,7 @@ def clump_walls():
                     del others[origin]
                 else:
                     others[origin] = face
-                    alter_mat(face, face_seed(face))
+                    alter_mat(face, face_seed(face), texture_lock)
 
     todo_walls = len(walls)  # number of walls un-edited
     clump_size = int(get_opt("clump_size"))
@@ -1234,35 +1307,33 @@ def clump_walls():
     for _ in range(clump_numb):
         pos = random.choice(wall_pos)
         wall_type = walls[pos].mat
+        pos = Vec(pos) // 128 * 128
+        ':type pos: Vec'
         state = random.getstate()  # keep using the map_seed for the clumps
         if wall_type == "WHITE" or wall_type == "BLACK":
-            random.seed(pos)
-            pos_min = [0, 0, 0]
-            pos_max = [0, 0, 0]
+            random.seed(pos.as_tuple())
+            pos_min = Vec()
+            pos_max = Vec()
             # these are long strips extended in one direction
             direction = random.randint(0, 2)
             for i in range(3):
                 if i == direction:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_size) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_size) * 128)
+                    dist = clump_size
                 else:
-                    pos_min[i] = int(
-                        pos[i] - random.randint(0, clump_wid) * 128)
-                    pos_max[i] = int(
-                        pos[i] + random.randint(0, clump_wid) * 128)
+                    dist = clump_wid
+                pos_min[i] = int(
+                    pos[i] - random.randint(0, dist) * 128)
+                pos_max[i] = int(
+                    pos[i] + random.randint(0, dist) * 128)
 
             tex = get_tex(wall_type.lower() + '.wall')
             # Loop though all these grid points, and set to the given
             # texture if they have the same wall type
-            for x in range(pos_min[0], pos_max[0], 128):
-                for y in range(pos_min[1], pos_max[1], 128):
-                    for z in range(pos_min[2], pos_max[2], 128):
-                        if (x, y, z) in walls:
-                            side = walls[x, y, z]
-                            if side.mat == wall_type:
-                                side.mat = tex
+            for pos, side in walls.items():
+                if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
+                    side.mat = tex
+                    if not texture_lock:
+                        reset_tex_offset(side)
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -1281,7 +1352,7 @@ def clump_walls():
             else:
                 face.mat = get_tex("black.wall")
         else:
-            alter_mat(face, seed=pos)
+            alter_mat(face, seed=pos, texture_lock=texture_lock)
 
 
 def get_face_orient(face):
@@ -1496,8 +1567,8 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split(" ")
-                    split_v = side.vaxis.split(" ")
+                    split_u = side.uaxis.split()
+                    split_v = side.vaxis.split()
                     split_u[-1] = grating_scale  # apply the grtating
                     split_v[-1] = grating_scale  # scaling option
                     side.uaxis = " ".join(split_u)
@@ -1513,11 +1584,14 @@ def change_func_brush():
             VMF.remove_ent(brush)
             continue
 
+        if is_grating:
+            # Set solidbsp to true on grating brushes. This makes the
+            # correct footstep sounds play.
+            brush['solidbsp'] = '1'
+
         if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
-            inst = find_glass_inst(brush.get_origin())
-            if inst:
-                inst['file'] = grating_inst
+            switch_glass_inst(brush.get_origin(), grating_inst)
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
@@ -1703,18 +1777,13 @@ def main():
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
-    new_path = ""
-    path = ""
+    path = sys.argv[-1]  # The path is the last argument to vbsp
+
+    # Add styled/ to the list of directories for the new location
+    path_dir, path_file = os.path.split(path)
+    new_args[-1] = new_path = os.path.join(path_dir, 'styled', path_file)
+
     for i, a in enumerate(new_args):
-        fixed_a = os.path.normpath(a)
-        if "sdk_content\\maps\\" in fixed_a:
-            new_args[i] = fixed_a.replace(
-                'sdk_content\\maps\\',
-                'sdk_content\\maps\styled\\',
-                1,
-                )
-            new_path = new_args[i]
-            path = a
         # We need to strip these out, otherwise VBSP will get confused.
         if a == '-force_peti' or a == '-force_hammer':
             new_args[i] = ''
@@ -1731,9 +1800,6 @@ def main():
     if not path.endswith(".vmf"):
         path += ".vmf"
         new_path += ".vmf"
-
-    utils.con_log("Loading settings...")
-    load_settings()
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1757,6 +1823,9 @@ def main():
         )
     else:
         utils.con_log("PeTI map detected!")
+
+        utils.con_log("Loading settings...")
+        load_settings()
 
         load_map(path)
 

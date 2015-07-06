@@ -4,8 +4,7 @@ from tk_root import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 
 class LoadScreen(Toplevel):
-
-    def __init__(self, *stages):
+    def __init__(self, *stages, title_text='Loading'):
         self.stages = list(stages)
         self.widgets = {}
         self.labels = {}
@@ -18,19 +17,18 @@ class LoadScreen(Toplevel):
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything.
 
-        super().__init__(TK_ROOT, cursor='watch') # Initialise the window
+        super().__init__(TK_ROOT, cursor='watch')  # Initialise the window
+        self.withdraw()
 
         # this prevents stuff like the title bar, normal borders etc from
         # appearing in this window.
         self.overrideredirect(1)
         self.resizable(False, False)
         self.attributes('-topmost', 1)
-        self.geometry('+200+200')
-        self.deiconify()
 
         ttk.Label(
             self,
-            text='Loading...',
+            text=title_text + '...',
             font=("Helvetica", 12, "bold"),
             ).grid(columnspan=2)
         ttk.Separator(
@@ -60,10 +58,10 @@ class LoadScreen(Toplevel):
             self.labels[st_id] = ttk.Label(self, text='0/??')
             self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
-        self.show()
 
     def show(self):
         """Display this loading screen."""
+        self.deiconify()
         self.update()  # Force an update so the reqwidth is correct
         loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
         loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
@@ -122,7 +120,8 @@ class LoadScreen(Toplevel):
 main_loader = LoadScreen(
     ('PAK', 'Packages'),
     ('OBJ', 'Loading Objects'),
-    ('RES', 'Extracting Resources'),
+    ('IMG_EX', 'Extracting Images'),
     ('IMG', 'Loading Images'),
     ('UI', 'Initialising UI'),
+    title_text='Loading',
 )

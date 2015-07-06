@@ -10,6 +10,7 @@ from collections import defaultdict, namedtuple
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
 from loadScreen import main_loader as loader
+import extract_packages
 import utils
 
 
@@ -93,6 +94,10 @@ def find_packages(pak_dir, zips, zip_name_lst):
             zip_file = ZipFile(name)
         elif is_dir:
             zip_file = FakeZip(name)
+        else:
+            utils.con_log('Extra file: ', name)
+            continue
+
         if 'info.txt' in zip_file.namelist():  # Is it valid?
             zips.append(zip_file)
             zip_name_lst.append(os.path.abspath(name))
@@ -127,12 +132,8 @@ def load_packages(
         log_missing_ent_count=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global res_count, LOG_ENT_COUNT
+    global LOG_ENT_COUNT
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
-    if load_res:
-        res_count = 0
-    else:
-        loader.skip_stage("RES")
 
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
@@ -149,14 +150,25 @@ def load_packages(
             data[obj_type] = []
 
         objects = 0
+        images = 0
         for pak_id, (zip_file, info, name, dispName) in packages.items():
-            print(("Reading objects from '" + pak_id + "'...").ljust(50), end='')
-            obj_count = parse_package(zip_file, info, pak_id, dispName)
+            print(
+                ("Reading objects from '" + pak_id + "'...").ljust(50),
+                end=''
+            )
+            obj_count, img_count = parse_package(
+                zip_file,
+                info,
+                pak_id,
+                dispName,
+            )
             objects += obj_count
+            images += img_count
             loader.step("PAK")
             print("Done!")
 
         loader.set_length("OBJ", objects)
+        loader.set_length("IMG_EX", images)
 
         # Except for StyleVars, each object will have at least 1 image -
         # in UI.py we step the progress once per object.
@@ -187,32 +199,20 @@ def load_packages(
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
-        if load_res:
-            print('Extracting Resources...')
-            for zip_file in zips:
-                for path in zip_names(zip_file):
-                    loc = os.path.normcase(path)
-                    if loc.startswith("resources"):
-                        loader.step("RES")
-                        zip_file.extract(path, path="../cache/")
 
-            shutil.rmtree('../images/cache', ignore_errors=True)
-            shutil.rmtree('../inst_cache/', ignore_errors=True)
-            shutil.rmtree('../source_cache/', ignore_errors=True)
+        shutil.rmtree('../cache/', ignore_errors=True)
+        img_loc = os.path.join('resources', 'bee2')
+        for zip_file in zips:
+            for path in zip_names(zip_file):
+                loc = os.path.normcase(path)
+                if loc.startswith(img_loc):
+                    loader.step("IMG_EX")
+                    zip_file.extract(path, path="../cache/")
 
-            if os.path.isdir("../cache/resources/bee2"):
-                shutil.move("../cache/resources/bee2", "../images/cache")
-            if os.path.isdir("../cache/resources/instances"):
-                shutil.move("../cache/resources/instances", "../inst_cache/")
-            for file_type in ("materials", "models", "sound", "scripts"):
-                if os.path.isdir("../cache/resources/" + file_type):
-                    shutil.move(
-                        "../cache/resources/" + file_type,
-                        "../source_cache/" + file_type,
-                    )
-
-            shutil.rmtree('../cache/', ignore_errors=True)
-            print('Done!')
+        shutil.rmtree('../images/cache', ignore_errors=True)
+        if os.path.isdir("../cache/resources/bee2"):
+            shutil.move("../cache/resources/bee2", "../images/cache")
+        shutil.rmtree('../cache/', ignore_errors=True)
 
     finally:
         # close them all, we've already read the contents.
@@ -233,7 +233,6 @@ def load_packages(
 
 def parse_package(zip_file, info, pak_id, disp_name):
     """Parse through the given package to find all the components."""
-    global res_count
     for pre in Property.find_key(info, 'Prerequisites', []).value:
         if pre.value not in packages:
             utils.con_log(
@@ -267,12 +266,15 @@ def parse_package(zip_file, info, pak_id, disp_name):
                 disp_name,
             )
 
-    if res_count != -1:
-        for item in zip_names(zip_file):
-            if item.startswith("resources"):
-                res_count += 1
-        loader.set_length("RES", res_count)
-    return objects
+    img_count = 0
+    img_loc = os.path.join('resources', 'bee2')
+    for item in zip_names(zip_file):
+        item = os.path.normcase(item)
+        if item.startswith("resources"):
+            extract_packages.res_count += 1
+            if item.startswith(img_loc):
+                img_count += 1
+    return objects, img_count
 
 
 def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
@@ -422,24 +424,16 @@ class Style:
     def __init__(
             self,
             style_id,
-            name,
-            author,
-            desc,
-            icon,
+            selitem_data: 'SelitemData',
             editor,
             config=None,
             base_style=None,
-            short_name=None,
             suggested=None,
             has_video=True,
             corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
-        self.auth = author
-        self.name = name
-        self.desc = desc
-        self.icon = icon
-        self.short_name = name if short_name is None else short_name
+        self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
         self.bases = []  # Set by setup_style_tree()
@@ -479,7 +473,6 @@ class Style:
             'coop':     corridors.find_key('coop', []),
         }
 
-        short_name = selitem_data.short_name or None
         if base == '':
             base = None
         folder = 'styles/' + info['folder']
@@ -500,24 +493,20 @@ class Style:
             vbsp = None
         return cls(
             style_id=data.id,
-            name=selitem_data.name,
-            author=selitem_data.auth,
-            desc=selitem_data.desc,
-            icon=selitem_data.icon,
+            selitem_data=selitem_data,
             editor=items,
             config=vbsp,
             base_style=base,
-            short_name=short_name,
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
         self.editor.extend(override.editor)
         self.config.extend(override.config)
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -631,19 +620,11 @@ class QuotePack:
     def __init__(
             self,
             quote_id,
-            name,
+            selitem_data: 'SelitemData',
             config,
-            icon,
-            desc,
-            auth=None,
-            short_name=None,
             ):
         self.id = quote_id
-        self.name = name
-        self.icon = icon
-        self.short_name = name if short_name is None else short_name
-        self.desc = desc
-        self.auth = [] if auth is None else auth
+        self.selitem_data = selitem_data
         self.config = config
 
     @classmethod
@@ -661,17 +642,13 @@ class QuotePack:
 
         return cls(
             data.id,
-            selitem_data.name,
+            selitem_data,
             config,
-            selitem_data.icon,
-            selitem_data.desc,
-            auth=selitem_data.auth,
-            short_name=selitem_data.short_name
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'QuotePack'):
         """Add the additional lines to ourselves."""
-        self.auth += override.auth
+        self.selitem_data.auth += override.selitem_data.auth
         self.config += override.config
         self.config.merge_children(
             'quotes_sp',
@@ -686,27 +663,18 @@ class Skybox:
     def __init__(
             self,
             sky_id,
-            name,
-            ico,
+            selitem_data: 'SelitemData',
             config,
             mat,
-            auth,
-            desc,
-            short_name=None,
             ):
         self.id = sky_id
-        self.short_name = name if short_name is None else short_name
-        self.name = name
-        self.icon = ico
+        self.selitem_data = selitem_data
         self.material = mat
         self.config = config
-        self.auth = auth
-        self.desc = desc
 
     @classmethod
     def parse(cls, data):
         """Parse a skybox definition."""
-        config_dir = data.info['config', '']
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
         config = get_config(
@@ -717,18 +685,14 @@ class Skybox:
         )
         return cls(
             data.id,
-            selitem_data.name,
-            selitem_data.icon,
+            selitem_data,
             config,
             mat,
-            selitem_data.auth,
-            selitem_data.desc,
-            selitem_data.short_name,
         )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
         self.config.extend(override.config)
 
     def __repr__(self):
@@ -739,24 +703,17 @@ class Music:
     def __init__(
             self,
             music_id,
-            name,
-            ico,
-            auth,
-            desc,
-            short_name=None,
+            selitem_data: 'SelitemData',
             config=None,
             inst=None,
             sound=None,
             ):
         self.id = music_id
-        self.short_name = name if short_name is None else short_name
-        self.name = name
-        self.icon = ico
+        self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
-        self.auth = auth
-        self.desc = desc
-        self.config = config or Property(None, [])
+
+        self.selitem_data = selitem_data
 
     @classmethod
     def parse(cls, data):
@@ -773,20 +730,16 @@ class Music:
         )
         return cls(
             data.id,
-            selitem_data.name,
-            selitem_data.icon,
-            selitem_data.auth,
-            selitem_data.desc,
-            short_name=selitem_data.short_name,
+            selitem_data,
             inst=inst,
             sound=sound,
             config=config,
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
         self.config.extend(override.config)
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
         return '<Music ' + self.id + '>'
@@ -857,20 +810,14 @@ class ElevatorVid:
     def __init__(
             self,
             elev_id,
-            ico,
-            name,
-            auth,
-            desc,
+            selitem_data: 'SelitemData',
             video,
-            short_name=None,
             vert_video=None,
             ):
         self.id = elev_id
-        self.icon = ico
-        self.auth = auth
-        self.name = name
-        self.short_name = name if short_name is None else short_name
-        self.desc = desc
+
+        self.selitem_data = selitem_data
+
         if vert_video is None:
             self.has_orient = False
             self.horiz_video = video
@@ -894,12 +841,8 @@ class ElevatorVid:
 
         return cls(
             data.id,
-            selitem_data.icon,
-            selitem_data.name,
-            selitem_data.auth,
-            selitem_data.desc,
+            selitem_data,
             video,
-            selitem_data.short_name,
             vert_video,
         )
 
@@ -922,7 +865,10 @@ def desc_parse(info):
             yield ("line", prop.value)
 
 
-SelitemData = namedtuple('SelitemData', 'name, short_name, auth, icon, desc')
+SelitemData = namedtuple(
+    'SelitemData',
+    'name, short_name, auth, icon, desc, group',
+)
 
 
 def get_selitem_data(info):
@@ -934,7 +880,20 @@ def get_selitem_data(info):
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
-    return SelitemData(name, short_name, auth, icon, desc)
+    group = info['group', '']
+    if not group:
+        group = None
+    if not short_name:
+        short_name = name
+
+    return SelitemData(
+        name,
+        short_name,
+        auth,
+        icon,
+        desc,
+        group,
+    )
 
 
 def sep_values(string, delimiters=',;/'):

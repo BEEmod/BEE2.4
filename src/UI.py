@@ -18,6 +18,7 @@ import utils
 
 from SubPane import SubPane
 from selectorWin import selWin, Item as selWinItem
+import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
@@ -62,7 +63,6 @@ elevators = {}
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
-
 
 class Item:
     """Represents an item that can appear on the list."""
@@ -474,14 +474,19 @@ def load_packages(data):
     for sel_list, obj_list, name in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(data[name], key=operator.attrgetter('name')):
+        for obj in sorted(
+                data[name],
+                key=operator.attrgetter('selitem_data.name'),
+                ):
+            selitem_data = obj.selitem_data
             sel_list.append(selWinItem(
                 obj.id,
-                obj.short_name,
-                long_name=obj.name,
-                icon=obj.icon,
-                authors=obj.auth,
-                desc=obj.desc,
+                selitem_data.short_name,
+                long_name=selitem_data.name,
+                icon=selitem_data.icon,
+                authors=selitem_data.auth,
+                desc=selitem_data.desc,
+                group=selitem_data.group,
             ))
             obj_list[obj.id] = obj
             # Every item has an image
@@ -699,16 +704,18 @@ def export_editoritems(_=None):
         voice=voices.get(voice_win.chosen_id, None),
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
+        should_refresh=not GEN_OPTS.get_bool(
+            'General',
+            'preserve_BEE2_resource_dir',
+            False,
         )
+    )
+
     messagebox.showinfo(
         'BEEMOD2',
         message='Selected Items and Style successfully exported!',
         )
 
-    if not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir', False):
-        print('Copying resources...')
-        gameMan.selected_game.refresh_cache()
-        print('Done!')
 
     for pal in palettes[:]:
         if pal.name == '<Last Export>':
@@ -1080,15 +1087,26 @@ def init_option(f):
         text="Save Palette As...",
         command=pal_save_as,
         ).grid(row=1, sticky="EW", padx=5)
-    ttk.Button(
+    UI['export_button'] = ttk.Button(
         f,
-        text="Export...",
+        textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
-        ).grid(row=2, sticky="EW", padx=5, pady=(0, 10))
+    )
+    extract_packages.export_btn_text.set('Export...')
+    UI['export_button'].state(['disabled'])
+    UI['export_button'].grid(row=2, sticky="EW", padx=5)
+
+    UI['extract_progress'] = ttk.Progressbar(
+        f,
+        length=200,
+        maximum=1000,
+        variable=extract_packages.progress_var,
+    )
+    UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
 
     props = ttk.LabelFrame(f, text="Properties", width="50")
     props.columnconfigure(1, weight=1)
-    props.grid(row=3, sticky="EW")
+    props.grid(row=4, sticky="EW")
 
     def suggested_style_set():
         """Set music, skybox, voices, etc to the settings defined for a style.
@@ -1469,7 +1487,6 @@ def init_menu_bar(win):
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', False)
-
     # Name is used to make this the special 'BEE2' menu item on Mac
     menus['file'] = Menu(bar, name='apple')
     file_menu = menus['file']
@@ -1479,8 +1496,8 @@ def init_menu_bar(win):
         label="Export",
         command=export_editoritems,
         accelerator='Ctrl-E',
+        state=DISABLED,
         )
-    win.bind_all('<Control-e>', export_editoritems)
 
     file_menu.add_command(
         label="Add Game",
@@ -1500,7 +1517,6 @@ def init_menu_bar(win):
         command=quit_application,
         )
     file_menu.add_separator()
-
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game)
     gameMan.game_menu = menus['file']
@@ -1782,7 +1798,22 @@ def init_windows():
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
 
+    def copy_done_callback():
+        """Callback run when all resources have been extracted."""
+
+        UI['export_button'].state(['!disabled'])
+        UI['extract_progress'].grid_remove()
+        windows['opt'].update_idletasks()
+        # Reload the option window's position and sizing configuration,
+        # that way it resizes automatically.
+        windows['opt'].save_conf()
+        windows['opt'].load_conf()
+        menus['file'].entryconfigure(2, state=NORMAL)
+        TK_ROOT.bind_all('<Control-e>', export_editoritems)
+        print('Done extracting resources!')
+
+    extract_packages.done_callback = copy_done_callback
+
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
-
     set_palette()
