@@ -20,6 +20,7 @@ from property_parser import Property
 import utils
 import UI
 import loadScreen
+import extract_packages
 
 all_games = []
 selected_game = None
@@ -61,6 +62,16 @@ CACHE_LOC = [
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority.
 GAMEINFO_LINE = 'Game\t"BEE2"'
+
+
+# The progress bars used when exporting data into a game
+export_screen = loadScreen.LoadScreen(
+    ('BACK', 'Backup Original Files'),
+    ('CONF', 'Generate Config Files'),
+    ('COMP', 'Copy Compiler'),
+    ('RES', 'Copy Resources'),
+    title_text='Exporting',
+)
 
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
@@ -192,12 +203,18 @@ class Game:
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
-        messagebox.showinfo(
-            message='Now copying over resources. The BEE2 may be non-responsive'
-                    ' for a few seconds',
-            parent=TK_ROOT,
-            title='BEE2 - Exporting',
-        )
+        # messagebox.showinfo(
+        #     message='Now copying over resources. The BEE2 may be non-responsive'
+        #             ' for a few seconds',
+        #     parent=TK_ROOT,
+        #     title='BEE2 - Exporting',
+        # )
+        screen_func = export_screen.step
+        copy2 = shutil.copy2
+        def copy_func(src, dest):
+            screen_func('RES')
+            copy2(src, dest)
+
         for source, dest in CACHE_LOC:
             dest = self.abs_path(dest)
             print('Copying to "' + dest + '" ...', end='')
@@ -205,11 +222,10 @@ class Game:
                 shutil.rmtree(dest)
             except (IOError, shutil.Error):
                 pass
-            shutil.copytree(source, dest)
+
+
+            shutil.copytree(source, dest, copy_function=copy_func)
             print(' Done!')
-        print('Copying PakRat...', end='')
-        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
-        print(' Done!')
 
     def clear_cache(self):
         """Remove all resources from the game."""
@@ -229,6 +245,7 @@ class Game:
             voice,
             style_vars,
             elevator,
+            should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
 
@@ -247,6 +264,21 @@ class Game:
         for key, val in style_vars.items():
             print('  {} = {!s}'.format(key, val))
         print('  }')
+
+        # VBSP, VRAD, editoritems
+        export_screen.set_length('BACK', 3)
+        # VBSP_conf, Editoritems, instances, gameinfo, 4 voices
+        export_screen.set_length('CONF', 8)
+        # files in compiler/ + pakrat
+        export_screen.set_length('COMP', len(os.listdir('../compiler') + 1))
+
+        if should_refresh:
+            export_screen.set_length('RES', extract_packages.res_count)
+        else:
+            export_screen.skip_stage('RES')
+
+        export_screen.show()
+        export_screen.grab_set_global() # Stop interaction with other windows
 
         vbsp_config = style.config.copy()
 
@@ -309,6 +341,7 @@ class Game:
             if os.path.isfile(item_path) and not os.path.isfile(backup_path):
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
+            export_screen.step('BACK')
 
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
@@ -338,31 +371,28 @@ class Game:
         print('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
+        export_screen.step('CONF')
+
         print('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path(
                 'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
+        export_screen.step('CONF')
 
         print('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
+        export_screen.step('CONF')
 
         print('Writing instance list!')
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
             for line in all_instances.export():
                 inst_file.write(line)
-
-        print('Copying Custom Compiler!')
-        for file in os.listdir('../compiler'):
-            print('\t* compiler/{0} -> bin/{0}'.format(file))
-            shutil.copy(
-                os.path.join('../compiler', file),
-                self.abs_path('bin/')
-            )
+        export_screen.step('CONF')
 
         for prefix, pretty in VOICE_PATHS:
             path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
@@ -374,6 +404,28 @@ class Game:
                 print('Written "{}.cfg"'.format(prefix))
             else:
                 print('No ' + pretty + ' voice config!')
+            export_screen.step('CONF')
+
+        print('Copying Custom Compiler!')
+        for file in os.listdir('../compiler'):
+            print('\t* compiler/{0} -> bin/{0}'.format(file))
+            shutil.copy(
+                os.path.join('../compiler', file),
+                self.abs_path('bin/')
+            )
+            export_screen.step('COMP')
+
+        print('Copying PakRat...', end='')
+        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
+        export_screen.step('COMP')
+        print(' Done!')
+
+        if should_refresh:
+            print('Copying Resources!')
+            self.refresh_cache()
+
+        export_screen.grab_release()
+        export_screen.reset()  # Hide loading screen, we're done
 
 
 def find_steam_info(game_dir):

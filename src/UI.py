@@ -64,7 +64,6 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
-
 class Item:
     """Represents an item that can appear on the list."""
     __slots__ = [
@@ -705,16 +704,18 @@ def export_editoritems(_=None):
         voice=voices.get(voice_win.chosen_id, None),
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
+        should_refresh=not GEN_OPTS.get_bool(
+            'General',
+            'preserve_BEE2_resource_dir',
+            False,
         )
+    )
+
     messagebox.showinfo(
         'BEEMOD2',
         message='Selected Items and Style successfully exported!',
         )
 
-    if not GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir', False):
-        print('Copying resources...')
-        gameMan.selected_game.refresh_cache()
-        print('Done!')
 
     for pal in palettes[:]:
         if pal.name == '<Last Export>':
