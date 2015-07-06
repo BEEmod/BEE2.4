@@ -94,6 +94,10 @@ def find_packages(pak_dir, zips, zip_name_lst):
             zip_file = ZipFile(name)
         elif is_dir:
             zip_file = FakeZip(name)
+        else:
+            utils.con_log('Extra file: ', name)
+            continue
+
         if 'info.txt' in zip_file.namelist():  # Is it valid?
             zips.append(zip_file)
             zip_name_lst.append(os.path.abspath(name))
@@ -420,24 +424,16 @@ class Style:
     def __init__(
             self,
             style_id,
-            name,
-            author,
-            desc,
-            icon,
+            selitem_data: 'SelitemData',
             editor,
             config=None,
             base_style=None,
-            short_name=None,
             suggested=None,
             has_video=True,
             corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
-        self.auth = author
-        self.name = name
-        self.desc = desc
-        self.icon = icon
-        self.short_name = name if short_name is None else short_name
+        self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
         self.bases = []  # Set by setup_style_tree()
@@ -477,7 +473,6 @@ class Style:
             'coop':     corridors.find_key('coop', []),
         }
 
-        short_name = selitem_data.short_name or None
         if base == '':
             base = None
         folder = 'styles/' + info['folder']
@@ -498,24 +493,20 @@ class Style:
             vbsp = None
         return cls(
             style_id=data.id,
-            name=selitem_data.name,
-            author=selitem_data.auth,
-            desc=selitem_data.desc,
-            icon=selitem_data.icon,
+            selitem_data=selitem_data,
             editor=items,
             config=vbsp,
             base_style=base,
-            short_name=short_name,
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
         self.editor.extend(override.editor)
         self.config.extend(override.config)
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -629,19 +620,11 @@ class QuotePack:
     def __init__(
             self,
             quote_id,
-            name,
+            selitem_data: 'SelitemData',
             config,
-            icon,
-            desc,
-            auth=None,
-            short_name=None,
             ):
         self.id = quote_id
-        self.name = name
-        self.icon = icon
-        self.short_name = name if short_name is None else short_name
-        self.desc = desc
-        self.auth = [] if auth is None else auth
+        self.selitem_data = selitem_data
         self.config = config
 
     @classmethod
@@ -659,17 +642,13 @@ class QuotePack:
 
         return cls(
             data.id,
-            selitem_data.name,
+            selitem_data,
             config,
-            selitem_data.icon,
-            selitem_data.desc,
-            auth=selitem_data.auth,
-            short_name=selitem_data.short_name
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'QuotePack'):
         """Add the additional lines to ourselves."""
-        self.auth += override.auth
+        self.selitem_data.auth += override.selitem_data.auth
         self.config += override.config
         self.config.merge_children(
             'quotes_sp',
@@ -684,27 +663,18 @@ class Skybox:
     def __init__(
             self,
             sky_id,
-            name,
-            ico,
+            selitem_data: 'SelitemData',
             config,
             mat,
-            auth,
-            desc,
-            short_name=None,
             ):
         self.id = sky_id
-        self.short_name = name if short_name is None else short_name
-        self.name = name
-        self.icon = ico
+        self.selitem_data = selitem_data
         self.material = mat
         self.config = config
-        self.auth = auth
-        self.desc = desc
 
     @classmethod
     def parse(cls, data):
         """Parse a skybox definition."""
-        config_dir = data.info['config', '']
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
         config = get_config(
@@ -715,18 +685,14 @@ class Skybox:
         )
         return cls(
             data.id,
-            selitem_data.name,
-            selitem_data.icon,
+            selitem_data,
             config,
             mat,
-            selitem_data.auth,
-            selitem_data.desc,
-            selitem_data.short_name,
         )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
         self.config.extend(override.config)
 
     def __repr__(self):
@@ -737,24 +703,17 @@ class Music:
     def __init__(
             self,
             music_id,
-            name,
-            ico,
-            auth,
-            desc,
-            short_name=None,
+            selitem_data: 'SelitemData',
             config=None,
             inst=None,
             sound=None,
             ):
         self.id = music_id
-        self.short_name = name if short_name is None else short_name
-        self.name = name
-        self.icon = ico
+        self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
-        self.auth = auth
-        self.desc = desc
-        self.config = config or Property(None, [])
+
+        self.selitem_data = selitem_data
 
     @classmethod
     def parse(cls, data):
@@ -771,20 +730,16 @@ class Music:
         )
         return cls(
             data.id,
-            selitem_data.name,
-            selitem_data.icon,
-            selitem_data.auth,
-            selitem_data.desc,
-            short_name=selitem_data.short_name,
+            selitem_data,
             inst=inst,
             sound=sound,
             config=config,
             )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
         self.config.extend(override.config)
-        self.auth.extend(override.auth)
+        self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
         return '<Music ' + self.id + '>'
@@ -855,20 +810,14 @@ class ElevatorVid:
     def __init__(
             self,
             elev_id,
-            ico,
-            name,
-            auth,
-            desc,
+            selitem_data: 'SelitemData',
             video,
-            short_name=None,
             vert_video=None,
             ):
         self.id = elev_id
-        self.icon = ico
-        self.auth = auth
-        self.name = name
-        self.short_name = name if short_name is None else short_name
-        self.desc = desc
+
+        self.selitem_data = selitem_data
+
         if vert_video is None:
             self.has_orient = False
             self.horiz_video = video
@@ -892,12 +841,8 @@ class ElevatorVid:
 
         return cls(
             data.id,
-            selitem_data.icon,
-            selitem_data.name,
-            selitem_data.auth,
-            selitem_data.desc,
+            selitem_data,
             video,
-            selitem_data.short_name,
             vert_video,
         )
 
@@ -920,7 +865,10 @@ def desc_parse(info):
             yield ("line", prop.value)
 
 
-SelitemData = namedtuple('SelitemData', 'name, short_name, auth, icon, desc')
+SelitemData = namedtuple(
+    'SelitemData',
+    'name, short_name, auth, icon, desc, group',
+)
 
 
 def get_selitem_data(info):
@@ -932,7 +880,20 @@ def get_selitem_data(info):
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
-    return SelitemData(name, short_name, auth, icon, desc)
+    group = info['group', '']
+    if not group:
+        group = None
+    if not short_name:
+        short_name = name
+
+    return SelitemData(
+        name,
+        short_name,
+        auth,
+        icon,
+        desc,
+        group,
+    )
 
 
 def sep_values(string, delimiters=',;/'):
