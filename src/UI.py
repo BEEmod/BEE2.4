@@ -1812,20 +1812,7 @@ def init_windows():
         TK_ROOT.bind_all('<Control-e>', export_editoritems)
         print('Done extracting resources!')
 
-    def make_extract_progress_infinite():
-        pr = UI['extract_progress']
-        pr.stop()
-        pr.configure(
-            mode='indeterminate',
-            # Decrease the number of 'steps' which exist,
-            # so the bar moves faster
-            maximum=25,
-        )
-        # Move 1/25 steps every 50 miliseconds
-        pr.start(50)
-
     extract_packages.done_callback = copy_done_callback
-    extract_packages.make_progress_infinite = make_extract_progress_infinite
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)

@@ -52,12 +52,8 @@ _UNLOCK_ITEMS = [
     'ITEM_OBSERVATION_ROOM'
     ]
 
-# The source and desination locations of resources that must be copied
-# into the game folder.
-CACHE_LOC = [
-    ('../inst_cache/', 'sdk_content/maps/instances/BEE2'),
-    ('../source_cache/', 'BEE2/'),
-    ]
+# The location of all the instances in the game directory
+INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority.
@@ -203,37 +199,32 @@ class Game:
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
-        # messagebox.showinfo(
-        #     message='Now copying over resources. The BEE2 may be non-responsive'
-        #             ' for a few seconds',
-        #     parent=TK_ROOT,
-        #     title='BEE2 - Exporting',
-        # )
+
         screen_func = export_screen.step
         copy2 = shutil.copy2
         def copy_func(src, dest):
             screen_func('RES')
             copy2(src, dest)
 
-        for source, dest in CACHE_LOC:
-            dest = self.abs_path(dest)
+        for folder in os.listdir('../cache/resources/'):
+            source = os.path.join('../cache/resources/', folder)
+            if folder == 'instances':
+                dest = self.abs_path(INST_PATH)
+            else:
+                dest = self.abs_path(os.path.join('bee2', folder))
             print('Copying to "' + dest + '" ...', end='')
             try:
                 shutil.rmtree(dest)
             except (IOError, shutil.Error):
                 pass
 
-
             shutil.copytree(source, dest, copy_function=copy_func)
             print(' Done!')
 
     def clear_cache(self):
         """Remove all resources from the game."""
-        for source, dest in CACHE_LOC:
-            try:
-                shutil.rmtree(self.abs_path(dest))
-            except (IOError, shutil.Error):
-                pass
+        shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
+        shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
     def export(
@@ -270,7 +261,7 @@ class Game:
         # VBSP_conf, Editoritems, instances, gameinfo, 4 voices
         export_screen.set_length('CONF', 8)
         # files in compiler/ + pakrat
-        export_screen.set_length('COMP', len(os.listdir('../compiler') + 1))
+        export_screen.set_length('COMP', len(os.listdir('../compiler')) + 1)
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)
