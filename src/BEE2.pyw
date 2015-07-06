@@ -1,4 +1,15 @@
+# Fix a bug with multiprocessing, where it tries to flush stdout
+import sys, io
+if sys.stdout is None:
+    sys.stdout = io.StringIO()
+if sys.stderr is None:
+    sys.stderr = io.StringIO()
+
+from multiprocessing import freeze_support
+
 if __name__ == '__main__':
+    freeze_support()  # Make multiprocessing work correctly when frozen
+
     from tkinter import messagebox
 
     import traceback
@@ -13,7 +24,6 @@ if __name__ == '__main__':
     import packageLoader
     import gameMan
     import extract_packages
-
     ERR_FORMAT = '''
     --------------
 
