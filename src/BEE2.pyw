@@ -56,6 +56,8 @@ if __name__ == '__main__':
     }
     loadScreen.main_loader.set_length('UI', 9)
     loadScreen.main_loader.show()
+
+    GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
     show_errors = False
