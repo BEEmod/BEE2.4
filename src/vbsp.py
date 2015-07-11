@@ -421,6 +421,7 @@ def add_voice(inst):
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
         mode=GAME_MODE,
+        map_seed=MAP_SEED,
         )
 
 @conditions.meta_cond(priority=-200, only_once=False)

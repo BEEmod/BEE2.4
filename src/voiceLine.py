@@ -1,9 +1,12 @@
 # coding=utf-8
-import itertools
 from decimal import Decimal
+import itertools
+import random
 
 from BEE2_config import ConfigFile
+import conditions
 import utils
+import vmfLib
 
 map_attr = {}
 style_vars = {}
@@ -12,6 +15,15 @@ ALLOW_MID_VOICES = False
 VMF = None
 
 INST_PREFIX = 'instances/BEE2/voice/'
+
+# Create a fake instance to pass to condition flags. This way we can
+# reuse all that logic, without breaking flags that check the instance.
+fake_inst = vmfLib.VMF().create_ent(
+    classname='func_instance',
+    file='',
+    angles='0 0 0',
+    origin='0 0 0',
+)
 
 
 def find_group_quotes(group, mid_quotes, conf):
@@ -22,21 +34,10 @@ def find_group_quotes(group, mid_quotes, conf):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name == 'instance':
+            if name == 'instance' or name == 'priority':
+                # Not flags!
                 continue
-            # break out if a flag is unsatisfied
-            if name == 'has' and map_attr[flag.value.casefold()] is False:
-                valid_quote = False
-                break
-            elif name == 'nothas' and map_attr[flag.value.casefold()] is True:
-                valid_quote = False
-                break
-            elif (name == 'stylevartrue' and
-                    style_vars[flag.value.casefold()] is False):
-                valid_quote = False
-                break
-            elif (name == 'stylevarfalse' and
-                    style_vars[flag.value.casefold()] is True):
+            if not conditions.check_flag(flag, fake_inst):
                 valid_quote = False
                 break
 
@@ -58,35 +59,38 @@ def find_group_quotes(group, mid_quotes, conf):
                             )
 
 
-def add_quote(prop, targetname, quote_loc):
+def add_quote(quote, targetname, quote_loc):
     """Add a quote to the map."""
-    name = prop.name
-    if name == 'file':
-        VMF.create_ent(
-            classname='func_instance',
-            targetname='',
-            file=INST_PREFIX + prop.value,
-            origin=quote_loc,
-            fixup_style='2',  # No fixup
-        )
-    elif name == 'choreo':
-        VMF.create_ent(
-            classname='logic_choreographed_scene',
-            targetname=targetname,
-            origin=quote_loc,
-            scenefile=prop.value,
-            busyactor="1",  # Wait for actor to stop talking
-            onplayerdeath='0',
-        )
-    elif name == 'snd':
-        VMF.create_ent(
-            classname='ambient_generic',
-            spawnflags='49',  # Infinite Range, Starts Silent
-            targetname=targetname,
-            origin=quote_loc,
-            message=prop.value,
-            health='10',  # Volume
-        )
+    utils.con_log('Adding quote: ', quote)
+
+    for prop in quote:
+        name = prop.name.casefold()
+        if name == 'file':
+            VMF.create_ent(
+                classname='func_instance',
+                targetname='',
+                file=INST_PREFIX + prop.value,
+                origin=quote_loc,
+                fixup_style='2',  # No fixup
+            )
+        elif name == 'choreo':
+            VMF.create_ent(
+                classname='logic_choreographed_scene',
+                targetname=targetname,
+                origin=quote_loc,
+                scenefile=prop.value,
+                busyactor="1",  # Wait for actor to stop talking
+                onplayerdeath='0',
+            )
+        elif name == 'snd':
+            VMF.create_ent(
+                classname='ambient_generic',
+                spawnflags='49',  # Infinite Range, Starts Silent
+                targetname=targetname,
+                origin=quote_loc,
+                message=prop.value,
+                health='10',  # Volume
+            )
 
 
 def sort_func(quote):
@@ -105,6 +109,7 @@ def add_voice(
         has_items,
         style_vars_,
         vmf_file,
+        map_seed,
         mode='SP',
         ):
     """Add a voice line to the map."""
@@ -166,12 +171,17 @@ def add_voice(
 
             chosen = possible_quotes[0][1]
 
-            utils.con_log('Chosen: {!r}'.format(chosen))
+            utils.con_log('Chosen:', '\n'.join(map(repr, chosen)))
 
-            # Add all the associated quotes
-
-            for prop in chosen:
-                add_quote(prop, quote_targetname, choreo_loc)
+            # Join the IDs for the voice lines to the map seed,
+            # so each quote block will chose different lines.
+            random.seed(map_seed + '-VOICE_' + '|'.join(
+                prop['id', 'ID']
+                for prop in
+                chosen
+            ))
+            # Add one of the associated quotes
+            add_quote(random.choice(chosen), quote_targetname, choreo_loc)
 
     print('mid quotes: ', mid_quotes)
     for mid_item in mid_quotes:
