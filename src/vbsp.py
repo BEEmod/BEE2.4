@@ -158,6 +158,7 @@ DEFAULTS = {
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
+    "goo_scale":                "1",  # Scale of goo material
 
     # If set, use these as the glass/grating 128x128 instances
     "glass_inst":                "NONE",
@@ -421,6 +422,7 @@ def add_voice(inst):
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
         mode=GAME_MODE,
+        map_seed=MAP_SEED,
         )
 
 @conditions.meta_cond(priority=-200, only_once=False)
@@ -1025,6 +1027,7 @@ def change_brush():
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
+    goo_scale = get_opt('goo_scale')
     is_bottomless = get_bool_opt('bottomless_pit')
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
@@ -1050,7 +1053,6 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
-    print('Glass inst', glass_inst)
     if glass_inst == "NONE":
         glass_inst = None
 
@@ -1083,9 +1085,16 @@ def change_brush():
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
+
+                split_u = face.uaxis.split()
+                split_v = face.vaxis.split()
+                split_u[-1] = goo_scale # Apply goo scaling
+                split_v[-1] = goo_scale
+                face.uaxis = " ".join(split_u)
+                face.vaxis = " ".join(split_v)
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                split_u = face.uaxis.split(" ")
-                split_v = face.vaxis.split(" ")
+                split_u = face.uaxis.split()
+                split_v = face.vaxis.split()
                 split_u[-1] = glass_scale  # apply the glass scaling option
                 split_v[-1] = glass_scale
                 face.uaxis = " ".join(split_u)
@@ -1094,6 +1103,7 @@ def change_brush():
                 is_glass = True
         if is_glass and glass_inst is not None:
             switch_glass_inst(solid.get_origin(), glass_inst)
+
     if is_bottomless:
         utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)

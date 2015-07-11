@@ -538,9 +538,6 @@ class Item:
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
 
-        if data.id == 'ITEM_GOO':
-            print(data.info)
-
         all_config = get_config(
             data.info,
             data.zip_file,

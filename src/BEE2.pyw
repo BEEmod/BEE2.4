@@ -56,6 +56,8 @@ if __name__ == '__main__':
     }
     loadScreen.main_loader.set_length('UI', 9)
     loadScreen.main_loader.show()
+
+    GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
 
     show_errors = False
@@ -129,7 +131,7 @@ if __name__ == '__main__':
         print('Logging ' + repr(e) + '!')
 
         # Always log the exception into a file.
-        with open('../config/BEE2-error.log', 'a') as log:
+        with open('../BEE2-error.log', 'a') as log:
             log.write(ERR_FORMAT.format(
                 time=cur_time,
                 underline='=' * len(cur_time),

@@ -4,11 +4,11 @@ from configparser import ConfigParser
 
 
 class ConfigFile(ConfigParser):
-    def __init__(self, filename, root='../config'):
+    def __init__(self, filename, root='../config', auto_load=True):
         """Initialise the config file.
 
         filename is the name of the config file, in the 'root' directory.
-        This file will immediately be read and parsed.
+        If auto_load is true, this file will immediately be read and parsed.
         """
         super().__init__()
         self.filename = os.path.join(root, filename)
@@ -22,7 +22,7 @@ class ConfigFile(ConfigParser):
         try:
             with open(self.filename, 'r') as conf:
                 self.read_file(conf)
-        except FileNotFoundError:
+        except (FileNotFoundError, IOError):
             print('Config "' + self.filename + '" not found! Using defaults...')
             # If we fail, just continue - we just use the default values
         self.has_changed = False
@@ -32,6 +32,11 @@ class ConfigFile(ConfigParser):
         if self.filename is None:
             return
         self.has_changed = False
+        # Make sure the directory exists
+        folder = os.path.dirname(self.filename)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+
         with open(self.filename, 'w') as conf:
             self.write(conf)
 
@@ -115,4 +120,6 @@ class ConfigFile(ConfigParser):
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
     set.__doc__ = ConfigParser.set.__doc__
 
-GEN_OPTS = ConfigFile('config.cfg')
+# Define this here so app modules can easily acess the config
+# Don't load it though, since this is imported by VBSP too.
+GEN_OPTS = ConfigFile('config.cfg', auto_load=False)
