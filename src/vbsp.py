@@ -407,6 +407,7 @@ def load_map(map_path):
 
 @conditions.meta_cond(priority=100)
 def add_voice(inst):
+    """Add voice lines to the map."""
     if GAME_MODE == 'COOP':
         utils.con_log('Adding Coop voice lines!')
         data = settings['voice_data_coop']
@@ -427,7 +428,11 @@ def add_voice(inst):
 
 @conditions.meta_cond(priority=-200, only_once=False)
 def fix_fizz_models(inst):
-    """Fix some bugs with fizzler model instances."""
+    """Fix some bugs with fizzler model instances.
+    This removes extra numbers from model instances, which prevents
+    inputs from being read correctly.
+    It also rotates fizzler models so they are both facing the same way.
+    """
     # Fizzler model names end with this special string
     if ("_modelStart" in inst['targetname', ''] or
             "_modelEnd" in inst['targetname', '']):
@@ -453,15 +458,18 @@ def fix_fizz_models(inst):
 
 @conditions.meta_cond(priority=-100, only_once=False)
 def static_pan(inst):
+    """Switches glass angled panels to static instances, if needed."""
     if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
 @conditions.meta_cond(priority=200, only_once=True)
 def anti_fizz_bump(inst):
-    """Create portal_bumpers surrounding any fizzlers in the map.
+    """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
+    It is only applied to trigger_portal_cleansers with the Client flag
+    checked.
     """
     FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
     # giving 32 in total: the width of a fizzler model.

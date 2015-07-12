@@ -454,27 +454,34 @@ def add_suffix(inst, suff):
 
 @make_flag('debug')
 def debug_flag(inst, props):
+    """Displays text when executed, for debugging conditions.
+
+    If the text ends with an '=', the instance will also be displayed.
+    As a flag, this always evaluates as true.
+    """
     if props.has_children():
         utils.con_log('Debug:')
         utils.con_log(str(props))
         utils.con_log(str(inst))
-    elif props.value.endswith('='):
+    elif props.value.strip().endswith('='):
         utils.con_log('Debug: {props}{inst!s}'.format(
             inst=inst,
             props=props.value,
         ))
     else:
         utils.con_log('Debug: ' + props.value)
-    return True # The flag is always true
+    return True  # The flag is always true
 
 @make_result('debug')
 def debug_result(inst, props):
     # Swallow the return value, so the flag isn't deleted
     debug_flag(inst, props)
 
+debug_result.__doc__ = debug_flag.__doc__
+
 @meta_cond(priority=1000, only_once=False)
 def remove_blank_inst(inst):
-    """Remove instances with blank file attr.
+    """Remove instances with a blank file keyvalue.
 
     This allows conditions to strip the instances when requested.
     """
@@ -498,8 +505,9 @@ def fix_catapult_targets(inst):
 # FLAGS #
 #########
 
-@make_flag('and')
+@make_flag('AND')
 def flag_and(inst, flag):
+    """The AND group evaluates True if all sub-flags are True."""
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
             return False
@@ -507,43 +515,49 @@ def flag_and(inst, flag):
         return len(sub_flag.value) == 0
 
 
-@make_flag('or')
+@make_flag('OR')
 def flag_or(inst, flag):
+    """The OR group evaluates True if any sub-flags are True."""
     for sub_flag in flag:
         if check_flag(sub_flag, inst):
             return True
     return False
 
-@make_flag('not')
+@make_flag('NOT')
 def flag_not(inst, flag):
+    """The NOT group inverts the value of it's one sub-flag."""
     if len(flag.value) == 1:
         return not check_flag(flag[0], inst)
     return False
 
 
-@make_flag('nor')
+@make_flag('NOR')
 def flag_nor(inst, flag):
+    """The NOR group evaluates True if any sub-flags are False."""
     return not flag_or(inst, flag)
 
 
-@make_flag('nand')
+@make_flag('NAND')
 def flag_nand(inst, flag):
+    """The NAND group evaluates True if all sub-flags are False."""
     return not flag_and(inst, flag)
 
 
 @make_flag('instance')
 def flag_file_equal(inst, flag):
+    """Evaluates True if the instance matches the given file."""
     return inst['file'].casefold() in resolve_inst(flag.value)
 
 
-@make_flag('InstFlag', 'instpart')
+@make_flag('instFlag', 'InstPart')
 def flag_file_cont(inst, flag):
+    """Evaluates True if the instance contains the given portion."""
     return flag.value in inst['file'].casefold()
 
 
 @make_flag('hasInst')
 def flag_has_inst(_, flag):
-    """Return true if the filename is present anywhere in the map."""
+    """Checks if the given instance is present anywhere in the map."""
     flags = resolve_inst(flag.value)
     return any(
         inst in flags
@@ -554,22 +568,39 @@ def flag_has_inst(_, flag):
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
+    """Checks if the $replace value matches the given value.
+
+    The flag value follows the form "$start_enabled 1", with or without
+    the $.
+    """
     bits = flag.value.split(' ', 1)
     return inst.fixup[bits[0]] == bits[1]
 
 
 @make_flag('styleVar')
 def flag_stylevar(_, flag):
+    """Checks if the given Style Var is true.
+
+    Use the NOT flag to invert if needed.
+    """
     return STYLE_VARS[flag.value.casefold()]
 
 
 @make_flag('has')
 def flag_voice_has(_, flag):
+    """Checks if the given Voice Attribute is present.
+
+    Use the NOT flag to invert if needed.
+    """
     return VOICE_ATTR[flag.value.casefold()]
 
 
 @make_flag('has_music')
 def flag_music(_, flag):
+    """Checks the selected music ID.
+
+    Use "<NONE>" for no music.
+    """
     return OPTIONS['music_id'] == flag.value
 
 
@@ -585,12 +616,22 @@ def flag_option(_, flag):
 
 @make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(_, flag):
+    """Checks if the game mode is "SP" or "COOP".
+    """
     import vbsp
     return vbsp.GAME_MODE.casefold() == flag.value.casefold()
 
 
 @make_flag('ifPreview', 'preview')
 def flag_is_preview(_, flag):
+    """Checks if the preview mode status equals the given value.
+
+    If preview mode is enabled, the player will start before the entry
+    door, and restart the map after reaching the exit door. If false,
+    they start in the elevator.
+
+    Preview mode is always False when publishing.
+    """
     import vbsp
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
 
@@ -604,7 +645,17 @@ def flag_is_preview(_, flag):
     'direction',
 )
 def flag_angles(inst, flag):
-    """Check that a instance is pointed in a direction."""
+    """Check that a instance is pointed in a direction.
+
+    The value should be either just the angle to check, or a block of
+    options:
+    - Angle: A unit vector (XYZ value) pointing in a direction, or some
+        keywords: +z, -y, N/S/E/W, up/down, floor/ceiling, or walls
+    - From_dir: The direction the unrotated instance is pointed in.
+        This lets the flag check multiple directions
+    - Allow_inverse: If true, this also returns True if the instance is
+        pointed the opposite direction .
+    """
     angle = inst['angles', '0 0 0']
 
     if flag.has_children():
@@ -638,7 +689,6 @@ def flag_angles(inst, flag):
         return inst_normal == normal or (
             allow_inverse and -inst_normal == normal
         )
-
 ###########
 # RESULTS #
 ###########
@@ -658,6 +708,10 @@ def res_add_suffix(inst, res):
 
 @make_result('styleVar')
 def res_set_style_var(_, res):
+    """Set Style Vars.
+
+    The value should be set of "SetTrue" and "SetFalse" keyvalues.
+    """
     for opt in res.value:
         if opt.name == 'settrue':
             STYLE_VARS[opt.value.casefold()] = True
@@ -667,6 +721,11 @@ def res_set_style_var(_, res):
 
 @make_result('has')
 def res_set_voice_attr(_, res):
+    """Sets a number of Voice Attributes.
+
+        Each child property will be set. The value is ignored, but must
+        be present for syntax reasons.
+    """
     if res.has_children():
         for opt in res.value:
             VOICE_ATTR[opt.name] = True
@@ -677,6 +736,10 @@ def res_set_voice_attr(_, res):
 
 @make_result('setOption')
 def res_set_option(_, res):
+    """Set a value in the "options" part of VBSP_config.
+
+    Each child property will be set.
+    """
     for opt in res.value:
         if opt.name in OPTIONS:
             OPTIONS[opt.name] = opt.value
@@ -687,7 +750,7 @@ def res_set_option(_, res):
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
 
-    Pass either the variable name, or a set of value:suffix pairs for a
+    Pass either the variable name, or a set of value->suffix pairs for a
     lookup.
     """
     if res.has_children():
@@ -704,7 +767,10 @@ def res_add_inst_var(inst, res):
 
 @make_result('setInstVar')
 def res_set_inst_var(inst, res):
-    """Set an instance variable to the given value."""
+    """Set an instance variable to the given value.
+
+    Values follow the format "$start_enabled 1", with or without the $.
+    """
     var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = val
 
@@ -714,6 +780,14 @@ def res_add_variant(inst, res):
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form "_var4".
+    Two properties should be given:
+        Number: The number of random instances.
+        Weight: A comma-separated list of weights for each instance.
+    Any variant has a chance of weight/sum(weights) of being chosen:
+    A weight of "2, 1, 1" means the first instance has a 2/4 chance of
+    being chosen, and the other 2 have a 1/4 chance of being chosen.
+    The chosen variant depends on the position, direction and name of
+    the instance.
     """
     if inst['targetname', ''] == '':
         # some instances don't get names, so use the global
@@ -730,7 +804,16 @@ def res_add_variant(inst, res):
 def res_add_global_inst(_, res):
     """Add one instance in a location.
 
-    Once this is executed, it will be ignored thereafter.
+    Options:
+        allow_multiple: Allow multiple copies of this instance. If 0, the
+            instance will not be added if it was already added.
+        name: The targetname of the instance. IF blank, the instance will
+              be given a name of the form 'inst_1234'.
+        file: The filename for the instance.
+        Angles: The orientation of the instance (defaults to '0 0 0').
+        Origin: The location of the instance (defaults to '0 0 -10000').
+        Fixup_style: The Fixup style for the instance. '0' (default) is
+            Prefix, '1' is Suffix, and '2' is None.
     """
     if res.value is not None:
         if (
@@ -758,7 +841,15 @@ def res_add_global_inst(_, res):
 
 @make_result('addOverlay', 'overlayinst')
 def res_add_overlay_inst(inst, res):
-    """Add another instance on top of this one."""
+    """Add another instance on top of this one.
+
+    Values:
+        File: The filename.
+        Fixup Style: The Fixup style for the instance. '0' (default) is
+            Prefix, '1' is Suffix, and '2' is None.
+        Copy_Fixup: If true, all the $replace values from the original
+            instance will be copied over.
+    """
     print('adding overlay', res['file'])
     overlay_inst = VMF.create_ent(
         classname='func_instance',
@@ -849,6 +940,12 @@ def res_cust_antline(inst, res):
     """Customise the output antline texture, toggle instances.
 
     This allows adding extra outputs between the instance and the toggle.
+    Values:
+        straight: The straight overlay texture.
+        corner: The corner overlay texture.
+        instance: Use the given indicator_toggle instance instead
+        addOut: A set of additional ouputs to add, pointing at the
+        toggle instance
     """
     import vbsp
 
@@ -888,6 +985,13 @@ def res_cust_antline(inst, res):
 def res_faith_mods(inst, res):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
+    Values:
+        - raise_trig: Raise or lower the trigger_catapults by this amount.
+        - angled_targ, angled_in: Instance entity and input for angled plates
+        - straight_targ, straight_in: Instance entity and input for
+            straight plates
+        - instvar: A $replace value to set to either 'angled' or '
+            'straight'.
     """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
@@ -924,7 +1028,27 @@ def res_faith_mods(inst, res):
 
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
-    """Modify a fizzler item to allow for custom brush ents."""
+    """Customises the various components of a custom fizzler item.
+
+    This should be executed on the base instance. Brush and MakeLaserField
+    are ignored on laserfield barriers.
+    Options:
+        - ModelName: sets the targetname given to the model instances.
+        - UniqueModel: If true, each model instance will get a suffix to
+            allow unique targetnames.
+        - Brush: A brush entity that will be generated (the original is
+         deleted.)
+            - Name is the instance name for the brush
+            - Left/Right/Center/Short/Nodraw are the textures used
+            - Keys are a block of keyvalues to be set. Targetname and
+              Origin are auto-set.
+        - MakeLaserField generates a brush stretched across the whole
+          area.
+            - Name and keys are the same as the regular Brush.
+            - Texture/Nodraw are the textures.
+            - Width is the pixel width of the laser texture, used to
+              scale it correctly.
+    """
     from vbsp import TEX_FIZZLER
     model_name = res['modelname', None]
     make_unique = utils.conv_bool(res['UniqueModel', '0'])
@@ -1113,13 +1237,15 @@ def res_sub_condition(base_inst, res):
 def res_break(base_inst, res):
     """Skip to the next instance.
 
+    The value will be ignored.
     """
     raise NextInstance
 
 @make_result('endCondition')
 def res_end_condition(base_inst, res):
-    """Skip to the next condition
+    """Skip to the next condition.
 
+    The value will be ignored.
     """
     raise EndCondition
 
@@ -1135,7 +1261,13 @@ PAIR_AXES = {
 
 @make_result('fizzlerModelPair')
 def res_fizzler_pair(begin_inst, res):
-    """Modify the instance of a fizzler to link with its pair."""
+    """Modify the instance of a fizzler to link with its pair.
+
+    Each pair will be given a name along the lines of "fizz_name-model1334".
+    Values:
+        - StartInst, EndInst: The instances used for each end
+        - MidInst: An instance placed every 128 units between emitters.
+    """
     orig_target = begin_inst['targetname']
 
     if 'modelEnd' in orig_target:
@@ -1289,6 +1421,19 @@ def res_make_catwalk(_, res):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
+    Instances:
+        MarkerInst: The instance set in editoritems.
+        Straight_128/256/512: Straight sections. Extends East
+        Corner: A corner piece. Connects on N and W sides.
+        TJunction; A T-piece. Connects on all but the East side.
+        CrossJunction: A X-piece. Connects on all sides.
+        End: An end piece. Connects on the East side.
+        Stair: A stair. Starts East and goes Up and West.
+        End_wall: Connects a West wall to a East catwalk.
+        Support_Wall: A support extending from the East wall.
+        Support_Ceil: A support extending from the ceiling.
+        Support_Floor: A support extending from the floor.
+        Single_Wall: A section connecting to an East wall.
     """
     utils.con_log("Starting catwalk generator...")
     marker = resolve_inst(res['markerInst'])
@@ -1448,7 +1593,12 @@ def make_static_pist_setup(res):
 def make_static_pist(ent, res):
     """Convert a regular piston into a static version.
 
-    This is done to save entities and improve lighting."""
+    This is done to save entities and improve lighting.
+    Instances:
+        Bottom_1/2/3: Moving piston with the given $bottom_level
+        Logic_0/1/2/3: Additional logic instance for the given $bottom_level
+        Static_0/1/2/3/4: A static piston at the given height.
+    """
 
     bottom_pos = ent.fixup['bottom_level', '-1']
 
@@ -1490,6 +1640,16 @@ def res_track_plat(_, res):
     This allows switching the instances used depending on if the track
     is horizontal or vertical and sets the track
     targetnames to a useful value.
+    Values:
+        - Orig_item: The "<ITEM_ID>" for the track platform, with angle brackets
+        - Single_plat: An instance used for platform with 1 rail
+        - Track_name: The name to give to the tracks.
+        - Vert_suffix: Add suffixes to vertical tracks
+            (_vert, _vert_mirrored)
+        - Horiz_suffix: Add suffixes to horizontal tracks
+            (_horiz, _horiz_mirrored)
+        - plat_suffix: Also add the above _vert or _horiz suffixes to
+            the platform.
     """
     # Get the instances from editoritems
     (
