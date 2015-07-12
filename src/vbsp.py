@@ -1789,6 +1789,11 @@ def main():
     old_args = sys.argv[1:]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
+    if old_args[0].casefold() == '-dump_conditions':
+        # Print all the condition flags, results, and metaconditions
+        conditions.dump_conditions()
+        sys.exit()
+
     # Add styled/ to the list of directories for the new location
     path_dir, path_file = os.path.split(path)
     new_args[-1] = new_path = os.path.join(path_dir, 'styled', path_file)

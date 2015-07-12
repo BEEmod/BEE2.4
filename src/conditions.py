@@ -19,6 +19,11 @@ FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
 RESULT_SETUP = {}
 
+# Used to dump a list of the flags, results, meta-conds
+ALL_FLAGS = []
+ALL_RESULTS = []
+ALL_META = []
+
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
 yp = utils.Vec_tuple(0, 1, 0)
@@ -234,6 +239,7 @@ def add_meta(func, priority, only_once=True):
             Property('endCondition', '')
         )
     conditions.append(cond)
+    ALL_META.append((name, priority, func))
 
 
 def meta_cond(priority=0, only_once=True):
@@ -243,18 +249,26 @@ def meta_cond(priority=0, only_once=True):
         return func
     return x
 
-def make_flag(*names):
+def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func):
-        for name in names:
+        ALL_FLAGS.append(
+            (orig_name, aliases, func)
+        )
+        FLAG_LOOKUP[orig_name.casefold()] = func
+        for name in aliases:
             FLAG_LOOKUP[name.casefold()] = func
         return func
     return x
 
-def make_result(*names):
+def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
     def x(func):
-        for name in names:
+        ALL_RESULTS.append(
+            (orig_name, aliases, func)
+        )
+        RESULT_LOOKUP[orig_name.casefold()] = func
+        for name in aliases:
             RESULT_LOOKUP[name.casefold()] = func
         return func
     return x
@@ -324,7 +338,6 @@ def check_inst(inst):
         condition.test(inst)
 
 
-
 def check_flag(flag, inst):
     # print('Checking {type} ({val!s} on {inst}'.format(
     #     type=flag.real_name,
@@ -339,6 +352,50 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
+def dump_conditions():
+    """Print a list of all the condition flags, results, metaconditions
+
+    to the screen, and then quit.
+    """
+
+    utils.con_log('Dumping conditions:')
+    utils.con_log('-------------------')
+
+    for lookup, name in [
+            (ALL_FLAGS, 'Flags'),
+            (ALL_RESULTS, 'Results'),
+            ]:
+        utils.con_log(name + ':')
+        utils.con_log('-'*len(name) + '-')
+        lookup.sort()
+        for flag_key, aliases, func in lookup:
+            utils.con_log('"{}":'.format(flag_key))
+            if aliases:
+                utils.con_log('\tAliases: "' + '", "'.join(aliases) + '"')
+            dump_func_docs(func)
+        input('...')
+        utils.con_log('')
+
+    utils.con_log('MetaConditions:')
+    utils.con_log('---------------')
+    ALL_META.sort(key=lambda i: i[1]) # Sort by priority
+    for flag_key, priority, func in ALL_META:
+        utils.con_log('{} ({}):'.format(flag_key, priority))
+        dump_func_docs(func)
+        utils.con_log('')
+
+
+def dump_func_docs(func):
+    import inspect
+    docs = inspect.getdoc(func)
+    if docs:
+        for line in docs.split('\n'):
+            if line.strip():
+                utils.con_log('\t'+line.rstrip('\n'))
+    else:
+        utils.con_log('\tNo documentation!')
+
 
 @make_result_setup('variant')
 def variant_weight(var):
