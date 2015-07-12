@@ -540,6 +540,68 @@ def anti_fizz_bump(inst):
     utils.con_log('Done!')
 
 
+@conditions.meta_cond(priority=500, only_once=True)
+def set_player_portalgun(inst):
+    """Controls which portalgun the player will be given.
+
+    This does not apply to coop. It checks the 'blueportal' and
+    'orangeportal' attributes to see what are in the map.
+    - If there are no spawners in the map, the player gets a dual portal
+      device.
+    - If there are only blue portal spawners, the player gets a orange-only
+      gun.
+    - If there are only orange portal spawners, the player gets a blue-
+      only gun (Regular single portal device)
+    - If there are both spawner types, the player doesn't get a gun.
+    """
+    if GAME_MODE == 'COOP':
+        return  # Don't change portalgun in coop
+
+    utils.con_log('Setting Portalgun:')
+
+    has = settings['has_attr']
+
+    blue_portal = not has['blueportal']
+    oran_portal = not has['orangeportal']
+
+    utils.con_log('Blue: {}, Orange: {!s}'.format(
+        'Y' if blue_portal else 'N',
+        'Y' if oran_portal else 'N',
+    ))
+
+    if blue_portal and oran_portal:
+        has['spawn_dual'] = True
+        has['spawn_single'] = False
+        has['spawn_nogun'] = False
+    elif blue_portal or oran_portal:
+        has['spawn_dual'] = False
+        has['spawn_single'] = True
+        has['spawn_nogun'] = False
+        inst = VMF.create_ent(
+            classname='func_instance',
+            targetname='pgun_logic',
+            origin=get_opt('global_pti_ents_loc'),  # Reuse this location
+            angles='0 0 0',
+            file='instances/BEE2/logic/pgun/pgun_single.vmf',
+        )
+        # Set which portals this weapon_portalgun can fire
+        inst.fixup['blue_portal'] = utils.bool_as_int(blue_portal)
+        inst.fixup['oran_portal'] = utils.bool_as_int(oran_portal)
+    else:
+        has['spawn_dual'] = False
+        has['spawn_single'] = False
+        has['spawn_nogun'] = True
+        # This instance only has a trigger_weapon_strip.
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='pgun_logic',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+            file='instances/BEE2/logic/pgun/no_pgun.vmf',
+        )
+    utils.con_log('Done!')
+
+
 def get_map_info():
     """Determine various attributes about the map.
 
