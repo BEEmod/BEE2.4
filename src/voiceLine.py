@@ -34,7 +34,7 @@ def find_group_quotes(group, mid_quotes, conf):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name == 'instance' or name == 'priority':
+            if name in ('instance', 'priority', 'name'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
