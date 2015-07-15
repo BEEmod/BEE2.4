@@ -91,6 +91,17 @@ def add_quote(quote, targetname, quote_loc):
                 message=prop.value,
                 health='10',  # Volume
             )
+        elif name == 'bullseye':
+            # Cave's voice lines require a special named bullseye to
+            # work correctly.
+            VMF.create_ent(
+                classname='npc_bullsye',
+                # Not solid, Take No Damage, Think outside PVS
+                spawnflags='222224',
+                targetname=prop.value,
+                origin=quote_loc,
+                angles='0 0 0',
+            )
 
 
 def sort_func(quote):
@@ -114,10 +125,10 @@ def add_voice(
         ):
     """Add a voice line to the map."""
     global ALLOW_MID_VOICES, VMF, map_attr, style_vars
-    print('Adding Voice!')
+    utils.con_log('Adding Voice Lines!')
 
     if len(voice_data.value) == 0:
-        print('No Data!')
+        utils.con_log('Error - No Voice Line Data!')
         return
 
     VMF = vmf_file
@@ -183,7 +194,7 @@ def add_voice(
             # Add one of the associated quotes
             add_quote(random.choice(chosen), quote_targetname, choreo_loc)
 
-    print('mid quotes: ', mid_quotes)
+    print('Mid quotes: ', mid_quotes)
     for mid_item in mid_quotes:
         # Add all the mid quotes
         target = mid_item['target', '']
