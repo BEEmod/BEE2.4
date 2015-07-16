@@ -106,6 +106,30 @@ def add_quote(quote, targetname, quote_loc):
                 message=prop.value,
                 health='10',  # Volume
             )
+        elif name == 'ambientchoreo':
+            # For some lines, they don't play globally. Workaround this
+            # by placing an ambient_generic and choreo ent, and play the
+            # sound when the choreo starts.
+            VMF.create_ent(
+                classname='ambient_generic',
+                spawnflags='49',  # Infinite Range, Starts Silent
+                targetname=targetname + '_snd',
+                origin=quote_loc,
+                message=prop['File'],
+                health='10',  # Volume
+            )
+
+            choreo = VMF.create_ent(
+                classname='logic_choreographed_scene',
+                targetname=targetname,
+                origin=quote_loc,
+                scenefile=prop.value,
+                busyactor="1",  # Wait for actor to stop talking
+                onplayerdeath='0',
+            )
+            choreo.outputs.append(
+                vmfLib.Output('OnStart', targetname + '_snd', 'PlaySound')
+            )
         elif name == 'bullseye':
             # Cave's voice lines require a special named bullseye to
             # work correctly.
@@ -117,6 +141,11 @@ def add_quote(quote, targetname, quote_loc):
                 origin=quote_loc,
                 angles='0 0 0',
             )
+        elif name == 'setstylevar':
+            # Set this stylevar to True
+            # This is useful so some styles can react to which line was
+            # chosen.
+            style_vars[prop.value.casefold()] = True
 
 
 def sort_func(quote):
