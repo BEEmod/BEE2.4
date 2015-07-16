@@ -27,7 +27,7 @@ settings = {
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
 
-    "voice_data_sp":   Property("Quotes", []),
+    "voice_data":   Property("Quotes", []),
     }
 
 
