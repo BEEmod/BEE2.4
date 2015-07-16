@@ -23,13 +23,11 @@ settings = {
     "fizzler":        {},
     "options":        {},
     "pit":            {},
-    "deathfield":     {},
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
 
-    "voice_data_sp":   Property("Quotes_SP", []),
-    "voice_data_coop": Property("Quotes_COOP", []),
+    "voice_data_sp":   Property("Quotes", []),
     }
 
 
@@ -143,8 +141,6 @@ DEFAULTS = {
     # Reset offsets for all white/black brushes, so embedface has correct
     # texture matching
     "tile_texture_lock":        "1",
-
-    "no_mid_voices":            "0",  # Remove the midpoint voice lines
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -339,11 +335,8 @@ def load_settings():
         for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
-    for quote_block in conf.find_all("quotes_sp"):
-        settings['voice_data_sp'] += quote_block.value
-
-    for quote_block in conf.find_all("quotes_coop"):
-        settings['voice_data_coop'] += quote_block.value
+    for quote_block in conf.find_all("quotes"):
+        settings['voice_data'] += quote_block.value
 
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
@@ -408,17 +401,8 @@ def load_map(map_path):
 @conditions.meta_cond(priority=100)
 def add_voice(inst):
     """Add voice lines to the map."""
-    if GAME_MODE == 'COOP':
-        utils.con_log('Adding Coop voice lines!')
-        data = settings['voice_data_coop']
-    elif GAME_MODE == 'SP':
-        utils.con_log('Adding Singleplayer voice lines!')
-        data = settings['voice_data_sp']
-    else:
-        return
-
     voiceLine.add_voice(
-        voice_data=data,
+        voice_data=settings['voice_data'],
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,

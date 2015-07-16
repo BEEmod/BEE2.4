@@ -12,6 +12,7 @@ map_attr = {}
 style_vars = {}
 
 ALLOW_MID_VOICES = False
+GAME_MODE = 'ERR'
 VMF = None
 
 INST_PREFIX = 'instances/BEE2/voice/'
@@ -26,7 +27,21 @@ fake_inst = vmfLib.VMF().create_ent(
 )
 
 
+def mode_quotes(prop_block):
+    """Get the quotes from a block which match the game mode."""
+    is_sp = GAME_MODE == 'SP'
+    for prop in prop_block:
+        if prop.name == 'line':
+            # Ones that apply to both modes
+            yield prop
+        elif prop.name == 'sp_line' and is_sp:
+            yield prop
+        elif prop.name == 'coop_line' and not is_sp:
+            yield prop
+
+
 def find_group_quotes(group, mid_quotes, conf):
+    """Scan through a group, looking for applicable quote options."""
     is_mid = group.name == 'midinst'
     group_id = group['name']
 
@@ -34,7 +49,7 @@ def find_group_quotes(group, mid_quotes, conf):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name in ('instance', 'priority', 'name'):
+            if name in ('priority', 'name', 'line', 'sp_line', 'coop_line'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
@@ -49,9 +64,9 @@ def find_group_quotes(group, mid_quotes, conf):
             # Check if the ID is enabled!
             if conf.get_bool(group_id, quote_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.extend(quote.find_all('instance'))
+                    mid_quotes.extend(mode_quotes(quote))
                 else:
-                    inst_list = list(quote.find_all('instance'))
+                    inst_list = list(mode_quotes(quote))
                     if inst_list:
                         yield (
                             quote['priority', '0'],
@@ -124,7 +139,7 @@ def add_voice(
         mode='SP',
         ):
     """Add a voice line to the map."""
-    global ALLOW_MID_VOICES, VMF, map_attr, style_vars
+    global ALLOW_MID_VOICES, VMF, map_attr, style_vars, GAME_MODE
     utils.con_log('Adding Voice Lines!')
 
     if len(voice_data.value) == 0:
@@ -134,13 +149,10 @@ def add_voice(
     VMF = vmf_file
     map_attr = has_items
     style_vars = style_vars_
+    GAME_MODE = mode
 
-    if mode == 'SP':
-        norm_config = ConfigFile('SP.cfg', root='bee2')
-        mid_config = ConfigFile('MID_SP.cfg', root='bee2')
-    else:
-        norm_config = ConfigFile('COOP.cfg', root='bee2')
-        mid_config = ConfigFile('MID_COOP.cfg', root='bee2')
+    norm_config = ConfigFile('SP.cfg', root='bee2')
+    mid_config = ConfigFile('MID_SP.cfg', root='bee2')
 
     quote_base = voice_data['base', False]
     quote_loc = voice_data['quote_loc', '-10000 0 0']
