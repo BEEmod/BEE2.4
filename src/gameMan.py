@@ -313,11 +313,13 @@ class Game:
         )
 
         # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children('Conditions',
-                                   'InstanceFiles',
-                                   'Options',
-                                   'StyleVars',
-                                   'Textures')
+        vbsp_config.merge_children(
+            'Conditions',
+            'StyleVars',
+            'Textures',
+            'Voice',
+            'Options',
+        )
 
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [
