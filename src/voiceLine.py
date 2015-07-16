@@ -11,6 +11,8 @@ import vmfLib
 map_attr = {}
 style_vars = {}
 
+ADDED_BULLSEYES = set()
+
 ALLOW_MID_VOICES = False
 GAME_MODE = 'ERR'
 VMF = None
@@ -34,9 +36,9 @@ def mode_quotes(prop_block):
         if prop.name == 'line':
             # Ones that apply to both modes
             yield prop
-        elif prop.name == 'sp_line' and is_sp:
+        elif prop.name == 'line_sp' and is_sp:
             yield prop
-        elif prop.name == 'coop_line' and not is_sp:
+        elif prop.name == 'line_coop' and not is_sp:
             yield prop
 
 
@@ -49,7 +51,7 @@ def find_group_quotes(group, mid_quotes, conf):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name in ('priority', 'name', 'line', 'sp_line', 'coop_line'):
+            if name in ('priority', 'name', 'line', 'line_sp', 'line_coop'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
@@ -119,11 +121,16 @@ def add_quote(quote, targetname, quote_loc):
                 health='10',  # Volume
             )
 
+            c_line = prop['choreo']
+            # Add this to the beginning, since all scenes need it...
+            if not c_line.startswith('scenes/'):
+                c_line = 'scenes/' + c_line
+
             choreo = VMF.create_ent(
                 classname='logic_choreographed_scene',
                 targetname=targetname,
                 origin=quote_loc,
-                scenefile=prop.value,
+                scenefile=c_line,
                 busyactor="1",  # Wait for actor to stop talking
                 onplayerdeath='0',
             )
@@ -133,14 +140,18 @@ def add_quote(quote, targetname, quote_loc):
         elif name == 'bullseye':
             # Cave's voice lines require a special named bullseye to
             # work correctly.
-            VMF.create_ent(
-                classname='npc_bullsye',
-                # Not solid, Take No Damage, Think outside PVS
-                spawnflags='222224',
-                targetname=prop.value,
-                origin=quote_loc,
-                angles='0 0 0',
-            )
+
+            # Don't add the same one more than once.
+            if prop.value not in ADDED_BULLSEYES:
+                VMF.create_ent(
+                    classname='npc_bullseye',
+                    # Not solid, Take No Damage, Think outside PVS
+                    spawnflags='222224',
+                    targetname=prop.value,
+                    origin=quote_loc,
+                    angles='0 0 0',
+                )
+                ADDED_BULLSEYES.add(prop.value)
         elif name == 'setstylevar':
             # Set this stylevar to True
             # This is useful so some styles can react to which line was
