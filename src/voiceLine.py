@@ -91,6 +91,12 @@ def add_quote(quote, targetname, quote_loc):
                 fixup_style='2',  # No fixup
             )
         elif name == 'choreo':
+
+            c_line = prop.value
+            # Add this to the beginning, since all scenes need it...
+            if not c_line.startswith('scenes/'):
+                c_line = 'scenes/' + c_line
+
             VMF.create_ent(
                 classname='logic_choreographed_scene',
                 targetname=targetname,
