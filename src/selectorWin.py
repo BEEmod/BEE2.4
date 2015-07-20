@@ -195,7 +195,13 @@ class selWin:
         self.win.bind("<Escape>", self.exit)
 
         # PanedWindow allows resizing the two areas independently.
-        self.pane_win = ttk.Panedwindow(self.win, orient=HORIZONTAL)
+        self.pane_win = PanedWindow(
+            self.win,
+            orient=HORIZONTAL,
+            sashpad=2,  # Padding above/below panes
+            sashwidth=3,  # Width of border
+            sashrelief=RAISED,  # Raise the border between panes
+        )
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
 
         self.wid = {}
@@ -382,8 +388,18 @@ class selWin:
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-        self.pane_win.add(shim, weight=1)
+        self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
+
+        # Force a minimum size for the two parts
+        self.pane_win.paneconfigure(shim, minsize=100, stretch='always')
+        self.prop_frm.update_idletasks()  # Update reqwidth()
+        self.pane_win.paneconfigure(
+            self.prop_frm,
+            minsize=200,
+            stretch='never',
+        )
+
 
     def widget(self, frame) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
