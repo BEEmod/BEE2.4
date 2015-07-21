@@ -371,8 +371,8 @@ def init_widgets():
             image=png.png('BEE2/alpha_64'),
         )
         wid['subitem'][i].grid(row=0, column=i)
-        wid['subitem'][i].bind('<Button-1>', functools.partial(sub_sel, i))
-        wid['subitem'][i].bind('<Button-3>', functools.partial(sub_open, i))
+        wid['subitem'][i].bind(utils.EVENTS['LEFT'], functools.partial(sub_sel, i))
+        wid['subitem'][i].bind(utils.EVENTS['RIGHT'], functools.partial(sub_open, i))
 
     wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
     wid['wip_dep'].grid(row=4, column=0, sticky="NW")

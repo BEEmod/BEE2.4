@@ -9,6 +9,7 @@ import img as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from SubPane import SubPane
+import utils
 
 MAX_ENTS = 2048
 MAX_OVERLAY = 512
@@ -231,7 +232,7 @@ def make_pane(tool_frame):
         textvariable=cust_file_loc_var,
         width=15,
     )
-    UI['thumb_custom_file'].bind("<Button-1>", find_screenshot)
+    UI['thumb_custom_file'].bind(utils.EVENTS['LEFT'], find_screenshot)
     UI['thumb_custom_file'].bind("<Key>", set_screenshot_text)
 
     UI['thumb_custom_btn'] = ttk.Button(

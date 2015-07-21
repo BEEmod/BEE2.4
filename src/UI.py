@@ -1,3 +1,4 @@
+# coding=utf-8
 from tkinter import *  # ui library
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -64,6 +65,7 @@ item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
 # versions, etc
 
+
 class Item:
     """Represents an item that can appear on the list."""
     __slots__ = [
@@ -88,9 +90,13 @@ class Item:
     def __init__(self, item):
         self.ver_list = sorted(item.versions.keys())
 
-        self.selected_ver = item_opts.get_val(item.id, 'sel_version', item.def_ver['id'])
+        self.selected_ver = item_opts.get_val(
+            item.id,
+            'sel_version',
+            item.def_ver['id'],
+        )
         if self.selected_ver not in item.versions:
-            self.selected_ver = self.def_ver['id']
+            self.selected_ver = self.item.def_ver['id']
 
         self.item = item
         self.def_data = self.item.def_ver['def_style']
@@ -297,18 +303,20 @@ class PalItem(Label):
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
-        self.bind("<Button-3>", contextWin.open_event)
-        self.bind("<Button-1>", drag_start)
-        self.bind("<Shift-Button-1>", drag_fast)
+        self.bind(utils.EVENTS['RIGHT'], contextWin.open_event)
+        self.bind(utils.EVENTS['LEFT'], drag_start)
+        self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
     def rollover(self, _):
+        """Show the name of a subitem when moused over."""
         set_disp_name(self)
         self.lift()
         self['relief'] = 'ridge'
 
     def rollout(self, _):
+        """Reset the item name display when the mouse leaves."""
         clear_disp_name()
         self['relief'] = 'flat'
 
@@ -408,6 +416,7 @@ def quit_application():
     TK_ROOT.destroy()
     exit(0)
 gameMan.quit_app = quit_application
+
 
 def load_palette(data):
     """Import in all defined palettes."""
@@ -590,6 +599,7 @@ def load_packages(data):
             GEN_OPTS.get_val('Last_Selected', opt_name, default)
         )
 
+
 def reposition_panes():
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
@@ -628,6 +638,7 @@ def reposition_panes():
     style_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
+
 
 def reset_panes():
     reposition_panes()
@@ -716,7 +727,6 @@ def export_editoritems(_=None):
         message='Selected Items and Style successfully exported!',
         )
 
-
     for pal in palettes[:]:
         if pal.name == '<Last Export>':
             palettes.remove(pal)
@@ -793,7 +803,7 @@ def drag_start(e):
     # NOTE: _global means no other programs can interact, make sure
     # it's released eventually or you won't be able to quit!
     drag_move(e)  # move to correct position
-    drag_win.bind("<B1-Motion>", drag_move)
+    drag_win.bind(utils.EVENTS['LEFT_MOVE'], drag_move)
     UI['pre_sel_line'].lift()
 
 
@@ -1118,12 +1128,12 @@ def init_option(f):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
 
-    def suggested_style_mousein(e):
+    def suggested_style_mousein(_):
         """When mousing over the button, show the suggested items."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.rollover_suggest()
 
-    def suggested_style_mouseout(e):
+    def suggested_style_mouseout(_):
         """Return text to the normal value on mouseout."""
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.set_disp()
@@ -1459,7 +1469,7 @@ def init_drag_icon():
     drag_win.withdraw()
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
-    drag_win.bind("<ButtonRelease-1>", drag_stop)
+    drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = Label(
         drag_win,
         image=img.png('BEE2/blank'),
@@ -1492,10 +1502,11 @@ def init_menu_bar(win):
     file_menu = menus['file']
     bar.add_cascade(menu=file_menu, label='File')
 
-    file_menu.add_command(
+    UI['menu_export_button'] = file_menu.add_command(
         label="Export",
         command=export_editoritems,
-        accelerator='Ctrl-E',
+        accelerator=utils.KEY_ACCEL['KEY_EXPORT'],
+        # This will be enabled when the resources have been unpacked
         state=DISABLED,
         )
 
@@ -1535,19 +1546,19 @@ def init_menu_bar(win):
     pal_menu.add_command(
         label='Save Palette',
         command=pal_save,
-        accelerator='Ctrl-S',
+        accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
         )
     pal_menu.add_command(
         label='Save Palette As...',
         command=pal_save_as,
-        accelerator='Ctrl-Shift-S'
+        accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
     pal_menu.add_separator()
 
     # refresh_pal_ui() adds the palette menu options here.
 
-    win.bind_all('<Control-s>', pal_save)
-    win.bind_all('<Control-Shift-s>', pal_save_as)
+    win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
+    win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
 
     menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
     bar.add_cascade(menu=menus['help'], label='Help')
@@ -1710,10 +1721,10 @@ def init_windows():
         )
 
     # When clicking on any window hide the context window
-    TK_ROOT.bind("<Button-1>", contextWin.hide_context)
-    StyleVarPane.window.bind("<Button-1>", contextWin.hide_context)
-    windows['opt'].bind("<Button-1>", contextWin.hide_context)
-    windows['pal'].bind("<Button-1>", contextWin.hide_context)
+    TK_ROOT.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    StyleVarPane.window.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    windows['opt'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    windows['pal'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
@@ -1808,10 +1819,9 @@ def init_windows():
         # that way it resizes automatically.
         windows['opt'].save_conf()
         windows['opt'].load_conf()
-        menus['file'].entryconfigure(2, state=NORMAL)
-        TK_ROOT.bind_all('<Control-e>', export_editoritems)
+        menus['file'].entryconfigure(UI['menu_export_button'], state=NORMAL)
+        TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
         print('Done extracting resources!')
-
     extract_packages.done_callback = copy_done_callback
 
     style_win.callback = style_select_callback

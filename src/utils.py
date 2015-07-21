@@ -1,3 +1,4 @@
+# coding=utf-8
 import math
 import string
 import collections.abc as abc
@@ -5,11 +6,86 @@ from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
 
+
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
+
+if WIN:
+    # Some events differ on different systems, so define them here.
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+
+        'KEY_EXPORT': '<Control-e>',
+        'KEY_SAVE_AS': '<Control-s>',
+        'KEY_SAVE': '<Control-Shift-s>',
+    }
+    # The text used to show shortcuts in menus.
+    KEY_ACCEL = {
+        'KEY_EXPORT': 'Ctrl-E',
+        'KEY_SAVE': 'Ctrl-S',
+        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+    }
+elif MAC:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+
+        'KEY_EXPORT': '<Command-e>',
+        'KEY_SAVE_AS': '<Command-s>',
+        'KEY_SAVE': '<Command-Shift-s>',
+    }
+
+    KEY_ACCEL = {
+        # \u2318 = Command Key
+        'KEY_EXPORT': '\u2318-E',
+        'KEY_SAVE': '\u2318-S',
+        'KEY_SAVE_AS': '\u2318-Shift-S',
+    }
+elif LINUX:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+
+        'KEY_EXPORT': '<Control-e>',
+        'KEY_SAVE_AS': '<Control-s>',
+        'KEY_SAVE': '<Control-Shift-s>',
+    }
+    KEY_ACCEL = {
+        'KEY_EXPORT': 'Ctrl-E',
+        'KEY_SAVE': 'Ctrl-S',
+        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+    }
 
 BOOL_LOOKUP = {
     '1': True,
@@ -22,6 +98,10 @@ BOOL_LOOKUP = {
 
 
 class CONN_TYPES(Enum):
+    """Possible connections when joining things together.
+
+    Used for things like catwalks, and bottomless pit sides.
+    """
     none = 0
     side = 1  # Points E
     straight = 2  # Points E-W
@@ -162,7 +242,10 @@ def conv_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
+
 DISABLE_ADJUST = False
+
+
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     """Adjust a window position to ensure it fits inside the screen."""
     if DISABLE_ADJUST:  # Allow disabling this adjustment
@@ -200,6 +283,7 @@ def append_bothsides(deq):
     while True:
         deq.append((yield))
         deq.appendleft((yield))
+
 
 def fit(dist, obj):
     """Figure out the smallest number of parts to stretch a distance."""
@@ -263,8 +347,11 @@ class EmptyMapping(abc.Mapping):
     def keys(self):
         return self
 
-EmptyMapping = EmptyMapping() # We only need the one instance
+EmptyMapping = EmptyMapping()  # We only need the one instance
+
+
 Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
+
 
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
@@ -463,7 +550,6 @@ class Vec:
                 return NotImplemented
     __rmul__ = __mul__
 
-
     def __div__(self, other):
         """Divide the Vector by a scalar.
 
@@ -546,7 +632,6 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-
     def __iadd__(self, other):
         """+= operation.
 
@@ -618,7 +703,6 @@ class Vec:
             self.y /= other
             self.z /= other
             return self
-
 
     def __ifloordiv__(self, other):
         """//= operation.
@@ -803,16 +887,13 @@ class Vec:
             delim=delim,
         )
 
-
     def __str__(self):
         """Return a user-friendly representation of this vector."""
         return "(" + self.join() + ")"
 
-
     def __repr__(self):
         """Code required to reproduce this vector."""
         return self.__class__.__name__ + "(" + self.join() + ")"
-
 
     def __iter__(self):
         """Allow iterating through the dimensions."""

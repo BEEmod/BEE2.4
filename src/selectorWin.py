@@ -384,7 +384,8 @@ class selWin:
                 "<Button-1>",
                 functools.partial(self.sel_item, item),
             )
-            item.button.bind("<Double-Button-1>", self.save)
+            print(utils.EVENTS['LEFT_DOUBLE'], self.save)
+            item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -413,9 +414,9 @@ class selWin:
             textvariable=self.disp_label,
             cursor='arrow',
         )
-        self.display.bind("<Button-1>", self.open_win)
+        self.display.bind(utils.EVENTS['LEFT'], self.open_win)
         self.display.bind("<Key>", self.set_disp)
-        self.display.bind("<Button-3>", self.open_context)
+        self.display.bind(utils.EVENTS['RIGHT'], self.open_context)
 
         self.disp_btn = ttk.Button(
             self.display,

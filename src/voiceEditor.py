@@ -377,7 +377,7 @@ if __name__ == '__main__':
 
     TK_ROOT = Tk()
     lab = ttk.Label(TK_ROOT, text='Root Window')
-    lab.bind('<Button-1>', lambda e: show(d['BEE2_CAVE_50s']))
+    lab.bind(utils.EVENTS['LEFT'], lambda e: show(d['BEE2_CAVE_50s']))
     lab.grid()
     init_widgets()
     d = {quote.id: quote for quote in data['QuotePack']}
