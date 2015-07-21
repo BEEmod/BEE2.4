@@ -12,8 +12,10 @@ class ConfigFile(ConfigParser):
         """
         super().__init__()
         self.filename = os.path.join(root, filename)
-        self.load()
         self.has_changed = False
+
+        if auto_load:
+            self.load()
 
     def load(self):
         if self.filename is None:
