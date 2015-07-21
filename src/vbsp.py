@@ -1203,10 +1203,13 @@ def switch_glass_inst(origin, new_file):
                 ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
-            inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
+            inst_ang = Vec.from_str
             # The brush parts are on this side!
-            rot = Vec(-1, 0, 0).rotate(
-                inst_ang.x, inst_ang.y, inst_ang.z
+            rot = Vec(-1, 0, 0).rotate_by_str(
+                inst['angles', ''],
+                45,
+                45,
+                45,
             )
             if rot == direction:
                 if targ is None:
@@ -1445,8 +1448,7 @@ def set_antline_mat(over, mat, raw_mat=False):
         if get_tex('overlay.' + mat + 'floor') != '':
             # For P1 style, check to see if the antline is on the floor or
             # walls.
-            ang = Vec.from_str(over['angles'])
-            direction = Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z)
+            direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
             if direction == (0, 0, 1) or direction == (0, 0, -1):
                 mat += 'floor'
 

@@ -243,6 +243,31 @@ def conv_int(val, default=0):
         return default
 
 
+def parse_str(val, x=0.0, y=0.0, z=0.0):
+    """Convert a string in the form '(4 6 -4)' into a set of floats.
+
+     If the string is unparsable, this uses the defaults (x,y,z).
+     The string can start with any of the (), {}, [], <> bracket
+     types.
+     """
+    parts = val.split(' ')
+    if len(parts) == 3:
+        # Strip off the brackets if present
+        if parts[0][0] in '({[<':
+            parts[0] = parts[0][1:]
+        if parts[2][-1] in ')}]>':
+            parts[2] = parts[2][:-1]
+        try:
+            return (
+                float(parts[0]),
+                float(parts[1]),
+                float(parts[2]),
+            )
+        except ValueError:
+            return x, y, z
+    else:
+        return x, y, z
+
 DISABLE_ADJUST = False
 
 
@@ -392,30 +417,15 @@ class Vec:
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val, x=0, y=0, z=0):
-        """Convert a string in the form '(4 6 -4)' into a vector.
+    def from_str(cls, val, x=0.0, y=0.0, z=0.0):
+        """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
          The string can start with any of the (), {}, [], <> bracket
          types.
          """
-        parts = val.split(' ')
-        if len(parts) == 3:
-            # strip off the brackets if present
-            if parts[0][0] in '({[<':
-                parts[0] = parts[0][1:]
-            if parts[2][-1] in ')}]>':
-                parts[2] = parts[2][:-1]
-            try:
-                return cls(
-                    float(parts[0]),
-                    float(parts[1]),
-                    float(parts[2]),
-                )
-            except ValueError:
-                return cls(x, y, z)
-        else:
-            return cls(x, y, z)
+        x, y, z = parse_str(val, x, y, z)
+        return cls(x, y, z)
 
     def mat_mul(self, matrix):
         """Multiply this vector by a 3x3 rotation matrix.
@@ -430,7 +440,7 @@ class Vec:
         self.z = x*g + y*h + z*i
         return self
 
-    def rotate(self, pitch=0, yaw=0, roll=0, round_vals=True):
+    def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
         Returns the vector, so you can use it in the form
         val = Vec(0,1,0).rotate(p, y, r)
@@ -481,6 +491,16 @@ class Vec:
             self.z = round(self.z, 3)
 
         return self
+
+    def rotate_by_str(self, ang, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
+        """Rotate a vector, using a string instead of a vector."""
+        pitch, yaw, roll = parse_str(ang, pitch, yaw, roll)
+        return self.rotate(
+            pitch,
+            yaw,
+            roll,
+            round_vals,
+        )
 
     def __add__(self, other):
         """+ operation.

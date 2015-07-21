@@ -679,8 +679,7 @@ def flag_angles(inst, flag):
         return False  # If it's not a special angle,
         # so it failed the exact match
 
-    angle = Vec.from_str(angle, 0, 0, 0)
-    inst_normal = from_dir.rotate(angle.x, angle.y, angle.z)
+    inst_normal = from_dir.rotate_by_str(angle)
 
     if normal == 'WALL':
         # Special case - it's not on the floor or ceiling
@@ -997,8 +996,7 @@ def res_faith_mods(inst, res):
     fixup_var = res['instvar', '']
     offset = utils.conv_int(res['raise_trig', '0'])
     if offset:
-        angle = Vec.from_str(inst['angles', '0 0 0'])
-        offset = Vec(0, 0, offset).rotate(angle.x, angle.y, angle.z)
+        offset = Vec(0, 0, offset).rotate_by_str(inst['angles', '0 0 0'])
         ':type offset Vec'
     for trig in VMF.by_class['trigger_catapult']:
         if inst['targetname'] in trig['targetname']:
@@ -1288,10 +1286,7 @@ def res_fizzler_pair(begin_inst, res):
     begin_inst['file'] = begin_file
     begin_inst['targetname'] = pair_name
 
-    angles = Vec.from_str(begin_inst['angles'])
-    # We round it to get rid of 0.00001 inprecision from the calculations.
-    direction = Vec(0, 0, 1).rotate(angles.x, angles.y, angles.z)
-    ':type direction: utils.Vec'
+    direction = Vec(0, 0, 1).rotate_by_str(begin_inst['angles'])
 
     begin_pos = Vec.from_str(begin_inst['origin'])
     axis_1, axis_2, main_axis = PAIR_AXES[direction.as_tuple()]
@@ -1528,11 +1523,10 @@ def res_make_catwalk(_, res):
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
         print(inst['targetname'], dir_mask)
-        angle = Vec.from_str(inst['angles'], 0, 0, 0)
         new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
 
-        normal = Vec(0, 0, 1).rotate(angle.x, angle.y, angle.z)
+        normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
         ':type normal: Vec'
 
         if new_type is utils.CONN_TYPES.side:
@@ -1685,10 +1679,9 @@ def res_track_plat(_, res):
         utils.con_log('Modifying "' + plat_inst['targetname'] + '"!')
 
         plat_loc = Vec.from_str(plat_inst['origin'])
-        angles = Vec.from_str(plat_inst['angles'])
         # The direction away from the wall/floor/ceil
         normal = Vec(0, 0, 1).rotate(
-            angles.x, angles.y, angles.z
+            plat_inst['angles']
         )
 
         for tr_origin, first_track in track_instances.items():
@@ -1746,12 +1739,10 @@ def res_track_plat(_, res):
         # Now figure out which way the track faces:
 
         # The direction horizontal track is offset
-        side_dir = Vec(0, 1, 0).rotate(*Vec.from_str(first_track['angles']))
+        side_dir = Vec(0, 1, 0).rotate_by_str(first_track['angles'])
 
         # The direction of the platform surface
-        facing = Vec(-1, 0, 0).rotate(
-            angles.x, angles.y, angles.z
-        )
+        facing = Vec(-1, 0, 0).rotate_by_str(plat_inst['angles'])
         if side_dir == facing:
             track_facing = 'HORIZ'
         elif side_dir == -facing:
@@ -1794,9 +1785,7 @@ def track_scan(
     :param x_dir: The direction to look (-1 or 1)
     """
     track = start_track
-    move_dir = Vec(x_dir*128, 0, 0).rotate(
-        *Vec.from_str(track['angles'])
-    )
+    move_dir = Vec(x_dir*128, 0, 0).rotate_by_str(track['angles'])
     while track:
         tr_set.add(track)
 
