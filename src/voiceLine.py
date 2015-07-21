@@ -101,7 +101,7 @@ def add_quote(quote, targetname, quote_loc):
                 classname='logic_choreographed_scene',
                 targetname=targetname,
                 origin=quote_loc,
-                scenefile=prop.value,
+                scenefile=c_line,
                 busyactor="1",  # Wait for actor to stop talking
                 onplayerdeath='0',
             )
