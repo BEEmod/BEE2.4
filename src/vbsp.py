@@ -1187,7 +1187,6 @@ def switch_glass_inst(origin, new_file):
         origin.z//128 * 128 + 64,
         )
     direction = (origin-loc).norm()
-    ang_vec = Vec(-1, 0, 0)
     loc_str = loc.join(' ')
     gls_file = instanceLocs.resolve('[glass_128]')
 
