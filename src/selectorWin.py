@@ -381,10 +381,9 @@ class selWin:
 
             item.win = self.win
             item.button.bind(
-                "<Button-1>",
+                utils.EVENTS['LEFT'],
                 functools.partial(self.sel_item, item),
             )
-            print(utils.EVENTS['LEFT_DOUBLE'], self.save)
             item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
