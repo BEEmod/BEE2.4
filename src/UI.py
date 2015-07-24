@@ -937,9 +937,8 @@ def set_palette(_=None):
 
 def pal_clear():
     """Empty the palette."""
-    for item in pal_picked:
+    for item in pal_picked[:]:
         item.kill()
-    pal_picked.clear()
     flow_preview()
 
 
@@ -1745,7 +1744,6 @@ def init_windows():
 
     TK_ROOT.after(50, set_pal_listbox_selection)
     # This needs some time for the listbox to appear first
-    set_palette()
 
     # Position windows according to remembered settings:
     try:
