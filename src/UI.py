@@ -815,6 +815,7 @@ def drag_stop(e):
     drag_win.grab_release()
     clear_disp_name()
     UI['pre_sel_line'].place_forget()
+    UI['pre_moving'].place_forget()
     snd.fx('config')
 
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
