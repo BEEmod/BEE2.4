@@ -197,8 +197,8 @@ def add_voice(
     style_vars = style_vars_
     GAME_MODE = mode
 
-    norm_config = ConfigFile('SP.cfg', root='bee2')
-    mid_config = ConfigFile('MID_SP.cfg', root='bee2')
+    norm_config = ConfigFile('voice.cfg', root='bee2')
+    mid_config = ConfigFile('mid_voice.cfg', root='bee2')
 
     quote_base = voice_data['base', False]
     quote_loc = voice_data['quote_loc', '-10000 0 0']
