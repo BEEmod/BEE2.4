@@ -1502,13 +1502,14 @@ def init_menu_bar(win):
     file_menu = menus['file']
     bar.add_cascade(menu=file_menu, label='File')
 
-    UI['menu_export_button'] = file_menu.add_command(
+    file_menu.add_command(
         label="Export",
         command=export_editoritems,
         accelerator=utils.KEY_ACCEL['KEY_EXPORT'],
         # This will be enabled when the resources have been unpacked
         state=DISABLED,
         )
+    file_menu.export_btn_index = 0 # Change this if the menu is reordered
 
     file_menu.add_command(
         label="Add Game",
@@ -1819,7 +1820,10 @@ def init_windows():
         # that way it resizes automatically.
         windows['opt'].save_conf()
         windows['opt'].load_conf()
-        menus['file'].entryconfigure(UI['menu_export_button'], state=NORMAL)
+        menus['file'].entryconfigure(
+            menus['file'].export_btn_index,
+            state=NORMAL,
+        )
         TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
         print('Done extracting resources!')
     extract_packages.done_callback = copy_done_callback
