@@ -22,7 +22,7 @@ settings = {
     "textures":       {},
     "fizzler":        {},
     "options":        {},
-    "pit":            {},
+    "pit":            None,
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
@@ -129,7 +129,6 @@ ANTLINES = {
     }  # these need to be handled separately to accommodate the scale-changing
 
 DEFAULTS = {
-    "bottomless_pit":           "0",  # Convert goo into bottomless pits
     "goo_mist":                 "0",  # Add info_particle_systems to goo pits
 
     "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
@@ -346,8 +345,8 @@ def load_settings():
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    if get_bool_opt('bottomless_pit'):
-        pit = conf.find_key("bottomless_pit", [])
+    pit = conf.find_key("bottomless_pit", [])
+    if pit:
         settings['pit'] = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
@@ -374,6 +373,8 @@ def load_settings():
             if len(vals) == 0:
                 vals = [""]
             pit_inst[inst_type] = vals
+    else:
+        settings['pit'] = None
 
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
@@ -880,12 +881,13 @@ def make_bottomless_pit(solids, max_height):
 
         random.seed(str(x) + str(y) + '-support')
         file = random.choice(instances['support'])
+
         if file != '':
             VMF.create_ent(
                 classname='func_instance',
                 file=file,
                 targetname='goo_support',
-                angles='0 0 0',
+                angles='0 ' + str(random.randrange(0, 360,90)) + ' 0',
                 origin='{!s} {!s} {!s}'.format(
                     x+tele_off_x,
                     y+tele_off_y,
@@ -1060,6 +1062,7 @@ def collapse_goo_trig():
 
     utils.con_log('Done!')
 
+
 def remove_static_ind_toggles():
     """Remove indicator_toggle instances that don't have assigned overlays.
 
@@ -1076,13 +1079,13 @@ def remove_static_ind_toggles():
             inst.remove()
     utils.con_log('Done!')
 
+
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     goo_scale = get_opt('goo_scale')
-    is_bottomless = get_bool_opt('bottomless_pit')
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1103,10 +1106,13 @@ def change_brush():
                     VMF.remove_ent(ent)
                     break  # Skip to next entity
 
-    if is_bottomless:
+    make_bottomless = settings['pit'] is not None
+    utils.con_log('Bottomless Pit:', make_bottomless)
+    if make_bottomless:
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
+
     if glass_inst == "NONE":
         glass_inst = None
 
@@ -1125,7 +1131,7 @@ def change_brush():
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
                 settings['has_attr']['goo'] = True
-                if is_bottomless:
+                if make_bottomless:
                     if face.planes[2].z < pit_height:
                         settings['has_attr']['bottomless_pit'] = True
                         pit_solids.append((solid, face))
@@ -1158,7 +1164,7 @@ def change_brush():
         if is_glass and glass_inst is not None:
             switch_glass_inst(solid.get_origin(), glass_inst)
 
-    if is_bottomless:
+    if make_bottomless:
         utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)
         utils.con_log('Done!')
