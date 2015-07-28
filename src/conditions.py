@@ -81,9 +81,11 @@ INST_ANGLE = {
 
 del xp, xn, yp, yn, zp, zn
 
+
 class NextInstance(Exception):
     """Raised to skip to the next instance, from the SkipInstance result."""
     pass
+
 
 class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
@@ -163,7 +165,6 @@ class Condition:
                 if res.value is None:
                     self.else_results.remove(res)
 
-
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
         success = True
@@ -210,6 +211,7 @@ class Condition:
             return self.priority >= other.priority
         return NotImplemented
 
+
 def add_meta(func, priority, only_once=True):
     """Add a metacondtion, which executes a function at a priority level.
 
@@ -249,6 +251,7 @@ def meta_cond(priority=0, only_once=True):
         return func
     return x
 
+
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func):
@@ -260,6 +263,7 @@ def make_flag(orig_name, *aliases):
             FLAG_LOOKUP[name.casefold()] = func
         return func
     return x
+
 
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
@@ -273,6 +277,7 @@ def make_result(orig_name, *aliases):
         return func
     return x
 
+
 def make_result_setup(*names):
     """Decorator to do setup for this result."""
     def x(func):
@@ -280,6 +285,7 @@ def make_result_setup(*names):
             RESULT_SETUP[name.casefold()] = func
         return func
     return x
+
 
 def add(prop_block):
     """Parse and add a condition to the list."""
@@ -352,6 +358,7 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
 
 def dump_conditions():
     """Print a list of all the condition flags, results, metaconditions
@@ -452,6 +459,7 @@ def add_suffix(inst, suff):
     old_name, dot, ext = file.partition('.')
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
+
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -472,12 +480,14 @@ def debug_flag(inst, props):
         utils.con_log('Debug: ' + props.value)
     return True  # The flag is always true
 
+
 @make_result('debug')
 def debug_result(inst, props):
     # Swallow the return value, so the flag isn't deleted
     debug_flag(inst, props)
 
 debug_result.__doc__ = debug_flag.__doc__
+
 
 @meta_cond(priority=1000, only_once=False)
 def remove_blank_inst(inst):
@@ -504,6 +514,7 @@ def fix_catapult_targets(inst):
 #########
 # FLAGS #
 #########
+
 
 @make_flag('AND')
 def flag_and(inst, flag):
@@ -635,6 +646,7 @@ def flag_is_preview(_, flag):
     import vbsp
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
 
+
 @make_flag(
     'rotation',
     'angle',
@@ -717,6 +729,7 @@ def res_set_style_var(_, res):
         elif opt.name == 'setfalse':
             STYLE_VARS[opt.value.casefold()] = False
     return True  # Remove this result
+
 
 @make_result('has')
 def res_set_voice_attr(_, res):
@@ -871,6 +884,7 @@ def res_cust_output_setup(res):
             sub_res.value = Condition.parse(sub_res)
     return res.value
 
+
 @make_result('custOutput')
 def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
@@ -918,6 +932,7 @@ def res_cust_output(inst, res):
         for out in res.find_all('addOut'):
             add_output(inst, out, targ)
 
+
 @make_result_setup('custAntline')
 def res_cust_antline_setup(res):
     result = {
@@ -933,6 +948,7 @@ def res_cust_antline_setup(res):
         return None # remove result
     else:
         return result
+
 
 @make_result('custAntline')
 def res_cust_antline(inst, res):
@@ -1023,6 +1039,7 @@ def res_faith_mods(inst, res):
                     if fixup_var:
                         inst.fixup[fixup_var] = 'straight'
                     break
+
 
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
@@ -1224,11 +1241,12 @@ def convert_to_laserfield(
             # heightwise it's always the same
             side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
 
-make_result_setup('condition')(Condition.parse)
+
 @make_result('condition')
 def res_sub_condition(base_inst, res):
     """Check a different condition if the outer block is true."""
     res.value.test(base_inst)
+make_result_setup('condition')(Condition.parse)
 
 
 @make_result('nextInstance')
@@ -1238,6 +1256,7 @@ def res_break(base_inst, res):
     The value will be ignored.
     """
     raise NextInstance
+
 
 @make_result('endCondition')
 def res_end_condition(base_inst, res):
@@ -1256,6 +1275,7 @@ PAIR_AXES = {
     (0, 0, 1):  'xy' 'z',
     (0, 0, -1): 'xy' 'z',
 }
+
 
 @make_result('fizzlerModelPair')
 def res_fizzler_pair(begin_inst, res):
@@ -1320,10 +1340,12 @@ def res_fizzler_pair(begin_inst, res):
                 origin=new_pos.join(' '),
             )
 
+
 @make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
+
 
 @make_result('removeFixup')
 def res_rem_fixup(inst, res):
@@ -1339,6 +1361,7 @@ CATWALK_TYPES = {
     utils.CONN_TYPES.triple: 'tjunction',
     utils.CONN_TYPES.none: 'NONE',
 }
+
 
 def place_catwalk_connections(instances, point_a, point_b):
     """Place catwalk sections to connect two straight points."""
@@ -1571,6 +1594,7 @@ def res_make_catwalk(_, res):
     utils.con_log('Finished catwalk generation!')
     return True  # Don't run this again
 
+
 @make_result_setup('staticPiston')
 def make_static_pist_setup(res):
     return {
@@ -1582,6 +1606,7 @@ def make_static_pist_setup(res):
             'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
         )
     }
+
 
 @make_result('staticPiston')
 def make_static_pist(ent, res):
@@ -1626,6 +1651,7 @@ def make_static_pist(ent, res):
         ]
         if val:
             ent['file'] = val
+
 
 @make_result('trackPlatform')
 def res_track_plat(_, res):
