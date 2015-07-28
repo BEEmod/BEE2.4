@@ -754,12 +754,10 @@ def change_brush():
                     VMF.remove_ent(ent)
                     break  # Skip to next entity
 
-    make_bottomless = settings['pit'] is not None
-    utils.con_log('Bottomless Pit:', make_bottomless)
-    if make_bottomless:
+    make_skybox = skybox.ENABLE_PIT
+    if make_skybox:
         pit_solids = []
-        pit_height = settings['pit']['height']
-        pit_goo_tex = settings['pit']['tex_goo']
+        pit_height = skybox.settings['height']
 
     if glass_inst == "NONE":
         glass_inst = None
@@ -779,12 +777,12 @@ def change_brush():
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
                 settings['has_attr']['goo'] = True
-                if make_bottomless:
+                if make_skybox:
                     if face.planes[2].z < pit_height:
                         settings['has_attr']['bottomless_pit'] = True
                         pit_solids.append((solid, face))
                     else:
-                        face.mat = pit_goo_tex
+                        face.mat = get_tex('special.goo_cheap')
                         if make_goo_mist:
                             mist_solids.add(
                                 solid.get_origin().as_tuple()
@@ -796,7 +794,7 @@ def change_brush():
 
                 split_u = face.uaxis.split()
                 split_v = face.vaxis.split()
-                split_u[-1] = goo_scale # Apply goo scaling
+                split_u[-1] = goo_scale  # Apply goo scaling
                 split_v[-1] = goo_scale
                 face.uaxis = " ".join(split_u)
                 face.vaxis = " ".join(split_v)
@@ -812,10 +810,8 @@ def change_brush():
         if is_glass and glass_inst is not None:
             switch_glass_inst(solid.get_origin(), glass_inst)
 
-    if make_bottomless:
-        utils.con_log('Creating Bottomless Pits...')
-        skybox.make_bottomless_pit(pit_solids, highest_brush)
-        utils.con_log('Done!')
+    if make_skybox:
+        skybox.generate_skybox(pit_solids, highest_brush)
 
     if make_goo_mist:
         utils.con_log('Adding Goo Mist...')
@@ -857,8 +853,7 @@ def switch_glass_inst(origin, new_file):
                 ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
-            inst_ang = Vec.from_str
-            # The brush parts are on this side!
+            # The brush parts are on the -x side!
             rot = Vec(-1, 0, 0).rotate_by_str(
                 inst['angles', ''],
                 45,

@@ -4,13 +4,14 @@ from decimal import Decimal
 from enum import Enum
 import random
 
-from utils import CONN_TYPES
-
+from utils import CONN_TYPES, Vec
 import vmfLib as VLib
 import vbsp
+import conditions
 import utils
 
 settings = {}
+ENABLE_PIT = False
 
 EDGE_DIRS = [
     # The direction for each value in the edges array
@@ -23,9 +24,10 @@ EDGE_DIRS = [
 
 
 def load_settings(config):
-    global settings
+    global settings, ENABLE_PIT
     pit = config.find_key("bottomless_pit", [])
     if pit:
+        ENABLE_PIT = True
         settings = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
@@ -39,7 +41,7 @@ def load_settings(config):
             'skybox_ceil': pit['sky_inst_ceil', ''],
             'targ': pit['targ_inst', ''],
         }
-        pit_inst = settings['pit']['inst'] = {}
+        pit_inst = settings['inst'] = {}
         for inst_type in (
                 'support',
                 'side',
@@ -53,6 +55,7 @@ def load_settings(config):
                 vals = [""]
             pit_inst[inst_type] = vals
     else:
+        ENABLE_PIT = False
         settings.clear()
 
 
@@ -104,8 +107,8 @@ def find_goo_sides():
 
 
 def add_supports(support_loc):
-    tele_off_x = settings['tele_off_x']
-    tele_off_y = settings['tele_off_y']
+    off_x = settings['off_x']
+    off_y = settings['off_y']
 
     supp_inst = settings['inst']['support']
 
@@ -121,8 +124,8 @@ def add_supports(support_loc):
                 targetname='goo_support',
                 angles='0 ' + str(random.randrange(0, 360, 90)) + ' 0',
                 origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
+                    x+off_x,
+                    y+off_y,
                     z,
                 ),
             ).make_unique()
@@ -130,8 +133,8 @@ def add_supports(support_loc):
 
 def add_edge_inst(edges):
     instances = settings['inst']
-    tele_off_x = settings['tele_off_x']
-    tele_off_y = settings['tele_off_y']
+    off_x = settings['off_x']
+    off_y = settings['off_y']
 
     side_types = {
         CONN_TYPES.side: instances['side'],
@@ -169,8 +172,8 @@ def add_edge_inst(edges):
                 file=file,
                 targetname='goo_side',
                 origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
+                    x+off_x,
+                    y+off_y,
                     highest_point,
                 ),
                 angles=angle,
@@ -197,13 +200,18 @@ def add_edge_inst(edges):
     return support_locs
 
 
-def make_bottomless_pit(solids, max_height):
-    """Transform all the goo pits into bottomless pits."""
-    tex_sky = settings['tex_sky']
-    tele_off_x = settings['tele_off_x'] - 128
-    tele_off_y = settings['tele_off_y'] - 128
+def generate_skybox(goo_solids, max_height):
+    """Transform all the goo pits into bottomless pits and add skybox detail.
 
-    for solid, wat_face in solids:
+
+    """
+    tex_sky = settings['tex_sky']
+    off_x = settings['off_x'] - 128
+    off_y = settings['off_y'] - 128
+
+    utils.con_log("Generating Skybox...")
+    utils.con_log("- Changing Goo...")
+    for solid, wat_face in goo_solids:
         wat_face.mat = tex_sky
         for vec in wat_face.planes:
             vec.z = float(Decimal(vec.z) - Decimal('95.5'))
@@ -218,8 +226,8 @@ def make_bottomless_pit(solids, max_height):
             targetname='skybox',
             angles='0 0 0',
             origin='{!s} {!s} 0'.format(
-                tele_off_x,
-                tele_off_y,
+                off_x,
+                off_y,
             ),
         )
 
@@ -232,8 +240,8 @@ def make_bottomless_pit(solids, max_height):
             targetname='skybox',
             angles='0 0 0',
             origin='{!s} {!s} {!s}'.format(
-                tele_off_x,
-                tele_off_y,
+                off_x,
+                off_y,
                 max_height,
             ),
         )
@@ -248,12 +256,64 @@ def make_bottomless_pit(solids, max_height):
             origin='0 0 0',
         )
 
+    utils.con_log("- Adding Goo Edges...")
     edges = find_goo_sides()
 
     supp_loc = add_edge_inst(edges)
 
+    utils.con_log("- Placing BG elements...")
+
+    place_bg_elements(max_height)
+
+    utils.con_log("- Adding supports...")
     add_supports(supp_loc)
 
+    utils.con_log("Done!")
+
+
+def place_bg_elements(pit_height):
+    """Place background elements in a 512 grid.
+    """
+    x_off = settings['off_x']
+    y_off = settings['off_y']
+
+    occupied_loc = set()
+    largest_pos = Vec(0,0,0)
+
+    for origin in conditions.SOLIDS.keys():
+        loc = Vec(origin)
+
+        loc //= 512
+        occupied_loc.add(loc.as_tuple())
+        largest_pos.max(loc)
+
+    for ent in vbsp.VMF.by_class['func_instance']:
+        # Also ignore areas occupied by instances.
+        # The ambient light instances ensure we won't mark empty air
+        # as unoccupied.
+        # Ignore instances without targetnames, since they're elevators
+        # and similar stuff.
+        if 'origin' in ent and ent['targetname', ''] != '':
+            loc = Vec.from_str(ent['origin'])
+
+            loc //= 512
+            occupied_loc.add(loc.as_tuple())
+            largest_pos.max(loc)
+
+    for x in range(-2, int(largest_pos.x) + 3):
+        for y in range(-2, int(largest_pos.y) + 3):
+            for z in range(-6, int(pit_height // 512) + 3):
+                if(x, y, z) in occupied_loc:
+                    continue
+                vbsp.VMF.create_ent(
+                    classname='func_instance',
+                    origin='{!s} {!s} {!s}'.format(
+                        x * 512 + x_off,
+                        y * 512 + y_off,
+                        z * 512
+                    ),
+                    # TODO: Choose instances
+                )
 
 
 
