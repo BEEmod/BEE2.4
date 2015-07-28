@@ -1823,3 +1823,103 @@ def track_scan(
             # If the next piece is an end section, add it then quit
             tr_set.add(track)
             return
+
+# The spawnflags that we toggle
+FLAG_ROTATING = {
+    'func_rotating': {
+        'rev': 2,  # Spin counterclockwise
+        'x': 4,  # Spinning in X axis
+        'y': 8,  # Spin in Y axis
+        'z': 0,
+    },
+    'func_door_rotating': {
+        'rev': 2,
+        'x': 128,
+        'y': 64,
+        'z': 0,
+    },
+    'beam_spotlight': {
+        'rev': 8,
+        'x': 16,
+        'y': 32,
+        'z': 0,
+    },
+    'momentary_rot_button': {
+        'x': 128,
+        'y': 0,
+        'z': 64,
+        # Reversed is set by keyvalue
+    },
+}
+FLAG_ROTATING['func_rot_button'] = FLAG_ROTATING['func_door_rotating']
+
+
+@make_result('RotationAxis')
+def res_fix_rotation_axis(ent, res):
+    """Determine the correct spawnflags for a `func_rotating`,
+
+    `func_door_rotating` or any similar entity. This uses the
+    orientation of the instance to detemine the correct spawnflags -
+    (`X axis`, `Y axis`, `reversed`) which makes the entity spin in the
+    desired direction.
+
+    The spawnflag will be combined with OtherFlags, and saved into the
+    resultVar $replace value. The `Reversed` spawnflag will be toggled
+    if required so the brush still rotates correctly.
+    Set ent_type to the classname of the entity, so the correct flags
+    are used.
+    mom_rev_var is a variable that corresponds to the momentary_rot_button's
+    Start Position keyvalue (since it doesn't have a reversed spawnflag).
+    """
+    des_axis = res['axis', 'z'].casefold()
+    reverse = utils.conv_bool(res['reversed', '0'])
+    result_var = res['resultVar']
+    door_type = res['entType', 'func_door_rotating']
+    # Extra stuff to apply to the flags (non-solid, USE, etc)
+    flags = utils.conv_int(res['otherflags'])
+    axis = Vec(
+        x=int(des_axis == 'x'),
+        y=int(des_axis == 'y'),
+        z=int(des_axis == 'z'),
+    ).rotate_by_str(ent['angles', '0 0 0'])
+
+    VMF.create_ent(
+        classname='info_null',
+        targetname=ent['targetname'],
+        origin=(
+            Vec.from_str(ent['origin']) +
+            axis * 16
+        ).join(' '),
+    )
+
+    if axis.x > 0 or axis.z > 0:
+        # If it points forward, we need to reverse the rotating door
+        reverse = not reverse
+
+    flag_values = FLAG_ROTATING[door_type]
+
+    # Add or remove flags as needed.
+    if axis.x != 0:
+        flags |= flag_values['x']
+    else:
+        flags &= ~flag_values['x']
+
+    if axis.y != 0:
+        flags |= flag_values['y']
+    else:
+        flags &= ~flag_values['y']
+
+    if axis.z != 0:
+        flags |= flag_values['z']
+    else:
+        flags &= ~flag_values['z']
+
+    if door_type == 'momentary_rot_button':
+        ent.fixup[res['mom_rev_var']] = '1' if reverse else '-1'
+    else:
+        if reverse:
+            flags |= flag_values['rev']
+        else:
+            flags &= ~flag_values['rev']
+
+    ent.fixup[result_var] = flags
