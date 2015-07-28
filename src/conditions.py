@@ -1,5 +1,7 @@
 # coding: utf-8
 from decimal import Decimal
+from collections import namedtuple
+from enum import Enum
 import random
 
 from utils import Vec
@@ -23,6 +25,16 @@ RESULT_SETUP = {}
 ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
+
+SOLIDS = {}  # A dictionary mapping origins to their brushes
+solidGroup = namedtuple('solidGroup', 'face solid normal color')
+
+
+class MAT_TYPES(Enum):
+    """The values saved in the solidGroup.color attribute."""
+    black = 0
+    white = 1
+
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -308,6 +320,8 @@ def init(seed, inst_list, vmf_file):
     # Sort by priority, where higher = done later
     conditions.sort()
 
+    build_solid_dict()
+
 
 def check_all():
     """Check all conditions."""
@@ -358,6 +372,43 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
+
+def build_solid_dict():
+    """Build a dictionary mapping origins to brush faces.
+
+    This allows easily finding brushes that are at certain locations.
+    """
+    import vbsp
+    mat_types = {}
+    for mat in vbsp.BLACK_PAN:
+        mat_types[mat] = MAT_TYPES.black
+
+    for mat in vbsp.WHITE_PAN:
+        mat_types[mat] = MAT_TYPES.white
+
+    for solid in VMF.brushes:
+        for face in solid:
+            try:
+                mat_type = mat_types[face.mat]
+            except KeyError:
+                continue
+            else:
+                origin = face.get_origin().as_tuple()
+                if origin in SOLIDS:
+                    # The only time two textures will be in the same
+                    # place is if they are covering each other -
+                    # nodraw them both and ignore them
+                    SOLIDS.pop(origin).face.mat = 'tools/toolsnodraw'
+                    face.mat = 'tools/toolsnodraw'
+                    continue
+
+                SOLIDS[origin] = solidGroup(
+                    mat_type,
+                    face,
+                    solid,
+                    face.normal(),
+                )
 
 
 def dump_conditions():
