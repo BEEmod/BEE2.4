@@ -1804,12 +1804,19 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     # Put quotes around args which contain spaces, and remove blank args.
     vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
 
+    if utils.MAC:
+        os_suff = '_osx'
+    elif utils.LINUX:
+        os_suff = '_linux'
+    else:
+        os_suff = ''
+
     arg = (
         '"'
         + os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp_original"
+                "vbsp" + os_suff + "_original"
                 )
             )
         + '" '
