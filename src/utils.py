@@ -46,11 +46,11 @@ elif MAC:
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
+        'RIGHT': '<Button-2>',
+        'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_SHIFT': '<Shift-Button-2>',
+        'RIGHT_RELEASE': '<ButtonRelease-2>',
+        'RIGHT_MOVE': '<B2-Motion>',
 
         'KEY_EXPORT': '<Command-e>',
         'KEY_SAVE_AS': '<Command-s>',
