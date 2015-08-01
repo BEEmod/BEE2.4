@@ -19,21 +19,21 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     algorithm.
     """
     if not path.casefold().endswith(".png"):
-        path = path + ".png"
+        path += ".png"
     orig_path = path
 
     if (orig_path, resize_to) in cached_img:
         return cached_img[orig_path, resize_to]
 
-    if not os.path.isfile(os.path.join("../images", path)):
+    if not os.path.isfile(os.path.join("..", "images", path)):
         # If not in the main folder, load from the zip-cache
-        path = os.path.join("../images/cache/", path)
-    path = os.path.join("../images", path)
+        path = os.path.join("..", "images", "cache", path)
+    path = os.path.join("..", "images", path)
 
     if os.path.isfile(path):
         image = Image.open(path)
     else:
-        print('ERROR: "images\\' + orig_path + '" does not exist!')
+        print('ERROR: "images/' + orig_path + '" does not exist!')
         return error or img_error
 
     if resize_to:
@@ -43,15 +43,17 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     cached_img[path, resize_to] = img
     return img
 
+
 def spr(name, error=None):
     """Load in the property icons with the correct size."""
     # We're doubling the icon size, so use nearest-neighbour to keep
     # image sharpness
     return png('icons/'+name, error=error, resize_to=32, algo=Image.NEAREST)
 
+
 def icon(name, error=None):
     """Load in a palette icon, using the correct directory and size."""
-    return png("items/" + name, error=error, resize_to=64)
+    return png(os.path.join("items", name), error=error, resize_to=64)
 
 
 # If image is not readable, use this instead

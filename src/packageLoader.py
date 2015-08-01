@@ -204,10 +204,10 @@ def load_packages(
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
-                loc = os.path.normcase(path)
+                loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
-                    zip_file.extract(path, path="../cache/")
+                    zip_file.extract(path.casefold(), path="../cache/")
 
         shutil.rmtree('../images/cache', ignore_errors=True)
         if os.path.isdir("../cache/resources/bee2"):
@@ -269,7 +269,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
     for item in zip_names(zip_file):
-        item = os.path.normcase(item)
+        item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
