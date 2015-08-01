@@ -258,15 +258,17 @@ def make_pane(tool_frame):
     UI['style_can'].bind('<Configure>', flow_stylevar)
 
     # Scroll globally even if canvas is not selected.
-    window.bind(
-        "<MouseWheel>",
-        lambda e: scroll(int(-1*(e.delta/120))),
-        )
-    window.bind(
-        "<Button-4>",
-        lambda e: scroll(1),
-        )
-    window.bind(
-        "<Button-5>",
-        lambda e: scroll(-1),
-        )
+    if utils.WIN:
+        window.bind(
+            "<MouseWheel>",
+            lambda e: scroll(int(-1*(e.delta/120))),
+            )
+    elif utils.MAC:
+        window.bind(
+            "<Button-4>",
+            lambda e: scroll(1),
+            )
+        window.bind(
+            "<Button-5>",
+            lambda e: scroll(-1),
+            )
