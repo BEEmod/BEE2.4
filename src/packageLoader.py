@@ -207,7 +207,7 @@ def load_packages(
                 loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
-                    zip_file.extract(path.casefold(), path="../cache/")
+                    zip_file.extract(path, path="../cache/")
 
         shutil.rmtree('../images/cache', ignore_errors=True)
         if os.path.isdir("../cache/resources/bee2"):
