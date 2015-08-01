@@ -34,7 +34,11 @@ config = ConfigFile('games.cfg')
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
     ('VBSP',        'bin/vbsp',                         '.exe'),
-    ('VRAD',        'bin/vrad',                         '.exe')
+    ('VRAD',        'bin/vrad',                         '.exe'),
+    ('VBSP',        'bin/vbsp_osx',   ''),
+    ('VRAD',        'bin/vrad_osx',   ''),
+    ('VBSP',        'bin/vbsp_linux', ''),
+    ('VRAD',        'bin/vrad_linux', ''),
 ]
 
 VOICE_PATHS = [
@@ -208,6 +212,8 @@ class Game:
             source = os.path.join('../cache/resources/', folder)
             if folder == 'instances':
                 dest = self.abs_path(INST_PATH)
+            elif folder.casefold() == 'bee2':
+                continue  # Skip app icons
             else:
                 dest = self.abs_path(os.path.join('bee2', folder))
             print('Copying to "' + dest + '" ...', end='')
@@ -255,7 +261,7 @@ class Game:
         print('  }')
 
         # VBSP, VRAD, editoritems
-        export_screen.set_length('BACK', 3)
+        export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         export_screen.set_length(
             'CONF',
             # VBSP_conf, Editoritems, instances, gameinfo
