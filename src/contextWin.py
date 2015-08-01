@@ -355,7 +355,10 @@ def init_widgets():
         )
         wid['subitem'][i].grid(row=0, column=i)
         wid['subitem'][i].bind(utils.EVENTS['LEFT'], functools.partial(sub_sel, i))
-        wid['subitem'][i].bind(utils.EVENTS['RIGHT'], functools.partial(sub_open, i))
+        utils.bind_rightclick(
+            wid['subitem'][i],
+            functools.partial(sub_open, i),
+        )
 
     wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
     wid['wip_dep'].grid(row=4, column=0, sticky="NW")

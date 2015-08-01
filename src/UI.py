@@ -305,7 +305,8 @@ class PalItem(Label):
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
-        self.bind(utils.EVENTS['RIGHT'], contextWin.open_event)
+
+        utils.bind_rightclick(self, contextWin.open_event)
         self.bind(utils.EVENTS['LEFT'], drag_start)
         self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
@@ -706,8 +707,8 @@ def export_editoritems(_=None):
     }
 
     # Add all of the special/hardcoded style vars
-    for var_id, _, __ in StyleVarPane.styleOptions:
-        style_vars[var_id] = style_vals[var_id].get() == 1
+    for var in StyleVarPane.styleOptions:
+        style_vars[var.id] = style_vals[var.id].get() == 1
 
     gameMan.selected_game.export(
         chosen_style,
@@ -1529,14 +1530,18 @@ def set_game(game):
 
 def init_menu_bar(win):
     bar = Menu(win)
-    win['menu'] = bar
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', False)
-    # Name is used to make this the special 'BEE2' menu item on Mac
-    menus['file'] = Menu(bar, name='apple')
-    file_menu = menus['file']
+    if utils.MAC:
+        # Name is used to make this the special 'BEE2' menu item
+        file_menu = menus['file'] = Menu(bar, name='apple')
+    else:
+        file_menu = menus['file'] = Menu(bar)
+
     bar.add_cascade(menu=file_menu, label='File')
+
+    win['menu'] = bar  # Must be done after creating the apple menu
 
     file_menu.add_command(
         label="Export",
@@ -1560,10 +1565,11 @@ def init_menu_bar(win):
         label="Options",
         command=optionWindow.show,
     )
-    file_menu.add_command(
-        label="Quit",
-        command=quit_application,
-        )
+    if not utils.MAC:
+        file_menu.add_command(
+            label="Quit",
+            command=quit_application,
+            )
     file_menu.add_separator()
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game)
@@ -1618,6 +1624,10 @@ def init_windows():
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
     TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
+
+    if utils.MAC:
+        # OS X has a special quit menu item.
+        TK_ROOT.createcommand('tk::mac::Quit', quit_application)
 
     ui_bg = Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
@@ -1745,39 +1755,46 @@ def init_windows():
         img=img.png('icons/shuffle_pal'),
         command=pal_shuffle,
     )
-    UI['shuffle_pal'].grid(row=0, column=0, padx=(2, 20))
+    UI['shuffle_pal'].grid(
+        row=0,
+        column=0,
+        padx=((2, 10) if utils.MAC else (2, 20)),
+    )
     tooltip.add_tooltip(
         UI['shuffle_pal'],
         'Fill empty spots in the palette with random items.',
     )
 
     # make scrollbar work globally
-    TK_ROOT.bind(
-        "<MouseWheel>",
-        lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
-        )
-    # needed for linux
-    TK_ROOT.bind(
-        "<Button-4>",
-        lambda e: pal_canvas.yview_scroll(1, "units"),
-        )
-    TK_ROOT.bind(
-        "<Button-5>",
-        lambda e: pal_canvas.yview_scroll(-1, "units"),
-        )
+    if utils.WIN:
+        TK_ROOT.bind(
+            "<MouseWheel>",
+            lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
+            )
+    elif utils.LINUX:
+        TK_ROOT.bind(
+            "<Button-4>",
+            lambda e: pal_canvas.yview_scroll(1, "units"),
+            )
+        TK_ROOT.bind(
+            "<Button-5>",
+            lambda e: pal_canvas.yview_scroll(-1, "units"),
+            )
 
-    StyleVarPane.window.bind(
-        "<MouseWheel>",
-        lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
-        )
-    StyleVarPane.window.bind(
-        "<Button-4>",
-        lambda e: UI['style_can'].yview_scroll(1, "units"),
-        )
-    StyleVarPane.window.bind(
-        "<Button-5>",
-        lambda e: UI['style_can'].yview_scroll(-1, "units"),
-        )
+    if utils.WIN:
+        StyleVarPane.window.bind(
+            "<MouseWheel>",
+            lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
+            )
+    elif utils.LINUX:
+        StyleVarPane.window.bind(
+            "<Button-4>",
+            lambda e: UI['style_can'].yview_scroll(1, "units"),
+            )
+        StyleVarPane.window.bind(
+            "<Button-5>",
+            lambda e: UI['style_can'].yview_scroll(-1, "units"),
+            )
 
     # When clicking on any window hide the context window
     TK_ROOT.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
@@ -1794,6 +1811,9 @@ def init_windows():
     optionWindow.reset_all_win = reposition_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
+
+    if utils.MAC:
+        TK_ROOT.lift()  # Raise to the top of the stack
 
     TK_ROOT.update_idletasks()
     StyleVarPane.window.update_idletasks()

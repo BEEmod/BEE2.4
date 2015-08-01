@@ -413,7 +413,10 @@ class selWin:
         )
         self.display.bind(utils.EVENTS['LEFT'], self.open_win)
         self.display.bind("<Key>", self.set_disp)
-        self.display.bind(utils.EVENTS['RIGHT'], self.open_context)
+        utils.bind_rightclick(
+            self.display,
+            self.open_context,
+        )
 
         self.disp_btn = ttk.Button(
             self.display,

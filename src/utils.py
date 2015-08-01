@@ -18,12 +18,14 @@ if WIN:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
         'RIGHT': '<Button-3>',
         'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
@@ -52,12 +54,14 @@ elif MAC:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
         'RIGHT': '<Button-2>',
         'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_CTRL': '<Control-Button-2>',
         'RIGHT_SHIFT': '<Shift-Button-2>',
         'RIGHT_RELEASE': '<ButtonRelease-2>',
         'RIGHT_MOVE': '<B2-Motion>',
@@ -87,12 +91,14 @@ elif LINUX:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
         'RIGHT': '<Button-3>',
         'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
@@ -116,6 +122,16 @@ elif LINUX:
         'destroy_item': 'x_cursor',
         'invalid_drag': 'no',
     }
+
+if MAC:
+    def bind_rightclick(wid, func):
+        """On OSX, we need to bind to both rightclick and control-leftclick."""
+        wid.bind(EVENTS['RIGHT'], func)
+        wid.bind(EVENTS['LEFT_CTRL'], func)
+else:
+    def bind_rightclick(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['RIGHT'], func)
 
 BOOL_LOOKUP = {
     '1': True,

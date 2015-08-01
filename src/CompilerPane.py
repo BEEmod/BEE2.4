@@ -228,7 +228,7 @@ def make_pane(tool_frame):
 
     UI['thumb_custom_file'] = ttk.Entry(
         cust_frame,
-        cursor='arrow',
+        cursor=utils.CURSORS['regular'],
         textvariable=cust_file_loc_var,
         width=15,
     )
