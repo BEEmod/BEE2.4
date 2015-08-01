@@ -24,6 +24,7 @@ if __name__ == '__main__':
     import packageLoader
     import gameMan
     import extract_packages
+    import utils
     ERR_FORMAT = '''
     --------------
 
@@ -56,6 +57,9 @@ if __name__ == '__main__':
     }
     loadScreen.main_loader.set_length('UI', 9)
     loadScreen.main_loader.show()
+
+    if utils.MAC:
+        TK_ROOT.lift()
 
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
