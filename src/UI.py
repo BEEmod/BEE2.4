@@ -27,6 +27,7 @@ import gameMan
 import StyleVarPane
 import CompilerPane
 import optionWindow
+import tooltip
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -1733,6 +1734,11 @@ def init_windows():
         command=pal_shuffle,
     )
     UI['shuffle_pal'].grid(row=0, column=0, padx=(2, 20))
+    tooltip.add_tooltip(
+        UI['shuffle_pal'],
+        'Fill empty spots in the palette with random items.',
+    )
+
     # make scrollbar work globally
     TK_ROOT.bind(
         "<MouseWheel>",
