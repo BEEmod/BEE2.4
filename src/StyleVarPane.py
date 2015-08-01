@@ -11,6 +11,7 @@ import img as png
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane
 import tooltip
+import utils
 
 stylevar = namedtuple('stylevar', 'id name enabled desc')
 
@@ -251,7 +252,7 @@ def make_pane(tool_frame):
         )
     ttk.Sizegrip(
         window,
-        cursor="sb_v_double_arrow",
+        cursor=utils.CURSORS['stretch_vert'],
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)

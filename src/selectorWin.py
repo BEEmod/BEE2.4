@@ -206,8 +206,6 @@ class selWin:
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
-        self.win.rowconfigure(0, weight=1)
-        self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
 
@@ -411,7 +409,7 @@ class selWin:
         self.display = ttk.Entry(
             frame,
             textvariable=self.disp_label,
-            cursor='arrow',
+            cursor=utils.CURSORS['regular'],
         )
         self.display.bind(utils.EVENTS['LEFT'], self.open_win)
         self.display.bind("<Key>", self.set_disp)

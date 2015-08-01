@@ -38,6 +38,16 @@ if WIN:
         'KEY_SAVE': 'Ctrl-S',
         'KEY_SAVE_AS': 'Ctrl-Shift-S',
     }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
 elif MAC:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -63,6 +73,16 @@ elif MAC:
         'KEY_SAVE': '\u2318-S',
         'KEY_SAVE_AS': '\u2318-Shift-S',
     }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'spinning',
+        'stretch_vert': 'resizeupdown',
+        'stretch_horiz': 'resizeleftright',
+        'move_item': 'plus',
+        'destroy_item': 'poof',
+        'invalid_drag': 'notallowed',
+    }
 elif LINUX:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -85,6 +105,16 @@ elif LINUX:
         'KEY_EXPORT': 'Ctrl-E',
         'KEY_SAVE': 'Ctrl-S',
         'KEY_SAVE_AS': 'Ctrl-Shift-S',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
     }
 
 BOOL_LOOKUP = {

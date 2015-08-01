@@ -855,7 +855,7 @@ def drag_move(e):
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_win.configure(cursor='plus')
+        drag_win.configure(cursor=utils.CURSORS['move_item'])
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
         if not drag_win.passed_over_pal:
             # If we've passed over the palette, replace identical items
@@ -872,9 +872,9 @@ def drag_move(e):
         drag_win.passed_over_pal = True
     else:
         if drag_win.from_pal and drag_win.passed_over_pal:
-            drag_win.configure(cursor='x_cursor')
+            drag_win.configure(cursor=utils.CURSORS['destroy_item'])
         else:
-            drag_win.configure(cursor='no')
+            drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
         UI['pre_sel_line'].place_forget()
 
 
@@ -1117,18 +1117,24 @@ def init_palette(f):
 def init_option(f):
     """Initialise the options pane."""
     f.columnconfigure(0, weight=1)
+    f.rowconfigure(0, weight=1)
+
+    frame = ttk.Frame(f)
+    frame.grid(row=0, column=0, sticky=NSEW)
+    frame.columnconfigure(0, weight=1)
+
     ttk.Button(
-        f,
+        frame,
         text="Save Palette...",
         command=pal_save,
         ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
-        f,
+        frame,
         text="Save Palette As...",
         command=pal_save_as,
         ).grid(row=1, sticky="EW", padx=5)
     UI['export_button'] = ttk.Button(
-        f,
+        frame,
         textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
     )
@@ -1137,14 +1143,14 @@ def init_option(f):
     UI['export_button'].grid(row=2, sticky="EW", padx=5)
 
     UI['extract_progress'] = ttk.Progressbar(
-        f,
+        frame,
         length=200,
         maximum=1000,
         variable=extract_packages.progress_var,
     )
     UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
 
-    props = ttk.LabelFrame(f, text="Properties", width="50")
+    props = ttk.LabelFrame(frame, text="Properties", width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=4, sticky="EW")
 
@@ -1216,7 +1222,7 @@ def init_option(f):
 
     ttk.Sizegrip(
         props,
-        cursor='sb_h_double_arrow',
+        cursor=utils.CURSORS['stretch_horiz'],
         ).grid(
             row=2,
             column=5,
@@ -1706,7 +1712,13 @@ def init_windows():
         tool_img=img.png('icons/win_palette'),
         tool_col=1,
     )
-    init_palette(windows['pal'])
+
+    pal_frame = ttk.Frame(windows['pal'])
+    pal_frame.grid(row=0, column=0, sticky='NSEW')
+    windows['pal'].columnconfigure(0, weight=1)
+    windows['pal'].rowconfigure(0, weight=1)
+
+    init_palette(pal_frame)
     loader.step('UI')
 
     windows['opt'] = SubPane.SubPane(
