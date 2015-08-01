@@ -10,6 +10,14 @@ from multiprocessing import freeze_support
 if __name__ == '__main__':
     freeze_support()  # Make multiprocessing work correctly when frozen
 
+    import utils
+    if utils.MAC or utils.LINUX:
+        import os
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        os.chdir(os.path.dirname(sys.argv[0]))
+
     from tkinter import messagebox
 
     import traceback
@@ -24,7 +32,6 @@ if __name__ == '__main__':
     import packageLoader
     import gameMan
     import extract_packages
-    import utils
     ERR_FORMAT = '''
     --------------
 
