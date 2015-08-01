@@ -5,6 +5,16 @@ import utils
 import sound as snd
 
 
+def make_tool_button(frame, img, command):
+    """Make a toolbar icon."""
+    button = ttk.Button(
+            frame,
+            style='BG.TButton',
+            image=img,
+            command=command)
+    return button
+
+
 class SubPane(Toplevel):
     """A Toplevel window that can be shown/hidden.
 
@@ -34,11 +44,11 @@ class SubPane(Toplevel):
         self.config_file = options
         super().__init__(parent)
 
-        self.tool_button = ttk.Button(
-            tool_frame,
-            style='BG.TButton',
-            image=tool_img,
-            command=self.toggle_win)
+        self.tool_button = make_tool_button(
+            frame=tool_frame,
+            img=tool_img,
+            command=self.toggle_win,
+        )
         self.tool_button.state(('pressed',))
         self.tool_button.grid(row=0, column=tool_col, padx=(5, 2))
 

@@ -6,6 +6,7 @@ from tk_root import TK_ROOT
 from functools import partial as func_partial
 import itertools
 import operator
+import random
 
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -17,7 +18,7 @@ import paletteLoader
 import img
 import utils
 
-from SubPane import SubPane
+import SubPane
 from selectorWin import selWin, Item as selWinItem
 import extract_packages
 import voiceEditor
@@ -26,6 +27,7 @@ import gameMan
 import StyleVarPane
 import CompilerPane
 import optionWindow
+import tooltip
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -943,6 +945,34 @@ def pal_clear():
     flow_preview()
 
 
+def pal_shuffle():
+    """Set the palette to a list of random items."""
+    if len(pal_picked) == 32:
+        return
+
+    shuff_items = item_list.copy()
+    for palitem in pal_picked:
+        # Don't add items that are already on the palette!
+        try:
+            del shuff_items[palitem.id]
+        except KeyError:
+            # We might try removing it multiple times
+            pass
+
+    shuff_items = list(shuff_items.values())
+
+    random.shuffle(shuff_items)
+
+    for item in shuff_items[:32-len(pal_picked)]:
+        pal_picked.append(PalItem(
+            frames['preview'],
+            item,
+            sub=0,  # Use the first subitem
+            is_pre=True,
+        ))
+    flow_preview()
+
+
 def pal_save_as(_=None):
     name = ""
     while True:
@@ -1541,9 +1571,13 @@ def init_menu_bar(win):
         command=pal_clear,
         )
     pal_menu.add_command(
-        label='Delete Palette',
+        label='Delete Palette', # This name is overwritten later
         command=pal_remove,
         )
+    pal_menu.add_command(
+        label='Fill Palette',
+        command=pal_shuffle,
+    )
     pal_menu.add_command(
         label='Save Palette',
         command=pal_save,
@@ -1554,6 +1588,7 @@ def init_menu_bar(win):
         command=pal_save_as,
         accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
+
     pal_menu.add_separator()
 
     # refresh_pal_ui() adds the palette menu options here.
@@ -1660,7 +1695,7 @@ def init_windows():
         )
     frames['toolMenu'].place(x=73, y=2)
 
-    windows['pal'] = SubPane(
+    windows['pal'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
         title='Palettes',
@@ -1669,12 +1704,12 @@ def init_windows():
         resize_y=True,
         tool_frame=frames['toolMenu'],
         tool_img=img.png('icons/win_palette'),
-        tool_col=0,
+        tool_col=1,
     )
     init_palette(windows['pal'])
     loader.step('UI')
 
-    windows['opt'] = SubPane(
+    windows['opt'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
         title='Export Options',
@@ -1682,7 +1717,7 @@ def init_windows():
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img=img.png('icons/win_options'),
-        tool_col=1,
+        tool_col=2,
     )
     init_option(windows['opt'])
     loader.step('UI')
@@ -1692,6 +1727,17 @@ def init_windows():
 
     CompilerPane.make_pane(frames['toolMenu'])
     loader.step('UI')
+
+    UI['shuffle_pal'] = SubPane.make_tool_button(
+        frame=frames['toolMenu'],
+        img=img.png('icons/shuffle_pal'),
+        command=pal_shuffle,
+    )
+    UI['shuffle_pal'].grid(row=0, column=0, padx=(2, 20))
+    tooltip.add_tooltip(
+        UI['shuffle_pal'],
+        'Fill empty spots in the palette with random items.',
+    )
 
     # make scrollbar work globally
     TK_ROOT.bind(

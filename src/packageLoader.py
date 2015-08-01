@@ -743,10 +743,19 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, unstyled=False, default=False):
+    def __init__(
+            self,
+            var_id,
+            name,
+            styles,
+            unstyled=False,
+            default=False,
+            desc='',
+            ):
         self.id = var_id
         self.name = name
         self.default = default
+        self.desc = desc
         if unstyled:
             self.styles = None
         else:
@@ -759,14 +768,21 @@ class StyleVar:
         default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
-            for prop in data.info.find_all('Style')
+            for prop in
+            data.info.find_all('Style')
         ]
+        desc = '\n'.join(
+            prop.value
+            for prop in
+            data.info.find_all('description')
+        )
         return cls(
             data.id,
             name,
             styles,
             unstyled=unstyled,
             default=default,
+            desc=desc,
         )
 
     def add_over(self, override):

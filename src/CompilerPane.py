@@ -187,7 +187,7 @@ def make_pane(tool_frame):
         resize_y=False,
         tool_frame=tool_frame,
         tool_img=png.png('icons/win_compiler'),
-        tool_col=3,
+        tool_col=4,
     )
     window.columnconfigure(0, weight=1)
 
