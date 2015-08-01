@@ -121,7 +121,7 @@ def make_pane(tool_frame):
         resize_y=True,
         tool_frame=tool_frame,
         tool_img=png.png('icons/win_stylevar'),
-        tool_col=2,
+        tool_col=3,
     )
 
     UI['style_can'] = Canvas(window, highlightthickness=0)
