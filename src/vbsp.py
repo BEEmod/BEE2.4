@@ -22,14 +22,12 @@ settings = {
     "textures":       {},
     "fizzler":        {},
     "options":        {},
-    "pit":            {},
-    "deathfield":     {},
+    "pit":            None,
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
 
-    "voice_data_sp":   Property("Quotes_SP", []),
-    "voice_data_coop": Property("Quotes_COOP", []),
+    "voice_data":   Property("Quotes", []),
     }
 
 
@@ -131,7 +129,6 @@ ANTLINES = {
     }  # these need to be handled separately to accommodate the scale-changing
 
 DEFAULTS = {
-    "bottomless_pit":           "0",  # Convert goo into bottomless pits
     "goo_mist":                 "0",  # Add info_particle_systems to goo pits
 
     "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
@@ -143,8 +140,6 @@ DEFAULTS = {
     # Reset offsets for all white/black brushes, so embedface has correct
     # texture matching
     "tile_texture_lock":        "1",
-
-    "no_mid_voices":            "0",  # Remove the midpoint voice lines
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -339,11 +334,8 @@ def load_settings():
         for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
-    for quote_block in conf.find_all("quotes_sp"):
-        settings['voice_data_sp'] += quote_block.value
-
-    for quote_block in conf.find_all("quotes_coop"):
-        settings['voice_data_coop'] += quote_block.value
+    for quote_block in conf.find_all("quotes"):
+        settings['voice_data'] += quote_block.value
 
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
@@ -353,8 +345,8 @@ def load_settings():
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    if get_bool_opt('bottomless_pit'):
-        pit = conf.find_key("bottomless_pit", [])
+    pit = conf.find_key("bottomless_pit", [])
+    if pit:
         settings['pit'] = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
@@ -381,6 +373,8 @@ def load_settings():
             if len(vals) == 0:
                 vals = [""]
             pit_inst[inst_type] = vals
+    else:
+        settings['pit'] = None
 
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
@@ -407,17 +401,9 @@ def load_map(map_path):
 
 @conditions.meta_cond(priority=100)
 def add_voice(inst):
-    if GAME_MODE == 'COOP':
-        utils.con_log('Adding Coop voice lines!')
-        data = settings['voice_data_coop']
-    elif GAME_MODE == 'SP':
-        utils.con_log('Adding Singleplayer voice lines!')
-        data = settings['voice_data_sp']
-    else:
-        return
-
+    """Add voice lines to the map."""
     voiceLine.add_voice(
-        voice_data=data,
+        voice_data=settings['voice_data'],
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
@@ -427,7 +413,11 @@ def add_voice(inst):
 
 @conditions.meta_cond(priority=-200, only_once=False)
 def fix_fizz_models(inst):
-    """Fix some bugs with fizzler model instances."""
+    """Fix some bugs with fizzler model instances.
+    This removes extra numbers from model instances, which prevents
+    inputs from being read correctly.
+    It also rotates fizzler models so they are both facing the same way.
+    """
     # Fizzler model names end with this special string
     if ("_modelStart" in inst['targetname', ''] or
             "_modelEnd" in inst['targetname', '']):
@@ -453,15 +443,18 @@ def fix_fizz_models(inst):
 
 @conditions.meta_cond(priority=-100, only_once=False)
 def static_pan(inst):
+    """Switches glass angled panels to static instances, if needed."""
     if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
 @conditions.meta_cond(priority=200, only_once=True)
 def anti_fizz_bump(inst):
-    """Create portal_bumpers surrounding any fizzlers in the map.
+    """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
+    It is only applied to trigger_portal_cleansers with the Client flag
+    checked.
     """
     FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
     # giving 32 in total: the width of a fizzler model.
@@ -529,6 +522,68 @@ def anti_fizz_bump(inst):
         noportal['classname'] = 'func_noportal_volume'
         VMF.add_ent(noportal)
 
+    utils.con_log('Done!')
+
+
+@conditions.meta_cond(priority=500, only_once=True)
+def set_player_portalgun(inst):
+    """Controls which portalgun the player will be given.
+
+    This does not apply to coop. It checks the 'blueportal' and
+    'orangeportal' attributes to see what are in the map.
+    - If there are no spawners in the map, the player gets a dual portal
+      device.
+    - If there are only blue portal spawners, the player gets a orange-only
+      gun.
+    - If there are only orange portal spawners, the player gets a blue-
+      only gun (Regular single portal device)
+    - If there are both spawner types, the player doesn't get a gun.
+    """
+    if GAME_MODE == 'COOP':
+        return  # Don't change portalgun in coop
+
+    utils.con_log('Setting Portalgun:')
+
+    has = settings['has_attr']
+
+    blue_portal = not has['blueportal']
+    oran_portal = not has['orangeportal']
+
+    utils.con_log('Blue: {}, Orange: {!s}'.format(
+        'Y' if blue_portal else 'N',
+        'Y' if oran_portal else 'N',
+    ))
+
+    if blue_portal and oran_portal:
+        has['spawn_dual'] = True
+        has['spawn_single'] = False
+        has['spawn_nogun'] = False
+    elif blue_portal or oran_portal:
+        has['spawn_dual'] = False
+        has['spawn_single'] = True
+        has['spawn_nogun'] = False
+        inst = VMF.create_ent(
+            classname='func_instance',
+            targetname='pgun_logic',
+            origin=get_opt('global_pti_ents_loc'),  # Reuse this location
+            angles='0 0 0',
+            file='instances/BEE2/logic/pgun/pgun_single.vmf',
+        )
+        # Set which portals this weapon_portalgun can fire
+        inst.fixup['blue_portal'] = utils.bool_as_int(blue_portal)
+        inst.fixup['oran_portal'] = utils.bool_as_int(oran_portal)
+    else:
+        has['spawn_dual'] = False
+        has['spawn_single'] = False
+        has['spawn_nogun'] = True
+        # This instance only has a trigger_weapon_strip.
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='pgun_logic',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+            file='instances/BEE2/logic/pgun/no_pgun.vmf',
+        )
     utils.con_log('Done!')
 
 
@@ -826,12 +881,13 @@ def make_bottomless_pit(solids, max_height):
 
         random.seed(str(x) + str(y) + '-support')
         file = random.choice(instances['support'])
+
         if file != '':
             VMF.create_ent(
                 classname='func_instance',
                 file=file,
                 targetname='goo_support',
-                angles='0 0 0',
+                angles='0 ' + str(random.randrange(0, 360,90)) + ' 0',
                 origin='{!s} {!s} {!s}'.format(
                     x+tele_off_x,
                     y+tele_off_y,
@@ -1006,6 +1062,7 @@ def collapse_goo_trig():
 
     utils.con_log('Done!')
 
+
 def remove_static_ind_toggles():
     """Remove indicator_toggle instances that don't have assigned overlays.
 
@@ -1022,13 +1079,13 @@ def remove_static_ind_toggles():
             inst.remove()
     utils.con_log('Done!')
 
+
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
     glass_scale = get_opt('glass_scale')
     goo_scale = get_opt('goo_scale')
-    is_bottomless = get_bool_opt('bottomless_pit')
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1049,10 +1106,13 @@ def change_brush():
                     VMF.remove_ent(ent)
                     break  # Skip to next entity
 
-    if is_bottomless:
+    make_bottomless = settings['pit'] is not None
+    utils.con_log('Bottomless Pit:', make_bottomless)
+    if make_bottomless:
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
+
     if glass_inst == "NONE":
         glass_inst = None
 
@@ -1071,7 +1131,7 @@ def change_brush():
                 # Force this voice attribute on, since conditions can't
                 # detect goo pits / bottomless pits
                 settings['has_attr']['goo'] = True
-                if is_bottomless:
+                if make_bottomless:
                     if face.planes[2].z < pit_height:
                         settings['has_attr']['bottomless_pit'] = True
                         pit_solids.append((solid, face))
@@ -1104,7 +1164,7 @@ def change_brush():
         if is_glass and glass_inst is not None:
             switch_glass_inst(solid.get_origin(), glass_inst)
 
-    if is_bottomless:
+    if make_bottomless:
         utils.con_log('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)
         utils.con_log('Done!')
@@ -1133,7 +1193,6 @@ def switch_glass_inst(origin, new_file):
         origin.z//128 * 128 + 64,
         )
     direction = (origin-loc).norm()
-    ang_vec = Vec(-1, 0, 0)
     loc_str = loc.join(' ')
     gls_file = instanceLocs.resolve('[glass_128]')
 
@@ -1150,10 +1209,13 @@ def switch_glass_inst(origin, new_file):
                 ):
             # (45, 45, 45) will never match any of the directions, so we
             # effectively skip instances without angles
-            inst_ang = Vec.from_str(inst['angles', ''], 45, 45, 45)
+            inst_ang = Vec.from_str
             # The brush parts are on this side!
-            rot = Vec(-1, 0, 0).rotate(
-                inst_ang.x, inst_ang.y, inst_ang.z
+            rot = Vec(-1, 0, 0).rotate_by_str(
+                inst['angles', ''],
+                45,
+                45,
+                45,
             )
             if rot == direction:
                 if targ is None:
@@ -1392,8 +1454,7 @@ def set_antline_mat(over, mat, raw_mat=False):
         if get_tex('overlay.' + mat + 'floor') != '':
             # For P1 style, check to see if the antline is on the floor or
             # walls.
-            ang = Vec.from_str(over['angles'])
-            direction = Vec(0, 0, 1).rotate(ang.x, ang.y, ang.z)
+            direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
             if direction == (0, 0, 1) or direction == (0, 0, -1):
                 mat += 'floor'
 
@@ -1743,12 +1804,19 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     # Put quotes around args which contain spaces, and remove blank args.
     vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
 
+    if utils.MAC:
+        os_suff = '_osx'
+    elif utils.LINUX:
+        os_suff = '_linux'
+    else:
+        os_suff = ''
+
     arg = (
         '"'
         + os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp_original"
+                "vbsp" + os_suff + "_original"
                 )
             )
         + '" '
@@ -1788,6 +1856,11 @@ def main():
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
     path = sys.argv[-1]  # The path is the last argument to vbsp
+
+    if old_args[0].casefold() == '-dump_conditions':
+        # Print all the condition flags, results, and metaconditions
+        conditions.dump_conditions()
+        sys.exit()
 
     # Add styled/ to the list of directories for the new location
     path_dir, path_file = os.path.split(path)

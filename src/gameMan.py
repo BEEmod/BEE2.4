@@ -34,14 +34,16 @@ config = ConfigFile('games.cfg')
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
     ('VBSP',        'bin/vbsp',                         '.exe'),
-    ('VRAD',        'bin/vrad',                         '.exe')
+    ('VRAD',        'bin/vrad',                         '.exe'),
+    ('VBSP',        'bin/vbsp_osx',   ''),
+    ('VRAD',        'bin/vrad_osx',   ''),
+    ('VBSP',        'bin/vbsp_linux', ''),
+    ('VRAD',        'bin/vrad_linux', ''),
 ]
 
 VOICE_PATHS = [
-    ('SP', 'SP'),
-    ('COOP', 'Coop'),
-    ('MID_SP', 'Mid SP'),
-    ('MID_COOP', 'Mid Coop'),
+    ('', '', 'normal'),
+    ('MID_', 'mid_', 'MidChamber'),
 ]
 
 _UNLOCK_ITEMS = [
@@ -210,6 +212,8 @@ class Game:
             source = os.path.join('../cache/resources/', folder)
             if folder == 'instances':
                 dest = self.abs_path(INST_PATH)
+            elif folder.casefold() == 'bee2':
+                continue  # Skip app icons
             else:
                 dest = self.abs_path(os.path.join('bee2', folder))
             print('Copying to "' + dest + '" ...', end='')
@@ -257,9 +261,14 @@ class Game:
         print('  }')
 
         # VBSP, VRAD, editoritems
-        export_screen.set_length('BACK', 3)
-        # VBSP_conf, Editoritems, instances, gameinfo, 4 voices
-        export_screen.set_length('CONF', 8)
+        export_screen.set_length('BACK', len(FILES_TO_BACKUP))
+        export_screen.set_length(
+            'CONF',
+            # VBSP_conf, Editoritems, instances, gameinfo
+            4 +
+            # Don't add the voicelines to the progress bar if not selected
+            (0 if voice is None else len(VOICE_PATHS)),
+        )
         # files in compiler/ + pakrat
         export_screen.set_length('COMP', len(os.listdir('../compiler')) + 1)
 
@@ -313,11 +322,13 @@ class Game:
         )
 
         # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children('Conditions',
-                                   'InstanceFiles',
-                                   'Options',
-                                   'StyleVars',
-                                   'Textures')
+        vbsp_config.merge_children(
+            'Conditions',
+            'StyleVars',
+            'Textures',
+            'Voice',
+            'Options',
+        )
 
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [
@@ -385,17 +396,25 @@ class Game:
                 inst_file.write(line)
         export_screen.step('CONF')
 
-        for prefix, pretty in VOICE_PATHS:
-            path = 'config/voice/{}_{}.cfg'.format(prefix, voice.id)
-            if os.path.isfile(path):
-                shutil.copy(
-                    path,
-                    self.abs_path('bin/bee2/{}.cfg'.format(prefix))
+        if voice is not None:
+            for prefix, dest, pretty in VOICE_PATHS:
+                path = os.path.join(
+                    os.getcwd(),
+                    '..',
+                    'config',
+                    'voice',
+                    prefix + voice.id + '.cfg',
                 )
-                print('Written "{}.cfg"'.format(prefix))
-            else:
-                print('No ' + pretty + ' voice config!')
-            export_screen.step('CONF')
+                print(path)
+                if os.path.isfile(path):
+                    shutil.copy(
+                        path,
+                        self.abs_path('bin/bee2/{}voice.cfg'.format(dest))
+                    )
+                    print('Written "{}voice.cfg"'.format(dest))
+                else:
+                    print('No ' + pretty + ' voice config!')
+                export_screen.step('CONF')
 
         print('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):

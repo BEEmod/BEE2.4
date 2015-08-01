@@ -1,3 +1,4 @@
+# coding=utf-8
 import math
 import string
 import collections.abc as abc
@@ -5,11 +6,133 @@ from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
 
+
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
+
+if WIN:
+    # Some events differ on different systems, so define them here.
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+
+        'KEY_EXPORT': '<Control-e>',
+        'KEY_SAVE_AS': '<Control-s>',
+        'KEY_SAVE': '<Control-Shift-s>',
+    }
+    # The text used to show shortcuts in menus.
+    KEY_ACCEL = {
+        'KEY_EXPORT': 'Ctrl-E',
+        'KEY_SAVE': 'Ctrl-S',
+        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
+elif MAC:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-2>',
+        'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_CTRL': '<Control-Button-2>',
+        'RIGHT_SHIFT': '<Shift-Button-2>',
+        'RIGHT_RELEASE': '<ButtonRelease-2>',
+        'RIGHT_MOVE': '<B2-Motion>',
+
+        'KEY_EXPORT': '<Command-e>',
+        'KEY_SAVE_AS': '<Command-s>',
+        'KEY_SAVE': '<Command-Shift-s>',
+    }
+
+    KEY_ACCEL = {
+        # tkinter replaces Command- with the special symbol automatically.
+        'KEY_EXPORT': 'Command-E',
+        'KEY_SAVE': 'Command-S',
+        'KEY_SAVE_AS': 'Command-Shift-S',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'spinning',
+        'stretch_vert': 'resizeupdown',
+        'stretch_horiz': 'resizeleftright',
+        'move_item': 'plus',
+        'destroy_item': 'poof',
+        'invalid_drag': 'notallowed',
+    }
+elif LINUX:
+    EVENTS = {
+        'LEFT': '<Button-1>',
+        'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
+        'LEFT_SHIFT': '<Shift-Button-1>',
+        'LEFT_RELEASE': '<ButtonRelease-1>',
+        'LEFT_MOVE': '<B1-Motion>',
+
+        'RIGHT': '<Button-3>',
+        'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
+        'RIGHT_SHIFT': '<Shift-Button-3>',
+        'RIGHT_RELEASE': '<ButtonRelease-3>',
+        'RIGHT_MOVE': '<B3-Motion>',
+
+        'KEY_EXPORT': '<Control-e>',
+        'KEY_SAVE_AS': '<Control-s>',
+        'KEY_SAVE': '<Control-Shift-s>',
+    }
+    KEY_ACCEL = {
+        'KEY_EXPORT': 'Ctrl-E',
+        'KEY_SAVE': 'Ctrl-S',
+        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
+
+if MAC:
+    def bind_rightclick(wid, func):
+        """On OSX, we need to bind to both rightclick and control-leftclick."""
+        wid.bind(EVENTS['RIGHT'], func)
+        # TODO: We need to cancel the original LEFT event for this to actually work.
+        wid.bind(EVENTS['LEFT_CTRL'], func)
+else:
+    def bind_rightclick(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['RIGHT'], func)
 
 BOOL_LOOKUP = {
     '1': True,
@@ -22,6 +145,10 @@ BOOL_LOOKUP = {
 
 
 class CONN_TYPES(Enum):
+    """Possible connections when joining things together.
+
+    Used for things like catwalks, and bottomless pit sides.
+    """
     none = 0
     side = 1  # Points E
     straight = 2  # Points E-W
@@ -162,7 +289,35 @@ def conv_int(val, default=0):
     except (ValueError, TypeError):
         return default
 
+
+def parse_str(val, x=0.0, y=0.0, z=0.0):
+    """Convert a string in the form '(4 6 -4)' into a set of floats.
+
+     If the string is unparsable, this uses the defaults (x,y,z).
+     The string can start with any of the (), {}, [], <> bracket
+     types.
+     """
+    parts = val.split(' ')
+    if len(parts) == 3:
+        # Strip off the brackets if present
+        if parts[0][0] in '({[<':
+            parts[0] = parts[0][1:]
+        if parts[2][-1] in ')}]>':
+            parts[2] = parts[2][:-1]
+        try:
+            return (
+                float(parts[0]),
+                float(parts[1]),
+                float(parts[2]),
+            )
+        except ValueError:
+            return x, y, z
+    else:
+        return x, y, z
+
 DISABLE_ADJUST = False
+
+
 def adjust_inside_screen(x, y, win, horiz_bound=14, vert_bound=45):
     """Adjust a window position to ensure it fits inside the screen."""
     if DISABLE_ADJUST:  # Allow disabling this adjustment
@@ -200,6 +355,7 @@ def append_bothsides(deq):
     while True:
         deq.append((yield))
         deq.appendleft((yield))
+
 
 def fit(dist, obj):
     """Figure out the smallest number of parts to stretch a distance."""
@@ -263,8 +419,11 @@ class EmptyMapping(abc.Mapping):
     def keys(self):
         return self
 
-EmptyMapping = EmptyMapping() # We only need the one instance
+EmptyMapping = EmptyMapping()  # We only need the one instance
+
+
 Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
+
 
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
@@ -305,30 +464,15 @@ class Vec:
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val, x=0, y=0, z=0):
-        """Convert a string in the form '(4 6 -4)' into a vector.
+    def from_str(cls, val, x=0.0, y=0.0, z=0.0):
+        """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
          The string can start with any of the (), {}, [], <> bracket
          types.
          """
-        parts = val.split(' ')
-        if len(parts) == 3:
-            # strip off the brackets if present
-            if parts[0][0] in '({[<':
-                parts[0] = parts[0][1:]
-            if parts[2][-1] in ')}]>':
-                parts[2] = parts[2][:-1]
-            try:
-                return cls(
-                    float(parts[0]),
-                    float(parts[1]),
-                    float(parts[2]),
-                )
-            except ValueError:
-                return cls(x, y, z)
-        else:
-            return cls(x, y, z)
+        x, y, z = parse_str(val, x, y, z)
+        return cls(x, y, z)
 
     def mat_mul(self, matrix):
         """Multiply this vector by a 3x3 rotation matrix.
@@ -343,7 +487,7 @@ class Vec:
         self.z = x*g + y*h + z*i
         return self
 
-    def rotate(self, pitch=0, yaw=0, roll=0, round_vals=True):
+    def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
         Returns the vector, so you can use it in the form
         val = Vec(0,1,0).rotate(p, y, r)
@@ -394,6 +538,16 @@ class Vec:
             self.z = round(self.z, 3)
 
         return self
+
+    def rotate_by_str(self, ang, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
+        """Rotate a vector, using a string instead of a vector."""
+        pitch, yaw, roll = parse_str(ang, pitch, yaw, roll)
+        return self.rotate(
+            pitch,
+            yaw,
+            roll,
+            round_vals,
+        )
 
     def __add__(self, other):
         """+ operation.
@@ -462,7 +616,6 @@ class Vec:
             except TypeError:
                 return NotImplemented
     __rmul__ = __mul__
-
 
     def __div__(self, other):
         """Divide the Vector by a scalar.
@@ -546,7 +699,6 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-
     def __iadd__(self, other):
         """+= operation.
 
@@ -618,7 +770,6 @@ class Vec:
             self.y /= other
             self.z /= other
             return self
-
 
     def __ifloordiv__(self, other):
         """//= operation.
@@ -803,16 +954,13 @@ class Vec:
             delim=delim,
         )
 
-
     def __str__(self):
         """Return a user-friendly representation of this vector."""
         return "(" + self.join() + ")"
 
-
     def __repr__(self):
         """Code required to reproduce this vector."""
         return self.__class__.__name__ + "(" + self.join() + ")"
-
 
     def __iter__(self):
         """Allow iterating through the dimensions."""

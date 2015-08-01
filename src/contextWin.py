@@ -18,6 +18,7 @@ from richTextBox import tkRichText
 import img as png
 import sound as snd
 import itemPropWin
+import tooltip
 import utils
 
 OPEN_IN_TAB = 2
@@ -96,28 +97,10 @@ def sub_open(ind, _=None):
 
 def more_info_show_url(_=None):
     if selected_item.url is not None:
-        wid['moreinfo_context']['text'] = selected_item.url
-        moreinfo_win.deiconify()
-        moreinfo_win.update_idletasks()
-        moreinfo_win.lift()
-
-        # Center vertically below the button
-        x = (
-            wid['moreinfo'].winfo_rootx() -
-            (
-                moreinfo_win.winfo_reqwidth()
-                - wid['moreinfo'].winfo_reqwidth()
-                ) // 2
-            )
-        y = (
-            wid['moreinfo'].winfo_rooty()
-            + wid['moreinfo'].winfo_reqheight()
-            )
-        moreinfo_win.geometry('+' + str(x) + '+' + str(y))
-
-
-def more_info_hide_url(e):
-    moreinfo_win.withdraw()
+        tooltip.show(
+            wid['moreinfo'],
+            selected_item.url,
+        )
 
 
 def open_event(e):
@@ -371,8 +354,11 @@ def init_widgets():
             image=png.png('BEE2/alpha_64'),
         )
         wid['subitem'][i].grid(row=0, column=i)
-        wid['subitem'][i].bind('<Button-1>', functools.partial(sub_sel, i))
-        wid['subitem'][i].bind('<Button-3>', functools.partial(sub_open, i))
+        wid['subitem'][i].bind(utils.EVENTS['LEFT'], functools.partial(sub_sel, i))
+        utils.bind_rightclick(
+            wid['subitem'][i],
+            functools.partial(sub_open, i),
+        )
 
     wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
     wid['wip_dep'].grid(row=4, column=0, sticky="NW")
@@ -432,22 +418,7 @@ def init_widgets():
     wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
     wid['moreinfo'].bind('<Enter>', more_info_show_url)
-    wid['moreinfo'].bind('<Leave>', more_info_hide_url)
-
-    moreinfo_win = Toplevel(TK_ROOT)
-    moreinfo_win.withdraw()
-    moreinfo_win.transient(master=TK_ROOT)
-    moreinfo_win.overrideredirect(1)
-    moreinfo_win.resizable(False, False)
-
-    wid['moreinfo_context'] = ttk.Label(
-        moreinfo_win,
-        text='',
-        relief="groove",
-        font="TkSmallCaptionFont",
-        padding=(5, 2),
-        )
-    wid['moreinfo_context'].grid(row=0, column=0)
+    wid['moreinfo'].bind('<Leave>', tooltip.hide)
 
     menu_info = Menu(wid['moreinfo'])
     menu_info.add_command(label='', state='disabled')

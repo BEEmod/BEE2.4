@@ -3,8 +3,8 @@ from tk_root import TK_ROOT
 from tkinter import ttk
 from tkinter import font
 
+from decimal import Decimal
 import os
-import itertools
 import functools
 
 from BEE2_config import ConfigFile
@@ -14,13 +14,14 @@ import utils
 voice_item = None
 
 UI = {}
-coop_selected = False
 
-TABS_SP = {}
-TABS_COOP = {}
+TABS = {}
 
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
+
+SP_IMG = img.png('icons/quote_sp')
+COOP_IMG = img.png('icons/quote_coop')
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
 win.columnconfigure(0, weight=1)
@@ -30,30 +31,14 @@ win.protocol("WM_DELETE_WINDOW", win.withdraw)
 win.bind("<Escape>", win.withdraw)
 win.withdraw()
 
+
 def init_widgets():
-    btn_frame = ttk.Frame(win)
-    btn_frame.grid(row=0, column=0, sticky='EW')
-    btn_frame.columnconfigure(0, weight=1)
-    btn_frame.columnconfigure(1, weight=1)
-
-    UI['mode_SP'] = ttk.Button(
-        btn_frame,
-        text='Single-Player',
-        state=['disabled'],
-        command=modeswitch_sp,
-        )
-    UI['mode_SP'].grid(row=0, column=0, sticky=E)
-
-    UI['mode_COOP'] = ttk.Button(
-        btn_frame,
-        text='Coop',
-        command=modeswitch_coop,
-        )
-    UI['mode_COOP'].grid(row=0, column=1, sticky=W)
-
-    pane = ttk.PanedWindow(
+    pane = PanedWindow(
         win,
         orient=VERTICAL,
+        sashpad=2,  # Padding above/below panes
+        sashwidth=3,  # Width of border
+        sashrelief=RAISED,  # Raise the border between panes
         )
     UI['pane'] = pane
     pane.grid(row=1, column=0, sticky='NSEW')
@@ -61,12 +46,12 @@ def init_widgets():
 
     UI['tabs'] = ttk.Notebook(pane)
     UI['tabs'].enable_traversal()  # Add keyboard shortcuts
-    pane.add(UI['tabs'], weight=2)
+    pane.add(UI['tabs'])
+    pane.paneconfigure(UI['tabs'], minsize=50)
 
     trans_frame = ttk.Frame(pane)
-    trans_frame.rowconfigure(0, weight=1)
+    trans_frame.rowconfigure(1, weight=1)
     trans_frame.columnconfigure(0, weight=1)
-    pane.add(trans_frame, weight=1)
 
     ttk.Label(
         trans_frame,
@@ -85,7 +70,7 @@ def init_widgets():
     UI['trans'] = Text(
         trans_inner_frame,
         width=10,
-        height=10,
+        height=4,
         wrap='word',
         relief='flat',
         state='disabled',
@@ -96,6 +81,10 @@ def init_widgets():
         orient=VERTICAL,
         command=UI['trans'].yview,
         )
+    UI['trans'].tag_config(
+        'bold',
+        font=('Helvectia', 10, 'bold'),
+    )
     UI['trans']['yscrollcommand'] = UI['trans_scroll'].set
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
     UI['trans'].grid(row=0, column=0, sticky='NSEW')
@@ -106,38 +95,31 @@ def init_widgets():
         command=save,
         ).grid(row=2, column=0)
 
-    pane.rowconfigure(0, minsize=100)
-    pane.rowconfigure(1, minsize=100)
+    # Don't allow resizing the transcript box to be smaller than the
+    # original size.
+    trans_frame.update_idletasks()
+    pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
+
 
 def quote_sort_func(quote):
     """The quotes will be sorted by their priority value."""
+    # Use Decimal so any number of decimal points can be used.
     try:
-        return float(quote['priority', '0'])
+        return Decimal(quote['priority', '0'])
     except ValueError:
-        return 0.0
-
-
-def modeswitch_sp():
-    global coop_selected
-    coop_selected = False
-    UI['mode_SP'].state(['disabled'])
-    UI['mode_COOP'].state(['!disabled'])
-    refresh()
-
-
-def modeswitch_coop():
-    global coop_selected
-    coop_selected = True
-    UI['mode_SP'].state(['!disabled'])
-    UI['mode_COOP'].state(['disabled'])
-    refresh()
+        return Decimal('0')
 
 
 def show_trans(e):
+    """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
     text.delete(1.0, END)
-    text.insert('end', e.widget.transcript)
+    for actor, line in e.widget.transcript:
+        text.insert('end', actor, ('bold',))
+        text.insert('end', line + '\n\n')
+    # Remove the trailing newlines
+    text.delete('end-2char', 'end')
     text['state'] = 'disabled'
 
 
@@ -160,17 +142,14 @@ def configure_canv(e):
 
 def save():
     print('Saving Configs!')
-    config_sp.save_check()
-    config_coop.save_check()
-    config_mid_sp.save_check()
-    config_mid_coop.save_check()
+    config.save_check()
+    config_mid.save_check()
     win.withdraw()
 
 
-def refresh(e=None):
+def add_tabs():
+    """Add the tabs to the notebook."""
     notebook = UI['tabs']
-    is_coop = coop_selected
-
     # Save the current tab index so we can restore it after.
     try:
         current_tab = notebook.index(notebook.select())
@@ -178,55 +157,36 @@ def refresh(e=None):
         current_tab = None  # in that case abandon remembering the tab.
 
     # Add or remove tabs so only the correct mode is visible.
-    for name, tab in sorted(TABS_SP.items()):
-        if is_coop:
-            notebook.forget(tab)
+    for name, tab in sorted(TABS.items()):
+        notebook.add(tab)
+        if tab.nb_is_mid:
+            # For the midpoint tabs, we use a special image to make
+            # sure they are well-distinguished from the other groups.
+            notebook.tab(
+                tab,
+                compound='image',
+                image=img.png('icons/mid_quote'),
+                )
         else:
-            notebook.add(tab)
-            if tab.nb_is_mid:
-                # For the midpoint tabs, we use a special image to make
-                # sure they are well-distinguished from the other groups.
-                notebook.tab(
-                    tab,
-                    compound='image',
-                    image=img.png('icons/mid_quote'),
-                    )
-            else:
-                notebook.tab(tab, text=tab.nb_text)
-
-    for name, tab in sorted(TABS_COOP.items()):
-        if is_coop:
-            notebook.add(tab)
-            if tab.nb_is_mid:
-                notebook.tab(
-                    tab,
-                    compound='image',
-                    image=img.png('icons/mid_quote'),
-                    )
-            else:
-                notebook.tab(tab, text=tab.nb_text)
-
-        else:
-            notebook.forget(tab)
+            notebook.tab(tab, text=tab.nb_text)
 
     if current_tab is not None:
         notebook.select(current_tab)
 
+
 def show(quote_pack):
     """Display the editing window."""
-    global voice_item, config_sp, config_coop, config_mid_sp, config_mid_coop
+    global voice_item, config, config_mid
     voice_item = quote_pack
 
-    win.title('BEE2 - Configure "' + voice_item.name + '"')
+    win.title('BEE2 - Configure "' + voice_item.selitem_data.name + '"')
     notebook = UI['tabs']
 
     quote_data = quote_pack.config
 
     os.makedirs('config/voice', exist_ok=True)
-    config_sp = ConfigFile('voice/SP_' + quote_pack.id + '.cfg')
-    config_coop = ConfigFile('voice/COOP_' + quote_pack.id + '.cfg')
-    config_mid_sp = ConfigFile('voice/MID_SP_' + quote_pack.id + '.cfg')
-    config_mid_coop = ConfigFile('voice/MID_COOP_' + quote_pack.id + '.cfg')
+    config = ConfigFile('voice/' + quote_pack.id + '.cfg')
+    config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
 
     # Clear the transcript textbox
     text = UI['trans']
@@ -235,64 +195,52 @@ def show(quote_pack):
     text['state'] = 'disabled'
 
     # Destroy all the old tabs
-    for tab in itertools.chain(
-            TABS_SP.values(),
-            TABS_COOP.values(),
-            ):
+    for tab in TABS.values():
         try:
             notebook.forget(tab)
-        except TclError:
+        except TclError as e:
             pass
         tab.destroy()
 
-    TABS_SP.clear()
-    TABS_COOP.clear()
+    TABS.clear()
 
-    add_tabs(quote_data, 'quotes_sp', TABS_SP, config_sp)
-    add_tabs(quote_data, 'quotes_coop', TABS_COOP, config_coop)
+    for group in quote_data.find_all('quotes', 'group'):
+        make_tab(
+            group,
+            config,
+            is_mid=False,
+            )
 
-    config_sp.save()
-    config_coop.save()
-    config_mid_sp.save()
-    config_mid_coop.save()
+    mid_quotes = list(quote_data.find_all('quotes', 'midchamber'))
+    if len(mid_quotes) > 0:
+        frame = make_tab(
+            mid_quotes[0],
+            config_mid,
+            is_mid=True,
+            )
+        frame.nb_text = ''
 
-    refresh()
+    config.save()
+    config_mid.save()
+
+    add_tabs()
+
     win.deiconify()
     win.lift(win.winfo_parent())
     utils.center_win(win)  # Center inside the parent
 
 
-def add_tabs(quote_data, section, tab_dict, config):
-    """Add all the tabs for one of the game modes."""
-    for group in quote_data.find_all(section, 'group'):
-        make_tab(
-            group,
-            tab_dict,
-            config,
-            is_mid=False,
-            )
-
-    mid_quotes = list(quote_data.find_all(section, 'midchamber'))
-    if len(mid_quotes) > 0:
-        frame = make_tab(
-            mid_quotes[0],
-            tab_dict,
-            config,
-            is_mid=True,
-            )
-        frame.nb_text = ''
-
-
-def make_tab(group, tab_dict, config, is_mid=False):
+def make_tab(group, config, is_mid=False):
     """Create all the widgets for a tab."""
     group_name = group['name', 'No Name!']
     group_desc = group['desc', '']
+
     # This is just to hold the canvas and scrollbar
     outer_frame = ttk.Frame(UI['tabs'])
     outer_frame.columnconfigure(0, weight=1)
     outer_frame.rowconfigure(0, weight=1)
 
-    tab_dict[group_name] = outer_frame
+    TABS[group_name] = outer_frame
     # We add this attribute so the refresh() method knows all the
     # tab names
     outer_frame.nb_text = group_name
@@ -371,11 +319,13 @@ def make_tab(group, tab_dict, config, is_mid=False):
                 sticky=W,
                 )
 
-        for line in quote.find_all('Instance'):
+        for badge, line in find_lines(quote):
             line_id = line['id', line['name']]
             check = ttk.Checkbutton(
                 frame,
                 text=line['name'],
+                compound=LEFT,
+                image=badge,
                 )
             check.quote_var = IntVar(
                 value=config.get_bool(group_name, line_id, True),
@@ -389,11 +339,7 @@ def make_tab(group, tab_dict, config, is_mid=False):
                 line_id,
                 )
 
-            check.transcript = '\n\n'.join([
-                '"' + trans.value + '"'
-                for trans in
-                line.find_all('trans')
-                ])
+            check.transcript = list(get_trans_lines(line))
             check.grid(
                 column=0,
                 padx=(10, 0),
@@ -405,13 +351,33 @@ def make_tab(group, tab_dict, config, is_mid=False):
     return outer_frame
 
 
+def find_lines(quote_block):
+    """Find the line property blocks in a quote."""
+    for prop in quote_block:
+        if prop.name == 'line':
+            yield None, prop
+        elif prop.name == 'line_sp':
+            yield SP_IMG, prop
+        elif prop.name == 'line_coop':
+            yield COOP_IMG, prop
+
+
+def get_trans_lines(trans_block):
+    for prop in trans_block:
+        if prop.name == 'trans':
+            if ':' in prop.value:
+                name, trans = prop.value.split(':', 1)
+                yield name.rstrip(), ': "' + trans.lstrip() + '"'
+            else:
+                yield '', '"' + prop.value + '"'
+
 if __name__ == '__main__':
     import packageLoader
     data = packageLoader.load_packages('packages\\', False)
 
     TK_ROOT = Tk()
     lab = ttk.Label(TK_ROOT, text='Root Window')
-    lab.bind('<Button-1>', lambda e: show(d['BEE2_CAVE_50s']))
+    lab.bind(utils.EVENTS['LEFT'], lambda e: show(d['BEE2_CAVE_50s']))
     lab.grid()
     init_widgets()
     d = {quote.id: quote for quote in data['QuotePack']}

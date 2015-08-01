@@ -195,13 +195,17 @@ class selWin:
         self.win.bind("<Escape>", self.exit)
 
         # PanedWindow allows resizing the two areas independently.
-        self.pane_win = ttk.Panedwindow(self.win, orient=HORIZONTAL)
+        self.pane_win = PanedWindow(
+            self.win,
+            orient=HORIZONTAL,
+            sashpad=2,  # Padding above/below panes
+            sashwidth=3,  # Width of border
+            sashrelief=RAISED,  # Raise the border between panes
+        )
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
-        self.win.rowconfigure(0, weight=1)
-        self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
 
@@ -375,15 +379,25 @@ class selWin:
 
             item.win = self.win
             item.button.bind(
-                "<Button-1>",
+                utils.EVENTS['LEFT'],
                 functools.partial(self.sel_item, item),
             )
-            item.button.bind("<Double-Button-1>", self.save)
+            item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-        self.pane_win.add(shim, weight=1)
+        self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
+
+        # Force a minimum size for the two parts
+        self.pane_win.paneconfigure(shim, minsize=100, stretch='always')
+        self.prop_frm.update_idletasks()  # Update reqwidth()
+        self.pane_win.paneconfigure(
+            self.prop_frm,
+            minsize=200,
+            stretch='never',
+        )
+
 
     def widget(self, frame) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
@@ -395,11 +409,14 @@ class selWin:
         self.display = ttk.Entry(
             frame,
             textvariable=self.disp_label,
-            cursor='arrow',
+            cursor=utils.CURSORS['regular'],
         )
-        self.display.bind("<Button-1>", self.open_win)
+        self.display.bind(utils.EVENTS['LEFT'], self.open_win)
         self.display.bind("<Key>", self.set_disp)
-        self.display.bind("<Button-3>", self.open_context)
+        utils.bind_rightclick(
+            self.display,
+            self.open_context,
+        )
 
         self.disp_btn = ttk.Button(
             self.display,

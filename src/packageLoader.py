@@ -204,7 +204,7 @@ def load_packages(
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
-                loc = os.path.normcase(path)
+                loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
                     zip_file.extract(path, path="../cache/")
@@ -269,7 +269,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
     for item in zip_names(zip_file):
-        item = os.path.normcase(item)
+        item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
@@ -743,10 +743,19 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, unstyled=False, default=False):
+    def __init__(
+            self,
+            var_id,
+            name,
+            styles,
+            unstyled=False,
+            default=False,
+            desc='',
+            ):
         self.id = var_id
         self.name = name
         self.default = default
+        self.desc = desc
         if unstyled:
             self.styles = None
         else:
@@ -759,14 +768,21 @@ class StyleVar:
         default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
-            for prop in data.info.find_all('Style')
+            for prop in
+            data.info.find_all('Style')
         ]
+        desc = '\n'.join(
+            prop.value
+            for prop in
+            data.info.find_all('description')
+        )
         return cls(
             data.id,
             name,
             styles,
             unstyled=unstyled,
             default=default,
+            desc=desc,
         )
 
     def add_over(self, override):

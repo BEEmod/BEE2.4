@@ -12,9 +12,17 @@ def quote(txt):
 
 def run_vrad(args):
     "Execute the original VRAD."
+
+    if utils.MAC:
+        os_suff = '_osx'
+    elif utils.LINUX:
+        os_suff = '_linux'
+    else:
+        os_suff = ''
+
     joined_args = (
         '"' + os.path.normpath(
-            os.path.join(os.getcwd(), "vrad_original")
+            os.path.join(os.getcwd(), "vrad" + os_suff + "_original")
             ) +
         '" ' +
         " ".join(
