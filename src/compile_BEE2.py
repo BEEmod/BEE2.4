@@ -1,9 +1,15 @@
 from cx_Freeze import setup, Executable
 import os, shutil
+import utils
 
 shutil.rmtree('build_BEE2', ignore_errors=True)
 
 ico_path = os.path.join(os.getcwd(), "../bee2.ico")
+
+if utils.WIN:
+    base = 'Win32GUI'
+else:
+    base = None
 
 setup(
     name='BEE2',
@@ -17,7 +23,7 @@ setup(
     executables=[
         Executable(
             'BEE2.pyw',
-            base='Win32GUI',
+            base=base,
             icon=ico_path,
             compress=True,
         )
