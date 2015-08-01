@@ -25,10 +25,29 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     if (orig_path, resize_to) in cached_img:
         return cached_img[orig_path, resize_to]
 
-    if not os.path.isfile(os.path.join("..", "images", path)):
+    base_path = os.path.abspath(
+        os.path.join(
+            os.getcwd(),
+            "../",
+            "images",
+            path,
+        )
+    )
+    cache_path = os.path.abspath(
+        os.path.join(
+            os.getcwd(),
+            "../",
+            "images",
+            "cache",
+            path,
+        )
+    )
+
+    if os.path.isfile(base_path):
+        path = base_path
+    else:
         # If not in the main folder, load from the zip-cache
-        path = os.path.join("..", "images", "cache", path)
-    path = os.path.join("..", "images", path)
+        path = cache_path
 
     if os.path.isfile(path):
         image = Image.open(path)
