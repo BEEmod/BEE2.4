@@ -72,10 +72,10 @@ elif MAC:
     }
 
     KEY_ACCEL = {
-        # \u2318 = Command Key
-        'KEY_EXPORT': '\u2318-E',
-        'KEY_SAVE': '\u2318-S',
-        'KEY_SAVE_AS': '\u2318-Shift-S',
+        # tkinter replaces Command- with the special symbol automatically.
+        'KEY_EXPORT': 'Command-E',
+        'KEY_SAVE': 'Command-S',
+        'KEY_SAVE_AS': 'Command-Shift-S',
     }
 
     CURSORS = {
@@ -127,6 +127,7 @@ if MAC:
     def bind_rightclick(wid, func):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func)
+        # TODO: We need to cancel the original LEFT event for this to actually work.
         wid.bind(EVENTS['LEFT_CTRL'], func)
 else:
     def bind_rightclick(wid, func):
