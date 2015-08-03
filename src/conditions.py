@@ -700,6 +700,44 @@ def flag_angles(inst, flag):
         return inst_normal == normal or (
             allow_inverse and -inst_normal == normal
         )
+
+@make_flag('posIsSolid')
+def flag_brush_at_loc(inst, flag):
+    """Checks to see if a wall is present at the given location.
+
+    - Pos is the position of the brush, where `0 0 0` is the floor-position
+       of the brush, and '0 0 1' is the ceiling.
+    - Dir is the normal the face is pointing. (0 0 1) is 'up'.
+    - Type defines the type the brush must be:
+      - "Any" requires either a black or white brush.
+      - "None" means that no brush must be present.
+      - "White" requires a portalable surface.
+      - "Black" requires a non-portalable surface.
+    - SetVar defines an instvar which will be given a value of "black",
+      'white" or "none" to allow the result to be reused.
+    - RemoveBrush: If set to 1, the brush will be removed if found.
+    """
+    pos = Vec.from_str(inst['origin', '0 0 0'])
+    # Relative to the instance origin
+    pos += (
+        Vec.from_str(flag['pos', '0 0 0'])
+        * 128  # 128 units between blocks
+        - (0, 0, 64)  # Subtract so origin is the floor-position
+    ).rotate_by_str(
+        inst['angles', '0 0 0']
+    )
+
+    norm = Vec.from_str(flag['dir', '0 0 1']).rotate_by_str(
+        inst['angles', '0 0 0']
+    )
+
+    result_var = flag['setVar', '']
+    should_remove = utils.conv_bool(flag['RemoveBrush'])
+    des_type = flag['type', 'any'].casefold()
+
+
+
+
 ###########
 # RESULTS #
 ###########
