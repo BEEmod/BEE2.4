@@ -410,10 +410,10 @@ def build_solid_dict():
                     continue
 
                 SOLIDS[origin] = solidGroup(
-                    mat_type,
-                    face,
-                    solid,
-                    face.normal(),
+                    color=mat_type,
+                    face=face,
+                    solid=solid,
+                    normal=face.normal(),
                 )
 
 
@@ -764,7 +764,7 @@ def flag_brush_at_loc(inst, flag):
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
        of the brush, in 16 unit increments.
-    - Dir is the normal the face is pointing. (0 0 1) is 'up'.
+    - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
     - Type defines the type the brush must be:
       - "Any" requires either a black or white brush.
       - "None" means that no brush must be present.
@@ -776,17 +776,15 @@ def flag_brush_at_loc(inst, flag):
       Only do this to EmbedFace brushes, since it will remove the other
       sides as well.
     """
-    pos = Vec.from_str(inst['origin', '0 0 0'])
-    # Relative to the instance origin
-    pos += (
-        Vec.from_str(flag['pos', '0 0 0'])
-        * 16  # 128 units between blocks
-        - (0, 0, 64)  # Subtract so origin is the floor-position
-    ).rotate_by_str(
-        inst['angles', '0 0 0']
-    )
+    pos = Vec.from_str(flag['pos', '0 0 0'])
+    pos *= 16  # 16 per quarter-tile
+    pos.z -= 64  # Subtract so origin is the floor-position
+    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
 
-    norm = Vec.from_str(flag['dir', '0 0 1']).rotate_by_str(
+    # Relative to the instance origin
+    pos += Vec.from_str(inst['origin', '0 0 0'])
+
+    norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
         inst['angles', '0 0 0']
     )
 
@@ -796,6 +794,7 @@ def flag_brush_at_loc(inst, flag):
 
     brush = SOLIDS.get(pos.as_tuple(), None)
     ':type brush: solidGroup'
+
     if brush is None or brush.normal != norm:
         br_type = 'none'
     else:
