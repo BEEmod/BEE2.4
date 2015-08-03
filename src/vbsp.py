@@ -1862,9 +1862,11 @@ def main():
         conditions.dump_conditions()
         sys.exit()
 
-    # Add styled/ to the list of directories for the new location
-    path_dir, path_file = os.path.split(path)
-    new_args[-1] = new_path = os.path.join(path_dir, 'styled', path_file)
+    if not path.endswith(".vmf"):
+        path += ".vmf"
+
+    # Append styled to the map path.
+    new_path = path[:-4] + '_styled.vmf'
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1880,9 +1882,6 @@ def main():
     utils.con_log('Map path is "' + path + '"')
     if path == "":
         raise Exception("No map passed!")
-    if not path.endswith(".vmf"):
-        path += ".vmf"
-        new_path += ".vmf"
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
