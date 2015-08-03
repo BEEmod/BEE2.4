@@ -35,6 +35,12 @@ class MAT_TYPES(Enum):
     black = 0
     white = 1
 
+    def __str__(self):
+        if self is MAT_TYPES.black:
+            return 'black'
+        if self is MAT_TYPES.white:
+            return 'white'
+
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -757,7 +763,7 @@ def flag_brush_at_loc(inst, flag):
     """Checks to see if a wall is present at the given location.
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
-       of the brush, and '0 0 1' is the ceiling.
+       of the brush, in 16 unit increments.
     - Dir is the normal the face is pointing. (0 0 1) is 'up'.
     - Type defines the type the brush must be:
       - "Any" requires either a black or white brush.
@@ -765,14 +771,16 @@ def flag_brush_at_loc(inst, flag):
       - "White" requires a portalable surface.
       - "Black" requires a non-portalable surface.
     - SetVar defines an instvar which will be given a value of "black",
-      'white" or "none" to allow the result to be reused.
+      "white" or "none" to allow the result to be reused.
     - RemoveBrush: If set to 1, the brush will be removed if found.
+      Only do this to EmbedFace brushes, since it will remove the other
+      sides as well.
     """
     pos = Vec.from_str(inst['origin', '0 0 0'])
     # Relative to the instance origin
     pos += (
         Vec.from_str(flag['pos', '0 0 0'])
-        * 128  # 128 units between blocks
+        * 16  # 128 units between blocks
         - (0, 0, 64)  # Subtract so origin is the floor-position
     ).rotate_by_str(
         inst['angles', '0 0 0']
@@ -783,10 +791,27 @@ def flag_brush_at_loc(inst, flag):
     )
 
     result_var = flag['setVar', '']
-    should_remove = utils.conv_bool(flag['RemoveBrush'])
+    should_remove = utils.conv_bool(flag['RemoveBrush'], False)
     des_type = flag['type', 'any'].casefold()
 
+    brush = SOLIDS.get(pos.as_tuple(), None)
+    ':type brush: solidGroup'
+    if brush is None or brush.normal != norm:
+        br_type = 'none'
+    else:
+        br_type = str(brush.color)
+        if should_remove:
+            VMF.remove_brush(
+                brush.solid,
+            )
 
+    if result_var:
+        inst.fixup[result_var] = br_type
+
+    if des_type == 'any' and br_type != 'none':
+        return True
+
+    return des_type == br_type
 
 
 ###########
