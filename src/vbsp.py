@@ -1866,7 +1866,7 @@ def main():
         path += ".vmf"
 
     # Append styled to the map path.
-    new_path = path[:-4] + '_styled.vmf'
+    new_path = new_args[-1] = path[:-4] + '_styled.vmf'
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
