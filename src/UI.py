@@ -1808,7 +1808,7 @@ def init_windows():
     init_drag_icon()
     loader.step('UI')
 
-    optionWindow.reset_all_win = reposition_panes
+    optionWindow.reset_all_win = reset_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
 
