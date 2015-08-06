@@ -521,6 +521,8 @@ class Item:
             needs_unlock=False,
             all_conf=None,
             unstyled=False,
+            glob_desc=(),
+            desc_last=False
             ):
         self.id = item_id
         self.versions = versions
@@ -529,6 +531,8 @@ class Item:
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
         self.unstyled = unstyled
+        self.glob_desc = glob_desc
+        self.glob_desc_last = desc_last
 
     @classmethod
     def parse(cls, data):
@@ -537,6 +541,9 @@ class Item:
         def_version = None
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        glob_desc = list(desc_parse(data.info))
+        desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
             data.info,
@@ -580,11 +587,13 @@ class Item:
 
         return cls(
             data.id,
-            versions,
-            def_version,
-            needs_unlock,
-            all_config,
-            unstyled,
+            versions=versions,
+            def_version=def_version,
+            needs_unlock=needs_unlock,
+            all_conf=all_config,
+            unstyled=unstyled,
+            glob_desc=glob_desc,
+            desc_last=desc_last,
         )
 
     def add_over(self, override):

@@ -11,6 +11,7 @@ from tkinter import *
 from tk_root import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
+
 import functools
 import webbrowser
 
@@ -164,6 +165,26 @@ def set_item_version(_=None):
     load_item_data()
 
 
+def get_description(global_last, glob_desc, style_desc):
+    """Join together the general and style description for an item."""
+    if glob_desc and style_desc:
+        # We have both, we need to join them together.
+        if global_last:
+            yield from style_desc
+            yield (('line', ''))
+            yield from glob_desc
+        else:
+            yield from glob_desc
+            yield (('line', ''))
+            yield from style_desc
+    elif glob_desc:
+        yield from glob_desc
+    elif style_desc:
+        yield from style_desc
+    else:
+        return # No description
+
+
 def load_item_data():
     """Refresh the window to use the selected item's data."""
     global version_lookup
@@ -182,7 +203,13 @@ def load_item_data():
     wid['name']['text'] = selected_sub_item.name
     wid['ent_count']['text'] = item_data['ent']
 
-    wid['desc'].set_text(item_data['desc'])
+    wid['desc'].set_text(
+        get_description(
+            global_last=selected_item.item.glob_desc_last,
+            glob_desc=selected_item.item.glob_desc,
+            style_desc=item_data['desc']
+        )
+    )
 
     if itemPropWin.can_edit(selected_item.properties()):
         wid['changedefaults'].state(['!disabled'])
