@@ -221,6 +221,8 @@ def load_item_data():
         wid['moreinfo'].state(['disabled'])
     else:
         wid['moreinfo'].state(['!disabled'])
+    wid['moreinfo'].tooltip_text = selected_item.url
+
     editor_data = item_data['editor']
     has_inputs = False
     has_polarity = False
@@ -417,8 +419,7 @@ def init_widgets():
 
     wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
-    wid['moreinfo'].bind('<Enter>', more_info_show_url)
-    wid['moreinfo'].bind('<Leave>', tooltip.hide)
+    tooltip.add_tooltip(wid['moreinfo'])
 
     menu_info = Menu(wid['moreinfo'])
     menu_info.add_command(label='', state='disabled')

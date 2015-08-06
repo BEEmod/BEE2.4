@@ -65,28 +65,41 @@ def hide(e=None):
     window.withdraw()
 
 
-def add_tooltip(targ_widget, text, delay=500):
-    """Add a tooltip to the specified widget."""
+def add_tooltip(targ_widget, text='', delay=500):
+    """Add a tooltip to the specified widget.
+
+    delay is the amount of milliseconds of hovering needed to show the
+    tooltip.
+    text is the initial text for the tooltip.
+    Set targ_widget.tooltip_text to change the tooltip dynamically.
+    """
+    targ_widget.tooltip_text = text
+    event_id = None  # The id of the enter event, so we can cancel it.
 
     def after_complete():
         """Remove the id and show the tooltip after the delay."""
-        del targ_widget._tooltip_id
-        show(targ_widget, text)
+        nonlocal event_id
+        event_id = None  # Invalidate event id
+        if targ_widget.tooltip_text:
+            show(targ_widget, targ_widget.tooltip_text)
 
     def enter_handler(e):
         """Schedule showing the tooltip."""
-        targ_widget._tooltip_id = TK_ROOT.after(
-            delay,
-            after_complete,
-        )
+        nonlocal event_id
+        if targ_widget.tooltip_text:
+            event_id = TK_ROOT.after(
+                delay,
+                after_complete,
+            )
 
     def exit_handler(e):
         """When the user leaves, cancel the event."""
         # We only want to cancel if the event hasn't expired already
+        nonlocal event_id
         hide()
-        if hasattr(targ_widget, '_tooltip_id'):
+        if event_id is not None:
             TK_ROOT.after_cancel(
-                targ_widget._tooltip_id
+                event_id
             )
 
     targ_widget.bind(
