@@ -448,6 +448,12 @@ def static_pan(inst):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
+
+
+FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
+FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
+
+
 @conditions.meta_cond(priority=200, only_once=True)
 def anti_fizz_bump(inst):
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
@@ -456,10 +462,14 @@ def anti_fizz_bump(inst):
     It is only applied to trigger_portal_cleansers with the Client flag
     checked.
     """
-    FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
-    # giving 32 in total: the width of a fizzler model.
+    # Subtract 2 for the fizzler width, and divide
+    # to get the difference for each face.
+
     if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
         return True
+
+    # Only use 1 bumper entity for each fizzler, since we can.
+    bumpers = {}
 
     utils.con_log('Adding Portal Bumpers to fizzlers...')
     for cleanser in VMF.by_class['trigger_portal_cleanser']:
@@ -473,54 +483,58 @@ def anti_fizz_bump(inst):
             # Fizzlers will be changed to this in fix_func_brush()
             fizz_name = fizz_name[:-6] + '-br_brush'
 
-        utils.con_log('name:', fizz_name)
-        # We can't combine the bumpers, since noportal_volumes
-        # don't work with concave areas
-        bumper = VMF.create_ent(
-            classname='func_portal_bumper',
+        # Only have 1 bumper per brush
+        if fizz_name not in bumpers:
+            bumper = bumpers[fizz_name] = VMF.create_ent(
+                classname='func_portal_bumper',
+                targetname=fizz_name,
+                origin=cleanser['origin'],
+                spawnflags='1',
+                # Start off, we can't really check if the original
+                # does, but that's usually handled by the instance anyway.
+            )
+        else:
+            bumper = bumpers[fizz_name]
+
+        # Noportal_volumes need separate parts, since they can't be
+        # concave.
+        noportal = VMF.create_ent(
+            classname='func_noportal_volume',
             targetname=fizz_name,
             origin=cleanser['origin'],
             spawnflags='1',
-            # Start off, we can't really check if the original
-            # does, but that's usually handled by the instance anyway.
         )
-
-        bound_min, bound_max = cleanser.get_bbox()
-        origin = (bound_max + bound_min) / 2  # type: Vec
-        size = bound_max - bound_min
-        for axis in 'xyz':
-            # One of the directions will be thinner than 128, that's the fizzler
-            # direction.
-            if size[axis] < 128:
-                bound_max[axis] += FIZZ_OFF_WIDTH
-                bound_min[axis] -= FIZZ_OFF_WIDTH
-                break
 
         # Copy one of the solids to use as a base, so the texture axes
         # are correct.
         if len(cleanser.solids) == 1:
             # It's a 128x128 brush, with only one solid
-            new_solid = cleanser.solids[0].copy()
+            bumper_brush = cleanser.solids[0].copy()
         else:
             # It's a regular one, we want the middle/large section
-            new_solid = cleanser.solids[1].copy()
-        bumper.solids.append(new_solid)
+            bumper_brush = cleanser.solids[1].copy()
+        bumper.solids.append(bumper_brush)
 
-        for face in new_solid:
+        noportal_brush = bumper_brush.copy()
+        noportal.solids.append(noportal_brush)
+
+        conditions.widen_fizz_brush(
+            bumper_brush,
+            FIZZ_BUMPER_WIDTH,
+            bounds=cleanser.get_bbox(),
+        )
+
+        conditions.widen_fizz_brush(
+            noportal_brush,
+            FIZZ_NOPORTAL_WIDTH,
+            bounds=cleanser.get_bbox(),
+        )
+
+        for face in bumper_brush:
             face.mat = 'tools/toolsinvisible'
-            # For every coordinate, set to the maximum if it's larger than the
-            # origin. This will expand the two sides.
-            for v in face.planes:
-                for axis in 'xyz':
-                    if v[axis] > origin[axis]:
-                        v[axis] = bound_max[axis]
-                    else:
-                        v[axis] = bound_min[axis]
 
-        noportal = bumper.copy()
-        # Add a noportal_volume as well, of the same size.
-        noportal['classname'] = 'func_noportal_volume'
-        VMF.add_ent(noportal)
+        for face in noportal_brush:
+            face.mat = 'tools/toolsinvisible'
 
     utils.con_log('Done!')
 
@@ -1865,8 +1879,13 @@ def main():
     if not path.endswith(".vmf"):
         path += ".vmf"
 
-    # Append styled to the map path.
-    new_path = new_args[-1] = path[:-4] + '_styled.vmf'
+    # Append styled/ to the directory path.
+    path_dir, path_file = os.path.split(path)
+    new_path = new_args[-1] = os.path.join(
+        path_dir,
+        'styled',
+        path_file,
+    )
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1880,6 +1899,7 @@ def main():
                 new_args[i+1] = ''
 
     utils.con_log('Map path is "' + path + '"')
+    utils.con_log('New path: "' + new_path + '"')
     if path == "":
         raise Exception("No map passed!")
 

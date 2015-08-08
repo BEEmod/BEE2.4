@@ -517,6 +517,42 @@ def add_suffix(inst, suff):
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
+def widen_fizz_brush(brush, thickness, bounds=None):
+    """Move the two faces of a fizzler brush outward.
+
+    This is good to make fizzlers which are thicker than 2 units.
+    bounds is the output of .get_bbox(), if this should be overriden
+    """
+
+    # Subtract 2 for the fizzler width, and divide
+    # to get the difference for each face.
+    offset = (thickness-2)/2
+
+    if bounds is None:
+        bound_min, bound_max = brush.get_bbox()
+    else:
+        # Allow passing these in
+        bound_min, bound_max = bounds
+    origin = (bound_max + bound_min) / 2  # type: Vec
+    size = bound_max - bound_min
+    for axis in 'xyz':
+        # One of the directions will be thinner than 128, that's the fizzler
+        # direction.
+        if size[axis] < 128:
+            bound_min[axis] -= offset
+            bound_max[axis] += offset
+
+    for face in brush:
+        # For every coordinate, set to the maximum if it's larger than the
+        # origin. This will expand the two sides.
+        for v in face.planes:
+            for axis in 'xyz':
+                if v[axis] > origin[axis]:
+                    v[axis] = bound_max[axis]
+                else:
+                    v[axis] = bound_min[axis]
+
+
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -1161,20 +1197,22 @@ def res_cust_fizzler(base_inst, res):
     This should be executed on the base instance. Brush and MakeLaserField
     are ignored on laserfield barriers.
     Options:
-        - ModelName: sets the targetname given to the model instances.
-        - UniqueModel: If true, each model instance will get a suffix to
+        * ModelName: sets the targetname given to the model instances.
+        * UniqueModel: If true, each model instance will get a suffix to
             allow unique targetnames.
-        - Brush: A brush entity that will be generated (the original is
+        * Brush: A brush entity that will be generated (the original is
          deleted.)
-            - Name is the instance name for the brush
-            - Left/Right/Center/Short/Nodraw are the textures used
-            - Keys are a block of keyvalues to be set. Targetname and
+            * Name is the instance name for the brush
+            * Left/Right/Center/Short/Nodraw are the textures used
+            * Keys are a block of keyvalues to be set. Targetname and
               Origin are auto-set.
-        - MakeLaserField generates a brush stretched across the whole
+            * Thickness will change the thickness of the fizzler if set.
+              By default it is 2 units thick.
+        * MakeLaserField generates a brush stretched across the whole
           area.
-            - Name and keys are the same as the regular Brush.
-            - Texture/Nodraw are the textures.
-            - Width is the pixel width of the laser texture, used to
+            * Name, keys and thickness are the same as the regular Brush.
+            * Texture/Nodraw are the textures.
+            * Width is the pixel width of the laser texture, used to
               scale it correctly.
     """
     from vbsp import TEX_FIZZLER
@@ -1283,6 +1321,14 @@ def res_cust_fizzler(base_inst, res):
                     except (KeyError, IndexError):
                         # If we fail, just use the original textures
                         pass
+
+            widen_amount = utils.conv_float(config['thickness', '2'], 2.0)
+            if widen_amount != 2:
+                for brush in new_brush.solids:
+                    widen_fizz_brush(
+                        brush,
+                        thickness=widen_amount,
+                    )
 
 
 def convert_to_laserfield(
