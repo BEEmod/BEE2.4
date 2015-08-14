@@ -1,8 +1,10 @@
-# Better Extended Editor 2 version 4
-
+# Better Extended Editor 2 version 4 #
 A Portal 2  Mod tool
 
-# Modules:
+[![forthebadge](http://forthebadge.com/images/badges/designed-in-ms-paint.svg)](http://forthebadge.com)
+[![forthebadge](http://forthebadge.com/images/badges/made-with-crayons.svg)](http://forthebadge.com)
+
+## Modules: ##
 - BEE2: Main application script, starts up the application.
 - config: Subclass of ConfigParser, with some useful tweaks
 - contextWin: Implements the rightclick context menu for items.
