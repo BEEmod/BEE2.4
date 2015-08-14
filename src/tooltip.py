@@ -72,6 +72,7 @@ def add_tooltip(targ_widget, text='', delay=500):
     tooltip.
     text is the initial text for the tooltip.
     Set targ_widget.tooltip_text to change the tooltip dynamically.
+    If the target widget is disabled, no context menu will be shown.
     """
     targ_widget.tooltip_text = text
     event_id = None  # The id of the enter event, so we can cancel it.
@@ -87,6 +88,9 @@ def add_tooltip(targ_widget, text='', delay=500):
         """Schedule showing the tooltip."""
         nonlocal event_id
         if targ_widget.tooltip_text:
+            if hasattr(targ_widget, 'instate'):
+                if not targ_widget.instate(('!disabled',)):
+                    return
             event_id = TK_ROOT.after(
                 delay,
                 after_complete,
