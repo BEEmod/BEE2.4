@@ -465,6 +465,10 @@ def init_widgets():
         command=show_item_props,
         )
     wid['changedefaults'].grid(row=6, column=1)
+    tooltip.add_tooltip(
+        wid['changedefaults'],
+        'Change the default settings for this item when placed.'
+    )
 
     wid['variant'] = ttk.Combobox(f, values=['VERSION'], exportselection=0)
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
