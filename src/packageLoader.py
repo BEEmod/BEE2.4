@@ -200,14 +200,16 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        shutil.rmtree('../cache/', ignore_errors=True)
+        cache_folder = os.path.abspath('../cache/')
+
+        shutil.rmtree(cache_folder, ignore_errors=True)
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
                 loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
-                    zip_file.extract(path, path="../cache/")
+                    zip_file.extract(path, path=cache_folder)
 
         shutil.rmtree('../images/cache', ignore_errors=True)
         if os.path.isdir("../cache/resources/bee2"):
