@@ -1871,6 +1871,21 @@ def main():
     old_args = sys.argv[1:]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
+    if not old_args:
+        # No arguments!
+        utils.con_log(
+            'No arguments!\n'
+            "The BEE2 VBSP takes all the regular VBSP's "
+            'arguments, with some extra arguments:\n'
+            '-dump_conditions: Print a list of all condition flags,\n'
+            '  results, and metaconditions.\n'
+            '-force_peti: Force enabling map conversion. \n'
+            "-force_hammer: Don't convert the map at all.\n"
+            '-entity_limit: A default VBSP command, this is inspected to'
+            'determine if the map is PeTI or not.'
+        )
+        sys.exit()
+
     if old_args[0].casefold() == '-dump_conditions':
         # Print all the condition flags, results, and metaconditions
         conditions.dump_conditions()
