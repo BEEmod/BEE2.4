@@ -401,6 +401,9 @@ class EmptyMapping(abc.Mapping):
     def get(self, item, default=None):
         return default
 
+    def __bool__(self):
+        return False
+
     def __next__(self):
         raise StopIteration
 
@@ -439,8 +442,15 @@ class Vec:
         If no value is given, that axis will be set to 0.
         A sequence can be passed in (as the x argument), which will use
         the three args as x/y/z.
+        :type x: int | float | Vec | list[float]
         """
-        if isinstance(x, abc.Sequence):
+        if isinstance(x, (int, float)):
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
+        elif isinstance(x, Vec):
+            self.x, self.y, self.z = x
+        else:
             try:
                 self.x = float(x[0])
             except (TypeError, KeyError):
@@ -455,10 +465,7 @@ class Vec:
                         self.z = float(x[2])
                     except (TypeError, KeyError):
                         self.z = 0.0
-        else:
-            self.x = float(x)
-            self.y = float(y)
-            self.z = float(z)
+
 
     def copy(self):
         return Vec(self.x, self.y, self.z)
