@@ -799,6 +799,7 @@ def flag_angles(inst, flag):
             allow_inverse and -inst_normal == normal
         )
 
+
 @make_flag('posIsSolid')
 def flag_brush_at_loc(inst, flag):
     """Checks to see if a wall is present at the given location.
@@ -818,7 +819,6 @@ def flag_brush_at_loc(inst, flag):
       sides as well.
     """
     pos = Vec.from_str(flag['pos', '0 0 0'])
-    pos *= 16  # 16 per quarter-tile
     pos.z -= 64  # Subtract so origin is the floor-position
     pos = pos.rotate_by_str(inst['angles', '0 0 0'])
 
@@ -830,7 +830,7 @@ def flag_brush_at_loc(inst, flag):
     )
 
     result_var = flag['setVar', '']
-    should_remove = utils.conv_bool(flag['RemoveBrush'], False)
+    should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
     des_type = flag['type', 'any'].casefold()
 
     brush = SOLIDS.get(pos.as_tuple(), None)
