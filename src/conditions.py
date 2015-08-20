@@ -150,6 +150,11 @@ class Condition:
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
+            elif prop.name == 'condition':
+                # Shortcut to eliminate lots of Result - Condition pairs
+                results.append(prop)
+            elif prop.name == 'elsecondition':
+                else_results.append(prop)
             elif prop.name == 'priority':
                 try:
                     priority = Decimal(prop.value)
