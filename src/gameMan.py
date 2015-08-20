@@ -284,7 +284,7 @@ class Game:
 
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
         # "Renderables" sections.
-        editoritems = Property("ItemData", *style.editor.find_all('Item'))
+        editoritems = Property("ItemData", list(style.editor.find_all('Item')))
 
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
