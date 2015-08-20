@@ -28,6 +28,12 @@ _DISP_ROWS = (
     'triangle_tags',
 )
 
+# Return value for VMF.make_prism()
+PrismFace = namedtuple(
+    "PrismFace",
+    "solid, top, bottom, north, south, east, west"
+)
+
 
 class IDMan(set):
     """Allocate and manage a set of unique IDs."""
@@ -427,6 +433,105 @@ class VMF:
                         if out.target == name:  # target
                             yield out
 
+    def make_prism(self, p1, p2) -> PrismFace:
+        """Create an axis-aligned brush connecting the two points.
+
+        A PrismFaces tuple will be returned which containes the six
+        faces, as well as the solid.
+        All faces will be textured with tools/toolsnodraw.
+        """
+        b_min = Vec(p1)
+        b_max = Vec(p1)
+        b_min.min(p2)
+        b_max.max(p2)
+
+        f_bottom = Side(
+            self,
+            planes=[  # -z side
+                (b_min.x, b_min.y, b_min.z),
+                (b_max.x, b_min.y, b_min.z),
+                (b_max.x, b_max.y, b_min.z),
+            ],
+            uaxis='[1 0 0 0] 0.25',
+            vaxis='[0 -1 0 0] 0.25',
+        )
+
+        f_top = Side(
+            self,
+            planes=[  # +z side
+                (b_min.x, b_max.y, b_max.z),
+                (b_max.x, b_max.y, b_max.z),
+                (b_max.x, b_min.y, b_max.z),
+            ],
+            uaxis='[1 0 0 0] 0.25',
+            vaxis='[0 -1 0 0] 0.25',
+        )
+
+        f_west = Side(
+            self,
+            planes=[  # -x side
+                (b_min.x, b_max.y, b_max.z),
+                (b_min.x, b_min.y, b_max.z),
+                (b_min.x, b_min.y, b_min.z),
+            ],
+            uaxis='[0 1 0 0] 0.25',
+            vaxis='[0 0 -1 0] 0.25',
+        )
+
+        f_east = Side(
+            self,
+            planes=[  # +x side
+                (b_max.x, b_max.y, b_min.z),
+                (b_max.x, b_min.y, b_min.z),
+                (b_max.x, b_min.y, b_max.z),
+            ],
+            uaxis='[0 1 0 0] 0.25',
+            vaxis='[0 0 -1 0] 0.25',
+        )
+
+        f_south = Side(
+            self,
+            planes=[  # -y side
+                (b_max.x, b_min.y, b_min.z),
+                (b_min.x, b_min.y, b_min.z),
+                (b_min.x, b_min.y, b_max.z),
+            ],
+            uaxis='[1 0 0 0] 0.25',
+            vaxis='[0 0 -1 0] 0.25',
+        )
+
+        f_north = Side(
+            self,
+            planes=[  # +y side
+                (b_max.x, b_max.y, b_max.z),
+                (b_min.x, b_max.y, b_max.z),
+                (b_min.x, b_max.y, b_min.z),
+            ],
+            uaxis='[1 0 0 0] 0.25',
+            vaxis='[0 0 -1 0] 0.25',
+        )
+
+        solid = Solid(
+            self,
+            sides=[
+                f_bottom,
+                f_top,
+                f_north,
+                f_south,
+                f_east,
+                f_west,
+            ],
+        )
+        return PrismFace(
+            solid=solid,
+            top=f_top,
+            bottom=f_bottom,
+            north=f_north,
+            south=f_south,
+            east=f_east,
+            west=f_west,
+        )
+
 
 class Camera:
     def __init__(self, vmf_file, pos, targ):
@@ -533,7 +638,7 @@ class Solid:
     """A single brush, serving as both world brushes and brush entities."""
     def __init__(
             self,
-            vmf_file,
+            vmf_file: VMF,
             des_id=-1,
             sides=None,
             editor=None,
@@ -591,7 +696,7 @@ class Solid:
         if len(editor['visgroup']) == 0:
             del editor['visgroup']
         return Solid(
-            vmf_file: VMF,
+            vmf_file,
             des_id=solid_id,
             sides=sides,
             editor=editor,
@@ -950,7 +1055,7 @@ class Entity:
     """
     def __init__(
             self,
-            vmf_file,
+            vmf_file: VMF,
             keys=None,
             fixup=None,
             ent_id=-1,
@@ -1069,7 +1174,7 @@ class Entity:
                 keys[item.name] = item.value
 
         return Entity(
-            vmf_file: VMF,
+            vmf_file,
             keys=keys,
             ent_id=ent_id,
             solids=solids,
