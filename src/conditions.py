@@ -1091,15 +1091,20 @@ def res_cust_output(inst, res):
 def res_cust_antline_setup(res):
     result = {
         'instance': res['instance', ''],
-        'antline': [p.value for p in res.find_all('straight')],
-        'antlinecorner': [p.value for p in res.find_all('corner')],
+        'wall_str': [p.value for p in res.find_all('straight')],
+        'wall_crn': [p.value for p in res.find_all('corner')],
+        # If this isn't defined, None signals to use the above textures.
+        'floor_str': [p.value for p in res.find_all('straightFloor')] or None,
+        'floor_crn': [p.value for p in res.find_all('cornerFloor')] or None,
         'outputs': list(res.find_all('addOut')),
         }
     if (
-            len(result['antline']) == 0 or
-            len(result['antlinecorner']) == 0
+            not result['wall_str'] or
+            not result['wall_crn']
             ):
-        return None # remove result
+        # If we don't have two textures, something's wrong. Remove this result.
+        utils.con_log('custAntline has missing values!')
+        return None
     else:
         return result
 
@@ -1112,38 +1117,51 @@ def res_cust_antline(inst, res):
     Values:
         straight: The straight overlay texture.
         corner: The corner overlay texture.
+        straightFloor: Alt texture used on straight floor segements (P1 style)
+        cornerFloor: Alt texture for floor corners (P1 style)
+          If these aren't set, the wall textures will be used.
         instance: Use the given indicator_toggle instance instead
         addOut: A set of additional ouputs to add, pointing at the
-        toggle instance
+          toggle instance
     """
     import vbsp
+
+    opts = res.value
+
+    # The original textures for straight and corner antlines
+    straight_ant = vbsp.ANTLINES['straight']
+    corner_ant = vbsp.ANTLINES['corner']
 
     over_name = '@' + inst['targetname'] + '_indicator'
     for over in (
             VMF.by_class['info_overlay'] &
             VMF.by_target[over_name]
             ):
-        random.seed(over['origin'])
-        new_tex = random.choice(
-            res.value[
-                vbsp.ANTLINES[
-                    over['material'].casefold()
-                ]
-            ]
-        )
-        vbsp.set_antline_mat(over, new_tex, raw_mat=True)
+        folded_mat = over['material'].casefold()
+        if folded_mat == straight_ant:
+            vbsp.set_antline_mat(
+                over,
+                opts['wall_str'],
+                opts['floor_str'],
+            )
+        elif folded_mat == corner_ant:
+            vbsp.set_antline_mat(
+                over,
+                opts['wall_crn'],
+                opts['floor_crn'],
+            )
 
     # allow replacing the indicator_toggle instance
-    if res.value['instance']:
+    if opts['instance']:
         for toggle in VMF.by_class['func_instance']:
             if toggle.fixup['indicator_name', ''] == over_name:
-                toggle['file'] = res.value['instance']
-                if len(res.value['outputs']) > 0:
+                toggle['file'] = opts['instance']
+                if len(opts['outputs']) > 0:
                     for out in inst.outputs[:]:
                         if out.target == toggle['targetname']:
                             # remove the original outputs
                             inst.outputs.remove(out)
-                    for out in res.value['outputs']:
+                    for out in opts['outputs']:
                         # Allow adding extra outputs to customly
                         # trigger the toggle
                         add_output(inst, out, toggle['targetname'])

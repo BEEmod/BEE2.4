@@ -124,9 +124,9 @@ GOO_TEX = [
     ]
 
 ANTLINES = {
-    "signage/indicator_lights/indicator_lights_floor": "antline",
-    "signage/indicator_lights/indicator_lights_corner_floor": "antlinecorner",
-    }  # these need to be handled separately to accommodate the scale-changing
+    'straight' : "signage/indicator_lights/indicator_lights_floor",
+    'corner': "signage/indicator_lights/indicator_lights_corner_floor",
+    }
 
 DEFAULTS = {
     "goo_mist":                 "0",  # Add info_particle_systems to goo pits
@@ -1451,10 +1451,15 @@ def get_face_orient(face):
         return ORIENT.ceiling
     return ORIENT.wall
 
-def set_antline_mat(over, mat, raw_mat=False):
+
+def set_antline_mat(
+        over,
+        mats,
+        floor_mats=None,
+        ):
     """Set the material on an overlay to the given value, applying options.
 
-    If raw_mat is set to 1, use the given texture directly.
+    floor_mat, if set is an alternate material to use for floors.
     The material is split into 3 parts, separated by '|':
     - Scale: the u-axis width of the material, used for clean antlines.
     - Material: the material
@@ -1464,17 +1469,17 @@ def set_antline_mat(over, mat, raw_mat=False):
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
-    if not raw_mat:
-        if get_tex('overlay.' + mat + 'floor') != '':
-            # For P1 style, check to see if the antline is on the floor or
-            # walls.
-            direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
-            if direction == (0, 0, 1) or direction == (0, 0, -1):
-                mat += 'floor'
+    if floor_mats:
+        # For P1 style, check to see if the antline is on the floor or
+        # walls.
+        direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
+        if direction == (0, 0, 1) or direction == (0, 0, -1):
+            mats = floor_mats
 
-        mat = get_tex('overlay.' + mat)
+    # Choose a random one
+    random.seed(over['origin'])
+    mat = random.choice(mats).split('|')
 
-    mat = mat.split('|')
     if len(mat) == 2:
         # rescale antlines if needed
         over['endu'], over['material'] = mat
@@ -1495,6 +1500,12 @@ def change_overlays():
     sign_inst = get_opt('signInst')
     if sign_inst == "NONE":
         sign_inst = None
+
+    ant_str = settings['textures']['overlay.antline'],
+    ant_str_floor = settings['textures']['overlay.antlinefloor'],
+    ant_corn = settings['textures']['overlay.antlinecorner'],
+    ant_corn_floor = settings['textures']['overlay.antlinecornerfloor'],
+
     for over in VMF.by_class['info_overlay']:
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
@@ -1508,8 +1519,10 @@ def change_overlays():
                 # useless info_overlay_accessors for these signs.
                 del over['targetname']
 
-        if over['material'].casefold() in TEX_VALVE:
-            sign_type = TEX_VALVE[over['material'].casefold()]
+        case_mat = over['material'].casefold()
+
+        if case_mat in TEX_VALVE:
+            sign_type = TEX_VALVE[case_mat]
             if sign_inst is not None:
                 new_inst = VMF.create_ent(
                     classname='func_instance',
@@ -1520,8 +1533,18 @@ def change_overlays():
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
-        if over['material'].casefold() in ANTLINES:
-            set_antline_mat(over, ANTLINES[over['material'].casefold()])
+        if case_mat == ANTLINES['straight']:
+            set_antline_mat(
+                over,
+                ant_str,
+                ant_str_floor,
+            )
+        elif case_mat == ANTLINES['corner']:
+            set_antline_mat(
+                over,
+                ant_corn,
+                ant_corn_floor,
+            )
 
 
 def change_trig():
