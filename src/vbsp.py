@@ -78,6 +78,8 @@ TEX_DEFAULTS = [
     # These replacements are deactivated when unset
     ('', 'special.white'),
     ('', 'special.black'),
+    ('', 'special.white_wall'),
+    ('', 'special.black_wall'),
     ('', 'special.white_gap'),
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
@@ -88,6 +90,7 @@ TEX_DEFAULTS = [
         'overlay.antline'),
     ('1|signage/indicator_lights/indicator_lights_corner_floor',
         'overlay.antlinecorner'),
+
     # This is for the P1 style, where antlines use different textures
     # on the floor and wall.
     # We just use the regular version if unset.
@@ -101,6 +104,14 @@ class ORIENT(Enum):
     wall = 2
     ceiling = 3
     ceil = 3
+
+    def __str__(self):
+        if self is ORIENT.floor:
+            return 'floor'
+        elif self is ORIENT.wall:
+            return 'wall'
+        elif self is ORIENT.ceiling:
+            return 'ceiling'
 
 WHITE_PAN = [
     "tile/white_floor_tile002a",
@@ -1660,18 +1671,15 @@ def change_func_brush():
             if (side.mat.casefold() == "anim_wp/framework/squarebeams" and
                     "special.edge" in settings['textures']):
                 side.mat = get_tex("special.edge")
-            elif side.mat.casefold() in WHITE_PAN:
+                continue
+
+            if side.mat.casefold() in WHITE_PAN:
                 brush_type = "white"
-                if not get_tex("special.white") == "":
-                    side.mat = get_tex("special.white")
-                elif not alter_mat(side):
-                    side.mat = get_tex("white.wall")
+                set_special_mat(side, 'white')
+
             elif side.mat.casefold() in BLACK_PAN:
                 brush_type = "black"
-                if not get_tex("special.black") == "":
-                    side.mat = get_tex("special.black")
-                elif not alter_mat(side):
-                    side.mat = get_tex("black.wall")
+                set_special_mat(side, 'black')
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
@@ -1682,6 +1690,7 @@ def change_func_brush():
                     side.uaxis = " ".join(split_u)
                     side.vaxis = " ".join(split_v)
                 alter_mat(side)  # for gratings, laserfields and some others
+
 
             # The style blanked the material, so delete the brush
             if side.mat == '':
@@ -1703,18 +1712,42 @@ def change_func_brush():
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
+            # Now find the associated instance
             for ins in (
                     VMF.by_class['func_instance'] &
                     VMF.by_target[targ]
                     ):
                 if make_static_pan(ins, brush_type):
-                    # delete the brush, we don't want it if we made a static one
+                    # delete the brush, we don't want it if we made a
+                    # static one
                     VMF.remove_ent(brush)
                 else:
+                    # Oherwise, rename the brush to -brush, so the panel
+                    # can send inputs itself. (This allows removing 1
+                    # logic_auto.)
                     brush['targetname'] = brush['targetname'].replace(
                         '_panel_top',
                         '-brush',
                         )
+
+
+def set_special_mat(face, side_type):
+    """Set a face to a special texture.
+
+    Those include checkers or portal-here tiles, used on flip
+    and angled panels.
+    side_type should be either 'white' or 'black'.
+    """
+    # We use a wall-specific texture, or the floor texture,
+    # or fallback to regular textures
+    rep_texture = 'special.' + side_type
+    orient = get_face_orient(face)
+    if orient is ORIENT.wall and get_tex(rep_texture + '_wall'):
+        face.mat = get_tex(rep_texture + '_wall')
+    elif get_tex(rep_texture):
+        face.mat = get_tex(rep_texture)
+    elif not alter_mat(face):
+        face.mat = get_tex(side_type + '.' + str(orient))
 
 
 def make_static_pan(ent, pan_type):

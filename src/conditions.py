@@ -2005,3 +2005,27 @@ def track_scan(
             # If the next piece is an end section, add it then quit
             tr_set.add(track)
             return
+
+
+@make_result('MarkFaceSpecial')
+def res_set_special_side(inst, res):
+    """Set the brush face at a location to a particular texture.
+
+    """
+    pos = Vec.from_str(res['pos', '0 0 0'])
+    pos.z -= 64  # Subtract so origin is the floor-position
+    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
+
+    # Relative to the instance origin
+    pos += Vec.from_str(inst['origin', '0 0 0'])
+
+    norm = Vec.from_str(res['dir', '0 0 -1']).rotate_by_str(
+        inst['angles', '0 0 0']
+    )
+
+    brush = SOLIDS.get(pos.as_tuple(), None)
+    ':type brush: solidGroup'
+
+    if brush and brush.normal == norm:
+        import vbsp
+        vbsp.set_special_mat(brush.face, str(brush.color))
