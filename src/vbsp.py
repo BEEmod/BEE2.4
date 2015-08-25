@@ -114,20 +114,23 @@ class ORIENT(Enum):
         elif self is ORIENT.ceiling:
             return 'ceiling'
 
+# The textures used for white surfaces.
 WHITE_PAN = [
     "tile/white_floor_tile002a",
     "tile/white_wall_tile003a",
     "tile/white_wall_tile003h",
-    "tile/white_wall_tile003c",
-    "tile/white_wall_tile003f",
+
+    "tile/white_wall_tile003c",  # 2x2
+    "tile/white_wall_tile003f",  # 4x4
     ]
 
+# Ditto for black surfaces.
 BLACK_PAN = [
     "metal/black_floor_metal_001c",
     "metal/black_wall_metal_002c",
     "metal/black_wall_metal_002e",
-    "metal/black_wall_metal_002a",
-    "metal/black_wall_metal_002b",
+    "metal/black_wall_metal_002a",  # 2x2
+    "metal/black_wall_metal_002b",  # 4x4
     ]
 
 GOO_TEX = [
@@ -232,6 +235,11 @@ BEE2_config = None
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
+
+# These are faces & overlays which have been forceably set by conditions,
+# and will not be overwritten later.
+IGNORED_FACES = set()
+IGNORED_OVERLAYS = set()
 
 ##################
 # UTIL functions #
@@ -1326,7 +1334,7 @@ def get_grid_sizes(face: VLib.Side):
         raise Exception(str(dim) + ' not on grid!')
 
     if u % 128 == 0 and v % 128 == 0:  # regular square
-        return "0.25", "0.5", "1"
+        return "0.25", "0.5", "0.5", "1", "1",
     if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
         return "0.5",
     if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
@@ -1343,6 +1351,9 @@ def random_walls():
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
+            if face in IGNORED_FACES:
+                continue
+
             if face.mat.casefold() == 'anim_wp/framework/squarebeams':
                 fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
 
@@ -1394,6 +1405,9 @@ def clump_walls():
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
+            if face in IGNORED_FACES:
+                continue
+
             mat = face.mat.casefold()
             if mat in (
                     'glass/glasswindow007a_less_shiny',
@@ -1569,6 +1583,9 @@ def change_overlays():
     ant_corn_floor = settings['textures']['overlay.antlinecornerfloor']
 
     for over in VMF.by_class['info_overlay']:
+        if over in IGNORED_OVERLAYS:
+            continue
+
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
             if get_bool_opt("remove_exit_signs"):
