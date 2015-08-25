@@ -1512,10 +1512,10 @@ def change_overlays():
     if sign_inst == "NONE":
         sign_inst = None
 
-    ant_str = settings['textures']['overlay.antline'],
-    ant_str_floor = settings['textures']['overlay.antlinefloor'],
-    ant_corn = settings['textures']['overlay.antlinecorner'],
-    ant_corn_floor = settings['textures']['overlay.antlinecornerfloor'],
+    ant_str = settings['textures']['overlay.antline']
+    ant_str_floor = settings['textures']['overlay.antlinefloor']
+    ant_corn = settings['textures']['overlay.antlinecorner']
+    ant_corn_floor = settings['textures']['overlay.antlinecornerfloor']
 
     for over in VMF.by_class['info_overlay']:
         if (over['targetname'] == 'exitdoor_stickman' or
