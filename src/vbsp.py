@@ -83,6 +83,7 @@ TEX_DEFAULTS = [
     ('', 'special.white_gap'),
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
+    ('', 'special.edge_special'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -147,6 +148,13 @@ DEFAULTS = {
     "remove_exit_signs":        "0",  # Remove the exit sign overlays
 
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
+
+    "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
+    "edge_off":                 "53.3335",  # The offset used on squarebeams.
+    "edge_scale":               "0.15",  # The scale on squarebeams textures
+    "rotate_edge_special":      "0",    # Ditto for angled/flip panels
+    "edge_off_special":         "53.3335",
+    "edge_scale_special":       "0.15",
 
     # Reset offsets for all white/black brushes, so embedface has correct
     # texture matching
@@ -230,7 +238,7 @@ IS_PREVIEW = 'ERR'
 ##################
 
 
-def get_opt(name):
+def get_opt(name) -> str:
     return settings['options'][name.casefold()]
 
 
@@ -973,6 +981,7 @@ def add_goo_mist(sides):
         particle='water_mist_256',
     )
 
+
 def fit_goo_mist(
         sides,
         needs_mist,
@@ -1008,6 +1017,7 @@ def fit_goo_mist(
             )
             for (x, y) in iter_grid(grid_x, grid_y, 128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+
 
 def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
@@ -1052,6 +1062,7 @@ def change_goo_sides():
                             ):
                         face.mat = get_tex('special.goo_wall')
     utils.con_log("Done!")
+
 
 def collapse_goo_trig():
     """Collapse the goo triggers to only use 2 entities for all pits."""
@@ -1103,6 +1114,30 @@ def remove_static_ind_toggles():
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
     utils.con_log('Done!')
+
+
+def fix_squarebeams(face, rotate, offset: str, scale: str):
+    '''Fix a squarebeams brush for use in other styles.
+
+    If rotate is True, rotate the texture 90 degrees.
+    offset is the offset for the texture.
+    '''
+    uaxis = face.uaxis.split(' ')
+    vaxis = face.vaxis.split(' ')
+    if rotate:
+        # To rotate, swap the two values
+        uaxis, vaxis = vaxis, uaxis
+
+    # We want to modify the value with an offset
+    if uaxis[3] != '0]':
+        uaxis[3] = offset + ']'
+        uaxis[4] = scale
+    else:
+        vaxis[3] = offset + ']'
+        vaxis[4] = scale
+
+    face.uaxis = ' '.join(uaxis)
+    face.vaxis = ' '.join(vaxis)
 
 
 def change_brush():
@@ -1265,6 +1300,7 @@ def face_seed(face):
             origin[axis] = (origin[axis] // 128) * 128 + 64
     return origin.join(' ')
 
+
 def reset_tex_offset(face):
     """Force all white/black walls to 0 offsets"""
     uaxis = face.uaxis.split()
@@ -1273,6 +1309,7 @@ def reset_tex_offset(face):
     vaxis[3] = '0]'
     face.uaxis = ' '.join(uaxis)
     face.vaxis = ' '.join(vaxis)
+
 
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
@@ -1295,12 +1332,20 @@ def get_grid_sizes(face: VLib.Side):
     if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
         return "0.25",
 
+
 def random_walls():
     """The original wall style, with completely randomised walls."""
     scale_walls = get_bool_opt("random_blackwall_scale")
+    rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
+    edge_off = get_opt('edge_off')
+    edge_scale = get_opt('edge_scale')
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
+            if face.mat.casefold() == 'anim_wp/framework/squarebeams':
+                fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
+
             orient = get_face_orient(face)
             # Only modify black walls and ceilings
             if (scale_walls and
@@ -1342,6 +1387,9 @@ def clump_walls():
     others = {}
 
     texture_lock = get_bool_opt('tile_texture_lock', True)
+    rotate_edge = get_bool_opt('rotate_edge')
+    edge_off = get_opt('edge_off')
+    edge_scale = get_opt('edge_scale')
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
@@ -1358,6 +1406,8 @@ def clump_walls():
                 # use random textures. Don't add them here. They also aren't
                 # on grid.
                 alter_mat(face)
+                if mat == 'anim_wp/framework/squarebeams':
+                    fix_squarebeams(face, edge_off, rotate_edge, edge_scale)
                 continue
 
             if face.mat in GOO_TEX:
@@ -1465,8 +1515,8 @@ def get_face_orient(face):
 
 def set_antline_mat(
         over,
-        mats,
-        floor_mats=None,
+        mats: list,
+        floor_mats: list=None,
         ):
     """Set the material on an overlay to the given value, applying options.
 
@@ -1489,6 +1539,7 @@ def set_antline_mat(
 
     # Choose a random one
     random.seed(over['origin'])
+    utils.con_log(mats)
     mat = random.choice(mats).split('|')
 
     if len(mat) == 2:
@@ -1646,6 +1697,18 @@ def change_func_brush():
     grating_inst = get_opt("grating_inst")
     grating_scale = get_opt("grating_scale")
 
+    if get_tex('special.edge_special') == '':
+        edge_tex = 'special.edge'
+        rotate_edge = get_bool_opt('rotate_edge', False)
+        edge_off = get_opt('edge_off')
+        edge_scale = get_opt('edge_scale')
+    else:
+        edge_tex = 'special.edge_special'
+        rotate_edge = get_bool_opt('rotate_edge_special', False)
+        edge_off = get_opt('edge_off_special')
+        edge_scale = get_opt('edge_scale_special')
+    utils.con_log('Special tex:', rotate_edge, edge_off, edge_scale)
+
     if grating_inst == "NONE":
         grating_inst = None
     for brush in (
@@ -1668,9 +1731,14 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
-            if (side.mat.casefold() == "anim_wp/framework/squarebeams" and
-                    "special.edge" in settings['textures']):
-                side.mat = get_tex("special.edge")
+            if side.mat.casefold() == "anim_wp/framework/squarebeams":
+                side.mat = get_tex(edge_tex)
+                fix_squarebeams(
+                    side,
+                    rotate_edge,
+                    edge_off,
+                    edge_scale,
+                )
                 continue
 
             if side.mat.casefold() in WHITE_PAN:
