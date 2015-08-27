@@ -126,7 +126,6 @@ def find_packages(pak_dir, zips, zip_name_lst):
 
 def load_packages(
         pak_dir,
-        load_res,
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
