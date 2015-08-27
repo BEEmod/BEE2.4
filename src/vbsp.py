@@ -1421,7 +1421,7 @@ def clump_walls():
                 # on grid.
                 alter_mat(face)
                 if mat == 'anim_wp/framework/squarebeams':
-                    fix_squarebeams(face, edge_off, rotate_edge, edge_scale)
+                    fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
                 continue
 
             if face.mat in GOO_TEX:
