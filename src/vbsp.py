@@ -1927,7 +1927,7 @@ def fix_inst():
 
 
 def fix_worldspawn():
-    """Adjust some properties on WorldSpawn."""""
+    """Adjust some properties on WorldSpawn."""
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # if PeTI thinks there should be paint, don't touch it
