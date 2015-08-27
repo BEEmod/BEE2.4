@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
+from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 import extract_packages
 import utils
@@ -55,6 +56,7 @@ def reraise_keyerror(err, obj_id):
             id=obj_id,
         )
     ) from err
+
 
 def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     """Extract a config file refered to by the given property block.
@@ -123,6 +125,7 @@ def find_packages(pak_dir, zips, zip_name_lst):
                 print('ERROR: Bad package "{}"!'.format(name))
     if not found_pak:
         print('No packages in folder!')
+
 
 def load_packages(
         pak_dir,
@@ -886,12 +889,6 @@ def desc_parse(info):
                 yield (line.name, line.value)
         else:
             yield ("line", prop.value)
-
-
-SelitemData = namedtuple(
-    'SelitemData',
-    'name, short_name, auth, icon, desc, group',
-)
 
 
 def get_selitem_data(info):
