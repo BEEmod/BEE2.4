@@ -2107,3 +2107,119 @@ def res_set_texture(inst, res):
 
     # Don't allow this to get overwritten later.
     vbsp.IGNORED_FACES.add(brush.face)
+
+
+@make_result('AddBrush')
+def res_add_brush(inst, res):
+    """Spawn in a brush at the indicated points.
+
+    - point1 and point2 are locations local to the instance, with '0 0 0'
+      as the floor-position.
+    - type is either 'black' or 'white'.
+    - detail should be set to True/False. If true the brush will be a
+      func_detail instead of a world brush.
+
+    The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
+    textures as needed.
+    """
+    import vbsp
+
+    point1 = Vec.from_str(res['point1'])
+    point2 = Vec.from_str(res['point2'])
+
+    point1.z -= 64 # Offset to the location of the floor
+    point2.z -= 64
+
+    point1.rotate_by_str(inst['angles']) # Rotate to match the instance
+    point2.rotate_by_str(inst['angles'])
+
+    origin = Vec.from_str(inst['origin'])
+    point1 += origin # Then offset to the location of the instance
+    point2 += origin
+
+    tex_type = res['type', None]
+    if tex_type not in ('white', 'black'):
+        utils.con_log(
+            'AddBrush: "{}" is not a valid brush '
+            'color! (white or black)'.format(tex_type)
+        )
+        tex_type = 'black'
+
+    # We need to rescale black walls and ceilings
+    rescale = vbsp.get_bool_opt('random_blackwall_scale') and tex_type == 'black'
+
+    dim = point2 - point1
+    dim.max(-dim)
+
+    # Figure out what grid size and scale is needed
+    # Check the dimensions in two axes to figure out the largest
+    # tile size that can fit in it.
+    x_maxsize = min(dim.y, dim.z)
+    y_maxsize = min(dim.x, dim.z)
+    if x_maxsize <= 32:
+        x_grid = '4x4'
+        x_scale = 0.25
+    elif x_maxsize <= 64:
+        x_grid = '2x2'
+        x_scale = 0.5
+    else:
+        x_grid = 'wall'
+        x_scale = 1
+
+    if y_maxsize <= 32:
+        y_grid = '4x4'
+        y_scale = 0.25
+    elif y_maxsize <= 64:
+        y_grid = '2x2'
+        y_scale = 0.5
+    else:
+        y_grid = 'wall'
+        y_scale = 1
+
+    grid_offset = (origin // 128)
+
+    # All brushes in each grid have the same textures for each side.
+    random.seed(grid_offset.join(' ') + '-partial_block')
+
+    solids = VMF.make_prism(point1, point2)
+    ':type solids: VLib.PrismFace'
+
+    # Ensure the faces aren't re-textured later
+    vbsp.IGNORED_FACES.update(solids.solid.sides)
+
+    solids.north.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.south.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.east.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.west.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.top.mat = vbsp.get_tex(tex_type + '.floor')
+    solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
+
+    if rescale:
+        z_maxsize = min(dim.x, dim.y)
+        # randomised black wall scale applies to the ceiling too
+        if z_maxsize <= 32:
+            z_scale = 0.25
+        elif z_maxsize <= 64:
+            z_scale = random.choice((0.5, 0.5, 0.25))
+        else:
+            z_scale = random.choice((1, 1, 0.5, 0.5, 0.25))
+    else:
+        z_scale = 0.25
+
+    if rescale:
+        solids.north.scale = y_scale
+        solids.south.scale = y_scale
+        solids.east.scale = x_scale
+        solids.west.scale = x_scale
+        solids.bottom.scale = z_scale
+
+    if utils.conv_bool(res['detail', False], False):
+        # Add the brush to a func_detail entity
+        VMF.create_ent(
+            classname='func_detail'
+        ).solids = [
+            solids.solid
+        ]
+    else:
+        # Add to the world
+        VMF.add_brush(solids.solid)
