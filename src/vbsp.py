@@ -1515,11 +1515,11 @@ def set_antline_mat(
     - Material: the material
     - Static: if 'static', the antline will lose the targetname. This
       makes it non-dynamic, and removes the info_overlay_accessor
-      entity fromt the compiled map.
+      entity from the compiled map.
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
-    if floor_mats:
+    if floor_mats and any(floor_mats): # Ensure there's actually a value
         # For P1 style, check to see if the antline is on the floor or
         # walls.
         direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
@@ -1541,7 +1541,7 @@ def set_antline_mat(
             # becomes static.
             over['targetname'] = ''
     else:
-        over['material'] = mat
+        over['material'], = mat
         over['endu'] = '0.25'
 
 
