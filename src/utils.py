@@ -401,6 +401,9 @@ class EmptyMapping(abc.Mapping):
     def get(self, item, default=None):
         return default
 
+    def __bool__(self):
+        return False
+
     def __next__(self):
         raise StopIteration
 
@@ -439,8 +442,15 @@ class Vec:
         If no value is given, that axis will be set to 0.
         A sequence can be passed in (as the x argument), which will use
         the three args as x/y/z.
+        :type x: int | float | Vec | list[float]
         """
-        if isinstance(x, abc.Sequence):
+        if isinstance(x, (int, float)):
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
+        elif isinstance(x, Vec):
+            self.x, self.y, self.z = x
+        else:
             try:
                 self.x = float(x[0])
             except (TypeError, KeyError):
@@ -455,10 +465,7 @@ class Vec:
                         self.z = float(x[2])
                     except (TypeError, KeyError):
                         self.z = 0.0
-        else:
-            self.x = float(x)
-            self.y = float(y)
-            self.z = float(z)
+
 
     def copy(self):
         return Vec(self.x, self.y, self.z)
@@ -549,7 +556,7 @@ class Vec:
             round_vals,
         )
 
-    def __add__(self, other):
+    def __add__(self, other) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -560,7 +567,7 @@ class Vec:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -581,7 +588,7 @@ class Vec:
         except TypeError:
             return NotImplemented
 
-    def __rsub__(self, other):
+    def __rsub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -602,7 +609,7 @@ class Vec:
         except TypeError:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> 'Vec':
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -617,7 +624,7 @@ class Vec:
                 return NotImplemented
     __rmul__ = __mul__
 
-    def __div__(self, other):
+    def __div__(self, other) -> 'Vec':
         """Divide the Vector by a scalar.
 
         If any axis is equal to zero, it will be kept as zero as long
@@ -635,7 +642,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __rdiv__(self, other):
+    def __rdiv__(self, other) -> 'Vec':
         """Divide a scalar by a Vector.
 
         """
@@ -651,7 +658,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __floordiv__(self, other):
+    def __floordiv__(self, other) -> 'Vec':
         """Divide the Vector by a scalar, discarding the remainder.
 
         If any axis is equal to zero, it will be kept as zero as long
@@ -669,7 +676,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __mod__(self, other):
+    def __mod__(self, other) -> 'Vec':
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -683,7 +690,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other):
+    def __divmod__(self, other) -> ('Vec', 'Vec'):
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -699,7 +706,7 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> 'Vec':
         """+= operation.
 
         Like the normal one except without duplication.
@@ -722,7 +729,7 @@ class Vec:
                 ) from e
             return self
 
-    def __isub__(self, other):
+    def __isub__(self, other) -> 'Vec':
         """-= operation.
 
         Like the normal one except without duplication.
@@ -745,7 +752,7 @@ class Vec:
                 ) from e
             return self
 
-    def __imul__(self, other):
+    def __imul__(self, other) -> 'Vec':
         """*= operation.
 
         Like the normal one except without duplication.
@@ -758,7 +765,7 @@ class Vec:
             self.z *= other
             return self
 
-    def __idiv__(self, other):
+    def __idiv__(self, other) -> 'Vec':
         """/= operation.
 
         Like the normal one except without duplication.
@@ -771,7 +778,7 @@ class Vec:
             self.z /= other
             return self
 
-    def __ifloordiv__(self, other):
+    def __ifloordiv__(self, other) -> 'Vec':
         """//= operation.
 
         Like the normal one except without duplication.
@@ -784,7 +791,7 @@ class Vec:
             self.z //= other
             return self
 
-    def __imod__(self, other):
+    def __imod__(self, other) -> 'Vec':
         """%= operation.
 
         Like the normal one except without duplication.
@@ -797,11 +804,11 @@ class Vec:
             self.z %= other
             return self
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Vectors are True if any axis is non-zero."""
         return self.x != 0 or self.y != 0 or self.z != 0
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """== test.
 
         Two Vectors are compared based on the axes.
@@ -822,7 +829,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """A<B test.
 
         Two Vectors are compared based on the axes.
@@ -847,7 +854,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         """A<=B test.
 
         Two Vectors are compared based on the axes.
@@ -872,7 +879,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         """A>B test.
 
         Two Vectors are compared based on the axes.

@@ -1,5 +1,7 @@
 # coding: utf-8
 from decimal import Decimal
+from collections import namedtuple
+from enum import Enum
 import random
 
 from utils import Vec
@@ -23,6 +25,22 @@ RESULT_SETUP = {}
 ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
+
+SOLIDS = {}  # A dictionary mapping origins to their brushes
+solidGroup = namedtuple('solidGroup', 'face solid normal color')
+
+
+class MAT_TYPES(Enum):
+    """The values saved in the solidGroup.color attribute."""
+    black = 0
+    white = 1
+
+    def __str__(self):
+        if self is MAT_TYPES.black:
+            return 'black'
+        if self is MAT_TYPES.white:
+            return 'white'
+
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -132,6 +150,11 @@ class Condition:
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
+            elif prop.name == 'condition':
+                # Shortcut to eliminate lots of Result - Condition pairs
+                results.append(prop)
+            elif prop.name == 'elsecondition':
+                else_results.append(prop)
             elif prop.name == 'priority':
                 try:
                     priority = Decimal(prop.value)
@@ -308,6 +331,8 @@ def init(seed, inst_list, vmf_file):
     # Sort by priority, where higher = done later
     conditions.sort()
 
+    build_solid_dict()
+
 
 def check_all():
     """Check all conditions."""
@@ -358,6 +383,43 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
+
+def build_solid_dict():
+    """Build a dictionary mapping origins to brush faces.
+
+    This allows easily finding brushes that are at certain locations.
+    """
+    import vbsp
+    mat_types = {}
+    for mat in vbsp.BLACK_PAN:
+        mat_types[mat] = MAT_TYPES.black
+
+    for mat in vbsp.WHITE_PAN:
+        mat_types[mat] = MAT_TYPES.white
+
+    for solid in VMF.brushes:
+        for face in solid:
+            try:
+                mat_type = mat_types[face.mat]
+            except KeyError:
+                continue
+            else:
+                origin = face.get_origin().as_tuple()
+                if origin in SOLIDS:
+                    # The only time two textures will be in the same
+                    # place is if they are covering each other -
+                    # nodraw them both and ignore them
+                    SOLIDS.pop(origin).face.mat = 'tools/toolsnodraw'
+                    face.mat = 'tools/toolsnodraw'
+                    continue
+
+                SOLIDS[origin] = solidGroup(
+                    color=mat_type,
+                    face=face,
+                    solid=solid,
+                    normal=face.normal(),
+                )
 
 
 def dump_conditions():
@@ -458,6 +520,42 @@ def add_suffix(inst, suff):
     file = inst['file']
     old_name, dot, ext = file.partition('.')
     inst['file'] = ''.join((old_name, suff, dot, ext))
+
+
+def widen_fizz_brush(brush, thickness, bounds=None):
+    """Move the two faces of a fizzler brush outward.
+
+    This is good to make fizzlers which are thicker than 2 units.
+    bounds is the output of .get_bbox(), if this should be overriden
+    """
+
+    # Subtract 2 for the fizzler width, and divide
+    # to get the difference for each face.
+    offset = (thickness-2)/2
+
+    if bounds is None:
+        bound_min, bound_max = brush.get_bbox()
+    else:
+        # Allow passing these in
+        bound_min, bound_max = bounds
+    origin = (bound_max + bound_min) / 2  # type: Vec
+    size = bound_max - bound_min
+    for axis in 'xyz':
+        # One of the directions will be thinner than 128, that's the fizzler
+        # direction.
+        if size[axis] < 128:
+            bound_min[axis] -= offset
+            bound_max[axis] += offset
+
+    for face in brush:
+        # For every coordinate, set to the maximum if it's larger than the
+        # origin. This will expand the two sides.
+        for v in face.planes:
+            for axis in 'xyz':
+                if v[axis] > origin[axis]:
+                    v[axis] = bound_max[axis]
+                else:
+                    v[axis] = bound_min[axis]
 
 
 @make_flag('debug')
@@ -700,6 +798,62 @@ def flag_angles(inst, flag):
         return inst_normal == normal or (
             allow_inverse and -inst_normal == normal
         )
+
+
+@make_flag('posIsSolid')
+def flag_brush_at_loc(inst, flag):
+    """Checks to see if a wall is present at the given location.
+
+    - Pos is the position of the brush, where `0 0 0` is the floor-position
+       of the brush, in 16 unit increments.
+    - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
+    - Type defines the type the brush must be:
+      - "Any" requires either a black or white brush.
+      - "None" means that no brush must be present.
+      - "White" requires a portalable surface.
+      - "Black" requires a non-portalable surface.
+    - SetVar defines an instvar which will be given a value of "black",
+      "white" or "none" to allow the result to be reused.
+    - RemoveBrush: If set to 1, the brush will be removed if found.
+      Only do this to EmbedFace brushes, since it will remove the other
+      sides as well.
+    """
+    pos = Vec.from_str(flag['pos', '0 0 0'])
+    pos.z -= 64  # Subtract so origin is the floor-position
+    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
+
+    # Relative to the instance origin
+    pos += Vec.from_str(inst['origin', '0 0 0'])
+
+    norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
+        inst['angles', '0 0 0']
+    )
+
+    result_var = flag['setVar', '']
+    should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
+    des_type = flag['type', 'any'].casefold()
+
+    brush = SOLIDS.get(pos.as_tuple(), None)
+    ':type brush: solidGroup'
+
+    if brush is None or brush.normal != norm:
+        br_type = 'none'
+    else:
+        br_type = str(brush.color)
+        if should_remove:
+            VMF.remove_brush(
+                brush.solid,
+            )
+
+    if result_var:
+        inst.fixup[result_var] = br_type
+
+    if des_type == 'any' and br_type != 'none':
+        return True
+
+    return des_type == br_type
+
+
 ###########
 # RESULTS #
 ###########
@@ -937,15 +1091,20 @@ def res_cust_output(inst, res):
 def res_cust_antline_setup(res):
     result = {
         'instance': res['instance', ''],
-        'antline': [p.value for p in res.find_all('straight')],
-        'antlinecorner': [p.value for p in res.find_all('corner')],
+        'wall_str': [p.value for p in res.find_all('straight')],
+        'wall_crn': [p.value for p in res.find_all('corner')],
+        # If this isn't defined, None signals to use the above textures.
+        'floor_str': [p.value for p in res.find_all('straightFloor')] or None,
+        'floor_crn': [p.value for p in res.find_all('cornerFloor')] or None,
         'outputs': list(res.find_all('addOut')),
         }
     if (
-            len(result['antline']) == 0 or
-            len(result['antlinecorner']) == 0
+            not result['wall_str'] or
+            not result['wall_crn']
             ):
-        return None # remove result
+        # If we don't have two textures, something's wrong. Remove this result.
+        utils.con_log('custAntline has missing values!')
+        return None
     else:
         return result
 
@@ -958,38 +1117,54 @@ def res_cust_antline(inst, res):
     Values:
         straight: The straight overlay texture.
         corner: The corner overlay texture.
+        straightFloor: Alt texture used on straight floor segements (P1 style)
+        cornerFloor: Alt texture for floor corners (P1 style)
+          If these aren't set, the wall textures will be used.
         instance: Use the given indicator_toggle instance instead
         addOut: A set of additional ouputs to add, pointing at the
-        toggle instance
+          toggle instance
     """
     import vbsp
+
+    opts = res.value
+
+    # The original textures for straight and corner antlines
+    straight_ant = vbsp.ANTLINES['straight']
+    corner_ant = vbsp.ANTLINES['corner']
 
     over_name = '@' + inst['targetname'] + '_indicator'
     for over in (
             VMF.by_class['info_overlay'] &
             VMF.by_target[over_name]
             ):
-        random.seed(over['origin'])
-        new_tex = random.choice(
-            res.value[
-                vbsp.ANTLINES[
-                    over['material'].casefold()
-                ]
-            ]
-        )
-        vbsp.set_antline_mat(over, new_tex, raw_mat=True)
+        folded_mat = over['material'].casefold()
+        if folded_mat == straight_ant:
+            vbsp.set_antline_mat(
+                over,
+                opts['wall_str'],
+                opts['floor_str'],
+            )
+        elif folded_mat == corner_ant:
+            vbsp.set_antline_mat(
+                over,
+                opts['wall_crn'],
+                opts['floor_crn'],
+            )
+
+        # Ensure this isn't overriden later!
+        vbsp.IGNORED_OVERLAYS.add(over)
 
     # allow replacing the indicator_toggle instance
-    if res.value['instance']:
+    if opts['instance']:
         for toggle in VMF.by_class['func_instance']:
             if toggle.fixup['indicator_name', ''] == over_name:
-                toggle['file'] = res.value['instance']
-                if len(res.value['outputs']) > 0:
+                toggle['file'] = opts['instance']
+                if len(opts['outputs']) > 0:
                     for out in inst.outputs[:]:
                         if out.target == toggle['targetname']:
                             # remove the original outputs
                             inst.outputs.remove(out)
-                    for out in res.value['outputs']:
+                    for out in opts['outputs']:
                         # Allow adding extra outputs to customly
                         # trigger the toggle
                         add_output(inst, out, toggle['targetname'])
@@ -1048,20 +1223,22 @@ def res_cust_fizzler(base_inst, res):
     This should be executed on the base instance. Brush and MakeLaserField
     are ignored on laserfield barriers.
     Options:
-        - ModelName: sets the targetname given to the model instances.
-        - UniqueModel: If true, each model instance will get a suffix to
+        * ModelName: sets the targetname given to the model instances.
+        * UniqueModel: If true, each model instance will get a suffix to
             allow unique targetnames.
-        - Brush: A brush entity that will be generated (the original is
+        * Brush: A brush entity that will be generated (the original is
          deleted.)
-            - Name is the instance name for the brush
-            - Left/Right/Center/Short/Nodraw are the textures used
-            - Keys are a block of keyvalues to be set. Targetname and
+            * Name is the instance name for the brush
+            * Left/Right/Center/Short/Nodraw are the textures used
+            * Keys are a block of keyvalues to be set. Targetname and
               Origin are auto-set.
-        - MakeLaserField generates a brush stretched across the whole
+            * Thickness will change the thickness of the fizzler if set.
+              By default it is 2 units thick.
+        * MakeLaserField generates a brush stretched across the whole
           area.
-            - Name and keys are the same as the regular Brush.
-            - Texture/Nodraw are the textures.
-            - Width is the pixel width of the laser texture, used to
+            * Name, keys and thickness are the same as the regular Brush.
+            * Texture/Nodraw are the textures.
+            * Width is the pixel width of the laser texture, used to
               scale it correctly.
     """
     from vbsp import TEX_FIZZLER
@@ -1145,11 +1322,8 @@ def res_cust_fizzler(base_inst, res):
                         if side.mat.casefold() == 'effects/fizzler':
                             side.mat = laser_tex
 
-                            uaxis = side.uaxis.split(" ")
-                            vaxis = side.vaxis.split(" ")
-                            # the format is like "[1 0 0 -393.4] 0.25"
-                            side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
-                            side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
+                            side.uaxis.offset = 0
+                            side.scale = 0.25
                         else:
                             side.mat = nodraw_tex
                 else:
@@ -1170,6 +1344,14 @@ def res_cust_fizzler(base_inst, res):
                     except (KeyError, IndexError):
                         # If we fail, just use the original textures
                         pass
+
+            widen_amount = utils.conv_float(config['thickness', '2'], 2.0)
+            if widen_amount != 2:
+                for brush in new_brush.solids:
+                    widen_fizz_brush(
+                        brush,
+                        thickness=widen_amount,
+                    )
 
 
 def convert_to_laserfield(
@@ -1223,23 +1405,19 @@ def convert_to_laserfield(
             side.mat = laser_tex
             # Now we figure out the corrrect u/vaxis values for the texture.
 
-            uaxis = side.uaxis.split(" ")
-            vaxis = side.vaxis.split(" ")
-            # the format is like "[1 0 0 -393.4] 0.25"
             size = 0
             offset = 0
             for i, wid in enumerate(dimensions):
                 if wid > size:
                     size = int(wid)
                     offset = int(bounds_min[i])
-            side.uaxis = (
-                " ".join(uaxis[:3]) + " " +
-                # texture offset to fit properly
-                str(tex_width/size * -offset) + "] " +
-                str(size/tex_width)  # scaling
-                )
+            # texture offset to fit properly
+            side.uaxis.offset= tex_width/size * -offset
+            side.uaxis.scale= size/tex_width  # scaling
+
             # heightwise it's always the same
-            side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
+            side.vaxis.offset = 256
+            side.vaxis.scale = 0.25
 
 
 @make_result('condition')
@@ -1823,3 +2001,225 @@ def track_scan(
             # If the next piece is an end section, add it then quit
             tr_set.add(track)
             return
+
+
+@make_result('AlterTexture', 'AlterTex', 'AlterFace')
+def res_set_texture(inst, res):
+    """Set the brush face at a location to a particular texture.
+
+    pos is the position, relative to the instance
+      (0 0 0 is the floor-surface).
+    dir is the normal of the texture.
+    If gridPos is true, the position will be snapped so it aligns with
+     the 128 brushes (Useful with fizzler/light strip items).
+
+    tex is the texture used.
+    If tex begins and ends with '<>', certain
+    textures will be used based on style:
+    - If tex is '<special>', the brush will be given a special texture
+      like angled and clear panels.
+    - '<white>' and '<black>' will use the regular textures for the
+      given color.
+    - '<white-2x2>', '<white-4x4>', '<black-2x2>', '<black-4x4'> will use
+      the given wall-sizes. If on floors or ceilings these always use 4x4.
+    - '<2x2>' or '<4x4>' will force to the given wall-size, keeping color.
+    - '<special-white>' and '<special-black>' will use a special texture
+       of the given color.
+    If tex begins and ends with '[]', it is an option in the 'Textures' list.
+    These are composed of a group and texture, separated by '.'. 'white.wall'
+    are the white wall textures; 'special.goo' is the goo texture.
+    """
+    import vbsp
+    pos = Vec.from_str(res['pos', '0 0 0'])
+    pos.z -= 64  # Subtract so origin is the floor-position
+    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
+
+    # Relative to the instance origin
+    pos += Vec.from_str(inst['origin', '0 0 0'])
+
+    norm = Vec.from_str(res['dir', '0 0 -1']).rotate_by_str(
+        inst['angles', '0 0 0']
+    )
+
+    if utils.conv_bool(res['gridpos', '0']):
+        for axis in 'xyz':
+            # Don't realign things in the normal's axis -
+            # those are already fine.
+            if not norm[axis]:
+                pos[axis] //= 128
+                pos[axis] *= 128
+                pos[axis] += 64
+
+    brush = SOLIDS.get(pos.as_tuple(), None)
+    ':type brush: solidGroup'
+
+    if not brush or brush.normal != norm:
+        return
+
+    tex = res['tex']
+
+    if tex.startswith('[') and tex.endswith(']'):
+        brush.face.mat = vbsp.get_tex(tex[1:-1])
+        brush.face.mat = tex
+    elif tex.startswith('<') and tex.endswith('>'):
+        # Special texture names!
+        tex = tex[1:-1].casefold()
+        if tex == 'white':
+            brush.face.mat = 'tile/white_wall_tile003a'
+        elif tex == 'black':
+            brush.face.mat = 'metal/black_wall_metal_002c'
+
+        if tex == 'black' or tex == 'white':
+            # For these two, run the regular logic to apply textures
+            # correctly.
+            vbsp.alter_mat(
+                brush.face,
+                vbsp.face_seed(brush.face),
+                vbsp.get_bool_opt('tile_texture_lock', True),
+            )
+
+        if tex == 'special':
+            vbsp.set_special_mat(brush.face, str(brush.color))
+        elif tex == 'special-white':
+            vbsp.set_special_mat(brush.face, 'white')
+            return
+        elif tex == 'special-black':
+            vbsp.set_special_mat(brush.face, 'black')
+
+        # Do <4x4>, <white-2x4>, etc
+        color = str(brush.color)
+        if tex.startswith('black') or tex.endswith('white'):
+            # Override the color used for 2x2/4x4 brushes
+            color = tex[:5]
+        if tex.endswith('2x2') or tex.endswith('4x4'):
+            # 4x4 and 2x2 instructions are ignored on floors and ceilings.
+            orient = vbsp.get_face_orient(brush.face)
+            if orient == vbsp.ORIENT.wall:
+                brush.face.mat = vbsp.get_tex(
+                    color + '.' + tex[-3:]
+                )
+            else:
+                brush.face.mat = vbsp.get_tex(
+                    color + '.' + str(orient)
+                )
+    else:
+        brush.face.mat = tex
+
+    # Don't allow this to get overwritten later.
+    vbsp.IGNORED_FACES.add(brush.face)
+
+
+@make_result('AddBrush')
+def res_add_brush(inst, res):
+    """Spawn in a brush at the indicated points.
+
+    - point1 and point2 are locations local to the instance, with '0 0 0'
+      as the floor-position.
+    - type is either 'black' or 'white'.
+    - detail should be set to True/False. If true the brush will be a
+      func_detail instead of a world brush.
+
+    The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
+    textures as needed.
+    """
+    import vbsp
+
+    point1 = Vec.from_str(res['point1'])
+    point2 = Vec.from_str(res['point2'])
+
+    point1.z -= 64 # Offset to the location of the floor
+    point2.z -= 64
+
+    point1.rotate_by_str(inst['angles']) # Rotate to match the instance
+    point2.rotate_by_str(inst['angles'])
+
+    origin = Vec.from_str(inst['origin'])
+    point1 += origin # Then offset to the location of the instance
+    point2 += origin
+
+    tex_type = res['type', None]
+    if tex_type not in ('white', 'black'):
+        utils.con_log(
+            'AddBrush: "{}" is not a valid brush '
+            'color! (white or black)'.format(tex_type)
+        )
+        tex_type = 'black'
+
+    # We need to rescale black walls and ceilings
+    rescale = vbsp.get_bool_opt('random_blackwall_scale') and tex_type == 'black'
+
+    dim = point2 - point1
+    dim.max(-dim)
+
+    # Figure out what grid size and scale is needed
+    # Check the dimensions in two axes to figure out the largest
+    # tile size that can fit in it.
+    x_maxsize = min(dim.y, dim.z)
+    y_maxsize = min(dim.x, dim.z)
+    if x_maxsize <= 32:
+        x_grid = '4x4'
+        x_scale = 0.25
+    elif x_maxsize <= 64:
+        x_grid = '2x2'
+        x_scale = 0.5
+    else:
+        x_grid = 'wall'
+        x_scale = 1
+
+    if y_maxsize <= 32:
+        y_grid = '4x4'
+        y_scale = 0.25
+    elif y_maxsize <= 64:
+        y_grid = '2x2'
+        y_scale = 0.5
+    else:
+        y_grid = 'wall'
+        y_scale = 1
+
+    grid_offset = (origin // 128)
+
+    # All brushes in each grid have the same textures for each side.
+    random.seed(grid_offset.join(' ') + '-partial_block')
+
+    solids = VMF.make_prism(point1, point2)
+    ':type solids: VLib.PrismFace'
+
+    # Ensure the faces aren't re-textured later
+    vbsp.IGNORED_FACES.update(solids.solid.sides)
+
+    solids.north.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.south.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.east.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.west.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.top.mat = vbsp.get_tex(tex_type + '.floor')
+    solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
+
+    if rescale:
+        z_maxsize = min(dim.x, dim.y)
+        # randomised black wall scale applies to the ceiling too
+        if z_maxsize <= 32:
+            z_scale = 0.25
+        elif z_maxsize <= 64:
+            z_scale = random.choice((0.5, 0.5, 0.25))
+        else:
+            z_scale = random.choice((1, 1, 0.5, 0.5, 0.25))
+    else:
+        z_scale = 0.25
+
+    if rescale:
+        solids.north.scale = y_scale
+        solids.south.scale = y_scale
+        solids.east.scale = x_scale
+        solids.west.scale = x_scale
+        solids.bottom.scale = z_scale
+
+    if utils.conv_bool(res['detail', False], False):
+        # Add the brush to a func_detail entity
+        VMF.create_ent(
+            classname='func_detail'
+        ).solids = [
+            solids.solid
+        ]
+    else:
+        # Add to the world
+        VMF.add_brush(solids.solid)

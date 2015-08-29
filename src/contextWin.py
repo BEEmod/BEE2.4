@@ -11,6 +11,7 @@ from tkinter import *
 from tk_root import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
+
 import functools
 import webbrowser
 
@@ -164,6 +165,26 @@ def set_item_version(_=None):
     load_item_data()
 
 
+def get_description(global_last, glob_desc, style_desc):
+    """Join together the general and style description for an item."""
+    if glob_desc and style_desc:
+        # We have both, we need to join them together.
+        if global_last:
+            yield from style_desc
+            yield (('line', ''))
+            yield from glob_desc
+        else:
+            yield from glob_desc
+            yield (('line', ''))
+            yield from style_desc
+    elif glob_desc:
+        yield from glob_desc
+    elif style_desc:
+        yield from style_desc
+    else:
+        return # No description
+
+
 def load_item_data():
     """Refresh the window to use the selected item's data."""
     global version_lookup
@@ -182,7 +203,13 @@ def load_item_data():
     wid['name']['text'] = selected_sub_item.name
     wid['ent_count']['text'] = item_data['ent']
 
-    wid['desc'].set_text(item_data['desc'])
+    wid['desc'].set_text(
+        get_description(
+            global_last=selected_item.item.glob_desc_last,
+            glob_desc=selected_item.item.glob_desc,
+            style_desc=item_data['desc']
+        )
+    )
 
     if itemPropWin.can_edit(selected_item.properties()):
         wid['changedefaults'].state(['!disabled'])
@@ -221,6 +248,8 @@ def load_item_data():
         wid['moreinfo'].state(['disabled'])
     else:
         wid['moreinfo'].state(['!disabled'])
+    wid['moreinfo'].tooltip_text = selected_item.url
+
     editor_data = item_data['editor']
     has_inputs = False
     has_polarity = False
@@ -417,8 +446,7 @@ def init_widgets():
 
     wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
-    wid['moreinfo'].bind('<Enter>', more_info_show_url)
-    wid['moreinfo'].bind('<Leave>', tooltip.hide)
+    tooltip.add_tooltip(wid['moreinfo'])
 
     menu_info = Menu(wid['moreinfo'])
     menu_info.add_command(label='', state='disabled')
@@ -437,6 +465,10 @@ def init_widgets():
         command=show_item_props,
         )
     wid['changedefaults'].grid(row=6, column=1)
+    tooltip.add_tooltip(
+        wid['changedefaults'],
+        'Change the default settings for this item when placed.'
+    )
 
     wid['variant'] = ttk.Combobox(f, values=['VERSION'], exportselection=0)
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
