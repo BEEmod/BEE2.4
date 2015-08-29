@@ -58,7 +58,8 @@ _UNLOCK_ITEMS = [
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
-# We always add ours such that it's the highest priority.
+# We always add ours such that it's the highest priority, other
+# than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
 
@@ -71,6 +72,7 @@ export_screen = loadScreen.LoadScreen(
     title_text='Exporting',
 )
 
+
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
 
@@ -79,7 +81,7 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('../basemodui.txt', "r") as trans:
+        with open('../basemodui.txt') as trans:
             trans_prop = Property.parse(trans, 'basemodui.txt')
         trans_data = {
             item.real_name: item.value
@@ -132,18 +134,11 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
 
-    def is_modded(self):
-        return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
-
     def edit_gameinfo(self, add_line=False):
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
         """
-
-        if self.is_modded() == add_line:
-            # It's already in the correct state!
-            return
 
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
@@ -181,11 +176,7 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
-        if add_line:
-            with open(self.abs_path('BEE2_EDIT_FLAG'), 'w') as file:
-                file.write('')
-        else:
-            os.remove(self.abs_path('BEE2_EDIT_FLAG'))
+        if not add_line:
             # Restore the original files!
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
@@ -204,6 +195,7 @@ class Game:
 
         screen_func = export_screen.step
         copy2 = shutil.copy2
+
         def copy_func(src, dest):
             screen_func('RES')
             copy2(src, dest)
