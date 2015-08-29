@@ -1053,14 +1053,14 @@ def update_filters():
             # deselected
             (show_wip or not item.item.is_wip)
             # Visible if any of the author and tag checkboxes are checked
-            and any(
+            and (any(
                 FilterVars['author'][auth.casefold()].get()
                 for auth in item.item.authors
-                )
-            and any(
+                ) or not item.item.authors) # Show if no authors
+            and (any(
                 FilterVars['tags'][tag.casefold()].get()
                 for tag in item.item.tags
-                )
+                ) or not item.item.tags) # Show if no tags
             # The package is selected
             and FilterVars['package'][item.item.pak_id].get()
             # Items like the elevator that need the unlocked stylevar
@@ -1439,7 +1439,6 @@ def init_filter_col(cat, f):
             command=update_filters,
             variable=FilterVars[cat][filt_id],
             )
-        FilterBoxes[cat][filt_id]['variable'] = FilterVars[cat][filt_id]
         FilterBoxes[cat][filt_id].grid(
             row=ind+2,
             column=0,
