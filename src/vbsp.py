@@ -695,6 +695,7 @@ def get_map_info():
             else:
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
         if file in file_sp_exit_corr:
+            GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
             if override_sp_exit == 0:
                 utils.con_log(
@@ -706,6 +707,7 @@ def get_map_info():
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
+            GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
             if override_sp_entry == 0:
                 utils.con_log(
@@ -1143,8 +1145,6 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     if reset_offset:
         targ.offset = 0
     targ.scale = scale
-
-    utils.con_log(face.uaxis, face.vaxis)
 
 
 def change_brush():
