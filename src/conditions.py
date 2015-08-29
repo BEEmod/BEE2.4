@@ -1322,11 +1322,8 @@ def res_cust_fizzler(base_inst, res):
                         if side.mat.casefold() == 'effects/fizzler':
                             side.mat = laser_tex
 
-                            uaxis = side.uaxis.split(" ")
-                            vaxis = side.vaxis.split(" ")
-                            # the format is like "[1 0 0 -393.4] 0.25"
-                            side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
-                            side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
+                            side.uaxis.offset = 0
+                            side.scale = 0.25
                         else:
                             side.mat = nodraw_tex
                 else:
@@ -1408,23 +1405,19 @@ def convert_to_laserfield(
             side.mat = laser_tex
             # Now we figure out the corrrect u/vaxis values for the texture.
 
-            uaxis = side.uaxis.split(" ")
-            vaxis = side.vaxis.split(" ")
-            # the format is like "[1 0 0 -393.4] 0.25"
             size = 0
             offset = 0
             for i, wid in enumerate(dimensions):
                 if wid > size:
                     size = int(wid)
                     offset = int(bounds_min[i])
-            side.uaxis = (
-                " ".join(uaxis[:3]) + " " +
-                # texture offset to fit properly
-                str(tex_width/size * -offset) + "] " +
-                str(size/tex_width)  # scaling
-                )
+            # texture offset to fit properly
+            side.uaxis.offset= tex_width/size * -offset
+            side.uaxis.scale= size/tex_width  # scaling
+
             # heightwise it's always the same
-            side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
+            side.vaxis.offset = 256
+            side.vaxis.scale = 0.25
 
 
 @make_result('condition')

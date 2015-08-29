@@ -153,10 +153,10 @@ DEFAULTS = {
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
     "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
-    "edge_off":                 "53.3335",  # The offset used on squarebeams.
+    "reset_edge_off":           "0",  # Reset the scale on
     "edge_scale":               "0.15",  # The scale on squarebeams textures
     "rotate_edge_special":      "0",    # Ditto for angled/flip panels
-    "edge_off_special":         "53.3335",
+    "reset_edge_off_special":   "",
     "edge_scale_special":       "0.15",
 
     # Reset offsets for all white/black brushes, so embedface has correct
@@ -302,7 +302,7 @@ def alter_mat(face, seed=None, texture_lock=True):
         face.mat = get_tex(surf_type + '.' + orient)
 
         if not texture_lock:
-            reset_tex_offset(face)
+            face.offset = 0
 
         return True
     elif mat in TEX_FIZZLER:
@@ -1124,36 +1124,36 @@ def remove_static_ind_toggles():
     utils.con_log('Done!')
 
 
-def fix_squarebeams(face, rotate, offset: str, scale: str):
+def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     '''Fix a squarebeams brush for use in other styles.
 
     If rotate is True, rotate the texture 90 degrees.
     offset is the offset for the texture.
     '''
-    uaxis = face.uaxis.split(' ')
-    vaxis = face.vaxis.split(' ')
     if rotate:
         # To rotate, swap the two values
-        uaxis, vaxis = vaxis, uaxis
+        face.uaxis, face.vaxis = face.vaxis, face.uaxis
 
     # We want to modify the value with an offset
-    if uaxis[3] != '0]':
-        uaxis[3] = offset + ']'
-        uaxis[4] = scale
+    if face.uaxis.offset != 0:
+        targ = face.uaxis
     else:
-        vaxis[3] = offset + ']'
-        vaxis[4] = scale
+        targ = face.vaxis
 
-    face.uaxis = ' '.join(uaxis)
-    face.vaxis = ' '.join(vaxis)
+    if reset_offset:
+        targ.offset = 0
+    targ.scale = scale
+
+    utils.con_log(face.uaxis, face.vaxis)
 
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
-    glass_scale = get_opt('glass_scale')
-    goo_scale = get_opt('goo_scale')
+    glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
+    goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1213,20 +1213,11 @@ def change_brush():
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
-
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = goo_scale # Apply goo scaling
-                split_v[-1] = goo_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply goo scaling
+                face.scale = goo_scale
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = glass_scale  # apply the glass scaling option
-                split_v[-1] = glass_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply the glass scaling option
+                face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
@@ -1309,16 +1300,6 @@ def face_seed(face):
     return origin.join(' ')
 
 
-def reset_tex_offset(face):
-    """Force all white/black walls to 0 offsets"""
-    uaxis = face.uaxis.split()
-    vaxis = face.vaxis.split()
-    uaxis[3] = '0]'
-    vaxis[3] = '0]'
-    face.uaxis = ' '.join(uaxis)
-    face.vaxis = ' '.join(vaxis)
-
-
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
     bbox_min, bbox_max = face.get_bbox()
@@ -1346,8 +1327,8 @@ def random_walls():
     scale_walls = get_bool_opt("random_blackwall_scale")
     rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
-    edge_off = get_opt('edge_off')
-    edge_scale = get_opt('edge_scale')
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -1367,13 +1348,7 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(get_grid_sizes(face))
-                split = face.uaxis.split()
-                split[-1] = scale
-                face.uaxis = " ".join(split)
-
-                split = face.vaxis.split()
-                split[-1] = scale
-                face.vaxis = " ".join(split)
+                face.scale = scale
             alter_mat(face, face_seed(face), texture_lock)
 
 
@@ -1399,8 +1374,8 @@ def clump_walls():
 
     texture_lock = get_bool_opt('tile_texture_lock', True)
     rotate_edge = get_bool_opt('rotate_edge')
-    edge_off = get_opt('edge_off')
-    edge_scale = get_opt('edge_scale')
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
@@ -1494,7 +1469,7 @@ def clump_walls():
                 if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
                     side.mat = tex
                     if not texture_lock:
-                        reset_tex_offset(side)
+                        side.offset = 0
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -1712,18 +1687,18 @@ def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("grating_inst")
-    grating_scale = get_opt("grating_scale")
+    grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
         rotate_edge = get_bool_opt('rotate_edge', False)
-        edge_off = get_opt('edge_off')
-        edge_scale = get_opt('edge_scale')
+        edge_off = get_bool_opt('reset_edge_off')
+        edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
     else:
         edge_tex = 'special.edge_special'
         rotate_edge = get_bool_opt('rotate_edge_special', False)
-        edge_off = get_opt('edge_off_special')
-        edge_scale = get_opt('edge_scale_special')
+        edge_off = get_bool_opt('reset_edge_off_special')
+        edge_scale = utils.conv_float(get_opt('edge_scale_special'), 0.15)
     utils.con_log('Special tex:', rotate_edge, edge_off, edge_scale)
 
     if grating_inst == "NONE":
@@ -1768,14 +1743,8 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split()
-                    split_v = side.vaxis.split()
-                    split_u[-1] = grating_scale  # apply the grtating
-                    split_v[-1] = grating_scale  # scaling option
-                    side.uaxis = " ".join(split_u)
-                    side.vaxis = " ".join(split_v)
+                    side.scale = grating_scale
                 alter_mat(side)  # for gratings, laserfields and some others
-
 
             # The style blanked the material, so delete the brush
             if side.mat == '':
