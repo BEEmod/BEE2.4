@@ -669,7 +669,7 @@ def flag_has_inst(_, flag):
     """Checks if the given instance is present anywhere in the map."""
     flags = resolve_inst(flag.value)
     return any(
-        inst in flags
+        inst.casefold() in flags
         for inst in
         ALL_INST
     )
