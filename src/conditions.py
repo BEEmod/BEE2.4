@@ -1884,7 +1884,7 @@ def res_track_plat(_, res):
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
-        normal = Vec(0, 0, 1).rotate(
+        normal = Vec(0, 0, 1).rotate_by_str(
             plat_inst['angles']
         )
 
