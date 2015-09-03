@@ -43,6 +43,7 @@ if WIN:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'hand2',
         'wait': 'watch',
         'stretch_vert': 'sb_v_double_arrow',
         'stretch_horiz': 'sb_h_double_arrow',
@@ -80,6 +81,7 @@ elif MAC:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'hand2',
         'wait': 'spinning',
         'stretch_vert': 'resizeupdown',
         'stretch_horiz': 'resizeleftright',
@@ -115,6 +117,7 @@ elif LINUX:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'hand2',
         'wait': 'watch',
         'stretch_vert': 'sb_v_double_arrow',
         'stretch_horiz': 'sb_h_double_arrow',

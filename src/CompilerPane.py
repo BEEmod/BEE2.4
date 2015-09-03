@@ -4,11 +4,15 @@ from tkinter import ttk
 from tkinter import filedialog
 
 from functools import partial
+from PIL import Image, ImageTk
+
+import os.path
 
 import img as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from SubPane import SubPane
+from tooltip import add_tooltip
 import utils
 
 MAX_ENTS = 2048
@@ -24,6 +28,7 @@ COMPILE_DEFAULTS = {
     'General': {
         'spawn_elev': 'True',
         'player_model': 'PETI',
+        'force_final_light': '0',
         },
     'Corridor': {
         'sp_entry': '1',
@@ -54,13 +59,25 @@ UI = {}
 chosen_thumb = StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
+tk_screenshot = None # The preview image shown
+
+# Location we copy custom screenshots to
+SCREENSHOT_LOC = os.path.abspath(os.path.join(
+        os.getcwd(),
+        '..',
+        'config',
+        'screenshot.jpg'
+    ))
+
 player_model_var = StringVar(
     value=PLAYER_MODELS.get(
         COMPILE_CFG.get_val('General', 'player_model', 'PETI'),
         PLAYER_MODELS['PETI'],
     )
 )
-start_in_elev = IntVar(value=0)
+start_in_elev = IntVar(
+    value=COMPILE_CFG.get_bool('General', 'spawn_elev')
+)
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = StringVar(value='')
 
@@ -68,7 +85,12 @@ count_brush = IntVar(value=0)
 count_ents = IntVar(value=0)
 count_overlay = IntVar(value=0)
 
+vrad_light_type = IntVar(
+    value=COMPILE_CFG.get_bool('General', 'vrad_force_full')
+)
+
 CORRIDOR = {}
+
 
 def set_corr_values(group_name, props):
     """Set the corrdors according to the passed prop_block."""
@@ -115,39 +137,59 @@ def refresh_counts(reload=True):
 
 
 def find_screenshot(_=None):
-    global cust_file_loc
-    cust_file_loc = ''
+    """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
         title='Find Game Exe',
         filetypes=[
-            ('JPEG Image', '*.jpg *.jpeg *.jpe *.jfif'),
+            ('Image File', '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
+                           '*.tiff *.tga *.ico *.psd'),
         ],
         initialdir='C:',
     )
     if file_name:
-        cust_file_loc = file_name
-        COMPILE_CFG['Screenshot']['LOC'] = file_name
-        set_screenshot_text()
-        UI['thumb_custom'].invoke()
-    else:
-        cust_file_loc = ''
-        cust_file_loc_var.set('')
-        COMPILE_CFG['Screenshot']['LOC'] = ''
-        # Set to this instead!
-        if chosen_thumb.get() == 'CUST':
-            UI['thumb_auto'].invoke()
+        load_screenshot(file_name)
     COMPILE_CFG.save_check()
 
 
-def set_screenshot_text(_=None):
-    if len(cust_file_loc) > 20:
-        if cust_file_loc[-18] in r'\/':
-            # We don't whant it to start with "../"!
-            cust_file_loc_var.set('...' + cust_file_loc[-17:])
-        else:
-            cust_file_loc_var.set('..' + cust_file_loc[-18:])
+def set_screen_type():
+    """Set the type of screenshot used."""
+    chosen = chosen_thumb.get()
+    COMPILE_CFG['Screenshot']['type'] = chosen
+    if chosen == 'CUST':
+        print('Showing')
+        UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
-        cust_file_loc_var.set(cust_file_loc)
+        UI['thumb_label'].grid_forget()
+    UI['thumb_label'].update()
+    # Resize the pane to accommodate the shown/hidden image
+    window.geometry('{}x{}'.format(
+        window.winfo_width(),
+        window.winfo_reqheight(),
+    ))
+
+    COMPILE_CFG.save()
+
+
+def load_screenshot(path):
+    """Copy the selected image, changing format if needed."""
+    img = Image.open(path)
+    COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
+    img.save(SCREENSHOT_LOC)
+    set_screenshot(img)
+
+
+def set_screenshot(img=None):
+    # Make the visible screenshot small
+    global tk_screenshot
+    if img is None:
+        try:
+            img = Image.open(SCREENSHOT_LOC)
+        except IOError: # Image doesn't exist!
+            # In that case, use a black image
+            img = Image.new('RGB', (1, 1), color=(0, 0, 0))
+    tk_img = img.resize((150, 100), Image.LANCZOS)
+    tk_screenshot = ImageTk.PhotoImage(tk_img)
+    UI['thumb_label']['image'] = tk_screenshot
 
 
 def set_elev_type():
@@ -155,23 +197,32 @@ def set_elev_type():
     COMPILE_CFG.save()
 
 
-def set_screen_type():
-    COMPILE_CFG['Screenshot']['type'] = chosen_thumb.get()
-    COMPILE_CFG.save()
-
-
 def set_model(_=None):
+    """Save the selected player model."""
     text = player_model_var.get()
     COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]
     COMPILE_CFG.save()
 
+
 def set_corr(corr_name, e):
+    """Save the chosen corridor when it's changed.
+
+    This is shared by all three dropdowns.
+    """
     COMPILE_CFG['Corridor'][corr_name] = str(e.widget.current())
     COMPILE_CFG.save()
+
 
 def set_corr_dropdown(corr_name, widget):
     """Set the values in the dropdown when it's opened."""
     widget['values'] = CORRIDOR[corr_name]
+
+
+def set_vrad_type():
+    """Set the compile type override for VRAD."""
+    COMPILE_CFG['General']['vrad_force_full'] = str(vrad_light_type.get())
+    COMPILE_CFG.save()
+
 
 def make_pane(tool_frame):
     """Create the compiler options pane.
@@ -215,39 +266,88 @@ def make_pane(tool_frame):
         command=set_screen_type,
     )
 
-    cust_frame = ttk.Frame(thumb_frame)
-    cust_frame.columnconfigure(1, weight=1)
-
     UI['thumb_custom'] = ttk.Radiobutton(
-        cust_frame,
-        text='',
+        thumb_frame,
+        text='Custom:',
         value='CUST',
         variable=chosen_thumb,
         command=set_screen_type,
     )
 
-    UI['thumb_custom_file'] = ttk.Entry(
-        cust_frame,
-        cursor=utils.CURSORS['regular'],
-        textvariable=cust_file_loc_var,
-        width=15,
+    UI['thumb_label'] = ttk.Label(
+        thumb_frame,
+        anchor=CENTER,
+        cursor=utils.CURSORS['link'],
     )
-    UI['thumb_custom_file'].bind(utils.EVENTS['LEFT'], find_screenshot)
-    UI['thumb_custom_file'].bind("<Key>", set_screenshot_text)
-
-    UI['thumb_custom_btn'] = ttk.Button(
-        cust_frame,
-        text="...",
-        width=1.5,
-        command=find_screenshot,
+    UI['thumb_label'].bind(
+        utils.EVENTS['LEFT'],
+        find_screenshot,
     )
 
-    UI['thumb_auto'].grid(row=0, column=0, sticky=W)
-    UI['thumb_peti'].grid(row=0, column=1, sticky=W)
-    cust_frame.grid(row=1, column=0, columnspan=2, sticky=EW)
-    UI['thumb_custom'].grid(row=0, column=0, sticky=W)
-    UI['thumb_custom_file'].grid(row=0, column=1, sticky=EW)
-    UI['thumb_custom_btn'].grid(row=0, column=2, sticky=EW)
+    UI['thumb_auto'].grid(row=0, column=0, sticky='W')
+    UI['thumb_peti'].grid(row=0, column=1, sticky='W')
+    UI['thumb_custom'].grid(row=1, column=0, columnspan=2, sticky='NEW')
+    add_tooltip(
+        UI['thumb_auto'],
+        "Override the map image to use a screenshot automatically taken"
+        "from the beginning of a chamber. Press F5 to take a new "
+        "screenshot. If the map has not been previewed recently "
+        "(within the last few hours), the default PeTI screenshot "
+        "will be used instead."
+    )
+    add_tooltip(
+        UI['thumb_peti'],
+        "Use the normal editor view for the map preview image."
+    )
+    add_tooltip(
+        UI['thumb_custom'],
+        "Use a custom image for the map preview image. Click the "
+        "screenshot to select.\n"
+        "Images will be converted to JPEGs if needed."
+    )
+
+    if chosen_thumb.get() == 'CUST':
+        # Show this if the user has set it before
+        UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
+    set_screenshot()  # Load the last saved screenshot
+
+    vrad_frame = ttk.LabelFrame(
+        window,
+        text='Lighting:',
+        labelanchor=N,
+    )
+    vrad_frame.grid(row=1, column=0, sticky=EW)
+
+    UI['light_fast'] = ttk.Radiobutton(
+        vrad_frame,
+        text='Fast',
+        value=0,
+        variable=vrad_light_type,
+        command=set_vrad_type,
+    )
+    UI['light_fast'].grid(row=0, column=0)
+    UI['light_full'] = ttk.Radiobutton(
+        vrad_frame,
+        text='Full',
+        value=1,
+        variable=vrad_light_type,
+        command=set_vrad_type,
+    )
+    UI['light_full'].grid(row=0, column=1)
+
+    add_tooltip(
+        UI['light_fast'],
+        "Compile with lower-quality, fast lighting. This speeds "
+        "up compile times, but does not appear as good. Some "
+        "shadows may appear wrong.\n"
+        "When publishing, this is ignored."
+    )
+    add_tooltip(
+        UI['light_full'],
+        "Compile with high-quality lighting. This looks correct, "
+        "but takes longer to compute. Use if you're arranging lights."
+        "When publishing, this is always used."
+    )
 
     elev_frame = ttk.LabelFrame(
         window,
@@ -255,7 +355,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    elev_frame.grid(row=1, column=0, sticky=EW)
+    elev_frame.grid(row=2, column=0, sticky=EW)
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
@@ -278,12 +378,24 @@ def make_pane(tool_frame):
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
     UI['elev_elevator'].grid(row=0, column=1, sticky=W)
 
+    add_tooltip(
+        UI['elev_preview'],
+        "When previewing in SP, spawn inside the entry elevator. "
+        "This also disables the map restarts when you reach the "
+        "exit door. Use this to examine the entry and exit corridors."
+    )
+    add_tooltip(
+        UI['elev_elevator'],
+        "When previewing in SP, spawn just before the entry door. "
+        "When you reach the exit door, the map will restart."
+    )
+
     corr_frame = ttk.LabelFrame(
         window,
         text='Corridor:',
         labelanchor=N,
     )
-    corr_frame.grid(row=2, column=0, sticky=EW)
+    corr_frame.grid(row=3, column=0, sticky=EW)
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
@@ -329,7 +441,7 @@ def make_pane(tool_frame):
         text='Player Model (SP):',
         labelanchor=N,
     )
-    model_frame.grid(row=3, column=0, sticky=EW)
+    model_frame.grid(row=4, column=0, sticky=EW)
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,
@@ -350,7 +462,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    count_frame.grid(row=4, column=0, sticky=EW)
+    count_frame.grid(row=5, column=0, sticky=EW)
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
@@ -413,6 +525,3 @@ def make_pane(tool_frame):
     UI['view_logs'].grid(row=4, column=0, columnspan=3, sticky=EW)
 
     refresh_counts(reload=False)
-
-# Set the text to the previously saved value
-set_screenshot_text()
