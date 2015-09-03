@@ -378,11 +378,14 @@ class selWin:
                 )
 
             item.win = self.win
-            item.button.bind(
-                utils.EVENTS['LEFT'],
+            utils.bind_leftclick(
+                item.button,
                 functools.partial(self.sel_item, item),
             )
-            item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
+            utils.bind_leftclick_double(
+                item.button,
+                self.save,
+            )
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -411,7 +414,10 @@ class selWin:
             textvariable=self.disp_label,
             cursor=utils.CURSORS['regular'],
         )
-        self.display.bind(utils.EVENTS['LEFT'], self.open_win)
+        utils.bind_leftclick(
+            self.display,
+            self.open_win,
+        )
         self.display.bind("<Key>", self.set_disp)
         utils.bind_rightclick(
             self.display,

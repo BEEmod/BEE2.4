@@ -1796,10 +1796,10 @@ def init_windows():
             )
 
     # When clicking on any window hide the context window
-    TK_ROOT.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    StyleVarPane.window.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['opt'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['pal'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
+    utils.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    utils.bind_leftclick(windows['opt'], contextWin.hide_context)
+    utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
