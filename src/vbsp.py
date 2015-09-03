@@ -231,7 +231,7 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-BEE2_config = None
+BEE2_config = None # ConfigFile
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
@@ -1904,6 +1904,29 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
+def make_vrad_config():
+    """Generate a config file for VRAD from our configs.
+
+    This way VRAD doesn't need to parse through vbsp_config, or anything else.
+    """
+    utils.con_log('Generating VRAD config...')
+    conf = Property('Config', [
+    ])
+    conf['force_full'] = utils.bool_as_int(
+        BEE2_config.get_bool('General', 'vrad_force_full')
+    )
+    conf['screenshot'] = BEE2_config.get(
+        'Screenshot', 'loc', ''
+    )
+    conf['screenshot_type'] = BEE2_config.get(
+        'Screenshot', 'type', 'PETI'
+    ).upper()
+
+    with open('bee2/vrad_config.cfg', 'w') as f:
+        for line in conf.export():
+            f.write(line)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -2080,8 +2103,8 @@ def main():
         remove_static_ind_toggles()
 
         fix_worldspawn()
+        make_vrad_config()
         save(new_path)
-
         run_vbsp(
             vbsp_args=new_args,
             do_swap=True,
