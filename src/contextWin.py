@@ -383,7 +383,10 @@ def init_widgets():
             image=png.png('BEE2/alpha_64'),
         )
         wid['subitem'][i].grid(row=0, column=i)
-        wid['subitem'][i].bind(utils.EVENTS['LEFT'], functools.partial(sub_sel, i))
+        utils.bind_leftclick(
+            wid['subitem'][i],
+            functools.partial(sub_sel, i),
+        )
         utils.bind_rightclick(
             wid['subitem'][i],
             functools.partial(sub_open, i),
