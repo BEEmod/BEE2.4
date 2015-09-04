@@ -19,6 +19,10 @@ MAX_ENTS = 2048
 MAX_OVERLAY = 512
 MAX_BRUSH = 8192
 
+# The size of PeTI screenshots
+PETI_WIDTH = 555
+PETI_HEIGHT = 312
+
 
 COMPILE_DEFAULTS = {
     'Screenshot': {
@@ -173,8 +177,16 @@ def set_screen_type():
 def load_screenshot(path):
     """Copy the selected image, changing format if needed."""
     img = Image.open(path)
+    resized_img = img.resize(
+        # Resize to the same propotions as the original
+        # PeTI screenshots.
+        (
+            img.width,
+            img.height * PETI_WIDTH / PETI_HEIGHT
+        )
+    )
     COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-    img.save(SCREENSHOT_LOC)
+    resized_img.save(SCREENSHOT_LOC)
     set_screenshot(img)
 
 
@@ -184,10 +196,16 @@ def set_screenshot(img=None):
     if img is None:
         try:
             img = Image.open(SCREENSHOT_LOC)
-        except IOError: # Image doesn't exist!
+        except IOError:  # Image doesn't exist!
             # In that case, use a black image
             img = Image.new('RGB', (1, 1), color=(0, 0, 0))
-    tk_img = img.resize((150, 100), Image.LANCZOS)
+    tk_img = img.resize(
+        (
+            int(PETI_WIDTH // 3.5),
+            int(PETI_HEIGHT // 3.5),
+        ),
+        Image.LANCZOS
+    )
     tk_screenshot = ImageTk.PhotoImage(tk_img)
     UI['thumb_label']['image'] = tk_screenshot
 
