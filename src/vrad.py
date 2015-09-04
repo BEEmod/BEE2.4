@@ -3,11 +3,26 @@ import os.path
 import sys
 import subprocess
 
+from property_parser import Property
 import utils
 
+CONF = Property('Config')
 
 def quote(txt):
     return '"' + txt + '"'
+
+
+def load_config():
+    global CONF
+    utils.con_log('Loading Settings...')
+    try:
+        with open("bee2/vrad_config.cfg") as config:
+            CONF = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
+                'Config', []
+            )
+    except FileNotFoundError:
+        pass
+    utils.con_log('Config Loaded!')
 
 
 def pack_content(path):
@@ -79,6 +94,7 @@ def main(argv):
     if path == "":
         raise Exception("No map passed!")
 
+    load_config()
 
     for a in fast_args[:]:
         if a.casefold() in (
@@ -119,6 +135,7 @@ def main(argv):
         # specified there.
         is_peti = (
             os.path.basename(path) == "preview.bsp" or
+            utils.conv_bool(CONF['force_full'], False)
         )
 
 
