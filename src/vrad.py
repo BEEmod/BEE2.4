@@ -1,5 +1,7 @@
 import os
 import os.path
+import stat
+import shutil
 import sys
 import subprocess
 
@@ -7,9 +9,44 @@ from property_parser import Property
 import utils
 
 CONF = Property('Config')
+SCREENSHOT_DIR = os.path.join(
+    '..',
+    'portal2',  # This is hardcoded into P2, it won't change for mods.
+    'puzzles',
+    # Then the <random numbers> folder
+)
+
 
 def quote(txt):
     return '"' + txt + '"'
+
+
+def set_readonly(file):
+    """Make the given file read-only."""
+    # Get the old flags
+    flags = os.stat(file).st_mode
+    # Make it read-only
+    os.chmod(
+        file,
+        flags & ~
+        stat.S_IWUSR & ~
+        stat.S_IWGRP & ~
+        stat.S_IWOTH
+    )
+
+
+def unset_readonly(file):
+    """Set the writeable flag on a file."""
+    # Get the old flags
+    flags = os.stat(file).st_mode
+    # Make it writeable
+    os.chmod(
+        file,
+        flags |
+        stat.S_IWUSR |
+        stat.S_IWGRP |
+        stat.S_IWOTH
+    )
 
 
 def load_config():
@@ -43,6 +80,56 @@ def pack_content(path):
     utils.con_log(arg)
     subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
     utils.con_log("Packing complete!")
+
+
+def find_screenshots():
+    """Find candidate screenshots to overwrite."""
+    # Inside SCREENSHOT_DIR, there should be 1 folder with a
+    # random name which contains the user's puzzles. Just
+    # attempt to modify a screenshot in each of the directories
+    # in the folder.
+    for folder in os.listdir(SCREENSHOT_DIR):
+        full_path = os.path.join(SCREENSHOT_DIR, folder)
+        if os.path.isdir(full_path):
+            # The screenshot to modify is untitled.jpg
+            screenshot = os.path.join(full_path, 'untitled.jpg')
+            if os.path.isfile(screenshot):
+                yield screenshot
+
+
+def mod_screenshots():
+    """Modify the map's screenshot."""
+    mod_type = CONF['screenshot_type', 'PETI'].lower()
+
+    if mod_type == 'cust':
+        utils.con_log('Using custom screenshot!')
+        scr_loc = CONF['screenshot', '']
+    elif mod_type == 'auto':
+        utils.con_log('Using automatic screenshot!')
+        scr_loc = None
+    else:
+        scr_loc = None
+
+    if scr_loc is not None and os.path.isfile(scr_loc):
+        # We should use a screenshot!
+        for screen in find_screenshots():
+            utils.con_log('Replacing "{}"...'.format(screen))
+            # Allow us to edit the file...
+            unset_readonly(screen)
+            shutil.copy(scr_loc, screen)
+            # Make the screenshot readonly, so P2 can't replace it.
+            # Then it'll use our own
+            set_readonly(screen)
+
+    else:
+        if mod_type != 'peti':
+            # Error if the screenshot doesn't exist
+            utils.con_log('"{}" not found!'.format(scr_loc))
+        utils.con_log('Using PeTI screenshot!')
+        for screen in find_screenshots():
+            # Make the screenshot writeable, so P2 will replace it
+            utils.con_log('Making "{}" replaceable...'.format(screen))
+            unset_readonly(screen)
 
 
 def run_vrad(args):
@@ -138,6 +225,7 @@ def main(argv):
             utils.conv_bool(CONF['force_full'], False)
         )
 
+    mod_screenshots()
 
     if is_peti:
         utils.con_log("Forcing Cheap Lighting!")
