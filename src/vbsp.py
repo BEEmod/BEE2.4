@@ -1915,12 +1915,15 @@ def make_vrad_config():
     conf['force_full'] = utils.bool_as_int(
         BEE2_config.get_bool('General', 'vrad_force_full')
     )
-    conf['screenshot'] = BEE2_config.get(
+    conf['screenshot'] = BEE2_config.get_val(
         'Screenshot', 'loc', ''
     )
-    conf['screenshot_type'] = BEE2_config.get(
+    conf['screenshot_type'] = BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper()
+    conf['is_preview'] = utils.bool_as_int(
+        IS_PREVIEW
+    )
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():
@@ -1959,15 +1962,15 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os_suff = ''
 
     arg = (
-        '"'
-        + os.path.normpath(
+        '"' +
+        os.path.normpath(
             os.path.join(
                 os.getcwd(),
                 "vbsp" + os_suff + "_original"
                 )
-            )
-        + '" '
-        + " ".join(vbsp_args)
+            ) +
+        '" ' +
+        " ".join(vbsp_args)
         )
 
     utils.con_log("Calling original VBSP...")
