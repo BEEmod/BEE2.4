@@ -317,11 +317,19 @@ def make_pane(tool_frame):
         UI['thumb_peti'],
         "Use the normal editor view for the map preview image."
     )
-    add_tooltip(
-        UI['thumb_custom'],
+    custom_tooltip = (
         "Use a custom image for the map preview image. Click the "
         "screenshot to select.\n"
         "Images will be converted to JPEGs if needed."
+    )
+    add_tooltip(
+        UI['thumb_custom'],
+        custom_tooltip,
+    )
+
+    add_tooltip(
+        UI['thumb_label'],
+        custom_tooltip
     )
 
     if chosen_thumb.get() == 'CUST':
