@@ -1531,6 +1531,12 @@ def res_rem_fixup(inst, res):
     del inst.fixup['res']
 
 
+@make_result('setAngles')
+def res_set_angles(inst, res):
+    """Set the orientation of an instance to a certain angle."""
+    inst['angles'] = res.value
+
+
 CATWALK_TYPES = {
     utils.CONN_TYPES.straight: 'straight_128',
     utils.CONN_TYPES.corner: 'corner',
