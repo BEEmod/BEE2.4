@@ -628,6 +628,21 @@ def set_player_portalgun(inst):
     utils.con_log('Done!')
 
 
+@conditions.meta_cond(priority=750, only_once=True)
+def add_screenshot_logic(inst):
+    """If the screenshot type is 'auto', add in the needed ents."""
+    if BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper() == 'AUTO':
+        VMF.create_ent(
+            classname='func_instance',
+            file='instances/BEE2/logic/screenshot_logic.vmf',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+        )
+        utils.con_log('Added Screenshot Logic')
+
+
 def get_map_info():
     """Determine various attributes about the map.
 

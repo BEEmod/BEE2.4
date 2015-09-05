@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import os
 import os.path
 import stat
@@ -107,6 +109,60 @@ def mod_screenshots():
     elif mod_type == 'auto':
         utils.con_log('Using automatic screenshot!')
         scr_loc = None
+        # The automatic screenshots are found at this location:
+        auto_path = os.path.join(
+            '..',
+            'portal2',
+            'screenshots'
+        )
+        # We need to find the most recent one. If it's named
+        # "previewcomplete", we want to ignore it - it's a flag
+        # to indicate the map was playtested correctly.
+        screens = [
+            os.path.join(auto_path, path)
+            for path in
+            os.listdir(auto_path)
+        ]
+        screens.sort(
+            key=os.path.getmtime,
+            reverse=True,
+            # Go from most recent to least
+        )
+        playtested = False
+        for scr_shot in screens:
+            utils.con_log(scr_shot)
+            filename = os.path.basename(scr_shot)
+            if filename.startswith('bee2_playtest_flag'):
+                # Previewcomplete is a flag to indicate the map's
+                # been playtested. It must be newer than the screenshot
+                playtested = True
+                continue
+            elif filename.startswith('bee2_screenshot'):
+                continue # Ignore other screenshots
+
+            # We have a screenshot. Check to see if it's
+            # not too old. (Old is > 2 hours)
+            date = datetime.fromtimestamp(
+                os.path.getmtime(scr_shot)
+            )
+            diff = datetime.now() - date
+            if diff.total_seconds() > 2 * 3600:
+                utils.con_log('Screenshot "{scr}" too old ({diff!s})'.format(
+                    scr=scr_shot, diff=diff
+                ))
+                continue
+
+            # If we got here, it's a good screenshot!
+            utils.con_log('Chosen "{}"'.format(scr_shot))
+            utils.con_log('Map Playtested:', playtested)
+            scr_loc = scr_shot
+            break
+        else:
+            # If we get to the end, we failed to find an automatic
+            # screenshot!
+            utils.con_log('No Auto Screenshot found!')
+            mod_type = 'peti'  # Suppress the "None not found" error
+
     else:
         scr_loc = None
 
