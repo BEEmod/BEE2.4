@@ -1936,6 +1936,9 @@ def make_vrad_config():
     conf['screenshot_type'] = BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper()
+    conf['clean_screenshots'] = utils.bool_as_int(
+        BEE2_config.get_bool('Screenshot', 'del_old')
+    )
     conf['is_preview'] = utils.bool_as_int(
         IS_PREVIEW
     )

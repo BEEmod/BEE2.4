@@ -92,6 +92,9 @@ count_overlay = IntVar(value=0)
 vrad_light_type = IntVar(
     value=COMPILE_CFG.get_bool('General', 'vrad_force_full')
 )
+cleanup_screenshot = IntVar(
+    value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True)
+)
 
 CORRIDOR = {}
 
@@ -210,6 +213,10 @@ def set_screenshot(img=None):
     UI['thumb_label']['image'] = tk_screenshot
 
 
+def set_screenshot_cleanup():
+    COMPILE_CFG['Screenshot']['del_old'] = str(cleanup_screenshot.get())
+
+
 def set_elev_type():
     COMPILE_CFG['General']['spawn_elev'] = str(start_in_elev.get())
     COMPILE_CFG.save()
@@ -302,9 +309,17 @@ def make_pane(tool_frame):
         find_screenshot,
     )
 
+    UI['thumb_cleanup'] = ttk.Checkbutton(
+        thumb_frame,
+        text='Cleanup old screenshots',
+        variable=cleanup_screenshot,
+        command=set_screenshot_cleanup,
+    )
+
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
     UI['thumb_peti'].grid(row=0, column=1, sticky='W')
     UI['thumb_custom'].grid(row=1, column=0, columnspan=2, sticky='NEW')
+    UI['thumb_cleanup'].grid(row=3, columnspan=2, sticky='W')
     add_tooltip(
         UI['thumb_auto'],
         "Override the map image to use a screenshot automatically taken"
@@ -330,6 +345,12 @@ def make_pane(tool_frame):
     add_tooltip(
         UI['thumb_label'],
         custom_tooltip
+    )
+
+    add_tooltip(
+        UI['thumb_cleanup'],
+        'Automatically delete unused Automatic screenshots. '
+        'Disable if you want to keep things in "portal2/screenshots". '
     )
 
     if chosen_thumb.get() == 'CUST':

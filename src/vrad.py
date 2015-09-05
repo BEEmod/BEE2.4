@@ -163,7 +163,16 @@ def mod_screenshots():
             utils.con_log('No Auto Screenshot found!')
             mod_type = 'peti'  # Suppress the "None not found" error
 
+        if utils.conv_bool(CONF['clean_screenshots', '0']):
+            utils.con_log('Cleaning up screenshots...')
+            # Clean up this folder - otherwise users will get thousands of
+            # pics in there!
+            for screen in screens:
+                if screen != scr_loc:
+                    os.remove(screen)
+            utils.con_log('Done!')
     else:
+        # PeTI type, or something else
         scr_loc = None
 
     if scr_loc is not None and os.path.isfile(scr_loc):
