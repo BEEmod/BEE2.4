@@ -231,7 +231,7 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-BEE2_config = None
+BEE2_config = None # ConfigFile
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
@@ -626,6 +626,21 @@ def set_player_portalgun(inst):
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
     utils.con_log('Done!')
+
+
+@conditions.meta_cond(priority=750, only_once=True)
+def add_screenshot_logic(inst):
+    """If the screenshot type is 'auto', add in the needed ents."""
+    if BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper() == 'AUTO':
+        VMF.create_ent(
+            classname='func_instance',
+            file='instances/BEE2/logic/screenshot_logic.vmf',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+        )
+        utils.con_log('Added Screenshot Logic')
 
 
 def get_map_info():
@@ -1904,6 +1919,35 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
+def make_vrad_config():
+    """Generate a config file for VRAD from our configs.
+
+    This way VRAD doesn't need to parse through vbsp_config, or anything else.
+    """
+    utils.con_log('Generating VRAD config...')
+    conf = Property('Config', [
+    ])
+    conf['force_full'] = utils.bool_as_int(
+        BEE2_config.get_bool('General', 'vrad_force_full')
+    )
+    conf['screenshot'] = BEE2_config.get_val(
+        'Screenshot', 'loc', ''
+    )
+    conf['screenshot_type'] = BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper()
+    conf['clean_screenshots'] = utils.bool_as_int(
+        BEE2_config.get_bool('Screenshot', 'del_old')
+    )
+    conf['is_preview'] = utils.bool_as_int(
+        IS_PREVIEW
+    )
+
+    with open('bee2/vrad_config.cfg', 'w') as f:
+        for line in conf.export():
+            f.write(line)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -1936,15 +1980,15 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os_suff = ''
 
     arg = (
-        '"'
-        + os.path.normpath(
+        '"' +
+        os.path.normpath(
             os.path.join(
                 os.getcwd(),
                 "vbsp" + os_suff + "_original"
                 )
-            )
-        + '" '
-        + " ".join(vbsp_args)
+            ) +
+        '" ' +
+        " ".join(vbsp_args)
         )
 
     utils.con_log("Calling original VBSP...")
@@ -2080,8 +2124,8 @@ def main():
         remove_static_ind_toggles()
 
         fix_worldspawn()
+        make_vrad_config()
         save(new_path)
-
         run_vbsp(
             vbsp_args=new_args,
             do_swap=True,
