@@ -1537,6 +1537,22 @@ def res_set_angles(inst, res):
     inst['angles'] = res.value
 
 
+@make_result('localTarget')
+def res_local_targetname(inst, res):
+    """Generate a instvar with an instance-local name.
+
+    Useful with AddOutput commands, or other values which use
+    targetnames in the parameter.
+    The result takes the form "<prefix><instance name>[-<local>]<suffix>".
+    """
+    local_name = res['name', '']
+    if local_name:
+        name = inst['targetname', ''] + '-' + local_name
+    else:
+        name = inst['targetname', '']
+    inst.fixup[res['resultVar']] = res['prfix',''] + name + res['suffix', '']
+
+
 CATWALK_TYPES = {
     utils.CONN_TYPES.straight: 'straight_128',
     utils.CONN_TYPES.corner: 'corner',
