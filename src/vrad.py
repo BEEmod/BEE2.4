@@ -76,23 +76,25 @@ def pack_content(path):
     """Pack any custom content into the map."""
     files = set()
     try:
-        pack_list = open('bee2/pack_list.txt')
+        pack_list = open(path[:-4] + '.filelist.txt')
     except (IOError, FileNotFoundError):
         pass
     else:
         with pack_list:
             for line in pack_list:
-                if not line:
-                    continue
-                files.add(line.lower())
+                files.add(line.strip().lower())
+
+    if '' in files:
+        # Allow blank lines in original files
+        files.remove('')
 
     if not files:
         utils.con_log('No files to pack!')
         return
 
     utils.con_log('Files to pack:')
-    for file in files:
-        utils.con_log(' - "' + file + '"')
+    for file in sorted(files):
+        utils.con_log(' # "' + file + '"')
 
     utils.con_log("Packing Files!")
     bsp_file = BSP(path)
@@ -106,11 +108,13 @@ def pack_content(path):
     utils.con_log(' - Existing zip read')
 
     for file in files:
-        full_path = os.path.join(RES_ROOT, file)
+        full_path = os.path.normpath(
+            os.path.join(RES_ROOT, file)
+        )
         if os.path.isfile(full_path):
             zipfile.write(
                 filename=full_path,
-                arcname=file
+                arcname=file,
             )
         else:
             utils.con_log('"' + full_path + '" not found!')
