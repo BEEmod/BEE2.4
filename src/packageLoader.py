@@ -170,9 +170,14 @@ def load_packages(
         loader.set_length("OBJ", objects)
         loader.set_length("IMG_EX", images)
 
-        # Except for StyleVars, each object will have at least 1 image -
-        # in UI.py we step the progress once per object.
-        loader.set_length("IMG", objects - len(all_obj['StyleVar']))
+        # Except for StyleVars and Packlists, each object will have at
+        # least 1 image - in UI.py we step the progress once per object.
+        loader.set_length(
+            "IMG",
+            objects -
+            len(all_obj['StyleVar']) -
+            len(all_obj['PackList'])
+        )
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
@@ -877,6 +882,46 @@ class ElevatorVid:
         return '<ElevatorVid ' + self.id + '>'
 
 
+class PackList:
+    def __init__(self, pak_id, files):
+        self.id = pak_id
+        self.files = files
+
+    @classmethod
+    def parse(cls, data):
+        conf = data.info.find_key('Config', '')
+        if conf.has_children():
+            # Allow having a child block to define packlists inline
+            files = [
+                prop.value
+                for prop in conf
+            ]
+        else:
+            path = os.path.join('pack', conf.value) + '.cfg'
+            try:
+                with data.zip_file.open(path) as f:
+                    # Each line is a file to pack.
+                    # Skip blank lines, strip whitespace, and
+                    # alow // comments.
+                    files = [
+                        line.strip()
+                        for line in f
+                        if line and not line.startswith('//')
+                    ]
+            except KeyError as ex:
+                raise FileNotFoundError(
+                    '"{}:{}" not in zip!'.format(
+                        data.pack_id,
+                        path,
+                    )
+                ) from ex
+
+        return cls(
+            data.id,
+            files,
+        )
+
+
 def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
 
@@ -947,6 +992,7 @@ obj_types = {
     'Music':     Music,
     'StyleVar':  StyleVar,
     'Elevator':  ElevatorVid,
+    'PackList':  PackList,
     }
 
 if __name__ == '__main__':

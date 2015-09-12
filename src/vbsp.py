@@ -241,6 +241,8 @@ IS_PREVIEW = 'ERR'
 IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
 
+TO_PACK = set() # The lists we want to pack.
+
 ##################
 # UTIL functions #
 ##################
@@ -1919,6 +1921,42 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
+@conditions.make_result('Pack')
+def packlist_cond(_, res):
+    """Add the files in the given packlist to the map."""
+    TO_PACK.add(res.value.casefold())
+
+
+def make_packlist(map_path):
+    """Write the list of files that VRAD should pack."""
+    if not TO_PACK:
+        # Nothing to pack - wipe the packfile!
+        open(map_path[:-4] + '.filelist.txt', 'w').close()
+
+    utils.con_log('Making Pack list...')
+
+    with open('bee2/pack_list.cfg') as f:
+        props = Property.parse(
+            f,
+            'bee2/pack_list.cfg'
+        ).find_key('PackList', [])
+
+    files = set()
+    for pack_id in TO_PACK:
+        files.update(
+            prop.value
+            for prop in
+            props[pack_id, ()]
+        )
+
+    with open(map_path[:-4] + '.filelist.txt', 'w') as f:
+        for file in sorted(files):
+            f.write(file + '\n')
+            utils.con_log(file)
+
+    utils.con_log('Packlist written!')
+
+
 def make_vrad_config():
     """Generate a config file for VRAD from our configs.
 
@@ -2122,9 +2160,11 @@ def main():
         collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
         remove_static_ind_toggles()
-
         fix_worldspawn()
+
+        make_packlist(path)
         make_vrad_config()
+
         save(new_path)
         run_vbsp(
             vbsp_args=new_args,

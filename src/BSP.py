@@ -20,6 +20,7 @@ class BSP_LUMPS(Enum):
     """All the lumps in a BSP file.
 
     The values represent the order lumps appear in the index.
+    Some indexes were reused, so they have aliases.
     """
     ENTITIES = 0
     PLANES = 1
@@ -193,7 +194,7 @@ class Lump:
         """Decode this header from the file."""
         offset, length, version, ident = get_struct(
             file,
-            # 4 ints and a 4-long char array
+            # 3 ints and a 4-long char array
             '<3i4s',
         )
         return cls(
