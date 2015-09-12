@@ -232,6 +232,7 @@ class Game:
             voice,
             style_vars,
             elevator,
+            pack_list,
             should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
@@ -251,18 +252,22 @@ class Game:
         for key, val in style_vars.items():
             print('  {} = {!s}'.format(key, val))
         print('  }')
+        print('Pack Lists:\n  {')
+        for key in pack_list.keys():
+            print('  ' + key)
+        print('  }')
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         export_screen.set_length(
             'CONF',
-            # VBSP_conf, Editoritems, instances, gameinfo
-            4 +
+            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists
+            5 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
-        # files in compiler/ + pakrat
-        export_screen.set_length('COMP', len(os.listdir('../compiler')) + 1)
+        # files in compiler/
+        export_screen.set_length('COMP', len(os.listdir('../compiler')))
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)
@@ -329,6 +334,29 @@ class Game:
             style_vars.items()
         ]
 
+        pack_block = Property('PackList', [])
+        # A list of materials which will casue a specific packlist to be used.
+        pack_triggers = Property('PackTriggers', [])
+
+        for key, pack in pack_list.items():
+            pack_block.append(Property(
+                key,
+                [
+                    Property('File', file)
+                    for file in
+                    pack.files
+                ]
+            ))
+            for trigger_mat in pack.trigger_mats:
+                pack_triggers.append(
+                    Property('Material', [
+                        Property('Texture', trigger_mat),
+                        Property('PackList', pack.id),
+                    ])
+                )
+        if pack_triggers.value:
+            vbsp_config.append(pack_triggers)
+
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
@@ -388,6 +416,12 @@ class Game:
                 inst_file.write(line)
         export_screen.step('CONF')
 
+        print('Writing packing list!')
+        with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
+            for line in pack_block.export():
+                pack_file.write(line)
+        export_screen.step('CONF')
+
         if voice is not None:
             for prefix, dest, pretty in VOICE_PATHS:
                 path = os.path.join(
@@ -416,11 +450,6 @@ class Game:
                 self.abs_path('bin/')
             )
             export_screen.step('COMP')
-
-        print('Copying PakRat...', end='')
-        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
-        export_screen.step('COMP')
-        print(' Done!')
 
         if should_refresh:
             print('Copying Resources!')

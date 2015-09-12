@@ -1,4 +1,6 @@
 from datetime import datetime
+from zipfile import ZipFile
+from io import BytesIO
 
 import os
 import os.path
@@ -8,6 +10,7 @@ import sys
 import subprocess
 
 from property_parser import Property
+from BSP import BSP, BSP_LUMPS
 import utils
 
 CONF = Property('Config')
@@ -16,6 +19,11 @@ SCREENSHOT_DIR = os.path.join(
     'portal2',  # This is hardcoded into P2, it won't change for mods.
     'puzzles',
     # Then the <random numbers> folder
+)
+# Locations of resources we need to pack
+RES_ROOT = os.path.join(
+    '..',
+    'bee2',
 )
 
 
@@ -66,21 +74,62 @@ def load_config():
 
 def pack_content(path):
     """Pack any custom content into the map."""
-    utils.con_log("Running PakRat!")
-    arg_bits = [
-        quote(os.path.normpath(os.path.join(os.getcwd(), "bee2/pakrat.jar"))),
-        "-auto",
-        quote(os.path.normpath(
-            os.path.join(
-                os.path.dirname(os.getcwd()),
-                'bee2/',
+    files = set()
+    try:
+        pack_list = open(path[:-4] + '.filelist.txt')
+    except (IOError, FileNotFoundError):
+        pass
+    else:
+        with pack_list:
+            for line in pack_list:
+                files.add(line.strip().lower())
+
+    if '' in files:
+        # Allow blank lines in original files
+        files.remove('')
+
+    if not files:
+        utils.con_log('No files to pack!')
+        return
+
+    utils.con_log('Files to pack:')
+    for file in sorted(files):
+        utils.con_log(' # "' + file + '"')
+
+    utils.con_log("Packing Files!")
+    bsp_file = BSP(path)
+    utils.con_log(' - Header read')
+    bsp_file.read_header()
+
+    # Manipulate the zip entirely in memory
+    zip_data = BytesIO()
+    zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
+    zipfile = ZipFile(zip_data, mode='a')
+    utils.con_log(' - Existing zip read')
+
+    for file in files:
+        full_path = os.path.normpath(
+            os.path.join(RES_ROOT, file)
+        )
+        if os.path.isfile(full_path):
+            zipfile.write(
+                filename=full_path,
+                arcname=file,
             )
-        )),
-        quote(path),
-    ]
-    arg = " ".join(arg_bits)
-    utils.con_log(arg)
-    subprocess.call(arg, stdout=None, stderr=subprocess.PIPE, shell=True)
+        else:
+            utils.con_log('"' + full_path + '" not found!')
+    utils.con_log(' - Added files')
+
+    zipfile.close()  # Finalise the zip modification
+
+    # Copy the zipfile into the BSP file, and adjust the headers
+    bsp_file.replace_lump(
+        path,
+        BSP_LUMPS.PAKFILE,
+        zip_data.getvalue(),  # Get the binary data we need
+    )
+    utils.con_log(' - BSP written!')
+
     utils.con_log("Packing complete!")
 
 
