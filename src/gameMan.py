@@ -335,15 +335,27 @@ class Game:
         ]
 
         pack_block = Property('PackList', [])
-        for key, value in pack_list.items():
+        # A list of materials which will casue a specific packlist to be used.
+        pack_triggers = Property('PackTriggers', [])
+
+        for key, pack in pack_list.items():
             pack_block.append(Property(
                 key,
                 [
                     Property('File', file)
                     for file in
-                    value
+                    pack.files
                 ]
             ))
+            for trigger_mat in pack.trigger_mats:
+                pack_triggers.append(
+                    Property('Material', [
+                        Property('Texture', trigger_mat),
+                        Property('PackList', pack.id),
+                    ])
+                )
+        if pack_triggers.value:
+            vbsp_config.append(pack_triggers)
 
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)

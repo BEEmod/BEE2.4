@@ -883,13 +883,19 @@ class ElevatorVid:
 
 
 class PackList:
-    def __init__(self, pak_id, files):
+    def __init__(self, pak_id, files, mats):
         self.id = pak_id
         self.files = files
+        self.trigger_mats = mats
 
     @classmethod
     def parse(cls, data):
         conf = data.info.find_key('Config', '')
+        mats = [
+            prop.value
+            for prop in
+            data.info.find_all('AddIfMat')
+        ]
         if conf.has_children():
             # Allow having a child block to define packlists inline
             files = [
@@ -919,6 +925,7 @@ class PackList:
         return cls(
             data.id,
             files,
+            mats,
         )
 
 

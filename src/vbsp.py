@@ -26,6 +26,7 @@ settings = {
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
+    "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
     }
@@ -241,7 +242,7 @@ IS_PREVIEW = 'ERR'
 IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
 
-TO_PACK = set() # The lists we want to pack.
+TO_PACK = set()  # The packlists we want to pack.
 
 ##################
 # UTIL functions #
@@ -373,6 +374,12 @@ def load_settings():
 
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
+
+    for trigger in conf.find_all('PackTriggers', 'material'):
+        mat = trigger['texture', ''].casefold()
+        packlist = trigger['packlist', '']
+        if mat and packlist:
+            settings['packtrigger'][mat].append(packlist)
 
     pit = conf.find_key("bottomless_pit", [])
     if pit:
@@ -1929,6 +1936,34 @@ def packlist_cond(_, res):
 
 def make_packlist(map_path):
     """Write the list of files that VRAD should pack."""
+
+    # Scan map materials for marked materials
+    # This way world-brush materials can be packed.
+    pack_triggers = settings['packtrigger']
+
+    utils.con_log(pack_triggers)
+    if pack_triggers:
+        def face_iter():
+            """Check all these locations for the target textures."""
+            # We need the iterator to allow breaking out of the loop.
+            yield from VMF.iter_wfaces()
+            for ent in (
+                VMF.by_class['func_brush'] |
+                VMF.by_class['func_door_rotating'] |
+                VMF.by_class['trigger_portal_cleanser']
+                    ):
+                yield from ent.sides()
+
+        utils.con_log(set(face.mat.casefold() for face in face_iter()))
+
+        for face in face_iter():
+            mat = face.mat.casefold()
+            if face.mat.casefold() in pack_triggers:
+                TO_PACK.update(pack_triggers[mat])
+                del pack_triggers[mat]
+                if not pack_triggers:
+                    break  # No more left
+
     if not TO_PACK:
         # Nothing to pack - wipe the packfile!
         open(map_path[:-4] + '.filelist.txt', 'w').close()

@@ -471,7 +471,7 @@ def load_packages(data):
     StyleVarPane.add_vars(data['StyleVar'])
 
     for packlist in data['PackList']:
-        pack_lists[packlist.id] = packlist.files
+        pack_lists[packlist.id] = packlist
 
     sky_list = []
     voice_list = []
