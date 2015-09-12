@@ -23,7 +23,7 @@ SCREENSHOT_DIR = os.path.join(
 # Locations of resources we need to pack
 RES_ROOT = os.path.join(
     '..',
-    'bee2_dev',
+    'bee2',
 )
 
 
