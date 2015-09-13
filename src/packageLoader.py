@@ -912,7 +912,7 @@ class PackList:
                     files = [
                         line.strip()
                         for line in f
-                        if line and not line.startswith('//')
+                        if not line.isspace() and not line.startswith('//')
                     ]
             except KeyError as ex:
                 raise FileNotFoundError(
