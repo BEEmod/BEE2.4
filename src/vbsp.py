@@ -170,6 +170,10 @@ DEFAULTS = {
 
     "sky":                      "sky_black",  # Change the skybox
 
+    # Allow changing flip panel sounds.
+    "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
+    "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
+
 
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
@@ -1818,6 +1822,17 @@ def change_func_brush():
                         '_panel_top',
                         '-brush',
                         )
+    flip_panel_start = get_opt('flip_sound_start')
+    flip_panel_stop = get_opt('flip_sound_stop')
+    utils.con_log(flip_panel_stop, DEFAULTS['flip_sound_stop'])
+    if (
+            flip_panel_start != DEFAULTS['flip_sound_start'] or
+            flip_panel_stop != DEFAULTS['flip_sound_stop']
+            ):
+        for flip_pan in VMF.by_class['func_door_rotating']:
+            # Change flip panel sounds by editing the func_door_rotating
+            flip_pan['noise1'] = flip_panel_start
+            flip_pan['noise2'] = flip_panel_stop
 
 
 def set_special_mat(face, side_type):
