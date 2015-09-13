@@ -318,15 +318,6 @@ class Game:
             os.path.dirname(os.getcwd()) # Go up one dir to our actual location
         )
 
-        # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children(
-            'Conditions',
-            'StyleVars',
-            'Textures',
-            'Voice',
-            'Options',
-        )
-
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [
             Property(key, utils.bool_as_int(val))
@@ -356,6 +347,18 @@ class Game:
                 )
         if pack_triggers.value:
             vbsp_config.append(pack_triggers)
+
+        # If there are multiple of these blocks, merge them together
+        # They will end up in this order.
+        vbsp_config.merge_children(
+            'Textures',
+            'Fizzler',
+            'Options',
+            'StyleVars',
+            'Conditions',
+            'Voice',
+            'PackTriggers',
+        )
 
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
