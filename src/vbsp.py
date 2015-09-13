@@ -173,6 +173,7 @@ DEFAULTS = {
 
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
+    "signSize":                 "16",  # Allow resizing the sign overlays
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -1573,6 +1574,7 @@ def change_overlays():
     """Alter the overlays."""
     utils.con_log("Editing Overlays...")
     sign_inst = get_opt('signInst')
+    sign_size = utils.conv_int(get_opt('signSize'), 32) / 2
     if sign_inst == "NONE":
         sign_inst = None
 
@@ -1611,6 +1613,15 @@ def change_overlays():
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
+            if sign_size != 16:
+                # Resize the signage overlays
+                # These are the 4 vertex locations
+                # Each axis is set to -16, 16 or 0
+                for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
+                    val = Vec.from_str(over[prop])
+                    val /= 16
+                    val *= sign_size
+                    over[prop] = val.join(' ')
         if case_mat == ANTLINES['straight']:
             set_antline_mat(
                 over,
