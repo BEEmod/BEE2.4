@@ -4,6 +4,7 @@ from tkinter import ttk
 from tk_root import TK_ROOT
 
 from BEE2_config import GEN_OPTS
+from tooltip import add_tooltip
 
 import sound
 import utils
@@ -17,7 +18,12 @@ refresh_callbacks = []  # functions called to apply settings.
 
 VARS = {}
 
+
 def reset_all_win():
+    """Return all windows to their default positions.
+
+    This is replaced by `UI.reset_panes`.
+    """
     pass
 
 win = Toplevel(TK_ROOT)
@@ -26,15 +32,18 @@ win.iconbitmap('../BEE2.ico')
 win.title('BEE2 Options')
 win.withdraw()
 
+
 def show():
     win.deiconify()
     contextWin.hide_context() # Ensure this closes
     utils.center_win(win)
 
+
 def load():
     """Load the current settings from config."""
     for var in VARS.values():
         var.load()
+
 
 def save():
     """Save settings into the config and apply them to other windows."""
@@ -47,7 +56,16 @@ def save():
     for func in refresh_callbacks:
         func()
 
-def make_checkbox(frame, section, item, desc, default=False, var=None):
+
+def make_checkbox(
+        frame,
+        section,
+        item,
+        desc,
+        default=False,
+        var: BooleanVar=None,
+        tooltip='',
+        ):
     """Add a checkbox to the given frame which toggles an option.
 
     section and item are the location in GEN_OPTS for this config.
@@ -87,6 +105,10 @@ def make_checkbox(frame, section, item, desc, default=False, var=None):
         variable=var,
         text=desc,
     )
+
+    if tooltip:
+        add_tooltip(widget, tooltip)
+
     UI[section, item] = widget
     return widget
 
@@ -160,6 +182,7 @@ def init_widgets():
 
     save()  # And ensure they are applied to other windows
 
+
 def init_gen_tab(f):
 
     if sound.initiallised:
@@ -176,6 +199,11 @@ def init_gen_tab(f):
             text='Play Sounds',
             state='disabled',
         )
+        add_tooltip(
+            UI['mute'],
+            'PyGame is either not installed or broken.\n'
+            'Sound effects have been disabled.'
+        )
     mute.grid(row=0, column=0, sticky=W)
 
     make_checkbox(
@@ -183,6 +211,8 @@ def init_gen_tab(f):
         section='General',
         item='show_wip_items',
         desc='Show WIP items',
+        tooltip='Show items and item versions marked Work In Progress. '
+                'These may be buggy or incomplete.',
         var=SHOW_WIP,
     ).grid(row=1, column=0, sticky=W)
 
@@ -192,8 +222,9 @@ def init_win_tab(f):
         f,
         section='General',
         item='keep_win_inside',
-        desc='Keep windows inside screen \n'
-             '(disable for multi-monitor setups)',
+        desc='Keep windows inside screen',
+        tooltip='Allow sub-windows to move outside the screen borders. '
+                'If you have multiple monitors, disable this.',
         var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=W)
@@ -206,6 +237,7 @@ def init_win_tab(f):
     )
     reset_win.grid(row=1, column=0, sticky=EW)
 
+
 def init_dev_tab(f):
     f.columnconfigure(1, weight=1)
     f.columnconfigure(2, weight=1)
@@ -215,6 +247,8 @@ def init_dev_tab(f):
         section='Debug',
         item='log_missing_ent_count',
         desc='Log missing entity counts',
+        tooltip='When loading items, log items with missing entity counts '
+                'in their properties.txt file.',
     ).grid(row=0, column=0, sticky=W)
 
     make_checkbox(
@@ -222,6 +256,8 @@ def init_dev_tab(f):
         section='Debug',
         item='log_missing_styles',
         desc="Log when item doesn't have a style",
+        tooltip='Log items have no applicable version for a particular style.'
+                'This usually means it will look very bad.',
     ).grid(row=1, column=0, sticky=W)
 
     make_checkbox(
@@ -229,6 +265,9 @@ def init_dev_tab(f):
         section='Debug',
         item='log_item_fallbacks',
         desc="Log when item uses parent's style",
+        tooltip='Log when an item reuses a variant from a parent style '
+                '(1970s using 1950s items, for example). This is usually '
+                'fine, but may need to be fixed.',
     ).grid(row=3, column=0, sticky=W)
 
     make_checkbox(
@@ -236,6 +275,8 @@ def init_dev_tab(f):
         section='Debug',
         item='show_errors',
         desc="Show detailed error message",
+        tooltip='If an error occurs, show the error and traceback '
+                'before quitting.',
     ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
@@ -243,4 +284,9 @@ def init_dev_tab(f):
         section='General',
         item='preserve_bee2_resource_dir',
         desc='Preserve Game Directories',
+        tooltip='When exporting, do not overwrite \n"bee2/" and'
+                '\n"sdk_content/maps/bee2/".\n'
+                'Enable if you\'re'
+                ' developing new content, to ensure it is not '
+                'overwritten.',
     ).grid(row=1, column=1, sticky=W)

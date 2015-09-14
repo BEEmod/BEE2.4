@@ -26,6 +26,7 @@ settings = {
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
+    "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
     }
@@ -78,9 +79,12 @@ TEX_DEFAULTS = [
     # These replacements are deactivated when unset
     ('', 'special.white'),
     ('', 'special.black'),
+    ('', 'special.white_wall'),
+    ('', 'special.black_wall'),
     ('', 'special.white_gap'),
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
+    ('', 'special.edge_special'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -88,6 +92,7 @@ TEX_DEFAULTS = [
         'overlay.antline'),
     ('1|signage/indicator_lights/indicator_lights_corner_floor',
         'overlay.antlinecorner'),
+
     # This is for the P1 style, where antlines use different textures
     # on the floor and wall.
     # We just use the regular version if unset.
@@ -102,20 +107,31 @@ class ORIENT(Enum):
     ceiling = 3
     ceil = 3
 
+    def __str__(self):
+        if self is ORIENT.floor:
+            return 'floor'
+        elif self is ORIENT.wall:
+            return 'wall'
+        elif self is ORIENT.ceiling:
+            return 'ceiling'
+
+# The textures used for white surfaces.
 WHITE_PAN = [
     "tile/white_floor_tile002a",
     "tile/white_wall_tile003a",
     "tile/white_wall_tile003h",
-    "tile/white_wall_tile003c",
-    "tile/white_wall_tile003f",
+
+    "tile/white_wall_tile003c",  # 2x2
+    "tile/white_wall_tile003f",  # 4x4
     ]
 
+# Ditto for black surfaces.
 BLACK_PAN = [
     "metal/black_floor_metal_001c",
     "metal/black_wall_metal_002c",
     "metal/black_wall_metal_002e",
-    "metal/black_wall_metal_002a",
-    "metal/black_wall_metal_002b",
+    "metal/black_wall_metal_002a",  # 2x2
+    "metal/black_wall_metal_002b",  # 4x4
     ]
 
 GOO_TEX = [
@@ -124,9 +140,9 @@ GOO_TEX = [
     ]
 
 ANTLINES = {
-    "signage/indicator_lights/indicator_lights_floor": "antline",
-    "signage/indicator_lights/indicator_lights_corner_floor": "antlinecorner",
-    }  # these need to be handled separately to accommodate the scale-changing
+    'straight' : "signage/indicator_lights/indicator_lights_floor",
+    'corner': "signage/indicator_lights/indicator_lights_corner_floor",
+    }
 
 DEFAULTS = {
     "goo_mist":                 "0",  # Add info_particle_systems to goo pits
@@ -136,6 +152,13 @@ DEFAULTS = {
     "remove_exit_signs":        "0",  # Remove the exit sign overlays
 
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
+
+    "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
+    "reset_edge_off":           "0",  # Reset the scale on
+    "edge_scale":               "0.15",  # The scale on squarebeams textures
+    "rotate_edge_special":      "0",    # Ditto for angled/flip panels
+    "reset_edge_off_special":   "",
+    "edge_scale_special":       "0.15",
 
     # Reset offsets for all white/black brushes, so embedface has correct
     # texture matching
@@ -147,9 +170,14 @@ DEFAULTS = {
 
     "sky":                      "sky_black",  # Change the skybox
 
+    # Allow changing flip panel sounds.
+    "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
+    "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
+
 
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
+    "signSize":                 "16",  # Allow resizing the sign overlays
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -209,17 +237,24 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-BEE2_config = None
+BEE2_config = None # ConfigFile
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
+
+# These are faces & overlays which have been forceably set by conditions,
+# and will not be overwritten later.
+IGNORED_FACES = set()
+IGNORED_OVERLAYS = set()
+
+TO_PACK = set()  # The packlists we want to pack.
 
 ##################
 # UTIL functions #
 ##################
 
 
-def get_opt(name):
+def get_opt(name) -> str:
     return settings['options'][name.casefold()]
 
 
@@ -275,7 +310,7 @@ def alter_mat(face, seed=None, texture_lock=True):
         face.mat = get_tex(surf_type + '.' + orient)
 
         if not texture_lock:
-            reset_tex_offset(face)
+            face.offset = 0
 
         return True
     elif mat in TEX_FIZZLER:
@@ -344,6 +379,12 @@ def load_settings():
 
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
+
+    for trigger in conf.find_all('PackTriggers', 'material'):
+        mat = trigger['texture', ''].casefold()
+        packlist = trigger['packlist', '']
+        if mat and packlist:
+            settings['packtrigger'][mat].append(packlist)
 
     pit = conf.find_key("bottomless_pit", [])
     if pit:
@@ -448,6 +489,12 @@ def static_pan(inst):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
+
+
+FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
+FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
+
+
 @conditions.meta_cond(priority=200, only_once=True)
 def anti_fizz_bump(inst):
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
@@ -456,10 +503,14 @@ def anti_fizz_bump(inst):
     It is only applied to trigger_portal_cleansers with the Client flag
     checked.
     """
-    FIZZ_OFF_WIDTH = 16 - 1 # We extend 15 units on each side,
-    # giving 32 in total: the width of a fizzler model.
+    # Subtract 2 for the fizzler width, and divide
+    # to get the difference for each face.
+
     if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
         return True
+
+    # Only use 1 bumper entity for each fizzler, since we can.
+    bumpers = {}
 
     utils.con_log('Adding Portal Bumpers to fizzlers...')
     for cleanser in VMF.by_class['trigger_portal_cleanser']:
@@ -473,54 +524,58 @@ def anti_fizz_bump(inst):
             # Fizzlers will be changed to this in fix_func_brush()
             fizz_name = fizz_name[:-6] + '-br_brush'
 
-        utils.con_log('name:', fizz_name)
-        # We can't combine the bumpers, since noportal_volumes
-        # don't work with concave areas
-        bumper = VMF.create_ent(
-            classname='func_portal_bumper',
+        # Only have 1 bumper per brush
+        if fizz_name not in bumpers:
+            bumper = bumpers[fizz_name] = VMF.create_ent(
+                classname='func_portal_bumper',
+                targetname=fizz_name,
+                origin=cleanser['origin'],
+                spawnflags='1',
+                # Start off, we can't really check if the original
+                # does, but that's usually handled by the instance anyway.
+            )
+        else:
+            bumper = bumpers[fizz_name]
+
+        # Noportal_volumes need separate parts, since they can't be
+        # concave.
+        noportal = VMF.create_ent(
+            classname='func_noportal_volume',
             targetname=fizz_name,
             origin=cleanser['origin'],
             spawnflags='1',
-            # Start off, we can't really check if the original
-            # does, but that's usually handled by the instance anyway.
         )
-
-        bound_min, bound_max = cleanser.get_bbox()
-        origin = (bound_max + bound_min) / 2  # type: Vec
-        size = bound_max - bound_min
-        for axis in 'xyz':
-            # One of the directions will be thinner than 128, that's the fizzler
-            # direction.
-            if size[axis] < 128:
-                bound_max[axis] += FIZZ_OFF_WIDTH
-                bound_min[axis] -= FIZZ_OFF_WIDTH
-                break
 
         # Copy one of the solids to use as a base, so the texture axes
         # are correct.
         if len(cleanser.solids) == 1:
             # It's a 128x128 brush, with only one solid
-            new_solid = cleanser.solids[0].copy()
+            bumper_brush = cleanser.solids[0].copy()
         else:
             # It's a regular one, we want the middle/large section
-            new_solid = cleanser.solids[1].copy()
-        bumper.solids.append(new_solid)
+            bumper_brush = cleanser.solids[1].copy()
+        bumper.solids.append(bumper_brush)
 
-        for face in new_solid:
+        noportal_brush = bumper_brush.copy()
+        noportal.solids.append(noportal_brush)
+
+        conditions.widen_fizz_brush(
+            bumper_brush,
+            FIZZ_BUMPER_WIDTH,
+            bounds=cleanser.get_bbox(),
+        )
+
+        conditions.widen_fizz_brush(
+            noportal_brush,
+            FIZZ_NOPORTAL_WIDTH,
+            bounds=cleanser.get_bbox(),
+        )
+
+        for face in bumper_brush:
             face.mat = 'tools/toolsinvisible'
-            # For every coordinate, set to the maximum if it's larger than the
-            # origin. This will expand the two sides.
-            for v in face.planes:
-                for axis in 'xyz':
-                    if v[axis] > origin[axis]:
-                        v[axis] = bound_max[axis]
-                    else:
-                        v[axis] = bound_min[axis]
 
-        noportal = bumper.copy()
-        # Add a noportal_volume as well, of the same size.
-        noportal['classname'] = 'func_noportal_volume'
-        VMF.add_ent(noportal)
+        for face in noportal_brush:
+            face.mat = 'tools/toolsinvisible'
 
     utils.con_log('Done!')
 
@@ -585,6 +640,21 @@ def set_player_portalgun(inst):
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
     utils.con_log('Done!')
+
+
+@conditions.meta_cond(priority=750, only_once=True)
+def add_screenshot_logic(inst):
+    """If the screenshot type is 'auto', add in the needed ents."""
+    if BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper() == 'AUTO':
+        VMF.create_ent(
+            classname='func_instance',
+            file='instances/BEE2/logic/screenshot_logic.vmf',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+        )
+        utils.con_log('Added Screenshot Logic')
 
 
 def get_map_info():
@@ -654,6 +724,7 @@ def get_map_info():
             else:
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
         if file in file_sp_exit_corr:
+            GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
             if override_sp_exit == 0:
                 utils.con_log(
@@ -665,6 +736,7 @@ def get_map_info():
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
+            GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
             if override_sp_entry == 0:
                 utils.con_log(
@@ -948,6 +1020,7 @@ def add_goo_mist(sides):
         particle='water_mist_256',
     )
 
+
 def fit_goo_mist(
         sides,
         needs_mist,
@@ -983,6 +1056,7 @@ def fit_goo_mist(
             )
             for (x, y) in iter_grid(grid_x, grid_y, 128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+
 
 def change_goo_sides():
     """Replace the textures on the sides of goo with specific ones.
@@ -1027,6 +1101,7 @@ def change_goo_sides():
                             ):
                         face.mat = get_tex('special.goo_wall')
     utils.con_log("Done!")
+
 
 def collapse_goo_trig():
     """Collapse the goo triggers to only use 2 entities for all pits."""
@@ -1080,12 +1155,34 @@ def remove_static_ind_toggles():
     utils.con_log('Done!')
 
 
+def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
+    '''Fix a squarebeams brush for use in other styles.
+
+    If rotate is True, rotate the texture 90 degrees.
+    offset is the offset for the texture.
+    '''
+    if rotate:
+        # To rotate, swap the two values
+        face.uaxis, face.vaxis = face.vaxis, face.uaxis
+
+    # We want to modify the value with an offset
+    if face.uaxis.offset != 0:
+        targ = face.uaxis
+    else:
+        targ = face.vaxis
+
+    if reset_offset:
+        targ.offset = 0
+    targ.scale = scale
+
+
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
-    glass_scale = get_opt('glass_scale')
-    goo_scale = get_opt('goo_scale')
+    glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
+    goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1145,20 +1242,11 @@ def change_brush():
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
-
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = goo_scale # Apply goo scaling
-                split_v[-1] = goo_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply goo scaling
+                face.scale = goo_scale
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = glass_scale  # apply the glass scaling option
-                split_v[-1] = glass_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply the glass scaling option
+                face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
@@ -1240,14 +1328,6 @@ def face_seed(face):
             origin[axis] = (origin[axis] // 128) * 128 + 64
     return origin.join(' ')
 
-def reset_tex_offset(face):
-    """Force all white/black walls to 0 offsets"""
-    uaxis = face.uaxis.split()
-    vaxis = face.vaxis.split()
-    uaxis[3] = '0]'
-    vaxis[3] = '0]'
-    face.uaxis = ' '.join(uaxis)
-    face.vaxis = ' '.join(vaxis)
 
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
@@ -1264,18 +1344,29 @@ def get_grid_sizes(face: VLib.Side):
         raise Exception(str(dim) + ' not on grid!')
 
     if u % 128 == 0 and v % 128 == 0:  # regular square
-        return "0.25", "0.5", "1"
+        return "0.25", "0.5", "0.5", "1", "1",
     if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
         return "0.5",
     if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
         return "0.25",
 
+
 def random_walls():
     """The original wall style, with completely randomised walls."""
     scale_walls = get_bool_opt("random_blackwall_scale")
+    rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
+            if face in IGNORED_FACES:
+                continue
+
+            if face.mat.casefold() == 'anim_wp/framework/squarebeams':
+                fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
+
             orient = get_face_orient(face)
             # Only modify black walls and ceilings
             if (scale_walls and
@@ -1286,13 +1377,7 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(get_grid_sizes(face))
-                split = face.uaxis.split()
-                split[-1] = scale
-                face.uaxis = " ".join(split)
-
-                split = face.vaxis.split()
-                split[-1] = scale
-                face.vaxis = " ".join(split)
+                face.scale = scale
             alter_mat(face, face_seed(face), texture_lock)
 
 
@@ -1317,10 +1402,16 @@ def clump_walls():
     others = {}
 
     texture_lock = get_bool_opt('tile_texture_lock', True)
+    rotate_edge = get_bool_opt('rotate_edge')
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
         for face in solid:
+            if face in IGNORED_FACES:
+                continue
+
             mat = face.mat.casefold()
             if mat in (
                     'glass/glasswindow007a_less_shiny',
@@ -1333,6 +1424,8 @@ def clump_walls():
                 # use random textures. Don't add them here. They also aren't
                 # on grid.
                 alter_mat(face)
+                if mat == 'anim_wp/framework/squarebeams':
+                    fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
                 continue
 
             if face.mat in GOO_TEX:
@@ -1405,7 +1498,7 @@ def clump_walls():
                 if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
                     side.mat = tex
                     if not texture_lock:
-                        reset_tex_offset(side)
+                        side.offset = 0
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -1437,30 +1530,36 @@ def get_face_orient(face):
         return ORIENT.ceiling
     return ORIENT.wall
 
-def set_antline_mat(over, mat, raw_mat=False):
+
+def set_antline_mat(
+        over,
+        mats: list,
+        floor_mats: list=None,
+        ):
     """Set the material on an overlay to the given value, applying options.
 
-    If raw_mat is set to 1, use the given texture directly.
+    floor_mat, if set is an alternate material to use for floors.
     The material is split into 3 parts, separated by '|':
     - Scale: the u-axis width of the material, used for clean antlines.
     - Material: the material
     - Static: if 'static', the antline will lose the targetname. This
       makes it non-dynamic, and removes the info_overlay_accessor
-      entity fromt the compiled map.
+      entity from the compiled map.
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
-    if not raw_mat:
-        if get_tex('overlay.' + mat + 'floor') != '':
-            # For P1 style, check to see if the antline is on the floor or
-            # walls.
-            direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
-            if direction == (0, 0, 1) or direction == (0, 0, -1):
-                mat += 'floor'
+    if floor_mats and any(floor_mats): # Ensure there's actually a value
+        # For P1 style, check to see if the antline is on the floor or
+        # walls.
+        direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
+        if direction == (0, 0, 1) or direction == (0, 0, -1):
+            mats = floor_mats
 
-        mat = get_tex('overlay.' + mat)
+    # Choose a random one
+    random.seed(over['origin'])
+    utils.con_log(mats)
+    mat = random.choice(mats).split('|')
 
-    mat = mat.split('|')
     if len(mat) == 2:
         # rescale antlines if needed
         over['endu'], over['material'] = mat
@@ -1471,7 +1570,7 @@ def set_antline_mat(over, mat, raw_mat=False):
             # becomes static.
             over['targetname'] = ''
     else:
-        over['material'] = mat
+        over['material'], = mat
         over['endu'] = '0.25'
 
 
@@ -1479,9 +1578,19 @@ def change_overlays():
     """Alter the overlays."""
     utils.con_log("Editing Overlays...")
     sign_inst = get_opt('signInst')
+    sign_size = utils.conv_int(get_opt('signSize'), 32) / 2
     if sign_inst == "NONE":
         sign_inst = None
+
+    ant_str = settings['textures']['overlay.antline']
+    ant_str_floor = settings['textures']['overlay.antlinefloor']
+    ant_corn = settings['textures']['overlay.antlinecorner']
+    ant_corn_floor = settings['textures']['overlay.antlinecornerfloor']
+
     for over in VMF.by_class['info_overlay']:
+        if over in IGNORED_OVERLAYS:
+            continue
+
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
             if get_bool_opt("remove_exit_signs"):
@@ -1494,8 +1603,10 @@ def change_overlays():
                 # useless info_overlay_accessors for these signs.
                 del over['targetname']
 
-        if over['material'].casefold() in TEX_VALVE:
-            sign_type = TEX_VALVE[over['material'].casefold()]
+        case_mat = over['material'].casefold()
+
+        if case_mat in TEX_VALVE:
+            sign_type = TEX_VALVE[case_mat]
             if sign_inst is not None:
                 new_inst = VMF.create_ent(
                     classname='func_instance',
@@ -1506,8 +1617,27 @@ def change_overlays():
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
-        if over['material'].casefold() in ANTLINES:
-            set_antline_mat(over, ANTLINES[over['material'].casefold()])
+            if sign_size != 16:
+                # Resize the signage overlays
+                # These are the 4 vertex locations
+                # Each axis is set to -16, 16 or 0
+                for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
+                    val = Vec.from_str(over[prop])
+                    val /= 16
+                    val *= sign_size
+                    over[prop] = val.join(' ')
+        if case_mat == ANTLINES['straight']:
+            set_antline_mat(
+                over,
+                ant_str,
+                ant_str_floor,
+            )
+        elif case_mat == ANTLINES['corner']:
+            set_antline_mat(
+                over,
+                ant_corn,
+                ant_corn_floor,
+            )
 
 
 def change_trig():
@@ -1596,7 +1726,19 @@ def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("grating_inst")
-    grating_scale = get_opt("grating_scale")
+    grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
+
+    if get_tex('special.edge_special') == '':
+        edge_tex = 'special.edge'
+        rotate_edge = get_bool_opt('rotate_edge', False)
+        edge_off = get_bool_opt('reset_edge_off')
+        edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
+    else:
+        edge_tex = 'special.edge_special'
+        rotate_edge = get_bool_opt('rotate_edge_special', False)
+        edge_off = get_bool_opt('reset_edge_off_special')
+        edge_scale = utils.conv_float(get_opt('edge_scale_special'), 0.15)
+    utils.con_log('Special tex:', rotate_edge, edge_off, edge_scale)
 
     if grating_inst == "NONE":
         grating_inst = None
@@ -1620,30 +1762,27 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
-            if (side.mat.casefold() == "anim_wp/framework/squarebeams" and
-                    "special.edge" in settings['textures']):
-                side.mat = get_tex("special.edge")
-            elif side.mat.casefold() in WHITE_PAN:
+            if side.mat.casefold() == "anim_wp/framework/squarebeams":
+                side.mat = get_tex(edge_tex)
+                fix_squarebeams(
+                    side,
+                    rotate_edge,
+                    edge_off,
+                    edge_scale,
+                )
+                continue
+
+            if side.mat.casefold() in WHITE_PAN:
                 brush_type = "white"
-                if not get_tex("special.white") == "":
-                    side.mat = get_tex("special.white")
-                elif not alter_mat(side):
-                    side.mat = get_tex("white.wall")
+                set_special_mat(side, 'white')
+
             elif side.mat.casefold() in BLACK_PAN:
                 brush_type = "black"
-                if not get_tex("special.black") == "":
-                    side.mat = get_tex("special.black")
-                elif not alter_mat(side):
-                    side.mat = get_tex("black.wall")
+                set_special_mat(side, 'black')
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split()
-                    split_v = side.vaxis.split()
-                    split_u[-1] = grating_scale  # apply the grtating
-                    split_v[-1] = grating_scale  # scaling option
-                    side.uaxis = " ".join(split_u)
-                    side.vaxis = " ".join(split_v)
+                    side.scale = grating_scale
                 alter_mat(side)  # for gratings, laserfields and some others
 
             # The style blanked the material, so delete the brush
@@ -1666,18 +1805,53 @@ def change_func_brush():
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
+            # Now find the associated instance
             for ins in (
                     VMF.by_class['func_instance'] &
                     VMF.by_target[targ]
                     ):
                 if make_static_pan(ins, brush_type):
-                    # delete the brush, we don't want it if we made a static one
+                    # delete the brush, we don't want it if we made a
+                    # static one
                     VMF.remove_ent(brush)
                 else:
+                    # Oherwise, rename the brush to -brush, so the panel
+                    # can send inputs itself. (This allows removing 1
+                    # logic_auto.)
                     brush['targetname'] = brush['targetname'].replace(
                         '_panel_top',
                         '-brush',
                         )
+    flip_panel_start = get_opt('flip_sound_start')
+    flip_panel_stop = get_opt('flip_sound_stop')
+    utils.con_log(flip_panel_stop, DEFAULTS['flip_sound_stop'])
+    if (
+            flip_panel_start != DEFAULTS['flip_sound_start'] or
+            flip_panel_stop != DEFAULTS['flip_sound_stop']
+            ):
+        for flip_pan in VMF.by_class['func_door_rotating']:
+            # Change flip panel sounds by editing the func_door_rotating
+            flip_pan['noise1'] = flip_panel_start
+            flip_pan['noise2'] = flip_panel_stop
+
+
+def set_special_mat(face, side_type):
+    """Set a face to a special texture.
+
+    Those include checkers or portal-here tiles, used on flip
+    and angled panels.
+    side_type should be either 'white' or 'black'.
+    """
+    # We use a wall-specific texture, or the floor texture,
+    # or fallback to regular textures
+    rep_texture = 'special.' + side_type
+    orient = get_face_orient(face)
+    if orient is ORIENT.wall and get_tex(rep_texture + '_wall'):
+        face.mat = get_tex(rep_texture + '_wall')
+    elif get_tex(rep_texture):
+        face.mat = get_tex(rep_texture)
+    elif not alter_mat(face):
+        face.mat = get_tex(side_type + '.' + str(orient))
 
 
 def make_static_pan(ent, pan_type):
@@ -1772,12 +1946,105 @@ def fix_inst():
 
 
 def fix_worldspawn():
-    """Adjust some properties on WorldSpawn."""""
+    """Adjust some properties on WorldSpawn."""
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # if PeTI thinks there should be paint, don't touch it
         VMF.spawn['paintinmap'] = get_opt('force_paint')
     VMF.spawn['skyname'] = get_tex("special.sky")
+
+
+@conditions.make_result('Pack')
+def packlist_cond(_, res):
+    """Add the files in the given packlist to the map."""
+    TO_PACK.add(res.value.casefold())
+
+
+def make_packlist(map_path):
+    """Write the list of files that VRAD should pack."""
+
+    # Scan map materials for marked materials
+    # This way world-brush materials can be packed.
+    pack_triggers = settings['packtrigger']
+
+    utils.con_log(pack_triggers)
+    if pack_triggers:
+        def face_iter():
+            """Check all these locations for the target textures."""
+            # We need the iterator to allow breaking out of the loop.
+            yield from VMF.iter_wfaces()
+            for ent in (
+                VMF.by_class['func_brush'] |
+                VMF.by_class['func_door_rotating'] |
+                VMF.by_class['trigger_portal_cleanser']
+                    ):
+                yield from ent.sides()
+
+        utils.con_log(set(face.mat.casefold() for face in face_iter()))
+
+        for face in face_iter():
+            mat = face.mat.casefold()
+            if face.mat.casefold() in pack_triggers:
+                TO_PACK.update(pack_triggers[mat])
+                del pack_triggers[mat]
+                if not pack_triggers:
+                    break  # No more left
+
+    if not TO_PACK:
+        # Nothing to pack - wipe the packfile!
+        open(map_path[:-4] + '.filelist.txt', 'w').close()
+
+    utils.con_log('Making Pack list...')
+
+    with open('bee2/pack_list.cfg') as f:
+        props = Property.parse(
+            f,
+            'bee2/pack_list.cfg'
+        ).find_key('PackList', [])
+
+    files = set()
+    for pack_id in TO_PACK:
+        files.update(
+            prop.value
+            for prop in
+            props[pack_id, ()]
+        )
+
+    with open(map_path[:-4] + '.filelist.txt', 'w') as f:
+        for file in sorted(files):
+            f.write(file + '\n')
+            utils.con_log(file)
+
+    utils.con_log('Packlist written!')
+
+
+def make_vrad_config():
+    """Generate a config file for VRAD from our configs.
+
+    This way VRAD doesn't need to parse through vbsp_config, or anything else.
+    """
+    utils.con_log('Generating VRAD config...')
+    conf = Property('Config', [
+    ])
+    conf['force_full'] = utils.bool_as_int(
+        BEE2_config.get_bool('General', 'vrad_force_full')
+    )
+    conf['screenshot'] = BEE2_config.get_val(
+        'Screenshot', 'loc', ''
+    )
+    conf['screenshot_type'] = BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper()
+    conf['clean_screenshots'] = utils.bool_as_int(
+        BEE2_config.get_bool('Screenshot', 'del_old')
+    )
+    conf['is_preview'] = utils.bool_as_int(
+        IS_PREVIEW
+    )
+
+    with open('bee2/vrad_config.cfg', 'w') as f:
+        for line in conf.export():
+            f.write(line)
 
 
 def save(path):
@@ -1804,16 +2071,23 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     # Put quotes around args which contain spaces, and remove blank args.
     vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
 
+    if utils.MAC:
+        os_suff = '_osx'
+    elif utils.LINUX:
+        os_suff = '_linux'
+    else:
+        os_suff = ''
+
     arg = (
-        '"'
-        + os.path.normpath(
+        '"' +
+        os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp_original"
+                "vbsp" + os_suff + "_original"
                 )
-            )
-        + '" '
-        + " ".join(vbsp_args)
+            ) +
+        '" ' +
+        " ".join(vbsp_args)
         )
 
     utils.con_log("Calling original VBSP...")
@@ -1850,14 +2124,36 @@ def main():
     old_args = sys.argv[1:]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
+    if not old_args:
+        # No arguments!
+        utils.con_log(
+            'No arguments!\n'
+            "The BEE2 VBSP takes all the regular VBSP's "
+            'arguments, with some extra arguments:\n'
+            '-dump_conditions: Print a list of all condition flags,\n'
+            '  results, and metaconditions.\n'
+            '-force_peti: Force enabling map conversion. \n'
+            "-force_hammer: Don't convert the map at all.\n"
+            '-entity_limit: A default VBSP command, this is inspected to'
+            'determine if the map is PeTI or not.'
+        )
+        sys.exit()
+
     if old_args[0].casefold() == '-dump_conditions':
         # Print all the condition flags, results, and metaconditions
         conditions.dump_conditions()
         sys.exit()
 
-    # Add styled/ to the list of directories for the new location
+    if not path.endswith(".vmf"):
+        path += ".vmf"
+
+    # Append styled/ to the directory path.
     path_dir, path_file = os.path.split(path)
-    new_args[-1] = new_path = os.path.join(path_dir, 'styled', path_file)
+    new_path = new_args[-1] = os.path.join(
+        path_dir,
+        'styled',
+        path_file,
+    )
 
     for i, a in enumerate(new_args):
         # We need to strip these out, otherwise VBSP will get confused.
@@ -1871,11 +2167,9 @@ def main():
                 new_args[i+1] = ''
 
     utils.con_log('Map path is "' + path + '"')
+    utils.con_log('New path: "' + new_path + '"')
     if path == "":
         raise Exception("No map passed!")
-    if not path.endswith(".vmf"):
-        path += ".vmf"
-        new_path += ".vmf"
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
@@ -1927,10 +2221,12 @@ def main():
         collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
         remove_static_ind_toggles()
-
         fix_worldspawn()
-        save(new_path)
 
+        make_packlist(path)
+        make_vrad_config()
+
+        save(new_path)
         run_vbsp(
             vbsp_args=new_args,
             do_swap=True,

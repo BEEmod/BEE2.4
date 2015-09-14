@@ -29,7 +29,8 @@ def done_callback():
 
 
 def do_copy(zip_list, done_files):
-    shutil.rmtree('../cache/', ignore_errors=True)
+    cache_path = os.path.abspath('../cache/')
+    shutil.rmtree(cache_path, ignore_errors=True)
 
     img_loc = os.path.join('resources', 'bee2')
     for zip_path in zip_list:
@@ -43,7 +44,7 @@ def do_copy(zip_list, done_files):
                 if loc.startswith("resources"):
                     # Don't re-extract images
                     if not loc.startswith(img_loc):
-                        zip_file.extract(path, path="../cache/")
+                        zip_file.extract(path, path=cache_path)
                     with currently_done.get_lock():
                         done_files.value += 1
 

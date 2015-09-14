@@ -17,8 +17,6 @@ REPLACE_CHARS = {
     r'\/':   '/',
     }
 
-INVALID = object()
-
 # Sentinel value to indicate that no default was given to find_key()
 _NO_KEY_FOUND = object()
 
@@ -77,53 +75,39 @@ class NoKeyError(Exception):
 
 
 class Property:
-    """Represents Property found in property files, like those used by Valve."""
-    # Helps decrease memory footprint with lots of Property values.
-    __slots__ = ('_folded_name', 'real_name', 'value', 'valid')
+    """Represents Property found in property files, like those used by Valve.
 
-    def __init__(self, name, *values, **kargs):
-        """Create a new property instance.
-        Values can be passed in 4 ways:
-        - A single value for the Property
-        - A number of Property objects for the tree
-        - A set of keyword arguments which will be converted into
-          Property objects
-        - A single dictionary which will be converted into Property
-          objects
-        Values default to just ''.
-        If INVALID is passed as the only parameter, an Property object
-          will be returned that has be marked as invalid.
-        If the name is set to None, this is a root Property object - it
-          exports each of its children at the top-most indent level.
+    Value should be a string (for leaf properties), or a list of children
+    Property objects.
+    The name should be a string, or None for a root object.
+    Root objects export each child at the topmost indent level.
         This is produced from Property.parse() calls.
+
+    :type value: list | str
+    :type name: str | None
+    :type _folded_name: str | None
+    :type real_name: str | None
+    """
+    # Helps decrease memory footprint with lots of Property values.
+    __slots__ = ('_folded_name', 'real_name', 'value')
+
+    def __init__(self, name, value=''):
+        """Create a new property instance.
+
         """
-        if name == INVALID:
-            self.real_name = None
-            self._folded_name = None
-            self.value = None
-            self.valid = False
-        else:
-            self.name = name
-            if len(values) == 1:
-                if isinstance(values[0], Property):
-                    self.value = [values[0]]
-                elif isinstance(values[0], dict):
-                    self.value = [Property(key, val) for key, val in values[0].items()]
-                else:
-                    self.value = values[0]
-            else:
-                self.value = list(values)
-                self.value.extend(Property(key, val) for key, val in kargs.items())
-            if values == 0 and len(kargs) == 0:
-                self.value = ''
-            self.valid = True
+        self.real_name = name
+        self.value = value
+        self._folded_name = (
+            None if name is None
+            else name.casefold()
+        )
 
     @property
     def name(self):
         """Name automatically casefolds() any given names.
 
         This ensures comparisons are always case-sensitive.
-        Read .real_name to get the original value
+        Read .real_name to get the original value.
         """
         return self._folded_name
 
@@ -134,7 +118,6 @@ class Property:
             self._folded_name = None
         else:
             self._folded_name = new_name.casefold()
-        pass
 
     def edit(self, name=None, value=None):
         """Simultaneously modify the name and value."""
@@ -152,7 +135,6 @@ class Property:
         file_contents should be an iterable of strings
         """
         open_properties = [Property(None, [])]
-
         for line_num, line in enumerate(file_contents, start=1):
             values = open_properties[-1].value
             freshline = utils.clean_line(line)
@@ -183,10 +165,6 @@ class Property:
                     value = None
 
                 values.append(Property(name, value))
-            # handle name bare on one line, will need a brace on
-            # the next line
-            elif utils.is_identifier(freshline):
-                values.append(Property(freshline, []))
             elif freshline.startswith('{'):
                 if values[-1].value:
                     raise KeyValError(
@@ -199,6 +177,10 @@ class Property:
                 open_properties.append(values[-1])
             elif freshline.startswith('}'):
                 open_properties.pop()
+            # handle name bare on one line, will need a brace on
+            # the next line
+            elif utils.is_identifier(freshline):
+                values.append(Property(freshline, []))
             else:
                 raise KeyValError(
                     "Unexpected beginning character '"
@@ -252,7 +234,7 @@ class Property:
         """
         key = key.casefold()
         for prop in reversed(self.value):
-            if prop.name is not None and prop.name == key:
+            if prop.name == key:
                 return prop
         if def_ is _NO_KEY_FOUND:
             raise NoKeyError(key)
@@ -317,16 +299,11 @@ class Property:
         else:
             return self.value
 
-    def make_invalid(self):
-        """Soft delete this property tree, so it does not appear in any output.
-
-        """
-        self.valid = False
-        self.value = None # Dump this if it exists
-        self.name = None
-
     def __eq__(self, other):
-        """Compare two items and determine if they are equal. This ignores names."""
+        """Compare two items and determine if they are equal.
+
+        This ignores names.
+        """
         if isinstance(other, Property):
             return self.value == other.value
         else:
@@ -373,24 +350,20 @@ class Property:
         """Determine the number of child properties.
 
         Singluar Properties have a length of 1.
-        Invalid properties have a length of 0.
         """
-        if self.valid:
-            if self.has_children():
-                return len(self.value)
-            else:
-                return 1
+        if self.has_children():
+            return len(self.value)
         else:
-            return 0
+            return 1
 
     def __iter__(self):
-        """Iterate through the value list, or loop once through the single value.
+        """Iterate through the value list.
 
         """
         if self.has_children():
-            yield from self.value
+            return iter(self.value)
         else:
-            yield self.value
+            return iter((self.value,))
 
     def __contains__(self, key):
         """Check to see if a name is present in the children.
@@ -513,7 +486,7 @@ class Property:
     append = __iadd__
     append.__doc__ = """Append another property to this one."""
 
-    def merge_children(self, *names):
+    def merge_children(self, *names: str):
         """Merge together any children of ours with the given names.
 
         After execution, this tree will have only one sub-Property for
@@ -521,14 +494,19 @@ class Property:
         """
         folded_names = [name.casefold() for name in names]
         new_list = []
-        merge = {name.casefold(): Property(name, []) for name in names}
+        merge = {
+            name.casefold(): Property(name, [])
+            for name in
+            names
+        }
         if self.has_children():
             for item in self.value[:]:
                 if item.name in folded_names:
                     merge[item.name].value.extend(item.value)
                 else:
                     new_list.append(item)
-        for prop in merge.values():
+        for prop_name in names:
+            prop = merge[prop_name.casefold()]
             if len(prop.value) > 0:
                 new_list.append(prop)
 
@@ -544,10 +522,7 @@ class Property:
         return isinstance(self.value, list)
 
     def __repr__(self):
-        if self.valid:
-            return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
-        else:
-            return 'Property(INVALID)'
+        return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
 
     def __str__(self):
         return ''.join(self.export())
@@ -558,30 +533,25 @@ class Property:
         Recursively calls itself for all child properties.
         If the Property is marked invalid, it will immediately return.
         """
-        if self.valid:
-            out_val = '"' + str(self.real_name) + '"'
-            if isinstance(self.value, list):
-                if self.name is None:
-                    # If the name is None, we just output the chilren
-                    # without a "Name" { } surround. These Property
-                    # objects represent the root.
-                    yield from (
-                        line
-                        for prop in self.value
-                        for line in prop.export()
-                        if prop.valid
-                        )
-                else:
-                    yield out_val + '\n'
-                    yield '\t{\n'
-                    yield from (
-                        '\t'+line
-                        for prop in self.value
-                        for line in prop.export()
-                        if prop.valid
-                        )
-                    yield '\t}\n'
+        out_val = '"' + str(self.real_name) + '"'
+        if isinstance(self.value, list):
+            if self.name is None:
+                # If the name is None, we just output the chilren
+                # without a "Name" { } surround. These Property
+                # objects represent the root.
+                yield from (
+                    line
+                    for prop in self.value
+                    for line in prop.export()
+                    )
             else:
-                yield out_val + ' "' + str(self.value) + '"\n'
+                yield out_val + '\n'
+                yield '\t{\n'
+                yield from (
+                    '\t'+line
+                    for prop in self.value
+                    for line in prop.export()
+                    )
+                yield '\t}\n'
         else:
-            return
+            yield out_val + ' "' + str(self.value) + '"\n'

@@ -18,12 +18,14 @@ if WIN:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
         'RIGHT': '<Button-3>',
         'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
@@ -38,19 +40,32 @@ if WIN:
         'KEY_SAVE': 'Ctrl-S',
         'KEY_SAVE_AS': 'Ctrl-Shift-S',
     }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'hand2',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
 elif MAC:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
-        'RIGHT': '<Button-3>',
-        'RIGHT_DOUBLE': '<Double-Button-3>',
-        'RIGHT_SHIFT': '<Shift-Button-3>',
-        'RIGHT_RELEASE': '<ButtonRelease-3>',
-        'RIGHT_MOVE': '<B3-Motion>',
+        'RIGHT': '<Button-2>',
+        'RIGHT_DOUBLE': '<Double-Button-2>',
+        'RIGHT_CTRL': '<Control-Button-2>',
+        'RIGHT_SHIFT': '<Shift-Button-2>',
+        'RIGHT_RELEASE': '<ButtonRelease-2>',
+        'RIGHT_MOVE': '<B2-Motion>',
 
         'KEY_EXPORT': '<Command-e>',
         'KEY_SAVE_AS': '<Command-s>',
@@ -58,21 +73,34 @@ elif MAC:
     }
 
     KEY_ACCEL = {
-        # \u2318 = Command Key
-        'KEY_EXPORT': '\u2318-E',
-        'KEY_SAVE': '\u2318-S',
-        'KEY_SAVE_AS': '\u2318-Shift-S',
+        # tkinter replaces Command- with the special symbol automatically.
+        'KEY_EXPORT': 'Command-E',
+        'KEY_SAVE': 'Command-S',
+        'KEY_SAVE_AS': 'Command-Shift-S',
+    }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'hand2',
+        'wait': 'spinning',
+        'stretch_vert': 'resizeupdown',
+        'stretch_horiz': 'resizeleftright',
+        'move_item': 'plus',
+        'destroy_item': 'poof',
+        'invalid_drag': 'notallowed',
     }
 elif LINUX:
     EVENTS = {
         'LEFT': '<Button-1>',
         'LEFT_DOUBLE': '<Double-Button-1>',
+        'LEFT_CTRL': '<Control-Button-1>',
         'LEFT_SHIFT': '<Shift-Button-1>',
         'LEFT_RELEASE': '<ButtonRelease-1>',
         'LEFT_MOVE': '<B1-Motion>',
 
         'RIGHT': '<Button-3>',
         'RIGHT_DOUBLE': '<Double-Button-3>',
+        'RIGHT_CTRL': '<Control-Button-3>',
         'RIGHT_SHIFT': '<Shift-Button-3>',
         'RIGHT_RELEASE': '<ButtonRelease-3>',
         'RIGHT_MOVE': '<B3-Motion>',
@@ -86,6 +114,58 @@ elif LINUX:
         'KEY_SAVE': 'Ctrl-S',
         'KEY_SAVE_AS': 'Ctrl-Shift-S',
     }
+
+    CURSORS = {
+        'regular': 'arrow',
+        'link': 'hand2',
+        'wait': 'watch',
+        'stretch_vert': 'sb_v_double_arrow',
+        'stretch_horiz': 'sb_h_double_arrow',
+        'move_item': 'plus',
+        'destroy_item': 'x_cursor',
+        'invalid_drag': 'no',
+    }
+
+if MAC:
+    # On OSX, make left-clicks switch to a rightclick when control is held.
+    def bind_leftclick(wid, func):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func()
+        wid.bind(EVENTS['LEFT'], event_handler)
+
+    def bind_leftclick_double(wid, func):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func()
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler)
+
+    def bind_rightclick(wid, func):
+        """On OSX, we need to bind to both rightclick and control-leftclick."""
+        wid.bind(EVENTS['RIGHT'], func)
+        wid.bind(EVENTS['LEFT_CTRL'], func)
+else:
+    def bind_leftclick(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT'], func)
+
+    def bind_leftclick_double(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT_DOUBLE'], func)
+
+    def bind_rightclick(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['RIGHT'], func)
 
 BOOL_LOOKUP = {
     '1': True,
@@ -354,6 +434,9 @@ class EmptyMapping(abc.Mapping):
     def get(self, item, default=None):
         return default
 
+    def __bool__(self):
+        return False
+
     def __next__(self):
         raise StopIteration
 
@@ -392,8 +475,15 @@ class Vec:
         If no value is given, that axis will be set to 0.
         A sequence can be passed in (as the x argument), which will use
         the three args as x/y/z.
+        :type x: int | float | Vec | list[float]
         """
-        if isinstance(x, abc.Sequence):
+        if isinstance(x, (int, float)):
+            self.x = float(x)
+            self.y = float(y)
+            self.z = float(z)
+        elif isinstance(x, Vec):
+            self.x, self.y, self.z = x
+        else:
             try:
                 self.x = float(x[0])
             except (TypeError, KeyError):
@@ -408,10 +498,7 @@ class Vec:
                         self.z = float(x[2])
                     except (TypeError, KeyError):
                         self.z = 0.0
-        else:
-            self.x = float(x)
-            self.y = float(y)
-            self.z = float(z)
+
 
     def copy(self):
         return Vec(self.x, self.y, self.z)
@@ -502,7 +589,7 @@ class Vec:
             round_vals,
         )
 
-    def __add__(self, other):
+    def __add__(self, other) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -513,7 +600,7 @@ class Vec:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -534,7 +621,7 @@ class Vec:
         except TypeError:
             return NotImplemented
 
-    def __rsub__(self, other):
+    def __rsub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -555,7 +642,7 @@ class Vec:
         except TypeError:
             return NotImplemented
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> 'Vec':
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -570,7 +657,7 @@ class Vec:
                 return NotImplemented
     __rmul__ = __mul__
 
-    def __div__(self, other):
+    def __div__(self, other) -> 'Vec':
         """Divide the Vector by a scalar.
 
         If any axis is equal to zero, it will be kept as zero as long
@@ -588,7 +675,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __rdiv__(self, other):
+    def __rdiv__(self, other) -> 'Vec':
         """Divide a scalar by a Vector.
 
         """
@@ -604,7 +691,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __floordiv__(self, other):
+    def __floordiv__(self, other) -> 'Vec':
         """Divide the Vector by a scalar, discarding the remainder.
 
         If any axis is equal to zero, it will be kept as zero as long
@@ -622,7 +709,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __mod__(self, other):
+    def __mod__(self, other) -> 'Vec':
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -636,7 +723,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other):
+    def __divmod__(self, other) -> ('Vec', 'Vec'):
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -652,7 +739,7 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> 'Vec':
         """+= operation.
 
         Like the normal one except without duplication.
@@ -675,7 +762,7 @@ class Vec:
                 ) from e
             return self
 
-    def __isub__(self, other):
+    def __isub__(self, other) -> 'Vec':
         """-= operation.
 
         Like the normal one except without duplication.
@@ -698,7 +785,7 @@ class Vec:
                 ) from e
             return self
 
-    def __imul__(self, other):
+    def __imul__(self, other) -> 'Vec':
         """*= operation.
 
         Like the normal one except without duplication.
@@ -711,7 +798,7 @@ class Vec:
             self.z *= other
             return self
 
-    def __idiv__(self, other):
+    def __idiv__(self, other) -> 'Vec':
         """/= operation.
 
         Like the normal one except without duplication.
@@ -724,7 +811,7 @@ class Vec:
             self.z /= other
             return self
 
-    def __ifloordiv__(self, other):
+    def __ifloordiv__(self, other) -> 'Vec':
         """//= operation.
 
         Like the normal one except without duplication.
@@ -737,7 +824,7 @@ class Vec:
             self.z //= other
             return self
 
-    def __imod__(self, other):
+    def __imod__(self, other) -> 'Vec':
         """%= operation.
 
         Like the normal one except without duplication.
@@ -750,11 +837,11 @@ class Vec:
             self.z %= other
             return self
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Vectors are True if any axis is non-zero."""
         return self.x != 0 or self.y != 0 or self.z != 0
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """== test.
 
         Two Vectors are compared based on the axes.
@@ -775,7 +862,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         """A<B test.
 
         Two Vectors are compared based on the axes.
@@ -800,7 +887,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __le__(self, other):
+    def __le__(self, other) -> bool:
         """A<=B test.
 
         Two Vectors are compared based on the axes.
@@ -825,7 +912,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __gt__(self, other):
+    def __gt__(self, other) -> bool:
         """A>B test.
 
         Two Vectors are compared based on the axes.

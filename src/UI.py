@@ -6,6 +6,7 @@ from tk_root import TK_ROOT
 from functools import partial as func_partial
 import itertools
 import operator
+import random
 
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -17,7 +18,7 @@ import paletteLoader
 import img
 import utils
 
-from SubPane import SubPane
+import SubPane
 from selectorWin import selWin, Item as selWinItem
 import extract_packages
 import voiceEditor
@@ -26,6 +27,7 @@ import gameMan
 import StyleVarPane
 import CompilerPane
 import optionWindow
+import tooltip
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -60,6 +62,7 @@ voices = {}
 styles = {}
 musics = {}
 elevators = {}
+pack_lists = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -303,7 +306,8 @@ class PalItem(Label):
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
-        self.bind(utils.EVENTS['RIGHT'], contextWin.open_event)
+
+        utils.bind_rightclick(self, contextWin.open_event)
         self.bind(utils.EVENTS['LEFT'], drag_start)
         self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
@@ -465,6 +469,9 @@ def load_packages(data):
         loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'])
+
+    for packlist in data['PackList']:
+        pack_lists[packlist.id] = packlist
 
     sky_list = []
     voice_list = []
@@ -704,8 +711,8 @@ def export_editoritems(_=None):
     }
 
     # Add all of the special/hardcoded style vars
-    for var_id, _, __ in StyleVarPane.styleOptions:
-        style_vars[var_id] = style_vals[var_id].get() == 1
+    for var in StyleVarPane.styleOptions:
+        style_vars[var.id] = style_vals[var.id].get() == 1
 
     gameMan.selected_game.export(
         chosen_style,
@@ -715,6 +722,7 @@ def export_editoritems(_=None):
         voice=voices.get(voice_win.chosen_id, None),
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
+        pack_list=pack_lists,
         should_refresh=not GEN_OPTS.get_bool(
             'General',
             'preserve_BEE2_resource_dir',
@@ -853,7 +861,7 @@ def drag_move(e):
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
     if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_win.configure(cursor='plus')
+        drag_win.configure(cursor=utils.CURSORS['move_item'])
         UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
         if not drag_win.passed_over_pal:
             # If we've passed over the palette, replace identical items
@@ -870,9 +878,9 @@ def drag_move(e):
         drag_win.passed_over_pal = True
     else:
         if drag_win.from_pal and drag_win.passed_over_pal:
-            drag_win.configure(cursor='x_cursor')
+            drag_win.configure(cursor=utils.CURSORS['destroy_item'])
         else:
-            drag_win.configure(cursor='no')
+            drag_win.configure(cursor=utils.CURSORS['invalid_drag'])
         UI['pre_sel_line'].place_forget()
 
 
@@ -940,6 +948,34 @@ def pal_clear():
     """Empty the palette."""
     for item in pal_picked[:]:
         item.kill()
+    flow_preview()
+
+
+def pal_shuffle():
+    """Set the palette to a list of random items."""
+    if len(pal_picked) == 32:
+        return
+
+    shuff_items = item_list.copy()
+    for palitem in pal_picked:
+        # Don't add items that are already on the palette!
+        try:
+            del shuff_items[palitem.id]
+        except KeyError:
+            # We might try removing it multiple times
+            pass
+
+    shuff_items = list(shuff_items.values())
+
+    random.shuffle(shuff_items)
+
+    for item in shuff_items[:32-len(pal_picked)]:
+        pal_picked.append(PalItem(
+            frames['preview'],
+            item,
+            sub=0,  # Use the first subitem
+            is_pre=True,
+        ))
     flow_preview()
 
 
@@ -1022,14 +1058,14 @@ def update_filters():
             # deselected
             (show_wip or not item.item.is_wip)
             # Visible if any of the author and tag checkboxes are checked
-            and any(
+            and (any(
                 FilterVars['author'][auth.casefold()].get()
                 for auth in item.item.authors
-                )
-            and any(
+                ) or not item.item.authors) # Show if no authors
+            and (any(
                 FilterVars['tags'][tag.casefold()].get()
                 for tag in item.item.tags
-                )
+                ) or not item.item.tags) # Show if no tags
             # The package is selected
             and FilterVars['package'][item.item.pak_id].get()
             # Items like the elevator that need the unlocked stylevar
@@ -1087,18 +1123,24 @@ def init_palette(f):
 def init_option(f):
     """Initialise the options pane."""
     f.columnconfigure(0, weight=1)
+    f.rowconfigure(0, weight=1)
+
+    frame = ttk.Frame(f)
+    frame.grid(row=0, column=0, sticky=NSEW)
+    frame.columnconfigure(0, weight=1)
+
     ttk.Button(
-        f,
+        frame,
         text="Save Palette...",
         command=pal_save,
         ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
-        f,
+        frame,
         text="Save Palette As...",
         command=pal_save_as,
         ).grid(row=1, sticky="EW", padx=5)
     UI['export_button'] = ttk.Button(
-        f,
+        frame,
         textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
     )
@@ -1107,14 +1149,14 @@ def init_option(f):
     UI['export_button'].grid(row=2, sticky="EW", padx=5)
 
     UI['extract_progress'] = ttk.Progressbar(
-        f,
+        frame,
         length=200,
         maximum=1000,
         variable=extract_packages.progress_var,
     )
     UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
 
-    props = ttk.LabelFrame(f, text="Properties", width="50")
+    props = ttk.LabelFrame(frame, text="Properties", width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=4, sticky="EW")
 
@@ -1186,7 +1228,7 @@ def init_option(f):
 
     ttk.Sizegrip(
         props,
-        cursor='sb_h_double_arrow',
+        cursor=utils.CURSORS['stretch_horiz'],
         ).grid(
             row=2,
             column=5,
@@ -1402,7 +1444,6 @@ def init_filter_col(cat, f):
             command=update_filters,
             variable=FilterVars[cat][filt_id],
             )
-        FilterBoxes[cat][filt_id]['variable'] = FilterVars[cat][filt_id]
         FilterBoxes[cat][filt_id].grid(
             row=ind+2,
             column=0,
@@ -1493,14 +1534,18 @@ def set_game(game):
 
 def init_menu_bar(win):
     bar = Menu(win)
-    win['menu'] = bar
     # Suppress ability to make each menu a separate window - weird old
     # TK behaviour
     win.option_add('*tearOff', False)
-    # Name is used to make this the special 'BEE2' menu item on Mac
-    menus['file'] = Menu(bar, name='apple')
-    file_menu = menus['file']
+    if utils.MAC:
+        # Name is used to make this the special 'BEE2' menu item
+        file_menu = menus['file'] = Menu(bar, name='apple')
+    else:
+        file_menu = menus['file'] = Menu(bar)
+
     bar.add_cascade(menu=file_menu, label='File')
+
+    win['menu'] = bar  # Must be done after creating the apple menu
 
     file_menu.add_command(
         label="Export",
@@ -1524,10 +1569,11 @@ def init_menu_bar(win):
         label="Options",
         command=optionWindow.show,
     )
-    file_menu.add_command(
-        label="Quit",
-        command=quit_application,
-        )
+    if not utils.MAC:
+        file_menu.add_command(
+            label="Quit",
+            command=quit_application,
+            )
     file_menu.add_separator()
     # Add a set of options to pick the game into the menu system
     gameMan.add_menu_opts(menus['file'], callback=set_game)
@@ -1541,9 +1587,13 @@ def init_menu_bar(win):
         command=pal_clear,
         )
     pal_menu.add_command(
-        label='Delete Palette',
+        label='Delete Palette', # This name is overwritten later
         command=pal_remove,
         )
+    pal_menu.add_command(
+        label='Fill Palette',
+        command=pal_shuffle,
+    )
     pal_menu.add_command(
         label='Save Palette',
         command=pal_save,
@@ -1554,6 +1604,7 @@ def init_menu_bar(win):
         command=pal_save_as,
         accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
+
     pal_menu.add_separator()
 
     # refresh_pal_ui() adds the palette menu options here.
@@ -1577,6 +1628,10 @@ def init_windows():
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
     TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
+
+    if utils.MAC:
+        # OS X has a special quit menu item.
+        TK_ROOT.createcommand('tk::mac::Quit', quit_application)
 
     ui_bg = Frame(TK_ROOT, bg=ItemsBG)
     ui_bg.grid(row=0, column=0, sticky='NSEW')
@@ -1660,7 +1715,7 @@ def init_windows():
         )
     frames['toolMenu'].place(x=73, y=2)
 
-    windows['pal'] = SubPane(
+    windows['pal'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
         title='Palettes',
@@ -1669,12 +1724,18 @@ def init_windows():
         resize_y=True,
         tool_frame=frames['toolMenu'],
         tool_img=img.png('icons/win_palette'),
-        tool_col=0,
+        tool_col=1,
     )
-    init_palette(windows['pal'])
+
+    pal_frame = ttk.Frame(windows['pal'])
+    pal_frame.grid(row=0, column=0, sticky='NSEW')
+    windows['pal'].columnconfigure(0, weight=1)
+    windows['pal'].rowconfigure(0, weight=1)
+
+    init_palette(pal_frame)
     loader.step('UI')
 
-    windows['opt'] = SubPane(
+    windows['opt'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
         title='Export Options',
@@ -1682,7 +1743,7 @@ def init_windows():
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img=img.png('icons/win_options'),
-        tool_col=1,
+        tool_col=2,
     )
     init_option(windows['opt'])
     loader.step('UI')
@@ -1693,39 +1754,57 @@ def init_windows():
     CompilerPane.make_pane(frames['toolMenu'])
     loader.step('UI')
 
-    # make scrollbar work globally
-    TK_ROOT.bind(
-        "<MouseWheel>",
-        lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
-        )
-    # needed for linux
-    TK_ROOT.bind(
-        "<Button-4>",
-        lambda e: pal_canvas.yview_scroll(1, "units"),
-        )
-    TK_ROOT.bind(
-        "<Button-5>",
-        lambda e: pal_canvas.yview_scroll(-1, "units"),
-        )
+    UI['shuffle_pal'] = SubPane.make_tool_button(
+        frame=frames['toolMenu'],
+        img=img.png('icons/shuffle_pal'),
+        command=pal_shuffle,
+    )
+    UI['shuffle_pal'].grid(
+        row=0,
+        column=0,
+        padx=((2, 10) if utils.MAC else (2, 20)),
+    )
+    tooltip.add_tooltip(
+        UI['shuffle_pal'],
+        'Fill empty spots in the palette with random items.',
+    )
 
-    StyleVarPane.window.bind(
-        "<MouseWheel>",
-        lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
-        )
-    StyleVarPane.window.bind(
-        "<Button-4>",
-        lambda e: UI['style_can'].yview_scroll(1, "units"),
-        )
-    StyleVarPane.window.bind(
-        "<Button-5>",
-        lambda e: UI['style_can'].yview_scroll(-1, "units"),
-        )
+    # make scrollbar work globally
+    if utils.WIN:
+        TK_ROOT.bind(
+            "<MouseWheel>",
+            lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
+            )
+    elif utils.LINUX:
+        TK_ROOT.bind(
+            "<Button-4>",
+            lambda e: pal_canvas.yview_scroll(1, "units"),
+            )
+        TK_ROOT.bind(
+            "<Button-5>",
+            lambda e: pal_canvas.yview_scroll(-1, "units"),
+            )
+
+    if utils.WIN:
+        StyleVarPane.window.bind(
+            "<MouseWheel>",
+            lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
+            )
+    elif utils.LINUX:
+        StyleVarPane.window.bind(
+            "<Button-4>",
+            lambda e: UI['style_can'].yview_scroll(1, "units"),
+            )
+        StyleVarPane.window.bind(
+            "<Button-5>",
+            lambda e: UI['style_can'].yview_scroll(-1, "units"),
+            )
 
     # When clicking on any window hide the context window
-    TK_ROOT.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    StyleVarPane.window.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['opt'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['pal'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
+    utils.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    utils.bind_leftclick(windows['opt'], contextWin.hide_context)
+    utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
@@ -1733,9 +1812,12 @@ def init_windows():
     init_drag_icon()
     loader.step('UI')
 
-    optionWindow.reset_all_win = reposition_panes
+    optionWindow.reset_all_win = reset_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
+
+    if utils.MAC:
+        TK_ROOT.lift()  # Raise to the top of the stack
 
     TK_ROOT.update_idletasks()
     StyleVarPane.window.update_idletasks()

@@ -206,8 +206,6 @@ class selWin:
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
-        self.win.rowconfigure(0, weight=1)
-        self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
 
@@ -380,11 +378,14 @@ class selWin:
                 )
 
             item.win = self.win
-            item.button.bind(
-                utils.EVENTS['LEFT'],
+            utils.bind_leftclick(
+                item.button,
                 functools.partial(self.sel_item, item),
             )
-            item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
+            utils.bind_leftclick_double(
+                item.button,
+                self.save,
+            )
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -411,11 +412,17 @@ class selWin:
         self.display = ttk.Entry(
             frame,
             textvariable=self.disp_label,
-            cursor='arrow',
+            cursor=utils.CURSORS['regular'],
         )
-        self.display.bind(utils.EVENTS['LEFT'], self.open_win)
+        utils.bind_leftclick(
+            self.display,
+            self.open_win,
+        )
         self.display.bind("<Key>", self.set_disp)
-        self.display.bind(utils.EVENTS['RIGHT'], self.open_context)
+        utils.bind_rightclick(
+            self.display,
+            self.open_context,
+        )
 
         self.disp_btn = ttk.Button(
             self.display,

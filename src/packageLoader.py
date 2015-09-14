@@ -170,9 +170,14 @@ def load_packages(
         loader.set_length("OBJ", objects)
         loader.set_length("IMG_EX", images)
 
-        # Except for StyleVars, each object will have at least 1 image -
-        # in UI.py we step the progress once per object.
-        loader.set_length("IMG", objects - len(all_obj['StyleVar']))
+        # Except for StyleVars and Packlists, each object will have at
+        # least 1 image - in UI.py we step the progress once per object.
+        loader.set_length(
+            "IMG",
+            objects -
+            len(all_obj['StyleVar']) -
+            len(all_obj['PackList'])
+        )
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
@@ -200,14 +205,16 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        shutil.rmtree('../cache/', ignore_errors=True)
+        cache_folder = os.path.abspath('../cache/')
+
+        shutil.rmtree(cache_folder, ignore_errors=True)
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
-                loc = os.path.normcase(path)
+                loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
-                    zip_file.extract(path, path="../cache/")
+                    zip_file.extract(path, path=cache_folder)
 
         shutil.rmtree('../images/cache', ignore_errors=True)
         if os.path.isdir("../cache/resources/bee2"):
@@ -269,7 +276,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
     for item in zip_names(zip_file):
-        item = os.path.normcase(item)
+        item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
@@ -521,6 +528,8 @@ class Item:
             needs_unlock=False,
             all_conf=None,
             unstyled=False,
+            glob_desc=(),
+            desc_last=False
             ):
         self.id = item_id
         self.versions = versions
@@ -529,6 +538,8 @@ class Item:
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
         self.unstyled = unstyled
+        self.glob_desc = glob_desc
+        self.glob_desc_last = desc_last
 
     @classmethod
     def parse(cls, data):
@@ -537,6 +548,9 @@ class Item:
         def_version = None
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        glob_desc = list(desc_parse(data.info))
+        desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
             data.info,
@@ -580,11 +594,13 @@ class Item:
 
         return cls(
             data.id,
-            versions,
-            def_version,
-            needs_unlock,
-            all_config,
-            unstyled,
+            versions=versions,
+            def_version=def_version,
+            needs_unlock=needs_unlock,
+            all_conf=all_config,
+            unstyled=unstyled,
+            glob_desc=glob_desc,
+            desc_last=desc_last,
         )
 
     def add_over(self, override):
@@ -743,10 +759,19 @@ class Music:
 
 
 class StyleVar:
-    def __init__(self, var_id, name, styles, unstyled=False, default=False):
+    def __init__(
+            self,
+            var_id,
+            name,
+            styles,
+            unstyled=False,
+            default=False,
+            desc='',
+            ):
         self.id = var_id
         self.name = name
         self.default = default
+        self.desc = desc
         if unstyled:
             self.styles = None
         else:
@@ -759,14 +784,21 @@ class StyleVar:
         default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
-            for prop in data.info.find_all('Style')
+            for prop in
+            data.info.find_all('Style')
         ]
+        desc = '\n'.join(
+            prop.value
+            for prop in
+            data.info.find_all('description')
+        )
         return cls(
             data.id,
             name,
             styles,
             unstyled=unstyled,
             default=default,
+            desc=desc,
         )
 
     def add_over(self, override):
@@ -850,6 +882,53 @@ class ElevatorVid:
         return '<ElevatorVid ' + self.id + '>'
 
 
+class PackList:
+    def __init__(self, pak_id, files, mats):
+        self.id = pak_id
+        self.files = files
+        self.trigger_mats = mats
+
+    @classmethod
+    def parse(cls, data):
+        conf = data.info.find_key('Config', '')
+        mats = [
+            prop.value
+            for prop in
+            data.info.find_all('AddIfMat')
+        ]
+        if conf.has_children():
+            # Allow having a child block to define packlists inline
+            files = [
+                prop.value
+                for prop in conf
+            ]
+        else:
+            path = os.path.join('pack', conf.value) + '.cfg'
+            try:
+                with data.zip_file.open(path) as f:
+                    # Each line is a file to pack.
+                    # Skip blank lines, strip whitespace, and
+                    # alow // comments.
+                    files = [
+                        line.strip()
+                        for line in f
+                        if not line.isspace() and not line.startswith('//')
+                    ]
+            except KeyError as ex:
+                raise FileNotFoundError(
+                    '"{}:{}" not in zip!'.format(
+                        data.pack_id,
+                        path,
+                    )
+                ) from ex
+
+        return cls(
+            data.id,
+            files,
+            mats,
+        )
+
+
 def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
 
@@ -920,6 +999,7 @@ obj_types = {
     'Music':     Music,
     'StyleVar':  StyleVar,
     'Elevator':  ElevatorVid,
+    'PackList':  PackList,
     }
 
 if __name__ == '__main__':
