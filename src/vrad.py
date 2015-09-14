@@ -21,10 +21,11 @@ SCREENSHOT_DIR = os.path.join(
     # Then the <random numbers> folder
 )
 # Locations of resources we need to pack
-RES_ROOT = os.path.join(
-    '..',
-    'bee2',
-)
+RES_ROOT = [
+    os.path.join('..', loc)
+    for loc in
+    ('bee2', 'bee2_dev', 'portal2_dlc2')
+]
 
 
 def quote(txt):
@@ -72,6 +73,23 @@ def load_config():
     utils.con_log('Config Loaded!')
 
 
+def pack_file(zipfile, filename):
+    """Check multiple locations for a resource file.
+    """
+    for poss_path in RES_ROOT:
+        full_path = os.path.normpath(
+            os.path.join(poss_path, filename)
+        )
+        if os.path.isfile(full_path):
+            zipfile.write(
+                filename=full_path,
+                arcname=filename,
+            )
+            break
+    else:
+        utils.con_log('"bee2/' + filename + '" not found!')
+
+
 def pack_content(path):
     """Pack any custom content into the map."""
     files = set()
@@ -108,16 +126,8 @@ def pack_content(path):
     utils.con_log(' - Existing zip read')
 
     for file in files:
-        full_path = os.path.normpath(
-            os.path.join(RES_ROOT, file)
-        )
-        if os.path.isfile(full_path):
-            zipfile.write(
-                filename=full_path,
-                arcname=file,
-            )
-        else:
-            utils.con_log('"' + full_path + '" not found!')
+        pack_file(zipfile, file)
+
     utils.con_log(' - Added files')
 
     zipfile.close()  # Finalise the zip modification
