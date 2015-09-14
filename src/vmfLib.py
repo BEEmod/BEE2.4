@@ -202,7 +202,7 @@ class VMF:
         for i in item:
             self.add_ent(i)
 
-    def create_ent(self, **kargs):
+    def create_ent(self, **kargs) -> 'Entity':
         """Quick method to allow creating point entities.
 
         This constructs an entity, adds it to the map, and then returns
