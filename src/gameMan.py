@@ -299,6 +299,16 @@ class Game:
             )
             vbsp_config += skybox.config
 
+        if style.has_video and elevator is not None:
+            vbsp_config.set_key(
+                ('Options', 'elev_horiz'),
+                elevator.horiz_video,
+            )
+            vbsp_config.set_key(
+                ('Options', 'elev_vert'),
+                elevator.vert_video,
+            )
+
         if music is not None:
             if music.sound is not None:
                 vbsp_config.set_key(
