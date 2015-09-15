@@ -7,6 +7,7 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
+from tk_root import TK_ROOT
 import functools
 import math
 
@@ -15,8 +16,8 @@ from richTextBox import tkRichText
 import utils
 
 ICON_SIZE = 96  # Size of the selector win icons
-ITEM_WIDTH = ICON_SIZE+16
-ITEM_HEIGHT = ICON_SIZE+51
+ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
+ITEM_HEIGHT = ICON_SIZE + 51
 
 # The larger error icon used if an image is not found
 err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
@@ -194,6 +195,9 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
 
+        self.win.columnconfigure(0, weight=1)
+        self.win.rowconfigure(0, weight=1)
+
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
             self.win,
@@ -225,12 +229,20 @@ class selWin:
         self.wid_scroll.grid(row=0, column=1, sticky="NS")
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
 
-        self.sugg_lbl = ttk.LabelFrame(
-            self.pal_frame,
-            text="Suggested",
-            labelanchor=N,
-            height=50,
-        )
+        if utils.MAC:
+            # Labelframe doesn't look good here on OSX
+            self.sugg_lbl = ttk.Label(
+                self.pal_frame,
+                # Draw lines with box drawing characters
+                text="\u250E\u2500Suggested\u2500\u2512"
+            )
+        else:
+            self.sugg_lbl = ttk.LabelFrame(
+                self.pal_frame,
+                text="Suggested",
+                labelanchor=N,
+                height=50,
+            )
 
         # Holds all the widgets which provide info for the current item.
         self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
@@ -646,7 +658,6 @@ class selWin:
         self.flow_items()  # Refresh
 
 if __name__ == '__main__':  # test the window if directly executing this file
-    from tk_root import TK_ROOT
     lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
     lbl.grid()
     TK_ROOT.geometry("+500+500")
@@ -669,12 +680,14 @@ if __name__ == '__main__':  # test the window if directly executing this file
             icon="voices/glados",
             authors=["TeamSpen210"],
             desc=[
-                ('line', 'The dark constuction and office areas of Aperture.'
-                         'Catwalks extend between different buildings, with'
-                         'vactubes and cranes carrying objects throughout'
+                ('line', 'The dark constuction and office areas of Aperture. '
+                         'Catwalks extend between different buildings, with '
+                         'vactubes and cranes carrying objects throughout '
                          'the facility.'),
                 ('rule', ''),
-                ('line', 'Abandoned offices can often be found here.')
+                ('line', 'Abandoned offices can often be found here.'),
+                ('bullet', 'This is a bullet point, with a\n second line'),
+                ('invert', 'white-on-black text')
                 ],
             ),
         ]
