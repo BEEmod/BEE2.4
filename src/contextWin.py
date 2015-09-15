@@ -412,6 +412,7 @@ def init_widgets():
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
+    desc_frame.columnconfigure(0, weight=1)
 
     wid['desc'] = tkRichText(desc_frame, width=40, height=8, font=None)
     wid['desc'].grid(row=0, column=0, sticky="EW")
@@ -473,7 +474,13 @@ def init_widgets():
         'Change the default settings for this item when placed.'
     )
 
-    wid['variant'] = ttk.Combobox(f, values=['VERSION'], exportselection=0)
+    wid['variant'] = ttk.Combobox(
+        f,
+        values=['VERSION'],
+        exportselection=0,
+        # On Mac this defaults to being way too wide!
+        width=7 if utils.MAC else None,
+    )
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
     wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
     wid['variant'].current(0)
