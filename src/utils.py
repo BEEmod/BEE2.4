@@ -81,7 +81,7 @@ elif MAC:
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'pointinghand',
         'wait': 'spinning',
         'stretch_vert': 'resizeupdown',
         'stretch_horiz': 'resizeleftright',
