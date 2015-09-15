@@ -1822,6 +1822,9 @@ def change_func_brush():
                         '_panel_top',
                         '-brush',
                         )
+
+
+def alter_flip_panel():
     flip_panel_start = get_opt('flip_sound_start')
     flip_panel_stop = get_opt('flip_sound_stop')
     utils.con_log(flip_panel_stop, DEFAULTS['flip_sound_stop'])
@@ -2210,6 +2213,7 @@ def main():
             )
 
         fix_inst()
+        alter_flip_panel() # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
