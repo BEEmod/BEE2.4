@@ -185,7 +185,7 @@ def load_screenshot(path):
         # PeTI screenshots.
         (
             img.width,
-            img.height * PETI_WIDTH / PETI_HEIGHT
+            int(img.height * PETI_WIDTH / PETI_HEIGHT)
         )
     )
     COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
