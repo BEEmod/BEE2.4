@@ -1528,7 +1528,7 @@ def res_clear_outputs(inst, res):
 @make_result('removeFixup')
 def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
-    del inst.fixup['res']
+    del inst.fixup[res.value]
 
 
 @make_result('setAngles')
