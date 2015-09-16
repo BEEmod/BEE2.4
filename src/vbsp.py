@@ -168,8 +168,6 @@ DEFAULTS = {
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
 
-    "sky":                      "sky_black",  # Change the skybox
-
     # Allow changing flip panel sounds.
     "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
     "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
@@ -177,7 +175,7 @@ DEFAULTS = {
 
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
-    "signSize":                 "16",  # Allow resizing the sign overlays
+    "signSize":                 "32",  # Allow resizing the sign overlays
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
