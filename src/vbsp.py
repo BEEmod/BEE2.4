@@ -23,6 +23,7 @@ settings = {
     "fizzler":        {},
     "options":        {},
     "pit":            None,
+    "elev_opt":       {},
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
@@ -189,23 +190,28 @@ DEFAULTS = {
     "clump_size":               "4",  # The maximum length of a clump
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
-
-    "music_instance":           "",  # The instance for the chosen music
-    "music_soundscript":        "",  # The soundscript for the chosen music
     # Default to the origin of the elevator instance - that's likely to
     # be enclosed
     "music_location_sp":        "-2000 2000 0",
     "music_location_coop":      "-2000 -2000 0",
-    # BEE2 sets this to tell conditions what music is selected
-    "music_id":                 "<NONE>",
     # Instance used for pti_ents
     "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
     # Location of the model changer instance if needed
     "model_changer_loc":        "-2400 -2800 -256",
+
+    # These are set by the BEE2.4 app automatically:
+
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
+    "music_id":                 "<NONE>", # The music ID which was selected
+    "music_instance":           "",  # The instance for the chosen music
+    "music_soundscript":        "",  # The soundscript for the chosen music
+    "elev_type":                "RAND", # What type of script to use:
+        # Either "RAND", "FORCE", "NONE" or "BSOD"
+    "elev_horiz":               "",  # The horizontal elevator video to use
+    "elev_vert":                "",  # The vertical elevator video to use
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -246,6 +252,7 @@ IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
 
 TO_PACK = set()  # The packlists we want to pack.
+PACK_FILES = set()  # Raw files we force pack
 
 ##################
 # UTIL functions #
@@ -383,6 +390,17 @@ def load_settings():
         packlist = trigger['packlist', '']
         if mat and packlist:
             settings['packtrigger'][mat].append(packlist)
+
+    # Get configuration for the elevator, defaulting to ''.
+    elev = conf.find_key('elevator', [])
+    settings['elevator'] = {
+        key: elev[key, '']
+        for key in
+        (
+            'type', 'horiz', 'vert',
+            'scr_rand', 'scr_force', 'scr_bsod',
+        )
+    }
 
     pit = conf.find_key("bottomless_pit", [])
     if pit:
@@ -653,6 +671,53 @@ def add_screenshot_logic(inst):
             angles='0 0 0',
         )
         utils.con_log('Added Screenshot Logic')
+
+
+@conditions.meta_cond(priority=50, only_once=True)
+def set_elev_videos(_):
+    vid_type = settings['elevator']['type'].casefold()
+
+    utils.con_log('Elevator type: ', vid_type.upper())
+
+    if vid_type == 'none' or GAME_MODE == 'COOP':
+        # The style doesn't have an elevator...
+        return
+    elif vid_type == 'bsod':
+        # This uses different video shaping!
+        script = settings['elevator']['scr_bsod']
+        vert_vid = 'bluescreen'
+        horiz_vid = 'bluescreen'
+    elif vid_type == 'force':
+        # Use the given video
+        script = settings['elevator']['scr_force']
+        vert_vid = settings['elevator']['vert']
+        horiz_vid = settings['elevator']['horiz']
+    elif vid_type == 'rand':
+        script = settings['elevator']['scr_rand']
+        vert_vid = None
+        horiz_vid = None
+    else:
+        utils.con_log('Invalid elevator type!')
+        return
+
+    transition_ents = instanceLocs.resolve('[transitionents]')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in transition_ents:
+            continue
+        if vert_vid:
+            inst.fixup['$vert_video'] = 'media/' + vert_vid + '.bik'
+        if horiz_vid:
+            inst.fixup['$horiz_video'] = 'media/' + horiz_vid + '.bik'
+
+        # Create the video script
+        VMF.create_ent(
+            classname='logic_script',
+            targetname='@video_splitter',
+            vscripts=script,
+            origin=inst['origin'],
+        )
+    # Ensure the script gets packed.
+    PACK_FILES.add('scripts/vscripts/' + script)
 
 
 def get_map_info():
@@ -2003,16 +2068,15 @@ def make_packlist(map_path):
             'bee2/pack_list.cfg'
         ).find_key('PackList', [])
 
-    files = set()
     for pack_id in TO_PACK:
-        files.update(
+        PACK_FILES.update(
             prop.value
             for prop in
             props[pack_id, ()]
         )
 
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
-        for file in sorted(files):
+        for file in sorted(PACK_FILES):
             f.write(file + '\n')
             utils.con_log(file)
 
