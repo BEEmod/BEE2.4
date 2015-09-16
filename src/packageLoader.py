@@ -56,6 +56,7 @@ def reraise_keyerror(err, obj_id):
         )
     ) from err
 
+
 def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     """Extract a config file refered to by the given property block.
 
@@ -917,7 +918,7 @@ class PackList:
             except KeyError as ex:
                 raise FileNotFoundError(
                     '"{}:{}" not in zip!'.format(
-                        data.pack_id,
+                        data.id,
                         path,
                     )
                 ) from ex
