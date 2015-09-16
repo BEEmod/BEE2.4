@@ -128,6 +128,11 @@ def load_conf():
         INST_SPECIAL['indpantimer']
     )
 
+    INST_SPECIAL['transitionents'] = (
+        resolve('<ITEM_ENTRY_DOOR:11>') +
+        resolve('<ITEM_COOP_ENTRY_DOOR:4>')
+    )
+
     INST_SPECIAL['lasercatcher'] = (
         resolve('<ITEM_LASER_CATCHER_CENTER>') +
         resolve('<ITEM_LASER_CATCHER_OFFSET>')
