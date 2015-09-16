@@ -299,14 +299,37 @@ class Game:
             )
             vbsp_config += skybox.config
 
-        if style.has_video and elevator is not None:
+        if style.has_video:
+            if elevator is None:
+                # Use a randomised video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'RAND',
+                )
+            elif elevator.id == 'VALVE_BLUESCREEN':
+                # This video gets a special script and handling
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'BSOD',
+                )
+            else:
+                # Use the particular selected video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'FORCE',
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'horiz'),
+                    elevator.horiz_video,
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'vert'),
+                    elevator.vert_video,
+                )
+        else:  # No elevator video for this style
             vbsp_config.set_key(
-                ('Options', 'elev_horiz'),
-                elevator.horiz_video,
-            )
-            vbsp_config.set_key(
-                ('Options', 'elev_vert'),
-                elevator.vert_video,
+                ('Elevator', 'type'),
+                'NONE',
             )
 
         if music is not None:
