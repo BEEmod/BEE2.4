@@ -920,17 +920,17 @@ class PackList:
                 for prop in conf
             ]
         else:
-            path = os.path.join('pack', conf.value) + '.cfg'
+            path = 'pack/' + conf.value + '.cfg'
             try:
                 with data.zip_file.open(path) as f:
                     # Each line is a file to pack.
                     # Skip blank lines, strip whitespace, and
                     # alow // comments.
-                    files = [
-                        line.strip()
-                        for line in f
-                        if not line.isspace() and not line.startswith('//')
-                    ]
+                    files = []
+                    for line in f:
+                        line = utils.clean_line(line)
+                        if line:
+                            files.append(line)
             except KeyError as ex:
                 raise FileNotFoundError(
                     '"{}:{}" not in zip!'.format(
