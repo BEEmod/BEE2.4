@@ -1816,6 +1816,10 @@ def init_windows():
     optionWindow.reset_all_win = reset_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
+    windows['pal'].deiconify()
+    windows['opt'].deiconify()
+    StyleVarPane.window.deiconify()
+    CompilerPane.window.deiconify()
 
     if utils.MAC:
         TK_ROOT.lift()  # Raise to the top of the stack
