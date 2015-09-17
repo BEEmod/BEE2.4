@@ -88,7 +88,7 @@ def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
 def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
-    for name in os.listdir(pak_dir): # Both files and dirs
+    for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
         is_dir = os.path.isdir(name)
         if name.endswith('.zip') and os.path.isfile(name):
@@ -135,6 +135,22 @@ def load_packages(
     """Scan and read in all packages in the specified directory."""
     global LOG_ENT_COUNT
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
+
+    if not os.path.isdir(pak_dir):
+        from tkinter import messagebox
+        import sys
+        # We don't have a packages directory!
+        messagebox.showerror(
+            master=loader,
+            title='BEE2 - Invalid Packages Directory!',
+            message='The given packages directory is not present!\n'
+                    'Get the packages from '
+                    '"http://github.com/TeamSpen210/BEE2-items" '
+                    'and place them in "' + pak_dir +
+                    os.path.sep + '".',
+                    # Add slash to the end to indicate it's a folder.
+        )
+        sys.exit('No Packages Directory!')
 
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
