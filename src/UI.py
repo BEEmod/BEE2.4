@@ -1803,6 +1803,7 @@ def init_windows():
     # When clicking on any window hide the context window
     utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
     utils.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    utils.bind_leftclick(CompilerPane.window, contextWin.hide_context)
     utils.bind_leftclick(windows['opt'], contextWin.hide_context)
     utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
