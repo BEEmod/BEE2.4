@@ -669,7 +669,7 @@ def flag_has_inst(_, flag):
     """Checks if the given instance is present anywhere in the map."""
     flags = resolve_inst(flag.value)
     return any(
-        inst in flags
+        inst.casefold() in flags
         for inst in
         ALL_INST
     )
@@ -1528,7 +1528,29 @@ def res_clear_outputs(inst, res):
 @make_result('removeFixup')
 def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
-    del inst.fixup['res']
+    del inst.fixup[res.value]
+
+
+@make_result('setAngles')
+def res_set_angles(inst, res):
+    """Set the orientation of an instance to a certain angle."""
+    inst['angles'] = res.value
+
+
+@make_result('localTarget')
+def res_local_targetname(inst, res):
+    """Generate a instvar with an instance-local name.
+
+    Useful with AddOutput commands, or other values which use
+    targetnames in the parameter.
+    The result takes the form "<prefix><instance name>[-<local>]<suffix>".
+    """
+    local_name = res['name', '']
+    if local_name:
+        name = inst['targetname', ''] + '-' + local_name
+    else:
+        name = inst['targetname', '']
+    inst.fixup[res['resultVar']] = res['prfix',''] + name + res['suffix', '']
 
 
 CATWALK_TYPES = {
@@ -1884,7 +1906,7 @@ def res_track_plat(_, res):
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
-        normal = Vec(0, 0, 1).rotate(
+        normal = Vec(0, 0, 1).rotate_by_str(
             plat_inst['angles']
         )
 
@@ -2001,6 +2023,153 @@ def track_scan(
             # If the next piece is an end section, add it then quit
             tr_set.add(track)
             return
+
+# The spawnflags that we toggle
+FLAG_ROTATING = {
+    'func_rotating': {
+        'rev': 2,  # Spin counterclockwise
+        'x': 4,  # Spinning in X axis
+        'y': 8,  # Spin in Y axis
+        'solid_flags': 64,  # 'Not solid'
+    },
+    'func_door_rotating': {
+        'rev': 2,
+        'x': 128,
+        'y': 64,
+        'solid_flags': 8 | 4,  # 'Non-solid to player', 'passable'
+    },
+    'func_rot_button': {
+        'rev': 2,
+        'x': 128,
+        'y': 64,
+        'solid_flags': 1,  # 'Not solid'
+    },
+    'momentary_rot_button': {
+        'x': 128,
+        'z': 64,
+        # Reversed is set by keyvalue
+        'solid_flags': 1,  # 'Not solid'
+    },
+    'func_platrot': {
+        'x': 64,
+        'y': 128,
+        'solid_flags': 0,  # There aren't any
+    }
+}
+
+
+@make_result('GenRotatingEnt')
+def res_fix_rotation_axis(ent, res):
+    """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
+
+    This uses the orientation of the instance to detemine the correct
+    spawnflags to make it rotate in the correct direction. The brush
+    will be 2x2x2 units large, and always set to be non-solid.
+    - `Pos` and `name` are local to the
+      instance, and will set the `origin` and `targetname` respectively.
+    - `Keys` are any other keyvalues to be be set.
+    - `Flags` sets additional spawnflags. Multiple values may be
+       separated by '+', and will be added together.
+    - `Classname` specifies which entity will be created, as well as
+       which other values will be set to specify the correct orientation.
+    - `AddOut` is used to add outputs to the generated entity. It takes
+       the options `Output`, `Target`, `Input`, `Param` and `Delay`. If
+       `Inst_targ` is defined, it will be used with the input to construct
+       an instance proxy input. If `OnceOnly` is set, the output will be
+       deleted when fired.
+
+    Permitted entities:
+     * `func_rotating`
+     * `func_door_rotating`
+     * `func_rot_button`
+     * `func_platrot`
+    """
+    des_axis = res['axis', 'z'].casefold()
+    reverse = utils.conv_bool(res['reversed', '0'])
+    door_type = res['classname', 'func_door_rotating']
+
+    # Extra stuff to apply to the flags (USE, toggle, etc)
+    flags = sum(map(
+        # Add together multiple values
+        utils.conv_int,
+        res['flags', '0'].split('+')
+    ))
+
+    name = res['name', '']
+    if not name.startswith('@'):
+        # If a local name is given, add it to the instance targetname.
+        # It the name given is '', set to the instance's name.
+        # If it has an @, don't change it!
+        name = ent['targetname', ''] + (('-' + name) if name else '')
+
+    axis = Vec(
+        x=int(des_axis == 'x'),
+        y=int(des_axis == 'y'),
+        z=int(des_axis == 'z'),
+    ).rotate_by_str(ent['angles', '0 0 0'])
+
+    pos = Vec.from_str(
+        res['Pos', '0 0 0']
+    ).rotate_by_str(ent['angles', '0 0 0'])
+    pos += Vec.from_str(ent['origin', '0 0 0'])
+
+    door_ent = VMF.create_ent(
+        classname=door_type,
+        targetname=name,
+        origin=pos.join(' '),
+    )
+
+    for key in res.find_key('Keys', []):
+        door_ent[key.real_name] = key.value
+
+    for output in res.find_all('AddOut'):
+        door_ent.add_out(VLib.Output(
+            out=output['Output', 'OnUse'],
+            inp=output['Input', 'Use'],
+            targ=output['Target', ''],
+            inst_in=output['Inst_targ', None],
+            param=output['Param', ''],
+            delay=utils.conv_float(output['Delay', '']),
+            times=(
+                1 if
+                utils.conv_bool(output['OnceOnly', False])
+                else -1),
+        ))
+
+    # Generate brush
+    door_ent.solids = [VMF.make_prism(pos - 1, pos + 1).solid]
+
+    if axis.x > 0 or axis.z > 0:
+        # If it points forward, we need to reverse the rotating door
+        reverse = not reverse
+
+    flag_values = FLAG_ROTATING[door_type]
+    # Make the door always non-solid!
+    flags |= flag_values.get('solid_flags', 0)
+    # Add or remove flags as needed.
+    if axis.x != 0:
+        flags |= flag_values.get('x', 0)
+    else:
+        flags &= ~flag_values.get('x', 0)
+
+    if axis.y != 0:
+        flags |= flag_values.get('y', 0)
+    else:
+        flags &= ~flag_values.get('y', 0)
+
+    if axis.z != 0:
+        flags |= flag_values.get('z', 0)
+    else:
+        flags &= ~flag_values.get('z', 0)
+
+    if door_type == 'momentary_rot_button':
+        door_ent['startdirection'] = '1' if reverse else '-1'
+    else:
+        if reverse:
+            flags |= flag_values.get('rev', 0)
+        else:
+            flags &= ~flag_values.get('rev', 0)
+    door_ent['spawnflags'] = str(flags)
 
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')

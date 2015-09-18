@@ -486,7 +486,7 @@ class Property:
     append = __iadd__
     append.__doc__ = """Append another property to this one."""
 
-    def merge_children(self, *names):
+    def merge_children(self, *names: str):
         """Merge together any children of ours with the given names.
 
         After execution, this tree will have only one sub-Property for
@@ -494,14 +494,19 @@ class Property:
         """
         folded_names = [name.casefold() for name in names]
         new_list = []
-        merge = {name.casefold(): Property(name, []) for name in names}
+        merge = {
+            name.casefold(): Property(name, [])
+            for name in
+            names
+        }
         if self.has_children():
             for item in self.value[:]:
                 if item.name in folded_names:
                     merge[item.name].value.extend(item.value)
                 else:
                     new_list.append(item)
-        for prop in merge.values():
+        for prop_name in names:
+            prop = merge[prop_name.casefold()]
             if len(prop.value) > 0:
                 new_list.append(prop)
 

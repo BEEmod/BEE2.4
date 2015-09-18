@@ -56,6 +56,7 @@ def reraise_keyerror(err, obj_id):
         )
     ) from err
 
+
 def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     """Extract a config file refered to by the given property block.
 
@@ -87,7 +88,7 @@ def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
 def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
-    for name in os.listdir(pak_dir): # Both files and dirs
+    for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
         is_dir = os.path.isdir(name)
         if name.endswith('.zip') and os.path.isfile(name):
@@ -135,6 +136,22 @@ def load_packages(
     global LOG_ENT_COUNT
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
+    if not os.path.isdir(pak_dir):
+        from tkinter import messagebox
+        import sys
+        # We don't have a packages directory!
+        messagebox.showerror(
+            master=loader,
+            title='BEE2 - Invalid Packages Directory!',
+            message='The given packages directory is not present!\n'
+                    'Get the packages from '
+                    '"http://github.com/TeamSpen210/BEE2-items" '
+                    'and place them in "' + pak_dir +
+                    os.path.sep + '".',
+                    # Add slash to the end to indicate it's a folder.
+        )
+        sys.exit('No Packages Directory!')
+
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
     zips = []
@@ -170,9 +187,14 @@ def load_packages(
         loader.set_length("OBJ", objects)
         loader.set_length("IMG_EX", images)
 
-        # Except for StyleVars, each object will have at least 1 image -
-        # in UI.py we step the progress once per object.
-        loader.set_length("IMG", objects - len(all_obj['StyleVar']))
+        # Except for StyleVars and Packlists, each object will have at
+        # least 1 image - in UI.py we step the progress once per object.
+        loader.set_length(
+            "IMG",
+            objects -
+            len(all_obj['StyleVar']) -
+            len(all_obj['PackList'])
+        )
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
@@ -877,6 +899,53 @@ class ElevatorVid:
         return '<ElevatorVid ' + self.id + '>'
 
 
+class PackList:
+    def __init__(self, pak_id, files, mats):
+        self.id = pak_id
+        self.files = files
+        self.trigger_mats = mats
+
+    @classmethod
+    def parse(cls, data):
+        conf = data.info.find_key('Config', '')
+        mats = [
+            prop.value
+            for prop in
+            data.info.find_all('AddIfMat')
+        ]
+        if conf.has_children():
+            # Allow having a child block to define packlists inline
+            files = [
+                prop.value
+                for prop in conf
+            ]
+        else:
+            path = 'pack/' + conf.value + '.cfg'
+            try:
+                with data.zip_file.open(path) as f:
+                    # Each line is a file to pack.
+                    # Skip blank lines, strip whitespace, and
+                    # alow // comments.
+                    files = []
+                    for line in f:
+                        line = utils.clean_line(line)
+                        if line:
+                            files.append(line)
+            except KeyError as ex:
+                raise FileNotFoundError(
+                    '"{}:{}" not in zip!'.format(
+                        data.id,
+                        path,
+                    )
+                ) from ex
+
+        return cls(
+            data.id,
+            files,
+            mats,
+        )
+
+
 def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
 
@@ -947,6 +1016,7 @@ obj_types = {
     'Music':     Music,
     'StyleVar':  StyleVar,
     'Elevator':  ElevatorVid,
+    'PackList':  PackList,
     }
 
 if __name__ == '__main__':

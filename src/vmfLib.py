@@ -202,7 +202,7 @@ class VMF:
         for i in item:
             self.add_ent(i)
 
-    def create_ent(self, **kargs):
+    def create_ent(self, **kargs) -> 'Entity':
         """Quick method to allow creating point entities.
 
         This constructs an entity, adds it to the map, and then returns
@@ -371,12 +371,15 @@ class VMF:
     def iter_wbrushes(self, world=True, detail=True):
         """Iterate through all world and detail solids in the map."""
         if world:
-            for br in self.brushes:
-                yield br
+            yield from self.brushes
         if detail:
             for ent in self.iter_ents(classname='func_detail'):
-                for solid in ent.solids:
-                    yield solid
+                yield from ent.solids
+
+    def iter_wfaces(self, world=True, detail=True):
+        """Iterate through the faces of world and detail solids."""
+        for brush in self.iter_wbrushes(world, detail):
+            yield from brush
 
     def iter_ents(self, **cond):
         """Iterate through entities having the given keyvalue values."""
