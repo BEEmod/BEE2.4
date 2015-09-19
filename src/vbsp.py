@@ -1879,12 +1879,14 @@ def change_func_brush():
                     VMF.remove_ent(brush)
                 else:
                     # Oherwise, rename the brush to -brush, so the panel
-                    # can send inputs itself. (This allows removing 1
-                    # logic_auto.)
+                    # can be sent inputs.
                     brush['targetname'] = brush['targetname'].replace(
                         '_panel_top',
                         '-brush',
                         )
+                    # Add the attachment name to the parent, so it
+                    # automatically sets the attachment point for us.
+                    brush['parentname'] += ',panel_attach'
 
 
 def alter_flip_panel():
