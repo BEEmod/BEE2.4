@@ -100,8 +100,14 @@ SUBITEMS = {
     'track_plat': 4,
     'track_platform_oscillate': 5,
     'track_plat_oscil': 5,
-    'track_single': 6
+    'track_single': 6,
+
+    # Funnels
+    'fun_emitter': 0,
+    'fun_white': 1,
+    'fun_black': 2,
 }
+
 
 def load_conf():
     """Read the config and build our dictionaries."""
