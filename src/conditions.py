@@ -1550,7 +1550,7 @@ def res_local_targetname(inst, res):
         name = inst['targetname', ''] + '-' + local_name
     else:
         name = inst['targetname', '']
-    inst.fixup[res['resultVar']] = res['prfix',''] + name + res['suffix', '']
+    inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
 
 
 CATWALK_TYPES = {
