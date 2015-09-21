@@ -1015,6 +1015,7 @@ def res_add_overlay_inst(inst, res):
             Prefix, '1' is Suffix, and '2' is None.
         Copy_Fixup: If true, all the $replace values from the original
             instance will be copied over.
+        move_outputs: If true, outputs will be moved to this instance.
     """
     print('adding overlay', res['file'])
     overlay_inst = VMF.create_ent(
@@ -1029,6 +1030,9 @@ def res_add_overlay_inst(inst, res):
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+    if utils.conv_bool(res['move_outputs', '0']):
+        overlay_inst.outputs = inst.outputs
+        inst.outputs = []
 
 
 @make_result_setup('custOutput')
