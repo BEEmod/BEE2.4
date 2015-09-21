@@ -669,6 +669,9 @@ class selWin:
                         ICON_CROSS
                     )
                 else:
+                    # Display as text. If it's a container, sort alphabetically.
+                    if isinstance(val, (list, tuple, set)):
+                        val = ', '.join(sorted(val))
                     label['text'] = val
 
 

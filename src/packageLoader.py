@@ -653,16 +653,24 @@ class QuotePack:
             quote_id,
             selitem_data: 'SelitemData',
             config,
+            chars=None,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
         self.config = config
+        self.chars = chars or ['??']
 
     @classmethod
     def parse(cls, data):
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
-        path = 'voice/' + data.info['file'] + '.cfg'
+        chars = {
+            char.strip()
+            for char in
+            data.info['characters', ''].split(',')
+            if char.strip()
+        }
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -675,6 +683,7 @@ class QuotePack:
             data.id,
             selitem_data,
             config,
+            chars=chars,
             )
 
     def add_over(self, override: 'QuotePack'):

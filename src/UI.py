@@ -485,7 +485,7 @@ def load_packages(data):
             '3D': 'config.value',  # Check if it has a config
         }),
         (voice_list, voices, 'QuotePack', {
-            # Todo: Specify what characters are in the voice pack
+            'CHAR': 'chars',
         }),
         (style_list, styles, 'Style', {
             'VID': 'has_video',
@@ -573,7 +573,7 @@ def load_packages(data):
         none_desc='Add no extra voice lines.',
         callback=voice_callback,
         attributes=[
-            SelAttr('CHAR', 'Character: ', '??'),
+            SelAttr('CHAR', 'Characters: ', '??'),
         ],
     )
 
