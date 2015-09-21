@@ -43,6 +43,7 @@ if WIN:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'hand2',
         'wait': 'watch',
         'stretch_vert': 'sb_v_double_arrow',
         'stretch_horiz': 'sb_h_double_arrow',
@@ -80,6 +81,7 @@ elif MAC:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'pointinghand',
         'wait': 'spinning',
         'stretch_vert': 'resizeupdown',
         'stretch_horiz': 'resizeleftright',
@@ -115,6 +117,7 @@ elif LINUX:
 
     CURSORS = {
         'regular': 'arrow',
+        'link': 'hand2',
         'wait': 'watch',
         'stretch_vert': 'sb_v_double_arrow',
         'stretch_horiz': 'sb_h_double_arrow',
@@ -124,12 +127,42 @@ elif LINUX:
     }
 
 if MAC:
+    # On OSX, make left-clicks switch to a rightclick when control is held.
+    def bind_leftclick(wid, func):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func()
+        wid.bind(EVENTS['LEFT'], event_handler)
+
+    def bind_leftclick_double(wid, func):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held."""
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func()
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler)
+
     def bind_rightclick(wid, func):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func)
-        # TODO: We need to cancel the original LEFT event for this to actually work.
         wid.bind(EVENTS['LEFT_CTRL'], func)
 else:
+    def bind_leftclick(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT'], func)
+
+    def bind_leftclick_double(wid, func):
+        """Other systems just bind directly."""
+        wid.bind(EVENTS['LEFT_DOUBLE'], func)
+
     def bind_rightclick(wid, func):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func)

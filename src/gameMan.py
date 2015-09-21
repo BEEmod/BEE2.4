@@ -58,7 +58,8 @@ _UNLOCK_ITEMS = [
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
-# We always add ours such that it's the highest priority.
+# We always add ours such that it's the highest priority, other
+# than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
 
@@ -71,6 +72,7 @@ export_screen = loadScreen.LoadScreen(
     title_text='Exporting',
 )
 
+
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
 
@@ -79,7 +81,7 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('../basemodui.txt', "r") as trans:
+        with open('../basemodui.txt') as trans:
             trans_prop = Property.parse(trans, 'basemodui.txt')
         trans_data = {
             item.real_name: item.value
@@ -132,18 +134,11 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
 
-    def is_modded(self):
-        return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
-
     def edit_gameinfo(self, add_line=False):
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
         """
-
-        if self.is_modded() == add_line:
-            # It's already in the correct state!
-            return
 
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
@@ -181,11 +176,7 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
-        if add_line:
-            with open(self.abs_path('BEE2_EDIT_FLAG'), 'w') as file:
-                file.write('')
-        else:
-            os.remove(self.abs_path('BEE2_EDIT_FLAG'))
+        if not add_line:
             # Restore the original files!
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
@@ -204,6 +195,7 @@ class Game:
 
         screen_func = export_screen.step
         copy2 = shutil.copy2
+
         def copy_func(src, dest):
             screen_func('RES')
             copy2(src, dest)
@@ -240,6 +232,7 @@ class Game:
             voice,
             style_vars,
             elevator,
+            pack_list,
             should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
@@ -259,18 +252,22 @@ class Game:
         for key, val in style_vars.items():
             print('  {} = {!s}'.format(key, val))
         print('  }')
+        print('Pack Lists:\n  {')
+        for key in pack_list.keys():
+            print('  ' + key)
+        print('  }')
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         export_screen.set_length(
             'CONF',
-            # VBSP_conf, Editoritems, instances, gameinfo
-            4 +
+            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists
+            5 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
-        # files in compiler/ + pakrat
-        export_screen.set_length('COMP', len(os.listdir('../compiler')) + 1)
+        # files in compiler/
+        export_screen.set_length('COMP', len(os.listdir('../compiler')))
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)
@@ -302,6 +299,39 @@ class Game:
             )
             vbsp_config += skybox.config
 
+        if style.has_video:
+            if elevator is None:
+                # Use a randomised video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'RAND',
+                )
+            elif elevator.id == 'VALVE_BLUESCREEN':
+                # This video gets a special script and handling
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'BSOD',
+                )
+            else:
+                # Use the particular selected video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'FORCE',
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'horiz'),
+                    elevator.horiz_video,
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'vert'),
+                    elevator.vert_video,
+                )
+        else:  # No elevator video for this style
+            vbsp_config.set_key(
+                ('Elevator', 'type'),
+                'NONE',
+            )
+
         if music is not None:
             if music.sound is not None:
                 vbsp_config.set_key(
@@ -321,21 +351,47 @@ class Game:
             os.path.dirname(os.getcwd()) # Go up one dir to our actual location
         )
 
-        # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children(
-            'Conditions',
-            'StyleVars',
-            'Textures',
-            'Voice',
-            'Options',
-        )
-
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [
             Property(key, utils.bool_as_int(val))
             for key, val in
             style_vars.items()
         ]
+
+        pack_block = Property('PackList', [])
+        # A list of materials which will casue a specific packlist to be used.
+        pack_triggers = Property('PackTriggers', [])
+
+        for key, pack in pack_list.items():
+            pack_block.append(Property(
+                key,
+                [
+                    Property('File', file)
+                    for file in
+                    pack.files
+                ]
+            ))
+            for trigger_mat in pack.trigger_mats:
+                pack_triggers.append(
+                    Property('Material', [
+                        Property('Texture', trigger_mat),
+                        Property('PackList', pack.id),
+                    ])
+                )
+        if pack_triggers.value:
+            vbsp_config.append(pack_triggers)
+
+        # If there are multiple of these blocks, merge them together
+        # They will end up in this order.
+        vbsp_config.merge_children(
+            'Textures',
+            'Fizzler',
+            'Options',
+            'StyleVars',
+            'Conditions',
+            'Voice',
+            'PackTriggers',
+        )
 
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -396,6 +452,12 @@ class Game:
                 inst_file.write(line)
         export_screen.step('CONF')
 
+        print('Writing packing list!')
+        with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
+            for line in pack_block.export():
+                pack_file.write(line)
+        export_screen.step('CONF')
+
         if voice is not None:
             for prefix, dest, pretty in VOICE_PATHS:
                 path = os.path.join(
@@ -424,11 +486,6 @@ class Game:
                 self.abs_path('bin/')
             )
             export_screen.step('COMP')
-
-        print('Copying PakRat...', end='')
-        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
-        export_screen.step('COMP')
-        print(' Done!')
 
         if should_refresh:
             print('Copying Resources!')

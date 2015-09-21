@@ -23,9 +23,11 @@ settings = {
     "fizzler":        {},
     "options":        {},
     "pit":            None,
+    "elev_opt":       {},
 
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
+    "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
     }
@@ -153,10 +155,10 @@ DEFAULTS = {
     "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
 
     "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
-    "edge_off":                 "53.3335",  # The offset used on squarebeams.
+    "reset_edge_off":           "0",  # Reset the scale on
     "edge_scale":               "0.15",  # The scale on squarebeams textures
     "rotate_edge_special":      "0",    # Ditto for angled/flip panels
-    "edge_off_special":         "53.3335",
+    "reset_edge_off_special":   "",
     "edge_scale_special":       "0.15",
 
     # Reset offsets for all white/black brushes, so embedface has correct
@@ -167,11 +169,14 @@ DEFAULTS = {
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
     "force_paint":              "0",  # Force paintinmap = 1
 
-    "sky":                      "sky_black",  # Change the skybox
+    # Allow changing flip panel sounds.
+    "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
+    "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
 
 
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
+    "signSize":                 "32",  # Allow resizing the sign overlays
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -185,23 +190,28 @@ DEFAULTS = {
     "clump_size":               "4",  # The maximum length of a clump
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
-
-    "music_instance":           "",  # The instance for the chosen music
-    "music_soundscript":        "",  # The soundscript for the chosen music
     # Default to the origin of the elevator instance - that's likely to
     # be enclosed
     "music_location_sp":        "-2000 2000 0",
     "music_location_coop":      "-2000 -2000 0",
-    # BEE2 sets this to tell conditions what music is selected
-    "music_id":                 "<NONE>",
     # Instance used for pti_ents
     "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
     # Default pos is next to arrival_departure_ents
     "global_pti_ents_loc":      "-2400 -2800 0",
     # Location of the model changer instance if needed
     "model_changer_loc":        "-2400 -2800 -256",
+
+    # These are set by the BEE2.4 app automatically:
+
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
+    "music_id":                 "<NONE>", # The music ID which was selected
+    "music_instance":           "",  # The instance for the chosen music
+    "music_soundscript":        "",  # The soundscript for the chosen music
+    "elev_type":                "RAND", # What type of script to use:
+        # Either "RAND", "FORCE", "NONE" or "BSOD"
+    "elev_horiz":               "",  # The horizontal elevator video to use
+    "elev_vert":                "",  # The vertical elevator video to use
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -231,7 +241,7 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-BEE2_config = None
+BEE2_config = None # ConfigFile
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
@@ -240,6 +250,9 @@ IS_PREVIEW = 'ERR'
 # and will not be overwritten later.
 IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
+
+TO_PACK = set()  # The packlists we want to pack.
+PACK_FILES = set()  # Raw files we force pack
 
 ##################
 # UTIL functions #
@@ -302,7 +315,7 @@ def alter_mat(face, seed=None, texture_lock=True):
         face.mat = get_tex(surf_type + '.' + orient)
 
         if not texture_lock:
-            reset_tex_offset(face)
+            face.offset = 0
 
         return True
     elif mat in TEX_FIZZLER:
@@ -371,6 +384,23 @@ def load_settings():
 
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
+
+    for trigger in conf.find_all('PackTriggers', 'material'):
+        mat = trigger['texture', ''].casefold()
+        packlist = trigger['packlist', '']
+        if mat and packlist:
+            settings['packtrigger'][mat].append(packlist)
+
+    # Get configuration for the elevator, defaulting to ''.
+    elev = conf.find_key('elevator', [])
+    settings['elevator'] = {
+        key: elev[key, '']
+        for key in
+        (
+            'type', 'horiz', 'vert',
+            'scr_rand', 'scr_force', 'scr_bsod',
+        )
+    }
 
     pit = conf.find_key("bottomless_pit", [])
     if pit:
@@ -628,6 +658,68 @@ def set_player_portalgun(inst):
     utils.con_log('Done!')
 
 
+@conditions.meta_cond(priority=750, only_once=True)
+def add_screenshot_logic(inst):
+    """If the screenshot type is 'auto', add in the needed ents."""
+    if BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper() == 'AUTO':
+        VMF.create_ent(
+            classname='func_instance',
+            file='instances/BEE2/logic/screenshot_logic.vmf',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0',
+        )
+        utils.con_log('Added Screenshot Logic')
+
+
+@conditions.meta_cond(priority=50, only_once=True)
+def set_elev_videos(_):
+    vid_type = settings['elevator']['type'].casefold()
+
+    utils.con_log('Elevator type: ', vid_type.upper())
+
+    if vid_type == 'none' or GAME_MODE == 'COOP':
+        # The style doesn't have an elevator...
+        return
+    elif vid_type == 'bsod':
+        # This uses different video shaping!
+        script = settings['elevator']['scr_bsod']
+        vert_vid = 'bluescreen'
+        horiz_vid = 'bluescreen'
+    elif vid_type == 'force':
+        # Use the given video
+        script = settings['elevator']['scr_force']
+        vert_vid = settings['elevator']['vert']
+        horiz_vid = settings['elevator']['horiz']
+    elif vid_type == 'rand':
+        script = settings['elevator']['scr_rand']
+        vert_vid = None
+        horiz_vid = None
+    else:
+        utils.con_log('Invalid elevator type!')
+        return
+
+    transition_ents = instanceLocs.resolve('[transitionents]')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in transition_ents:
+            continue
+        if vert_vid:
+            inst.fixup['$vert_video'] = 'media/' + vert_vid + '.bik'
+        if horiz_vid:
+            inst.fixup['$horiz_video'] = 'media/' + horiz_vid + '.bik'
+
+        # Create the video script
+        VMF.create_ent(
+            classname='logic_script',
+            targetname='@video_splitter',
+            vscripts=script,
+            origin=inst['origin'],
+        )
+    # Ensure the script gets packed.
+    PACK_FILES.add('scripts/vscripts/' + script)
+
+
 def get_map_info():
     """Determine various attributes about the map.
 
@@ -695,6 +787,7 @@ def get_map_info():
             else:
                 IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
         if file in file_sp_exit_corr:
+            GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
             if override_sp_exit == 0:
                 utils.con_log(
@@ -706,6 +799,7 @@ def get_map_info():
                 utils.con_log('Setting exit to ' + str(override_sp_exit))
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
+            GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
             if override_sp_entry == 0:
                 utils.con_log(
@@ -1124,36 +1218,34 @@ def remove_static_ind_toggles():
     utils.con_log('Done!')
 
 
-def fix_squarebeams(face, rotate, offset: str, scale: str):
+def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     '''Fix a squarebeams brush for use in other styles.
 
     If rotate is True, rotate the texture 90 degrees.
     offset is the offset for the texture.
     '''
-    uaxis = face.uaxis.split(' ')
-    vaxis = face.vaxis.split(' ')
     if rotate:
         # To rotate, swap the two values
-        uaxis, vaxis = vaxis, uaxis
+        face.uaxis, face.vaxis = face.vaxis, face.uaxis
 
     # We want to modify the value with an offset
-    if uaxis[3] != '0]':
-        uaxis[3] = offset + ']'
-        uaxis[4] = scale
+    if face.uaxis.offset != 0:
+        targ = face.uaxis
     else:
-        vaxis[3] = offset + ']'
-        vaxis[4] = scale
+        targ = face.vaxis
 
-    face.uaxis = ' '.join(uaxis)
-    face.vaxis = ' '.join(vaxis)
+    if reset_offset:
+        targ.offset = 0
+    targ.scale = scale
 
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
     glass_inst = get_opt('glass_inst')
-    glass_scale = get_opt('glass_scale')
-    goo_scale = get_opt('goo_scale')
+    glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
+    goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1213,20 +1305,11 @@ def change_brush():
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
-
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = goo_scale # Apply goo scaling
-                split_v[-1] = goo_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply goo scaling
+                face.scale = goo_scale
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                split_u = face.uaxis.split()
-                split_v = face.vaxis.split()
-                split_u[-1] = glass_scale  # apply the glass scaling option
-                split_v[-1] = glass_scale
-                face.uaxis = " ".join(split_u)
-                face.vaxis = " ".join(split_v)
+                # Apply the glass scaling option
+                face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_inst is not None:
@@ -1309,16 +1392,6 @@ def face_seed(face):
     return origin.join(' ')
 
 
-def reset_tex_offset(face):
-    """Force all white/black walls to 0 offsets"""
-    uaxis = face.uaxis.split()
-    vaxis = face.vaxis.split()
-    uaxis[3] = '0]'
-    vaxis[3] = '0]'
-    face.uaxis = ' '.join(uaxis)
-    face.vaxis = ' '.join(vaxis)
-
-
 def get_grid_sizes(face: VLib.Side):
     """Determine the grid sizes that fits on this brush."""
     bbox_min, bbox_max = face.get_bbox()
@@ -1346,8 +1419,8 @@ def random_walls():
     scale_walls = get_bool_opt("random_blackwall_scale")
     rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
-    edge_off = get_opt('edge_off')
-    edge_scale = get_opt('edge_scale')
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -1367,13 +1440,7 @@ def random_walls():
                 # randomly scale textures to achieve the P1 multi-sized
                 #  black tile look without custom textues
                 scale = random.choice(get_grid_sizes(face))
-                split = face.uaxis.split()
-                split[-1] = scale
-                face.uaxis = " ".join(split)
-
-                split = face.vaxis.split()
-                split[-1] = scale
-                face.vaxis = " ".join(split)
+                face.scale = scale
             alter_mat(face, face_seed(face), texture_lock)
 
 
@@ -1399,8 +1466,8 @@ def clump_walls():
 
     texture_lock = get_bool_opt('tile_texture_lock', True)
     rotate_edge = get_bool_opt('rotate_edge')
-    edge_off = get_opt('edge_off')
-    edge_scale = get_opt('edge_scale')
+    edge_off = get_bool_opt('reset_edge_off', False)
+    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         # first build a dict of all textures and their locations...
@@ -1494,7 +1561,7 @@ def clump_walls():
                 if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
                     side.mat = tex
                     if not texture_lock:
-                        reset_tex_offset(side)
+                        side.offset = 0
         # Return to the map_seed state.
         random.setstate(state)
 
@@ -1540,11 +1607,11 @@ def set_antline_mat(
     - Material: the material
     - Static: if 'static', the antline will lose the targetname. This
       makes it non-dynamic, and removes the info_overlay_accessor
-      entity fromt the compiled map.
+      entity from the compiled map.
     If only 2 parts are given, the overlay is assumed to be dynamic.
     If one part is given, the scale is assumed to be 0.25
     """
-    if floor_mats:
+    if floor_mats and any(floor_mats): # Ensure there's actually a value
         # For P1 style, check to see if the antline is on the floor or
         # walls.
         direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
@@ -1566,7 +1633,7 @@ def set_antline_mat(
             # becomes static.
             over['targetname'] = ''
     else:
-        over['material'] = mat
+        over['material'], = mat
         over['endu'] = '0.25'
 
 
@@ -1574,6 +1641,7 @@ def change_overlays():
     """Alter the overlays."""
     utils.con_log("Editing Overlays...")
     sign_inst = get_opt('signInst')
+    sign_size = utils.conv_int(get_opt('signSize'), 32) / 2
     if sign_inst == "NONE":
         sign_inst = None
 
@@ -1612,6 +1680,15 @@ def change_overlays():
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
+            if sign_size != 16:
+                # Resize the signage overlays
+                # These are the 4 vertex locations
+                # Each axis is set to -16, 16 or 0
+                for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
+                    val = Vec.from_str(over[prop])
+                    val /= 16
+                    val *= sign_size
+                    over[prop] = val.join(' ')
         if case_mat == ANTLINES['straight']:
             set_antline_mat(
                 over,
@@ -1712,18 +1789,18 @@ def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
     grating_inst = get_opt("grating_inst")
-    grating_scale = get_opt("grating_scale")
+    grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
         rotate_edge = get_bool_opt('rotate_edge', False)
-        edge_off = get_opt('edge_off')
-        edge_scale = get_opt('edge_scale')
+        edge_off = get_bool_opt('reset_edge_off')
+        edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
     else:
         edge_tex = 'special.edge_special'
         rotate_edge = get_bool_opt('rotate_edge_special', False)
-        edge_off = get_opt('edge_off_special')
-        edge_scale = get_opt('edge_scale_special')
+        edge_off = get_bool_opt('reset_edge_off_special')
+        edge_scale = utils.conv_float(get_opt('edge_scale_special'), 0.15)
     utils.con_log('Special tex:', rotate_edge, edge_off, edge_scale)
 
     if grating_inst == "NONE":
@@ -1768,14 +1845,8 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    split_u = side.uaxis.split()
-                    split_v = side.vaxis.split()
-                    split_u[-1] = grating_scale  # apply the grtating
-                    split_v[-1] = grating_scale  # scaling option
-                    side.uaxis = " ".join(split_u)
-                    side.vaxis = " ".join(split_v)
+                    side.scale = grating_scale
                 alter_mat(side)  # for gratings, laserfields and some others
-
 
             # The style blanked the material, so delete the brush
             if side.mat == '':
@@ -1808,12 +1879,28 @@ def change_func_brush():
                     VMF.remove_ent(brush)
                 else:
                     # Oherwise, rename the brush to -brush, so the panel
-                    # can send inputs itself. (This allows removing 1
-                    # logic_auto.)
+                    # can be sent inputs.
                     brush['targetname'] = brush['targetname'].replace(
                         '_panel_top',
                         '-brush',
                         )
+                    # Add the attachment name to the parent, so it
+                    # automatically sets the attachment point for us.
+                    brush['parentname'] += ',panel_attach'
+
+
+def alter_flip_panel():
+    flip_panel_start = get_opt('flip_sound_start')
+    flip_panel_stop = get_opt('flip_sound_stop')
+    utils.con_log(flip_panel_stop, DEFAULTS['flip_sound_stop'])
+    if (
+            flip_panel_start != DEFAULTS['flip_sound_start'] or
+            flip_panel_stop != DEFAULTS['flip_sound_stop']
+            ):
+        for flip_pan in VMF.by_class['func_door_rotating']:
+            # Change flip panel sounds by editing the func_door_rotating
+            flip_pan['noise1'] = flip_panel_start
+            flip_pan['noise2'] = flip_panel_stop
 
 
 def set_special_mat(face, side_type):
@@ -1935,6 +2022,98 @@ def fix_worldspawn():
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
+@conditions.make_result('Pack')
+def packlist_cond(_, res):
+    """Add the files in the given packlist to the map."""
+    TO_PACK.add(res.value.casefold())
+
+
+def make_packlist(map_path):
+    """Write the list of files that VRAD should pack."""
+
+    # Scan map materials for marked materials
+    # This way world-brush materials can be packed.
+    pack_triggers = settings['packtrigger']
+
+    utils.con_log(pack_triggers)
+    if pack_triggers:
+        def face_iter():
+            """Check all these locations for the target textures."""
+            # We need the iterator to allow breaking out of the loop.
+            yield from VMF.iter_wfaces()
+            for ent in (
+                VMF.by_class['func_brush'] |
+                VMF.by_class['func_door_rotating'] |
+                VMF.by_class['trigger_portal_cleanser']
+                    ):
+                yield from ent.sides()
+
+        utils.con_log(set(face.mat.casefold() for face in face_iter()))
+
+        for face in face_iter():
+            mat = face.mat.casefold()
+            if face.mat.casefold() in pack_triggers:
+                TO_PACK.update(pack_triggers[mat])
+                del pack_triggers[mat]
+                if not pack_triggers:
+                    break  # No more left
+
+    if not TO_PACK:
+        # Nothing to pack - wipe the packfile!
+        open(map_path[:-4] + '.filelist.txt', 'w').close()
+
+    utils.con_log('Making Pack list...')
+
+    with open('bee2/pack_list.cfg') as f:
+        props = Property.parse(
+            f,
+            'bee2/pack_list.cfg'
+        ).find_key('PackList', [])
+
+    for pack_id in TO_PACK:
+        PACK_FILES.update(
+            prop.value
+            for prop in
+            props[pack_id, ()]
+        )
+
+    with open(map_path[:-4] + '.filelist.txt', 'w') as f:
+        for file in sorted(PACK_FILES):
+            f.write(file + '\n')
+            utils.con_log(file)
+
+    utils.con_log('Packlist written!')
+
+
+def make_vrad_config():
+    """Generate a config file for VRAD from our configs.
+
+    This way VRAD doesn't need to parse through vbsp_config, or anything else.
+    """
+    utils.con_log('Generating VRAD config...')
+    conf = Property('Config', [
+    ])
+    conf['force_full'] = utils.bool_as_int(
+        BEE2_config.get_bool('General', 'vrad_force_full')
+    )
+    conf['screenshot'] = BEE2_config.get_val(
+        'Screenshot', 'loc', ''
+    )
+    conf['screenshot_type'] = BEE2_config.get_val(
+        'Screenshot', 'type', 'PETI'
+    ).upper()
+    conf['clean_screenshots'] = utils.bool_as_int(
+        BEE2_config.get_bool('Screenshot', 'del_old')
+    )
+    conf['is_preview'] = utils.bool_as_int(
+        IS_PREVIEW
+    )
+
+    with open('bee2/vrad_config.cfg', 'w') as f:
+        for line in conf.export():
+            f.write(line)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -1967,15 +2146,15 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os_suff = ''
 
     arg = (
-        '"'
-        + os.path.normpath(
+        '"' +
+        os.path.normpath(
             os.path.join(
                 os.getcwd(),
                 "vbsp" + os_suff + "_original"
                 )
-            )
-        + '" '
-        + " ".join(vbsp_args)
+            ) +
+        '" ' +
+        " ".join(vbsp_args)
         )
 
     utils.con_log("Calling original VBSP...")
@@ -2098,6 +2277,7 @@ def main():
             )
 
         fix_inst()
+        alter_flip_panel() # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
@@ -2109,10 +2289,12 @@ def main():
         collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
         remove_static_ind_toggles()
-
         fix_worldspawn()
-        save(new_path)
 
+        make_packlist(path)
+        make_vrad_config()
+
+        save(new_path)
         run_vbsp(
             vbsp_args=new_args,
             do_swap=True,

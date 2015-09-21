@@ -62,6 +62,7 @@ voices = {}
 styles = {}
 musics = {}
 elevators = {}
+pack_lists = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -469,6 +470,9 @@ def load_packages(data):
 
     StyleVarPane.add_vars(data['StyleVar'])
 
+    for packlist in data['PackList']:
+        pack_lists[packlist.id] = packlist
+
     sky_list = []
     voice_list = []
     style_list = []
@@ -753,6 +757,7 @@ def export_editoritems(_=None):
         voice=voices.get(voice_win.chosen_id, None),
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
+        pack_list=pack_lists,
         should_refresh=not GEN_OPTS.get_bool(
             'General',
             'preserve_BEE2_resource_dir',
@@ -1088,14 +1093,14 @@ def update_filters():
             # deselected
             (show_wip or not item.item.is_wip)
             # Visible if any of the author and tag checkboxes are checked
-            and any(
+            and (any(
                 FilterVars['author'][auth.casefold()].get()
                 for auth in item.item.authors
-                )
-            and any(
+                ) or not item.item.authors) # Show if no authors
+            and (any(
                 FilterVars['tags'][tag.casefold()].get()
                 for tag in item.item.tags
-                )
+                ) or not item.item.tags) # Show if no tags
             # The package is selected
             and FilterVars['package'][item.item.pak_id].get()
             # Items like the elevator that need the unlocked stylevar
@@ -1474,7 +1479,6 @@ def init_filter_col(cat, f):
             command=update_filters,
             variable=FilterVars[cat][filt_id],
             )
-        FilterBoxes[cat][filt_id]['variable'] = FilterVars[cat][filt_id]
         FilterBoxes[cat][filt_id].grid(
             row=ind+2,
             column=0,
@@ -1832,10 +1836,11 @@ def init_windows():
             )
 
     # When clicking on any window hide the context window
-    TK_ROOT.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    StyleVarPane.window.bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['opt'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
-    windows['pal'].bind(utils.EVENTS['LEFT'], contextWin.hide_context)
+    utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
+    utils.bind_leftclick(StyleVarPane.window, contextWin.hide_context)
+    utils.bind_leftclick(CompilerPane.window, contextWin.hide_context)
+    utils.bind_leftclick(windows['opt'], contextWin.hide_context)
+    utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     voiceEditor.init_widgets()
     contextWin.init_widgets()
@@ -1846,6 +1851,10 @@ def init_windows():
     optionWindow.reset_all_win = reset_panes
 
     TK_ROOT.deiconify()  # show it once we've loaded everything
+    windows['pal'].deiconify()
+    windows['opt'].deiconify()
+    StyleVarPane.window.deiconify()
+    CompilerPane.window.deiconify()
 
     if utils.MAC:
         TK_ROOT.lift()  # Raise to the top of the stack

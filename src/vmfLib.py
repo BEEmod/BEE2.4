@@ -202,7 +202,7 @@ class VMF:
         for i in item:
             self.add_ent(i)
 
-    def create_ent(self, **kargs):
+    def create_ent(self, **kargs) -> 'Entity':
         """Quick method to allow creating point entities.
 
         This constructs an entity, adds it to the map, and then returns
@@ -371,12 +371,15 @@ class VMF:
     def iter_wbrushes(self, world=True, detail=True):
         """Iterate through all world and detail solids in the map."""
         if world:
-            for br in self.brushes:
-                yield br
+            yield from self.brushes
         if detail:
             for ent in self.iter_ents(classname='func_detail'):
-                for solid in ent.solids:
-                    yield solid
+                yield from ent.solids
+
+    def iter_wfaces(self, world=True, detail=True):
+        """Iterate through the faces of world and detail solids."""
+        for brush in self.iter_wbrushes(world, detail):
+            yield from brush
 
     def iter_ents(self, **cond):
         """Iterate through entities having the given keyvalue values."""
@@ -452,8 +455,8 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_max.y, b_min.z),
             ],
-            uaxis='[1 0 0 0] 0.25',
-            vaxis='[0 -1 0 0] 0.25',
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, -1, 0),
         )
 
         f_top = Side(
@@ -463,8 +466,8 @@ class VMF:
                 (b_max.x, b_max.y, b_max.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
-            uaxis='[1 0 0 0] 0.25',
-            vaxis='[0 -1 0 0] 0.25',
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, -1, 0),
         )
 
         f_west = Side(
@@ -474,8 +477,8 @@ class VMF:
                 (b_min.x, b_min.y, b_max.z),
                 (b_min.x, b_min.y, b_min.z),
             ],
-            uaxis='[0 1 0 0] 0.25',
-            vaxis='[0 0 -1 0] 0.25',
+            uaxis=UVAxis(0, 1, 0),
+            vaxis=UVAxis(0, 0, -1),
         )
 
         f_east = Side(
@@ -485,8 +488,8 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
-            uaxis='[0 1 0 0] 0.25',
-            vaxis='[0 0 -1 0] 0.25',
+            uaxis=UVAxis(0, 1, 0),
+            vaxis=UVAxis(0, 0, -1),
         )
 
         f_south = Side(
@@ -496,8 +499,8 @@ class VMF:
                 (b_min.x, b_min.y, b_min.z),
                 (b_min.x, b_min.y, b_max.z),
             ],
-            uaxis='[1 0 0 0] 0.25',
-            vaxis='[0 0 -1 0] 0.25',
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, 0, -1),
         )
 
         f_north = Side(
@@ -507,8 +510,8 @@ class VMF:
                 (b_min.x, b_max.y, b_max.z),
                 (b_min.x, b_max.y, b_min.z),
             ],
-            uaxis='[1 0 0 0] 0.25',
-            vaxis='[0 0 -1 0] 0.25',
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, 0, -1),
         )
 
         solid = Solid(
@@ -781,6 +784,54 @@ class Solid:
             s.translate(diff)
 
 
+class UVAxis:
+    """Values saved into Side.uaxis and Side.vaxis.
+
+    These define the alignment of textures on a face.
+    """
+    __slots__ = [
+        'x', 'y', 'z',
+        'scale',
+        'offset',
+    ]
+
+    def __init__(self, x, y, z, offset=0.0, scale=0.25):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.offset = offset
+        self.scale = scale
+
+    @staticmethod
+    def parse(value):
+        vals = value.split()
+        return UVAxis(
+            x=float(vals[0].lstrip('[')),
+            y=float(vals[1]),
+            z=float(vals[2]),
+            offset=float(vals[3].rstrip(']')),
+            scale=float(vals[4]),
+        )
+
+    def copy(self):
+        return UVAxis(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            offset=self.offset,
+            scale=self.scale,
+        )
+
+    def __str__(self):
+        return '[{x} {y} {z} {off}] {scale}'.format(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            off=self.offset,
+            scale=self.scale,
+        )
+
+
 class Side:
     """A brush face."""
     __slots__ = [
@@ -806,19 +857,19 @@ class Side:
     def __init__(
             self,
             vmf_file,
-            planes=[
+            planes=(
                 (0, 0, 0),
                 (0, 0, 0),
                 (0, 0, 0)
-                ],
+            ),
             des_id=-1,
             lightmap=16,
             smoothing=0,
             mat='tools/toolsnodraw',
             rotation=0,
-            uaxis='[0 1 0 0] 0.25',
-            vaxis='[0 0 -1 0] 0.25',
-            disp_data=utils.EmptyMapping,
+            uaxis=None,
+            vaxis=None,
+            disp_data: dict=None,
             ):
         """
         :type planes: list of [(int, int, int)]
@@ -832,9 +883,9 @@ class Side:
         self.smooth = smoothing
         self.mat = mat
         self.ham_rot = rotation
-        self.uaxis = uaxis
-        self.vaxis = vaxis
-        if disp_data:
+        self.uaxis = uaxis or UVAxis(0, 1, 0)
+        self.vaxis = vaxis or UVAxis(0, 0, -1)
+        if disp_data is not None:
             self.disp_power = utils.conv_int(
                 disp_data.get('power', '_'), 4)
             self.disp_pos = Vec.from_str(
@@ -899,8 +950,8 @@ class Side:
             des_id=side_id,
             disp_data=disp_data,
             mat=tree['material', ''],
-            uaxis=tree['uaxis', '[0 1  0 0] 0.25'],
-            vaxis=tree['vaxis', '[0 0 -1 0] 0.25'],
+            uaxis=UVAxis.parse(tree['uaxis', '[0 1 0 0] 0.25']),
+            vaxis=UVAxis.parse(tree['vaxis', '[0 0 -1 0] 0.25']),
             rotation=utils.conv_int(
                 tree['rotation', '0']),
             lightmap=utils.conv_int(
@@ -920,7 +971,7 @@ class Side:
             disp_data['subdiv'] = self.disp_is_subdiv
             disp_data['allowed_verts'] = self.disp_allowed_verts
         else:
-            disp_data = {}
+            disp_data = None
 
         return Side(
             self.map,
@@ -928,8 +979,8 @@ class Side:
             des_id=des_id,
             mat=self.mat,
             rotation=self.ham_rot,
-            uaxis=self.uaxis,
-            vaxis=self.vaxis,
+            uaxis=self.uaxis.copy(),
+            vaxis=self.vaxis.copy(),
             smoothing=self.smooth,
             lightmap=self.lightmap,
             disp_data=disp_data,
@@ -943,8 +994,8 @@ class Side:
         pl_str = ('(' + p.join(' ') + ')' for p in self.planes)
         buffer.write(ind + '\t"plane" "' + ' '.join(pl_str) + '"\n')
         buffer.write(ind + '\t"material" "' + self.mat + '"\n')
-        buffer.write(ind + '\t"uaxis" "' + self.uaxis + '"\n')
-        buffer.write(ind + '\t"vaxis" "' + self.vaxis + '"\n')
+        buffer.write(ind + '\t"uaxis" "' + str(self.uaxis) + '"\n')
+        buffer.write(ind + '\t"vaxis" "' + str(self.vaxis) + '"\n')
         buffer.write(ind + '\t"rotation" "' + str(self.ham_rot) + '"\n')
         buffer.write(ind + '\t"lightmapscale" "' + str(self.lightmap) + '"\n')
         buffer.write(ind + '\t"smoothing_groups" "' + str(self.smooth) + '"\n')
@@ -1040,6 +1091,16 @@ class Side:
         point_2 = self.planes[2] - self.planes[1]
 
         return point_2.cross(point_1).norm()
+
+    def scale(self, value):
+        self.uaxis.scale = value
+        self.vaxis.scale = value
+    scale = property(fset=scale, doc='Set botth scale attributes easily.')
+
+    def offset(self, value):
+        self.uaxis.offset = value
+        self.vaxis.offset = value
+    offset = property(fset=offset, doc='Set botth scale attributes easily.')
 
 
 class Entity:

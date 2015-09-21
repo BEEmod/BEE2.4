@@ -669,7 +669,7 @@ def flag_has_inst(_, flag):
     """Checks if the given instance is present anywhere in the map."""
     flags = resolve_inst(flag.value)
     return any(
-        inst in flags
+        inst.casefold() in flags
         for inst in
         ALL_INST
     )
@@ -1015,6 +1015,7 @@ def res_add_overlay_inst(inst, res):
             Prefix, '1' is Suffix, and '2' is None.
         Copy_Fixup: If true, all the $replace values from the original
             instance will be copied over.
+        move_outputs: If true, outputs will be moved to this instance.
     """
     print('adding overlay', res['file'])
     overlay_inst = VMF.create_ent(
@@ -1029,6 +1030,9 @@ def res_add_overlay_inst(inst, res):
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+    if utils.conv_bool(res['move_outputs', '0']):
+        overlay_inst.outputs = inst.outputs
+        inst.outputs = []
 
 
 @make_result_setup('custOutput')
@@ -1322,11 +1326,8 @@ def res_cust_fizzler(base_inst, res):
                         if side.mat.casefold() == 'effects/fizzler':
                             side.mat = laser_tex
 
-                            uaxis = side.uaxis.split(" ")
-                            vaxis = side.vaxis.split(" ")
-                            # the format is like "[1 0 0 -393.4] 0.25"
-                            side.uaxis = ' '.join(uaxis[:3]) + ' 0] 0.25'
-                            side.vaxis = ' '.join(vaxis[:4]) + ' 0.25'
+                            side.uaxis.offset = 0
+                            side.scale = 0.25
                         else:
                             side.mat = nodraw_tex
                 else:
@@ -1408,23 +1409,19 @@ def convert_to_laserfield(
             side.mat = laser_tex
             # Now we figure out the corrrect u/vaxis values for the texture.
 
-            uaxis = side.uaxis.split(" ")
-            vaxis = side.vaxis.split(" ")
-            # the format is like "[1 0 0 -393.4] 0.25"
             size = 0
             offset = 0
             for i, wid in enumerate(dimensions):
                 if wid > size:
                     size = int(wid)
                     offset = int(bounds_min[i])
-            side.uaxis = (
-                " ".join(uaxis[:3]) + " " +
-                # texture offset to fit properly
-                str(tex_width/size * -offset) + "] " +
-                str(size/tex_width)  # scaling
-                )
+            # texture offset to fit properly
+            side.uaxis.offset= tex_width/size * -offset
+            side.uaxis.scale= size/tex_width  # scaling
+
             # heightwise it's always the same
-            side.vaxis = (" ".join(vaxis[:3]) + " 256] 0.25")
+            side.vaxis.offset = 256
+            side.vaxis.scale = 0.25
 
 
 @make_result('condition')
@@ -1535,7 +1532,29 @@ def res_clear_outputs(inst, res):
 @make_result('removeFixup')
 def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
-    del inst.fixup['res']
+    del inst.fixup[res.value]
+
+
+@make_result('setAngles')
+def res_set_angles(inst, res):
+    """Set the orientation of an instance to a certain angle."""
+    inst['angles'] = res.value
+
+
+@make_result('localTarget')
+def res_local_targetname(inst, res):
+    """Generate a instvar with an instance-local name.
+
+    Useful with AddOutput commands, or other values which use
+    targetnames in the parameter.
+    The result takes the form "<prefix><instance name>[-<local>]<suffix>".
+    """
+    local_name = res['name', '']
+    if local_name:
+        name = inst['targetname', ''] + '-' + local_name
+    else:
+        name = inst['targetname', '']
+    inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
 
 
 CATWALK_TYPES = {
@@ -1891,7 +1910,7 @@ def res_track_plat(_, res):
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
-        normal = Vec(0, 0, 1).rotate(
+        normal = Vec(0, 0, 1).rotate_by_str(
             plat_inst['angles']
         )
 
@@ -2009,6 +2028,153 @@ def track_scan(
             tr_set.add(track)
             return
 
+# The spawnflags that we toggle
+FLAG_ROTATING = {
+    'func_rotating': {
+        'rev': 2,  # Spin counterclockwise
+        'x': 4,  # Spinning in X axis
+        'y': 8,  # Spin in Y axis
+        'solid_flags': 64,  # 'Not solid'
+    },
+    'func_door_rotating': {
+        'rev': 2,
+        'x': 128,
+        'y': 64,
+        'solid_flags': 8 | 4,  # 'Non-solid to player', 'passable'
+    },
+    'func_rot_button': {
+        'rev': 2,
+        'x': 128,
+        'y': 64,
+        'solid_flags': 1,  # 'Not solid'
+    },
+    'momentary_rot_button': {
+        'x': 128,
+        'z': 64,
+        # Reversed is set by keyvalue
+        'solid_flags': 1,  # 'Not solid'
+    },
+    'func_platrot': {
+        'x': 64,
+        'y': 128,
+        'solid_flags': 0,  # There aren't any
+    }
+}
+
+
+@make_result('GenRotatingEnt')
+def res_fix_rotation_axis(ent, res):
+    """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
+
+    This uses the orientation of the instance to detemine the correct
+    spawnflags to make it rotate in the correct direction. The brush
+    will be 2x2x2 units large, and always set to be non-solid.
+    - `Pos` and `name` are local to the
+      instance, and will set the `origin` and `targetname` respectively.
+    - `Keys` are any other keyvalues to be be set.
+    - `Flags` sets additional spawnflags. Multiple values may be
+       separated by '+', and will be added together.
+    - `Classname` specifies which entity will be created, as well as
+       which other values will be set to specify the correct orientation.
+    - `AddOut` is used to add outputs to the generated entity. It takes
+       the options `Output`, `Target`, `Input`, `Param` and `Delay`. If
+       `Inst_targ` is defined, it will be used with the input to construct
+       an instance proxy input. If `OnceOnly` is set, the output will be
+       deleted when fired.
+
+    Permitted entities:
+     * `func_rotating`
+     * `func_door_rotating`
+     * `func_rot_button`
+     * `func_platrot`
+    """
+    des_axis = res['axis', 'z'].casefold()
+    reverse = utils.conv_bool(res['reversed', '0'])
+    door_type = res['classname', 'func_door_rotating']
+
+    # Extra stuff to apply to the flags (USE, toggle, etc)
+    flags = sum(map(
+        # Add together multiple values
+        utils.conv_int,
+        res['flags', '0'].split('+')
+    ))
+
+    name = res['name', '']
+    if not name.startswith('@'):
+        # If a local name is given, add it to the instance targetname.
+        # It the name given is '', set to the instance's name.
+        # If it has an @, don't change it!
+        name = ent['targetname', ''] + (('-' + name) if name else '')
+
+    axis = Vec(
+        x=int(des_axis == 'x'),
+        y=int(des_axis == 'y'),
+        z=int(des_axis == 'z'),
+    ).rotate_by_str(ent['angles', '0 0 0'])
+
+    pos = Vec.from_str(
+        res['Pos', '0 0 0']
+    ).rotate_by_str(ent['angles', '0 0 0'])
+    pos += Vec.from_str(ent['origin', '0 0 0'])
+
+    door_ent = VMF.create_ent(
+        classname=door_type,
+        targetname=name,
+        origin=pos.join(' '),
+    )
+
+    for key in res.find_key('Keys', []):
+        door_ent[key.real_name] = key.value
+
+    for output in res.find_all('AddOut'):
+        door_ent.add_out(VLib.Output(
+            out=output['Output', 'OnUse'],
+            inp=output['Input', 'Use'],
+            targ=output['Target', ''],
+            inst_in=output['Inst_targ', None],
+            param=output['Param', ''],
+            delay=utils.conv_float(output['Delay', '']),
+            times=(
+                1 if
+                utils.conv_bool(output['OnceOnly', False])
+                else -1),
+        ))
+
+    # Generate brush
+    door_ent.solids = [VMF.make_prism(pos - 1, pos + 1).solid]
+
+    if axis.x > 0 or axis.z > 0:
+        # If it points forward, we need to reverse the rotating door
+        reverse = not reverse
+
+    flag_values = FLAG_ROTATING[door_type]
+    # Make the door always non-solid!
+    flags |= flag_values.get('solid_flags', 0)
+    # Add or remove flags as needed.
+    if axis.x != 0:
+        flags |= flag_values.get('x', 0)
+    else:
+        flags &= ~flag_values.get('x', 0)
+
+    if axis.y != 0:
+        flags |= flag_values.get('y', 0)
+    else:
+        flags &= ~flag_values.get('y', 0)
+
+    if axis.z != 0:
+        flags |= flag_values.get('z', 0)
+    else:
+        flags &= ~flag_values.get('z', 0)
+
+    if door_type == 'momentary_rot_button':
+        door_ent['startdirection'] = '1' if reverse else '-1'
+    else:
+        if reverse:
+            flags |= flag_values.get('rev', 0)
+        else:
+            flags &= ~flag_values.get('rev', 0)
+    door_ent['spawnflags'] = str(flags)
+
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
 def res_set_texture(inst, res):
@@ -2114,3 +2280,119 @@ def res_set_texture(inst, res):
 
     # Don't allow this to get overwritten later.
     vbsp.IGNORED_FACES.add(brush.face)
+
+
+@make_result('AddBrush')
+def res_add_brush(inst, res):
+    """Spawn in a brush at the indicated points.
+
+    - point1 and point2 are locations local to the instance, with '0 0 0'
+      as the floor-position.
+    - type is either 'black' or 'white'.
+    - detail should be set to True/False. If true the brush will be a
+      func_detail instead of a world brush.
+
+    The sides will be textured with 1x1, 2x2 or 4x4 wall, ceiling and floor
+    textures as needed.
+    """
+    import vbsp
+
+    point1 = Vec.from_str(res['point1'])
+    point2 = Vec.from_str(res['point2'])
+
+    point1.z -= 64 # Offset to the location of the floor
+    point2.z -= 64
+
+    point1.rotate_by_str(inst['angles']) # Rotate to match the instance
+    point2.rotate_by_str(inst['angles'])
+
+    origin = Vec.from_str(inst['origin'])
+    point1 += origin # Then offset to the location of the instance
+    point2 += origin
+
+    tex_type = res['type', None]
+    if tex_type not in ('white', 'black'):
+        utils.con_log(
+            'AddBrush: "{}" is not a valid brush '
+            'color! (white or black)'.format(tex_type)
+        )
+        tex_type = 'black'
+
+    # We need to rescale black walls and ceilings
+    rescale = vbsp.get_bool_opt('random_blackwall_scale') and tex_type == 'black'
+
+    dim = point2 - point1
+    dim.max(-dim)
+
+    # Figure out what grid size and scale is needed
+    # Check the dimensions in two axes to figure out the largest
+    # tile size that can fit in it.
+    x_maxsize = min(dim.y, dim.z)
+    y_maxsize = min(dim.x, dim.z)
+    if x_maxsize <= 32:
+        x_grid = '4x4'
+        x_scale = 0.25
+    elif x_maxsize <= 64:
+        x_grid = '2x2'
+        x_scale = 0.5
+    else:
+        x_grid = 'wall'
+        x_scale = 1
+
+    if y_maxsize <= 32:
+        y_grid = '4x4'
+        y_scale = 0.25
+    elif y_maxsize <= 64:
+        y_grid = '2x2'
+        y_scale = 0.5
+    else:
+        y_grid = 'wall'
+        y_scale = 1
+
+    grid_offset = (origin // 128)
+
+    # All brushes in each grid have the same textures for each side.
+    random.seed(grid_offset.join(' ') + '-partial_block')
+
+    solids = VMF.make_prism(point1, point2)
+    ':type solids: VLib.PrismFace'
+
+    # Ensure the faces aren't re-textured later
+    vbsp.IGNORED_FACES.update(solids.solid.sides)
+
+    solids.north.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.south.mat = vbsp.get_tex(tex_type + '.' + y_grid)
+    solids.east.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.west.mat = vbsp.get_tex(tex_type + '.' + x_grid)
+    solids.top.mat = vbsp.get_tex(tex_type + '.floor')
+    solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
+
+    if rescale:
+        z_maxsize = min(dim.x, dim.y)
+        # randomised black wall scale applies to the ceiling too
+        if z_maxsize <= 32:
+            z_scale = 0.25
+        elif z_maxsize <= 64:
+            z_scale = random.choice((0.5, 0.5, 0.25))
+        else:
+            z_scale = random.choice((1, 1, 0.5, 0.5, 0.25))
+    else:
+        z_scale = 0.25
+
+    if rescale:
+        solids.north.scale = y_scale
+        solids.south.scale = y_scale
+        solids.east.scale = x_scale
+        solids.west.scale = x_scale
+        solids.bottom.scale = z_scale
+
+    if utils.conv_bool(res['detail', False], False):
+        # Add the brush to a func_detail entity
+        VMF.create_ent(
+            classname='func_detail'
+        ).solids = [
+            solids.solid
+        ]
+    else:
+        # Add to the world
+        VMF.add_brush(solids.solid)

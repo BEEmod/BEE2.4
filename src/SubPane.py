@@ -55,6 +55,7 @@ class SubPane(Toplevel):
         self.can_resize_y = resize_y
         self.config_file = options
         super().__init__(parent)
+        self.withdraw() # Hide by default
 
         self.tool_button = make_tool_button(
             frame=tool_frame,
