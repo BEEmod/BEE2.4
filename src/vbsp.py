@@ -201,17 +201,20 @@ DEFAULTS = {
     # Location of the model changer instance if needed
     "model_changer_loc":        "-2400 -2800 -256",
 
+    ######
     # These are set by the BEE2.4 app automatically:
 
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
-    "music_id":                 "<NONE>", # The music ID which was selected
+    "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
-    "elev_type":                "RAND", # What type of script to use:
-        # Either "RAND", "FORCE", "NONE" or "BSOD"
+    "elev_type":                "RAND",  # What type of script to use:
+    # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
     "elev_vert":                "",  # The vertical elevator video to use
+    "voice_id":                 "<NONE>",  # The voice pack which was selected
+    "voice_char":               "",  # Characters in the pack
     }
 
 # angles needed to ensure fizzlers are not upside-down

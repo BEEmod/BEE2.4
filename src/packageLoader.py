@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
+from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 import extract_packages
 import utils
@@ -125,9 +126,9 @@ def find_packages(pak_dir, zips, zip_name_lst):
     if not found_pak:
         print('No packages in folder!')
 
+
 def load_packages(
         pak_dir,
-        load_res,
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
@@ -652,16 +653,24 @@ class QuotePack:
             quote_id,
             selitem_data: 'SelitemData',
             config,
+            chars=None,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
         self.config = config
+        self.chars = chars or ['??']
 
     @classmethod
     def parse(cls, data):
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
-        path = 'voice/' + data.info['file'] + '.cfg'
+        chars = {
+            char.strip()
+            for char in
+            data.info['characters', ''].split(',')
+            if char.strip()
+        }
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -674,6 +683,7 @@ class QuotePack:
             data.id,
             selitem_data,
             config,
+            chars=chars,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -956,12 +966,6 @@ def desc_parse(info):
                 yield (line.name, line.value)
         else:
             yield ("line", prop.value)
-
-
-SelitemData = namedtuple(
-    'SelitemData',
-    'name, short_name, auth, icon, desc, group',
-)
 
 
 def get_selitem_data(info):

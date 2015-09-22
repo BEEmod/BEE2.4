@@ -86,9 +86,6 @@ if __name__ == '__main__':
         print('Loading Packages...')
         pack_data = packageLoader.load_packages(
             GEN_OPTS['Directories']['package'],
-            load_res=not GEN_OPTS.get_bool(
-                'General', 'preserve_BEE2_resource_dir'
-            ),
             log_item_fallbacks=GEN_OPTS.get_bool(
                 'Debug', 'log_item_fallbacks'),
             log_missing_styles=GEN_OPTS.get_bool(

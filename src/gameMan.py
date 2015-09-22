@@ -347,8 +347,18 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
 
+        if voice is not None:
+            vbsp_config.set_key(
+                ('Options', 'voice_pack'),
+                voice.id,
+            )
+            vbsp_config.set_key(
+                ('Options', 'voice_char'),
+                ','.join(voice.chars)
+            )
+
         vbsp_config.set_key(('Options', 'BEE2_loc'),
-            os.path.dirname(os.getcwd()) # Go up one dir to our actual location
+            os.path.dirname(os.getcwd())  # Go up one dir to our actual location
         )
 
         vbsp_config.ensure_exists('StyleVars')

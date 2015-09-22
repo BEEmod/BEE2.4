@@ -19,7 +19,7 @@ import img
 import utils
 
 import SubPane
-from selectorWin import selWin, Item as selWinItem
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
 import voiceEditor
 import contextWin
@@ -481,13 +481,29 @@ def load_packages(data):
 
     # These don't need special-casing, and act the same.
     obj_types = [
-        (sky_list, skyboxes, 'Skybox'),
-        (voice_list, voices, 'QuotePack'),
-        (style_list, styles, 'Style'),
-        (music_list, musics, 'Music'),
-        (elev_list, elevators, 'Elevator'),
+        (sky_list, skyboxes, 'Skybox', {
+            '3D': 'config.value',  # Check if it has a config
+        }),
+        (voice_list, voices, 'QuotePack', {
+            'CHAR': 'chars',
+        }),
+        (style_list, styles, 'Style', {
+            'VID': 'has_video',
+        }),
+        (music_list, musics, 'Music', {
+            # TODO: Allow indicating the presence of extra track parts
+        }),
+        (elev_list, elevators, 'Elevator', {
+            'ORIENT': 'has_orient',
+        }),
+    ]
+
+    for sel_list, obj_list, name, attrs in obj_types:
+        attr_commands = [
+            # cache the operator.attrgetter funcs
+            (key, operator.attrgetter(value))
+            for key, value in attrs.items()
         ]
-    for sel_list, obj_list, name in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
         for obj in sorted(
@@ -495,14 +511,14 @@ def load_packages(data):
                 key=operator.attrgetter('selitem_data.name'),
                 ):
             selitem_data = obj.selitem_data
-            sel_list.append(selWinItem(
+            sel_list.append(selWinItem.from_data(
                 obj.id,
-                selitem_data.short_name,
-                long_name=selitem_data.name,
-                icon=selitem_data.icon,
-                authors=selitem_data.auth,
-                desc=selitem_data.desc,
-                group=selitem_data.group,
+                selitem_data,
+                attrs={
+                    key: func(obj)
+                    for key, func in
+                    attr_commands
+                }
             ))
             obj_list[obj.id] = obj
             # Every item has an image
@@ -544,7 +560,10 @@ def load_packages(data):
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
-        )
+        attributes=[
+            SelAttr('3D', '3D Skybox: ', False),
+        ],
+    )
 
     voice_win = selWin(
         TK_ROOT,
@@ -553,7 +572,10 @@ def load_packages(data):
         has_none=True,
         none_desc='Add no extra voice lines.',
         callback=voice_callback,
-        )
+        attributes=[
+            SelAttr('CHAR', 'Characters: ', '??'),
+        ],
+    )
 
     music_win = selWin(
         TK_ROOT,
@@ -563,7 +585,14 @@ def load_packages(data):
         none_desc='Add no music to the map at all.',
         callback=win_callback,
         callback_params=['Music'],
-        )
+        attributes=[
+            SelAttr('GEL_SPEED', 'Propulsion Gel SFX: ', False),
+            SelAttr('GEL_BOUNCE', 'Repulsion Gel SFX: ', False),
+            SelAttr('TBEAM', 'Excursion Funnel SFX: ', False),
+            SelAttr('BRIDGE', 'Hard Light SFX: ', False),
+            SelAttr('FLING', 'Fling SFX: ', False),
+        ],
+    )
 
     style_win = selWin(
         TK_ROOT,
@@ -571,7 +600,10 @@ def load_packages(data):
         title='Select Style',
         has_none=False,
         has_def=False,
-        )
+        attributes=[
+            SelAttr('VID', 'Elevator Videos: ', True),
+        ]
+    )
 
     elev_win = selWin(
         TK_ROOT,
@@ -582,6 +614,9 @@ def load_packages(data):
         none_desc='Chose a random video.',
         callback=win_callback,
         callback_params=['Elevator'],
+        attributes=[
+            SelAttr('ORIENT', 'Multiple Orientations: ', False),
+        ]
     )
 
     last_style = GEN_OPTS.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
