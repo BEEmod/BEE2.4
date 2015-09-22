@@ -63,6 +63,7 @@ styles = {}
 musics = {}
 elevators = {}
 pack_lists = {}
+editor_sounds = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -473,6 +474,9 @@ def load_packages(data):
     for packlist in data['PackList']:
         pack_lists[packlist.id] = packlist
 
+    for editor_sound in data['EditorSound']:
+        editor_sounds[editor_sound.id] = editor_sound
+
     sky_list = []
     voice_list = []
     style_list = []
@@ -758,6 +762,7 @@ def export_editoritems(_=None):
         elevator=elevators.get(elev_win.chosen_id, None),
         style_vars=style_vars,
         pack_list=pack_lists,
+        editor_sounds=editor_sounds,
         should_refresh=not GEN_OPTS.get_bool(
             'General',
             'preserve_BEE2_resource_dir',

@@ -1013,6 +1013,27 @@ class PackList:
                 self.trigger_mats.append(item)
 
 
+@pak_object('EditorSound')
+class EditorSound:
+    """Add sounds that are usable in the editor.
+
+    The editor only reads in game_sounds_editor, so custom sounds must be
+    added here.
+    The ID is the name of the sound, prefixed with 'BEE2_Editor.'.
+    The values in 'keys' will form the soundscript body.
+    """
+    def __init__(self, snd_name, data):
+        self.id = 'BEE2_Editor.' + snd_name
+        self.data = data
+        data.name = self.id
+
+    @classmethod
+    def parse(cls, data):
+        return cls(
+            snd_name=data.id,
+            data=data.info.find_key('keys', [])
+        )
+
 
 def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
