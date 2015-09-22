@@ -713,6 +713,23 @@ def flag_music(_, flag):
     return OPTIONS['music_id'] == flag.value
 
 
+@make_flag('has_char')
+def flag_voice_char(_, flag):
+    """Checks to see if the given charcter is present in the voice pack.
+
+    "<NONE>" means no voice pack is chosen.
+    This is case-insensitive, and allows partial matches - 'Cave' matches
+    a voice pack with 'Cave Johnson'.
+    """
+    targ_char = flag.value.casefold()
+    if targ_char == '<none>':
+        return OPTIONS['voice_id'] == '<NONE>'
+    for char in OPTIONS['voice_char'].split(','):
+        if targ_char in char.casefold():
+            return True
+    return False
+
+
 @make_flag('ifOption')
 def flag_option(_, flag):
     bits = flag.value.split(' ', 1)
