@@ -28,6 +28,7 @@ __all__ = [
 all_obj = {}
 obj_override = {}
 packages = {}
+OBJ_TYPES = {}
 
 data = {}
 
@@ -36,6 +37,26 @@ res_count = -1
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
 PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
+ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+
+
+def pak_object(name, allow_mult=False, has_img=True):
+    """Decorator to add a class to the list of objects.
+
+    Each object class needs two methods:
+    parse() gets called with a ParseData object, to read from info.txt.
+    The return value gets saved.
+
+    For override items, they are parsed normally. The original item then
+    gets the add_over(override) method called for each override to add values.
+
+    If allow_mult is true, duplicate items will be treated as overrides,
+    with one randomly chosen to be the 'parent'.
+    """
+    def x(cls):
+        OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+        return cls
+    return x
 
 
 def reraise_keyerror(err, obj_id):
@@ -162,7 +183,7 @@ def load_packages(
 
         loader.set_length("PAK", len(packages))
 
-        for obj_type in obj_types:
+        for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
@@ -188,13 +209,16 @@ def load_packages(
         loader.set_length("OBJ", objects)
         loader.set_length("IMG_EX", images)
 
-        # Except for StyleVars and Packlists, each object will have at
-        # least 1 image - in UI.py we step the progress once per object.
+        # The number of images we need to load is the number of objects,
+        # excluding some types like Stylevars or PackLists.
         loader.set_length(
             "IMG",
-            objects -
-            len(all_obj['StyleVar']) -
-            len(all_obj['PackList'])
+            sum(
+                len(all_obj[key])
+                for key, opts in
+                OBJ_TYPES.items()
+                if opts.has_img
+            )
         )
 
         for obj_type, objs in all_obj.items():
@@ -202,7 +226,7 @@ def load_packages(
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
                 # parse through the object and return the resultant class
                 try:
-                    object_ = obj_types[obj_type].parse(
+                    object_ = OBJ_TYPES[obj_type].cls.parse(
                         ParseData(
                             obj_data.zip_file,
                             obj_id,
@@ -216,7 +240,7 @@ def load_packages(
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
                 for override_data in obj_override[obj_type].get(obj_id, []):
-                    override = obj_types[obj_type].parse(
+                    override = OBJ_TYPES[obj_type].cls.parse(
                         override_data
                     )
                     object_.add_over(override)
@@ -271,7 +295,8 @@ def parse_package(zip_file, info, pak_id, disp_name):
     objects = 0
     # First read through all the components we have, so we can match
     # overrides to the originals
-    for comp_type in obj_types:
+    for comp_type in OBJ_TYPES:
+        allow_dupes = OBJ_TYPES[comp_type].allow_mult
         # Look for overrides
         for obj in info.find_all("Overrides", comp_type):
             obj_id = obj['id']
@@ -282,7 +307,13 @@ def parse_package(zip_file, info, pak_id, disp_name):
         for obj in info.find_all(comp_type):
             obj_id = obj['id']
             if obj_id in all_obj[comp_type]:
-                raise Exception('ERROR! "' + obj_id + '" defined twice!')
+                if allow_dupes:
+                    # Pretend this is an override
+                    obj_override[comp_type][obj_id].append(
+                        ParseData(zip_file, obj_id, obj, pak_id)
+                    )
+                else:
+                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
             objects += 1
             all_obj[comp_type][obj_id] = ObjData(
                 zip_file,
@@ -445,6 +476,7 @@ def parse_item_folder(folders, zip_file, pak_id):
             folders[fold]['vbsp'] = Property(None, [])
 
 
+@pak_object('Style')
 class Style:
     def __init__(
             self,
@@ -537,6 +569,7 @@ class Style:
         return '<Style:' + self.id + '>'
 
 
+@pak_object('Item')
 class Item:
     def __init__(
             self,
@@ -647,6 +680,7 @@ class Item:
         return '<Item:' + self.id + '>'
 
 
+@pak_object('QuotePack')
 class QuotePack:
     def __init__(
             self,
@@ -699,6 +733,7 @@ class QuotePack:
         return '<Voice:' + self.id + '>'
 
 
+@pak_object('Skybox')
 class Skybox:
     def __init__(
             self,
@@ -739,6 +774,7 @@ class Skybox:
         return '<Skybox ' + self.id + '>'
 
 
+@pak_object('Music')
 class Music:
     def __init__(
             self,
@@ -785,6 +821,7 @@ class Music:
         return '<Music ' + self.id + '>'
 
 
+@pak_object('StyleVar', allow_mult=True, has_img=False)
 class StyleVar:
     def __init__(
             self,
@@ -837,6 +874,13 @@ class StyleVar:
             self.styles = None
         else:
             self.styles.extend(override.styles)
+        # If they both have descriptions, add them together.
+        # Don't do it if they're both identical though.
+        if override.desc and override.desc not in self.desc:
+            if self.desc:
+                self.desc += '\n\n' + override.desc
+            else:
+                self.desc = override.desc
 
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
@@ -858,10 +902,11 @@ class StyleVar:
         )
 
 
+@pak_object('Elevator')
 class ElevatorVid:
     """An elevator video definition.
 
-    This is mainly defined just for Valve's items.
+    This is mainly defined just for Valve's items - you can't pack BIKs.
     """
     def __init__(
             self,
@@ -909,6 +954,7 @@ class ElevatorVid:
         return '<ElevatorVid ' + self.id + '>'
 
 
+@pak_object('PackList', allow_mult=True, has_img=False)
 class PackList:
     def __init__(self, pak_id, files, mats):
         self.id = pak_id
@@ -953,6 +999,39 @@ class PackList:
             data.id,
             files,
             mats,
+        )
+
+    def add_over(self, override):
+        """Override items just append to the list of files."""
+        # Dont copy over if it's already present
+        for item in override.files:
+            if item not in self.files:
+                self.file.append(item)
+
+        for item in override.trigger_mats:
+            if item not in self.trigger_mats:
+                self.trigger_mats.append(item)
+
+
+@pak_object('EditorSound')
+class EditorSound:
+    """Add sounds that are usable in the editor.
+
+    The editor only reads in game_sounds_editor, so custom sounds must be
+    added here.
+    The ID is the name of the sound, prefixed with 'BEE2_Editor.'.
+    The values in 'keys' will form the soundscript body.
+    """
+    def __init__(self, snd_name, data):
+        self.id = 'BEE2_Editor.' + snd_name
+        self.data = data
+        data.name = self.id
+
+    @classmethod
+    def parse(cls, data):
+        return cls(
+            snd_name=data.id,
+            data=data.info.find_key('keys', [])
         )
 
 
@@ -1011,17 +1090,6 @@ def sep_values(string, delimiters=',;/'):
         (val.strip() for val in vals)
         if stripped
     ]
-
-obj_types = {
-    'Style':     Style,
-    'Item':      Item,
-    'QuotePack': QuotePack,
-    'Skybox':    Skybox,
-    'Music':     Music,
-    'StyleVar':  StyleVar,
-    'Elevator':  ElevatorVid,
-    'PackList':  PackList,
-    }
 
 if __name__ == '__main__':
     load_packages('packages//', False)
