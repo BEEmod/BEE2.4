@@ -504,7 +504,7 @@ def fix_fizz_models(inst):
 @conditions.meta_cond(priority=-100, only_once=False)
 def static_pan(inst):
     """Switches glass angled panels to static instances, if needed."""
-    if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
+    if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
