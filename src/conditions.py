@@ -2160,7 +2160,7 @@ def res_fix_rotation_axis(ent, res):
     # Generate brush
     door_ent.solids = [VMF.make_prism(pos - 1, pos + 1).solid]
 
-    if axis.x > 0 or axis.z > 0:
+    if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
         reverse = not reverse
 
