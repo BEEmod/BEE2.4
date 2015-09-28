@@ -167,7 +167,6 @@ DEFAULTS = {
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
-    "force_paint":              "0",  # Force paintinmap = 1
 
     # Allow changing flip panel sounds.
     "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
@@ -2021,7 +2020,10 @@ def fix_worldspawn():
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # if PeTI thinks there should be paint, don't touch it
-        VMF.spawn['paintinmap'] = get_opt('force_paint')
+        # Otherwise set it based on the 'gel' voice attribute
+        VMF.spawn['paintinmap'] = utils.bool_as_int(
+            settings['has_attr']['gel'],
+        )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
