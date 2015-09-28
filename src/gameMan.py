@@ -476,10 +476,12 @@ class Game:
                 # If the Unlock Default Items stylevar is enabled, we
                 # want to force the corridors and obs room to be
                 # deletable and copyable
+                # Also add DESIRES_UP, so they place in the correct orientation
                 if item['type', ''] in _UNLOCK_ITEMS:
-                    for prop in item.find_key("Editor", []):
-                        if prop.name == 'deletable' or prop.name == 'copyable':
-                            prop.value = '1'
+                    editor_section = item.find_key("Editor", [])
+                    editor_section['deletable'] = '1'
+                    editor_section['copyable'] = '1'
+                    editor_section['DesiredFacing'] = 'DESIRES_UP'
 
         print('Editing Gameinfo!')
         self.edit_gameinfo(True)
