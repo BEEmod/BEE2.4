@@ -2045,19 +2045,22 @@ def make_packlist(map_path):
         def face_iter():
             """Check all these locations for the target textures."""
             # We need the iterator to allow breaking out of the loop.
-            yield from VMF.iter_wfaces()
+            for face in VMF.iter_wfaces():
+                yield face.mat.casefold()
             for ent in (
                 VMF.by_class['func_brush'] |
                 VMF.by_class['func_door_rotating'] |
                 VMF.by_class['trigger_portal_cleanser']
                     ):
-                yield from ent.sides()
+                for side in ent.sides():
+                    yield side.mat.casefold()
 
-        utils.con_log(set(face.mat.casefold() for face in face_iter()))
+            for overlay in VMF.by_class['info_overlay']:
+                # Check overlays too
+                yield overlay['material', ''].casefold()
 
-        for face in face_iter():
-            mat = face.mat.casefold()
-            if face.mat.casefold() in pack_triggers:
+        for mat in face_iter():
+            if mat in pack_triggers:
                 TO_PACK.update(pack_triggers[mat])
                 del pack_triggers[mat]
                 if not pack_triggers:
