@@ -164,6 +164,7 @@ def resolve(path) -> list:
     - "[spExitCorridor]": Hardcoded shortcuts for specific items
 
     This returns a list of instances which match the selector.
+    When using <> values, the '' path will never be returned.
     """
 
     if path.startswith('<') and path.endswith('>'):
@@ -195,13 +196,18 @@ def resolve(path) -> list:
                             '"' + val + '" is not a valid instance'
                             ' subtype or index!'
                         )
-                # Only add if it's actually in range
-                if 0 <= ind < len(item_values):
+                # Only add if it's actually in range, and skip "" values
+                if 0 <= ind < len(item_values) and item_values[ind] != '':
                     out.append(item_values[ind])
             return out
         else:
             try:
-                return INSTANCE_FILES[path]
+                # Skip "" instances
+                return [
+                    inst for inst in
+                    INSTANCE_FILES[path]
+                    if inst != ''
+                    ]
             except KeyError:
                 utils.con_log(
                     '"{}" not a valid item!'.format(path)

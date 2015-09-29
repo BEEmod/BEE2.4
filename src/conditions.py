@@ -2320,7 +2320,8 @@ def res_add_brush(inst, res):
     point1.z -= 64 # Offset to the location of the floor
     point2.z -= 64
 
-    point1.rotate_by_str(inst['angles']) # Rotate to match the instance
+    # Rotate to match the instance
+    point1.rotate_by_str(inst['angles'])
     point2.rotate_by_str(inst['angles'])
 
     origin = Vec.from_str(inst['origin'])
