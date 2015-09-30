@@ -2450,9 +2450,6 @@ def res_unst_scaffold(_, res):
 
             'inst_wall': block['wallInst', None],
             'inst_floor': block['floorInst', None],
-
-            'static_wall': block['staticWall', None],
-            'static_floor': block['staticFloor', None],
         }
         for inst in resolve_inst(block['file']):
             TARG_INST[inst] = conf
@@ -2504,6 +2501,9 @@ def res_unst_scaffold(_, res):
                 instances[ent_targ]['prev'] = targ
                 inst['next'] = ent_targ
                 scaff_targs += 1
+            else:
+                # TODO: Delete these indicator_toggles, and attached antlines
+                pass
         if scaff_targs > 1:
             raise Exception('A scaffold item has multiple destinations!')
         elif scaff_targs == 0:
@@ -2513,7 +2513,7 @@ def res_unst_scaffold(_, res):
     # We need to find the start instances, so we can set everything up
     for inst in instances.values():
         if inst['prev'] is None and inst['next'] is None:
-            # Static item - these use the orignal instances!
+            # Static item!
             continue
         elif inst['prev'] is None:
             starting_inst.append(inst)
@@ -2583,6 +2583,9 @@ def res_unst_scaffold(_, res):
                         index=index + 1,
                     )
 
+            new_file = conf.get('inst_' + orient, '')
+            if new_file != '':
+                ent['file'] = new_file
 
     utils.con_log('Finished Scaffold generation!')
     return True  # Don't run this again
