@@ -62,6 +62,10 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t"BEE2"'
 
+# We inject this line to recognise where our sounds start, so we can modify
+# them.
+EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
+
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
@@ -133,6 +137,45 @@ class Game:
 
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
+
+    def add_editor_sounds(self, sounds: Property):
+        """Add soundscript items so they can be used in the editor."""
+        # PeTI only loads game_sounds_editor, so we must modify that.
+        # First find the highest-priority file
+        for folder in self.dlc_priority():
+            file = self.abs_path(os.path.join(
+                folder,
+                'scripts',
+                'game_sounds_editor.txt'
+            ))
+            if os.path.isfile(file):
+                break # We found it
+        else:
+            # Assume it's in dlc2
+            file = self.abs_path(os.path.join(
+                'portal2_dlc2',
+                'scripts',
+                'game_sounds_editor.txt',
+            ))
+        try:
+            with open(file) as f:
+                file_data = list(f)
+        except FileNotFoundError:
+            # If the file doesn't exist, we'll just write our stuff in.
+            file_data = []
+        for i, line in enumerate(file_data):
+            if line.strip() == EDITOR_SOUND_LINE:
+                # Delete our marker line and everything after it
+                del file_data[i:]
+
+        # Then add our stuff!
+        with open(file, 'w') as f:
+            f.writelines(file_data)
+            f.write(EDITOR_SOUND_LINE + '\n')
+            for sound in sounds:
+                for line in sound.data.export():
+                    f.write(line)
+                f.write('\n')  # Add a little spacing
 
     def edit_gameinfo(self, add_line=False):
         """Modify all gameinfo.txt files to add or remove our line.
@@ -233,6 +276,7 @@ class Game:
             style_vars,
             elevator,
             pack_list,
+            editor_sounds,
             should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
@@ -241,7 +285,7 @@ class Game:
         - We unlock the mandatory items if specified
         -
         """
-        print('--------------------')
+        print('-' * 20)
         print('Exporting Items and Style for "' + self.name + '"!')
         print('Style =', style)
         print('Music =', music)
@@ -252,17 +296,17 @@ class Game:
         for key, val in style_vars.items():
             print('  {} = {!s}'.format(key, val))
         print('  }')
-        print('Pack Lists:\n  {')
-        for key in pack_list.keys():
-            print('  ' + key)
-        print('  }')
+        print(len(pack_list), 'Pack Lists!')
+        print(len(editor_sounds), 'Editor Sounds!')
+        print('-' * 20)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         export_screen.set_length(
             'CONF',
-            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists
-            5 +
+            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists,
+            # editor_sounds
+            6 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
@@ -275,7 +319,7 @@ class Game:
             export_screen.skip_stage('RES')
 
         export_screen.show()
-        export_screen.grab_set_global() # Stop interaction with other windows
+        export_screen.grab_set_global()  # Stop interaction with other windows
 
         vbsp_config = style.config.copy()
 
@@ -347,8 +391,19 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
 
-        vbsp_config.set_key(('Options', 'BEE2_loc'),
-            os.path.dirname(os.getcwd()) # Go up one dir to our actual location
+        if voice is not None:
+            vbsp_config.set_key(
+                ('Options', 'voice_pack'),
+                voice.id,
+            )
+            vbsp_config.set_key(
+                ('Options', 'voice_char'),
+                ','.join(voice.chars)
+            )
+
+        vbsp_config.set_key(
+            ('Options', 'BEE2_loc'),
+            os.path.dirname(os.getcwd())  # Go up one dir to our actual location
         )
 
         vbsp_config.ensure_exists('StyleVars')
@@ -421,10 +476,12 @@ class Game:
                 # If the Unlock Default Items stylevar is enabled, we
                 # want to force the corridors and obs room to be
                 # deletable and copyable
+                # Also add DESIRES_UP, so they place in the correct orientation
                 if item['type', ''] in _UNLOCK_ITEMS:
-                    for prop in item.find_key("Editor", []):
-                        if prop.name == 'deletable' or prop.name == 'copyable':
-                            prop.value = '1'
+                    editor_section = item.find_key("Editor", [])
+                    editor_section['deletable'] = '1'
+                    editor_section['copyable'] = '1'
+                    editor_section['DesiredFacing'] = 'DESIRES_UP'
 
         print('Editing Gameinfo!')
         self.edit_gameinfo(True)
@@ -456,6 +513,10 @@ class Game:
         with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
             for line in pack_block.export():
                 pack_file.write(line)
+        export_screen.step('CONF')
+
+        print('Editing game_sounds!')
+        self.add_editor_sounds(editor_sounds.values())
         export_screen.step('CONF')
 
         if voice is not None:

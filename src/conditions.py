@@ -713,6 +713,23 @@ def flag_music(_, flag):
     return OPTIONS['music_id'] == flag.value
 
 
+@make_flag('has_char')
+def flag_voice_char(_, flag):
+    """Checks to see if the given charcter is present in the voice pack.
+
+    "<NONE>" means no voice pack is chosen.
+    This is case-insensitive, and allows partial matches - 'Cave' matches
+    a voice pack with 'Cave Johnson'.
+    """
+    targ_char = flag.value.casefold()
+    if targ_char == '<none>':
+        return OPTIONS['voice_id'] == '<NONE>'
+    for char in OPTIONS['voice_char'].split(','):
+        if targ_char in char.casefold():
+            return True
+    return False
+
+
 @make_flag('ifOption')
 def flag_option(_, flag):
     bits = flag.value.split(' ', 1)
@@ -1015,6 +1032,7 @@ def res_add_overlay_inst(inst, res):
             Prefix, '1' is Suffix, and '2' is None.
         Copy_Fixup: If true, all the $replace values from the original
             instance will be copied over.
+        move_outputs: If true, outputs will be moved to this instance.
     """
     print('adding overlay', res['file'])
     overlay_inst = VMF.create_ent(
@@ -1029,6 +1047,9 @@ def res_add_overlay_inst(inst, res):
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+    if utils.conv_bool(res['move_outputs', '0']):
+        overlay_inst.outputs = inst.outputs
+        inst.outputs = []
 
 
 @make_result_setup('custOutput')
@@ -1550,7 +1571,7 @@ def res_local_targetname(inst, res):
         name = inst['targetname', ''] + '-' + local_name
     else:
         name = inst['targetname', '']
-    inst.fixup[res['resultVar']] = res['prfix',''] + name + res['suffix', '']
+    inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
 
 
 CATWALK_TYPES = {
@@ -2139,7 +2160,7 @@ def res_fix_rotation_axis(ent, res):
     # Generate brush
     door_ent.solids = [VMF.make_prism(pos - 1, pos + 1).solid]
 
-    if axis.x > 0 or axis.z > 0:
+    if axis.x > 0 or axis.y > 0 or axis.z > 0:
         # If it points forward, we need to reverse the rotating door
         reverse = not reverse
 
@@ -2299,7 +2320,8 @@ def res_add_brush(inst, res):
     point1.z -= 64 # Offset to the location of the floor
     point2.z -= 64
 
-    point1.rotate_by_str(inst['angles']) # Rotate to match the instance
+    # Rotate to match the instance
+    point1.rotate_by_str(inst['angles'])
     point2.rotate_by_str(inst['angles'])
 
     origin = Vec.from_str(inst['origin'])

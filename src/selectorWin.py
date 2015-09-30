@@ -7,6 +7,7 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
+from collections import namedtuple
 from tk_root import TK_ROOT
 import functools
 import math
@@ -22,10 +23,21 @@ ITEM_HEIGHT = ICON_SIZE + 51
 # The larger error icon used if an image is not found
 err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 
+# The two icons used for boolean item attributes
+ICON_CHECK = img.png('icons/check')
+ICON_CROSS = img.png('icons/cross')
+
 
 def _NO_OP(*args):
     """The default callback, triggered whenever the chosen item is changed."""
     pass
+
+AttrDef = namedtuple('AttrDef', 'id desc default')
+
+SelitemData = namedtuple(
+    'SelitemData',
+    'name, short_name, auth, icon, desc, group',
+)
 
 
 class Item:
@@ -44,6 +56,7 @@ class Item:
     - desc: A list of tuples, following the richTextBox text format.
     - authors: A list of the item's authors.
     - group: Items with the same group name will be shown together.
+    - attrs: a dictionary containing the attribute values for this item.
 
     - button, win: Set later, the button and window TK objects for this item
     """
@@ -59,17 +72,19 @@ class Item:
         'win',
         'context_lbl',
         'ico_file',
+        'attrs',
         ]
 
     def __init__(
             self,
-            name,
-            short_name,
-            long_name=None,
+            name: str,
+            short_name: str,
+            long_name: str=None,
             icon=None,
-            authors=None,
+            authors: list=None,
             desc=(('line', ''),),
-            group=None,
+            group: str=None,
+            attributes: dict=None,
             ):
         self.name = name
         self.shortName = short_name
@@ -94,7 +109,8 @@ class Item:
             )
             self.ico_file = icon
         self.desc = desc
-        self.authors = [] if authors is None else authors
+        self.authors = authors or []
+        self.attrs = attributes or {}
         self.button = None
         self.win = None
 
@@ -114,6 +130,20 @@ class Item:
     def __str__(self):
         return '<Item:' + self.name + '>'
 
+    @classmethod
+    def from_data(cls, obj_id, data: SelitemData, attrs=None):
+        """Create a selector Item from a SelitemData tuple."""
+        return Item(
+            name=obj_id,
+            short_name=data.short_name,
+            long_name=data.name,
+            icon=data.icon,
+            authors=data.auth,
+            desc=data.desc,
+            group=data.group,
+            attributes=attrs
+        )
+
 
 class selWin:
     """The selection window for skyboxes, music, goo and voice packs.
@@ -131,6 +161,8 @@ class selWin:
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
+
+    :type suggested: Item | None
     """
     def __init__(
             self,
@@ -142,6 +174,7 @@ class selWin:
             title='BEE2',
             callback=_NO_OP,
             callback_params=(),
+            attributes=(),
             ):
         """Create a window object.
 
@@ -165,6 +198,10 @@ class selWin:
           The first arguement to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
           context menu.
+        - attributes is a list of AttrDef tuples.
+          Each tuple should contain an ID, display text, and default value.
+          If the values are True or False a check/cross will be displayed,
+          otherwise they're a string.
         """
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = img.png('BEE2/none_96')
@@ -207,6 +244,8 @@ class selWin:
             sashrelief=RAISED,  # Raise the border between panes
         )
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
+        self.win.columnconfigure(0, weight=1)
+        self.win.rowconfigure(0, weight=1)
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
@@ -282,7 +321,7 @@ class selWin:
         self.prop_desc = tkRichText(
             self.prop_desc_frm,
             width=40,
-            height=16,
+            height=4,
             font="TkSmallCaptionFont",
             )
         self.prop_desc.grid(
@@ -312,7 +351,7 @@ class selWin:
             text="OK",
             command=self.save,
             ).grid(
-                row=5,
+                row=6,
                 column=0,
                 padx=(8, 8),
                 )
@@ -324,7 +363,7 @@ class selWin:
                 command=self.sel_suggested,
                 )
             self.prop_reset.grid(
-                row=5,
+                row=6,
                 column=1,
                 sticky='EW',
                 )
@@ -334,7 +373,7 @@ class selWin:
             text="Cancel",
             command=self.exit,
             ).grid(
-                row=5,
+                row=6,
                 column=2,
                 padx=(8, 8),
                 )
@@ -413,6 +452,46 @@ class selWin:
             stretch='never',
         )
 
+        if attributes:
+            attr_frame = ttk.Frame(self.prop_frm)
+            attr_frame.grid(
+                row=5,
+                column=0,
+                columnspan=3,
+                sticky=EW,
+            )
+
+            self.attr = {}
+            # Add in all the attribute labels
+            for index, (at_id, desc, value) in enumerate(attributes):
+                desc_label = ttk.Label(
+                    attr_frame,
+                    text=desc,
+                )
+                self.attr[at_id] = val_label = ttk.Label(
+                    attr_frame,
+                )
+                val_label.default = value
+                if isinstance(value, bool):
+                    # It's a tick/cross label
+                    val_label['image'] = (
+                        ICON_CHECK
+                        if value else
+                        ICON_CROSS,
+                    )
+                # Position in a 2-wide grid
+                desc_label.grid(
+                    row=index // 2,
+                    column=(index % 2)*2,
+                    sticky=E,
+                )
+                val_label.grid(
+                    row=index // 2,
+                    column=(index % 2)*2 + 1,
+                    sticky=W,
+                )
+        else:
+            self.attr = None
 
     def widget(self, frame) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
@@ -571,11 +650,30 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+
         if self.has_def:
             if self.suggested is None or self.selected == self.suggested:
                 self.prop_reset.state(('disabled',))
             else:
                 self.prop_reset.state(('!disabled',))
+
+        if self.attr:
+            for attr_id, label in self.attr.items():
+                val = item.attrs.get(attr_id, None)
+                if val is None:
+                    val = label.default
+                if isinstance(label.default, bool):
+                    label['image'] = (
+                        ICON_CHECK
+                        if val else
+                        ICON_CROSS
+                    )
+                else:
+                    # Display as text. If it's a container, sort alphabetically.
+                    if isinstance(val, (list, tuple, set)):
+                        val = ', '.join(sorted(val))
+                    label['text'] = val
+
 
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.

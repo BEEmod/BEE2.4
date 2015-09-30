@@ -167,7 +167,6 @@ DEFAULTS = {
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
-    "force_paint":              "0",  # Force paintinmap = 1
 
     # Allow changing flip panel sounds.
     "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
@@ -201,17 +200,20 @@ DEFAULTS = {
     # Location of the model changer instance if needed
     "model_changer_loc":        "-2400 -2800 -256",
 
+    ######
     # These are set by the BEE2.4 app automatically:
 
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
-    "music_id":                 "<NONE>", # The music ID which was selected
+    "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
-    "elev_type":                "RAND", # What type of script to use:
-        # Either "RAND", "FORCE", "NONE" or "BSOD"
+    "elev_type":                "RAND",  # What type of script to use:
+    # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
     "elev_vert":                "",  # The vertical elevator video to use
+    "voice_id":                 "<NONE>",  # The voice pack which was selected
+    "voice_char":               "",  # Characters in the pack
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -501,7 +503,7 @@ def fix_fizz_models(inst):
 @conditions.meta_cond(priority=-100, only_once=False)
 def static_pan(inst):
     """Switches glass angled panels to static instances, if needed."""
-    if inst['file'] in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
+    if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
@@ -1879,12 +1881,14 @@ def change_func_brush():
                     VMF.remove_ent(brush)
                 else:
                     # Oherwise, rename the brush to -brush, so the panel
-                    # can send inputs itself. (This allows removing 1
-                    # logic_auto.)
+                    # can be sent inputs.
                     brush['targetname'] = brush['targetname'].replace(
                         '_panel_top',
                         '-brush',
                         )
+                    # Add the attachment name to the parent, so it
+                    # automatically sets the attachment point for us.
+                    brush['parentname'] += ',panel_attach'
 
 
 def alter_flip_panel():
@@ -2016,7 +2020,10 @@ def fix_worldspawn():
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # if PeTI thinks there should be paint, don't touch it
-        VMF.spawn['paintinmap'] = get_opt('force_paint')
+        # Otherwise set it based on the 'gel' voice attribute
+        VMF.spawn['paintinmap'] = utils.bool_as_int(
+            settings['has_attr']['gel'],
+        )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
 
@@ -2038,19 +2045,22 @@ def make_packlist(map_path):
         def face_iter():
             """Check all these locations for the target textures."""
             # We need the iterator to allow breaking out of the loop.
-            yield from VMF.iter_wfaces()
+            for face in VMF.iter_wfaces():
+                yield face.mat.casefold()
             for ent in (
                 VMF.by_class['func_brush'] |
                 VMF.by_class['func_door_rotating'] |
                 VMF.by_class['trigger_portal_cleanser']
                     ):
-                yield from ent.sides()
+                for side in ent.sides():
+                    yield side.mat.casefold()
 
-        utils.con_log(set(face.mat.casefold() for face in face_iter()))
+            for overlay in VMF.by_class['info_overlay']:
+                # Check overlays too
+                yield overlay['material', ''].casefold()
 
-        for face in face_iter():
-            mat = face.mat.casefold()
-            if face.mat.casefold() in pack_triggers:
+        for mat in face_iter():
+            if mat in pack_triggers:
                 TO_PACK.update(pack_triggers[mat])
                 del pack_triggers[mat]
                 if not pack_triggers:
