@@ -873,7 +873,7 @@ def drag_stop(e):
     # off the palette
     if drag_win.passed_over_pal:
         # is the cursor over the preview pane?
-        if 0 <= pos_x < 4:
+        if 0 <= pos_x < 4 and 0 <= pos_y < 8:
             drag_win.drag_item.clear()  # wipe duplicates off the palette first
             new_item = drag_win.drag_item.copy(frames['preview'])
             new_item.is_pre = True
