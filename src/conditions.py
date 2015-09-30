@@ -2414,3 +2414,165 @@ def res_add_brush(inst, res):
     else:
         # Add to the world
         VMF.add_brush(solids.solid)
+
+
+def scaff_scan(inst_list, start_ent):
+    """Given the start item and instance list, follow the programmed path."""
+    cur_ent = start_ent
+    while True:
+        yield cur_ent
+        cur_ent = cur_ent['next']
+        if cur_ent is None:
+            return
+
+
+
+@make_result('UnstScaffold')
+def res_unst_scaffold(_, res):
+    """The condition to generate Unstationary Scaffolds.
+
+    This is executed once to modify all instances.
+    """
+    # The instance types we're modifying
+    utils.con_log('Running Scaffold Generator...')
+    TARG_INST = {}
+    for block in res.find_all("Instance"):
+        conf = {
+            # If set, adjusts the offset appropriately
+            'pillar_var': block['pillarVar', None],
+            'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
+            'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
+
+            'logic_start': block['startlogic', None],
+            'logic_end': block['endLogic', None],
+            'logic_mid': block['midLogic', None],
+
+            'inst_wall': block['wallInst', None],
+            'inst_floor': block['floorInst', None],
+
+            'static_wall': block['staticWall', None],
+            'static_floor': block['staticFloor', None],
+        }
+        utils.con_log(block['file'], conf)
+        for inst in resolve_inst(block['file']):
+            TARG_INST[inst] = conf
+
+    # We need to provide vars to link the tracks and beams.
+    LINKS = {}
+    for block in res.find_all('LinkEnt'):
+        # The name for this set of entities.
+        # It must be a '@' name, or the name will be fixed-up incorrectly!
+        loc_name = block['name']
+        if not loc_name.startswith('@'):
+            loc_name = '@' + loc_name
+        LINKS[block['nameVar']] = {
+            'local': loc_name,
+            # The next entity (not set in end logic)
+            'next': block['nextVar'],
+            # A '*' name to reference all the ents (set on the start logic)
+            'all': block['allVar', None],
+        }
+        utils.con_log(LINKS[block['nameVar']])
+
+    instances = {}
+    # Find all the instances we're wanting to change, and map them to
+    # targetnames
+    for ent in VMF.by_class['func_instance']:
+        file = ent['file'].casefold()
+        targ = ent['targetname']
+        if file not in TARG_INST:
+            continue
+        config = TARG_INST[file]
+        next_inst = set(
+            out.target
+            for out in
+            ent.outputs
+        )
+        ent.outputs.clear() # Destroy these now!
+        instances[targ] = {
+            'ent': ent,
+            'conf': config,
+            'next': next_inst,
+            'prev': None,
+        }
+    utils.con_log(instances.keys())
+
+    # Now link each instance to its in and outputs
+    for targ,inst in instances.items():
+        scaff_targs = 0
+        for ent_targ in inst['next']:
+            if ent_targ in instances:
+                instances[ent_targ]['prev'] = targ
+                inst['next'] = ent_targ
+                scaff_targs += 1
+        if scaff_targs > 1:
+            raise Exception('A scaffold item has multiple destinations!')
+        elif scaff_targs == 0:
+            inst['next'] = None  # End instance
+
+    starting_inst = []
+    # We need to find the start instances, so we can set everything up
+    for inst in instances.values():
+        if inst['prev'] is None and inst['next'] is None:
+            # Static item - these use the orignal instances!
+            continue
+        elif inst['prev'] is None:
+            starting_inst.append(inst)
+
+    # We need to make the link entities unique for each scaffold set
+    group_counter = 0
+
+    # Set all the instances and properties
+    for start_inst in starting_inst:
+        group_counter += 1
+        ent = start_inst['ent']
+        for name, vals in LINKS.items():
+            if vals['all'] is not None:
+                ent.fixup[vals['all']] = name + '*'
+
+        # Now set each instance in the chain, including first and last
+        for inst in scaff_scan(instances, start_inst):
+
+            utils.con_log('{i[prev]} -> {t} -> {i[next]}'.format(t=targ, i=inst))
+            ent, conf = inst['ent'], inst['conf']
+            orient = (
+                'floor'
+                Vec(0, 0, 1).rotate_by_str(ent['angles']) == (0, 0, 1)
+                else
+                'wall'
+            )
+            utils.con_log(targ, is_floor)
+
+            # Find the offset used for the logic ents
+            offset = Vec.from_str(
+                conf['off_floor' if is_floor else 'off_wall']
+            )
+            if conf['pillar_var'] is not None:
+                offset.z += 128 * utils.conv_int(
+                    ent.fixup[conf['pillar_Var'], ''],
+                    0,
+                )
+            offset.rotate_by_str(ent['angles'])
+            offset += Vec.from_str(ent['origin'])
+
+            if inst['prev'] is None:
+                link_type = 'start'
+            elif inst['next'] is None:
+                link_type = 'end'
+            else:
+                link_type = 'mid'
+
+            logic_inst = VMF.create_ent(
+                classname='func_instance',
+                targetame=ent['targetname'],
+                file=conf.get('logic_' + link_type, ''),
+                origin=offset.join(' '),
+                angles='0 0 0',
+            )
+
+
+
+
+
+    utils.con_log('Finished Scaffold generation!')
+    return True  # Don't run this again
