@@ -2421,11 +2421,12 @@ def scaff_scan(inst_list, start_ent):
     cur_ent = start_ent
     while True:
         yield cur_ent
-        cur_ent = cur_ent['next']
+        cur_ent = inst_list.get(cur_ent['next'], None)
         if cur_ent is None:
             return
 
 
+SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
 @make_result('UnstScaffold')
 def res_unst_scaffold(_, res):
@@ -2453,7 +2454,6 @@ def res_unst_scaffold(_, res):
             'static_wall': block['staticWall', None],
             'static_floor': block['staticFloor', None],
         }
-        utils.con_log(block['file'], conf)
         for inst in resolve_inst(block['file']):
             TARG_INST[inst] = conf
 
@@ -2466,13 +2466,12 @@ def res_unst_scaffold(_, res):
         if not loc_name.startswith('@'):
             loc_name = '@' + loc_name
         LINKS[block['nameVar']] = {
-            'local': loc_name,
+            'name': loc_name,
             # The next entity (not set in end logic)
             'next': block['nextVar'],
             # A '*' name to reference all the ents (set on the start logic)
             'all': block['allVar', None],
         }
-        utils.con_log(LINKS[block['nameVar']])
 
     instances = {}
     # Find all the instances we're wanting to change, and map them to
@@ -2488,17 +2487,17 @@ def res_unst_scaffold(_, res):
             for out in
             ent.outputs
         )
-        ent.outputs.clear() # Destroy these now!
+        # Destroy these outputs, they're useless now!
+        ent.outputs.clear()
         instances[targ] = {
             'ent': ent,
             'conf': config,
             'next': next_inst,
             'prev': None,
         }
-    utils.con_log(instances.keys())
 
     # Now link each instance to its in and outputs
-    for targ,inst in instances.items():
+    for targ, inst in instances.items():
         scaff_targs = 0
         for ent_targ in inst['next']:
             if ent_targ in instances:
@@ -2526,31 +2525,28 @@ def res_unst_scaffold(_, res):
     for start_inst in starting_inst:
         group_counter += 1
         ent = start_inst['ent']
-        for name, vals in LINKS.items():
+        for vals in LINKS.values():
             if vals['all'] is not None:
-                ent.fixup[vals['all']] = name + '*'
+                ent.fixup[vals['all']] = SCAFF_PATTERN.format(
+                    name=vals['name'],
+                    group=group_counter,
+                    index='*',
+                )
 
         # Now set each instance in the chain, including first and last
-        for inst in scaff_scan(instances, start_inst):
-
-            utils.con_log('{i[prev]} -> {t} -> {i[next]}'.format(t=targ, i=inst))
+        for index, inst in enumerate(scaff_scan(instances, start_inst)):
             ent, conf = inst['ent'], inst['conf']
             orient = (
-                'floor'
+                'floor' if
                 Vec(0, 0, 1).rotate_by_str(ent['angles']) == (0, 0, 1)
-                else
-                'wall'
+                else 'wall'
             )
-            utils.con_log(targ, is_floor)
 
             # Find the offset used for the logic ents
-            offset = Vec.from_str(
-                conf['off_floor' if is_floor else 'off_wall']
-            )
+            offset = (conf['off_' + orient]).copy()
             if conf['pillar_var'] is not None:
                 offset.z += 128 * utils.conv_int(
-                    ent.fixup[conf['pillar_Var'], ''],
-                    0,
+                    ent.fixup[conf['pillar_var'], ''],
                 )
             offset.rotate_by_str(ent['angles'])
             offset += Vec.from_str(ent['origin'])
@@ -2564,14 +2560,28 @@ def res_unst_scaffold(_, res):
 
             logic_inst = VMF.create_ent(
                 classname='func_instance',
-                targetame=ent['targetname'],
+                targetname=ent['targetname'],
                 file=conf.get('logic_' + link_type, ''),
                 origin=offset.join(' '),
                 angles='0 0 0',
             )
+            for key, val in ent.fixup.items():
+                # Copy over fixup values
+                logic_inst.fixup[key] = val
 
-
-
+            # Add the link-values
+            for linkVar, link in LINKS.items():
+                logic_inst.fixup[linkVar] = SCAFF_PATTERN.format(
+                    name=link['name'],
+                    group=group_counter,
+                    index=index,
+                )
+                if inst['next'] is not None:
+                    logic_inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                        name=link['name'],
+                        group=group_counter,
+                        index=index + 1,
+                    )
 
 
     utils.con_log('Finished Scaffold generation!')
