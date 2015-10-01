@@ -1181,34 +1181,30 @@ class Entity:
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
-                ent_id = item.value
+                ent_id = int(item.value)
             elif name.startswith('replace'):
                 index = item.name[-2:]  # Index is the last 2 digits
-                if index.isdigit():
+                try:
+                    index = int(index)
+                except TypeError:  # Not a replace value!
+                    keys[name] = item.value
+                else:
+                    # Parse the $replace value
                     vals = item.value.split(" ", 1)
                     var = vals[0][1:]  # Strip the $ sign
                     value = vals[1]
-                    fixup[var.casefold()] = FixupTuple(var, value, index)
-                else:
-                    # Not a replace value!
-                    keys[name] = item.value
-            elif name == "solid":
-                if item.has_children():
-                    solids.append(Solid.parse(vmf_file, item))
-                else:
-                    keys[item.name] = item.value
+                    fixup[var.casefold()] = FixupTuple(var, value, int(index))
+            elif name == "solid" and item.has_children():
+                solids.append(Solid.parse(vmf_file, item))
             elif name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
-            elif name == "hidden":
-                if item.has_children():
+            elif name == "hidden" and item.has_children():
                     solids.extend(
                         Solid.parse(vmf_file, br, hidden=True)
                         for br in
                         item
                     )
-                else:
-                    keys[item.name] = item.value
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1512,13 +1508,9 @@ class EntityFixup:
         if folded_var not in self:
             max_id = 0
             for fixup in self._fixup.values():
-                if int(fixup.id) > max_id:
-                    max_id = int(fixup.id)
+                if fixup.id > max_id:
+                    max_id = fixup.id
             max_id += 1
-            if max_id < 9:
-                max_id = "0" + str(max_id)
-            else:
-                max_id = str(max_id)
             self._fixup[folded_var] = FixupTuple(var, val, max_id)
         else:
             self._fixup[folded_var] = FixupTuple(var, val, self._fixup[var].id)
@@ -1551,11 +1543,9 @@ class EntityFixup:
         """Export all the replace values into the VMF."""
         if len(self._fixup) > 0:
             for (key, value, index) in sorted(
-                    self._fixup.values(), key=lambda x: x[2]
-                    ):
-                # we end up with (key, val, index) and we want to sort
-                # by the index
-                buffer.write(ind + '\t"replace{}" "${} {}"\n'.format(
+                    self._fixup.values(), key=lambda x: x.id):
+                # When exporting, pad with zeros if needed
+                buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
 
 
