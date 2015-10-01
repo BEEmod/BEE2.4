@@ -2437,15 +2437,16 @@ def res_unst_scaffold_setup(res):
         conf = {
             # If set, adjusts the offset appropriately
             'is_piston': utils.conv_bool(block['isPiston', '0']),
+            'rotate_logic': utils.conv_bool(block['AlterAng', '1'], True),
             'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
             'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
 
-            'logic_start': block['startlogic', None],
-            'logic_end': block['endLogic', None],
-            'logic_mid': block['midLogic', None],
+            'logic_start': block['startlogic', ''],
+            'logic_end': block['endLogic', ''],
+            'logic_mid': block['midLogic', ''],
 
-            'inst_wall': block['wallInst', None],
-            'inst_floor': block['floorInst', None],
+            'inst_wall': block['wallInst', ''],
+            'inst_floor': block['floorInst', ''],
             'inst_offset': block['offsetInst', None],
             # Specially rotated to face the next track!
             'inst_end': block['endInst', None],
@@ -2530,7 +2531,6 @@ def res_unst_scaffold(_, res):
         elif scaff_targs == 0:
             inst['next'] = None  # End instance
 
-
     starting_inst = []
     # We need to find the start instances, so we can set everything up
     for inst in instances.values():
@@ -2600,7 +2600,7 @@ def res_unst_scaffold(_, res):
                 our_pos = Vec.from_str(ent['origin'])
                 link_dir = other_pos - our_pos
                 link_ang = math.degrees(
-                    -math.atan2(link_dir.y, link_dir.x)
+                    math.atan2(link_dir.y, link_dir.x)
                 )
                 # Round to nearest 90 degrees
                 # Add 45 so the switchover point is at the diagonals
@@ -2629,7 +2629,11 @@ def res_unst_scaffold(_, res):
                 targetname=ent['targetname'],
                 file=conf.get('logic_' + link_type, ''),
                 origin=offset.join(' '),
-                angles='0 0 0',
+                angles=(
+                    '0 0 0' if
+                    conf['rotate_logic']
+                    else ent['angles']
+                ),
             )
             for key, val in ent.fixup.items():
                 # Copy over fixup values
