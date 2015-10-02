@@ -2428,11 +2428,22 @@ def scaff_scan(inst_list, start_ent):
 
 
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
+# Store the configs for scaffold items so we can
+# join them up later
+SCAFFOLD_CONFIGS = {}
 
 
 @make_result_setup('UnstScaffold')
 def res_unst_scaffold_setup(res):
-    targ_inst = {}
+    group = res['group', 'DEFAULT_GROUP']
+
+    if group not in SCAFFOLD_CONFIGS:
+        # Store our values in the CONFIGS dictionary
+        targ_inst, links = SCAFFOLD_CONFIGS[group] = {}, {}
+    else:
+        # Grab the already-filled values, and add to them
+        targ_inst, links = SCAFFOLD_CONFIGS[group]
+
     for block in res.find_all("Instance"):
         conf = {
             # If set, adjusts the offset appropriately
@@ -2455,7 +2466,6 @@ def res_unst_scaffold_setup(res):
             targ_inst[inst] = conf
 
     # We need to provide vars to link the tracks and beams.
-    links = {}
     for block in res.find_all('LinkEnt'):
         # The name for this set of entities.
         # It must be a '@' name, or the name will be fixed-up incorrectly!
@@ -2470,7 +2480,8 @@ def res_unst_scaffold_setup(res):
             'all': block['allVar', None],
         }
 
-    return targ_inst, links
+    return group  # We look up the group name to find the values.
+
 
 @make_result('UnstScaffold')
 def res_unst_scaffold(_, res):
@@ -2479,8 +2490,16 @@ def res_unst_scaffold(_, res):
     This is executed once to modify all instances.
     """
     # The instance types we're modifying
-    utils.con_log('Running Scaffold Generator...')
-    TARG_INST, LINKS = res.value
+    if res.value not in SCAFFOLD_CONFIGS:
+        # We've already executed this config group
+        utils.con_log('Skipping Scaffold ' + res.value)
+        return True
+
+    utils.con_log(
+        'Running Scaffold Generator (' + res.value + ')...'
+    )
+    TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
+    del SCAFFOLD_CONFIGS[res.value] # Don't let this run twice
 
     instances = {}
     # Find all the instances we're wanting to change, and map them to
@@ -2504,8 +2523,6 @@ def res_unst_scaffold(_, res):
             'next': next_inst,
             'prev': None,
         }
-
-    utils.con_log(*instances)
 
     # Now link each instance to its in and outputs
     for targ, inst in instances.items():
