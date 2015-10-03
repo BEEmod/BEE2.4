@@ -2456,12 +2456,20 @@ def res_unst_scaffold_setup(res):
             'logic_end': block['endLogic', ''],
             'logic_mid': block['midLogic', ''],
 
+            'logic_start_rev': block['StartLogicRev', None],
+            'logic_end_rev': block['EndLogicRev', None],
+            'logic_mid_rev': block['EndLogicRev', None],
+
             'inst_wall': block['wallInst', ''],
             'inst_floor': block['floorInst', ''],
             'inst_offset': block['offsetInst', None],
             # Specially rotated to face the next track!
             'inst_end': block['endInst', None],
         }
+        for logic_type in ('logic_start', 'logic_mid', 'logic_end'):
+            if conf[logic_type + '_rev'] is None:
+                conf[logic_type + '_rev'] = conf[logic_type]
+
         for inst in resolve_inst(block['file']):
             targ_inst[inst] = conf
 
@@ -2492,7 +2500,6 @@ def res_unst_scaffold(_, res):
     # The instance types we're modifying
     if res.value not in SCAFFOLD_CONFIGS:
         # We've already executed this config group
-        utils.con_log('Skipping Scaffold ' + res.value)
         return True
 
     utils.con_log(
@@ -2573,6 +2580,8 @@ def res_unst_scaffold(_, res):
                     index='*',
                 )
 
+        should_reverse = utils.conv_bool(ent.fixup['$start_reversed'])
+
         # Now set each instance in the chain, including first and last
         for index, inst in enumerate(scaff_scan(instances, start_inst)):
             ent, conf = inst['ent'], inst['conf']
@@ -2644,7 +2653,14 @@ def res_unst_scaffold(_, res):
             logic_inst = VMF.create_ent(
                 classname='func_instance',
                 targetname=ent['targetname'],
-                file=conf.get('logic_' + link_type, ''),
+                file=conf.get(
+                    'logic_' + link_type + (
+                        '_rev' if
+                        should_reverse
+                        else ''
+                        ),
+                    '',
+                ),
                 origin=offset.join(' '),
                 angles=(
                     '0 0 0' if
