@@ -1886,11 +1886,12 @@ def res_track_plat(_, res):
         - Single_plat: An instance used for platform with 1 rail
         - Track_name: The name to give to the tracks.
         - Vert_suffix: Add suffixes to vertical tracks
-            (_vert, _vert_mirrored)
+            (_vert)
         - Horiz_suffix: Add suffixes to horizontal tracks
             (_horiz, _horiz_mirrored)
         - plat_suffix: Also add the above _vert or _horiz suffixes to
             the platform.
+        - plat_var: If set, save the orientation to the given $fixup variable
     """
     # Get the instances from editoritems
     (
@@ -2015,6 +2016,11 @@ def res_track_plat(_, res):
                     add_suffix(inst, '_horiz')
                 if utils.conv_bool(res['plat_suffix', '']):
                     add_suffix(plat_inst, '_horiz')
+
+        plat_var = res['plat_var', '']
+        if plat_var != '':
+            # Skip the '_mirrored' section if needed
+            plat_inst.fixup[plat_var] = track_facing[:5].lower()
     return True  # Only run once!
 
 
