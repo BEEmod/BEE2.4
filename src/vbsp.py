@@ -17,6 +17,7 @@ import voiceLine
 import instanceLocs
 import conditions
 
+
 # Configuration data extracted from VBSP_config
 settings = {
     "textures":       {},
@@ -1033,19 +1034,12 @@ def make_bottomless_pit(solids, max_height):
             ).make_unique()
 
 
-def iter_grid(dist_x, dist_y, stride=1):
-    """Loop over a rectangular grid area."""
-    for x in range(0, dist_x, stride):
-        for y in range(0, dist_y, stride):
-            yield x, y
-
-
 def add_goo_mist(sides):
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
     """
-    needs_mist = sides  # Locations that still need mist
+    needs_mist = set(sides)  # Locations that still need mist
     sides = sorted(sides)
     fit_goo_mist(
         sides, needs_mist,
@@ -1103,7 +1097,7 @@ def fit_goo_mist(
     for pos in sides:
         if pos not in needs_mist:
             continue  # We filled this space already
-        for x, y in iter_grid(grid_x, grid_y, 128):
+        for x, y in utils.iter_grid(grid_x, grid_y, stride=128):
             if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
                 break  # Doesn't match
         else:
@@ -1119,7 +1113,7 @@ def fit_goo_mist(
                 ),
                 angles=angles,
             )
-            for (x, y) in iter_grid(grid_x, grid_y, 128):
+            for (x, y) in utils.iter_grid(grid_x, grid_y, stride=128):
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
