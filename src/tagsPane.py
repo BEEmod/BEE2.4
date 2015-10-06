@@ -1,4 +1,3 @@
-from tk_root import TK_ROOT
 from tkinter import ttk
 import tkinter as tk
 
@@ -25,46 +24,49 @@ TAGS = {}
 # A 'pretty' name for a tag, if it exists
 PRETTY_TAG = {}
 
-def update_filters():
-    # First update the 'all' checkboxes to make half-selected if not
-    # fully selected.
+
+def filter_items():
+    """Update items based on selected tags."""
     show_wip = optionWindow.SHOW_WIP.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
+
+    # any() or all()
+    func = TAG_MODES[TAG_MODE.get()]
+
+    sel_tags = [
+        tag
+        for tag, enabled
+        in TAGS.items()
+        if enabled
+    ]
+    no_tags = len(sel_tags) == 0
+    print(sel_tags)
+
     for item in UI.pal_items:
-        item.visible = True
-        continue
-        # (
-        #     # Items are hidden if it's a wip item and the option is
-        #     # deselected
-        #     (show_wip or not item.item.is_wip)
-        #     # Visible if any of the author and tag checkboxes are checked
-        #     and (any(
-        #         UI.FilterVars['author'][auth.casefold()].get()
-        #         for auth in item.item.authors
-        #         ) or not item.item.authors) # Show if no authors
-        #     and (any(
-        #         UI.FilterVars['tags'][tag.casefold()].get()
-        #         for tag in item.item.tags
-        #         ) or not item.item.tags) # Show if no tags
-        #     # The package is selected
-        #     and UI.FilterVars['package'][item.item.pak_id].get()
-        #     # Items like the elevator that need the unlocked stylevar
-        #     and (not item.needs_unlock or style_unlocked)
-        #     )
+        if item.needs_unlock and not style_unlocked:
+            item.visible = False
+            continue
+        if item.item.is_wip and not show_wip:
+            item.visible = False
+            continue
+
+        if no_tags:
+            item.visible = True
+        else:
+            item_tags = {
+                tag.casefold()
+                for tag in
+                item.item.tags
+            }
+            item.visible = func(
+                tag in item_tags
+                for tag in
+                sel_tags
+            )
     UI.flow_picker()
 
 # When exiting settings, we need to hide/show WIP items.
-optionWindow.refresh_callbacks.append(update_filters)
-
-
-def filter_check(item, show_wip, style_unlocked):
-    """Determine if the given item should be visible."""
-    if item.needs_unlock and not style_unlocked:
-        return False
-    if item.item.is_wip and not show_wip:
-        return False
-
-    return True
+optionWindow.refresh_callbacks.append(filter_items)
 
 
 def expand(_):
@@ -94,16 +96,19 @@ def event_add_tag(tag, e):
     """Select the given tag."""
     TAGS[tag] = True
     refresh_tags()
+    filter_items()
 
 
 def event_remove_tag(tag, e):
     """Remove the given tag from our selection list."""
     TAGS[tag] = False
     refresh_tags()
+    filter_items()
 
 
 def add_tag(tag, pretty=None):
     """Add the tag to the list of known tags."""
+    tag = tag.casefold()
     if tag in TAGS:
         return  # Already added
 
@@ -123,6 +128,7 @@ def init(frm):
         text='Any',
         variable=TAG_MODE,
         value='ANY',
+        command=filter_items,
     )
     widget.grid(row=0, column=0, sticky='W')
 
@@ -131,15 +137,21 @@ def init(frm):
         text='All',
         variable=TAG_MODE,
         value='ALL',
+        command=filter_items,
     )
     widget.grid(row=1, column=0, sticky='W')
 
-    wid['cur_tags'] = widget = tk.Text(
+    wid['cur_tags'] = cur_tags = tk.Text(
         frm,
+        font='TkDefaultFont',
         width=10,
         height=2,
     )
-    widget.grid(row=0, rowspan=2, column=1, sticky='EW')
+    cur_tags.tag_config(
+        'highlight',
+        underline=1,
+    )
+    cur_tags.grid(row=0, rowspan=2, column=1, sticky='EW')
 
     wid['expand_frame'] = exp = ttk.Frame(
         frm,
@@ -160,10 +172,15 @@ def init(frm):
 
     wid['tag_list'] = tag_list = tk.Text(
         exp,
+        font='TkDefaultFont',
         width=10,
         height=6,
     )
     tag_list.grid(row=1, column=0, sticky='NSEW')
+    tag_list.tag_config(
+        'highlight',
+        underline=1,
+    )
 
     wid['tag_scroll'] = tag_scroll = ttk.Scrollbar(
         exp,

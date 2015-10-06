@@ -114,23 +114,12 @@ class Item:
                 )
             )
         self.authors = self.def_data['auth']
-        self.tags = {
-            'TAG_' + tag
-            for tag in
-            self.def_data['tags']
-        }
-        self.tags.add('PACK_' + item.pak_id)
-        self.tags.update({
-            'AUTH_' + auth
-            for auth in
-            self.authors
-        })
-
-        self.load_data()
-
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
+        self.tags = set()
+
+        self.load_data()
         self.set_properties(self.get_properties())
 
     def load_data(self):
@@ -155,6 +144,20 @@ class Item:
         self.can_group = ('all' in self.data['icons'] and
                           self.data['all_name'] is not None and
                           self.data['all_icon'] is not None)
+
+        # Item tags, used for filtering
+        self.tags = set()
+
+        for tag in self.data['tags']:
+            self.tags.add('TAG_' + tag.casefold())
+            tagsPane.add_tag('TAG_' + tag, pretty=tag)
+
+        self.tags.add('PACK_' + self.pak_id.casefold())
+        self.tags.update({
+            'AUTH_' + auth.casefold()
+            for auth in
+            self.data['auth']
+        })
 
     def get_icon(self, subKey, allow_single=False, single_num=1):
         """Get an icon for the given subkey.
@@ -464,10 +467,10 @@ def load_packages(data):
         it = Item(item)
         item_list[it.id] = it
         for tag in it.tags:
-            tagsPane.add_tag('TAG_' + tag.casefold(), pretty=tag)
+            tagsPane.add_tag('TAG_' + tag, pretty=tag)
         for auth in it.authors:
-            tagsPane.add_tag('AUTH_' + auth.casefold(), pretty=auth)
-        tagsPane.add_tag('PAK_' + it.pak_id, it.pak_name)
+            tagsPane.add_tag('AUTH_' + auth, pretty=auth)
+        tagsPane.add_tag('PACK_' + it.pak_id, pretty=it.pak_name)
         loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'])
@@ -1405,7 +1408,7 @@ def init_filter_col(cat, f):
         val = FilterVars_all[col].get()
         for i in FilterVars[col]:
             FilterVars[col][i].set(val)
-        tagsPane.update_filters()
+        tagsPane.filter_items()
 
     FilterBoxes_all[cat] = ttk.Checkbutton(
         f,
@@ -1432,7 +1435,7 @@ def init_filter_col(cat, f):
         FilterBoxes[cat][filt_id] = ttk.Checkbutton(
             f,
             text=name,
-            command=tagsPane.update_filters,
+            command=tagsPane.filter_items,
             variable=FilterVars[cat][filt_id],
             )
         FilterBoxes[cat][filt_id].grid(
@@ -1612,7 +1615,7 @@ def init_windows():
     TK_ROOT.columnconfigure(0, weight=1)
     TK_ROOT.rowconfigure(0, weight=1)
     ui_bg.rowconfigure(0, weight=1)
-    StyleVarPane.update_filter = tagsPane.update_filters
+    StyleVarPane.update_filter = tagsPane.filter_items
 
     style = ttk.Style()
     # Custom button style with correct background
@@ -1858,6 +1861,8 @@ def init_windows():
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
+
+        tagsPane.filter_items() # Update filters (authors may have changed)
 
         CompilerPane.set_corr_values('sp_entry', style_obj.corridor_names)
         CompilerPane.set_corr_values('sp_exit', style_obj.corridor_names)
