@@ -40,13 +40,6 @@ pal_items = []  # array of the "all items" icons
 pal_picked_fake = []  # Labels used for the empty palette positions
 pal_items_fake = []  # Labels for empty picker positions
 
-
-FILTER_CATS = ('author', 'package', 'tags')
-FilterBoxes = {}  # the various checkboxes for the filters
-FilterBoxes_all = {}
-FilterVars = {}  # The variables for the checkboxes
-FilterVars_all = {}
-
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
 
@@ -1347,7 +1340,7 @@ def flow_picker(_=None):
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
     if tagsPane.is_expanded:
-        # Offset the icons so they aren't covered by the filter popup
+        # Offset the icons so they aren't covered by the tags popup
         offset = max(
             (
                 tagsPane.wid['expand_frame'].winfo_height()
@@ -1394,88 +1387,6 @@ def flow_picker(_=None):
 
     for item in pal_items_fake[width:]:
         item.place_forget()
-
-
-def init_filter_col(cat, f):
-    FilterBoxes[cat] = {}
-    FilterVars[cat] = {}
-    FilterVars_all[cat] = IntVar(value=1)
-
-    def filter_all_callback(col):
-        """Sets all items in a category to true/false.
-
-        """
-        val = FilterVars_all[col].get()
-        for i in FilterVars[col]:
-            FilterVars[col][i].set(val)
-        tagsPane.filter_items()
-
-    FilterBoxes_all[cat] = ttk.Checkbutton(
-        f,
-        text='All',
-        onvalue=1,
-        offvalue=0,
-        # We pass along the name of the category, so the function can
-        # figure out what to change.
-        command=func_partial(filter_all_callback, cat),
-        variable=FilterVars_all[cat],
-        )
-
-    FilterBoxes_all[cat].grid(
-        row=1,
-        column=0,
-        sticky=W,
-        )
-
-    for ind, (filt_id, name) in enumerate(sorted(
-            filter_data[cat].items(),
-            key=operator.itemgetter(1),
-            )):
-        FilterVars[cat][filt_id] = IntVar(value=1)
-        FilterBoxes[cat][filt_id] = ttk.Checkbutton(
-            f,
-            text=name,
-            command=tagsPane.filter_items,
-            variable=FilterVars[cat][filt_id],
-            )
-        FilterBoxes[cat][filt_id].grid(
-            row=ind+2,
-            column=0,
-            sticky=W,
-            padx=(4, 0),
-            )
-        if ind == 0:
-            FilterBoxes_all[cat].first_var = FilterVars[cat][filt_id]
-
-
-def init_filter(f):
-    ttk.Label(
-        f,
-        text="Filters:",
-        anchor="center",
-        ).grid(
-            row=0,
-            column=0,
-            columnspan=3,
-            sticky="EW",
-            )
-    f.columnconfigure(0, weight=1)
-    f.columnconfigure(1, weight=1)
-    f.columnconfigure(2, weight=1)
-    f2 = ttk.Frame(f)
-    frames['filter_expanded'] = f2
-    # Not added to window, we add it below the others to expand the
-    # lists
-
-    auth = ttk.Labelframe(f2, text="Authors")
-    auth.grid(row=2, column=0, sticky="NS")
-    pack = ttk.Labelframe(f2, text="Packages")
-    pack.grid(row=2, column=1, sticky="NS")
-    tags = ttk.Labelframe(f2, text="Tags")
-    tags.grid(row=2, column=2, sticky="NS")
-    init_filter_col('author', auth)
-    init_filter_col('package', pack)
-    init_filter_col('tags', tags)
 
 
 def init_drag_icon():
@@ -1862,7 +1773,7 @@ def init_windows():
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
-        tagsPane.filter_items() # Update filters (authors may have changed)
+        tagsPane.filter_items()  # Update filters (authors may have changed)
 
         CompilerPane.set_corr_values('sp_entry', style_obj.corridor_names)
         CompilerPane.set_corr_values('sp_exit', style_obj.corridor_names)
