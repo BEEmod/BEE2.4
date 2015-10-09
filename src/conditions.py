@@ -2069,19 +2069,19 @@ FLAG_ROTATING = {
     },
     'func_door_rotating': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 8 | 4,  # 'Non-solid to player', 'passable'
     },
     'func_rot_button': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 1,  # 'Not solid'
     },
     'momentary_rot_button': {
-        'x': 128,
-        'z': 64,
+        'x': 64,
+        'z': 128,
         # Reversed is set by keyvalue
         'solid_flags': 1,  # 'Not solid'
     },

@@ -128,7 +128,10 @@ def find_packages(pak_dir, zips, zip_name_lst):
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
             pak_id = info['ID']
-            disp_name = info['Name', pak_id]
+            disp_name = info['Name', None]
+            if disp_name is None:
+                print('Warning: {} has no display name!'.format(pak_id))
+                disp_name = pak_id.lower()
             packages[pak_id] = PackageData(
                 zip_file,
                 info,

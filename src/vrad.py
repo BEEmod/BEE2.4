@@ -298,8 +298,9 @@ def main(argv):
     fast_args = argv[1:]
     full_args = argv[1:]
 
-    path = argv[-1]  # The path is the last argument to vrad
-    fast_args[-1] = os.path.normpath(path)
+    # The path is the last argument to vrad
+    # P2 adds wrong slashes sometimes, so fix that.
+    fast_args[-1] = path = os.path.normpath(argv[-1])
 
     utils.con_log("Map path is " + path)
     if path == "":
