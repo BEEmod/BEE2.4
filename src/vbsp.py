@@ -17,6 +17,9 @@ import voiceLine
 import instanceLocs
 import conditions
 
+# Load and register these conditions
+import cutoutTile
+
 
 # Configuration data extracted from VBSP_config
 settings = {

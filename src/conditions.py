@@ -14,7 +14,9 @@ import utils
 GLOBAL_INSTANCES = set()
 OPTIONS = {}
 ALL_INST = set()
-
+STYLE_VARS = {}
+VOICE_ATTR = {}
+VMF = None
 
 conditions = []
 FLAG_LOOKUP = {}
@@ -2509,7 +2511,7 @@ def res_goo_debris(_, res):
     ))
 
     for loc in possible_locs:
-        random.seed('goo_mist_{}_{}_{}'.format(loc.x, loc.y, loc.z))
+        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
         if random.random() > chance:
             continue
 
