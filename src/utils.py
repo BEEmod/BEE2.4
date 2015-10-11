@@ -604,6 +604,8 @@ class Vec:
         """
         if isinstance(other, Vec):
             return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
+        elif isinstance(other, tuple):
+            return Vec(self.x + other[0], self.y + other[1], self.z + other[2])
         else:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
@@ -613,42 +615,53 @@ class Vec:
 
         This additionally works on scalars (adds to all axes).
         """
+        if isinstance(other, Vec):
+            return Vec(
+                self.x - other.x,
+                self.y - other.y,
+                self.z - other.z
+            )
+
         try:
-            if isinstance(other, Vec):
-                return Vec(
-                    self.x - other.x,
-                    self.y - other.y,
-                    self.z - other.z
-                )
+            if isinstance(other, tuple):
+                x = self.x - other[0]
+                y = self.y - other[1]
+                z = self.z - other[2]
             else:
-                return Vec(
-                    self.x - other,
-                    self.y - other,
-                    self.z - other,
-                )
+                x = self.x - other
+                y = self.y - other
+                z = self.z - other
         except TypeError:
             return NotImplemented
+        else:
+            return Vec(x, y, z)
 
     def __rsub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
         """
+
+        if isinstance(other, Vec):
+            return Vec(
+                other.x - self.x,
+                other.y - self.x,
+                other.z - self.z
+            )
+
         try:
-            if isinstance(other, Vec):
-                return Vec(
-                    other.x - self.x,
-                    other.y - self.x,
-                    other.z - self.z
-                )
+            if isinstance(other, tuple):
+                x = other[0] - self.x
+                y = other[1] - self.y
+                z = other[2] - self.z
             else:
-                return Vec(
-                    other - self.x,
-                    other - self.y,
-                    other - self.z
-                )
+                x = other - self.x
+                y = other - self.y
+                z = other - self.z
         except TypeError:
             return NotImplemented
+        else:
+            return Vec(x, y, z)
 
     def __mul__(self, other) -> 'Vec':
         """Multiply the Vector by a scalar."""
