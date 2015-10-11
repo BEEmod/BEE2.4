@@ -436,12 +436,12 @@ class VMF:
                         if out.target == name:  # target
                             yield out
 
-    def make_prism(self, p1, p2) -> PrismFace:
+    def make_prism(self, p1, p2, mat='tools/toolsnodraw') -> PrismFace:
         """Create an axis-aligned brush connecting the two points.
 
         A PrismFaces tuple will be returned which containes the six
         faces, as well as the solid.
-        All faces will be textured with tools/toolsnodraw.
+        All faces will be textured with 'mat'.
         """
         b_min = Vec(p1)
         b_max = Vec(p1)
@@ -455,6 +455,7 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_max.y, b_min.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, -1, 0),
         )
@@ -466,6 +467,7 @@ class VMF:
                 (b_max.x, b_max.y, b_max.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, -1, 0),
         )
@@ -477,6 +479,7 @@ class VMF:
                 (b_min.x, b_min.y, b_max.z),
                 (b_min.x, b_min.y, b_min.z),
             ],
+            mat=mat,
             uaxis=UVAxis(0, 1, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -488,6 +491,7 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(0, 1, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -499,6 +503,7 @@ class VMF:
                 (b_min.x, b_min.y, b_min.z),
                 (b_min.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -506,10 +511,11 @@ class VMF:
         f_north = Side(
             self,
             planes=[  # +y side
-                (b_max.x, b_max.y, b_max.z),
-                (b_min.x, b_max.y, b_max.z),
                 (b_min.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, 0, -1),
         )
