@@ -52,6 +52,8 @@ def res_cutout_tile(inst, res):
     # brushes at the junction points of seperate tile 'groups'.
     brushes_to_remove = []
 
+    floor_edges = []  # Values to pass to add_floor_sides() at the end
+
     MATS = defaultdict(list)
     SETTINGS = {
         'floor_chance': utils.conv_int(
@@ -92,8 +94,13 @@ def res_cutout_tile(inst, res):
         loc = (orient * -64) + Vec.from_str(inst['origin'])
         INST_LOCS[targ] = loc
 
-        for out in {out.target for out in inst.outputs}:
+        outputs = {out.target for out in inst.outputs}
+        for out in outputs:
             io_list.append((targ, out))
+        if not outputs:
+            # If the item doesn't have any connections, 'connect'
+            # it to itself so we'll generate a 128x128 tile segment.
+            io_list.append((targ, targ))
         inst.remove()  # Remove the instance itself from the map.
     for start_floor, end_floor in FLOOR_IO:
         if end_floor not in INST_LOCS:
@@ -113,27 +120,36 @@ def res_cutout_tile(inst, res):
         box_max.max(INST_LOCS[end_floor])
 
         if box_min.z != box_max.z:
-            continue  # They're not in the same axis!
+            continue  # They're not in the same level!
         z = box_min.z
 
+        # Make the squarebeams props, using big models if possible
+        gen_squarebeams(
+            box_min, box_max - (0, 0, 8),
+            skin=SETTINGS['beam_skin']
+        )
+
+        # Add a player_clip brush across the whole area
         conditions.VMF.add_brush(conditions.VMF.make_prism(
-            p1=box_min - Vec(64, 64, 8),
-            p2=box_max + Vec(64, 64, 0),
+            p1=box_min - (64, 64, 8),
+            p2=box_max + (64, 64, 0),
             mat=MATS['clip'][0],
         ).solid)
 
         # Add a noportal_volume covering the surface, in case there's
         # room for a portal.
-        conditions.VMF.create_ent(
+        noportal_solid = conditions.VMF.make_prism(
+            # Don't go all the way to the end, so it doesn't affect wall
+            # brushes.
+            p1=box_min - (63, 63, 2),
+            p2=box_max + (63, 63, 4),
+            mat='tools/toolsinvisible',
+        ).solid
+        noportal_ent = conditions.VMF.create_ent(
             classname='func_noportal_volume',
             origin=box_min.join(' '),
-        ).solids.append(
-            conditions.VMF.make_prism(
-                p1=box_min - Vec(63, 63, 2),
-                p2=box_max + Vec(63, 63, 4),
-                mat='tools/toolsinvisible',
-            ).solid
         )
+        noportal_ent.solids.append(noportal_solid)
 
         for x, y in utils.iter_grid(
                 min_x=int(box_min.x),
@@ -148,14 +164,33 @@ def res_cutout_tile(inst, res):
                 MATS,
                 SETTINGS,
                 detail_ent,
+                brushes_to_remove,
             )
+
+        # Mark borders we need to fill in
+        for x in range(int(box_min.x), int(box_max.x)+1, 128):
+            floor_edges.append((Vec(x, box_max.y + 64, z-64), 'e'))
+            floor_edges.append((Vec(x, box_min.y - 64, z-64), 'w'))
+
+        for y in range(int(box_min.y), int(box_max.y)+1, 128):
+            floor_edges.append((Vec(box_max.x + 64, y, z-64), 'n'))
+            floor_edges.append((Vec(box_min.x - 64, y, z-64), 's'))
+
+    add_floor_sides(floor_edges)
 
     reallocate_overlays(overlay_ids)
 
     return True
 
 
-def convert_floor(loc, overlay_ids, mats, settings, detail):
+def convert_floor(
+        loc,
+        overlay_ids,
+        mats,
+        settings,
+        detail,
+        brushes_to_remove,
+):
     """Cut out tiles at the specified location."""
     try:
         brush = conditions.SOLIDS[loc.as_tuple()]
@@ -167,16 +202,16 @@ def convert_floor(loc, overlay_ids, mats, settings, detail):
     ant_locs = overlay_ids[str(brush.face.id)] = []
 
     # Remove the original brush from the map!
-    conditions.VMF.remove_brush(brush.solid)
+    try:
+        conditions.VMF.remove_brush(brush.solid)
+    except ValueError:
+        # We might try to remove it twice, if it's 1-block large.
+        # Abort so we don't repeat
+        return False
 
-    conditions.VMF.create_ent(
-        classname='prop_static',
-        angles='0 0 0',
-        origin=loc.join(' '),
-        model='models/anim_wp/framework/squarebeam_off_2x2.mdl',
-        skin=settings['beam_skin'],
-        disableshadows='1',
-    )
+    # Defer removing from the solids dict until later -
+    # otherwise adding border textures doesn't work correctly
+    brushes_to_remove.append(loc.as_tuple())
 
     loc.x -= 64
     loc.y -= 64
@@ -190,10 +225,10 @@ def convert_floor(loc, overlay_ids, mats, settings, detail):
     for x, y in utils.iter_grid(max_x=4, max_y=4):
         if tile_map[x*4 + y]:
             # Full tile
-            tile_loc = loc + Vec(x*32, y*32, 0)
+            tile_loc = loc + (x*32, y*32, 0)
             tile = make_tile(
                 p1=tile_loc,
-                p2=tile_loc + Vec(32, 32, -2),
+                p2=tile_loc + (32, 32, -2),
                 top_mat=vbsp.get_tex(str(brush.color) + '.floor'),
                 bottom_mat='tools/toolsnodraw',
                 beam_mat=random.choice(mats['squarebeams']),
@@ -205,11 +240,13 @@ def convert_floor(loc, overlay_ids, mats, settings, detail):
             pass
 
     base_brush = conditions.VMF.make_prism(
-        p1=loc + Vec(0, 0, -16),
-        p2=loc + Vec(128, 128, -8)
+        p1=loc + (0, 0, -16),
+        p2=loc + (128, 128, -8)
     )
     base_brush.top.mat = random.choice(mats['floorbase'])
     conditions.VMF.add_brush(base_brush.solid)
+
+    return True
 
 
 def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
@@ -284,10 +321,10 @@ def gen_squarebeams(p1, p2, skin):
     cutoff_128 = min(dist_x // 128, dist_y // 128) * 128
 
     for x, y in utils.iter_grid(
-            min_x=min_x,
-            min_y=min_y,
-            max_x=max(p1.x, p2.x) + 64,
-            max_y=max(p1.y, p2.y) + 64,
+            min_x=int(min_x),
+            min_y=int(min_y),
+            max_x=int(max_x),
+            max_y=int(max_y),
             stride=64,
             ):
         dist = max(x-min_x, y-min_y)
@@ -306,7 +343,6 @@ def gen_squarebeams(p1, p2, skin):
             _make_squarebeam(x + 32, y + 32, z, skin)
 
 
-
 def reallocate_overlays(mapping):
     """Fix any overlay faces which were removed.
     This makes antlines continue to appear on the small tiles.
@@ -319,3 +355,13 @@ def reallocate_overlays(mapping):
             sides.remove(side)
             sides.extend(mapping[side])
         overlay['sides'] = ' '.join(sides)
+
+
+def add_floor_sides(locs):
+    """We need to replace nodraw textures around the outside of the holes.
+
+    This requires looping through all faces, since these will have been
+    nodrawed.
+    """
+    # TODO: find nodraw sides at the location and change texture, or make brush
+    # if no brush is present
