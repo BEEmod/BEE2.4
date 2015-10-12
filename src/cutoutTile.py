@@ -67,6 +67,8 @@ def res_cutout_tile(inst, res):
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
+        'floor_edge': res['floorEdgeInst', ''],
+
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
     }
@@ -97,7 +99,7 @@ def res_cutout_tile(inst, res):
         outputs = {out.target for out in inst.outputs}
         for out in outputs:
             io_list.append((targ, out))
-        if not outputs:
+        if not outputs and inst.fixup['$connectioncount'] == '0':
             # If the item doesn't have any connections, 'connect'
             # it to itself so we'll generate a 128x128 tile segment.
             io_list.append((targ, targ))
@@ -167,16 +169,18 @@ def res_cutout_tile(inst, res):
                 brushes_to_remove,
             )
 
-        # Mark borders we need to fill in
+        # Mark borders we need to fill in, and the angle (for func_instance)
         for x in range(int(box_min.x), int(box_max.x)+1, 128):
-            floor_edges.append((Vec(x, box_max.y + 64, z-64), 'e'))
-            floor_edges.append((Vec(x, box_min.y - 64, z-64), 'w'))
+            # North, South
+            floor_edges.append((Vec(x, box_max.y + 64, z-64), '0 270 0'))
+            floor_edges.append((Vec(x, box_min.y - 64, z-64), '0 90 0'))
 
         for y in range(int(box_min.y), int(box_max.y)+1, 128):
-            floor_edges.append((Vec(box_max.x + 64, y, z-64), 'n'))
-            floor_edges.append((Vec(box_min.x - 64, y, z-64), 's'))
+            # East, West
+            floor_edges.append((Vec(box_max.x + 64, y, z-64), '0 180 0'))
+            floor_edges.append((Vec(box_min.x - 64, y, z-64), '0 0 0'))
 
-    add_floor_sides(floor_edges)
+    add_floor_sides(floor_edges, MATS['squarebeams'], SETTINGS['floor_edge'])
 
     reallocate_overlays(overlay_ids)
 
@@ -357,11 +361,42 @@ def reallocate_overlays(mapping):
         overlay['sides'] = ' '.join(sides)
 
 
-def add_floor_sides(locs):
+def add_floor_sides(locs, tex, file):
     """We need to replace nodraw textures around the outside of the holes.
 
     This requires looping through all faces, since these will have been
     nodrawed.
     """
-    # TODO: find nodraw sides at the location and change texture, or make brush
-    # if no brush is present
+    added_locations = {
+        loc.as_tuple(): False
+        for loc, _ in
+        locs
+    }
+
+    for face in conditions.VMF.iter_wfaces(world=True, detail=False):
+        if face.mat != 'tools/toolsnodraw':
+            continue
+        loc = face.get_origin().as_tuple()
+        if loc in added_locations:
+            random.seed('floor_side_{}_{}_{}'.format(*loc))
+            face.mat = random.choice(tex)
+            added_locations[loc] = True
+            # Swap these to flip the texture diagonally, so the beam is at top
+            face.uaxis, face.vaxis = face.vaxis, face.uaxis
+            face.uaxis.offset = 48
+
+            vbsp.IGNORED_FACES.add(face)
+
+    # Look for the ones without a texture - these are open to the void and
+    # need to be sealed. We use an instance to allow chamfering the edges
+    # to prevent showing void at outside corners.
+    for loc, angles in locs:
+        if added_locations[loc.as_tuple()]:
+            continue
+
+        conditions.VMF.create_ent(
+            classname='func_instance',
+            file=file,
+            origin=loc.join(' '),
+            angles=angles,
+        )
