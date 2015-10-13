@@ -329,12 +329,6 @@ def gen_squarebeams(p1, p2, skin):
     cutoff_256_y = dist_y // 256 * 256
     cutoff_128_y = dist_y // 128 * 128
 
-    conditions.VMF.create_ent(
-        classname='info_null',
-        origin='{} {} 0'.format(cutoff_128_x + min_x, cutoff_128_y + min_y),
-        targetname='cutoff_128',
-    )
-
     for x, y in utils.iter_grid(
             max_x=int(dist_x),
             max_y=int(dist_y),
