@@ -245,7 +245,7 @@ def convert_floor(
             pass
 
     base_brush = conditions.VMF.make_prism(
-        p1=loc + (0, 0, -16),
+        p1=loc + (0, 0, -9),
         p2=loc + (128, 128, -8)
     )
     base_brush.top.mat = random.choice(mats['floorbase'])
