@@ -127,7 +127,8 @@ def res_cutout_tile(inst, res):
 
         # Make the squarebeams props, using big models if possible
         gen_squarebeams(
-            box_min, box_max - (0, 0, 8),
+            box_min + (-64, -64, 0),
+            box_max + (64, 64, -8),
             skin=SETTINGS['beam_skin']
         )
 
@@ -320,31 +321,50 @@ def gen_squarebeams(p1, p2, skin):
     dist_y = max_y - min_y
 
     # After this x or y dist, move to the next grid size.
-    cutoff_512 = min(dist_x // 512, dist_y // 512) * 512
-    cutoff_256 = min(dist_x // 256, dist_y // 256) * 256
-    cutoff_128 = min(dist_x // 128, dist_y // 128) * 128
+    cutoff_512_x = dist_x // 512 * 512
+    cutoff_256_x = dist_x // 256 * 256
+    cutoff_128_x = dist_x // 128 * 128
+
+    cutoff_512_y = dist_y // 512 * 512
+    cutoff_256_y = dist_y // 256 * 256
+    cutoff_128_y = dist_y // 128 * 128
+
+    conditions.VMF.create_ent(
+        classname='info_null',
+        origin='{} {} 0'.format(cutoff_128_x + min_x, cutoff_128_y + min_y),
+        targetname='cutoff_128',
+    )
 
     for x, y in utils.iter_grid(
-            min_x=int(min_x),
-            min_y=int(min_y),
-            max_x=int(max_x),
-            max_y=int(max_y),
+            max_x=int(dist_x),
+            max_y=int(dist_y),
             stride=64,
             ):
-        dist = max(x-min_x, y-min_y)
-        if dist < cutoff_512:
+        if x < cutoff_512_x and y < cutoff_512_y:
             # Make 1 prop every 512 units, at the center
-            if (dist + 256) % 512 == 0:
-                _make_squarebeam(x, y, z, skin, '_8x8')
-        elif dist < cutoff_256:
-            if (dist + 128) % 256 == 0:
-                _make_squarebeam(x, y, z, skin, '_4x4')
-        elif dist < cutoff_128:
-            if (dist + 64) % 128 == 0:
-                _make_squarebeam(x, y, z, skin, '_2x2')
+            if x % 512 == 0 and y % 512 == 0:
+                _make_squarebeam(
+                    min_x+x+256, min_y+y+256, z,
+                    skin, '_8x8',
+                )
+        elif x < cutoff_256_x and y < cutoff_256_y:
+            if x % 256 == 0 and y % 256 == 0:
+                _make_squarebeam(
+                    min_x+x+128, min_y+y+128, z,
+                    skin, '_4x4',
+                )
+        elif x < cutoff_128_x and y < cutoff_128_y:
+            if x % 128 == 0 and y % 128 == 0:
+                _make_squarebeam(
+                    min_x+x+64, min_y+y+64, z,
+                    skin, '_2x2',
+                )
         else:
             # Make squarebeams for every point!
-            _make_squarebeam(x + 32, y + 32, z, skin)
+            _make_squarebeam(
+                min_x + x + 32, min_y+y + 32, z,
+                skin,
+            )
 
 
 def reallocate_overlays(mapping):
