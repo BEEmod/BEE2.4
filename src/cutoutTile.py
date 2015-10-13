@@ -19,6 +19,33 @@ TEX_DEFAULT = [
     ('clip', 'tools/toolsplayerclip'),
 ]
 
+# We want to force tiles with these overlay materials to appear!
+FORCE_TILE_MATS = {
+    mat
+    for mat, key in
+    vbsp.TEX_VALVE.items()
+    if key.startswith('overlay.')
+}
+
+FORCE_LOCATIONS = set()
+
+
+@conditions.meta_cond(priority=-1000, only_once=False)
+def find_indicator_panels(inst):
+    """We need to locate indicator panels, so they aren't overwritten.
+    """
+    if inst['file'].casefold() not in resolve_inst('[indpan]'):
+        return
+    loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    loc += Vec.from_str(inst['origin'])
+
+    # Sometimes (light bridges etc) a sign will be halfway between
+    # tiles, so in that case we need to force 2 tiles.
+    loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+    loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+    FORCE_LOCATIONS.add(loc_min.as_tuple())
+    FORCE_LOCATIONS.add(loc_max.as_tuple())
+
 
 @conditions.make_result('CutOutTile')
 def res_cutout_tile(inst, res):
@@ -46,13 +73,30 @@ def res_cutout_tile(inst, res):
     overlay_ids = {}  # When we replace brushes, we need to fix any overlays
     # on that surface.
 
-    # The solid locations which we're removing from the map. By leaving them
+    # The brushes which we're removing from the map. By leaving them
     # in the map until after the condition is evaulated, floor sections will
     # harmlessly modify each other's side textures instead of generating
     # brushes at the junction points of seperate tile 'groups'.
-    brushes_to_remove = []
+    brushes_to_remove = set()
 
     floor_edges = []  # Values to pass to add_floor_sides() at the end
+
+    sign_loc = set(FORCE_LOCATIONS)
+    # If any signage is present in the map, we need to force tiles to
+    # appear at that location!
+    for over in conditions.VMF.by_class['info_overlay']:
+        if (
+                over['material'].casefold() in FORCE_TILE_MATS and
+                # Only check floor/ceiling overlays
+                over['basisnormal'] in ('0 0 1', '0 0 -1')
+                ):
+            loc = Vec.from_str(over['origin'])
+            # Sometimes (light bridges etc) a sign will be halfway between
+            # tiles, so in that case we need to force 2 tiles.
+            loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+            loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+            sign_loc.add(loc_min.as_tuple())
+            sign_loc.add(loc_max.as_tuple())
 
     MATS = defaultdict(list)
     SETTINGS = {
@@ -166,6 +210,7 @@ def res_cutout_tile(inst, res):
                 overlay_ids,
                 MATS,
                 SETTINGS,
+                sign_loc,
                 detail_ent,
                 brushes_to_remove,
             )
@@ -185,6 +230,9 @@ def res_cutout_tile(inst, res):
 
     reallocate_overlays(overlay_ids)
 
+    for loc, brush in brushes_to_remove:
+        del conditions.SOLIDS[loc]
+        conditions.VMF.remove_brush(brush)
     return True
 
 
@@ -193,6 +241,7 @@ def convert_floor(
         overlay_ids,
         mats,
         settings,
+        signage_loc,
         detail,
         brushes_to_remove,
 ):
@@ -206,17 +255,9 @@ def convert_floor(
     # NOTE: strings, not ints!
     ant_locs = overlay_ids[str(brush.face.id)] = []
 
-    # Remove the original brush from the map!
-    try:
-        conditions.VMF.remove_brush(brush.solid)
-    except ValueError:
-        # We might try to remove it twice, if it's 1-block large.
-        # Abort so we don't repeat
-        return False
-
-    # Defer removing from the solids dict until later -
+    # Defer removing brushes until later -
     # otherwise adding border textures doesn't work correctly
-    brushes_to_remove.append(loc.as_tuple())
+    brushes_to_remove.add((loc.as_tuple(), brush.solid))
 
     loc.x -= 64
     loc.y -= 64
@@ -228,12 +269,18 @@ def convert_floor(
     ]
 
     for x, y in utils.iter_grid(max_x=4, max_y=4):
-        if tile_map[x*4 + y]:
+        tile_loc = loc + (x*32 + 16, y*32 + 16, 0)
+        if tile_loc.as_tuple() in signage_loc:
+            should_make_tile = True
+            # We don't need to check this again in future!
+            signage_loc.remove(tile_loc.as_tuple())
+        else:
+            should_make_tile = tile_map[x*4 + y]
+        if should_make_tile:
             # Full tile
-            tile_loc = loc + (x*32, y*32, 0)
             tile = make_tile(
-                p1=tile_loc,
-                p2=tile_loc + (32, 32, -2),
+                p1=tile_loc - (16, 16, 0),
+                p2=tile_loc + (16, 16, -2),
                 top_mat=vbsp.get_tex(str(brush.color) + '.floor'),
                 bottom_mat='tools/toolsnodraw',
                 beam_mat=random.choice(mats['squarebeams']),

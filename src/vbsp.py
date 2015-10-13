@@ -17,9 +17,6 @@ import voiceLine
 import instanceLocs
 import conditions
 
-# Load and register these conditions
-import cutoutTile
-
 
 # Configuration data extracted from VBSP_config
 settings = {
@@ -62,6 +59,9 @@ TEX_VALVE = {
     "effects/laserplane": "special.laserfield",
     "sky_black": "special.sky",
     }
+
+# Load and register these conditions
+import cutoutTile  # This uses TEX_VALVE, so ensure that's defined
 
 TEX_DEFAULTS = [
     # Extra default replacements we need to specially handle.

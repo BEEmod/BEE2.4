@@ -424,7 +424,6 @@ def fit(dist, obj):
     assert sum(items) == orig_dist
     return list(items)  # Dump the deque
 
-
 class EmptyMapping(abc.Mapping):
     """A Mapping class which is always empty."""
     __slots__ = []
@@ -596,6 +595,17 @@ class Vec:
             roll,
             round_vals,
         )
+
+    @staticmethod
+    def bbox(*points):
+        """Compute the bounding box for a set of points."""
+        first, *points = points
+        bbox_min = Vec(first)
+        bbox_max = Vec(first)
+        for point in points:
+            bbox_min.min(point)
+            bbox_max.max(point)
+        return bbox_min, bbox_max
 
     def __add__(self, other) -> 'Vec':
         """+ operation.
