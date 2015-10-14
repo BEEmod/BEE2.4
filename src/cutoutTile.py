@@ -287,6 +287,16 @@ def convert_floor(
             )
             detail.solids.append(tile.solid)
             ant_locs.append(str(tile.top.id))
+        elif random.randint(0, 100) < settings['floor_glue_chance']:
+            # 'Glue' tile
+            tile = make_tile(
+                p1=tile_loc - (16, 16, 1),
+                p2=tile_loc + (16, 16, -2),
+                top_mat=random.choice(mats['tile_glue']),
+                bottom_mat='tools/toolsnodraw',
+                beam_mat=random.choice(mats['squarebeams']),
+            )
+            detail.solids.append(tile.solid)
         else:
             # No tile at this loc!
             pass
@@ -315,10 +325,22 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
     e.mat = beam_mat
     w.mat = beam_mat
 
-    # The z-axis texture offset needed
-    # The texture is 512 max, so wrap around
-    # 56 is the offset for the thin-line part of squarebeams
-    z_off = ((max(p1.z, p2.z) * 12) + 56) % 512
+    thickness = abs(p1.z - p2.z)
+
+    if thickness == 2:
+        # The z-axis texture offset needed
+        # The texture is 512 high, so wrap around
+        # 56 is the offset for the thin-line part of squarebeams
+        # Textures are at 0.25 size, so 4 per hammer unit
+        z_off = ((max(p1.z, p2.z) * 4) + 56) % 512
+    elif thickness == 1:
+        # Slightly different offset, so the line is still centered
+        z_off = ((max(p1.z, p2.z) * 4) + 54) % 512
+    else:
+        raise ValueError(
+            'Tile has incorrect thickness '
+            '(expected 1 or 2, got {})'.format(thickness)
+        )
 
     n.uaxis = VLib.UVAxis(
         0, 0, 1, offset=z_off)
@@ -340,7 +362,7 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
     return prism
 
 
-def _make_squarebeam(x,y,z, skin='0', size=''):
+def _make_squarebeam(x, y, z, skin='0', size=''):
     """Make a squarebeam prop at the given location."""
     conditions.VMF.create_ent(
         classname='prop_static',
