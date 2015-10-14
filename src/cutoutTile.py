@@ -441,7 +441,10 @@ def reallocate_overlays(mapping):
                 continue
             sides.remove(side)
             sides.extend(mapping[side])
-        overlay['sides'] = ' '.join(sides)
+        if not sides:
+            conditions.VMF.remove_ent(overlay)
+        else:
+            overlay['sides'] = ' '.join(sides)
 
 
 def add_floor_sides(locs, tex, file):
