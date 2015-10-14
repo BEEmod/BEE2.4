@@ -374,7 +374,7 @@ def _make_squarebeam(x, y, z, skin='0', size=''):
     )
 
 
-def gen_squarebeams(p1, p2, skin):
+def gen_squarebeams(p1, p2, skin, gen_collision=True):
     """Generate squarebeams props to fill the space given.
 
     The space should be in multiples of 64. The squarebeams brush will
@@ -429,6 +429,46 @@ def gen_squarebeams(p1, p2, skin):
                 skin,
             )
 
+    if gen_collision:
+        collision = conditions.VMF.create_ent(
+            classname='func_brush',
+            disableshadows='1',
+            disableflashlight='1',
+            disablereceiveshadows='1',
+            shadowdepthnocache='1',
+            solidity='2', # Always Solid
+            solidbsp='1',
+        )
+        for x in range(int(min_x)+64, int(max_x), 64):
+            collision.solids.append(
+                conditions.VMF.make_prism(
+                    p1=Vec(x-2, min_y+2, z-2),
+                    p2=Vec(x+2, max_y-2, z-8),
+                    mat='tools/toolsnodraw',
+                ).solid
+            )
+        for y in range(int(min_y)+64, int(max_y), 64):
+            collision.solids.append(
+                conditions.VMF.make_prism(
+                    p1=Vec(min_x+2, y-2, z-2),
+                    p2=Vec(max_x-2, y+2, z-8),
+                    mat='tools/toolsnodraw',
+                ).solid
+            )
+        for x1, y1, x2, y2 in [
+                (min_x, min_y, max_x, min_y+2),
+                (min_x, max_y, max_x, max_y-2),
+                (min_x, min_y, min_x+2, max_y),
+                (max_x, min_y, max_x-2, max_y),
+                ]:
+            collision.solids.append(
+                conditions.VMF.make_prism(
+                    p1=Vec(x1, y1, z-2),
+                    p2=Vec(x2, y2, z-8),
+                    mat='tools/toolsnodraw',
+                ).solid
+            )
+
 
 def reallocate_overlays(mapping):
     """Fix any overlay faces which were removed.
@@ -442,6 +482,7 @@ def reallocate_overlays(mapping):
             sides.remove(side)
             sides.extend(mapping[side])
         if not sides:
+            # The overlay doesn't have any sides at all!
             conditions.VMF.remove_ent(overlay)
         else:
             overlay['sides'] = ' '.join(sides)
