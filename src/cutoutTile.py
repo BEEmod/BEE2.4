@@ -186,10 +186,10 @@ def res_cutout_tile(inst, res):
         # Add a noportal_volume covering the surface, in case there's
         # room for a portal.
         noportal_solid = conditions.VMF.make_prism(
-            # Don't go all the way to the end, so it doesn't affect wall
+            # Don't go all the way to the sides, so it doesn't affect wall
             # brushes.
-            p1=box_min - (63, 63, 2),
-            p2=box_max + (63, 63, 4),
+            p1=box_min - (63, 63, 9),
+            p2=box_max + (63, 63, 0),
             mat='tools/toolsinvisible',
         ).solid
         noportal_ent = conditions.VMF.create_ent(
@@ -436,7 +436,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             disableflashlight='1',
             disablereceiveshadows='1',
             shadowdepthnocache='1',
-            solidity='2', # Always Solid
+            solidity='2',  # Always Solid
             solidbsp='1',
         )
         for x in range(int(min_x)+64, int(max_x), 64):
