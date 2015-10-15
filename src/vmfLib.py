@@ -1113,12 +1113,12 @@ class Side:
     def scale(self, value):
         self.uaxis.scale = value
         self.vaxis.scale = value
-    scale = property(fset=scale, doc='Set botth scale attributes easily.')
+    scale = property(fset=scale, doc='Set both scale attributes easily.')
 
     def offset(self, value):
         self.uaxis.offset = value
         self.vaxis.offset = value
-    offset = property(fset=offset, doc='Set botth scale attributes easily.')
+    offset = property(fset=offset, doc='Set both offset attributes easily.')
 
 
 class Entity:

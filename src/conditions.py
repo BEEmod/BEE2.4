@@ -832,7 +832,7 @@ def flag_brush_at_loc(inst, flag):
     """Checks to see if a wall is present at the given location.
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
-       of the brush, in 16 unit increments.
+       of the brush.
     - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
     - Type defines the type the brush must be:
       - "Any" requires either a black or white brush.
