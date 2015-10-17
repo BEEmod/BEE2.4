@@ -1053,6 +1053,13 @@ def res_add_overlay_inst(inst, res):
         inst.outputs = []
 
 
+@make_result('OffsetInst')
+def res_translate_inst(inst, res):
+    """Translate the instance locally by the given amount."""
+    offset = Vec.from_str(res.value).rotate_by_str(inst['angles'])
+    inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
+
+
 @make_result_setup('custOutput')
 def res_cust_output_setup(res):
     for sub_res in res:

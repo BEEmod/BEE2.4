@@ -508,7 +508,6 @@ def static_pan(inst):
         make_static_pan(inst, "glass")
 
 
-
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
