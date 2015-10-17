@@ -348,6 +348,14 @@ def parse_str(val, x=0.0, y=0.0, z=0.0):
     else:
         return x, y, z
 
+
+def iter_grid(max_x, max_y, min_x=0, min_y=0, stride=1):
+    """Loop over a rectangular grid area."""
+    for x in range(min_x, max_x, stride):
+        for y in range(min_y, max_y, stride):
+            yield x, y
+
+
 DISABLE_ADJUST = False
 
 

@@ -30,6 +30,8 @@ ALL_META = []
 SOLIDS = {}  # A dictionary mapping origins to their brushes
 solidGroup = namedtuple('solidGroup', 'face solid normal color')
 
+GOO_LOCS = set()  # A set of all goo solid origins.
+
 
 class MAT_TYPES(Enum):
     """The values saved in the solidGroup.color attribute."""
@@ -401,6 +403,12 @@ def build_solid_dict():
 
     for solid in VMF.brushes:
         for face in solid:
+            if face.mat.casefold() in (
+                    'nature/toxicslime_a2_bridge_intro',
+                    'nature/toxicslime_puzzlemaker_cheap'):
+                GOO_LOCS.add(face.get_origin().as_tuple())
+                continue
+
             try:
                 mat_type = mat_types[face.mat]
             except KeyError:
@@ -1894,11 +1902,12 @@ def res_track_plat(_, res):
         - Single_plat: An instance used for platform with 1 rail
         - Track_name: The name to give to the tracks.
         - Vert_suffix: Add suffixes to vertical tracks
-            (_vert, _vert_mirrored)
+            (_vert)
         - Horiz_suffix: Add suffixes to horizontal tracks
             (_horiz, _horiz_mirrored)
         - plat_suffix: Also add the above _vert or _horiz suffixes to
             the platform.
+        - plat_var: If set, save the orientation to the given $fixup variable
     """
     # Get the instances from editoritems
     (
@@ -2023,6 +2032,11 @@ def res_track_plat(_, res):
                     add_suffix(inst, '_horiz')
                 if utils.conv_bool(res['plat_suffix', '']):
                     add_suffix(plat_inst, '_horiz')
+
+        plat_var = res['plat_var', '']
+        if plat_var != '':
+            # Skip the '_mirrored' section if needed
+            plat_inst.fixup[plat_var] = track_facing[:5].lower()
     return True  # Only run once!
 
 
@@ -2063,19 +2077,19 @@ FLAG_ROTATING = {
     },
     'func_door_rotating': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 8 | 4,  # 'Non-solid to player', 'passable'
     },
     'func_rot_button': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 1,  # 'Not solid'
     },
     'momentary_rot_button': {
-        'x': 128,
-        'z': 64,
+        'x': 64,
+        'z': 128,
         # Reversed is set by keyvalue
         'solid_flags': 1,  # 'Not solid'
     },
@@ -2699,3 +2713,101 @@ def res_unst_scaffold(_, res):
 
     utils.con_log('Finished Scaffold generation!')
     return True  # Don't run this again
+
+
+@make_result('RandomNum')
+def res_rand_num(inst, res):
+    """Generate a random number and save in a fixup value.
+
+    If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
+    inclusive. 'ResultVar' is the variable the result will be saved in.
+    If 'seed' is set, it will be used to keep the value constant across
+    map recompiles. This should be unique.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    max_val = utils.conv_float(res['max', 1.0])
+    min_val = utils.conv_float(res['min', 0.0])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    inst.fixup[var] = str(func(min_val, max_val))
+
+
+@make_result('GooDebris')
+def res_goo_debris(_, res):
+    """Add random instances to goo squares.
+
+    Parameters:
+        - file: The filename for the instance. The variant files should be
+            suffixed with '_1.vmf', '_2.vmf', etc.
+        - space: the number of border squares which must be filled with goo
+                 for a square to be eligable - defaults to 1.
+        - weight, number: see the 'Variant' result, a set of weights for the
+                 options
+        - chance: The percentage chance a square will have a debris item
+        - offset: A random xy offset applied to the instances.
+    """
+    space = utils.conv_int(res['spacing', '1'], 1)
+    rand_list = variant_weight(res)
+    chance = utils.conv_int(res['chance', '30'], 30)/100
+    file = res['file']
+    offset = utils.conv_int(res['offset', '0'], 0)
+
+    if file.endswith('.vmf'):
+        file = file[:-4]
+
+    if space == 0:
+        # No spacing needed, just copy
+        possible_locs = [Vec(loc) for loc in GOO_LOCS]
+    else:
+        possible_locs = []
+        utils.con_log('Pos:', *utils.iter_grid(
+                    min_x=-space,
+                    max_x=space+1,
+                    min_y=-space,
+                    max_y=space+1,
+                    )
+        )
+        for x, y, z in set(GOO_LOCS):
+            for x_off, y_off in utils.iter_grid(
+                    min_x=-space,
+                    max_x=space+1,
+                    min_y=-space,
+                    max_y=space+1,
+                    ):
+                if x_off == y_off == 0:
+                    continue
+                if (x + x_off*128, y + y_off*128, z) not in GOO_LOCS:
+                    break  # This doesn't qualify
+            else:
+                possible_locs.append(Vec(x,y,z))
+
+    utils.con_log('GooDebris: {}/{} locations'.format(
+        len(possible_locs), len(GOO_LOCS)
+    ))
+
+    for loc in possible_locs:
+        random.seed('goo_mist_{}_{}_{}'.format(loc.x, loc.y, loc.z))
+        if random.random() > chance:
+            continue
+
+        ind = random.choice(rand_list)
+        if offset > 0:
+            loc.x += random.randint(-offset, offset)
+            loc.y += random.randint(-offset, offset)
+        loc.z -= 32  # Position the instances in the center of the 128 grid.
+        VMF.create_ent(
+            classname='func_instance',
+            file=file + '_' + str(ind) + '.vmf',
+            origin=loc.join(' '),
+            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+        )
+
+    return True  # Only run once!
