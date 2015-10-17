@@ -567,6 +567,19 @@ def widen_fizz_brush(brush, thickness, bounds=None):
                     v[axis] = bound_min[axis]
 
 
+def set_ent_keys(ent, inst, keys):
+    """Copy the given key prop block to an entity.
+
+    Values with $fixup variables will be treated appropriately.
+    """
+    for prop in keys:
+        if prop.value.startswith('$'):
+            if prop.value in inst.fixup:
+                ent[prop.real_name] = inst.fixup[prop.value]
+        else:
+            ent[prop.real_name] = prop.value
+
+
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -1061,7 +1074,7 @@ def res_add_overlay_inst(inst, res):
         inst.outputs = []
 
 
-@make_result('OffsetInst')
+@make_result('OffsetInst', 'offsetinstance')
 def res_translate_inst(inst, res):
     """Translate the instance locally by the given amount."""
     offset = Vec.from_str(res.value).rotate_by_str(inst['angles'])
@@ -1335,8 +1348,10 @@ def res_cust_fizzler(base_inst, res):
             # All ents must have a classname!
             new_brush['classname'] = 'trigger_portal_cleanser'
 
-            for prop in config['keys', []]:
-                new_brush[prop.name] = prop.value
+            set_ent_keys(
+                new_brush, base_inst,
+                config.find_key('keys', []),
+            )
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
@@ -2162,8 +2177,7 @@ def res_fix_rotation_axis(ent, res):
         origin=pos.join(' '),
     )
 
-    for key in res.find_key('Keys', []):
-        door_ent[key.real_name] = key.value
+    set_ent_keys(door_ent, ent, res.find_key('Keys', []))
 
     for output in res.find_all('AddOut'):
         door_ent.add_out(VLib.Output(
