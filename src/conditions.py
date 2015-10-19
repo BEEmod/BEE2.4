@@ -567,17 +567,30 @@ def widen_fizz_brush(brush, thickness, bounds=None):
                     v[axis] = bound_min[axis]
 
 
-def set_ent_keys(ent, inst, keys):
+def set_ent_keys(ent, inst, prop_block, suffix=''):
     """Copy the given key prop block to an entity.
 
+    This uses the 'keys' and 'localkeys' properties on the prop_block.
     Values with $fixup variables will be treated appropriately.
+    LocalKeys keys will be changed to use instance-local names, where needed.
+    If suffix is set, it is a suffix to the two prop_block names
     """
-    for prop in keys:
+    for prop in prop_block.find_key('Keys'+suffix, []):
         if prop.value.startswith('$'):
             if prop.value in inst.fixup:
                 ent[prop.real_name] = inst.fixup[prop.value]
         else:
             ent[prop.real_name] = prop.value
+    name = inst['targetname', ''] + '-'
+    for prop in prop_block.find_key('LocalKeys'+suffix, []):
+        if prop.value.startswith('$'):
+            val = inst.fixup[prop.value]
+        else:
+            val = prop.value
+        if val.startswith('@'):
+            ent[prop.real_name] = val
+        else:
+            ent[prop.real_name] = name + val
 
 
 @make_flag('debug')
@@ -1350,7 +1363,7 @@ def res_cust_fizzler(base_inst, res):
 
             set_ent_keys(
                 new_brush, base_inst,
-                config.find_key('keys', []),
+                config,
             )
 
             laserfield_conf = config.find_key('MakeLaserField', None)
@@ -2177,7 +2190,7 @@ def res_fix_rotation_axis(ent, res):
         origin=pos.join(' '),
     )
 
-    set_ent_keys(door_ent, ent, res.find_key('Keys', []))
+    set_ent_keys(door_ent, ent, res)
 
     for output in res.find_all('AddOut'):
         door_ent.add_out(VLib.Output(
