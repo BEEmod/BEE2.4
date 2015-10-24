@@ -1132,13 +1132,17 @@ def res_add_overlay_inst(inst, res):
         Copy_Fixup: If true, all the $replace values from the original
             instance will be copied over.
         move_outputs: If true, outputs will be moved to this instance.
+        offset: The offset (relative to the base) that the instance
+            will be placed.
+        angles: If set, overrides the base instance angles. This does
+            not affect the offset property.
     """
-    print('adding overlay', res['file'])
+    angle = res['angles', inst['angles', '0 0 0']]
     overlay_inst = VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=resolve_inst(res['file', ''])[0],
-        angles=inst['angles', '0 0 0'],
+        angles=angle,
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
@@ -1149,6 +1153,15 @@ def res_add_overlay_inst(inst, res):
     if utils.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
+
+    if 'offset' in res:
+        # Offset the overlay by the given distance
+        offset = Vec.from_str(res['offset']).rotate_by_str(
+            inst['angles', '0 0 0']
+        )
+        overlay_inst['origin'] = (
+            offset + Vec.from_str(inst['origin'])
+        ).join(' ')
 
 
 @make_result_setup('custOutput')
