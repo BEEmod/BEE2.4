@@ -942,6 +942,16 @@ def res_set_option(_, res):
     return True  # Remove this result
 
 
+@make_result('setKey')
+def res_set_key(inst, res):
+    """Set a keyvalue to the given value.
+
+    The name and value should be separated by a space.
+    """
+    key, value = res.value.split(' ', 1)
+    inst[key] = value
+
+
 @make_result_setup('random')
 def res_random_setup(res):
     weight = ''
