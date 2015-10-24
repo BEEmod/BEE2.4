@@ -3,6 +3,7 @@ from decimal import Decimal
 from collections import namedtuple
 from enum import Enum
 import random
+import math
 
 from utils import Vec
 from property_parser import Property
@@ -960,7 +961,11 @@ def res_random_setup(res):
     seed = ''
     for prop in res:
         if prop.name == 'chance':
-            chance = utils.conv_int(prop.value, chance)
+            # Allow ending with '%' sign
+            chance = utils.conv_int(
+                prop.value.rstrip('%'),
+                chance,
+            )
         elif prop.name == 'weights':
             weight = prop.value
         elif prop.name == 'seed':
@@ -1003,7 +1008,7 @@ def res_random(inst, res):
         inst['origin'],
         inst['angles'],
     ))
-    if random.randrange(100) < chance:
+    if random.randrange(100) > chance:
         return
 
     ind = random.choice(weight)
