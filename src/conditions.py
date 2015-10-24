@@ -177,18 +177,36 @@ class Condition:
 
         """
         for res in self.results[:]:
-            func = RESULT_SETUP.get(res.name)
-            if func:
-                res.value = func(res)
-                if res.value is None:
-                    self.results.remove(res)
+            self.setup_result(self.results, res)
 
         for res in self.else_results[:]:
-            func = RESULT_SETUP.get(res.name)
-            if func:
-                res.value = func(res)
-                if res.value is None:
-                    self.else_results.remove(res)
+            self.setup_result(self.else_results, res)
+
+
+    @staticmethod
+    def setup_result(res_list, result):
+        """Helper method to perform result setup."""
+        func = RESULT_SETUP.get(result.name)
+        if func:
+            result.value = func(result)
+            if result.value is None:
+                # This result is invalid, remove it.
+                res_list.remove(result)
+
+
+    @staticmethod
+    def test_result(inst, res):
+        """Execute the given result."""
+        try:
+            func = RESULT_LOOKUP[res.name]
+        except KeyError:
+            utils.con_log(
+                '"{}" is not a valid condition result!'.format(
+                    res.real_name,
+                )
+            )
+        else:
+            return func(inst, res)
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -199,18 +217,10 @@ class Condition:
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            try:
-                func = RESULT_LOOKUP[res.name]
-            except KeyError:
-                utils.con_log(
-                    '"{}" is not a valid condition result!'.format(
-                        res.real_name,
-                    )
-                )
-            else:
-                should_del = func(inst, res)
-                if should_del is True:
-                    results.remove(res)
+            should_del = self.test_result(inst, res)
+            if should_del is True:
+                results.remove(res)
+
 
     def __lt__(self, other):
         """Condition items sort by priority."""
@@ -341,19 +351,19 @@ def check_all():
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.by_class['func_instance']:
-                try:
-                    condition.test(inst)
-                except NextInstance:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next instance.
-                    pass
-                except EndCondition:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next condtion.
-                    break
-                if not condition.results and not condition.else_results:
-                    utils.con_log('Exiting empty condition!')
-                    break  # Condition has run out of results, quit early
+            try:
+                condition.test(inst)
+            except NextInstance:
+                # This is raised to immediately stop running
+                # this condition, and skip to the next instance.
+                pass
+            except EndCondition:
+                # This is raised to immediately stop running
+                # this condition, and skip to the next condtion.
+                break
+            if not condition.results and not condition.else_results:
+                utils.con_log('Exiting empty condition!')
+                break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
         key
@@ -363,12 +373,6 @@ def check_all():
     ])
     utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
     utils.con_log('Global instances: ', GLOBAL_INSTANCES)
-
-
-def check_inst(inst):
-    """Run all conditions on a given instance."""
-    for condition in conditions:
-        condition.test(inst)
 
 
 def check_flag(flag, inst):
@@ -590,6 +594,12 @@ def debug_result(inst, props):
     debug_flag(inst, props)
 
 debug_result.__doc__ = debug_flag.__doc__
+
+
+@make_result('dummy', 'nop', 'do_nothing')
+def dummy_result(inst, props):
+    """Dummy result that doesn't do anything."""
+    pass
 
 
 @meta_cond(priority=1000, only_once=False)
@@ -934,6 +944,80 @@ def res_set_option(_, res):
     return True  # Remove this result
 
 
+@make_result_setup('random')
+def res_random_setup(res):
+    weight = ''
+    results = []
+    chance = 100
+    seed = ''
+    for prop in res:
+        if prop.name == 'chance':
+            chance = utils.conv_int(prop.value, chance)
+        elif prop.name == 'weights':
+            weight = prop.value
+        elif prop.name == 'seed':
+            seed = prop.value
+        else:
+            results.append(prop)
+
+    if not results:
+        return None  # Invalid!
+
+    weight = weighted_random(len(results), weight)
+
+    # We also need to execute result setups on all child properties!
+    for prop in results[:]:
+        if prop.name == 'group':
+            for sub_prop in prop.value[:]:
+                Condition.setup_result(prop.value, sub_prop)
+        else:
+            Condition.setup_result(results, prop)
+
+    return seed, chance, weight, results
+
+
+@make_result('random')
+def res_random(inst, res):
+    """Randomly choose one of the sub-results to execute.
+
+    The "chance" value defines the percentage chance for any result to be
+    chosen. "weights" defines the weighting for each result. Wrap a set of
+    results in a "group" property block to treat them as a single result to be
+    executed in order.
+    """
+    # Note: 'global' results like "Has" won't delete themselves!
+    # Instead they're replaced by 'dummy' results that don't execute.
+    # Otherwise the chances would be messed up.
+    seed, chance, weight, results = res.value
+    random.seed('random_case_{}:{}_{}_{}'.format(
+        seed,
+        inst['targetname', ''],
+        inst['origin'],
+        inst['angles'],
+    ))
+    if random.randrange(100) < chance:
+        return
+
+    ind = random.choice(weight)
+    choice = results[ind]
+    if choice.name == 'group':
+        for sub_res in choice.value:
+            should_del = Condition.test_result(
+                inst,
+                sub_res,
+            )
+            if should_del:
+                # This Result doesn't do anything!
+                sub_res.name = 'nop'
+    else:
+        should_del = Condition.test_result(
+            inst,
+            choice,
+        )
+        if should_del:
+            choice.name = 'nop'
+
+
 @make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
@@ -972,7 +1056,7 @@ def res_add_variant_setup(res):
             res['weights', ''],
         )
     else:
-        return False
+        return None
 
 
 @make_result('variant')
