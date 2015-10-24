@@ -474,41 +474,38 @@ def dump_func_docs(func):
         utils.con_log('\tNo documentation!')
 
 
-@make_result_setup('variant')
-def variant_weight(var):
-    """Read variant commands from settings and create the weight list."""
-    count = var['number', '']
-    if count.isdecimal():
-        count = int(count)
-        weight = var['weights', '']
-        if weight == '' or ',' not in weight:
-            utils.con_log('Invalid weight! (' + weight + ')')
-            weight = [str(i) for i in range(1, count + 1)]
-        else:
-            # Parse the weight
-            vals = weight.split(',')
-            weight = []
-            if len(vals) == count:
-                for i, val in enumerate(vals):
-                    val = val.strip()
-                    if val.isdecimal():
-                        # repeat the index the correct number of times
-                        weight.extend(
-                            str(i+1)
-                            for _ in
-                            range(1, int(val)+1)
-                        )
-                    else:
-                        # Abandon parsing
-                        break
-            if len(weight) == 0:
-                utils.con_log('Failed parsing weight! ({!s})'.format(weight))
-                weight = [str(i) for i in range(1, count + 1)]
-        # random.choice(weight) will now give an index with the correct
-        # probabilities.
-        return weight
+def weighted_random(count: int, weights: str):
+    """Generate random indexes with weights.
+
+    This produces a list intended to be fed to random.choice(), with
+    repeated indexes corresponding to the comma-separated weight values.
+    """
+    if weights == '' or ',' not in weights:
+        utils.con_log('Invalid weight! (' + weights + ')')
+        weight = [str(i) for i in range(1, count + 1)]
     else:
-        return ['']  # This won't append anything to the file
+        # Parse the weight
+        vals = weights.split(',')
+        weight = []
+        if len(vals) == count:
+            for i, val in enumerate(vals):
+                val = val.strip()
+                if val.isdecimal():
+                    # repeat the index the correct number of times
+                    weight.extend(
+                        str(i+1)
+                        for _ in
+                        range(1, int(val)+1)
+                    )
+                else:
+                    # Abandon parsing
+                    break
+        if len(weight) == 0:
+            utils.con_log('Failed parsing weight! ({!s})'.format(weight))
+            weight = [str(i) for i in range(1, count + 1)]
+    # random.choice(weight) will now give an index with the correct
+    # probabilities.
+    return weight
 
 
 def add_output(inst, prop, target):
@@ -966,6 +963,18 @@ def res_set_inst_var(inst, res):
     inst.fixup[var_name] = val
 
 
+@make_result_setup('variant')
+def res_add_variant_setup(res):
+    count = utils.conv_int('count', None)
+    if count:
+        return weighted_random(
+            count,
+            res['weights', ''],
+        )
+    else:
+        return False
+
+
 @make_result('variant')
 def res_add_variant(inst, res):
     """This allows using a random instance from a weighted group.
@@ -973,7 +982,7 @@ def res_add_variant(inst, res):
     A suffix will be added in the form "_var4".
     Two properties should be given:
         Number: The number of random instances.
-        Weight: A comma-separated list of weights for each instance.
+        Weights: A comma-separated list of weights for each instance.
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of "2, 1, 1" means the first instance has a 2/4 chance of
     being chosen, and the other 2 have a 1/4 chance of being chosen.
@@ -2470,7 +2479,14 @@ def res_goo_debris(_, res):
         - offset: A random xy offset applied to the instances.
     """
     space = utils.conv_int(res['spacing', '1'], 1)
-    rand_list = variant_weight(res)
+    rand_count = utils.conv_int(res['count', ''], None)
+    if rand_count:
+        rand_list = weighted_random(
+            utils.conv_int(res['count', '']),
+            res['weights', ''],
+        )
+    else:
+        rand_list = None
     chance = utils.conv_int(res['chance', '30'], 30)/100
     file = res['file']
     offset = utils.conv_int(res['offset', '0'], 0)
@@ -2508,19 +2524,22 @@ def res_goo_debris(_, res):
         len(possible_locs), len(GOO_LOCS)
     ))
 
+    suff = ''
     for loc in possible_locs:
         random.seed('goo_mist_{}_{}_{}'.format(loc.x, loc.y, loc.z))
         if random.random() > chance:
             continue
 
-        ind = random.choice(rand_list)
+        if rand_list is not None:
+            suff = '_' + random.choice(rand_list)
+
         if offset > 0:
             loc.x += random.randint(-offset, offset)
             loc.y += random.randint(-offset, offset)
         loc.z -= 32  # Position the instances in the center of the 128 grid.
         VMF.create_ent(
             classname='func_instance',
-            file=file + '_' + str(ind) + '.vmf',
+            file=file + suff + '.vmf',
             origin=loc.join(' '),
             angles='0 {} 0'.format(random.randrange(0, 3600)/10)
         )
