@@ -1016,6 +1016,20 @@ def res_random(inst, res):
             choice.name = 'nop'
 
 
+@make_result('forceUpright')
+def res_force_upright(inst, _):
+    """Position an instance to orient upwards while keeping the normal.
+
+    The result angle will have pitch and roll set to 0. Vertical
+    instances are unaffected.
+    """
+    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    if normal.z != 0:
+        return
+    ang = math.degrees(math.atan2(normal.y, normal.z))
+    inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
+
+
 @make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
