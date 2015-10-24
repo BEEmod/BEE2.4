@@ -486,7 +486,7 @@ def weighted_random(count: int, weights: str):
     """
     if weights == '' or ',' not in weights:
         utils.con_log('Invalid weight! (' + weights + ')')
-        weight = [str(i) for i in range(1, count + 1)]
+        weight = list(range(count))
     else:
         # Parse the weight
         vals = weights.split(',')
@@ -497,16 +497,14 @@ def weighted_random(count: int, weights: str):
                 if val.isdecimal():
                     # repeat the index the correct number of times
                     weight.extend(
-                        str(i+1)
-                        for _ in
-                        range(1, int(val)+1)
+                        [i] * int(val)
                     )
                 else:
                     # Abandon parsing
                     break
         if len(weight) == 0:
             utils.con_log('Failed parsing weight! ({!s})'.format(weight))
-            weight = [str(i) for i in range(1, count + 1)]
+            weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
     return weight
@@ -1049,7 +1047,7 @@ def res_set_inst_var(inst, res):
 
 @make_result_setup('variant')
 def res_add_variant_setup(res):
-    count = utils.conv_int('count', None)
+    count = utils.conv_int(res['Number', ''], None)
     if count:
         return weighted_random(
             count,
@@ -1081,7 +1079,7 @@ def res_add_variant(inst, res):
         # We still need to use angles and origin, since things like
         # fizzlers might not get unique names.
         random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
-    add_suffix(inst, "_var" + random.choice(res.value))
+    add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
 
 
 @make_result('addGlobal')
@@ -2566,7 +2564,7 @@ def res_goo_debris(_, res):
     rand_count = utils.conv_int(res['count', ''], None)
     if rand_count:
         rand_list = weighted_random(
-            utils.conv_int(res['count', '']),
+            utils.conv_int(res['Number', '']),
             res['weights', ''],
         )
     else:
