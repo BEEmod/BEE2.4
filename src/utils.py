@@ -13,6 +13,23 @@ LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
 
+STEAM_IDS = {
+    'PORTAL2': 620,
+
+    'APTAG': 280740,
+    'ALATAG': 280740,
+    'TAG': 280740,
+
+    'TWTM': 286080,
+
+    # Others:
+    # 841: P2 Beta
+    # 213630: Educational
+    # 247120: Sixense
+    # 211480: 'In Motion'
+    # 317400: PS Mel - No workshop
+}
+
 if WIN:
     # Some events differ on different systems, so define them here.
     EVENTS = {
