@@ -656,6 +656,7 @@ def add_game(_=None, refresh_menu=True):
             name = ask_string(
                 prompt="Enter the name of this game:",
                 title='BEE2 - Add Game',
+                initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(
