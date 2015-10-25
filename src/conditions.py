@@ -731,11 +731,17 @@ def flag_music(_, flag):
 def flag_game(_, flag):
     """Checks which game is being modded.
 
-    Accepts the aliases PORTAL2, APTAG, ALATAG, TAG, TWTM or the Steam
-    ID.
+    Accepts the ffollowing aliases instead of a Steam ID:
+     - PORTAL2
+     - APTAG
+     - ALATAG
+     - TAG
+     - Aperture Tag
+     - TWTM,
+     - Thinking With Time Machine
     """
     return OPTIONS['game_id'] == utils.STEAM_IDS.get(
-        flag.value,
+        flag.value.upper(),
         flag.value,
     )
 

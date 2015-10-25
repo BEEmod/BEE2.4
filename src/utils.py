@@ -17,10 +17,12 @@ STEAM_IDS = {
     'PORTAL2': '620',
 
     'APTAG': '280740',
+    'APERTURE TAG': '280740',
     'ALATAG': '280740',
     'TAG': '280740',
 
     'TWTM': '286080',
+    'THINKING WITH TIME MACHINE': '286080',
 
     # Others:
     # 841: P2 Beta
