@@ -2065,7 +2065,7 @@ def fix_worldspawn():
         # If the game is Aperture Tag, it's always forced on
         VMF.spawn['paintinmap'] = utils.bool_as_int(
             settings['has_attr']['gel'] or
-            settings['game_id'] == utils.STEAM_IDS['APTAG']
+            get_opt('game_id') == utils.STEAM_IDS['APTAG']
         )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
