@@ -337,7 +337,7 @@ def init(seed, inst_list, vmf_file):
     VMF = vmf_file
     MAP_RAND_SEED = seed
     ALL_INST = set(inst_list)
-    OPTIONS = vbsp.settings
+    OPTIONS = vbsp.settings['options']
     STYLE_VARS = vbsp.settings['style_vars']
     VOICE_ATTR = vbsp.settings['has_attr']
 
