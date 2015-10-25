@@ -2159,6 +2159,7 @@ def make_vrad_config():
     conf['is_preview'] = utils.bool_as_int(
         IS_PREVIEW
     )
+    conf['game_id'] = get_opt('game_id')
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():

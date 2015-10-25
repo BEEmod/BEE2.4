@@ -27,6 +27,13 @@ RES_ROOT = [
     ('bee2', 'bee2_dev', 'portal2_dlc2')
 ]
 
+GAME_FOLDER = {
+    # The game's root folder, where screenshots are saved/
+    utils.STEAM_IDS['PORTAL2']: 'portal2',
+    utils.STEAM_IDS['TWTM']: 'twtm',
+    utils.STEAM_IDS['APTAG']: 'aperturetag',
+}
+
 
 def quote(txt):
     return '"' + txt + '"'
@@ -171,17 +178,21 @@ def mod_screenshots():
         # The automatic screenshots are found at this location:
         auto_path = os.path.join(
             '..',
-            'portal2',
+            GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
             'screenshots'
         )
         # We need to find the most recent one. If it's named
         # "previewcomplete", we want to ignore it - it's a flag
         # to indicate the map was playtested correctly.
-        screens = [
-            os.path.join(auto_path, path)
-            for path in
-            os.listdir(auto_path)
-        ]
+        try:
+            screens = [
+                os.path.join(auto_path, path)
+                for path in
+                os.listdir(auto_path)
+            ]
+        except FileNotFoundError:
+            # The screenshot folder doesn't exist!
+            screens = []
         screens.sort(
             key=os.path.getmtime,
             reverse=True,
