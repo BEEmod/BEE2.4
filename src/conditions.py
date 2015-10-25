@@ -727,6 +727,19 @@ def flag_music(_, flag):
     return OPTIONS['music_id'] == flag.value
 
 
+@make_flag('Game')
+def flag_game(_, flag):
+    """Checks which game is being modded.
+
+    Accepts the aliases PORTAL2, APTAG, ALATAG, TAG, TWTM or the Steam
+    ID.
+    """
+    return OPTIONS['game_id'] == utils.STEAM_IDS.get(
+        flag.value,
+        flag.value,
+    )
+
+
 @make_flag('has_char')
 def flag_voice_char(_, flag):
     """Checks to see if the given charcter is present in the voice pack.

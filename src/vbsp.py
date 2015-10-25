@@ -202,10 +202,11 @@ DEFAULTS = {
     "model_changer_loc":        "-2400 -2800 -256",
 
     ######
-    # These are set by the BEE2.4 app automatically:
+    # The following are set by the BEE2.4 app automatically:
 
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
+    "game_id":                  "620", # The game's steam ID
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music

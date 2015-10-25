@@ -14,13 +14,13 @@ LINUX = platform.startswith('linux')
 BEE_VERSION = "2.4"
 
 STEAM_IDS = {
-    'PORTAL2': 620,
+    'PORTAL2': '620',
 
-    'APTAG': 280740,
-    'ALATAG': 280740,
-    'TAG': 280740,
+    'APTAG': '280740',
+    'ALATAG': '280740',
+    'TAG': '280740',
 
-    'TWTM': 286080,
+    'TWTM': '286080',
 
     # Others:
     # 841: P2 Beta
