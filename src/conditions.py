@@ -88,7 +88,6 @@ DIRECTIONS = {
 }
 
 INST_ANGLE = {
-    # The angles needed to point a PeTI instance in this direction
     # IE up = zp = floor
     zp: "0 0 0",
     zn: "0 0 0",
@@ -98,6 +97,16 @@ INST_ANGLE = {
     xp: "0 180 0",
     yp: "0 270 0",
 
+}
+
+PETI_INST_ANGLE = {
+    # The angles needed to point a PeTI instance in this direction
+    # IE north = yn
+
+    yn: "0 0 90",
+    xp: "0 90 90",
+    yp: "0 180 90",
+    xn: "0 270 90",
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -2688,3 +2697,130 @@ def res_goo_debris(_, res):
         )
 
     return True  # Only run once!
+
+# A mapping of fizzler targetnames to a list of sign ents
+tag_fizzlers = {}
+
+
+@meta_cond(priority=-100, only_once=False)
+def res_find_pontential_tag_fizzlers(inst):
+    """We need to know which items are 'real' fizzlers.
+
+    This is used for Aperture Tag paint fizzlers.
+    """
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        return True # We don't need to bother running this check
+
+    if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+        # The key list in the dict will be a set of all fizzler items!
+        tag_fizzlers[inst['targetname']] = []
+
+
+@make_result('TagFizzler')
+def res_make_tag_fizzler(inst, res):
+    """Add an Aperture Tag Paint Gun activation fizzler.
+
+    These fizzlers are created via signs, and work very specially.
+    """
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        # Abort - TAG fizzlers shouldn't appear in any other game!
+        inst.remove()
+        return
+
+    # Look for the fizzler instance we want to replace
+    found_fizz = False
+    # Use a set to avoid double-checking for the pairs
+    for target in {o.target for o in inst.outputs}:
+        if target in tag_fizzlers:
+            tag_fizzlers[target].append(
+                inst
+            )
+            found_fizz = True
+        # else: it's not a fizzler (indicator_toggle), ignore it.
+
+    # The distance from origin the double signs are seperated by.
+    sign_offset = utils.conv_int(res['signoffset', ''], 16)
+
+    if not found_fizz:
+        # No fizzler - remove this sign
+        inst.remove()
+        return
+    # Now deal with the visual aspect
+    # Blue signs should be on top.
+
+    blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
+    oran_enabled = utils.conv_bool(inst.fixup['$start_reversed'])
+    if not blue_enabled and not oran_enabled:
+        # Hide the sign in this case!
+        inst.remove()
+        return
+
+    inst_angle = utils.parse_str(inst['angles'])
+
+    inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
+    loc = Vec.from_str(inst['origin'])
+
+    if blue_enabled and oran_enabled:
+        inst['file'] = res['frame_double']
+        # On a wall, and pointing vertically
+        if inst_normal.z != 0 and Vec(0, 1, 0).rotate(*inst_angle).z != 0:
+            # They're vertical, make sure blue's on top!
+            blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
+            oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
+        else:
+            offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
+            blue_loc = loc + offset
+            oran_loc = loc - offset
+    else:
+        inst['file'] = res['frame_single']
+        # They're always centered
+        blue_loc = loc
+        oran_loc = loc
+
+    if inst_normal.z != 0:
+        # If on floors/ceilings, use the original angles
+        sign_angle = inst['angles']
+    else:
+        # On a wall, face upright
+        sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
+
+    if blue_enabled:
+        VMF.add_ent(VMF.create_ent(
+            classname='func_instance',
+            file=res['blue_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=blue_loc.join(' '),
+        ))
+
+    if oran_enabled:
+        VMF.add_ent(VMF.create_ent(
+            classname='func_instance',
+            file=res['oran_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=oran_loc.join(' '),
+        ))
+
+
+@meta_cond(priority=100)
+def meta_make_tag_fizzler(_):
+    """In order to combine signs, we need to know all the locations first.
+    """
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        # There won't be any fizzlers anyway!
+        return True
+
+    utils.con_log(
+        'Aperture Tag fizzlers:',
+        [(k, len(v)) for k,v in tag_fizzlers.items()]
+    )
+
+    for fizz_name, signs in tag_fizzlers.items():
+        blue_enabled = False
+        oran_enabled = False
+        for sign in signs:
+            if utils.conv_bool(sign['$start_enabled']):
+                blue_enabled = True
+            if utils.conv_bool(sign['$start_reversed']):
+                oran_enabled = True
