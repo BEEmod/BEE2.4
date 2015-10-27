@@ -2698,12 +2698,13 @@ def res_goo_debris(_, res):
 
     return True  # Only run once!
 
-# A mapping of fizzler targetnames to a list of sign ents
+# A mapping of fizzler targetnames to a list of sign ents and the base
 tag_fizzlers = {}
+tag_fizz_settings = {}
 
 
-@meta_cond(priority=-100, only_once=False)
-def res_find_pontential_tag_fizzlers(inst):
+@meta_cond(priority=-110, only_once=False)
+def res_find_potential_tag_fizzlers(inst):
     """We need to know which items are 'real' fizzlers.
 
     This is used for Aperture Tag paint fizzlers.
@@ -2713,14 +2714,33 @@ def res_find_pontential_tag_fizzlers(inst):
 
     if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
         # The key list in the dict will be a set of all fizzler items!
-        tag_fizzlers[inst['targetname']] = []
+        tag_fizzlers[inst['targetname']] = (inst, [])
 
+
+@make_result_setup('TagFizzler')
+def res_make_tag_fizzler_setup(res):
+    """We need to record the materials needed for the fizzler itself."""
+    tag_fizz_settings['off_tex'] = {
+        'left': res['off_left'],
+        'center': res['off_center'],
+        'right': res['off_right'],
+        'short': res['off_short'],
+    }
+    tag_fizz_settings['on_tex'] = {
+        'left': res['on_left'],
+        'center': res['on_center'],
+        'right': res['on_right'],
+        'hort':res['on_short'],
+    }
+
+    return res
 
 @make_result('TagFizzler')
 def res_make_tag_fizzler(inst, res):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
+    MUST be priority -100 so it runs before fizzlers!
     """
     if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
@@ -2732,7 +2752,8 @@ def res_make_tag_fizzler(inst, res):
     # Use a set to avoid double-checking for the pairs
     for target in {o.target for o in inst.outputs}:
         if target in tag_fizzlers:
-            tag_fizzlers[target].append(
+            base, signs = tag_fizzlers[target]
+            signs.append(
                 inst
             )
             found_fizz = True
@@ -2803,24 +2824,176 @@ def res_make_tag_fizzler(inst, res):
         ))
 
 
-@meta_cond(priority=100)
+@meta_cond(priority=-90)
 def meta_make_tag_fizzler(_):
     """In order to combine signs, we need to know all the locations first.
     """
+    import vbsp
     if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
         # There won't be any fizzlers anyway!
         return True
 
-    utils.con_log(
-        'Aperture Tag fizzlers:',
-        [(k, len(v)) for k,v in tag_fizzlers.items()]
-    )
+    for fizz_name, (base_inst, (signs, res)) in tag_fizzlers.items():
+        brushes = list(
+            VMF.by_class['trigger_portal_cleanser'] &
+            VMF.by_target[fizz_name + '_brush']
+        )
 
-    for fizz_name, signs in tag_fizzlers.items():
-        blue_enabled = False
-        oran_enabled = False
+        # Find the direction the fizzler front/back points - z=floor fizz
+        # Signs will associate with the given side!
+        bbox_min, bbox_max = brushes[0].get_bbox()
+        for axis, val in zip('xyz', bbox_max-bbox_min):
+            if val == 2:
+                fizz_axis = axis
+                sign_center = val
+                break
+        else:
+            # A fizzler that's not 128*x*2?
+            raise Exception('Invalid fizzler brush ({})!'.format(fizz_name))
+
+        # Figure out what the sides will set values to...
+        pos_blue = False
+        pos_oran = False
+        neg_blue = False
+        neg_oran = False
+
         for sign in signs:
-            if utils.conv_bool(sign['$start_enabled']):
-                blue_enabled = True
-            if utils.conv_bool(sign['$start_reversed']):
-                oran_enabled = True
+            if sign_center > Vec.from_str(sign['origin'])[fizz_axis]:
+                if utils.conv_bool(sign.fixup['$start_enabled']):
+                    pos_blue = True
+                if utils.conv_bool(sign.fixup['$start_reversed']):
+                    pos_oran = True
+            else:
+                if utils.conv_bool(sign.fixup['$start_enabled']):
+                    neg_blue = True
+                if utils.conv_bool(sign.fixup['$start_reversed']):
+                    neg_oran = True
+
+        # If it activates the paint gun, use different textures
+        # The direction is inverted since the 'on' texture should
+        # be visible when walking INTO the side with a given trigger.
+        if pos_blue or pos_oran:
+            neg_tex = tag_fizz_settings['on_tex']
+        else:
+            neg_tex = tag_fizz_settings['off_tex']
+
+        if neg_blue or neg_oran:
+            pos_tex = tag_fizz_settings['on_tex']
+        else:
+            pos_tex = tag_fizz_settings['off_tex']
+
+        if vbsp.GAME_MODE == 'COOP':
+            # We need ATLAS-specific triggers
+            pos_trig = VMF.create_ent(
+                classname='trigger_playerteam',
+            )
+            neg_trig = VMF.create_ent(
+                classname='trigger_playerteam',
+            )
+            output = 'OnStartTouchBluePlayer'
+        else:
+            pos_trig = VMF.create_ent(
+                classname='trigger_multiple',
+            )
+            neg_trig = VMF.create_ent(
+                classname='trigger_multiple',
+            )
+            output = 'OnStartTouch'
+
+        pos_trig['origin'] = neg_trig['origin'] = base_inst['origin']
+        pos_trig['targetname'] = fizz_name + '-trig_pos'
+        neg_trig['targetname'] = fizz_name + '-trig_neg'
+
+        pos_trig.outputs = [
+            VLib.Output(
+                output,
+                fizz_name + '-trig_neg',
+                'Enable',
+            ),
+            VLib.Output(
+                output,
+                fizz_name + '-trig_pos',
+                'Disable',
+            ),
+            VLib.Output(
+                output,
+                '@BlueIsEnabled',
+                'SetValue',
+                param=utils.bool_as_int(pos_blue),
+            ),
+            VLib.Output(
+                output,
+                '@OrangeIsEnabled',
+                'SetValue',
+                param=utils.bool_as_int(pos_oran),
+            ),
+        ]
+
+        neg_trig.outputs = [
+            VLib.Output(
+                output,
+                fizz_name + '-trig_pos',
+                'Enable',
+            ),
+            VLib.Output(
+                output,
+                fizz_name + '-trig_neg',
+                'Disable',
+            ),
+            VLib.Output(
+                output,
+                '@BlueIsEnabled',
+                'SetValue',
+                param=utils.bool_as_int(neg_blue),
+            ),
+            VLib.Output(
+                output,
+                '@OrangeIsEnabled',
+                'SetValue',
+                param=utils.bool_as_int(neg_oran),
+            ),
+        ]
+
+        paint_fizz = VMF.create_ent(
+            classname='trigger_paint_cleanser',
+            targetname=fizz_name + '-pfiz',
+            origin=base_inst['origin'],
+        )
+
+        for fizz_brush in brushes:
+            # Modify fizzler textures
+            bbox_min, bbox_max = fizz_brush.get_bbox()
+            for side in fizz_brush.sides():
+                norm = side.get_normal()
+                if norm[fizz_axis] == 0:
+                    continue # Not the front/back
+                if norm[fizz_axis] == 1:
+                    side.mat = pos_tex[
+                        vbsp.TEX_FIZZLER[
+                            side.mat.casefold()
+                        ]
+                    ]
+                else:
+                    side.mat = neg_tex[
+                        vbsp.TEX_FIZZLER[
+                            side.mat.casefold()
+                        ]
+                    ]
+            # The fizzler shouldn't kill portals or cubes
+            fizz_brush['spawnflags'] = '0'
+
+            # The triggers are 8 units thick, 24 from the center
+            # (-1 because fizzlers are 2 thick on each side).
+            neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
+            neg_min[fizz_axis] -= 31
+            neg_max[fizz_axis] -= 23
+
+            pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
+            pos_min[fizz_axis] += 23
+            pos_max[fizz_axis] += 31
+
+            neg_trig.solids.append(
+                VMF.make_prism(neg_min, neg_max).solid
+            )
+
+
