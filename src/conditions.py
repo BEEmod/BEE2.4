@@ -2746,8 +2746,7 @@ def res_make_tag_fizzler(inst, res):
     # The distance from origin the double signs are seperated by.
     sign_offset = utils.conv_int(res['signoffset', ''], 16)
 
-
-    # Now deal with the visual aspect
+    # Now deal with the visual aspect:
     # Blue signs should be on top.
 
     blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
@@ -2787,22 +2786,22 @@ def res_make_tag_fizzler(inst, res):
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
 
     if blue_enabled:
-        VMF.add_ent(VMF.create_ent(
+        VMF.create_ent(
             classname='func_instance',
             file=res['blue_sign', ''],
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=blue_loc.join(' '),
-        ))
+        )
 
     if oran_enabled:
-        VMF.add_ent(VMF.create_ent(
+        VMF.create_ent(
             classname='func_instance',
             file=res['oran_sign', ''],
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=oran_loc.join(' '),
-        ))
+        )
 
     # Modifying the fizzler:
 
@@ -2973,8 +2972,8 @@ def res_make_tag_fizzler(inst, res):
                         side.mat.casefold()
                     ]
                 ]
-        # The fizzler shouldn't kill portals or cubes
-        fizz_brush['spawnflags'] = '0'
+        # The fizzler shouldn't kill cubes
+        fizz_brush['spawnflags'] = '1'
 
         fizz_brush.outputs.append(VLib.Output(
             output,
@@ -2984,19 +2983,19 @@ def res_make_tag_fizzler(inst, res):
 
         fizz_brush.outputs.append(VLib.Output(
             output,
-            '@@shake_global_sound',
+            '@shake_global_sound',
             'PlaySound',
         ))
 
         # The triggers are 8 units thick, 24 from the center
         # (-1 because fizzlers are 2 thick on each side).
         neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
-        neg_min[fizz_axis] -= 31
-        neg_max[fizz_axis] -= 23
+        neg_min[fizz_axis] -= 23
+        neg_max[fizz_axis] -= 17
 
         pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
-        pos_min[fizz_axis] += 23
-        pos_max[fizz_axis] += 31
+        pos_min[fizz_axis] += 17
+        pos_max[fizz_axis] += 23
 
         neg_trig.solids.append(
             VMF.make_prism(
