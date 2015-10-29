@@ -747,6 +747,9 @@ def ap_tag_modifications(_):
         p_fizz['classname'] = 'trigger_paint_cleanser'
         VMF.add_ent(p_fizz)
 
+        if p_fizz['targetname'].endswith('_brush'):
+            p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
+
         del p_fizz['drawinfastreflection']
         del p_fizz['visible']
         del p_fizz['useScanline']

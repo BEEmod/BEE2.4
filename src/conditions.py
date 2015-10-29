@@ -2803,12 +2803,31 @@ def res_make_tag_fizzler(inst, res):
             origin=oran_loc.join(' '),
         )
 
-    # Modifying the fizzler:
+    # Now modify the fizzler...
 
     fizz_brushes = list(
         VMF.by_class['trigger_portal_cleanser'] &
         VMF.by_target[fizz_name + '_brush']
     )
+
+    if 'base_inst' in res:
+        fizz_base['file'] = resolve_inst(res['base_inst'])[0]
+    fizz_base.outputs.clear()  # Remove outputs, otherwise they break
+    # branch_toggle entities
+
+    # Subtract the sign from the list of connections, but don't go below
+    # zero
+    fizz_base.fixup['$connectioncount'] = str(max(
+        0,
+        utils.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+    ))
+
+    if 'model_inst' in res:
+        utils.con_log(VMF.by_target.keys())
+        model_inst = resolve_inst(res['model_inst'])[0]
+        for mdl_inst in VMF.by_class['func_instance']:
+            if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
+                mdl_inst['file'] = model_inst
 
     # Find the direction the fizzler front/back points - z=floor fizz
     # Signs will associate with the given side!
@@ -2828,16 +2847,20 @@ def res_make_tag_fizzler(inst, res):
     neg_blue = False
     neg_oran = False
 
-    if sign_center > Vec.from_str(inst['origin'])[fizz_axis]:
-        if utils.conv_bool(inst.fixup['$start_enabled']):
-            pos_blue = True
-        if utils.conv_bool(inst.fixup['$start_reversed']):
-            pos_oran = True
+    sign_loc = (
+        Vec.from_str(inst['origin']) +
+        Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    )
+    VMF.create_ent(
+        classname='info_null',
+        origin=sign_loc,
+    )
+    if sign_loc[fizz_axis] < sign_center:
+        pos_blue = blue_enabled
+        pos_oran = oran_enabled
     else:
-        if utils.conv_bool(inst.fixup['$start_enabled']):
-            neg_blue = True
-        if utils.conv_bool(inst.fixup['$start_reversed']):
-            neg_oran = True
+        neg_blue = blue_enabled
+        neg_oran = oran_enabled
 
     fizz_off_tex = {
         'left': res['off_left'],
@@ -2943,13 +2966,7 @@ def res_make_tag_fizzler(inst, res):
             param=utils.bool_as_int(pos_oran),
         ))
 
-    paint_fizz = VMF.create_ent(
-        classname='trigger_paint_cleanser',
-        targetname=fizz_name + '-pfiz',
-        origin=fizz_base['origin'],
-    )
-
-    for fizz_brush in fizz_brushes: # portal_cleanser ent, not solid!
+    for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
         # Modify fizzler textures
         bbox_min, bbox_max = fizz_brush.get_bbox()
         for side in fizz_brush.sides():
@@ -3011,11 +3028,3 @@ def res_make_tag_fizzler(inst, res):
                 mat='tools/toolstrigger',
             ).solid,
         )
-        paint_fizz.solids.append(
-            VMF.make_prism(
-                bbox_min,
-                bbox_max,
-                mat='tools/toolstrigger',
-            ).solid,
-        )
-
