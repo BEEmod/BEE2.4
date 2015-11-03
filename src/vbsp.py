@@ -739,8 +739,14 @@ def ap_tag_modifications(_):
     if get_opt('game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
 
+    has = settings['has_attr']
     # This will enable the PaintInMap property.
-    settings['has_attr']['Gel'] = True
+    has['Gel'] = True
+
+    # Set as if the player spawned with no pgun
+    has['spawn_dual'] = False
+    has['spawn_single'] = False
+    has['spawn_nogun'] = True
 
     for fizz in VMF.by_class['trigger_portal_cleanser']:
         p_fizz = fizz.copy()

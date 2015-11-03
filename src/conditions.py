@@ -2951,6 +2951,11 @@ def res_make_tag_fizzler(inst, res):
             'SetValue',
             param=utils.bool_as_int(pos_blue),
         ))
+        # Add voice attributes - we have the gun and gel!
+        VOICE_ATTR['bluegelgun'] = True
+        VOICE_ATTR['bluegel'] = True
+        VOICE_ATTR['bouncegun'] = True
+        VOICE_ATTR['bouncegel'] = True
 
     if oran_enabled:
         neg_trig.outputs.append(VLib.Output(
@@ -2964,6 +2969,30 @@ def res_make_tag_fizzler(inst, res):
             '@OrangeIsEnabled',
             'SetValue',
             param=utils.bool_as_int(pos_oran),
+        ))
+        VOICE_ATTR['orangegelgun'] = True
+        VOICE_ATTR['orangegel'] = True
+        VOICE_ATTR['speedgelgun'] = True
+        VOICE_ATTR['speedgel'] = True
+
+    if not oran_enabled and not blue_enabled:
+        # If both are disabled, we must shutdown the gun when touching
+        # either side - use neg_trig for that purpose!
+        # We want to get rid of pos_trig to save ents
+        VMF.remove_ent(pos_trig)
+        neg_trig['targetname'] = fizz_name + '-trig'
+        neg_trig.outputs.clear()
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param='0'
+        ))
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param='0'
         ))
 
     for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
@@ -3014,17 +3043,27 @@ def res_make_tag_fizzler(inst, res):
         pos_min[fizz_axis] += 17
         pos_max[fizz_axis] += 23
 
-        neg_trig.solids.append(
-            VMF.make_prism(
-                neg_min,
-                neg_max,
-                mat='tools/toolstrigger',
-            ).solid,
-        )
-        pos_trig.solids.append(
-            VMF.make_prism(
-                pos_min,
-                pos_max,
-                mat='tools/toolstrigger',
-            ).solid,
-        )
+        if blue_enabled or oran_enabled:
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    neg_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+            pos_trig.solids.append(
+                VMF.make_prism(
+                    pos_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+        else:
+            # If neither enabled, use one trigger
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
