@@ -11,6 +11,11 @@ from property_parser import Property
 from utils import Vec
 import utils
 
+from typing import (
+    Optional, Union,
+    Dict, List, Tuple, Iterator,
+)
+
 # Used to set the defaults for versioninfo
 CURRENT_HAMMER_VERSION = 400
 CURRENT_HAMMER_BUILD = 5304
@@ -298,7 +303,7 @@ class VMF:
           inc_version to False to suppress this.
         """
         if dest_file is None:
-            dest_file = io.stringIO()
+            dest_file = io.StringIO()
             # acts like a file object but is actually a string. We're
             # using this to prevent having Python duplicate the entire
             # string every time we append
@@ -765,7 +770,7 @@ class Solid:
         if self.id in self.map.solid_id:
             self.map.solid_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Get two vectors representing the space this brush takes up."""
         bbox_min, bbox_max = self.sides[0].get_bbox()
         for s in self.sides[1:]:
@@ -774,7 +779,7 @@ class Solid:
             bbox_min.min(side_min)
         return bbox_min, bbox_max
 
-    def get_origin(self, bbox_min=None, bbox_max=None):
+    def get_origin(self, bbox_min=None, bbox_max=None) -> Vec:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
@@ -802,9 +807,9 @@ class UVAxis:
     ]
 
     def __init__(self, x, y, z, offset=0.0, scale=0.25):
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = x  # type: float
+        self.y = y  # type: float
+        self.z = z  # type: float
         self.offset = offset
         self.scale = scale
 
@@ -1051,7 +1056,7 @@ class Side:
         if self.id in self.map.face_id:
             self.map.face_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Generate the highest and lowest points these planes form."""
         bbox_max = self.planes[0].copy()
         bbox_min = self.planes[0].copy()
@@ -1060,7 +1065,7 @@ class Side:
             bbox_min.min(v)
         return bbox_min, bbox_max
 
-    def get_origin(self):
+    def get_origin(self) -> Vec:
         """Calculates a vector representing the exact center of this plane."""
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
@@ -1086,7 +1091,7 @@ class Side:
             self.planes[2].join(' ')
             )
 
-    def normal(self):
+    def normal(self) -> Vec:
         """Compute the unit vector which extends perpendicular to the face.
 
         """
