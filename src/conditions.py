@@ -2746,6 +2746,12 @@ def res_make_tag_fizzler(inst, res):
     # The distance from origin the double signs are seperated by.
     sign_offset = utils.conv_int(res['signoffset', ''], 16)
 
+    sign_loc = (
+        # The actual location of the sign - on the wall
+        Vec.from_str(inst['origin']) +
+        Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    )
+
     # Now deal with the visual aspect:
     # Blue signs should be on top.
 
@@ -2779,8 +2785,22 @@ def res_make_tag_fizzler(inst, res):
         oran_loc = loc
 
     if inst_normal.z != 0:
-        # If on floors/ceilings, use the original angles
-        sign_angle = inst['angles']
+        # If on floors/ceilings, rotate to point at the fizzler!
+        sign_dir = sign_loc - Vec.from_str(fizz_base['origin'])
+        sign_angle = math.degrees(
+            math.atan2(sign_dir.y, sign_dir.x)
+        )
+        # Round to nearest 90 degrees
+        # Add 45 so the switchover point is at the diagonals
+        sign_angle = (sign_angle + 45) // 90 * 90
+
+        # Rotate to fit the instances - south is down
+        sign_angle = int(sign_angle + 90) % 360
+        if inst_normal.z > 0:
+            sign_angle = '0 {} 0'.format(sign_angle)
+        elif inst_normal.z < 0:
+            # Flip upside-down
+            sign_angle = '0 {} 180'.format(sign_angle)
     else:
         # On a wall, face upright
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
@@ -2846,11 +2866,6 @@ def res_make_tag_fizzler(inst, res):
     pos_oran = False
     neg_blue = False
     neg_oran = False
-
-    sign_loc = (
-        Vec.from_str(inst['origin']) +
-        Vec(0, 0, -64).rotate_by_str(inst['angles'])
-    )
     VMF.create_ent(
         classname='info_null',
         origin=sign_loc,
@@ -2872,7 +2887,7 @@ def res_make_tag_fizzler(inst, res):
         'left': res['on_left'],
         'center': res['on_center'],
         'right': res['on_right'],
-        'hort': res['on_short'],
+        'short': res['on_short'],
     }
 
     # If it activates the paint gun, use different textures
