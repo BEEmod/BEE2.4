@@ -4,8 +4,12 @@
 #   comment is tacked onto the end of a line.
 # - Comments on bracketed lines should be separated into their own
 #   comment properties.
-
 import utils
+
+from typing import (
+    Optional, Union,
+    Dict, List, Tuple, Iterator,
+)
 
 __all__ = ['KeyValError', 'NoKeyError', 'Property', 'INVALID']
 
@@ -20,6 +24,8 @@ REPLACE_CHARS = {
 # Sentinel value to indicate that no default was given to find_key()
 _NO_KEY_FOUND = object()
 
+_Prop_Value = Union[List['Property'], str]
+_as_dict_return = Dict[str, Union[str, 'as_dict_return']]
 
 class KeyValError(Exception):
     """An error that occured when parsing a Valve KeyValues file.
@@ -28,7 +34,12 @@ class KeyValError(Exception):
     file = The filename passed to Property.parse(), if it exists
     line_num = The line where the error occured.
     """
-    def __init__(self, message, file, line):
+    def __init__(
+            self,
+            message: str,
+            file: Optional[str],
+            line: Optional[int]
+            ) -> None:
         super().__init__()
         self.mess = message
         self.file = file
@@ -82,28 +93,27 @@ class Property:
     The name should be a string, or None for a root object.
     Root objects export each child at the topmost indent level.
         This is produced from Property.parse() calls.
-
-    :type value: list | str
-    :type name: str | None
-    :type _folded_name: str | None
-    :type real_name: str | None
     """
     # Helps decrease memory footprint with lots of Property values.
     __slots__ = ('_folded_name', 'real_name', 'value')
 
-    def __init__(self, name, value=''):
+    def __init__(
+            self: 'Property',
+            name: Optional[str],
+            value=_Prop_Value,
+            ):
         """Create a new property instance.
 
         """
-        self.real_name = name
-        self.value = value
+        self.real_name = name  # type: Optional[str]
+        self.value = value  # type: _Prop_Value
         self._folded_name = (
             None if name is None
             else name.casefold()
-        )
+        )  # type: Optional[str]
 
     @property
-    def name(self):
+    def name(self) -> Optional[str]:
         """Name automatically casefolds() any given names.
 
         This ensures comparisons are always case-sensitive.
@@ -204,7 +214,7 @@ class Property:
                 )
         return open_properties[0]
 
-    def find_all(self, *keys) -> "Generator for matching Property objects":
+    def find_all(self, *keys) -> Iterator['Property']:
         """Search through a tree to obtain all properties that match a particular path.
 
         """
@@ -225,7 +235,7 @@ class Property:
                 else:
                     yield prop
 
-    def find_key(self, key, def_=_NO_KEY_FOUND) -> 'Property':
+    def find_key(self, key, def_=_NO_KEY_FOUND):
         """Obtain the value of the child Property with a given name.
 
         - If no child is found with the given name, this will return the
@@ -356,7 +366,7 @@ class Property:
         else:
             return 1
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator['Property']:
         """Iterate through the value list.
 
         """
@@ -379,7 +389,15 @@ class Property:
         else:
             return self.name == key
 
-    def __getitem__(self, index):
+    def __getitem__(
+            self,
+            index: Union[
+                str,
+                int,
+                slice,
+                Tuple[Union[str, int, slice], _Prop_Value],
+            ],
+            ):
         """Allow indexing the children directly.
 
         - If given an index or slice, it will search by position.
@@ -405,7 +423,11 @@ class Property:
         else:
             raise IndexError
 
-    def __setitem__(self, index, value):
+    def __setitem__(
+            self,
+            index: Union[int, slice, str],
+            value: _Prop_Value
+            ):
         """Allow setting the values of the children directly.
 
         - If given an index or slice, it will search by position.
@@ -443,7 +465,7 @@ class Property:
                 except NoKeyError as no_key:
                     raise IndexError(no_key) from no_key
         else:
-            self.value = ''
+            self.value = ''  # type: _Prop_Value
 
     def __add__(self, other):
         """Allow appending other properties to this one.
