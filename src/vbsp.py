@@ -735,9 +735,12 @@ def ap_tag_modifications(_):
     * Paint is always present in every map!
     * Suppress ATLAS's Portalgun in coop
     * Override the transition ent instance to have the Gel Gun
+    * Create subdirectories with the user's steam ID
     """
     if get_opt('game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
+
+    print('Performing Aperture Tag modifications...')
 
     has = settings['has_attr']
     # This will enable the PaintInMap property.
@@ -777,6 +780,24 @@ def ap_tag_modifications(_):
         if inst['file'].casefold() not in transition_ents:
             continue
         inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
+
+    # Because of a bug in P2, these folders aren't created automatically.
+    # We need a folder with the user's ID in portal2/maps/puzzlemaker.
+    try:
+        puzz_folders = os.listdir('../aperturetag/puzzles')
+    except FileNotFoundError:
+        print("Aperturetag/puzzles/ doesn't exist??")
+    else:
+        for puzz_folder in puzz_folders:
+            new_folder = os.path.abspath(os.path.join(
+                '../portal2/maps/puzzlemaker',
+                puzz_folder,
+            ))
+            print('Creating', new_folder)
+            os.makedirs(
+                new_folder,
+                exist_ok=True,
+            )
 
 
 def get_map_info():
