@@ -202,10 +202,11 @@ DEFAULTS = {
     "model_changer_loc":        "-2400 -2800 -256",
 
     ######
-    # These are set by the BEE2.4 app automatically:
+    # The following are set by the BEE2.4 app automatically:
 
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
+    "game_id":                  "620", # The game's steam ID
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
@@ -471,6 +472,7 @@ def add_voice(inst):
         map_seed=MAP_SEED,
         )
 
+
 @conditions.meta_cond(priority=-200, only_once=False)
 def fix_fizz_models(inst):
     """Fix some bugs with fizzler model instances.
@@ -501,13 +503,13 @@ def fix_fizz_models(inst):
         if inst['angles'] in FIZZLER_ANGLE_FIX:
             inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
+
 @conditions.meta_cond(priority=-100, only_once=False)
 def static_pan(inst):
     """Switches glass angled panels to static instances, if needed."""
     if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
-
 
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
@@ -614,7 +616,9 @@ def set_player_portalgun(inst):
     - If there are both spawner types, the player doesn't get a gun.
     """
     if GAME_MODE == 'COOP':
-        return  # Don't change portalgun in coop
+        return  # Don't change portalgun in Portal 2 Coop
+    if get_opt('game_id') == utils.STEAM_IDS['TAG']:
+        return  # Aperture Tag doesn't have Portal Guns!
 
     utils.con_log('Setting Portalgun:')
 
@@ -721,6 +725,79 @@ def set_elev_videos(_):
         )
     # Ensure the script gets packed.
     PACK_FILES.add('scripts/vscripts/' + script)
+
+
+@conditions.meta_cond(priority=200, only_once=True)
+def ap_tag_modifications(_):
+    """Perform modifications for Aperture Tag.
+
+    * All fizzlers will be combined with a trigger_paint_cleanser
+    * Paint is always present in every map!
+    * Suppress ATLAS's Portalgun in coop
+    * Override the transition ent instance to have the Gel Gun
+    * Create subdirectories with the user's steam ID
+    """
+    if get_opt('game_id') != utils.STEAM_IDS['APTAG']:
+        return  # Wrong game!
+
+    print('Performing Aperture Tag modifications...')
+
+    has = settings['has_attr']
+    # This will enable the PaintInMap property.
+    has['Gel'] = True
+
+    # Set as if the player spawned with no pgun
+    has['spawn_dual'] = False
+    has['spawn_single'] = False
+    has['spawn_nogun'] = True
+
+    for fizz in VMF.by_class['trigger_portal_cleanser']:
+        p_fizz = fizz.copy()
+        p_fizz['classname'] = 'trigger_paint_cleanser'
+        VMF.add_ent(p_fizz)
+
+        if p_fizz['targetname'].endswith('_brush'):
+            p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
+
+        del p_fizz['drawinfastreflection']
+        del p_fizz['visible']
+        del p_fizz['useScanline']
+
+        for side in p_fizz.sides():
+            side.mat = 'tools/toolstrigger'
+            side.scale = 0.25
+
+    if GAME_MODE == 'COOP':
+        VMF.create_ent(
+            classname='info_target',
+            targetname='supress_blue_portalgun_spawn',
+            origin=get_opt('global_pti_ents_loc'),
+            angles='0 0 0'
+        )
+
+    transition_ents = instanceLocs.resolve('[transitionents]')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in transition_ents:
+            continue
+        inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
+
+    # Because of a bug in P2, these folders aren't created automatically.
+    # We need a folder with the user's ID in portal2/maps/puzzlemaker.
+    try:
+        puzz_folders = os.listdir('../aperturetag/puzzles')
+    except FileNotFoundError:
+        print("Aperturetag/puzzles/ doesn't exist??")
+    else:
+        for puzz_folder in puzz_folders:
+            new_folder = os.path.abspath(os.path.join(
+                '../portal2/maps/puzzlemaker',
+                puzz_folder,
+            ))
+            print('Creating', new_folder)
+            os.makedirs(
+                new_folder,
+                exist_ok=True,
+            )
 
 
 def get_map_info():
@@ -2013,10 +2090,12 @@ def fix_worldspawn():
     """Adjust some properties on WorldSpawn."""
     utils.con_log("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
-        # if PeTI thinks there should be paint, don't touch it
+        # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
+        # If the game is Aperture Tag, it's always forced on
         VMF.spawn['paintinmap'] = utils.bool_as_int(
-            settings['has_attr']['gel'],
+            settings['has_attr']['gel'] or
+            get_opt('game_id') == utils.STEAM_IDS['APTAG']
         )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
@@ -2110,6 +2189,7 @@ def make_vrad_config():
     conf['is_preview'] = utils.bool_as_int(
         IS_PREVIEW
     )
+    conf['game_id'] = get_opt('game_id')
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():

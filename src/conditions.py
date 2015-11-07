@@ -88,7 +88,6 @@ DIRECTIONS = {
 }
 
 INST_ANGLE = {
-    # The angles needed to point a PeTI instance in this direction
     # IE up = zp = floor
     zp: "0 0 0",
     zn: "0 0 0",
@@ -98,6 +97,16 @@ INST_ANGLE = {
     xp: "0 180 0",
     yp: "0 270 0",
 
+}
+
+PETI_INST_ANGLE = {
+    # The angles needed to point a PeTI instance in this direction
+    # IE north = yn
+
+    yn: "0 0 90",
+    xp: "0 90 90",
+    yp: "0 180 90",
+    xn: "0 270 90",
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -337,7 +346,7 @@ def init(seed, inst_list, vmf_file):
     VMF = vmf_file
     MAP_RAND_SEED = seed
     ALL_INST = set(inst_list)
-    OPTIONS = vbsp.settings
+    OPTIONS = vbsp.settings['options']
     STYLE_VARS = vbsp.settings['style_vars']
     VOICE_ATTR = vbsp.settings['has_attr']
 
@@ -725,6 +734,25 @@ def flag_music(_, flag):
     Use "<NONE>" for no music.
     """
     return OPTIONS['music_id'] == flag.value
+
+
+@make_flag('Game')
+def flag_game(_, flag):
+    """Checks which game is being modded.
+
+    Accepts the ffollowing aliases instead of a Steam ID:
+     - PORTAL2
+     - APTAG
+     - ALATAG
+     - TAG
+     - Aperture Tag
+     - TWTM,
+     - Thinking With Time Machine
+    """
+    return OPTIONS['game_id'] == utils.STEAM_IDS.get(
+        flag.value.upper(),
+        flag.value,
+    )
 
 
 @make_flag('has_char')
@@ -2669,3 +2697,388 @@ def res_goo_debris(_, res):
         )
 
     return True  # Only run once!
+
+# A mapping of fizzler targetnames to the base instance
+tag_fizzlers = {}
+
+
+@meta_cond(priority=-110, only_once=False)
+def res_find_potential_tag_fizzlers(inst):
+    """We need to know which items are 'real' fizzlers.
+
+    This is used for Aperture Tag paint fizzlers.
+    """
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        return True # We don't need to bother running this check
+
+    if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+        # The key list in the dict will be a set of all fizzler items!
+        tag_fizzlers[inst['targetname']] = inst
+
+
+@make_result('TagFizzler')
+def res_make_tag_fizzler(inst, res):
+    """Add an Aperture Tag Paint Gun activation fizzler.
+
+    These fizzlers are created via signs, and work very specially.
+    MUST be priority -100 so it runs before fizzlers!
+    """
+    import vbsp
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        # Abort - TAG fizzlers shouldn't appear in any other game!
+        inst.remove()
+        return
+
+    # Look for the fizzler instance we want to replace
+    # Use a set to avoid double-checking for the pairs
+    for out in inst.outputs:
+        if out.target in tag_fizzlers:
+            fizz_name = out.target
+            fizz_base = tag_fizzlers[out.target]
+            del tag_fizzlers[out.target]  # Don't let other signs mod this one!
+            break
+        # else: it's not a fizzler (indicator_toggle), ignore it.
+    else:
+        # No fizzler - remove this sign
+        inst.remove()
+        return
+
+    # The distance from origin the double signs are seperated by.
+    sign_offset = utils.conv_int(res['signoffset', ''], 16)
+
+    sign_loc = (
+        # The actual location of the sign - on the wall
+        Vec.from_str(inst['origin']) +
+        Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    )
+
+    # Now deal with the visual aspect:
+    # Blue signs should be on top.
+
+    blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
+    oran_enabled = utils.conv_bool(inst.fixup['$start_reversed'])
+
+    if not blue_enabled and not oran_enabled:
+        # Hide the sign in this case!
+        inst.remove()
+
+    inst_angle = utils.parse_str(inst['angles'])
+
+    inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
+    loc = Vec.from_str(inst['origin'])
+
+    if blue_enabled and oran_enabled:
+        inst['file'] = res['frame_double']
+        # On a wall, and pointing vertically
+        if inst_normal.z != 0 and Vec(0, 1, 0).rotate(*inst_angle).z != 0:
+            # They're vertical, make sure blue's on top!
+            blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
+            oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
+        else:
+            offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
+            blue_loc = loc + offset
+            oran_loc = loc - offset
+    else:
+        inst['file'] = res['frame_single']
+        # They're always centered
+        blue_loc = loc
+        oran_loc = loc
+
+    if inst_normal.z != 0:
+        # If on floors/ceilings, rotate to point at the fizzler!
+        sign_dir = sign_loc - Vec.from_str(fizz_base['origin'])
+        sign_angle = math.degrees(
+            math.atan2(sign_dir.y, sign_dir.x)
+        )
+        # Round to nearest 90 degrees
+        # Add 45 so the switchover point is at the diagonals
+        sign_angle = (sign_angle + 45) // 90 * 90
+
+        # Rotate to fit the instances - south is down
+        sign_angle = int(sign_angle + 90) % 360
+        if inst_normal.z > 0:
+            sign_angle = '0 {} 0'.format(sign_angle)
+        elif inst_normal.z < 0:
+            # Flip upside-down
+            sign_angle = '0 {} 180'.format(sign_angle)
+    else:
+        # On a wall, face upright
+        sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
+
+    if blue_enabled:
+        VMF.create_ent(
+            classname='func_instance',
+            file=res['blue_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=blue_loc.join(' '),
+        )
+
+    if oran_enabled:
+        VMF.create_ent(
+            classname='func_instance',
+            file=res['oran_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=oran_loc.join(' '),
+        )
+
+    # Now modify the fizzler...
+
+    fizz_brushes = list(
+        VMF.by_class['trigger_portal_cleanser'] &
+        VMF.by_target[fizz_name + '_brush']
+    )
+
+    if 'base_inst' in res:
+        fizz_base['file'] = resolve_inst(res['base_inst'])[0]
+    fizz_base.outputs.clear()  # Remove outputs, otherwise they break
+    # branch_toggle entities
+
+    # Subtract the sign from the list of connections, but don't go below
+    # zero
+    fizz_base.fixup['$connectioncount'] = str(max(
+        0,
+        utils.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+    ))
+
+    if 'model_inst' in res:
+        utils.con_log(VMF.by_target.keys())
+        model_inst = resolve_inst(res['model_inst'])[0]
+        for mdl_inst in VMF.by_class['func_instance']:
+            if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
+                mdl_inst['file'] = model_inst
+
+    # Find the direction the fizzler front/back points - z=floor fizz
+    # Signs will associate with the given side!
+    bbox_min, bbox_max = fizz_brushes[0].get_bbox()
+    for axis, val in zip('xyz', bbox_max-bbox_min):
+        if val == 2:
+            fizz_axis = axis
+            sign_center = (bbox_min[axis] + bbox_max[axis]) / 2
+            break
+    else:
+        # A fizzler that's not 128*x*2?
+        raise Exception('Invalid fizzler brush ({})!'.format(fizz_name))
+
+    # Figure out what the sides will set values to...
+    pos_blue = False
+    pos_oran = False
+    neg_blue = False
+    neg_oran = False
+    VMF.create_ent(
+        classname='info_null',
+        origin=sign_loc,
+    )
+    if sign_loc[fizz_axis] < sign_center:
+        pos_blue = blue_enabled
+        pos_oran = oran_enabled
+    else:
+        neg_blue = blue_enabled
+        neg_oran = oran_enabled
+
+    fizz_off_tex = {
+        'left': res['off_left'],
+        'center': res['off_center'],
+        'right': res['off_right'],
+        'short': res['off_short'],
+    }
+    fizz_on_tex = {
+        'left': res['on_left'],
+        'center': res['on_center'],
+        'right': res['on_right'],
+        'short': res['on_short'],
+    }
+
+    # If it activates the paint gun, use different textures
+    if pos_blue or pos_oran:
+        pos_tex = fizz_on_tex
+    else:
+        pos_tex = fizz_off_tex
+
+    if neg_blue or neg_oran:
+        neg_tex = fizz_on_tex
+    else:
+        neg_tex = fizz_off_tex
+
+    if vbsp.GAME_MODE == 'COOP':
+        # We need ATLAS-specific triggers
+        pos_trig = VMF.create_ent(
+            classname='trigger_playerteam',
+        )
+        neg_trig = VMF.create_ent(
+            classname='trigger_playerteam',
+        )
+        output = 'OnStartTouchBluePlayer'
+    else:
+        pos_trig = VMF.create_ent(
+            classname='trigger_multiple',
+        )
+        neg_trig = VMF.create_ent(
+            classname='trigger_multiple',
+            spawnflags='1',
+        )
+        output = 'OnStartTouch'
+
+    pos_trig['origin'] = neg_trig['origin'] = fizz_base['origin']
+    pos_trig['spawnflags'] = neg_trig['spawnflags'] = '1'  # Clients Only
+
+    pos_trig['targetname'] = fizz_name + '-trig_pos'
+    neg_trig['targetname'] = fizz_name + '-trig_neg'
+
+    pos_trig.outputs = [
+        VLib.Output(
+            output,
+            fizz_name + '-trig_neg',
+            'Enable',
+        ),
+        VLib.Output(
+            output,
+            fizz_name + '-trig_pos',
+            'Disable',
+        ),
+    ]
+
+    neg_trig.outputs = [
+        VLib.Output(
+            output,
+            fizz_name + '-trig_pos',
+            'Enable',
+        ),
+        VLib.Output(
+            output,
+            fizz_name + '-trig_neg',
+            'Disable',
+        ),
+    ]
+
+    if blue_enabled:
+        # If this is blue/oran only, don't affect the other color
+        neg_trig.outputs.append(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(neg_blue),
+        ))
+        pos_trig.outputs.append(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(pos_blue),
+        ))
+        # Add voice attributes - we have the gun and gel!
+        VOICE_ATTR['bluegelgun'] = True
+        VOICE_ATTR['bluegel'] = True
+        VOICE_ATTR['bouncegun'] = True
+        VOICE_ATTR['bouncegel'] = True
+
+    if oran_enabled:
+        neg_trig.outputs.append(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(neg_oran),
+        ))
+        pos_trig.outputs.append(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(pos_oran),
+        ))
+        VOICE_ATTR['orangegelgun'] = True
+        VOICE_ATTR['orangegel'] = True
+        VOICE_ATTR['speedgelgun'] = True
+        VOICE_ATTR['speedgel'] = True
+
+    if not oran_enabled and not blue_enabled:
+        # If both are disabled, we must shutdown the gun when touching
+        # either side - use neg_trig for that purpose!
+        # We want to get rid of pos_trig to save ents
+        VMF.remove_ent(pos_trig)
+        neg_trig['targetname'] = fizz_name + '-trig'
+        neg_trig.outputs.clear()
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param='0'
+        ))
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param='0'
+        ))
+
+    for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
+        # Modify fizzler textures
+        bbox_min, bbox_max = fizz_brush.get_bbox()
+        for side in fizz_brush.sides():
+            norm = side.normal()
+            if norm[fizz_axis] == 0:
+                # Not the front/back: force nodraw
+                # Otherwise the top/bottom will have the odd stripes
+                # which won't match the sides
+                side.mat = 'tools/toolsnodraw'
+                continue
+            if norm[fizz_axis] == 1:
+                side.mat = pos_tex[
+                    vbsp.TEX_FIZZLER[
+                        side.mat.casefold()
+                    ]
+                ]
+            else:
+                side.mat = neg_tex[
+                    vbsp.TEX_FIZZLER[
+                        side.mat.casefold()
+                    ]
+                ]
+        # The fizzler shouldn't kill cubes
+        fizz_brush['spawnflags'] = '1'
+
+        fizz_brush.outputs.append(VLib.Output(
+            output,
+            '@shake_global',
+            'StartShake',
+        ))
+
+        fizz_brush.outputs.append(VLib.Output(
+            output,
+            '@shake_global_sound',
+            'PlaySound',
+        ))
+
+        # The triggers are 8 units thick, 24 from the center
+        # (-1 because fizzlers are 2 thick on each side).
+        neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
+        neg_min[fizz_axis] -= 23
+        neg_max[fizz_axis] -= 17
+
+        pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
+        pos_min[fizz_axis] += 17
+        pos_max[fizz_axis] += 23
+
+        if blue_enabled or oran_enabled:
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    neg_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+            pos_trig.solids.append(
+                VMF.make_prism(
+                    pos_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+        else:
+            # If neither enabled, use one trigger
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )

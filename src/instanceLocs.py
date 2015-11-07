@@ -6,7 +6,8 @@ INSTANCE_FILES = {}
 
 # Special names for these specific instances
 SPECIAL_INST = {
-    # Glass
+    # Glass only generates borders for genuine ITEM_BARRIER items,
+    # so it's possible to define special names.
     'glass_128':                 '<ITEM_BARRIER:0>',
     'glass_left_corner':         '<ITEM_BARRIER:1>',
     'glass_left_straight':       '<ITEM_BARRIER:2>',
@@ -31,12 +32,13 @@ SPECIAL_INST = {
     'elevatorEntry':     '<ITEM_ENTRY_DOOR:9>',
     'elevatorExit':      '<ITEM_ENTRY_DOOR:10>',
 
-    'spExitCorr':  '<ITEM_EXIT_DOOR:0,1,2,3>',
-    'spEntryCorr': '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
-    'coopCorr':    '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
+    'spExitCorr':   '<ITEM_EXIT_DOOR:0,1,2,3>',
+    'spEntryCorr':  '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
+    'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
+
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
-    # although unused, editoritems allows having different instances
-    # for toggle/timer panels
+    # Although unused by default, editoritems allows having different instances
+    # for toggle/timer panels:
     'indPanCheck':  '<ITEM_INDICATOR_PANEL>',
     'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
     # 'indpan' is defined below from these two
@@ -106,6 +108,11 @@ SUBITEMS = {
     'fun_emitter': 0,
     'fun_white': 1,
     'fun_black': 2,
+
+    # Fizzler
+    'fizz_base': 0,
+    'fizz_mdl': 1,
+    'fizz_model': 1,
 }
 
 
@@ -129,16 +136,22 @@ def load_conf():
         SPECIAL_INST.items()
     }
 
+    # Several special items which use multiple item types!
+
+    # Checkmark and Timer indicator panels:
     INST_SPECIAL['indpan'] = (
         INST_SPECIAL['indpancheck'] +
         INST_SPECIAL['indpantimer']
     )
 
+    # Arrival_departure_ents is set in both entry doors - it's usually the same
+    # though.
     INST_SPECIAL['transitionents'] = (
         resolve('<ITEM_ENTRY_DOOR:11>') +
         resolve('<ITEM_COOP_ENTRY_DOOR:4>')
     )
 
+    # Laser items have the offset and centered item versions.
     INST_SPECIAL['lasercatcher'] = (
         resolve('<ITEM_LASER_CATCHER_CENTER>') +
         resolve('<ITEM_LASER_CATCHER_OFFSET>')
