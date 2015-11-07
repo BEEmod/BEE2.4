@@ -389,6 +389,8 @@ def load_settings():
             settings['style_vars'][
                 var.name.casefold()] = utils.conv_bool(var.value)
 
+    instanceLocs.load_conf()
+
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
@@ -447,8 +449,6 @@ def load_settings():
         )
     else:
         BEE2_config = ConfigFile(None)
-
-    instanceLocs.load_conf()
 
     utils.con_log("Settings Loaded!")
 
