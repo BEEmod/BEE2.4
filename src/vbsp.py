@@ -60,6 +60,9 @@ TEX_VALVE = {
     "sky_black": "special.sky",
     }
 
+# Load and register these conditions
+import cutoutTile  # This uses TEX_VALVE, so ensure that's defined
+
 TEX_DEFAULTS = [
     # Extra default replacements we need to specially handle.
 
@@ -614,6 +617,8 @@ def set_player_portalgun(inst):
     - If there are only orange portal spawners, the player gets a blue-
       only gun (Regular single portal device)
     - If there are both spawner types, the player doesn't get a gun.
+    - The two relays '@player_has_blue' and '@player_has_oran' will be
+      triggered OnMapSpawn if the player has those portals.
     """
     if GAME_MODE == 'COOP':
         return  # Don't change portalgun in Portal 2 Coop
@@ -654,6 +659,7 @@ def set_player_portalgun(inst):
         has['spawn_dual'] = False
         has['spawn_single'] = False
         has['spawn_nogun'] = True
+        has_gun = False
         # This instance only has a trigger_weapon_strip.
         VMF.create_ent(
             classname='func_instance',
@@ -662,6 +668,28 @@ def set_player_portalgun(inst):
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
+
+    if blue_portal or oran_portal:
+        auto = VMF.create_ent(
+            classname='logic_auto',
+            origin=get_opt('global_pti_ents_loc'),
+            spawnflags='1',  # Remove on Fire
+        )
+        if blue_portal:
+            auto.add_out(VLib.Output(
+                'OnMapSpawn',
+                '@player_has_blue',
+                'Trigger',
+                times=1,
+            ))
+        if oran_portal:
+            auto.add_out(VLib.Output(
+                'OnMapSpawn',
+                '@player_has_oran',
+                'Trigger',
+                times=1,
+            ))
+
     utils.con_log('Done!')
 
 

@@ -15,7 +15,9 @@ import utils
 GLOBAL_INSTANCES = set()
 OPTIONS = {}
 ALL_INST = set()
-
+STYLE_VARS = {}
+VOICE_ATTR = {}
+VMF = None
 
 conditions = []
 FLAG_LOOKUP = {}
@@ -864,7 +866,7 @@ def flag_brush_at_loc(inst, flag):
     """Checks to see if a wall is present at the given location.
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
-       of the brush, in 16 unit increments.
+       of the brush.
     - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
     - Type defines the type the brush must be:
       - "Any" requires either a black or white brush.
@@ -2678,7 +2680,7 @@ def res_goo_debris(_, res):
 
     suff = ''
     for loc in possible_locs:
-        random.seed('goo_mist_{}_{}_{}'.format(loc.x, loc.y, loc.z))
+        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
         if random.random() > chance:
             continue
 

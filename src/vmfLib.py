@@ -84,6 +84,18 @@ def find_empty_id(used_id, desired=-1):
                 return poss_id
 
 
+def overlay_bounds(over):
+    """Compute the bounding box of an overlay."""
+    origin = Vec.from_str(over['origin'])
+    return Vec.bbox(
+        Vec.from_str(
+            (origin + Vec.from_str(over['uv' + str(x)]))
+            for x in
+            range(4)
+        )
+    )
+
+
 class CopySet(set):
     """Modified version of a Set which allows modification during iteration.
 
@@ -1106,12 +1118,12 @@ class Side:
     def scale(self, value):
         self.uaxis.scale = value
         self.vaxis.scale = value
-    scale = property(fset=scale, doc='Set botth scale attributes easily.')
+    scale = property(fset=scale, doc='Set both scale attributes easily.')
 
     def offset(self, value):
         self.uaxis.offset = value
         self.vaxis.offset = value
-    offset = property(fset=offset, doc='Set botth scale attributes easily.')
+    offset = property(fset=offset, doc='Set both offset attributes easily.')
 
 
 class Entity:
