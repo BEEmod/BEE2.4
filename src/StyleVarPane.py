@@ -249,10 +249,12 @@ def make_pane(tool_frame):
     UI['style_can'].config(
         scrollregion=UI['style_can'].bbox(ALL),
         width=canvas_frame.winfo_reqwidth(),
-        )
-    ttk.Sizegrip(
-        window,
-        cursor=utils.CURSORS['stretch_vert'],
+    )
+
+    if utils.USE_SIZEGRIP:
+        ttk.Sizegrip(
+            window,
+            cursor=utils.CURSORS['stretch_vert'],
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
@@ -262,13 +264,13 @@ def make_pane(tool_frame):
         window.bind(
             "<MouseWheel>",
             lambda e: scroll(int(-1*(e.delta/120))),
-            )
+        )
     elif utils.MAC:
         window.bind(
             "<Button-4>",
             lambda e: scroll(1),
-            )
+        )
         window.bind(
             "<Button-5>",
             lambda e: scroll(-1),
-            )
+        )

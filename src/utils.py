@@ -186,6 +186,8 @@ else:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func)
 
+USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
+
 BOOL_LOOKUP = {
     '1': True,
     '0': False,

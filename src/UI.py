@@ -1104,7 +1104,8 @@ def init_palette(f):
     UI['pal_remove'] = ttk.Button(f, text='Delete Palette', command=pal_remove)
     UI['pal_remove'].grid(row=2, sticky="EW")
 
-    ttk.Sizegrip(f).grid(row=2, column=1)
+    if utils.USE_SIZEGRIP:
+        ttk.Sizegrip(f).grid(row=2, column=1)
 
 
 def init_option(f):
@@ -1213,15 +1214,16 @@ def init_option(f):
     elev_win.widget(props).grid(row=5, column=1, sticky='EW')
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
 
-    ttk.Sizegrip(
-        props,
-        cursor=utils.CURSORS['stretch_horiz'],
+    if utils.USE_SIZEGRIP:
+        ttk.Sizegrip(
+            props,
+            cursor=utils.CURSORS['stretch_horiz'],
         ).grid(
             row=2,
             column=5,
             rowspan=2,
             sticky="NS",
-            )
+        )
 
 
 def flow_preview():
