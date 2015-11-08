@@ -13,6 +13,25 @@ LINUX = platform.startswith('linux')
 
 BEE_VERSION = "2.4"
 
+STEAM_IDS = {
+    'PORTAL2': '620',
+
+    'APTAG': '280740',
+    'APERTURE TAG': '280740',
+    'ALATAG': '280740',
+    'TAG': '280740',
+
+    'TWTM': '286080',
+    'THINKING WITH TIME MACHINE': '286080',
+
+    # Others:
+    # 841: P2 Beta
+    # 213630: Educational
+    # 247120: Sixense
+    # 211480: 'In Motion'
+    # 317400: PS Mel - No workshop
+}
+
 if WIN:
     # Some events differ on different systems, so define them here.
     EVENTS = {
@@ -166,6 +185,8 @@ else:
     def bind_rightclick(wid, func):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func)
+
+USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
 
 BOOL_LOOKUP = {
     '1': True,
@@ -348,6 +369,14 @@ def parse_str(val, x=0.0, y=0.0, z=0.0):
     else:
         return x, y, z
 
+
+def iter_grid(max_x, max_y, min_x=0, min_y=0, stride=1):
+    """Loop over a rectangular grid area."""
+    for x in range(min_x, max_x, stride):
+        for y in range(min_y, max_y, stride):
+            yield x, y
+
+
 DISABLE_ADJUST = False
 
 
@@ -415,7 +444,6 @@ def fit(dist, obj):
 
     assert sum(items) == orig_dist
     return list(items)  # Dump the deque
-
 
 class EmptyMapping(abc.Mapping):
     """A Mapping class which is always empty."""
@@ -589,6 +617,17 @@ class Vec:
             round_vals,
         )
 
+    @staticmethod
+    def bbox(*points):
+        """Compute the bounding box for a set of points."""
+        first, *points = points
+        bbox_min = Vec(first)
+        bbox_max = Vec(first)
+        for point in points:
+            bbox_min.min(point)
+            bbox_max.max(point)
+        return bbox_min, bbox_max
+
     def __add__(self, other) -> 'Vec':
         """+ operation.
 
@@ -596,6 +635,8 @@ class Vec:
         """
         if isinstance(other, Vec):
             return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
+        elif isinstance(other, tuple):
+            return Vec(self.x + other[0], self.y + other[1], self.z + other[2])
         else:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
@@ -605,42 +646,53 @@ class Vec:
 
         This additionally works on scalars (adds to all axes).
         """
+        if isinstance(other, Vec):
+            return Vec(
+                self.x - other.x,
+                self.y - other.y,
+                self.z - other.z
+            )
+
         try:
-            if isinstance(other, Vec):
-                return Vec(
-                    self.x - other.x,
-                    self.y - other.y,
-                    self.z - other.z
-                )
+            if isinstance(other, tuple):
+                x = self.x - other[0]
+                y = self.y - other[1]
+                z = self.z - other[2]
             else:
-                return Vec(
-                    self.x - other,
-                    self.y - other,
-                    self.z - other,
-                )
+                x = self.x - other
+                y = self.y - other
+                z = self.z - other
         except TypeError:
             return NotImplemented
+        else:
+            return Vec(x, y, z)
 
     def __rsub__(self, other) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
         """
+
+        if isinstance(other, Vec):
+            return Vec(
+                other.x - self.x,
+                other.y - self.x,
+                other.z - self.z
+            )
+
         try:
-            if isinstance(other, Vec):
-                return Vec(
-                    other.x - self.x,
-                    other.y - self.x,
-                    other.z - self.z
-                )
+            if isinstance(other, tuple):
+                x = other[0] - self.x
+                y = other[1] - self.y
+                z = other[2] - self.z
             else:
-                return Vec(
-                    other - self.x,
-                    other - self.y,
-                    other - self.z
-                )
+                x = other - self.x
+                y = other - self.y
+                z = other - self.z
         except TypeError:
             return NotImplemented
+        else:
+            return Vec(x, y, z)
 
     def __mul__(self, other) -> 'Vec':
         """Multiply the Vector by a scalar."""

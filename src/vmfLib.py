@@ -11,6 +11,11 @@ from property_parser import Property
 from utils import Vec
 import utils
 
+from typing import (
+    Optional, Union,
+    Dict, List, Tuple, Iterator,
+)
+
 # Used to set the defaults for versioninfo
 CURRENT_HAMMER_VERSION = 400
 CURRENT_HAMMER_BUILD = 5304
@@ -77,6 +82,18 @@ def find_empty_id(used_id, desired=-1):
             if poss_id not in used_id:
                 used_id.append(poss_id)
                 return poss_id
+
+
+def overlay_bounds(over):
+    """Compute the bounding box of an overlay."""
+    origin = Vec.from_str(over['origin'])
+    return Vec.bbox(
+        Vec.from_str(
+            (origin + Vec.from_str(over['uv' + str(x)]))
+            for x in
+            range(4)
+        )
+    )
 
 
 class CopySet(set):
@@ -298,7 +315,7 @@ class VMF:
           inc_version to False to suppress this.
         """
         if dest_file is None:
-            dest_file = io.stringIO()
+            dest_file = io.StringIO()
             # acts like a file object but is actually a string. We're
             # using this to prevent having Python duplicate the entire
             # string every time we append
@@ -436,12 +453,12 @@ class VMF:
                         if out.target == name:  # target
                             yield out
 
-    def make_prism(self, p1, p2) -> PrismFace:
+    def make_prism(self, p1, p2, mat='tools/toolsnodraw') -> PrismFace:
         """Create an axis-aligned brush connecting the two points.
 
         A PrismFaces tuple will be returned which containes the six
         faces, as well as the solid.
-        All faces will be textured with tools/toolsnodraw.
+        All faces will be textured with 'mat'.
         """
         b_min = Vec(p1)
         b_max = Vec(p1)
@@ -455,6 +472,7 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_max.y, b_min.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, -1, 0),
         )
@@ -466,6 +484,7 @@ class VMF:
                 (b_max.x, b_max.y, b_max.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, -1, 0),
         )
@@ -477,6 +496,7 @@ class VMF:
                 (b_min.x, b_min.y, b_max.z),
                 (b_min.x, b_min.y, b_min.z),
             ],
+            mat=mat,
             uaxis=UVAxis(0, 1, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -488,6 +508,7 @@ class VMF:
                 (b_max.x, b_min.y, b_min.z),
                 (b_max.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(0, 1, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -499,6 +520,7 @@ class VMF:
                 (b_min.x, b_min.y, b_min.z),
                 (b_min.x, b_min.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -506,10 +528,11 @@ class VMF:
         f_north = Side(
             self,
             planes=[  # +y side
-                (b_max.x, b_max.y, b_max.z),
-                (b_min.x, b_max.y, b_max.z),
                 (b_min.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_max.z),
             ],
+            mat=mat,
             uaxis=UVAxis(1, 0, 0),
             vaxis=UVAxis(0, 0, -1),
         )
@@ -759,7 +782,7 @@ class Solid:
         if self.id in self.map.solid_id:
             self.map.solid_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Get two vectors representing the space this brush takes up."""
         bbox_min, bbox_max = self.sides[0].get_bbox()
         for s in self.sides[1:]:
@@ -768,7 +791,7 @@ class Solid:
             bbox_min.min(side_min)
         return bbox_min, bbox_max
 
-    def get_origin(self, bbox_min=None, bbox_max=None):
+    def get_origin(self, bbox_min=None, bbox_max=None) -> Vec:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
@@ -796,9 +819,9 @@ class UVAxis:
     ]
 
     def __init__(self, x, y, z, offset=0.0, scale=0.25):
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = x  # type: float
+        self.y = y  # type: float
+        self.z = z  # type: float
         self.offset = offset
         self.scale = scale
 
@@ -1045,7 +1068,7 @@ class Side:
         if self.id in self.map.face_id:
             self.map.face_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Generate the highest and lowest points these planes form."""
         bbox_max = self.planes[0].copy()
         bbox_min = self.planes[0].copy()
@@ -1054,7 +1077,7 @@ class Side:
             bbox_min.min(v)
         return bbox_min, bbox_max
 
-    def get_origin(self):
+    def get_origin(self) -> Vec:
         """Calculates a vector representing the exact center of this plane."""
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
@@ -1080,7 +1103,7 @@ class Side:
             self.planes[2].join(' ')
             )
 
-    def normal(self):
+    def normal(self) -> Vec:
         """Compute the unit vector which extends perpendicular to the face.
 
         """
@@ -1095,12 +1118,12 @@ class Side:
     def scale(self, value):
         self.uaxis.scale = value
         self.vaxis.scale = value
-    scale = property(fset=scale, doc='Set botth scale attributes easily.')
+    scale = property(fset=scale, doc='Set both scale attributes easily.')
 
     def offset(self, value):
         self.uaxis.offset = value
         self.vaxis.offset = value
-    offset = property(fset=offset, doc='Set botth scale attributes easily.')
+    offset = property(fset=offset, doc='Set both offset attributes easily.')
 
 
 class Entity:
@@ -1181,34 +1204,30 @@ class Entity:
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
-                ent_id = item.value
+                ent_id = int(item.value)
             elif name.startswith('replace'):
                 index = item.name[-2:]  # Index is the last 2 digits
-                if index.isdigit():
+                try:
+                    index = int(index)
+                except TypeError:  # Not a replace value!
+                    keys[name] = item.value
+                else:
+                    # Parse the $replace value
                     vals = item.value.split(" ", 1)
                     var = vals[0][1:]  # Strip the $ sign
                     value = vals[1]
-                    fixup[var.casefold()] = FixupTuple(var, value, index)
-                else:
-                    # Not a replace value!
-                    keys[name] = item.value
-            elif name == "solid":
-                if item.has_children():
-                    solids.append(Solid.parse(vmf_file, item))
-                else:
-                    keys[item.name] = item.value
+                    fixup[var.casefold()] = FixupTuple(var, value, int(index))
+            elif name == "solid" and item.has_children():
+                solids.append(Solid.parse(vmf_file, item))
             elif name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
-            elif name == "hidden":
-                if item.has_children():
+            elif name == "hidden" and item.has_children():
                     solids.extend(
                         Solid.parse(vmf_file, br, hidden=True)
                         for br in
                         item
                     )
-                else:
-                    keys[item.name] = item.value
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1512,13 +1531,9 @@ class EntityFixup:
         if folded_var not in self:
             max_id = 0
             for fixup in self._fixup.values():
-                if int(fixup.id) > max_id:
-                    max_id = int(fixup.id)
+                if fixup.id > max_id:
+                    max_id = fixup.id
             max_id += 1
-            if max_id < 9:
-                max_id = "0" + str(max_id)
-            else:
-                max_id = str(max_id)
             self._fixup[folded_var] = FixupTuple(var, val, max_id)
         else:
             self._fixup[folded_var] = FixupTuple(var, val, self._fixup[var].id)
@@ -1551,11 +1566,9 @@ class EntityFixup:
         """Export all the replace values into the VMF."""
         if len(self._fixup) > 0:
             for (key, value, index) in sorted(
-                    self._fixup.values(), key=lambda x: x[2]
-                    ):
-                # we end up with (key, val, index) and we want to sort
-                # by the index
-                buffer.write(ind + '\t"replace{}" "${} {}"\n'.format(
+                    self._fixup.values(), key=lambda x: x.id):
+                # When exporting, pad with zeros if needed
+                buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
 
 

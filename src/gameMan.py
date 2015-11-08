@@ -405,6 +405,10 @@ class Game:
             ('Options', 'BEE2_loc'),
             os.path.dirname(os.getcwd())  # Go up one dir to our actual location
         )
+        vbsp_config.set_key(
+            ('Options', 'Game_ID'),
+            self.steamID,
+        )
 
         vbsp_config.ensure_exists('StyleVars')
         vbsp_config['StyleVars'] += [
@@ -656,6 +660,7 @@ def add_game(_=None, refresh_menu=True):
             name = ask_string(
                 prompt="Enter the name of this game:",
                 title='BEE2 - Add Game',
+                initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(

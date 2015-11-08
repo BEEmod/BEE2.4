@@ -3,6 +3,7 @@ from decimal import Decimal
 from collections import namedtuple
 from enum import Enum
 import random
+import math
 
 from utils import Vec
 from property_parser import Property
@@ -14,7 +15,9 @@ import utils
 GLOBAL_INSTANCES = set()
 OPTIONS = {}
 ALL_INST = set()
-
+STYLE_VARS = {}
+VOICE_ATTR = {}
+VMF = None
 
 conditions = []
 FLAG_LOOKUP = {}
@@ -28,6 +31,8 @@ ALL_META = []
 
 SOLIDS = {}  # A dictionary mapping origins to their brushes
 solidGroup = namedtuple('solidGroup', 'face solid normal color')
+
+GOO_LOCS = set()  # A set of all goo solid origins.
 
 
 class MAT_TYPES(Enum):
@@ -85,7 +90,6 @@ DIRECTIONS = {
 }
 
 INST_ANGLE = {
-    # The angles needed to point a PeTI instance in this direction
     # IE up = zp = floor
     zp: "0 0 0",
     zn: "0 0 0",
@@ -95,6 +99,16 @@ INST_ANGLE = {
     xp: "0 180 0",
     yp: "0 270 0",
 
+}
+
+PETI_INST_ANGLE = {
+    # The angles needed to point a PeTI instance in this direction
+    # IE north = yn
+
+    yn: "0 0 90",
+    xp: "0 90 90",
+    yp: "0 180 90",
+    xn: "0 270 90",
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -175,18 +189,36 @@ class Condition:
 
         """
         for res in self.results[:]:
-            func = RESULT_SETUP.get(res.name)
-            if func:
-                res.value = func(res)
-                if res.value is None:
-                    self.results.remove(res)
+            self.setup_result(self.results, res)
 
         for res in self.else_results[:]:
-            func = RESULT_SETUP.get(res.name)
-            if func:
-                res.value = func(res)
-                if res.value is None:
-                    self.else_results.remove(res)
+            self.setup_result(self.else_results, res)
+
+
+    @staticmethod
+    def setup_result(res_list, result):
+        """Helper method to perform result setup."""
+        func = RESULT_SETUP.get(result.name)
+        if func:
+            result.value = func(result)
+            if result.value is None:
+                # This result is invalid, remove it.
+                res_list.remove(result)
+
+
+    @staticmethod
+    def test_result(inst, res):
+        """Execute the given result."""
+        try:
+            func = RESULT_LOOKUP[res.name]
+        except KeyError:
+            utils.con_log(
+                '"{}" is not a valid condition result!'.format(
+                    res.real_name,
+                )
+            )
+        else:
+            return func(inst, res)
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -197,18 +229,10 @@ class Condition:
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            try:
-                func = RESULT_LOOKUP[res.name]
-            except KeyError:
-                utils.con_log(
-                    '"{}" is not a valid condition result!'.format(
-                        res.real_name,
-                    )
-                )
-            else:
-                should_del = func(inst, res)
-                if should_del is True:
-                    results.remove(res)
+            should_del = self.test_result(inst, res)
+            if should_del is True:
+                results.remove(res)
+
 
     def __lt__(self, other):
         """Condition items sort by priority."""
@@ -324,7 +348,7 @@ def init(seed, inst_list, vmf_file):
     VMF = vmf_file
     MAP_RAND_SEED = seed
     ALL_INST = set(inst_list)
-    OPTIONS = vbsp.settings
+    OPTIONS = vbsp.settings['options']
     STYLE_VARS = vbsp.settings['style_vars']
     VOICE_ATTR = vbsp.settings['has_attr']
 
@@ -339,19 +363,19 @@ def check_all():
     utils.con_log('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.by_class['func_instance']:
-                try:
-                    condition.test(inst)
-                except NextInstance:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next instance.
-                    pass
-                except EndCondition:
-                    # This is raised to immediately stop running
-                    # this condition, and skip to the next condtion.
-                    break
-                if not condition.results and not condition.else_results:
-                    utils.con_log('Exiting empty condition!')
-                    break  # Condition has run out of results, quit early
+            try:
+                condition.test(inst)
+            except NextInstance:
+                # This is raised to immediately stop running
+                # this condition, and skip to the next instance.
+                pass
+            except EndCondition:
+                # This is raised to immediately stop running
+                # this condition, and skip to the next condtion.
+                break
+            if not condition.results and not condition.else_results:
+                utils.con_log('Exiting empty condition!')
+                break  # Condition has run out of results, quit early
 
     utils.con_log('Map has attributes: ', [
         key
@@ -361,12 +385,6 @@ def check_all():
     ])
     utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
     utils.con_log('Global instances: ', GLOBAL_INSTANCES)
-
-
-def check_inst(inst):
-    """Run all conditions on a given instance."""
-    for condition in conditions:
-        condition.test(inst)
 
 
 def check_flag(flag, inst):
@@ -400,6 +418,12 @@ def build_solid_dict():
 
     for solid in VMF.brushes:
         for face in solid:
+            if face.mat.casefold() in (
+                    'nature/toxicslime_a2_bridge_intro',
+                    'nature/toxicslime_puzzlemaker_cheap'):
+                GOO_LOCS.add(face.get_origin().as_tuple())
+                continue
+
             try:
                 mat_type = mat_types[face.mat]
             except KeyError:
@@ -466,41 +490,36 @@ def dump_func_docs(func):
         utils.con_log('\tNo documentation!')
 
 
-@make_result_setup('variant')
-def variant_weight(var):
-    """Read variant commands from settings and create the weight list."""
-    count = var['number', '']
-    if count.isdecimal():
-        count = int(count)
-        weight = var['weights', '']
-        if weight == '' or ',' not in weight:
-            utils.con_log('Invalid weight! (' + weight + ')')
-            weight = [str(i) for i in range(1, count + 1)]
-        else:
-            # Parse the weight
-            vals = weight.split(',')
-            weight = []
-            if len(vals) == count:
-                for i, val in enumerate(vals):
-                    val = val.strip()
-                    if val.isdecimal():
-                        # repeat the index the correct number of times
-                        weight.extend(
-                            str(i+1)
-                            for _ in
-                            range(1, int(val)+1)
-                        )
-                    else:
-                        # Abandon parsing
-                        break
-            if len(weight) == 0:
-                utils.con_log('Failed parsing weight! ({!s})'.format(weight))
-                weight = [str(i) for i in range(1, count + 1)]
-        # random.choice(weight) will now give an index with the correct
-        # probabilities.
-        return weight
+def weighted_random(count: int, weights: str):
+    """Generate random indexes with weights.
+
+    This produces a list intended to be fed to random.choice(), with
+    repeated indexes corresponding to the comma-separated weight values.
+    """
+    if weights == '' or ',' not in weights:
+        utils.con_log('Invalid weight! (' + weights + ')')
+        weight = list(range(count))
     else:
-        return ['']  # This won't append anything to the file
+        # Parse the weight
+        vals = weights.split(',')
+        weight = []
+        if len(vals) == count:
+            for i, val in enumerate(vals):
+                val = val.strip()
+                if val.isdecimal():
+                    # repeat the index the correct number of times
+                    weight.extend(
+                        [i] * int(val)
+                    )
+                else:
+                    # Abandon parsing
+                    break
+        if len(weight) == 0:
+            utils.con_log('Failed parsing weight! ({!s})'.format(weight))
+            weight = list(range(count))
+    # random.choice(weight) will now give an index with the correct
+    # probabilities.
+    return weight
 
 
 def add_output(inst, prop, target):
@@ -558,6 +577,32 @@ def widen_fizz_brush(brush, thickness, bounds=None):
                     v[axis] = bound_min[axis]
 
 
+def set_ent_keys(ent, inst, prop_block, suffix=''):
+    """Copy the given key prop block to an entity.
+
+    This uses the 'keys' and 'localkeys' properties on the prop_block.
+    Values with $fixup variables will be treated appropriately.
+    LocalKeys keys will be changed to use instance-local names, where needed.
+    If suffix is set, it is a suffix to the two prop_block names
+    """
+    for prop in prop_block.find_key('Keys'+suffix, []):
+        if prop.value.startswith('$'):
+            if prop.value in inst.fixup:
+                ent[prop.real_name] = inst.fixup[prop.value]
+        else:
+            ent[prop.real_name] = prop.value
+    name = inst['targetname', ''] + '-'
+    for prop in prop_block.find_key('LocalKeys'+suffix, []):
+        if prop.value.startswith('$'):
+            val = inst.fixup[prop.value]
+        else:
+            val = prop.value
+        if val.startswith('@'):
+            ent[prop.real_name] = val
+        else:
+            ent[prop.real_name] = name + val
+
+
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -585,6 +630,12 @@ def debug_result(inst, props):
     debug_flag(inst, props)
 
 debug_result.__doc__ = debug_flag.__doc__
+
+
+@make_result('dummy', 'nop', 'do_nothing')
+def dummy_result(inst, props):
+    """Dummy result that doesn't do anything."""
+    pass
 
 
 @meta_cond(priority=1000, only_once=False)
@@ -713,6 +764,25 @@ def flag_music(_, flag):
     return OPTIONS['music_id'] == flag.value
 
 
+@make_flag('Game')
+def flag_game(_, flag):
+    """Checks which game is being modded.
+
+    Accepts the ffollowing aliases instead of a Steam ID:
+     - PORTAL2
+     - APTAG
+     - ALATAG
+     - TAG
+     - Aperture Tag
+     - TWTM,
+     - Thinking With Time Machine
+    """
+    return OPTIONS['game_id'] == utils.STEAM_IDS.get(
+        flag.value.upper(),
+        flag.value,
+    )
+
+
 @make_flag('has_char')
 def flag_voice_char(_, flag):
     """Checks to see if the given charcter is present in the voice pack.
@@ -822,7 +892,7 @@ def flag_brush_at_loc(inst, flag):
     """Checks to see if a wall is present at the given location.
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
-       of the brush, in 16 unit increments.
+       of the brush.
     - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
     - Type defines the type the brush must be:
       - "Any" requires either a black or white brush.
@@ -929,6 +999,108 @@ def res_set_option(_, res):
     return True  # Remove this result
 
 
+@make_result('setKey')
+def res_set_key(inst, res):
+    """Set a keyvalue to the given value.
+
+    The name and value should be separated by a space.
+    """
+    key, value = res.value.split(' ', 1)
+    inst[key] = value
+
+
+@make_result_setup('random')
+def res_random_setup(res):
+    weight = ''
+    results = []
+    chance = 100
+    seed = ''
+    for prop in res:
+        if prop.name == 'chance':
+            # Allow ending with '%' sign
+            chance = utils.conv_int(
+                prop.value.rstrip('%'),
+                chance,
+            )
+        elif prop.name == 'weights':
+            weight = prop.value
+        elif prop.name == 'seed':
+            seed = prop.value
+        else:
+            results.append(prop)
+
+    if not results:
+        return None  # Invalid!
+
+    weight = weighted_random(len(results), weight)
+
+    # We also need to execute result setups on all child properties!
+    for prop in results[:]:
+        if prop.name == 'group':
+            for sub_prop in prop.value[:]:
+                Condition.setup_result(prop.value, sub_prop)
+        else:
+            Condition.setup_result(results, prop)
+
+    return seed, chance, weight, results
+
+
+@make_result('random')
+def res_random(inst, res):
+    """Randomly choose one of the sub-results to execute.
+
+    The "chance" value defines the percentage chance for any result to be
+    chosen. "weights" defines the weighting for each result. Wrap a set of
+    results in a "group" property block to treat them as a single result to be
+    executed in order.
+    """
+    # Note: 'global' results like "Has" won't delete themselves!
+    # Instead they're replaced by 'dummy' results that don't execute.
+    # Otherwise the chances would be messed up.
+    seed, chance, weight, results = res.value
+    random.seed('random_case_{}:{}_{}_{}'.format(
+        seed,
+        inst['targetname', ''],
+        inst['origin'],
+        inst['angles'],
+    ))
+    if random.randrange(100) > chance:
+        return
+
+    ind = random.choice(weight)
+    choice = results[ind]
+    if choice.name == 'group':
+        for sub_res in choice.value:
+            should_del = Condition.test_result(
+                inst,
+                sub_res,
+            )
+            if should_del:
+                # This Result doesn't do anything!
+                sub_res.name = 'nop'
+    else:
+        should_del = Condition.test_result(
+            inst,
+            choice,
+        )
+        if should_del:
+            choice.name = 'nop'
+
+
+@make_result('forceUpright')
+def res_force_upright(inst, _):
+    """Position an instance to orient upwards while keeping the normal.
+
+    The result angle will have pitch and roll set to 0. Vertical
+    instances are unaffected.
+    """
+    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    if normal.z != 0:
+        return
+    ang = math.degrees(math.atan2(normal.y, normal.z))
+    inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
+
+
 @make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
@@ -958,6 +1130,18 @@ def res_set_inst_var(inst, res):
     inst.fixup[var_name] = val
 
 
+@make_result_setup('variant')
+def res_add_variant_setup(res):
+    count = utils.conv_int(res['Number', ''], None)
+    if count:
+        return weighted_random(
+            count,
+            res['weights', ''],
+        )
+    else:
+        return None
+
+
 @make_result('variant')
 def res_add_variant(inst, res):
     """This allows using a random instance from a weighted group.
@@ -965,7 +1149,7 @@ def res_add_variant(inst, res):
     A suffix will be added in the form "_var4".
     Two properties should be given:
         Number: The number of random instances.
-        Weight: A comma-separated list of weights for each instance.
+        Weights: A comma-separated list of weights for each instance.
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of "2, 1, 1" means the first instance has a 2/4 chance of
     being chosen, and the other 2 have a 1/4 chance of being chosen.
@@ -980,7 +1164,7 @@ def res_add_variant(inst, res):
         # We still need to use angles and origin, since things like
         # fizzlers might not get unique names.
         random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
-    add_suffix(inst, "_var" + random.choice(res.value))
+    add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
 
 
 @make_result('addGlobal')
@@ -1033,13 +1217,17 @@ def res_add_overlay_inst(inst, res):
         Copy_Fixup: If true, all the $replace values from the original
             instance will be copied over.
         move_outputs: If true, outputs will be moved to this instance.
+        offset: The offset (relative to the base) that the instance
+            will be placed.
+        angles: If set, overrides the base instance angles. This does
+            not affect the offset property.
     """
-    print('adding overlay', res['file'])
+    angle = res['angles', inst['angles', '0 0 0']]
     overlay_inst = VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
         file=resolve_inst(res['file', ''])[0],
-        angles=inst['angles', '0 0 0'],
+        angles=angle,
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
@@ -1050,6 +1238,22 @@ def res_add_overlay_inst(inst, res):
     if utils.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
+
+    if 'offset' in res:
+        # Offset the overlay by the given distance
+        offset = Vec.from_str(res['offset']).rotate_by_str(
+            inst['angles', '0 0 0']
+        )
+        overlay_inst['origin'] = (
+            offset + Vec.from_str(inst['origin'])
+        ).join(' ')
+
+
+@make_result('OffsetInst', 'offsetinstance')
+def res_translate_inst(inst, res):
+    """Translate the instance locally by the given amount."""
+    offset = Vec.from_str(res.value).rotate_by_str(inst['angles'])
+    inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
 
 
 @make_result_setup('custOutput')
@@ -1319,8 +1523,10 @@ def res_cust_fizzler(base_inst, res):
             # All ents must have a classname!
             new_brush['classname'] = 'trigger_portal_cleanser'
 
-            for prop in config['keys', []]:
-                new_brush[prop.name] = prop.value
+            set_ent_keys(
+                new_brush, base_inst,
+                config,
+            )
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
@@ -1886,11 +2092,12 @@ def res_track_plat(_, res):
         - Single_plat: An instance used for platform with 1 rail
         - Track_name: The name to give to the tracks.
         - Vert_suffix: Add suffixes to vertical tracks
-            (_vert, _vert_mirrored)
+            (_vert)
         - Horiz_suffix: Add suffixes to horizontal tracks
             (_horiz, _horiz_mirrored)
         - plat_suffix: Also add the above _vert or _horiz suffixes to
             the platform.
+        - plat_var: If set, save the orientation to the given $fixup variable
     """
     # Get the instances from editoritems
     (
@@ -2015,6 +2222,11 @@ def res_track_plat(_, res):
                     add_suffix(inst, '_horiz')
                 if utils.conv_bool(res['plat_suffix', '']):
                     add_suffix(plat_inst, '_horiz')
+
+        plat_var = res['plat_var', '']
+        if plat_var != '':
+            # Skip the '_mirrored' section if needed
+            plat_inst.fixup[plat_var] = track_facing[:5].lower()
     return True  # Only run once!
 
 
@@ -2055,19 +2267,19 @@ FLAG_ROTATING = {
     },
     'func_door_rotating': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 8 | 4,  # 'Non-solid to player', 'passable'
     },
     'func_rot_button': {
         'rev': 2,
-        'x': 128,
-        'y': 64,
+        'x': 64,
+        'y': 128,
         'solid_flags': 1,  # 'Not solid'
     },
     'momentary_rot_button': {
-        'x': 128,
-        'z': 64,
+        'x': 64,
+        'z': 128,
         # Reversed is set by keyvalue
         'solid_flags': 1,  # 'Not solid'
     },
@@ -2140,8 +2352,7 @@ def res_fix_rotation_axis(ent, res):
         origin=pos.join(' '),
     )
 
-    for key in res.find_key('Keys', []):
-        door_ent[key.real_name] = key.value
+    set_ent_keys(door_ent, ent, res)
 
     for output in res.find_all('AddOut'):
         door_ent.add_out(VLib.Output(
@@ -2414,3 +2625,773 @@ def res_add_brush(inst, res):
     else:
         # Add to the world
         VMF.add_brush(solids.solid)
+
+
+def scaff_scan(inst_list, start_ent):
+    """Given the start item and instance list, follow the programmed path."""
+    cur_ent = start_ent
+    while True:
+        yield cur_ent
+        cur_ent = inst_list.get(cur_ent['next'], None)
+        if cur_ent is None:
+            return
+
+
+SCAFF_PATTERN = '{name}_group{group}_part{index}'
+# Store the configs for scaffold items so we can
+# join them up later
+SCAFFOLD_CONFIGS = {}
+
+
+@make_result_setup('UnstScaffold')
+def res_unst_scaffold_setup(res):
+    group = res['group', 'DEFAULT_GROUP']
+
+    if group not in SCAFFOLD_CONFIGS:
+        # Store our values in the CONFIGS dictionary
+        targ_inst, links = SCAFFOLD_CONFIGS[group] = {}, {}
+    else:
+        # Grab the already-filled values, and add to them
+        targ_inst, links = SCAFFOLD_CONFIGS[group]
+
+    for block in res.find_all("Instance"):
+        conf = {
+            # If set, adjusts the offset appropriately
+            'is_piston': utils.conv_bool(block['isPiston', '0']),
+            'rotate_logic': utils.conv_bool(block['AlterAng', '1'], True),
+            'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
+            'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
+
+            'logic_start': block['startlogic', ''],
+            'logic_end': block['endLogic', ''],
+            'logic_mid': block['midLogic', ''],
+
+            'logic_start_rev': block['StartLogicRev', None],
+            'logic_end_rev': block['EndLogicRev', None],
+            'logic_mid_rev': block['EndLogicRev', None],
+
+            'inst_wall': block['wallInst', ''],
+            'inst_floor': block['floorInst', ''],
+            'inst_offset': block['offsetInst', None],
+            # Specially rotated to face the next track!
+            'inst_end': block['endInst', None],
+        }
+        for logic_type in ('logic_start', 'logic_mid', 'logic_end'):
+            if conf[logic_type + '_rev'] is None:
+                conf[logic_type + '_rev'] = conf[logic_type]
+
+        for inst in resolve_inst(block['file']):
+            targ_inst[inst] = conf
+
+    # We need to provide vars to link the tracks and beams.
+    for block in res.find_all('LinkEnt'):
+        # The name for this set of entities.
+        # It must be a '@' name, or the name will be fixed-up incorrectly!
+        loc_name = block['name']
+        if not loc_name.startswith('@'):
+            loc_name = '@' + loc_name
+        links[block['nameVar']] = {
+            'name': loc_name,
+            # The next entity (not set in end logic)
+            'next': block['nextVar'],
+            # A '*' name to reference all the ents (set on the start logic)
+            'all': block['allVar', None],
+        }
+
+    return group  # We look up the group name to find the values.
+
+
+@make_result('UnstScaffold')
+def res_unst_scaffold(_, res):
+    """The condition to generate Unstationary Scaffolds.
+
+    This is executed once to modify all instances.
+    """
+    # The instance types we're modifying
+    if res.value not in SCAFFOLD_CONFIGS:
+        # We've already executed this config group
+        return True
+
+    utils.con_log(
+        'Running Scaffold Generator (' + res.value + ')...'
+    )
+    TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
+    del SCAFFOLD_CONFIGS[res.value] # Don't let this run twice
+
+    instances = {}
+    # Find all the instances we're wanting to change, and map them to
+    # targetnames
+    for ent in VMF.by_class['func_instance']:
+        file = ent['file'].casefold()
+        targ = ent['targetname']
+        if file not in TARG_INST:
+            continue
+        config = TARG_INST[file]
+        next_inst = set(
+            out.target
+            for out in
+            ent.outputs
+        )
+        # Destroy these outputs, they're useless now!
+        ent.outputs.clear()
+        instances[targ] = {
+            'ent': ent,
+            'conf': config,
+            'next': next_inst,
+            'prev': None,
+        }
+
+    # Now link each instance to its in and outputs
+    for targ, inst in instances.items():
+        scaff_targs = 0
+        for ent_targ in inst['next']:
+            if ent_targ in instances:
+                instances[ent_targ]['prev'] = targ
+                inst['next'] = ent_targ
+                scaff_targs += 1
+            else:
+                # If it's not a scaffold, it's probably an indicator_toggle.
+                # We want to remove any them as well as the assoicated
+                # antlines! Assume anything with '$indicator_name' is a
+                # toggle instance
+                for toggle in VMF.by_target[ent_targ]:
+                    overlay_name = toggle.fixup['$indicator_name', '']
+                    if overlay_name != '':
+                        toggle.remove()
+                        for ent in VMF.by_target[overlay_name]:
+                            ent.remove()
+        if scaff_targs > 1:
+            raise Exception('A scaffold item has multiple destinations!')
+        elif scaff_targs == 0:
+            inst['next'] = None  # End instance
+
+    starting_inst = []
+    # We need to find the start instances, so we can set everything up
+    for inst in instances.values():
+        if inst['prev'] is None and inst['next'] is None:
+            # Static item!
+            continue
+        elif inst['prev'] is None:
+            starting_inst.append(inst)
+
+    # We need to make the link entities unique for each scaffold set,
+    # otherwise the AllVar property won't work.
+    group_counter = 0
+
+    # Set all the instances and properties
+    for start_inst in starting_inst:
+        group_counter += 1
+        ent = start_inst['ent']
+        for vals in LINKS.values():
+            if vals['all'] is not None:
+                ent.fixup[vals['all']] = SCAFF_PATTERN.format(
+                    name=vals['name'],
+                    group=group_counter,
+                    index='*',
+                )
+
+        should_reverse = utils.conv_bool(ent.fixup['$start_reversed'])
+
+        # Now set each instance in the chain, including first and last
+        for index, inst in enumerate(scaff_scan(instances, start_inst)):
+            ent, conf = inst['ent'], inst['conf']
+            orient = (
+                'floor' if
+                Vec(0, 0, 1).rotate_by_str(ent['angles']) == (0, 0, 1)
+                else 'wall'
+            )
+
+            # Find the offset used for the logic ents
+            offset = (conf['off_' + orient]).copy()
+            if conf['is_piston']:
+                # Adjust based on the piston position
+                offset.z += 128 * utils.conv_int(ent.fixup[
+                    '$top_level' if
+                    ent.fixup['$start_up'] == '1'
+                    else '$bottom_level'
+                ])
+            offset.rotate_by_str(ent['angles'])
+            offset += Vec.from_str(ent['origin'])
+
+            if inst['prev'] is None:
+                link_type = 'start'
+            elif inst['next'] is None:
+                link_type = 'end'
+            else:
+                link_type = 'mid'
+
+            if (
+                    orient == 'floor' and
+                    link_type != 'mid' and
+                    conf['inst_end'] is not None
+                    ):
+                # Add an extra instance pointing in the direction
+                # of the connected track. This would be the endcap
+                # model.
+                other_ent = instances[inst[
+                    'next' if link_type == 'start' else 'prev'
+                ]]['ent']
+
+                other_pos = Vec.from_str(other_ent['origin'])
+                our_pos = Vec.from_str(ent['origin'])
+                link_dir = other_pos - our_pos
+                link_ang = math.degrees(
+                    math.atan2(link_dir.y, link_dir.x)
+                )
+                # Round to nearest 90 degrees
+                # Add 45 so the switchover point is at the diagonals
+                link_ang = (link_ang + 45) // 90 * 90
+                VMF.create_ent(
+                    classname='func_instance',
+                    targetname=ent['targetname'],
+                    file=conf['inst_end'],
+                    origin=offset.join(' '),
+                    angles='0 {:.0f} 0'.format(link_ang),
+                )
+                # Don't place the offset instance, this replaces that!
+            elif conf['inst_offset'] is not None:
+                # Add an additional rotated entity at the offset.
+                # This is useful for the piston item.
+                VMF.create_ent(
+                    classname='func_instance',
+                    targetname=ent['targetname'],
+                    file=conf['inst_offset'],
+                    origin=offset.join(' '),
+                    angles=ent['angles'],
+                )
+
+            logic_inst = VMF.create_ent(
+                classname='func_instance',
+                targetname=ent['targetname'],
+                file=conf.get(
+                    'logic_' + link_type + (
+                        '_rev' if
+                        should_reverse
+                        else ''
+                        ),
+                    '',
+                ),
+                origin=offset.join(' '),
+                angles=(
+                    '0 0 0' if
+                    conf['rotate_logic']
+                    else ent['angles']
+                ),
+            )
+            for key, val in ent.fixup.items():
+                # Copy over fixup values
+                logic_inst.fixup[key] = val
+
+            # Add the link-values
+            for linkVar, link in LINKS.items():
+                logic_inst.fixup[linkVar] = SCAFF_PATTERN.format(
+                    name=link['name'],
+                    group=group_counter,
+                    index=index,
+                )
+                if inst['next'] is not None:
+                    logic_inst.fixup[link['next']] = SCAFF_PATTERN.format(
+                        name=link['name'],
+                        group=group_counter,
+                        index=index + 1,
+                    )
+
+            new_file = conf.get('inst_' + orient, '')
+            if new_file != '':
+                ent['file'] = new_file
+
+    utils.con_log('Finished Scaffold generation!')
+    return True  # Don't run this again
+
+
+@make_result('RandomNum')
+def res_rand_num(inst, res):
+    """Generate a random number and save in a fixup value.
+
+    If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
+    inclusive. 'ResultVar' is the variable the result will be saved in.
+    If 'seed' is set, it will be used to keep the value constant across
+    map recompiles. This should be unique.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    max_val = utils.conv_float(res['max', 1.0])
+    min_val = utils.conv_float(res['min', 0.0])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    inst.fixup[var] = str(func(min_val, max_val))
+
+
+@make_result('GooDebris')
+def res_goo_debris(_, res):
+    """Add random instances to goo squares.
+
+    Parameters:
+        - file: The filename for the instance. The variant files should be
+            suffixed with '_1.vmf', '_2.vmf', etc.
+        - space: the number of border squares which must be filled with goo
+                 for a square to be eligable - defaults to 1.
+        - weight, number: see the 'Variant' result, a set of weights for the
+                 options
+        - chance: The percentage chance a square will have a debris item
+        - offset: A random xy offset applied to the instances.
+    """
+    space = utils.conv_int(res['spacing', '1'], 1)
+    rand_count = utils.conv_int(res['count', ''], None)
+    if rand_count:
+        rand_list = weighted_random(
+            utils.conv_int(res['Number', '']),
+            res['weights', ''],
+        )
+    else:
+        rand_list = None
+    chance = utils.conv_int(res['chance', '30'], 30)/100
+    file = res['file']
+    offset = utils.conv_int(res['offset', '0'], 0)
+
+    if file.endswith('.vmf'):
+        file = file[:-4]
+
+    if space == 0:
+        # No spacing needed, just copy
+        possible_locs = [Vec(loc) for loc in GOO_LOCS]
+    else:
+        possible_locs = []
+        utils.con_log('Pos:', *utils.iter_grid(
+                    min_x=-space,
+                    max_x=space+1,
+                    min_y=-space,
+                    max_y=space+1,
+                    )
+        )
+        for x, y, z in set(GOO_LOCS):
+            for x_off, y_off in utils.iter_grid(
+                    min_x=-space,
+                    max_x=space+1,
+                    min_y=-space,
+                    max_y=space+1,
+                    ):
+                if x_off == y_off == 0:
+                    continue
+                if (x + x_off*128, y + y_off*128, z) not in GOO_LOCS:
+                    break  # This doesn't qualify
+            else:
+                possible_locs.append(Vec(x,y,z))
+
+    utils.con_log('GooDebris: {}/{} locations'.format(
+        len(possible_locs), len(GOO_LOCS)
+    ))
+
+    suff = ''
+    for loc in possible_locs:
+        random.seed('goo_debris_{}_{}_{}'.format(loc.x, loc.y, loc.z))
+        if random.random() > chance:
+            continue
+
+        if rand_list is not None:
+            suff = '_' + random.choice(rand_list)
+
+        if offset > 0:
+            loc.x += random.randint(-offset, offset)
+            loc.y += random.randint(-offset, offset)
+        loc.z -= 32  # Position the instances in the center of the 128 grid.
+        VMF.create_ent(
+            classname='func_instance',
+            file=file + suff + '.vmf',
+            origin=loc.join(' '),
+            angles='0 {} 0'.format(random.randrange(0, 3600)/10)
+        )
+
+    return True  # Only run once!
+
+# A mapping of fizzler targetnames to the base instance
+tag_fizzlers = {}
+
+
+@meta_cond(priority=-110, only_once=False)
+def res_find_potential_tag_fizzlers(inst):
+    """We need to know which items are 'real' fizzlers.
+
+    This is used for Aperture Tag paint fizzlers.
+    """
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        return True # We don't need to bother running this check
+
+    if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+        # The key list in the dict will be a set of all fizzler items!
+        tag_fizzlers[inst['targetname']] = inst
+
+
+@make_result('TagFizzler')
+def res_make_tag_fizzler(inst, res):
+    """Add an Aperture Tag Paint Gun activation fizzler.
+
+    These fizzlers are created via signs, and work very specially.
+    MUST be priority -100 so it runs before fizzlers!
+    """
+    import vbsp
+    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+        # Abort - TAG fizzlers shouldn't appear in any other game!
+        inst.remove()
+        return
+
+    # Look for the fizzler instance we want to replace
+    # Use a set to avoid double-checking for the pairs
+    for out in inst.outputs:
+        if out.target in tag_fizzlers:
+            fizz_name = out.target
+            fizz_base = tag_fizzlers[out.target]
+            del tag_fizzlers[out.target]  # Don't let other signs mod this one!
+            break
+        # else: it's not a fizzler (indicator_toggle), ignore it.
+    else:
+        # No fizzler - remove this sign
+        inst.remove()
+        return
+
+    # The distance from origin the double signs are seperated by.
+    sign_offset = utils.conv_int(res['signoffset', ''], 16)
+
+    sign_loc = (
+        # The actual location of the sign - on the wall
+        Vec.from_str(inst['origin']) +
+        Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    )
+
+    # Now deal with the visual aspect:
+    # Blue signs should be on top.
+
+    blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
+    oran_enabled = utils.conv_bool(inst.fixup['$start_reversed'])
+
+    if not blue_enabled and not oran_enabled:
+        # Hide the sign in this case!
+        inst.remove()
+
+    inst_angle = utils.parse_str(inst['angles'])
+
+    inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
+    loc = Vec.from_str(inst['origin'])
+
+    if blue_enabled and oran_enabled:
+        inst['file'] = res['frame_double']
+        # On a wall, and pointing vertically
+        if inst_normal.z != 0 and Vec(0, 1, 0).rotate(*inst_angle).z != 0:
+            # They're vertical, make sure blue's on top!
+            blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
+            oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
+        else:
+            offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
+            blue_loc = loc + offset
+            oran_loc = loc - offset
+    else:
+        inst['file'] = res['frame_single']
+        # They're always centered
+        blue_loc = loc
+        oran_loc = loc
+
+    if inst_normal.z != 0:
+        # If on floors/ceilings, rotate to point at the fizzler!
+        sign_dir = sign_loc - Vec.from_str(fizz_base['origin'])
+        sign_angle = math.degrees(
+            math.atan2(sign_dir.y, sign_dir.x)
+        )
+        # Round to nearest 90 degrees
+        # Add 45 so the switchover point is at the diagonals
+        sign_angle = (sign_angle + 45) // 90 * 90
+
+        # Rotate to fit the instances - south is down
+        sign_angle = int(sign_angle + 90) % 360
+        if inst_normal.z > 0:
+            sign_angle = '0 {} 0'.format(sign_angle)
+        elif inst_normal.z < 0:
+            # Flip upside-down
+            sign_angle = '0 {} 180'.format(sign_angle)
+    else:
+        # On a wall, face upright
+        sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
+
+    if blue_enabled:
+        VMF.create_ent(
+            classname='func_instance',
+            file=res['blue_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=blue_loc.join(' '),
+        )
+
+    if oran_enabled:
+        VMF.create_ent(
+            classname='func_instance',
+            file=res['oran_sign', ''],
+            targetname=inst['targetname'],
+            angles=sign_angle,
+            origin=oran_loc.join(' '),
+        )
+
+    # Now modify the fizzler...
+
+    fizz_brushes = list(
+        VMF.by_class['trigger_portal_cleanser'] &
+        VMF.by_target[fizz_name + '_brush']
+    )
+
+    if 'base_inst' in res:
+        fizz_base['file'] = resolve_inst(res['base_inst'])[0]
+    fizz_base.outputs.clear()  # Remove outputs, otherwise they break
+    # branch_toggle entities
+
+    # Subtract the sign from the list of connections, but don't go below
+    # zero
+    fizz_base.fixup['$connectioncount'] = str(max(
+        0,
+        utils.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+    ))
+
+    if 'model_inst' in res:
+        utils.con_log(VMF.by_target.keys())
+        model_inst = resolve_inst(res['model_inst'])[0]
+        for mdl_inst in VMF.by_class['func_instance']:
+            if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
+                mdl_inst['file'] = model_inst
+
+    # Find the direction the fizzler front/back points - z=floor fizz
+    # Signs will associate with the given side!
+    bbox_min, bbox_max = fizz_brushes[0].get_bbox()
+    for axis, val in zip('xyz', bbox_max-bbox_min):
+        if val == 2:
+            fizz_axis = axis
+            sign_center = (bbox_min[axis] + bbox_max[axis]) / 2
+            break
+    else:
+        # A fizzler that's not 128*x*2?
+        raise Exception('Invalid fizzler brush ({})!'.format(fizz_name))
+
+    # Figure out what the sides will set values to...
+    pos_blue = False
+    pos_oran = False
+    neg_blue = False
+    neg_oran = False
+    VMF.create_ent(
+        classname='info_null',
+        origin=sign_loc,
+    )
+    if sign_loc[fizz_axis] < sign_center:
+        pos_blue = blue_enabled
+        pos_oran = oran_enabled
+    else:
+        neg_blue = blue_enabled
+        neg_oran = oran_enabled
+
+    fizz_off_tex = {
+        'left': res['off_left'],
+        'center': res['off_center'],
+        'right': res['off_right'],
+        'short': res['off_short'],
+    }
+    fizz_on_tex = {
+        'left': res['on_left'],
+        'center': res['on_center'],
+        'right': res['on_right'],
+        'short': res['on_short'],
+    }
+
+    # If it activates the paint gun, use different textures
+    if pos_blue or pos_oran:
+        pos_tex = fizz_on_tex
+    else:
+        pos_tex = fizz_off_tex
+
+    if neg_blue or neg_oran:
+        neg_tex = fizz_on_tex
+    else:
+        neg_tex = fizz_off_tex
+
+    if vbsp.GAME_MODE == 'COOP':
+        # We need ATLAS-specific triggers
+        pos_trig = VMF.create_ent(
+            classname='trigger_playerteam',
+        )
+        neg_trig = VMF.create_ent(
+            classname='trigger_playerteam',
+        )
+        output = 'OnStartTouchBluePlayer'
+    else:
+        pos_trig = VMF.create_ent(
+            classname='trigger_multiple',
+        )
+        neg_trig = VMF.create_ent(
+            classname='trigger_multiple',
+            spawnflags='1',
+        )
+        output = 'OnStartTouch'
+
+    pos_trig['origin'] = neg_trig['origin'] = fizz_base['origin']
+    pos_trig['spawnflags'] = neg_trig['spawnflags'] = '1'  # Clients Only
+
+    pos_trig['targetname'] = fizz_name + '-trig_pos'
+    neg_trig['targetname'] = fizz_name + '-trig_neg'
+
+    pos_trig.outputs = [
+        VLib.Output(
+            output,
+            fizz_name + '-trig_neg',
+            'Enable',
+        ),
+        VLib.Output(
+            output,
+            fizz_name + '-trig_pos',
+            'Disable',
+        ),
+    ]
+
+    neg_trig.outputs = [
+        VLib.Output(
+            output,
+            fizz_name + '-trig_pos',
+            'Enable',
+        ),
+        VLib.Output(
+            output,
+            fizz_name + '-trig_neg',
+            'Disable',
+        ),
+    ]
+
+    if blue_enabled:
+        # If this is blue/oran only, don't affect the other color
+        neg_trig.outputs.append(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(neg_blue),
+        ))
+        pos_trig.outputs.append(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(pos_blue),
+        ))
+        # Add voice attributes - we have the gun and gel!
+        VOICE_ATTR['bluegelgun'] = True
+        VOICE_ATTR['bluegel'] = True
+        VOICE_ATTR['bouncegun'] = True
+        VOICE_ATTR['bouncegel'] = True
+
+    if oran_enabled:
+        neg_trig.outputs.append(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(neg_oran),
+        ))
+        pos_trig.outputs.append(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param=utils.bool_as_int(pos_oran),
+        ))
+        VOICE_ATTR['orangegelgun'] = True
+        VOICE_ATTR['orangegel'] = True
+        VOICE_ATTR['speedgelgun'] = True
+        VOICE_ATTR['speedgel'] = True
+
+    if not oran_enabled and not blue_enabled:
+        # If both are disabled, we must shutdown the gun when touching
+        # either side - use neg_trig for that purpose!
+        # We want to get rid of pos_trig to save ents
+        VMF.remove_ent(pos_trig)
+        neg_trig['targetname'] = fizz_name + '-trig'
+        neg_trig.outputs.clear()
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@BlueIsEnabled',
+            'SetValue',
+            param='0'
+        ))
+        neg_trig.add_out(VLib.Output(
+            output,
+            '@OrangeIsEnabled',
+            'SetValue',
+            param='0'
+        ))
+
+    for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
+        # Modify fizzler textures
+        bbox_min, bbox_max = fizz_brush.get_bbox()
+        for side in fizz_brush.sides():
+            norm = side.normal()
+            if norm[fizz_axis] == 0:
+                # Not the front/back: force nodraw
+                # Otherwise the top/bottom will have the odd stripes
+                # which won't match the sides
+                side.mat = 'tools/toolsnodraw'
+                continue
+            if norm[fizz_axis] == 1:
+                side.mat = pos_tex[
+                    vbsp.TEX_FIZZLER[
+                        side.mat.casefold()
+                    ]
+                ]
+            else:
+                side.mat = neg_tex[
+                    vbsp.TEX_FIZZLER[
+                        side.mat.casefold()
+                    ]
+                ]
+        # The fizzler shouldn't kill cubes
+        fizz_brush['spawnflags'] = '1'
+
+        fizz_brush.outputs.append(VLib.Output(
+            output,
+            '@shake_global',
+            'StartShake',
+        ))
+
+        fizz_brush.outputs.append(VLib.Output(
+            output,
+            '@shake_global_sound',
+            'PlaySound',
+        ))
+
+        # The triggers are 8 units thick, 24 from the center
+        # (-1 because fizzlers are 2 thick on each side).
+        neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
+        neg_min[fizz_axis] -= 23
+        neg_max[fizz_axis] -= 17
+
+        pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
+        pos_min[fizz_axis] += 17
+        pos_max[fizz_axis] += 23
+
+        if blue_enabled or oran_enabled:
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    neg_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+            pos_trig.solids.append(
+                VMF.make_prism(
+                    pos_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
+        else:
+            # If neither enabled, use one trigger
+            neg_trig.solids.append(
+                VMF.make_prism(
+                    neg_min,
+                    pos_max,
+                    mat='tools/toolstrigger',
+                ).solid,
+            )

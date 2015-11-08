@@ -256,13 +256,13 @@ def load_item_data():
     has_outputs = False
     for inp_list in editor_data.find_all("Exporting", "Inputs"):
         for inp in inp_list:
-            if inp.name == "CONNECTION_STANDARD":
+            if inp.name == "connection_standard":
                 has_inputs = True
-            elif inp.name == "CONNECTION_TBEAM_POLARITY":
+            elif inp.name == "connection_tbeam_polarity":
                 has_polarity = True
     for out_list in editor_data.find_all("Exporting", "Outputs"):
         for out in out_list:
-            if out.name == "CONNECTION_STANDARD":
+            if out.name == "connection_standard":
                 has_outputs = True
                 break
     has_timer = any(editor_data.find_all("Properties", "TimerDelay"))
