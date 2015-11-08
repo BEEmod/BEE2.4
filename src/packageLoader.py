@@ -1047,28 +1047,37 @@ class BrushTemplate:
 
     This allows the sides of the brush to swap between wall/floor textures
     based on orientation.
-    All brushes from the given VMF will be copied - entities will be ignored.
+    All world and detail brushes from the given VMF will be copied.
     """
     def __init__(self, temp_id, vmf_file: VLib.VMF):
         self.id = temp_id
         # We don't actually store the solids here - put them in
-        # the TEMPLATE_FILE VMF with a custom classname.
-        # That way the VMF object can vanish.
-        self.template = TEMPLATE_FILE.create_ent(
-            classname='bee2_template_world',
-            template_id=self.id,
-        )
-        self.template.solids = [
-            solid.copy(map=TEMPLATE_FILE)
-            for solid in
-            vmf_file.brushes
-        ]
-        for ent in vmf_file.entities:
-            self.template.solids.extend(
+        # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+        if vmf_file.brushes:
+            self.temp_world = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_world',
+                template_id=self.id,
+            )
+            self.temp_world.solids = [
                 solid.copy(map=TEMPLATE_FILE)
                 for solid in
-                ent.solids
+                vmf_file.brushes
+            ]
+        else:
+            self.temp_world = None
+        if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
+            self.temp_detail = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_detail',
+                template_id=self.id,
             )
+            for ent in vmf_file.by_class['func_detail']:
+                self.temp_detail.solids.extend(
+                    solid.copy(map=TEMPLATE_FILE)
+                    for solid in
+                    ent.solids
+                )
+        else:
+            self.temp_detail = None
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1080,7 +1089,7 @@ class BrushTemplate:
             prop_name='file',
         )
         file = VLib.VMF.parse(file)
-        template = cls(
+        return cls(
             data.id,
             file,
         )

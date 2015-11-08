@@ -689,7 +689,7 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy(map=VMF) for s in self.sides]
+        sides = [s.copy(map=map) for s in self.sides]
         return Solid(
             map or self.map,
             des_id=des_id,
