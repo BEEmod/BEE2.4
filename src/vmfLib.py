@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional, Union,
-    Dict, List, Tuple, Iterator,
+    Dict, List, Tuple, Set, Iterator,
 )
 
 # Used to set the defaults for versioninfo
@@ -88,11 +88,9 @@ def overlay_bounds(over):
     """Compute the bounding box of an overlay."""
     origin = Vec.from_str(over['origin'])
     return Vec.bbox(
-        Vec.from_str(
-            (origin + Vec.from_str(over['uv' + str(x)]))
-            for x in
-            range(4)
-        )
+        (origin + Vec.from_str(over['uv' + str(x)]))
+        for x in
+        range(4)
     )
 
 
@@ -134,14 +132,14 @@ class VMF:
 
         # Allow quick searching for particular groups, without checking
         # the whole map
-        self.by_target = defaultdict(CopySet)
-        self.by_class = defaultdict(CopySet)
+        self.by_target = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
+        self.by_class = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
 
-        self.entities = []
-        self.add_ents(entities or [])  # need to set the by_ dicts too.
-        self.brushes = brushes or []
-        self.cameras = cameras or []
-        self.cordons = cordons or []
+        self.entities = []  # type: List[Entity]
+        self.add_ents(entities or [])  # We need to set the by_ dicts too.
+        self.brushes = brushes or []  # type: List[Solid]
+        self.cameras = cameras or []  # type: List[Camera]
+        self.cordons = cordons or []  # type: List[Cordon]
         self.visgroups = visgroups or []
 
         # mapspawn entity, which is the entity world brushes are saved
@@ -795,16 +793,17 @@ class Solid:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
-        return (bbox_min+bbox_max)/2
+        return (bbox_min + bbox_max) / 2
 
-    def translate(self, diff):
-        """Move this solid by the specified vector.
-
-        - This does not translate textures as well.
-        - A tuple can be passed in instead if desired.
-        """
+    def translate(self, diff: Vec):
+        """Move this solid by the specified vector."""
         for s in self.sides:
             s.translate(diff)
+
+    def localise(self, origin: Vec, angles: Vec):
+        """Shift this brush by the given origin/angles."""
+        for s in self.sides:
+            s.localise(origin, angles)
 
 
 class UVAxis:
@@ -1086,11 +1085,45 @@ class Side:
     def translate(self, diff):
         """Move this side by the specified vector.
 
-        - This does not translate textures as well.
         - A tuple can be passed in instead if desired.
         """
         for p in self.planes:
             p += diff
+
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= diff.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= diff.dot(v_axis) / self.vaxis.scale
+
+    def localise(self, origin: Vec, angles: Vec=None):
+        """Shift the face by the given origin and angles.
+
+        This preserves texture offsets
+        """
+        for p in self.planes:
+            p.localise(origin, angles)
+        # Rotate the uaxis values
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        u_axis.rotate(angles.x, angles.y, angles.z)
+        v_axis.rotate(angles.x, angles.y, angles.z)
+
+        self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
+        self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= origin.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= origin.dot(v_axis) / self.vaxis.scale
+
+        # Keep the values low. The highest texture size in P2 is 1024, so
+        # do the next power just to be safe.
+        # Add and subtract 1024 so the value is between -1024, 1024 not 0, 2048
+        # (This just looks nicer)
+        self.uaxis.offset = (self.uaxis.offset + 1024) % 2048 - 1024
+        self.vaxis.offset = (self.vaxis.offset + 1024) % 2048 - 1024
 
     def plane_desc(self):
         """Return a string which describes this face.

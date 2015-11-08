@@ -1147,6 +1147,18 @@ class Vec:
             self.x * other.y - self.y * other.x,
             )
 
+    def localise(
+            self,
+            origin: Union['Vec', Vec_tuple],
+            angles: Union['Vec', Vec_tuple]=None
+            ):
+        """Shift this point to be local to the given position and angles
+
+        """
+        if angles is not None:
+            self.rotate(angles.x, angles.y, angles.z)
+        self.__iadd__(origin)
+
     len = mag
     mag_sq = len_sq
     __truediv__ = __div__
