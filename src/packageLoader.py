@@ -11,19 +11,10 @@ from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
+import vmfLib as VLib
 import extract_packages
 import utils
 
-
-__all__ = [
-    'load_packages',
-    'Style',
-    'Item',
-    'QuotePack',
-    'Skybox',
-    'Music',
-    'StyleVar',
-    ]
 
 all_obj = {}
 obj_override = {}
@@ -33,6 +24,8 @@ OBJ_TYPES = {}
 data = {}
 
 res_count = -1
+
+TEMPLATE_FILE = VLib.VMF()
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
@@ -79,7 +72,14 @@ def reraise_keyerror(err, obj_id):
     ) from err
 
 
-def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
+def get_config(
+        prop_block,
+        zip_file,
+        folder,
+        pak_id='',
+        prop_name='config',
+        extension='.cfg',
+        ):
     """Extract a config file refered to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
@@ -96,7 +96,10 @@ def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     if prop_block.value == '':
         return Property(None, [])
 
-    path = os.path.join(folder, prop_block.value) + '.cfg'
+    path = os.path.join(folder, prop_block.value)
+    if len(path) < 3 or path[-4] != '.':
+        # Add extension
+        path += extension
     try:
         with zip_file.open(path) as f:
             return Property.parse(f,
@@ -1035,6 +1038,51 @@ class EditorSound:
         return cls(
             snd_name=data.id,
             data=data.info.find_key('keys', [])
+        )
+
+
+@pak_object('BrushTemplate', has_img=False)
+class BrushTemplate:
+    """A template brush which will be copied into the map, then retextured.
+
+    This allows the sides of the brush to swap between wall/floor textures
+    based on orientation.
+    All brushes from the given VMF will be copied - entities will be ignored.
+    """
+    def __init__(self, temp_id, vmf_file: VLib.VMF):
+        self.id = temp_id
+        # We don't actually store the solids here - put them in
+        # the TEMPLATE_FILE VMF with a custom classname.
+        # That way the VMF object can vanish.
+        self.template = TEMPLATE_FILE.create_ent(
+            classname='bee2_template_world',
+            template_id=self.id,
+        )
+        self.template.solids = [
+            solid.copy(map=TEMPLATE_FILE)
+            for solid in
+            vmf_file.brushes
+        ]
+        for ent in vmf_file.entities:
+            self.template.solids.extend(
+                solid.copy(map=TEMPLATE_FILE)
+                for solid in
+                ent.solids
+            )
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        file = get_config(
+            prop_block=data.info,
+            zip_file=data.zip_file,
+            folder='templates',
+            pak_id=data.pak_id,
+            prop_name='file',
+        )
+        file = VLib.VMF.parse(file)
+        template = cls(
+            data.id,
+            file,
         )
 
 
