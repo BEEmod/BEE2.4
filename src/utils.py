@@ -6,6 +6,12 @@ from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
 
+from typing import (
+    Union,
+    Tuple,
+    SupportsFloat, Iterator,
+)
+
 
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
@@ -274,7 +280,7 @@ def is_plain_text(name, valid_chars=FILE_CHARS):
     return True
 
 
-def get_indent(line):
+def get_indent(line: str):
     """Return the whitespace which this line starts with.
 
     """
@@ -295,7 +301,7 @@ def con_log(*text):
     print(*text, flush=True)
 
 
-def bool_as_int(val):
+def bool_as_int(val: bool):
     """Convert a True/False value into '1' or '0'.
 
     Valve uses these strings for True/False in editoritems and other
@@ -307,7 +313,7 @@ def bool_as_int(val):
         return '0'
 
 
-def conv_bool(val, default=False):
+def conv_bool(val: Union[str, int, bool, None], default=False):
     """Converts a string to a boolean, using a default if it fails.
 
     Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1, None.
@@ -334,7 +340,7 @@ def conv_float(val, default=0.0):
         return default
 
 
-def conv_int(val, default=0):
+def conv_int(val: str, default=0):
     """Converts a string to an integer, using a default if it fails.
 
     """
@@ -344,7 +350,7 @@ def conv_int(val, default=0):
         return default
 
 
-def parse_str(val, x=0.0, y=0.0, z=0.0):
+def parse_str(val: str, x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
     """Convert a string in the form '(4 6 -4)' into a set of floats.
 
      If the string is unparsable, this uses the defaults (x,y,z).
@@ -370,7 +376,13 @@ def parse_str(val, x=0.0, y=0.0, z=0.0):
         return x, y, z
 
 
-def iter_grid(max_x, max_y, min_x=0, min_y=0, stride=1):
+def iter_grid(
+        max_x: int,
+        max_y: int,
+        min_x: int=0,
+        min_y: int=0,
+        stride: int=1,
+        ) -> Iterator[Tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
@@ -444,6 +456,7 @@ def fit(dist, obj):
 
     assert sum(items) == orig_dist
     return list(items)  # Dump the deque
+
 
 class EmptyMapping(abc.Mapping):
     """A Mapping class which is always empty."""
@@ -527,12 +540,11 @@ class Vec:
                     except (TypeError, KeyError):
                         self.z = 0.0
 
-
     def copy(self):
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val, x=0.0, y=0.0, z=0.0):
+    def from_str(cls, val: str, x=0.0, y=0.0, z=0.0):
         """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
@@ -553,7 +565,6 @@ class Vec:
         self.x = x*a + y*b + z*c
         self.y = x*d + y*e + z*f
         self.z = x*g + y*h + z*i
-        return self
 
     def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
@@ -628,7 +639,7 @@ class Vec:
             bbox_max.max(point)
         return bbox_min, bbox_max
 
-    def __add__(self, other) -> 'Vec':
+    def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -709,12 +720,8 @@ class Vec:
                 return NotImplemented
     __rmul__ = __mul__
 
-    def __div__(self, other) -> 'Vec':
-        """Divide the Vector by a scalar.
-
-        If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero.
-        """
+    def __div__(self, other: float) -> 'Vec':
+        """Divide the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -727,7 +734,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __rdiv__(self, other) -> 'Vec':
+    def __rdiv__(self, other: float) -> 'Vec':
         """Divide a scalar by a Vector.
 
         """
@@ -775,7 +782,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other) -> ('Vec', 'Vec'):
+    def __divmod__(self, other) -> Tuple['Vec', 'Vec']:
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -893,7 +900,10 @@ class Vec:
         """Vectors are True if any axis is non-zero."""
         return self.x != 0 or self.y != 0 or self.z != 0
 
-    def __eq__(self, other) -> bool:
+    def __eq__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """== test.
 
         Two Vectors are compared based on the axes.
@@ -914,7 +924,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __lt__(self, other) -> bool:
+    def __lt__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A<B test.
 
         Two Vectors are compared based on the axes.
@@ -939,7 +952,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __le__(self, other) -> bool:
+    def __le__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A<=B test.
 
         Two Vectors are compared based on the axes.
@@ -964,7 +980,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __gt__(self, other) -> bool:
+    def __gt__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A>B test.
 
         Two Vectors are compared based on the axes.
@@ -989,7 +1008,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def max(self, other):
+    def max(self, other: Union['Vec', Vec_tuple]):
         """Set this vector's values to the maximum of the two vectors."""
         if self.x < other.x:
             self.x = other.x
@@ -998,7 +1017,7 @@ class Vec:
         if self.z < other.z:
             self.z = other.z
 
-    def min(self, other):
+    def min(self, other: Union['Vec', Vec_tuple]):
         """Set this vector's values to be the minimum of the two vectors."""
         if self.x > other.x:
             self.x = other.x
@@ -1054,13 +1073,13 @@ class Vec:
         """Code required to reproduce this vector."""
         return self.__class__.__name__ + "(" + self.join() + ")"
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[float]:
         """Allow iterating through the dimensions."""
         yield self.x
         yield self.y
         yield self.z
 
-    def __getitem__(self, ind):
+    def __getitem__(self, ind: Union[str, int]) -> float:
         """Allow reading values by index instead of name if desired.
 
         This accepts either 0,1,2 or 'x','y','z' to read values.
@@ -1075,7 +1094,7 @@ class Vec:
         else:
             return NotImplemented
 
-    def __setitem__(self, ind, val):
+    def __setitem__(self, ind: Union[str, int], val: float):
         """Allow editing values by index instead of name if desired.
 
         This accepts either 0,1,2 or 'x','y','z' to edit values.
@@ -1118,7 +1137,7 @@ class Vec:
         """+ on a Vector simply copies it."""
         return Vec(self.x, self.y, self.z)
 
-    def norm(self):
+    def norm(self) -> 'Vec':
         """Normalise the Vector.
 
          This is done by transforming it to have a magnitude of 1 but the same
