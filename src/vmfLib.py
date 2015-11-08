@@ -674,7 +674,7 @@ class Solid:
         self.editor = editor or {}
         self.hidden = hidden
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush."""
         editor = {}
         for key in ('color', 'groupid', 'visgroupshown', 'visgroupautoshown'):
@@ -682,9 +682,9 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy() for s in self.sides]
+        sides = [s.copy(map=VMF) for s in self.sides]
         return Solid(
-            self.map,
+            map or self.map,
             des_id=des_id,
             sides=sides,
             editor=editor,
@@ -982,7 +982,7 @@ class Side:
                 tree['smoothing_groups', '0']),
         )
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush side."""
         planes = [p.as_tuple() for p in self.planes]
         if self.is_disp:
@@ -996,7 +996,7 @@ class Side:
             disp_data = None
 
         return Side(
-            self.map,
+            map or self.map,
             planes=planes,
             des_id=des_id,
             mat=self.mat,
@@ -1211,11 +1211,11 @@ class Entity:
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
 
-        new_solids = [s.copy() for s in self.solids]
+        new_solids = [s.copy(map=map) for s in self.solids]
         outs = [o.copy() for o in self.outputs]
 
         return Entity(
-            vmf_file=self.map,
+            vmf_file=map or self.map,
             keys=new_keys,
             fixup=new_fixup,
             ent_id=des_id,
