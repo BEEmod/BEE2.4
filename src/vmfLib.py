@@ -228,7 +228,7 @@ class VMF:
         return ent
 
     @staticmethod
-    def parse(tree):
+    def parse(tree: Union[Property, str]):
         """Convert a property_parser tree into VMF classes.
         """
         if not isinstance(tree, Property):
@@ -608,7 +608,14 @@ class Camera:
 
 class Cordon:
     """Represents one cordon volume."""
-    def __init__(self, vmf_file, min_, max_, is_active=True, name='Cordon'):
+    def __init__(
+            self,
+            vmf_file: VMF,
+            min_: Vec,
+            max_: Vec,
+            is_active=True,
+            name='Cordon',
+            ):
         self.map = vmf_file
         self.name = name
         self.bounds_min = min_
@@ -669,7 +676,7 @@ class Solid:
             hidden=False,
             ):
         self.map = vmf_file
-        self.sides = sides or []
+        self.sides = sides or []  # type: List[Side]
         self.id = vmf_file.solid_id.get_id(des_id)
         self.editor = editor or {}
         self.hidden = hidden
@@ -1183,8 +1190,8 @@ class Entity:
         self.map = vmf_file
         self.keys = keys or {}
         self.fixup = EntityFixup(fixup or {})
-        self.outputs = outputs or []
-        self.solids = solids or []
+        self.outputs = outputs or []  # type: List[Output]
+        self.solids = solids or []  # type: List[Solid]
         self.id = vmf_file.ent_id.get_id(ent_id)
         self.hidden = hidden
         self.editor = editor or {'visgroup': []}
@@ -1198,7 +1205,7 @@ class Entity:
         if 'color' not in self.editor:
             self.editor['color'] = '255 255 255'
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this entity entirely, including solids and outputs."""
         new_keys = {}
         new_fixup = self.fixup.copy_dict()
@@ -1226,7 +1233,7 @@ class Entity:
         )
 
     @staticmethod
-    def parse(vmf_file, tree_list, hidden=False):
+    def parse(vmf_file, tree_list: Property, hidden=False):
         """Parse a property tree into an Entity object."""
         ent_id = -1
         solids = []
@@ -1522,6 +1529,7 @@ class Entity:
             return Vec(self['origin'].split(" "))
 
 FixupTuple = namedtuple('FixupTuple', 'var value id')
+
 
 class EntityFixup:
     """A speciallised mapping which keeps track of the variable indexes.
