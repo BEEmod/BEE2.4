@@ -12,9 +12,9 @@ import vmfLib as VLib
 import utils
 
 from typing import (
-    Union, Optional,
-    Dict, List, Tuple
-)
+    Optional,
+    Dict, List, Tuple,
+    )
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
@@ -142,12 +142,14 @@ TEMPLATE_RETEXTURE = {
     'metal/black_wall_metal_002b': (B, '4x4'),
 
     'tile/white_wall_tile001a': (W, 'wall'),
+    'tile/white_wall_tile003a': (W, 'wall'),
     'tile/white_wall_state': (W, '2x2'),
     'tile/white_wall_tile003f': (W, '4x4'),
 
-    # No black portal-placement texture
-    'metal/black_floor_metal_bullseye_001': 'black.special',
-    'tile/white_wall_tile003j': 'white.special',
+    # No black portal-placement texture, so use the bullseye instead
+    'metal/black_floor_metal_bullseye_001': (B, 'special'),
+    'tile/white_wall_tile003j': (W, 'special'),
+    'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
 
     'anim_wp/framework/backpanels': 'special.behind',
     'anim_wp/framework/squarebeams': 'special.edge',
@@ -400,6 +402,7 @@ def init(seed, inst_list, vmf_file):
     conditions.sort()
 
     build_solid_dict()
+    load_templates()
 
 
 def check_all():
@@ -651,7 +654,7 @@ def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
-    vmf = VLib.VMF(props)
+    vmf = VLib.VMF.parse(props)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
     for ent in vmf.by_class['bee2_template_world']:
@@ -683,7 +686,7 @@ def import_template(
     entity will be returned. If there are no detail brushes, None will be
     returned instead of an invalid entity.
     """
-    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+    orig_world, orig_detail = TEMPLATES[temp_name]
     new_world = []
     new_detail = []
 
@@ -694,6 +697,7 @@ def import_template(
         for old_brush in orig_list:
             brush = old_brush.copy(map=VMF)
             brush.localise(origin, angles)
+            new_list.append(brush)
 
     if force_type is TEMP_TYPES.detail:
         new_detail.extend(new_world)
@@ -719,6 +723,7 @@ def retexture_template(
         world: List[VLib.Solid],
         detail: VLib.Entity,
         origin: Vec,
+        replace_tex: dict=utils.EmptyMapping,
         ):
     """Retexture a template at the given location.
 
@@ -727,6 +732,8 @@ def retexture_template(
     - Wall textures pointing up and down will switch to floor/ceiling textures.
     - Textures of the same type, normal and inst origin will randomise to the
       same type.
+    - replace_tex is a replacer for textures, applied if the material is not
+      in TEMPLATE_RETEXTURE.
     """
     import vbsp
     all_brushes = list(world)
@@ -738,6 +745,7 @@ def retexture_template(
         for face in brush:
             tex_type = TEMPLATE_RETEXTURE.get(face.mat.casefold())
             if tex_type is None:
+                face.mat = replace_tex.get(face.mat.casefold(), face.mat)
                 continue
 
             norm = face.normal()
@@ -750,6 +758,21 @@ def retexture_template(
                 continue
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
+
+            if grid_size == 'special':
+                # Various fallbacks if not defines
+                face.mat = vbsp.get_tex(
+                    'special.{!s}_wall'.format(tex_colour)
+                )
+                if face.mat == '':
+                    face.mat = vbsp.get_tex(
+                        'special.{!s}'.format(tex_colour)
+                    )
+                if face.mat == '':
+                    grid_size = 'wall'
+                    # No special texture, use wall texture
+                else:
+                    continue
 
             # Floor/ceiling is always 1 size!
             if norm == (0, 0, 1):
@@ -2745,7 +2768,6 @@ def res_add_brush(inst, res):
     solids.top.mat = vbsp.get_tex(tex_type + '.floor')
     solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
 
-
     if utils.conv_bool(res['detail', False], False):
         # Add the brush to a func_detail entity
         VMF.create_ent(
@@ -2756,6 +2778,28 @@ def res_add_brush(inst, res):
     else:
         # Add to the world
         VMF.add_brush(solids.solid)
+
+
+@make_result_setup('TemplateBrush')
+def res_import_template_setup(res):
+    temp_id = res['id'].casefold()
+    replace_tex = {
+        prop.name: prop.value
+        for prop in
+        res.find_key('replace', [])
+    }
+    return temp_id, replace_tex
+
+
+@make_result('TemplateBrush')
+def res_import_template(inst, res):
+    temp_id, replace_tex = res.value
+    if temp_id not in TEMPLATES:
+        return
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles', '0 0 0'])
+    world, detail = import_template(temp_id, origin, angles)
+    retexture_template(world, detail, origin)
 
 
 def scaff_scan(inst_list, start_ent):
