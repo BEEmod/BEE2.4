@@ -148,7 +148,7 @@ TEMPLATE_RETEXTURE = {
 
     # No black portal-placement texture, so use the bullseye instead
     'metal/black_floor_metal_bullseye_001': (B, 'special'),
-    'tile/white_wall_tile003j': (W, 'special'),
+    'tile/white_wall_tile004j': (W, 'special'),
     'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
 
     'anim_wp/framework/backpanels': 'special.behind',
@@ -774,11 +774,28 @@ def retexture_template(
                 else:
                     continue
 
-            # Floor/ceiling is always 1 size!
-            if norm == (0, 0, 1):
-                grid_size = 'floor'
-            elif norm == (0, 0, -1):
-                grid_size = 'ceiling'
+            if 1 in norm or -1 in norm:
+                # If axis-aligned, make the orientation aligned to world
+                # That way multiple items merge well, and walls are upright
+                face.offset = 0
+
+                # Floor / ceiling is always 1 size - 4x4
+                if norm == (0, 0, 1):
+                    grid_size = 'ceiling'
+                    face.uaxis = VLib.UVAxis(1, 0, 0)
+                    face.vaxis = VLib.UVAxis(0, -1, 0)
+                elif norm == (0, 0, -1):
+                    grid_size = 'floor'
+                    face.uaxis = VLib.UVAxis(1, 0, 0)
+                    face.vaxis = VLib.UVAxis(0, -1, 0)
+                # Walls:
+                elif norm == (-1, 0, 0) or norm == (1, 0, 0):
+                    face.uaxis = VLib.UVAxis(0, 1, 0)
+                    face.vaxis = VLib.UVAxis(0, 0, -1)
+                elif norm == (0, -1, 0) or norm == (0, 1, 0):
+                    face.uaxis=VLib.UVAxis(1, 0, 0)
+                    face.vaxis=VLib.UVAxis(0, 0, -1)
+
             face.mat = vbsp.get_tex(
                 '{!s}.{!s}'.format(tex_colour, grid_size)
             )
