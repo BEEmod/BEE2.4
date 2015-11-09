@@ -143,6 +143,8 @@ TEMPLATE_RETEXTURE = {
 
     'tile/white_wall_tile001a': (W, 'wall'),
     'tile/white_wall_tile003a': (W, 'wall'),
+    'tile/white_wall_tile003b': (W, 'wall'),
+    'tile/white_wall_tile003c': (W, '2x2'),
     'tile/white_wall_tile003h': (W, 'wall'),
     'tile/white_wall_state': (W, '2x2'),
     'tile/white_wall_tile003f': (W, '4x4'),
