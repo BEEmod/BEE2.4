@@ -724,6 +724,7 @@ def retexture_template(
         detail: VLib.Entity,
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
+        force_colour: MAT_TYPES=None,
         ):
     """Retexture a template at the given location.
 
@@ -732,8 +733,8 @@ def retexture_template(
     - Wall textures pointing up and down will switch to floor/ceiling textures.
     - Textures of the same type, normal and inst origin will randomise to the
       same type.
-    - replace_tex is a replacer for textures, applied if the material is not
-      in TEMPLATE_RETEXTURE.
+    - replace_tex is a replacement table. This overrides everything else.
+    - If force_colour is set, all tile textures will be switched accordingly.
     """
     import vbsp
     all_brushes = list(world)
@@ -743,10 +744,16 @@ def retexture_template(
 
     for brush in all_brushes:
         for face in brush:
-            tex_type = TEMPLATE_RETEXTURE.get(face.mat.casefold())
-            if tex_type is None:
-                face.mat = replace_tex.get(face.mat.casefold(), face.mat)
+            folded_mat = face.mat.casefold()
+            if folded_mat in replace_tex:
+                # replace_tex overrides everything
+                face.mat = replace_tex[folded_mat]
                 continue
+
+            tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
+
+            if tex_type is None:
+                continue # It's nodraw, or something we shouldn't change
 
             norm = face.normal()
             random.seed(rand_prefix + norm.join('_'))
@@ -758,6 +765,9 @@ def retexture_template(
                 continue
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
+
+            if force_colour is not None:
+                tex_colour = force_colour
 
             if grid_size == 'special':
                 # Various fallbacks if not defines
@@ -793,8 +803,8 @@ def retexture_template(
                     face.uaxis = VLib.UVAxis(0, 1, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
                 elif norm == (0, -1, 0) or norm == (0, 1, 0):
-                    face.uaxis=VLib.UVAxis(1, 0, 0)
-                    face.vaxis=VLib.UVAxis(0, 0, -1)
+                    face.uaxis = VLib.UVAxis(1, 0, 0)
+                    face.vaxis = VLib.UVAxis(0, 0, -1)
 
             face.mat = vbsp.get_tex(
                 '{!s}.{!s}'.format(tex_colour, grid_size)
@@ -2800,23 +2810,38 @@ def res_add_brush(inst, res):
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res):
     temp_id = res['id'].casefold()
+
+    force_colour = res['force', 'none'].casefold()
+    if force_colour == 'white':
+        force_colour = MAT_TYPES.white
+    elif force_colour == 'black':
+        force_colour = MAT_TYPES.black
+    else:
+        force_colour = None
+
     replace_tex = {
         prop.name: prop.value
         for prop in
         res.find_key('replace', [])
     }
-    return temp_id, replace_tex
+    return temp_id, replace_tex, force_colour
 
 
 @make_result('TemplateBrush')
 def res_import_template(inst, res):
-    temp_id, replace_tex = res.value
+    temp_id, replace_tex, force_colour = res.value
     if temp_id not in TEMPLATES:
         return
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
     world, detail = import_template(temp_id, origin, angles)
-    retexture_template(world, detail, origin)
+    retexture_template(
+        world,
+        detail,
+        origin,
+        replace_tex,
+        force_colour,
+    )
 
 
 def scaff_scan(inst_list, start_ent):
