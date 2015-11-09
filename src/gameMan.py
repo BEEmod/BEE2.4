@@ -20,6 +20,7 @@ from property_parser import Property
 import utils
 import UI
 import loadScreen
+import packageLoader
 import extract_packages
 
 all_games = []
@@ -305,8 +306,8 @@ class Game:
         export_screen.set_length(
             'CONF',
             # VBSP_conf, Editoritems, instances, gameinfo, pack_lists,
-            # editor_sounds
-            6 +
+            # editor_sounds, template VMF
+            7 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
@@ -521,6 +522,11 @@ class Game:
 
         print('Editing game_sounds!')
         self.add_editor_sounds(editor_sounds.values())
+        export_screen.step('CONF')
+
+        print('Writing template VMF!')
+        with open(self.abs_path('bin/bee2/templates.vmf'), 'w') as temp_file:
+            packageLoader.TEMPLATE_FILE.export(temp_file)
         export_screen.step('CONF')
 
         if voice is not None:
