@@ -191,25 +191,27 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        objects = 0
         images = 0
         for pak_id, (zip_file, info, name, dispName) in packages.items():
             print(
                 ("Reading objects from '" + pak_id + "'...").ljust(50),
                 end=''
             )
-            obj_count, img_count = parse_package(
+            img_count = parse_package(
                 zip_file,
                 info,
                 pak_id,
                 dispName,
             )
-            objects += obj_count
             images += img_count
             loader.step("PAK")
             print("Done!")
 
-        loader.set_length("OBJ", objects)
+        loader.set_length("OBJ", sum(
+            len(obj_type)
+            for obj_type in
+            all_obj.values()
+        ))
         loader.set_length("IMG_EX", images)
 
         # The number of images we need to load is the number of objects,
@@ -278,7 +280,6 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    print(data['zips'])
     print('Done!')
     return data
 
@@ -295,7 +296,6 @@ def parse_package(zip_file, info, pak_id, disp_name):
                 '" - ignoring package!'
             )
             return False
-    objects = 0
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in OBJ_TYPES:
@@ -317,7 +317,6 @@ def parse_package(zip_file, info, pak_id, disp_name):
                     )
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
-            objects += 1
             all_obj[comp_type][obj_id] = ObjData(
                 zip_file,
                 obj,
@@ -333,7 +332,7 @@ def parse_package(zip_file, info, pak_id, disp_name):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
                 img_count += 1
-    return objects, img_count
+    return img_count
 
 
 def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
