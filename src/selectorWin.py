@@ -268,6 +268,8 @@ class selWin:
         self.wid_scroll.grid(row=0, column=1, sticky="NS")
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
 
+        utils.add_mousewheel(self.wid_canvas, self.win)
+
         if utils.MAC:
             # Labelframe doesn't look good here on OSX
             self.sugg_lbl = ttk.Label(

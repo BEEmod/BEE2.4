@@ -106,10 +106,6 @@ def set_stylevar(var):
         update_filter()
 
 
-def scroll(delta):
-    UI['style_can'].yview_scroll(delta, "units")
-
-
 def refresh(selected_style):
     """Move the stylevars to the correct position.
 
@@ -177,6 +173,9 @@ def make_pane(tool_frame):
         )
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
+
+    utils.add_mousewheel(UI['style_can'], window)
+
     canvas_frame = ttk.Frame(UI['style_can'])
 
     frame_all = ttk.Labelframe(canvas_frame, text="All:")
@@ -258,19 +257,3 @@ def make_pane(tool_frame):
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
-
-    # Scroll globally even if canvas is not selected.
-    if utils.WIN:
-        window.bind(
-            "<MouseWheel>",
-            lambda e: scroll(int(-1*(e.delta/120))),
-        )
-    elif utils.MAC:
-        window.bind(
-            "<Button-4>",
-            lambda e: scroll(1),
-        )
-        window.bind(
-            "<Button-5>",
-            lambda e: scroll(-1),
-        )

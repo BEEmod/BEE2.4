@@ -1659,36 +1659,8 @@ def init_windows():
         'Fill empty spots in the palette with random items.',
     )
 
-    # make scrollbar work globally
-    if utils.WIN:
-        TK_ROOT.bind(
-            "<MouseWheel>",
-            lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
-            )
-    elif utils.LINUX:
-        TK_ROOT.bind(
-            "<Button-4>",
-            lambda e: pal_canvas.yview_scroll(1, "units"),
-            )
-        TK_ROOT.bind(
-            "<Button-5>",
-            lambda e: pal_canvas.yview_scroll(-1, "units"),
-            )
-
-    if utils.WIN:
-        StyleVarPane.window.bind(
-            "<MouseWheel>",
-            lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
-            )
-    elif utils.LINUX:
-        StyleVarPane.window.bind(
-            "<Button-4>",
-            lambda e: UI['style_can'].yview_scroll(1, "units"),
-            )
-        StyleVarPane.window.bind(
-            "<Button-5>",
-            lambda e: UI['style_can'].yview_scroll(-1, "units"),
-            )
+    # Make scrollbar work globally
+    utils.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
     utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
