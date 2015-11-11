@@ -168,6 +168,7 @@ class Condition:
                 # Shortcut to eliminate lots of Result - Condition pairs
                 results.append(prop)
             elif prop.name == 'elsecondition':
+                prop.name = 'condition'
                 else_results.append(prop)
             elif prop.name == 'priority':
                 try:
