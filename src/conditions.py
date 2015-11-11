@@ -728,6 +728,7 @@ def retexture_template(
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
+        force_grid:str=None,
         ):
     """Retexture a template at the given location.
 
@@ -738,6 +739,8 @@ def retexture_template(
       same type.
     - replace_tex is a replacement table. This overrides everything else.
     - If force_colour is set, all tile textures will be switched accordingly.
+    - If force_grid is set, all tile textures will be that size
+        ('wall', '2x2', '4x4', 'special')
     """
     import vbsp
     all_brushes = list(world)
@@ -771,6 +774,8 @@ def retexture_template(
 
             if force_colour is not None:
                 tex_colour = force_colour
+            if force_grid is not None:
+                grid_size = force_grid
 
             if grid_size == 'special':
                 # Various fallbacks if not defines
@@ -2814,27 +2819,53 @@ def res_add_brush(inst, res):
 def res_import_template_setup(res):
     temp_id = res['id'].casefold()
 
-    force_colour = res['force', 'none'].casefold()
-    if force_colour == 'white':
+    force = res['force', 'none'].casefold().split()
+    if 'white' in force:
         force_colour = MAT_TYPES.white
-    elif force_colour == 'black':
+    elif 'black' in force:
         force_colour = MAT_TYPES.black
     else:
         force_colour = None
+
+    for size in ('2x2', '4x4', 'wall', 'special') :
+        if size in force:
+            force_grid = size
+            break
+    else:
+        force_grid = None
 
     replace_tex = {
         prop.name: prop.value
         for prop in
         res.find_key('replace', [])
     }
-    return temp_id, replace_tex, force_colour
+    return temp_id, replace_tex, force_colour, force_grid
 
 
 @make_result('TemplateBrush')
 def res_import_template(inst, res):
-    temp_id, replace_tex, force_colour = res.value
+    """Import a template VMF file, retexturing it to match orientatation.
+
+    It will be placed overlapping the given instance.
+    Options:
+    - ID: The ID of the template to be inserted.
+    - force: a space-seperated list of overrides. If 'white' or 'black' is
+             present, the colour of tiles will be overriden. If a tile size
+            ('2x2', '4x4', 'wall', 'special') is included, all tiles will
+            be switched to that size (if not a floor/ceiling)
+    - replace: A block of template material -> replacement textures.
+            This is case insensitive - any texture here will not be altered
+            otherwise.
+    """
+    temp_id, replace_tex, force_colour, force_grid = res.value
+
     if temp_id not in TEMPLATES:
+        # The template map is read in after setup is performed, so
+        # it must be checked here!
+        # We don't want an error, just quit
+        utils.con_log('"{}" not a valid template!'.format(temp_id))
         return
+
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
     world, detail = import_template(temp_id, origin, angles)
@@ -2844,6 +2875,7 @@ def res_import_template(inst, res):
         origin,
         replace_tex,
         force_colour,
+        force_grid,
     )
 
 
