@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional,
-    Dict, List, Tuple,
+    Dict, List, Tuple, NamedTuple
     )
 
 # Stuff we get from VBSP in init()
@@ -34,15 +34,13 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-SOLIDS = {}  # A dictionary mapping origins to their brushes
-solidGroup = namedtuple('solidGroup', 'face solid normal color')
-
 GOO_LOCS = set()  # A set of all goo solid origins.
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list are world brushes, the second are func_detail brushes.
 TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
+
 
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
@@ -62,6 +60,15 @@ class MAT_TYPES(Enum):
             return 'black'
         if self is MAT_TYPES.white:
             return 'white'
+
+# A dictionary mapping origins to their brushes
+solidGroup = NamedTuple('solidGroup', [
+    ('face', VLib.Side),
+    ('solid', VLib.Solid),
+    ('normal', Vec),
+    ('color', MAT_TYPES)
+])
+SOLIDS = {}  # type: Dict[utils.Vec_tuple, solidGroup]
 
 
 xp = utils.Vec_tuple(1, 0, 0)
@@ -689,6 +696,7 @@ def import_template(
     entity will be returned. If there are no detail brushes, None will be
     returned instead of an invalid entity.
     """
+    import vbsp
     orig_world, orig_detail = TEMPLATES[temp_name]
     new_world = []
     new_detail = []
@@ -719,6 +727,10 @@ def import_template(
     else:
         detail_ent = None
 
+    # Don't let these get retextured normally - that should be
+    # done by retexture_template(), if at all!
+    vbsp.IGNORED_FACES.update(new_world, new_detail)
+
     return new_world, detail_ent
 
 
@@ -728,7 +740,7 @@ def retexture_template(
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
-        force_grid:str=None,
+        force_grid: str=None,
         ):
     """Retexture a template at the given location.
 
@@ -739,14 +751,19 @@ def retexture_template(
       same type.
     - replace_tex is a replacement table. This overrides everything else.
     - If force_colour is set, all tile textures will be switched accordingly.
-    - If force_grid is set, all tile textures will be that size
-        ('wall', '2x2', '4x4', 'special')
+    - If force_grid is set, all tile textures will be that size:
+      ('wall', '2x2', '4x4', 'special')
     """
     import vbsp
     all_brushes = list(world)
     if detail is not None:
         all_brushes.extend(detail.solids)
     rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*origin)
+
+    # Even if not axis-aligned, make mostly-flat surfaces
+    # floor/ceiling (+-40 degrees)
+    # sin(40) = ~0.707
+    floor_tolerance = 0.8
 
     for brush in all_brushes:
         for face in brush:
@@ -777,33 +794,20 @@ def retexture_template(
             if force_grid is not None:
                 grid_size = force_grid
 
-            if grid_size == 'special':
-                # Various fallbacks if not defines
-                face.mat = vbsp.get_tex(
-                    'special.{!s}_wall'.format(tex_colour)
-                )
-                if face.mat == '':
-                    face.mat = vbsp.get_tex(
-                        'special.{!s}'.format(tex_colour)
-                    )
-                if face.mat == '':
-                    grid_size = 'wall'
-                    # No special texture, use wall texture
-                else:
-                    continue
-
             if 1 in norm or -1 in norm:
                 # If axis-aligned, make the orientation aligned to world
                 # That way multiple items merge well, and walls are upright
                 face.offset = 0
 
                 # Floor / ceiling is always 1 size - 4x4
-                if norm == (0, 0, 1):
-                    grid_size = 'ceiling'
+                if norm.z == (0, 0, 1):
+                    if grid_size != 'special':
+                        grid_size = 'ceiling'
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, -1, 0)
                 elif norm == (0, 0, -1):
-                    grid_size = 'floor'
+                    if grid_size != 'special':
+                        grid_size = 'floor'
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, -1, 0)
                 # Walls:
@@ -813,6 +817,30 @@ def retexture_template(
                 elif norm == (0, -1, 0) or norm == (0, 1, 0):
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
+
+            if grid_size == 'special':
+                # Don't use wall on faces similar to floor/ceiling:
+                if -floor_tolerance < norm.z < floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.{!s}_wall'.format(tex_colour)
+                    )
+                else:
+                    face.mat = ''  # Ensure next if statement triggers
+
+                # Various fallbacks if not defined
+                if face.mat == '':
+                    face.mat = vbsp.get_tex(
+                        'special.{!s}'.format(tex_colour)
+                    )
+                if face.mat != '':
+                    continue  # Set to a special texture,
+                    # don't use the wall one
+            else:
+                utils.con_log(grid_size, norm.z)
+                if norm.z > floor_tolerance:
+                    grid_size = 'ceiling'
+                if norm.z < -floor_tolerance:
+                    grid_size = 'floor'
 
             face.mat = vbsp.get_tex(
                 '{!s}.{!s}'.format(tex_colour, grid_size)
@@ -1137,7 +1165,6 @@ def flag_brush_at_loc(inst, flag):
     des_type = flag['type', 'any'].casefold()
 
     brush = SOLIDS.get(pos.as_tuple(), None)
-    ':type brush: solidGroup'
 
     if brush is None or brush.normal != norm:
         br_type = 'none'
@@ -2819,7 +2846,7 @@ def res_add_brush(inst, res):
 def res_import_template_setup(res):
     temp_id = res['id'].casefold()
 
-    force = res['force', 'none'].casefold().split()
+    force = res['force', ''].casefold().split()
     if 'white' in force:
         force_colour = MAT_TYPES.white
     elif 'black' in force:
@@ -2827,7 +2854,14 @@ def res_import_template_setup(res):
     else:
         force_colour = None
 
-    for size in ('2x2', '4x4', 'wall', 'special') :
+    if 'world' in force:
+        force_type = TEMP_TYPES.world
+    elif 'detail' in force:
+        force_type = TEMP_TYPES.detail
+    else:
+        force_type = TEMP_TYPES.default
+
+    for size in ('2x2', '4x4', 'wall', 'special'):
         if size in force:
             force_grid = size
             break
@@ -2839,7 +2873,13 @@ def res_import_template_setup(res):
         for prop in
         res.find_key('replace', [])
     }
-    return temp_id, replace_tex, force_colour, force_grid
+    return (
+        temp_id,
+        replace_tex,
+        force_colour,
+        force_grid,
+        force_type,
+    )
 
 
 @make_result('TemplateBrush')
@@ -2852,12 +2892,19 @@ def res_import_template(inst, res):
     - force: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overriden. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
-            be switched to that size (if not a floor/ceiling)
+            be switched to that size (if not a floor/ceiling). If 'world' or
+            'detail' is present, the brush will be forced to that type.
     - replace: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
             otherwise.
     """
-    temp_id, replace_tex, force_colour, force_grid = res.value
+    (
+        temp_id,
+        replace_tex,
+        force_colour,
+        force_grid,
+        force_type,
+    ) = res.value
 
     if temp_id not in TEMPLATES:
         # The template map is read in after setup is performed, so
@@ -2868,7 +2915,12 @@ def res_import_template(inst, res):
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    world, detail = import_template(temp_id, origin, angles)
+    world, detail = import_template(
+        temp_id,
+        origin,
+        angles,
+        force_type,
+    )
     retexture_template(
         world,
         detail,
