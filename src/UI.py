@@ -7,7 +7,7 @@ import itertools
 import operator
 import random
 
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS

@@ -417,7 +417,7 @@ def init_widgets():
     wid['desc'] = tkRichText(desc_frame, width=40, height=8, font=None)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
-    desc_scroll = ttk.Scrollbar(
+    desc_scroll = tk_tools.HidingScroll(
         desc_frame,
         orient=VERTICAL,
         command=wid['desc'].yview,
