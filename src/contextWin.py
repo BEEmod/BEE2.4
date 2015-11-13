@@ -20,6 +20,7 @@ import img as png
 import sound as snd
 import itemPropWin
 import tooltip
+import tk_tools
 import utils
 
 OPEN_IN_TAB = 2

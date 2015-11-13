@@ -2,7 +2,6 @@
 from tkinter import *  # ui library
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
-from functools import partial as func_partial
 import itertools
 import operator
 import random
@@ -16,6 +15,7 @@ from loadScreen import main_loader as loader
 import paletteLoader
 import img
 import utils
+import tk_tools
 import SubPane
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
@@ -1097,7 +1097,11 @@ def init_palette(f):
     # selected.
     UI['palette'].selection_set(0)
 
-    pal_scroll = ttk.Scrollbar(f, orient=VERTICAL, command=UI['palette'].yview)
+    pal_scroll = tk_tools.HidingScroll(
+        f,
+        orient=VERTICAL,
+        command=UI['palette'].yview,
+    )
     pal_scroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand'] = pal_scroll.set
 
@@ -1320,7 +1324,11 @@ def init_picker(f):
     cframe.rowconfigure(0, weight=1)
     cframe.columnconfigure(0, weight=1)
 
-    scroll = ttk.Scrollbar(cframe, orient=VERTICAL, command=pal_canvas.yview)
+    scroll = tk_tools.HidingScroll(
+        cframe,
+        orient=VERTICAL,
+        command=pal_canvas.yview,
+    )
     scroll.grid(column=1, row=0, sticky="NS")
     pal_canvas['yscrollcommand'] = scroll.set
 

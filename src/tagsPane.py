@@ -9,6 +9,7 @@ import optionWindow
 import StyleVarPane
 import UI
 import utils
+import tk_tools
 
 is_expanded = False
 wid = {}
@@ -182,7 +183,7 @@ def init(frm):
         underline=1,
     )
 
-    wid['tag_scroll'] = tag_scroll = ttk.Scrollbar(
+    wid['tag_scroll'] = tag_scroll = tk_tools.HidingScroll(
         exp,
         orient=tk.VERTICAL,
         command=tag_list.yview,

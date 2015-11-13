@@ -10,6 +10,7 @@ import functools
 from BEE2_config import ConfigFile
 import img
 import utils
+import tk_tools
 
 voice_item = None
 
@@ -76,7 +77,7 @@ def init_widgets():
         state='disabled',
         font=('Helvectia', 10),
         )
-    UI['trans_scroll'] = ttk.Scrollbar(
+    UI['trans_scroll'] = tk_tools.HidingScroll(
         trans_inner_frame,
         orient=VERTICAL,
         command=UI['trans'].yview,
@@ -251,7 +252,7 @@ def make_tab(group, config, is_mid=False):
         outer_frame,
         highlightthickness=0,
         )
-    scroll = ttk.Scrollbar(
+    scroll = tk_tools.HidingScroll(
         outer_frame,
         orient=VERTICAL,
         command=canv.yview,
