@@ -1,6 +1,6 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 
 import utils

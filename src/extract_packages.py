@@ -11,7 +11,7 @@ import os.path
 from zipfile import ZipFile
 
 from FakeZip import zip_names, FakeZip
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 UPDATE_INTERVAL = 500  # Number of miliseconds between each progress check
 

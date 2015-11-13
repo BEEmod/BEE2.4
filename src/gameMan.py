@@ -12,7 +12,7 @@ import shutil
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
 from tkinter import filedialog  # open/save as dialog creator
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 from query_dialogs import ask_string
 from BEE2_config import ConfigFile

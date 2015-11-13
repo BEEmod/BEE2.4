@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # BEE2_config creates this config file to allow easy cross-module access
     from BEE2_config import GEN_OPTS
 
-    from tk_root import TK_ROOT
+    from tk_tools import TK_ROOT
     import UI
     import loadScreen
     import paletteLoader

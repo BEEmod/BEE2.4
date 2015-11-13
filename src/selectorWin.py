@@ -8,7 +8,7 @@ from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
 from collections import namedtuple
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 import functools
 import math
 
