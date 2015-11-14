@@ -18,7 +18,7 @@ import tk_tools
 UP_ARROW = '\u25B3'
 DN_ARROW = '\u25BD'
 
-ROW_HEIGHT = 24
+ROW_HEIGHT = 16
 ROW_PADDING = 2
 
 style = ttk.Style()
@@ -98,7 +98,14 @@ class Item:
 
 
 class CheckDetails(ttk.Frame):
-    def __init__(self, parent, items=(), headers=()):
+    def __init__(self, parent, items=(), headers=(), add_sizegrip=False):
+        """Initialise a CheckDetails pane.
+
+        parent is the parent widget.
+        items is a list of Items objects.
+        headers is a list of the header strings.
+        If add_sizegrip is True, add a sizegrip object between the scrollbars.
+        """
         super(CheckDetails, self).__init__(parent)
 
         self.parent = parent
@@ -153,12 +160,12 @@ class CheckDetails(ttk.Frame):
         self.columnconfigure(1, weight=1)
         self.rowconfigure(1, weight=1)
 
-        self.horiz_scroll = tk_tools.HidingScroll(
+        self.horiz_scroll = ttk.Scrollbar(
             self,
             orient=tk.HORIZONTAL,
             command=self.wid_canvas.xview,
         )
-        self.vert_scroll = tk_tools.HidingScroll(
+        self.vert_scroll = ttk.Scrollbar(
             self,
             orient=tk.VERTICAL,
             command=self.wid_canvas.yview,
@@ -168,13 +175,16 @@ class CheckDetails(ttk.Frame):
 
         self.horiz_scroll.grid(row=2, column=0, columnspan=2, sticky='EWS')
         self.vert_scroll.grid(row=1, column=2, sticky='NSE')
-        if utils.USE_SIZEGRIP:
-            ttk.Sizegrip(self).grid(row=2, column=2)
+        if add_sizegrip and utils.USE_SIZEGRIP:
+            self.sizegrip = ttk.Sizegrip(self)
+            self.sizegrip.grid(row=2, column=2)
+        else:
+            self.sizegrip = None
 
         self.wid_frame = tk.Frame(
             self.wid_canvas,
-            relief=tk.SUNKEN,
             background='white',
+            border=0
         )
         self.wid_canvas.create_window(0, 0, window=self.wid_frame, anchor='nw')
 
@@ -288,6 +298,44 @@ class CheckDetails(ttk.Frame):
             self.wid_canvas.winfo_height(),
             pos,
         )
+
+        has_scroll_horiz = width > self.wid_canvas.winfo_width()
+        has_scroll_vert = height > self.wid_canvas.winfo_height()
+
+        # Re-grid the canvas, sizegrip and scrollbar to fill in gaps
+        if self.sizegrip is not None:
+            if has_scroll_horiz or has_scroll_vert:
+                self.sizegrip.grid()
+            else:
+                self.sizegrip.grid_remove()
+
+        # If only one, extend the canvas to fill the empty space
+        if has_scroll_horiz and not has_scroll_vert:
+            self.wid_canvas.grid(
+                row=1, column=0, sticky='NSEW',
+                columnspan=3,
+            )
+        elif not has_scroll_horiz and has_scroll_vert:
+            self.wid_canvas.grid(
+                row=1, column=0, sticky='NSEW',
+                columnspan=2, rowspan=2,
+            )
+        else:
+            # Both or neither, just fit in the original space
+            self.wid_canvas.grid(
+                row=1, column=0, sticky='NSEW',
+                columnspan=2,
+            )
+
+        if has_scroll_horiz:
+            self.horiz_scroll.grid()
+        else:
+            self.horiz_scroll.grid_remove()
+
+        if has_scroll_vert:
+            self.vert_scroll.grid()
+        else:
+            self.vert_scroll.grid_remove()
 
         # Set the size of the canvas
         self.wid_frame.update_idletasks()
