@@ -27,6 +27,7 @@ style.configure(
     background='white',
 )
 
+
 class Item:
     """Represents one item in a CheckDetails list.
 
@@ -37,6 +38,9 @@ class Item:
         self.master = None  # type: CheckDetails
         self.check = None  # type: ttk.Checkbutton
         self.val_widgets = []
+
+    def copy(self):
+        return Item(self.values)
 
     def make_widgets(self, master: 'CheckDetails'):
         if self.master is not None:
