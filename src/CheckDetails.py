@@ -7,7 +7,12 @@ via tooltips
 """
 from tkinter import ttk
 import tkinter as tk
+
+import utils
 import tk_tools
+
+UP_ARROW = '\u25B3'
+DN_ARROW = '\u25BD'
 
 
 class Item:
@@ -16,18 +21,34 @@ class Item:
     """
     def __init__(self, *values):
         self.values = values
-        self.state = tk.BooleanVar(value=False)
+        self.state_var = None
+        self.widget = None
+        self.check = None
+        self.master = None
 
+    def make_widgets(self, master):
+        if self.master is not None:
+            # If we let items move between lists, the old widgets will become
+            # orphaned!
+            raise ValueError(
+                "Can't move Item objects between lists!"
+            )
 
-class _ItemRow:
-    """Holds the widgets displayed in each row.
-    """
-    def __init__(self, master: 'CheckDetails', item: 'Item'):
-        self.widget = master
-        self.item = item
+        self.master = master
+        self.state_var = tk.BooleanVar(value=False)
         self.check = ttk.Checkbutton(
             master.wid_canvas,
+            variable=self.state_var,
         )
+
+    @property
+    def state(self) -> bool:
+        return self.state_var.get()
+
+    @state.setter
+    def state(self, value: bool):
+        self.state_var.set(value)
+        self.master.update_allcheck()
 
 
 class CheckDetails(ttk.Frame):
@@ -37,15 +58,37 @@ class CheckDetails(ttk.Frame):
         self.parent = parent
         self.headers = list(headers)
         self.items = []
-        # The widgets used for rows
-        self._wid_rows = {}
+
+        self.head_check_var = tk.IntVar(value=0)
+        self.wid_head_check = ttk.Checkbutton(
+            self,
+            takefocus=False,
+            variable=self.head_check_var,
+            onvalue=1,
+            offvalue=0,
+        )
+        self.wid_head_check.grid(row=0, column=0)
+
+        self.wid_header = tk.PanedWindow(
+            self,
+            orient=tk.HORIZONTAL,
+            sashrelief=tk.RAISED,
+            sashpad=2,
+            showhandle=False,
+        )
+        self.wid_header.grid(row=0, column=1, sticky='EW')
+        self.wid_head_label = [0] * len(self.headers)
+        self.wid_head_sort = [0] * len(self.headers)
+        self.make_headers()
 
         self.wid_canvas = tk.Canvas(
             self,
+            relief=tk.SUNKEN,
+            background='white',
         )
-        self.wid_canvas.grid(row=0, column=0, sticky='NSEW')
-        self.columnconfigure(0, weight=1)
-        self.rowconfigure(0, weight=1)
+        self.wid_canvas.grid(row=1, column=0, columnspan=2, sticky='NSEW')
+        self.columnconfigure(1, weight=1)
+        self.rowconfigure(1, weight=1)
 
         self.horiz_scroll = tk_tools.HidingScroll(
             self,
@@ -60,23 +103,90 @@ class CheckDetails(ttk.Frame):
         self.wid_canvas['xscrollcommand'] = self.horiz_scroll.set
         self.wid_canvas['yscrollcommand'] = self.vert_scroll.set
 
-        self.horiz_scroll.grid(row=1, column=0, sticky='EW')
-        self.vert_scroll.grid(row=0, column=1, sticky='NS')
+        self.horiz_scroll.grid(row=2, column=0, columnspan=2, sticky='EW')
+        self.vert_scroll.grid(row=1, column=1, sticky='NS')
+
+        self.wid_frame = ttk.Frame(
+            self.wid_canvas,
+        )
+        self.wid_canvas.create_window(0, 0, window=self.wid_frame, anchor='nw')
+
+        self.bind('<Configure>', self.refresh)
+        utils.add_mousewheel(self.wid_canvas, self)
 
         for item in items:
             self.add_item(item)
 
+    def make_headers(self):
+        """Generate the heading widgets."""
+
+        for i, head_text in enumerate(self.headers):
+            header = ttk.Frame(
+                self.wid_header,
+                relief=tk.RAISED,
+            )
+
+            self.wid_head_label[i] = label = ttk.Label(
+                header,
+                text=head_text,
+            )
+            self.wid_head_sort[i] = sorter = ttk.Label(
+                header,
+                text='',
+            )
+            label.grid(row=0, column=0, sticky='EW')
+            sorter.grid(row=0, column=1, sticky='E')
+            header.columnconfigure(0, weight=1)
+            self.wid_header.add(header)
+
+            def header_enter(e, wid=label):
+                wid['background'] = 'lightblue'
+
+            def header_leave(_, wid=label):
+                wid['background'] = ''
+
+            header.bind('<Enter>', header_enter)
+            header.bind('<Leave>', header_leave)
+
+            # Headers can't become smaller than their initial size -
+            # The amount of space to show all the text + arrow
+            header.update_idletasks()
+            self.wid_header.paneconfig(
+                header,
+                minsize=header.winfo_reqwidth(),
+            )
+
+            sorter['text'] = ''
+
     def add_item(self, item):
         self.items.append(item)
-        self._wid_rows[item] = _ItemRow(self, item)
+        item.make_widgets(self)
 
     def rem_item(self, item):
         self.items.remove(item)
-        del self._wid_rows[item]
 
-    def refresh(self):
-        """Reposition the widgets."""
-        pass
+    def update_allcheck(self):
+        """Update the 'all' checkbox to match the state of sub-boxes."""
+        self.head_check_var.set(
+            any(item.state for item in self.items)
+        )
+
+    def refresh(self, _=None):
+        """Reposition the widgets.
+
+        Must be called when self.items or _wid_rows is changed,
+        or when window is resized.
+        """
+
+        # Set the size of the canvas
+        self.wid_frame.update_idletasks()
+
+        self.wid_canvas['scrollregion'] = (
+            0,
+            0,
+            self.wid_frame.winfo_reqwidth(),
+            self.wid_frame.winfo_reqheight(),
+        )
 
 
 if __name__ == '__main__':
@@ -90,7 +200,7 @@ if __name__ == '__main__':
             Item('Item3', 'Auth2'),
         ]
     )
-    test_inst.grid()
+    test_inst.grid(sticky='NSEW')
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
     root.mainloop()
