@@ -31,6 +31,11 @@ style.configure(
     background='white',
 )
 
+# An event generated when items are all unchecked.
+# Use to disable buttons when needed
+EVENT_NO_CHECKS = '<<NoItemsChecked>>'
+EVENT_HAS_CHECKS = '<<ItemsChecked>>'
+
 
 def truncate(text, width):
     """Truncate text to fit in the given space."""
@@ -227,8 +232,7 @@ class CheckDetails(ttk.Frame):
         self.wid_header.bind('<B1-Motion>', self.refresh)
         self.wid_header.bind('<Configure>', self.refresh)
 
-        for item in items:
-            self.add_item(item)
+        self.add_items(*items)
 
     def make_headers(self):
         """Generate the heading widgets."""
@@ -276,33 +280,46 @@ class CheckDetails(ttk.Frame):
 
             sorter['text'] = ''
 
-    def add_item(self, item):
-        self.items.append(item)
-        item.make_widgets(self)
+    def add_items(self, *items):
+        for item in items:
+            self.items.append(item)
+            item.make_widgets(self)
+        self.update_allcheck()
+        self.refresh()
 
-    def rem_item(self, item):
-        self.items.remove(item)
+    def rem_items(self, *items):
+        for item in items:
+            self.items.remove(item)
+        self.update_allcheck()
+        self.refresh()
 
     def update_allcheck(self):
         """Update the 'all' checkbox to match the state of sub-boxes."""
         num_checked = sum(item.state for item in self.items)
         if num_checked == 0:
             self.head_check_var.set(False)
+            self.event_generate(EVENT_NO_CHECKS)
         elif num_checked == len(self.items):
             self.wid_head_check.state(['!alternate'])
             self.head_check_var.set(True)
             self.wid_head_check.state(['!alternate'])
+            self.event_generate(EVENT_HAS_CHECKS)
         else:
             # The 'half' state is just visual.
             # Set to true so everything is blanked when next clicking
             self.head_check_var.set(True)
             self.wid_head_check.state(['alternate'])
+            self.event_generate(EVENT_HAS_CHECKS)
 
     def toggle_allcheck(self):
         value = self.head_check_var.get()
         for item in self.items:
             # Bypass the update function
             item.state_var.set(value)
+        if value and self.items:  # Don't enable if we don't have items
+            self.event_generate(EVENT_HAS_CHECKS)
+        else:
+            self.event_generate(EVENT_NO_CHECKS)
 
     def refresh(self, _=None):
         """Reposition the widgets.
@@ -323,6 +340,12 @@ class CheckDetails(ttk.Frame):
         for item in self.items:
             item.place(check_width, header_sizes, pos)
             pos += ROW_HEIGHT + ROW_PADDING
+
+        # Disable checkbox if no items are present
+        if self.items:
+            self.wid_head_check.state(['!disabled'])
+        else:
+            self.wid_head_check.state(['disabled'])
 
         self.wid_frame['width'] = width = max(
             self.wid_canvas.winfo_width(),
