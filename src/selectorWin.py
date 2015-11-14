@@ -503,7 +503,7 @@ class selWin:
         and place the textbox.
         """
 
-        self.display = ttk.Entry(
+        self.display = tk_tools.ReadOnlyEntry(
             frame,
             textvariable=self.disp_label,
             cursor=utils.CURSORS['regular'],
