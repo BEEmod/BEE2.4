@@ -18,7 +18,6 @@ from query_dialogs import ask_string
 from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
-import UI
 import loadScreen
 import extract_packages
 
@@ -101,7 +100,17 @@ def translate(string):
 
 
 def setgame_callback(selected_game):
+    """Callback function run when games are selected."""
     pass
+
+
+def quit_application():
+    """Command run to quit the application.
+
+    This is overwritten by UI later.
+    """
+    import sys
+    sys.exit()
 
 
 class Game:
@@ -625,7 +634,7 @@ def load():
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            UI.quit_application()
+            quit_application()
         loadScreen.main_loader.deiconify()  # Show it again
     selected_game = all_games[0]
 
