@@ -20,6 +20,15 @@ UI = {}
 
 menus = {}  # For standalone application, generate menu bars
 
+HEADERS = ['Name', 'Mode', 'Date', 'Description']
+
+# The game subfolder where puzzles are located
+PUZZLE_FOLDERS = {
+    utils.STEAM_IDS['PORTAL2']: 'portal2',
+    utils.STEAM_IDS['APTAG']: 'aperturetag',
+    utils.STEAM_IDS['TWTM']: 'TWTM',
+}
+
 
 class P2C:
     """A PeTI map."""
@@ -30,10 +39,11 @@ class P2C:
         self.title = props['title', '<Untitled>']
         self.desc = props['description', '...']
         self.is_coop = utils.conv_bool(props['coop', '0'])
-        self.create_time = props['Timestamp_Created', '']
+        self.create_time = read_time(props['timestamp_created', ''])
+        self.mod_time = read_time(props['timestamp_modified', ''])
 
 
-def read(hex_time):
+def read_time(hex_time):
     """Convert the time format in P2C files into a readable string."""
     try:
         val = int(hex_time, 16)
@@ -48,7 +58,65 @@ def read(hex_time):
 
 def init():
     """Initialise all widgets in the given window."""
-    pass
+    for cat, btn_text in [
+            ('back_', 'Restore:'),
+            ('game_', 'Backup:'),
+            ]:
+        UI[cat + 'frame'] = frame = ttk.Frame(
+            window,
+        )
+
+        UI[cat + 'title'] = ttk.Label(
+            frame,
+        )
+        UI[cat + 'title'].grid(row=0, column=0, sticky='EW')
+        UI[cat + 'details'] = CheckDetails(
+            frame,
+            headers=HEADERS,
+        )
+        UI[cat + 'details'].grid(row=1, column=0, sticky='NSEW')
+        frame.rowconfigure(1, weight=1)
+        frame.columnconfigure(0, weight=1)
+
+        button_frame = ttk.Frame(
+            frame,
+        )
+        button_frame.grid(column=0, row=2)
+        ttk.Label(button_frame, text=btn_text).grid(row=0, column=0)
+        UI[cat + 'btn_all'] = ttk.Button(
+            button_frame,
+            text='All',
+            width=3,
+        )
+        UI[cat + 'btn_sel'] = ttk.Button(
+            button_frame,
+            text='Selected',
+            width=8,
+        )
+        UI[cat + 'btn_all'].grid(row=0, column=1)
+        UI[cat + 'btn_sel'].grid(row=0, column=2)
+
+        UI[cat + 'btn_del'] = ttk.Button(
+            button_frame,
+            text='Delete Selected',
+            width=14,
+        )
+        UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
+
+        utils.add_mousewheel(
+            UI[cat + 'details'].wid_canvas,
+            UI[cat + 'frame'],
+        )
+
+    UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
+    ttk.Separator(orient=tk.VERTICAL).grid(
+        row=1, column=1, sticky='NS', padx=5,
+    )
+    UI['game_frame'].grid(row=1, column=2, sticky='NSEW')
+
+    window.rowconfigure(1, weight=1)
+    window.columnconfigure(0, weight=1)
+    window.columnconfigure(2, weight=1)
 
 
 def init_application():
