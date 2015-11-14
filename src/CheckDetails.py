@@ -6,6 +6,7 @@ be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
 from tkinter import ttk
+from tkinter import font
 import tkinter as tk
 
 import functools
@@ -17,15 +18,31 @@ import tk_tools
 
 UP_ARROW = '\u25B3'
 DN_ARROW = '\u25BD'
+ELLIPSIS = '\u2026'
 
 ROW_HEIGHT = 16
 ROW_PADDING = 2
+
+BODY_FONT = font.nametofont('TkDefaultFont')
 
 style = ttk.Style()
 style.configure(
     'CheckDetails.TCheckbutton',
     background='white',
 )
+
+
+def truncate(text, width):
+    """Truncate text to fit in the given space."""
+    if BODY_FONT.measure(text) < width:
+        return text # No truncation needed!
+
+    # Chop one character off the end at a time
+    for ind in range(len(text)-1, 0, -1):
+        short = text[:ind] + ELLIPSIS
+        if BODY_FONT.measure(short) < width:
+            return short
+    return ELLIPSIS
 
 
 class Item:
@@ -62,17 +79,19 @@ class Item:
             command=self.master.update_allcheck,
         )
 
-        self.val_widgets = [
-            tk.Label(
+        self.val_widgets = []
+        for value in self.values:
+            wid = tk.Label(
                 master.wid_frame,
                 text=value,
                 justify=tk.LEFT,
                 anchor=tk.W,
                 background='white',
             )
-            for value in
-            self.values
-        ]
+            add_tooltip(wid)
+            wid.tooltip_text = ''
+            self.val_widgets.append(wid)
+
 
     def place(self, check_width, head_pos, y):
         """Position the widgets on the frame."""
@@ -82,13 +101,22 @@ class Item:
             width=check_width,
             height=ROW_HEIGHT,
         )
-        for widget, (x, width) in zip(self.val_widgets, head_pos):
+        for text, widget, (x, width) in zip(
+                self.values,
+                self.val_widgets,
+                head_pos
+                ):
             widget.place(
                 x=x+check_width,
                 y=y,
                 width=width,
                 height=ROW_HEIGHT,
             )
+            short_text = widget['text'] = truncate(text, width-5)
+            if short_text != text:
+                widget.tooltip_text = text
+            else:
+                widget.tooltip_text = ''
             x += width
 
     @property
@@ -213,10 +241,12 @@ class CheckDetails(ttk.Frame):
 
             self.wid_head_label[i] = label = ttk.Label(
                 header,
+                font='TkHeadingFont',
                 text=head_text,
             )
             self.wid_head_sort[i] = sorter = ttk.Label(
                 header,
+                font='TkHeadingFont',
                 text='',
             )
             label.grid(row=0, column=0, sticky='EW')
@@ -377,7 +407,7 @@ if __name__ == '__main__':
             Item('Item5', 'Auth3', 'Lorem Ipsum'),
             Item('Item3', 'Auth2', '.........'),
             Item('Item4', 'Auth2', '.........'),
-            Item('Item6', 'Auth4', '.....'),
+            Item('Item6', 'Sir VeryLongName', '.....'),
             Item('Item2', 'Auth1', '...'),
         ]
     )
