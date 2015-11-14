@@ -56,6 +56,12 @@ def read_time(hex_time):
     )
 
 
+def show_window():
+    window.deiconify()
+    window.lift()
+    utils.center_win(window, TK_ROOT)
+
+
 def init():
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
@@ -155,13 +161,37 @@ def init_application():
     gameMan.game_menu = game_menu
 
 
+def init_backup_settings():
+    """Initialise the auto-backup settings widget."""
+    UI['auto_frame'] = frame = ttk.LabelFrame(
+        window,
+    )
+    UI['auto_enable'] = enable_check = ttk.Checkbutton(
+        frame,
+        text='Automatic Backup After Export',
+    )
+    frame['labelwidget'] = enable_check
+    frame.grid(row=2, column=0, columnspan=3)
+
+    UI['auto_dir'] = tk_tools.ReadOnlyEntry(frame)
+
+    UI['auto_dir'].grid(row=0, column=0)
+
+
+
+
 def init_toplevel():
     """Initialise the window as part of the BEE2."""
     global window
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
+    window.withdraw()
+
+    # Don't destroy window when quit!
+    window.protocol("WM_DELETE_WINDOW", window.withdraw)
 
     init()
+    init_backup_settings()
 
 
 if __name__ == '__main__':

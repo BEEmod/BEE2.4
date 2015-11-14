@@ -62,7 +62,7 @@ if __name__ == '__main__':
             'log_missing_ent_count': '0',
         },
     }
-    loadScreen.main_loader.set_length('UI', 9)
+    loadScreen.main_loader.set_length('UI', 13)
     loadScreen.main_loader.show()
 
     if utils.MAC:

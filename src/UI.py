@@ -26,6 +26,7 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
+import backup as backupWin
 import tooltip
 
 
@@ -1452,7 +1453,7 @@ def init_menu_bar(win):
         # This will be enabled when the resources have been unpacked
         state=DISABLED,
         )
-    file_menu.export_btn_index = 0 # Change this if the menu is reordered
+    file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
     file_menu.add_command(
         label="Add Game",
@@ -1462,6 +1463,10 @@ def init_menu_bar(win):
         label="Remove Selected Game",
         command=gameMan.remove_game,
         )
+    file_menu.add_command(
+        label="Backup/Restore Puzzles",
+        command=backupWin.show_window,
+    )
     file_menu.add_separator()
     file_menu.add_command(
         label="Options",
@@ -1558,8 +1563,6 @@ def init_windows():
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
         )  # Prevent making the window smaller than the preview pane
-    loader.step('UI')
-
     loader.step('UI')
 
     ttk.Separator(
@@ -1677,9 +1680,14 @@ def init_windows():
     utils.bind_leftclick(windows['opt'], contextWin.hide_context)
     utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
+    backupWin.init_toplevel()
+    loader.step('UI')
     voiceEditor.init_widgets()
+    loader.step('UI')
     contextWin.init_widgets()
+    loader.step('UI')
     optionWindow.init_widgets()
+    loader.step('UI')
     init_drag_icon()
     loader.step('UI')
 
