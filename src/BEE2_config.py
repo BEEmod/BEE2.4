@@ -1,6 +1,6 @@
 import os.path
 
-from configparser import ConfigParser
+from configparser import ConfigParser, NoOptionError
 
 
 class ConfigFile(ConfigParser):
@@ -79,9 +79,10 @@ class ConfigFile(ConfigParser):
             """
         if section not in self:
             self[section] = {}
-        if value in self[section]:
+        try:
             return super().getboolean(section, value)
-        else:
+        except (ValueError, NoOptionError):
+            #  Invalid boolean, or not found
             self.has_changed = True
             self[section][value] = str(int(default))
             return default
@@ -95,9 +96,9 @@ class ConfigFile(ConfigParser):
             """
         if section not in self:
             self[section] = {}
-        if value in self[section]:
+        try:
             return super().getint(section, value)
-        else:
+        except (ValueError, NoOptionError):
             self.has_changed = True
             self[section][value] = str(int(default))
             return default
