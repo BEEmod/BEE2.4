@@ -122,6 +122,7 @@ class Item:
                 width=width,
                 height=ROW_HEIGHT,
             )
+            text = str(text)
             short_text = widget['text'] = truncate(text, width-5)
             if not widget.hover_override:
                 if short_text != text:
