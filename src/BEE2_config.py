@@ -4,6 +4,13 @@ from configparser import ConfigParser, NoOptionError
 
 
 class ConfigFile(ConfigParser):
+    """A version of ConfigParser which can easily save itself.
+
+    The config will track whether any values change, and only resave
+    if modified.
+    get_val, get_bool, and get_int are modified to return defaults instead
+    of erroring.
+    """
     def __init__(self, filename, root='../config', auto_load=True):
         """Initialise the config file.
 
@@ -115,9 +122,10 @@ class ConfigFile(ConfigParser):
 
     def set(self, section, option, value=None):
         orig_val = self.get(section, option, fallback=None)
-        if orig_val is None or orig_val is not value:
+        value = str(value)
+        if orig_val is None or orig_val != value:
             self.has_changed = True
-            super().set(section, option, str(value))
+            super().set(section, option, value)
 
     add_section.__doc__ = ConfigParser.add_section.__doc__
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
