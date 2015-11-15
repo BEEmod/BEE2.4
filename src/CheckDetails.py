@@ -144,6 +144,12 @@ class Item:
                     widget.tooltip_text = ''
             x += width
 
+    def destroy(self):
+        """Remove this from the window."""
+        self.check.place_forget()
+        for wid in self.val_widgets:
+            wid.place_forget()
+
     @property
     def state(self) -> bool:
         return self.state_var.get()
@@ -331,11 +337,14 @@ class CheckDetails(ttk.Frame):
     def rem_items(self, *items):
         for item in items:
             self.items.remove(item)
+            item.destroy()
         self.update_allcheck()
         self.refresh()
 
     def remove_all(self):
         """Remove all items from the list."""
+        for item in self.items:
+            item.destroy()
         self.items.clear()
         self.update_allcheck()
         self.refresh()
