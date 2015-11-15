@@ -206,7 +206,7 @@ elif LINUX:
 
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
-    def bind_leftclick(wid, func):
+    def bind_leftclick(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
         when control is held.
@@ -216,9 +216,9 @@ if MAC:
             # Don't run the event if control is held!
             if e.state & 4 == 0:
                 func()
-        wid.bind(EVENTS['LEFT'], event_handler)
+        wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
-    def bind_leftclick_double(wid, func):
+    def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
         when control is held."""
@@ -227,24 +227,24 @@ if MAC:
             # Don't run the event if control is held!
             if e.state & 4 == 0:
                 func()
-        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler)
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     def bind_rightclick(wid, func):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func)
         wid.bind(EVENTS['LEFT_CTRL'], func)
 else:
-    def bind_leftclick(wid, func):
+    def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT'], func)
+        wid.bind(EVENTS['LEFT'], func, add=add)
 
-    def bind_leftclick_double(wid, func):
+    def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT_DOUBLE'], func)
+        wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
-    def bind_rightclick(wid, func):
+    def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['RIGHT'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
 
 USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
 
