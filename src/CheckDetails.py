@@ -101,7 +101,20 @@ class Item:
             else:
                 wid.tooltip_text = ''
                 wid.hover_override = False
+
+            # Allow clicking on the row to toggle the checkbox
+            wid.bind('<Enter>', self.hover_start, add='+')
+            wid.bind('<Leave>', self.hover_stop, add='+')
+            utils.bind_leftclick(wid, self.row_click, add='+')
+            wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add='+')
+
             self.val_widgets.append(wid)
+
+        utils.add_mousewheel(
+            self.master.wid_canvas,
+            self.check,
+            *self.val_widgets
+        )
 
     def place(self, check_width, head_pos, y):
         """Position the widgets on the frame."""
@@ -139,6 +152,19 @@ class Item:
     def state(self, value: bool):
         self.state_var.set(value)
         self.master.update_allcheck()
+
+    def hover_start(self, e):
+        self.check.state(['active'])
+
+    def hover_stop(self, e):
+        self.check.state(['!active'])
+
+    def row_click(self, e):
+        self.state = not self.state
+        self.check.state(['pressed'])
+
+    def row_unclick(self, e):
+        self.check.state(['!pressed'])
 
 
 class CheckDetails(ttk.Frame):
@@ -241,6 +267,14 @@ class CheckDetails(ttk.Frame):
 
         self.add_items(*items)
 
+        utils.add_mousewheel(
+            self.wid_canvas,
+
+            self.wid_canvas,
+            self.wid_frame,
+            self.wid_header,
+        )
+
     def make_headers(self):
         """Generate the heading widgets."""
 
@@ -340,7 +374,6 @@ class CheckDetails(ttk.Frame):
         Must be called when self.items is changed,
         or when window is resized.
         """
-        self.wid_header.update_idletasks()
         header_sizes = [
             (head.winfo_x(), head.winfo_width())
             for head in
