@@ -69,7 +69,7 @@ class P2C:
         """Make a corresponding CheckItem object."""
         return CheckItem(
             self.title,
-            ('COOP' if self.is_coop else 'SP'),
+            ('Coop' if self.is_coop else 'SP'),
             self.mod_time,
             hover_text=self.desc
         )
@@ -350,4 +350,12 @@ if __name__ == '__main__':
     init_application()
 
     TK_ROOT.deiconify()
+
+    def fix_details():
+        # It takes a while before the detail headers update positions,
+        # so delay a refresh call.
+        TK_ROOT.update_idletasks()
+        UI['game_details'].refresh()
+    TK_ROOT.after(500, fix_details)
+
     TK_ROOT.mainloop()
