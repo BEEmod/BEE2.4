@@ -111,3 +111,11 @@ def zip_names(zip):
         return zip.names()
     else:
         return zip.namelist()
+
+
+def zip_open_bin(zip, filename):
+    """Open in binary mode if a fake zip."""
+    if isinstance(zip, FakeZip):
+        return zip.open(filename, 'rb')
+    else:
+        return zip.open(filename, 'r')
