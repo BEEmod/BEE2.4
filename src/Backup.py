@@ -121,12 +121,16 @@ class Date:
     def __lt__(self, other):
         if self.date is None:
             return True
+        elif other.date is None:
+            return False
         else:
             return self.date < other.date
 
     def __gt__(self, other):
         if self.date is None:
             return False
+        elif other.date is None:
+            return True
         else:
             return self.date > other.date
 
