@@ -54,11 +54,12 @@ class Item:
     """Represents one item in a CheckDetails list.
 
     """
-    def __init__(self, *values):
+    def __init__(self, *values, hover_text=None):
         self.values = values
         self.state_var = tk.IntVar(value=0)
         self.master = None  # type: CheckDetails
         self.check = None  # type: ttk.Checkbutton
+        self.hover_text = hover_text
         self.val_widgets = []
 
     def copy(self):
@@ -94,9 +95,13 @@ class Item:
                 background='white',
             )
             add_tooltip(wid)
-            wid.tooltip_text = ''
+            if self.hover_text:
+                wid.tooltip_text = self.hover_text
+                wid.hover_override = True
+            else:
+                wid.tooltip_text = ''
+                wid.hover_override = False
             self.val_widgets.append(wid)
-
 
     def place(self, check_width, head_pos, y):
         """Position the widgets on the frame."""
@@ -118,10 +123,11 @@ class Item:
                 height=ROW_HEIGHT,
             )
             short_text = widget['text'] = truncate(text, width-5)
-            if short_text != text:
-                widget.tooltip_text = text
-            else:
-                widget.tooltip_text = ''
+            if not widget.hover_override:
+                if short_text != text:
+                    widget.tooltip_text = text
+                else:
+                    widget.tooltip_text = ''
             x += width
 
     @property
@@ -290,6 +296,12 @@ class CheckDetails(ttk.Frame):
     def rem_items(self, *items):
         for item in items:
             self.items.remove(item)
+        self.update_allcheck()
+        self.refresh()
+
+    def remove_all(self):
+        """Remove all items from the list."""
+        self.items.clear()
         self.update_allcheck()
         self.refresh()
 
