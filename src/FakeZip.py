@@ -52,7 +52,7 @@ class FakeZip:
 
     def open(self, name, mode='r', pwd=None):
         try:
-            return open(os.path.join(self.folder, name))
+            return open(os.path.join(self.folder, name), mode)
         except FileNotFoundError as err:
             raise KeyError from err  # This is what zips raise
 
