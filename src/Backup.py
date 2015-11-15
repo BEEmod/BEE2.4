@@ -646,19 +646,90 @@ def init_application():
 
 def init_backup_settings():
     """Initialise the auto-backup settings widget."""
+    from BEE2_config import GEN_OPTS
+    check_var = tk.IntVar(
+        value=GEN_OPTS.get_bool('General', 'enable_auto_backup')
+    )
+    count_value = GEN_OPTS.get_int('General', 'auto_backup_count', 1)
+    back_dir = tk.StringVar(
+        value=GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
+    )
+
+    def check_callback():
+        GEN_OPTS['General']['enable_auto_backup'] = utils.bool_as_int(
+            check_var.get()
+        )
+
+    def count_callback():
+        GEN_OPTS['General']['enable_auto_backup'] = str(count.value)
+
+    dir_browser = filedialog.Directory(window, initialdir=back_dir.get())
+
+    def browse_folder():
+        directory = dir_browser.show()
+        print(directory)
+        if directory:
+            GEN_OPTS['Directories']['backup_loc'] = directory
+            back_dir.set(
+                ('...' + directory[-20:])
+                if len(directory) > 23 else
+                directory
+            )
+
     UI['auto_frame'] = frame = ttk.LabelFrame(
         window,
     )
     UI['auto_enable'] = enable_check = ttk.Checkbutton(
         frame,
         text='Automatic Backup After Export',
+        variable=check_var,
+        command=check_callback,
     )
+
     frame['labelwidget'] = enable_check
     frame.grid(row=2, column=0, columnspan=3)
 
-    UI['auto_dir'] = tk_tools.ReadOnlyEntry(frame)
+    dir_frame = ttk.Frame(
+        frame,
+    )
+    dir_frame.grid(row=0, column=0)
 
-    UI['auto_dir'].grid(row=0, column=0)
+    ttk.Label(
+        dir_frame,
+        text='Directory',
+    ).grid(row=0, column=0, columnspan=2)
+
+    UI['auto_dir'] = tk_tools.ReadOnlyEntry(
+        dir_frame,
+        textvariable=back_dir,
+        width=24,
+    )
+    UI['auto_dir'].grid(row=1, column=0)
+
+    browse_button = ttk.Button(
+        dir_frame,
+        text="...",
+        width=1.5,
+        command=browse_folder,
+    )
+    browse_button.grid(row=1, column=1, sticky='W')
+
+    count_frame = ttk.Frame(
+        frame,
+    )
+    count_frame.grid(row=0, column=1)
+    ttk.Label(
+        count_frame,
+        text='Keep (Per Game):'
+    ).grid(row=0, column=0)
+
+    count = tk_tools.ttk_Spinbox(
+        count_frame,
+        range=range(1, 50),
+        command=count_callback,
+    )
+    count.grid(row=1, column=0)
+    count.value = count_value
 
 
 def init_toplevel():
@@ -668,15 +739,20 @@ def init_toplevel():
     window.transient(TK_ROOT)
     window.withdraw()
 
+    def quit_command():
+        from BEE2_config import GEN_OPTS
+        window.withdraw()
+        GEN_OPTS.save_check()
+
     # Don't destroy window when quit!
-    window.protocol("WM_DELETE_WINDOW", window.withdraw)
+    window.protocol("WM_DELETE_WINDOW", quit_command)
 
     init()
     init_backup_settings()
 
     # When embedded in the BEE2, use regular buttons and a dropdown!
     toolbar_frame = ttk.Frame(
-        window
+        window,
     )
     ttk.Button(
         toolbar_frame,
