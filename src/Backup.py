@@ -14,7 +14,7 @@ import time
 import os
 import shutil
 
-from FakeZip import FakeZip, zip_names
+from FakeZip import FakeZip, zip_names, zip_open_bin
 from zipfile import ZipFile, ZIP_LZMA
 
 from tooltip import add_tooltip
@@ -302,12 +302,8 @@ def save_backup():
             map_path = p2c.path + '.p2c'
             scr_path = p2c.path + '.jpg'
             if scr_path in zip_names(old_zip):
-                if isinstance(old_zip, FakeZip):
-                    with old_zip.open(scr_path, 'rb') as f:
-                        new_zip.writestr(scr_path, f.read())
-                else:
-                    with old_zip.open(scr_path, 'r') as f:
-                        new_zip.writestr(scr_path, f.read())
+                with zip_open_bin(old_zip, scr_path) as f:
+                    new_zip.writestr(scr_path, f.read())
 
             with old_zip.open(map_path, 'r') as f:
                 new_zip.writestr(map_path, f.read())
@@ -334,11 +330,11 @@ def save_backup():
 def restore_maps(maps):
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
-    back_zip = BACKUPS['backup_zip']
 
     copy_loader.set_length('COPY', len(maps))
     with copy_loader:
         for p2c in maps:
+            back_zip = p2c.zip_file
             scr_path = p2c.path + '.jpg'
             map_path = p2c.path + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
@@ -359,11 +355,11 @@ def restore_maps(maps):
                     continue
 
             if scr_path in zip_names(back_zip):
-                with back_zip.open(scr_path, 'r') as src:
-                    with open(abs_scr, 'wb') as dest:
-                        shutil.copyfileobj(src, dest)
+                    with zip_open_bin(back_zip, scr_path) as src:
+                        with open(abs_scr, 'wb') as dest:
+                            shutil.copyfileobj(src, dest)
 
-            with back_zip.open(map_path, 'r') as src:
+            with zip_open_bin(back_zip, map_path) as src:
                 with open(abs_map, 'wb') as dest:
                     shutil.copyfileobj(src, dest)
 
@@ -401,6 +397,8 @@ def show_window():
     window.deiconify()
     window.lift()
     utils.center_win(window, TK_ROOT)
+    # Load our game data!
+    ui_refresh_game()
 
 
 def ui_load_backup():
@@ -495,6 +493,7 @@ def ui_backup_all():
         for item in
         UI['game_details'].items
     ])
+
 
 def ui_restore_sel():
     """Restore selected maps."""
@@ -675,7 +674,40 @@ def init_toplevel():
     init()
     init_backup_settings()
 
-    ui_refresh_game()
+    # When embedded in the BEE2, use regular buttons and a dropdown!
+    toolbar_frame = ttk.Frame(
+        window
+    )
+    ttk.Button(
+        toolbar_frame,
+        text='New Backup',
+        command=ui_new_backup,
+        width=14,
+    ).grid(row=0, column=0)
+
+    ttk.Button(
+        toolbar_frame,
+        text='Open Backup',
+        command=ui_load_backup,
+        width=13,
+    ).grid(row=0, column=1)
+
+    ttk.Button(
+        toolbar_frame,
+        text='Save Backup',
+        command=ui_save_backup,
+        width=11,
+    ).grid(row=0, column=2)
+
+    ttk.Button(
+        toolbar_frame,
+        text='.. As',
+        command=ui_save_backup_as,
+        width=5,
+    ).grid(row=0, column=3)
+
+    toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
+
     ui_new_backup()
 
 
