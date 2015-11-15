@@ -54,3 +54,47 @@ class ReadOnlyEntry(ttk.Entry):
         # so cancelling them stops anything from happening.
         self.insert = redir.register('insert', event_cancel)
         self.delete = redir.register('delete', event_cancel)
+
+
+class ttk_Spinbox(ttk.Widget, tk.Spinbox):
+    """This is missing from ttk, but still exists."""
+    def __init__(self, master, range=None, **kw):
+        """Initialise a spinbox.
+        Arguments:
+            range: The range buttons will run in
+            values: A list of values to use
+            wrap: Wether to loop at max/min
+            format: A specifier of the form ' %<pad>.<pad>f'
+            command: A command to run whenever the value changes
+        """
+        if range is not None:
+            kw['from'] = range.start
+            kw['to'] = range.stop
+            kw['increment'] = range.step
+            if 'width' not in kw:
+                kw['width'] = len(str(range.stop)) + 1
+
+        self.old_val = kw.get('from', '0')
+        kw['validate'] = 'all'
+        kw['validatecommand'] = self.validate
+
+        ttk.Widget.__init__(self, master, 'ttk::spinbox', kw)
+
+    @property
+    def value(self):
+        """Get the value of the spinbox."""
+        return self.tk.call(self._w, 'get')
+
+    @value.setter
+    def value(self, value):
+        """Set the spinbox to a value."""
+        self.tk.call(self._w, 'set', value)
+
+    def validate(self):
+        """Values must be integers."""
+        try:
+            self.old_val = int(self.value)
+            return True
+        except ValueError:
+            self.value = str(self.old_val)
+            return False
