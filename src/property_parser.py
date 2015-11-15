@@ -95,6 +95,7 @@ def read_multiline_value(file, line_num, filename):
         if line.endswith('"'):
             lines.append(line[:-1])
             return '\n'.join(lines)
+        lines.append(line)
     else:
         # We hit EOF!
         raise KeyValError(
