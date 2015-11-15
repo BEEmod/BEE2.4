@@ -3,6 +3,7 @@
 """
 import tkinter as tk
 from tkinter import ttk
+
 from tk_tools import TK_ROOT
 
 from datetime import datetime
@@ -15,6 +16,7 @@ from zipfile import ZipFile
 from tooltip import add_tooltip
 from property_parser import Property
 from CheckDetails import CheckDetails, Item as CheckItem
+from loadScreen import LoadScreen
 import img
 import utils
 import tk_tools
@@ -40,7 +42,25 @@ PUZZLE_FOLDERS = {
 BACKUPS = {
     'game': [],
     'back': [],
+
+    # The name of the current backup file
+    'backup_path': None,
 }
+
+# Variables associated with the heading text.
+backup_name = tk.StringVar()
+game_name = tk.StringVar()
+
+copy_loader = LoadScreen(
+    ('COPY', ''),
+    title_text='Copying maps',
+)
+
+reading_loader = LoadScreen(
+    ('READ', ''),
+    title_text='Loading maps',
+)
+
 
 
 class P2C:
@@ -136,15 +156,27 @@ class Date:
 def load_backup(zip_file):
     """Load in a backup file."""
     maps = []
-    for file in zip_names(zip_file):
-        if file.endswith('.p2c'):
-            bare_file = file[:-4]
-            maps.append(P2C(bare_file, zip_file))
+    puzzles = [
+        file[:-4] # Strip extension
+        for file in
+        zip_names(zip_file)
+        if file.endswith('.p2c')
+    ]
+    # Each P2C init requires reading in the properties file, so this may take
+    # some time. Use a loading screen.
+    reading_loader.set_length('READ', len(puzzles))
+    with reading_loader:
+        for file in puzzles:
+            maps.append(P2C(file, zip_file))
+            reading_loader.step('READ')
+
     return maps
 
 
 def load_game(game: gameMan.Game):
     """Callback for gameMan, load in files for a game."""
+    game_name.set(game.name)
+
     puzzle_folder = PUZZLE_FOLDERS.get(str(game.steamID), 'portal2')
     path = game.abs_path(puzzle_folder + '/puzzles/')
     for folder in os.listdir(path):
@@ -155,11 +187,11 @@ def load_game(game: gameMan.Game):
             zip_file = FakeZip(abs_path)
             maps = load_backup(zip_file)
             BACKUPS['game'] = maps
-            refresh_details()
+            refresh_game_details()
 
 
-def refresh_details():
-    """Remake the items in the checkdetails list."""
+def refresh_game_details():
+    """Remake the items in the game maps list."""
     game = UI['game_details']
     game.remove_all()
     game.add_items(*(
@@ -168,6 +200,9 @@ def refresh_details():
         BACKUPS['game']
     ))
 
+
+def refresh_back_details():
+    """Remake the items in the backup list."""
     backup = UI['back_details']
     backup.remove_all()
     backup.add_items(*(
@@ -186,6 +221,13 @@ def show_window():
 def ui_load_backup():
     """Prompt and load in a backup file."""
     pass
+
+
+def ui_new_backup():
+    """Create a new backup file."""
+    BACKUPS['back'].clear()
+    BACKUPS['backup_name'] = None
+    backup_name.set('Unsaved Backup')
 
 
 def ui_refresh_game():
@@ -209,8 +251,9 @@ def init():
         title_frame.grid(row=0, column=0, sticky='EW')
         UI[cat + 'title'] = ttk.Label(
             title_frame,
+            font='TkHeadingFont',
         )
-        UI[cat + 'title'].grid(row=0, column=0, sticky='EW')
+        UI[cat + 'title'].grid(row=0, column=0)
         title_frame.rowconfigure(0, weight=1)
         title_frame.columnconfigure(0, weight=1)
 
@@ -263,6 +306,9 @@ def init():
         "Reload the map list.",
     )
 
+    UI['game_title']['textvariable'] = game_name
+    UI['back_title']['textvariable'] = backup_name
+
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
         row=1, column=1, sticky='NS', padx=5,
@@ -284,15 +330,17 @@ def init_application():
     window.option_add('*tearOff', False)
 
     gameMan.load()
+    ui_new_backup()
 
-    ui_refresh_game()
+    # UI.py isn't present, so we use this callback
+    gameMan.setgame_callback = load_game
 
     if utils.MAC:
         # Name is used to make this the special 'BEE2' menu item
         file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
         file_menu = menus['file'] = tk.Menu(bar)
-    file_menu.add_command(label='New Backup')
+    file_menu.add_command(label='New Backup', command=ui_new_backup)
     file_menu.add_command(label='Open Backup')
     file_menu.add_command(label='Save Backup')
     file_menu.add_command(label='Save Backup As')
@@ -343,6 +391,7 @@ def init_toplevel():
     init_backup_settings()
 
     ui_refresh_game()
+    ui_new_backup()
 
 
 if __name__ == '__main__':
