@@ -47,6 +47,9 @@ BACKUPS = {
     'game': [],
     'back': [],
 
+    # The path for the game folder
+    'game_path': None,
+
     # The name of the current backup file
     'backup_path': None,
 
@@ -233,8 +236,10 @@ def load_game(game: gameMan.Game):
             continue
         abs_path = os.path.join(path, folder)
         if os.path.isdir(abs_path):
-            zip_file = FakeZip(abs_path)
+            BACKUPS['game_path'] = abs_path
+            BACKUPS['game_zip'] = zip_file = FakeZip(abs_path)
             maps = load_backup(zip_file)
+
             BACKUPS['game'] = maps
             refresh_game_details()
 
@@ -242,19 +247,109 @@ def load_game(game: gameMan.Game):
 def backup_maps(maps):
     """Copy the given maps to the backup."""
     back_zip = BACKUPS['backup_zip']  # type: ZipFile
+
+    # Allow removing old maps when we overwrite objects
+    map_dict = {
+        p2c.path: p2c
+        for p2c in
+        BACKUPS['back']
+    }
+
+    # You can't remove files from a zip, so we need to create a new one!
+    # Here we'll just add entries into BACKUPS['back'].
+    # Also check for overwriting
+    for p2c in maps:
+        scr_path = p2c.path + '.jpg'
+        map_path = p2c.path + '.p2c'
+        if (
+                map_path in zip_names(back_zip) or
+                scr_path in zip_names(back_zip)
+                ):
+            if not messagebox.askyesno(
+                    title='Overwrite File?',
+                    message='This filename is already in the backup.'
+                            'Do you wish to overwrite it? '
+                            '({})'.format(p2c.title),
+                    parent=window,
+                    icon=messagebox.QUESTION,
+                    ):
+                continue
+        new_item = p2c.copy()
+        map_dict[p2c.path] = new_item
+
+    BACKUPS['back'] = list(map_dict.values())
+    refresh_back_details()
+
+
+def save_backup():
+    """Save the backup file."""
+    # We generate it from scratch, since that's the only way to remove
+    # files.
+    new_zip_data = BytesIO()
+    new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
+
+    maps = [
+        item.p2c
+        for item in
+        UI['back_details'].items
+    ]
+
+    copy_loader.set_length('COPY', len(maps))
+
+    with copy_loader:
+        for p2c in maps:
+            old_zip = p2c.zip_file
+            map_path = p2c.path + '.p2c'
+            scr_path = p2c.path + '.jpg'
+            if scr_path in zip_names(old_zip):
+                if isinstance(old_zip, FakeZip):
+                    with old_zip.open(scr_path, 'rb') as f:
+                        new_zip.writestr(scr_path, f.read())
+                else:
+                    with old_zip.open(scr_path, 'r') as f:
+                        new_zip.writestr(scr_path, f.read())
+
+            with old_zip.open(map_path, 'r') as f:
+                new_zip.writestr(map_path, f.read())
+            copy_loader.step('COPY')
+
+    new_zip.close()  # Finalize zip
+
+    with open(BACKUPS['backup_path'], 'wb') as backup:
+        backup.write(new_zip_data.getvalue())
+    BACKUPS['unsaved_file'] = new_zip_data
+
+    # Remake the zipfile object, so it's open again.
+    BACKUPS['backup_zip'] = new_zip = ZipFile(
+        new_zip_data,
+        mode='w',
+        compression=ZIP_LZMA,
+    )
+
+    # Update the items, so they use this zip now.
+    for p2c in maps:
+        p2c.zip_file = new_zip
+
+
+def restore_maps(maps):
+    """Copy the given maps to the game."""
+    game_dir = BACKUPS['game_path']
+    back_zip = BACKUPS['backup_zip']
+
     copy_loader.set_length('COPY', len(maps))
     with copy_loader:
         for p2c in maps:
-            game_zip = p2c.zip_file  # type: FakeZip
             scr_path = p2c.path + '.jpg'
             map_path = p2c.path + '.p2c'
+            abs_scr = os.path.join(game_dir, scr_path)
+            abs_map = os.path.join(game_dir, map_path)
             if (
-                    map_path in zip_names(back_zip) or
-                    scr_path in zip_names(back_zip)
+                    os.path.isfile(abs_scr) or
+                    os.path.isfile(abs_map)
                     ):
                 if not messagebox.askyesno(
                         title='Overwrite File?',
-                        message='This filename is already in the backup.'
+                        message='This map is already in the game directory.'
                                 'Do you wish to overwrite it? '
                                 '({})'.format(p2c.title),
                         parent=window,
@@ -263,24 +358,21 @@ def backup_maps(maps):
                     copy_loader.step('COPY')
                     continue
 
-            if scr_path in zip_names(game_zip):
-                with game_zip.open(scr_path, 'rb') as src:
-                    back_zip.writestr(
-                        scr_path,
-                        src.read(),
-                        compress_type=ZIP_LZMA,
-                    )
+            if scr_path in zip_names(back_zip):
+                with back_zip.open(scr_path, 'r') as src:
+                    with open(abs_scr, 'wb') as dest:
+                        shutil.copyfileobj(src, dest)
 
-            with game_zip.open(map_path, 'rb') as src:
-                back_zip.writestr(
-                    map_path,
-                    src.read(),
-                    compress_type=ZIP_LZMA,
-                )
+            with back_zip.open(map_path, 'r') as src:
+                with open(abs_map, 'wb') as dest:
+                    shutil.copyfileobj(src, dest)
+
             new_item = p2c.copy()
-            new_item.zip_file = back_zip
-            BACKUPS['back'].append(new_item)
-    refresh_back_details()
+            new_item.zip_file = FakeZip(game_dir)
+            BACKUPS['game'].append(new_item)
+            copy_loader.step('COPY')
+
+    refresh_game_details()
 
 
 def refresh_game_details():
@@ -323,15 +415,18 @@ def ui_load_backup():
     BACKUPS['backup_path'] = file
     with open(file, 'rb') as f:
         # Read the backup zip into memory!
-        BACKUPS['unsaved_file'] = unsaved = BytesIO(f.read())
+        data = f.read()
+        BACKUPS['unsaved_file'] = unsaved = BytesIO(data)
 
-    BACKUPS['backup_zip'] = zip_file = ZipFile(unsaved, mode='w')
+    BACKUPS['backup_zip'] = zip_file = ZipFile(
+        unsaved,
+        mode='a',
+        compression=ZIP_LZMA,
+    )
     BACKUPS['back'] = load_backup(zip_file)
 
     BACKUPS['backup_name'] = os.path.basename(file)
     backup_name.set(BACKUPS['backup_name'])
-
-    print(BACKUPS['back'])
 
     refresh_back_details()
 
@@ -357,19 +452,7 @@ def ui_save_backup():
         ui_save_backup_as()
         return
 
-    # Close the zipfile to write the contents properly
-    # That doesn't close the BytesIO object!
-    BACKUPS['backup_zip'].close()
-
-    with open(BACKUPS['backup_path'], 'wb') as backup:
-        backup.write(BACKUPS['unsaved_file'].getvalue())
-
-    # Remake the zipfile object.
-    BACKUPS['backup_zip'] = ZipFile(
-        BACKUPS['unsaved_file'],
-        mode='w',
-        compression=ZIP_LZMA,
-    )
+    save_backup()
 
 
 def ui_save_backup_as():
@@ -404,12 +487,31 @@ def ui_backup_sel():
         if item.state
     ])
 
+
 def ui_backup_all():
     """Backup all maps."""
     backup_maps([
         item.p2c
         for item in
         UI['game_details'].items
+    ])
+
+def ui_restore_sel():
+    """Restore selected maps."""
+    restore_maps([
+        item.p2c
+        for item in
+        UI['back_details'].items
+        if item.state
+    ])
+
+
+def ui_restore_all():
+    """Backup all maps."""
+    restore_maps([
+        item.p2c
+        for item in
+        UI['back_details'].items
     ])
 
 
@@ -488,6 +590,9 @@ def init():
 
     UI['game_btn_all']['command'] = ui_backup_all
     UI['game_btn_sel']['command'] = ui_backup_sel
+
+    UI['back_btn_all']['command'] = ui_restore_all
+    UI['back_btn_sel']['command'] = ui_restore_sel
 
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
