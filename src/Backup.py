@@ -651,9 +651,7 @@ def init_backup_settings():
         value=GEN_OPTS.get_bool('General', 'enable_auto_backup')
     )
     count_value = GEN_OPTS.get_int('General', 'auto_backup_count', 1)
-    back_dir = tk.StringVar(
-        value=GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
-    )
+    back_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
 
     def check_callback():
         GEN_OPTS['General']['enable_auto_backup'] = utils.bool_as_int(
@@ -663,18 +661,8 @@ def init_backup_settings():
     def count_callback():
         GEN_OPTS['General']['enable_auto_backup'] = str(count.value)
 
-    dir_browser = filedialog.Directory(window, initialdir=back_dir.get())
-
-    def browse_folder():
-        directory = dir_browser.show()
-        print(directory)
-        if directory:
-            GEN_OPTS['Directories']['backup_loc'] = directory
-            back_dir.set(
-                ('...' + directory[-20:])
-                if len(directory) > 23 else
-                directory
-            )
+    def directory_callback(path):
+        GEN_OPTS['Directories']['backup_loc'] = path
 
     UI['auto_frame'] = frame = ttk.LabelFrame(
         window,
@@ -697,22 +685,15 @@ def init_backup_settings():
     ttk.Label(
         dir_frame,
         text='Directory',
-    ).grid(row=0, column=0, columnspan=2)
+    ).grid(row=0, column=0)
 
-    UI['auto_dir'] = tk_tools.ReadOnlyEntry(
+    UI['auto_dir'] = tk_tools.FileField(
         dir_frame,
-        textvariable=back_dir,
-        width=24,
+        loc=back_dir,
+        is_dir=True,
+        callback=directory_callback,
     )
     UI['auto_dir'].grid(row=1, column=0)
-
-    browse_button = ttk.Button(
-        dir_frame,
-        text="...",
-        width=1.5,
-        command=browse_folder,
-    )
-    browse_button.grid(row=1, column=1, sticky='W')
 
     count_frame = ttk.Frame(
         frame,

@@ -3,7 +3,10 @@ General code used for tkinter portions.
 
 """
 from tkinter import ttk
+from tkinter import filedialog
 import tkinter as tk
+
+import os.path
 
 from idlelib.WidgetRedirector import WidgetRedirector
 
@@ -98,3 +101,86 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
         except ValueError:
             self.value = str(self.old_val)
             return False
+
+
+class FileField(ttk.Frame):
+    """A text box which allows searching for a file or directory.
+    """
+    def __init__(self, master, is_dir=False, loc='', width=24, callback=None):
+        """Initialise the field.
+
+        - Set is_dir to true to look for directories, instead of files.
+        - width sets the number of characters to display.
+        - loc is the initial value of the field.
+        - callback is a function to be called with the new path whenever it
+          changes.
+        """
+        super(FileField, self).__init__(master)
+
+        self._location = loc
+        self.is_dir = is_dir
+        self.width = width
+
+        self._text_var = tk.StringVar(master=self, value=self._truncate(loc))
+        if is_dir:
+            self.browser = filedialog.Directory(
+                self,
+                initialdir=loc,
+            )
+        else:
+            self.browser = filedialog.SaveAs(
+                self,
+                initialdir=loc,
+            )
+
+        if callback is not None:
+            self.callback = callback
+
+        self.textbox = ReadOnlyEntry(
+            self,
+            textvariable=self._text_var,
+            width=width,
+            cursor=utils.CURSORS['regular'],
+        )
+        self.textbox.grid(row=0, column=0)
+        utils.bind_leftclick(self.textbox, self.browse)
+
+        self.browse_btn = ttk.Button(
+            self,
+            text="...",
+            width=1.5,
+            command=self.browse,
+        )
+        self.browse_btn.grid(row=0, column=1)
+
+    def browse(self, event=None):
+        """Browse for a file."""
+        path = self.browser.show()
+        if path:
+            self.value = path
+
+    def callback(self, path):
+        """Callback function, called whenever the value changes."""
+        pass
+
+    @property
+    def value(self):
+        """Get the current path."""
+        return self._location
+
+    @value.setter
+    def value(self, path):
+        """Set the current path. This calls the callback function."""
+        self.callback(path)
+        self._location = path
+        self._text_var.set(self._truncate(path))
+
+    def _truncate(self, path):
+        """Truncate the path to the end portion."""
+        if not self.is_dir:
+            path = os.path.basename(path)
+
+        if len(path) > self.width - 4:
+            return '...' + path[-(self.width - 1):]
+
+        return path
