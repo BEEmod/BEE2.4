@@ -3,15 +3,19 @@
 """
 import tkinter as tk
 from tkinter import ttk
+from tkinter import filedialog
+from tkinter import messagebox
 
 from tk_tools import TK_ROOT
 
 from datetime import datetime
+from io import BytesIO
 import time
 import os
+import shutil
 
 from FakeZip import FakeZip, zip_names
-from zipfile import ZipFile
+from zipfile import ZipFile, ZIP_LZMA
 
 from tooltip import add_tooltip
 from property_parser import Property
@@ -45,6 +49,11 @@ BACKUPS = {
 
     # The name of the current backup file
     'backup_path': None,
+
+    # The backup zip file
+    'backup_zip': None,  # type: ZipFile
+    # The currently-open file
+    'unsaved_file': None,
 }
 
 # Variables associated with the heading text.
@@ -62,11 +71,29 @@ reading_loader = LoadScreen(
 )
 
 
-
 class P2C:
     """A PeTI map."""
-    def __init__(self, path, zip_file):
-        """Initialise the map.
+    def __init__(
+            self,
+            path,
+            zip_file,
+            create_time,
+            mod_time,
+            title='<untitled>',
+            desc='',
+            is_coop=False,
+            ):
+        self.path = path
+        self.zip_file = zip_file
+        self.create_time = create_time
+        self.mod_time = mod_time
+        self.title = title
+        self.desc = desc
+        self.is_coop = is_coop
+
+    @classmethod
+    def from_file(cls, path, zip_file):
+        """Initialise from a file.
 
         path is the file path for the map inside the zip, without extension.
         zip_file is either a ZipFile or FakeZip object.
@@ -75,24 +102,42 @@ class P2C:
             props = Property.parse(file, path)
         props = props.find_key('portal2_puzzle', [])
 
-        self.path = path
-        self.zip_file = zip_file
-        self.title = props['title', None]
-        if self.title is None:
-            self.title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
-        self.desc = props['description', '...']
-        self.is_coop = utils.conv_bool(props['coop', '0'])
-        self.create_time = Date(props['timestamp_created', ''])
-        self.mod_time = Date(props['timestamp_modified', ''])
+        title = props['title', None]
+        if title is None:
+            title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
+
+        return cls(
+            path=path,
+            zip_file = zip_file,
+            title=title,
+            desc=props['description', '...'],
+            is_coop=utils.conv_bool(props['coop', '0']),
+            create_time=Date(props['timestamp_created', '']),
+            mod_time=Date(props['timestamp_modified', '']),
+        )
+
+    def copy(self):
+        """Copy this item."""
+        return self.__class__(
+            self.path,
+            create_time=self.create_time,
+            zip_file=self.zip_file,
+            mod_time=self.mod_time,
+            is_coop=self.is_coop,
+            desc=self.desc,
+            title=self.title,
+        )
 
     def make_item(self):
         """Make a corresponding CheckItem object."""
-        return CheckItem(
+        chk = CheckItem(
             self.title,
             ('Coop' if self.is_coop else 'SP'),
             self.mod_time,
             hover_text=self.desc
         )
+        chk.p2c = self
+        return chk
 
 
 class Date:
@@ -161,7 +206,7 @@ def load_backup(zip_file):
     """Load in a backup file."""
     maps = []
     puzzles = [
-        file[:-4] # Strip extension
+        file[:-4]  # Strip extension
         for file in
         zip_names(zip_file)
         if file.endswith('.p2c')
@@ -171,7 +216,7 @@ def load_backup(zip_file):
     reading_loader.set_length('READ', len(puzzles))
     with reading_loader:
         for file in puzzles:
-            maps.append(P2C(file, zip_file))
+            maps.append(P2C.from_file(file, zip_file))
             reading_loader.step('READ')
 
     return maps
@@ -192,6 +237,50 @@ def load_game(game: gameMan.Game):
             maps = load_backup(zip_file)
             BACKUPS['game'] = maps
             refresh_game_details()
+
+
+def backup_maps(maps):
+    """Copy the given maps to the backup."""
+    back_zip = BACKUPS['backup_zip']  # type: ZipFile
+    copy_loader.set_length('COPY', len(maps))
+    with copy_loader:
+        for p2c in maps:
+            game_zip = p2c.zip_file  # type: FakeZip
+            scr_path = p2c.path + '.jpg'
+            map_path = p2c.path + '.p2c'
+            if (
+                    map_path in zip_names(back_zip) or
+                    scr_path in zip_names(back_zip)
+                    ):
+                if not messagebox.askyesno(
+                        title='Overwrite File?',
+                        message='This filename is already in the backup.'
+                                'Do you wish to overwrite it? '
+                                '({})'.format(p2c.title),
+                        parent=window,
+                        icon=messagebox.QUESTION,
+                        ):
+                    copy_loader.step('COPY')
+                    continue
+
+            if scr_path in zip_names(game_zip):
+                with game_zip.open(scr_path, 'rb') as src:
+                    back_zip.writestr(
+                        scr_path,
+                        src.read(),
+                        compress_type=ZIP_LZMA,
+                    )
+
+            with game_zip.open(map_path, 'rb') as src:
+                back_zip.writestr(
+                    map_path,
+                    src.read(),
+                    compress_type=ZIP_LZMA,
+                )
+            new_item = p2c.copy()
+            new_item.zip_file = back_zip
+            BACKUPS['back'].append(new_item)
+    refresh_back_details()
 
 
 def refresh_game_details():
@@ -224,20 +313,104 @@ def show_window():
 
 def ui_load_backup():
     """Prompt and load in a backup file."""
-    pass
+    file = filedialog.askopenfilename(
+        title='Load Backup',
+        filetypes=[('Backup zip', '.zip')],
+    )
+    if not file:
+        return
+
+    BACKUPS['backup_path'] = file
+    with open(file, 'rb') as f:
+        # Read the backup zip into memory!
+        BACKUPS['unsaved_file'] = unsaved = BytesIO(f.read())
+
+    BACKUPS['backup_zip'] = zip_file = ZipFile(unsaved, mode='w')
+    BACKUPS['back'] = load_backup(zip_file)
+
+    BACKUPS['backup_name'] = os.path.basename(file)
+    backup_name.set(BACKUPS['backup_name'])
+
+    print(BACKUPS['back'])
+
+    refresh_back_details()
 
 
 def ui_new_backup():
     """Create a new backup file."""
     BACKUPS['back'].clear()
     BACKUPS['backup_name'] = None
+    BACKUPS['backup_path'] = None
     backup_name.set('Unsaved Backup')
+    BACKUPS['unsaved_file'] = unsaved = BytesIO()
+    BACKUPS['backup_zip'] = ZipFile(
+        unsaved,
+        mode='w',
+        compression=ZIP_LZMA,
+    )
+
+
+def ui_save_backup():
+    """Save a backup."""
+    if BACKUPS['backup_path'] is None:
+        # No backup path, prompt first
+        ui_save_backup_as()
+        return
+
+    # Close the zipfile to write the contents properly
+    # That doesn't close the BytesIO object!
+    BACKUPS['backup_zip'].close()
+
+    with open(BACKUPS['backup_path'], 'wb') as backup:
+        backup.write(BACKUPS['unsaved_file'].getvalue())
+
+    # Remake the zipfile object.
+    BACKUPS['backup_zip'] = ZipFile(
+        BACKUPS['unsaved_file'],
+        mode='w',
+        compression=ZIP_LZMA,
+    )
+
+
+def ui_save_backup_as():
+    """Prompt for a name, and then save a backup."""
+    path = filedialog.asksaveasfilename(
+        title='Save Backup As',
+        filetypes=[('Backup zip', '.zip')],
+    )
+    if not path:
+        return
+    if not path.endswith('.zip'):
+        path += '.zip'
+
+    BACKUPS['backup_path'] = path
+    BACKUPS['backup_name'] = os.path.basename(path)
+    backup_name.set(BACKUPS['backup_name'])
+    ui_save_backup()
 
 
 def ui_refresh_game():
     """Reload the game maps list."""
     if gameMan.selected_game is not None:
         load_game(gameMan.selected_game)
+
+
+def ui_backup_sel():
+    """Backup selected maps."""
+    backup_maps([
+        item.p2c
+        for item in
+        UI['game_details'].items
+        if item.state
+    ])
+
+def ui_backup_all():
+    """Backup all maps."""
+    backup_maps([
+        item.p2c
+        for item in
+        UI['game_details'].items
+    ])
 
 
 def init():
@@ -313,6 +486,9 @@ def init():
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
 
+    UI['game_btn_all']['command'] = ui_backup_all
+    UI['game_btn_sel']['command'] = ui_backup_sel
+
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
         row=1, column=1, sticky='NS', padx=5,
@@ -345,9 +521,9 @@ def init_application():
     else:
         file_menu = menus['file'] = tk.Menu(bar)
     file_menu.add_command(label='New Backup', command=ui_new_backup)
-    file_menu.add_command(label='Open Backup')
-    file_menu.add_command(label='Save Backup')
-    file_menu.add_command(label='Save Backup As')
+    file_menu.add_command(label='Open Backup', command=ui_load_backup)
+    file_menu.add_command(label='Save Backup', command=ui_save_backup)
+    file_menu.add_command(label='Save Backup As', command=ui_save_backup_as)
 
     bar.add_cascade(menu=file_menu, label='File')
 
