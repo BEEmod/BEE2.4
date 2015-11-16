@@ -730,7 +730,10 @@ def import_template(
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
-    vbsp.IGNORED_FACES.update(new_world, new_detail)
+    for solid in new_world:
+        vbsp.IGNORED_FACES.update(solid.sides)
+    for solid in new_detail:
+        vbsp.IGNORED_FACES.update(solid.sides)
 
     return new_world, detail_ent
 
