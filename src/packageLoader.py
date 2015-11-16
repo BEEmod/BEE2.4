@@ -1015,7 +1015,7 @@ class PackList:
                 self.trigger_mats.append(item)
 
 
-@pak_object('EditorSound')
+@pak_object('EditorSound', has_img=False)
 class EditorSound:
     """Add sounds that are usable in the editor.
 
