@@ -4,67 +4,53 @@ A Portal 2  Mod tool
 [![forthebadge](http://forthebadge.com/images/badges/designed-in-ms-paint.svg)](http://forthebadge.com)
 [![forthebadge](http://forthebadge.com/images/badges/made-with-crayons.svg)](http://forthebadge.com)
 
+The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for 
+different eras, and configure many other aspects. All vanilla items have been upgraded with additional 
+bugfixes and improvments.
+
+The packages (item, style, etc definitions) are in the TeamSpen210/BEE2-Items repository.
+
+## Dependencies: ##
+- [pyGame](http://www.pygame.org/) (for sounds, not required)
+- [Pillow](https://python-pillow.github.io/)
+
 ## Modules: ##
-- BEE2: Main application script, starts up the application.
-- config: Subclass of ConfigParser, with some useful tweaks
-- contextWin: Implements the rightclick context menu for items.
-- FakeZip: simulates a ZipFile object based on a directory. Used to allow packageLoader to load either, without needing to check the type every time.
-- gameMan: Manages adding and removing games as well as exporting editoritems.
-- itemPropWin: A window which allows changing the default properties for an item.
-- loadScreen: Shows a window with loading bars during the startup process.
-- packageLoader: Reads packages and parses all data out of them.
-- paletteLoader: Reads and writes palettes to disk.
-- property_parser: Library to allow reading and writing Valve's KeyValues format.
-- richTextBox: Subclassed version of Tkinter's Text widget, with options to allow easily adding special formating like bullet lists.
-- selectorWin: Window class which allows picking items from a list, displaying various data about each option.
-- sound: Handles playing sound effects, using PyGame.
-- UI: Holds the majority of the UI code, tying the components together.
-- utils: Various utility functions and a Vector class.
-- VBSP: The BEE2's VBSP hook, which modifies a map VMF before it is compiled by the original VBSP.
-- vmfLib: A library which parses a VMF file to allow easy modification.
-- voiceLine: Parses quote pack data, and determines the appropriate quote to use for a given map.
-- VRAD: The BEE2's VRAD hook, which switches to use fast lighting when not in preview mode, and packs files into the BSP after the compilation.
-
-- png
-- tkinter_png: Libraries to read PNG files into Tkinter-compatible formats.  
-  Additionally contains some BEE2-specific helper functions that do the conversion, and cache calls so an image is only read once.
-
-Intended features:
-
-Back end:
-* Start up
-  - Check to see if VBSP / VRAD / particles_manifest / other files have been updated by Steam
-	+ If updated, then rename to *_original (for VRAD/VBSP) and copy in modded versions, for others append extra entries from relevant locations.
-  - Load config.cfg from root directory
-  - Load *.Bee2Style files from configurable directory
-  - Load *.Bee2Item files from configurable directory
-	+ Load alternate versions if they exist (maybe have the same name + an "Alternate" keyvalue?)
-  - Load *.Bee2Palette files from configurable directory
-    + Extract Image
-    + Determine groupings
-    + Locate dependant style
-  - Load *.Bee2Palette files from configurable directory
-  - Locate all known supported games from Steam location (ie. Portal 2, Portal 2 Beta, Aperture Tag) for dropdown of which game desired for export.
-* Export
-  - Given a Palette (list of items with positions) and selected style, export the "editoritems.txt" to configured game
-  - Save as last exported palette
-  - Export all packaged files from [.Bee2Item]s to configured game directory
-* Save/Load Palette
-  - Save list of items and positions to file in configurable directory
-
-Front End:
-* Display list of all items 
-  - Can be sorted by style, author, package, or supported games.
-  - Shows palette preview of image
-  - Either in right-click or other menu allow selecting alternate versions (style-dependant, will swap out with an alternate item block)
-* Display exporting palette preview
-
-VBSP Pre-Compiler:
-* ~~(Using Stylechangers vbsp) -> On call~~
-* ~~Call modular compiler operations~~
-* See issue #6
-
-VRAD Pre-Compiler:
-* ~~Run Stylechanger's VRAD~~
-  - ~~that runs PackBSP for us~~
-* Use PackRat to pack files, this is cross-platform.
+- Common:
+	- property_parser: Library to allow reading and writing Valve's KeyValues format.
+	- utils: Various utility functions and a Vector class.
+- BEE Application:
+	- BEE2: Main application script, starts up the application.
+	- BEE2_config: Subclass of ConfigParser, with some useful tweaks
+	- compile_BEE2: Cx-Freeze setup script to compile the BEE2 application.
+	- compilerPane: Window pane which controls compiler options. This updates configs in real time.
+	- contextWin: Implements the rightclick context menu for items.
+	- FakeZip: simulates a ZipFile object based on a directory. Used to allow packageLoader to load either, without needing to check the type every time.
+	- gameMan: Manages adding and removing games as well as exporting editoritems.
+	- img: read PNG files into Tkinter-compatible formats. Caches calls so an image is only read once.
+	- itemPropWin: A window which allows changing the default properties for an item.
+	- loadScreen: Shows a window with loading bars during the startup process.
+	- optionWindow: The BEE2 configuration window.
+	- packageLoader: Reads packages and parses all data out of them.
+	- paletteLoader: Reads and writes palettes to disk.
+	- query_dialogs: A version of tkinter.simpledialogs.ask_string, which uses the BEE2 icon.
+	- richTextBox: Subclassed version of Tkinter's Text widget, with options to allow easily adding special formating like bullet lists.
+	- selectorWin: Window class which allows picking items from a list, displaying various data about each option.
+	- sound: Handles playing sound effects, using PyGame. Gracefully fails if not present
+	- StyleVarPane: Window Pane which sets Style Properties, controlling certain style options.
+	- SubPane: Toplevel subclass which can be shown and hidden via a button, and follows the main window around.
+	- tagsPane: The dropdown which allows filtering the item list by tags.
+	- tk_root: Holds the singleton tkinter.Tk() instance, so the main window is only created once.
+	- tooltip: Allows registering a tooltip to appear on top of a widget.
+	- UI: Holds the majority of the UI code, tying the components together.
+	- voiceEditor: Window for viewing voice pack lines, and enabling/disabling individual ones.
+- VBSP and VRAD:
+	- BSP: Library for reading and writing BSP files. Used to pack files during compile.
+	- compile_vbsp_vrad: Cx-Freeze setup script to compile the VBSP and VRAD hooks.
+	- conditions: Implements the conditions system, controlling item-specific transformations.
+	- cutoutTile: Logic for the Cutout Tile item.
+	- instanceLocs: Translates <ITEM_ID:0,1> text into the associated instance paths.
+	- VBSP: The BEE2's VBSP hook, which modifies a map VMF before it is compiled by the original VBSP.
+	- vbsp_launch: Wrapper around vbsp, to get around the renaming of scripts to '__main__'.
+	- vmfLib: A library which parses a VMF file to allow easy modification.
+	- voiceLine: Parses quote pack data, and determines the appropriate quote to use for a given map.
+	- VRAD: The BEE2's VRAD hook, which switches to use fast lighting when not in preview mode, and packs files into the BSP after the compilation.

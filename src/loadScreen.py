@@ -1,7 +1,9 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
+
+import utils
 
 class LoadScreen(Toplevel):
     def __init__(self, *stages, title_text='Loading'):
@@ -17,7 +19,11 @@ class LoadScreen(Toplevel):
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything.
 
-        super().__init__(TK_ROOT, cursor='watch')  # Initialise the window
+        # Initialise the window
+        super().__init__(
+            TK_ROOT,
+            cursor=utils.CURSORS['wait'],
+        )
         self.withdraw()
 
         # this prevents stuff like the title bar, normal borders etc from
@@ -26,36 +32,49 @@ class LoadScreen(Toplevel):
         self.resizable(False, False)
         self.attributes('-topmost', 1)
 
+        self.frame = ttk.Frame(self, cursor=utils.CURSORS['wait'])
+        self.frame.grid(row=0, column=0)
+
         ttk.Label(
-            self,
+            self.frame,
             text=title_text + '...',
             font=("Helvetica", 12, "bold"),
+            cursor=utils.CURSORS['wait'],
             ).grid(columnspan=2)
         ttk.Separator(
-            self,
+            self.frame,
             orient=HORIZONTAL,
+            cursor=utils.CURSORS['wait'],
             ).grid(row=1, sticky="EW", columnspan=2)
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
-            ttk.Label(
-                self,
-                text=stage_name + ':',
-                ).grid(
-                    row=ind*2+2,
-                    columnspan=2,
-                    sticky="W",
-                    )
+            if stage_name:
+                # If stage name is blank, don't add a caption
+                ttk.Label(
+                    self.frame,
+                    text=stage_name + ':',
+                    cursor=utils.CURSORS['wait'],
+                    ).grid(
+                        row=ind*2+2,
+                        columnspan=2,
+                        sticky="W",
+                        )
             self.bar_var[st_id] = IntVar()
             self.bar_val[st_id] = 0
             self.maxes[st_id] = 10
 
             self.widgets[st_id] = ttk.Progressbar(
-                self,
+                self.frame,
                 length=210,
                 maximum=1000,
                 variable=self.bar_var[st_id],
+                cursor=utils.CURSORS['wait'],
                 )
-            self.labels[st_id] = ttk.Label(self, text='0/??')
+            self.labels[st_id] = ttk.Label(
+                self.frame,
+                text='0/??',
+                cursor=utils.CURSORS['wait'],
+            )
             self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
 
@@ -116,6 +135,19 @@ class LoadScreen(Toplevel):
             del self.bar_var
             del self.bar_val
             self.active = False
+
+    def __enter__(self):
+        """LoadScreen can be used as a context manager.
+
+        Inside the block, the screen will be visible.
+        """
+        self.show()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Hide the loading screen, and passthrough execptions.
+        """
+        self.reset()
 
 main_loader = LoadScreen(
     ('PAK', 'Packages'),

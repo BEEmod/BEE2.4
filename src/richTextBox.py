@@ -2,15 +2,16 @@ import tkinter
 from tkinter.constants import *
 from tkinter.font import Font as tkFont
 
+
 class tkRichText(tkinter.Text):
-    """A version of the TK Text widget with some options to allow writing with special formatting.
+    """A version of the TK Text widget which allows using special formatting.
 
     The format for the text is a list of tuples, where each tuple is (type, text).
     Types:
      - "line" : standard line, with carriage return after.
      - "bold" : bolded text, with carriage return
      - "bullet" : indented with a bullet at the beginning
-     - "list" : indented with "1. " at the beggining, the number increasing
+     - "list" : indented with "1. " at the beginning, the number increasing
      - "break" : A carriage return. This ignores the text part.
      - "rule" : A horizontal line. This ignores the text part.
      - "invert": White-on-black text.
@@ -67,7 +68,7 @@ class tkRichText(tkinter.Text):
                 elif line_type == "invert":
                     super().insert("end", data[1] + "\n", "invert")
                 elif line_type == "bullet":
-                    super().insert("end", '\x07 ' + data[1] + "\n", "indent")
+                    super().insert("end", '\u2022 ' + data[1] + "\n", "indent")
                 elif line_type == "list":
                     super().insert(
                         "end",

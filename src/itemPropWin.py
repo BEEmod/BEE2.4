@@ -1,6 +1,6 @@
 #coding: utf-8
 from tkinter import *  # ui library
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
 import math

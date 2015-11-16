@@ -8,9 +8,10 @@ various item properties.
   clicked widget from the event
 """
 from tkinter import *
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
+
 import functools
 import webbrowser
 
@@ -18,6 +19,8 @@ from richTextBox import tkRichText
 import img as png
 import sound as snd
 import itemPropWin
+import tooltip
+import tk_tools
 import utils
 
 OPEN_IN_TAB = 2
@@ -96,28 +99,10 @@ def sub_open(ind, _=None):
 
 def more_info_show_url(_=None):
     if selected_item.url is not None:
-        wid['moreinfo_context']['text'] = selected_item.url
-        moreinfo_win.deiconify()
-        moreinfo_win.update_idletasks()
-        moreinfo_win.lift()
-
-        # Center vertically below the button
-        x = (
-            wid['moreinfo'].winfo_rootx() -
-            (
-                moreinfo_win.winfo_reqwidth()
-                - wid['moreinfo'].winfo_reqwidth()
-                ) // 2
-            )
-        y = (
-            wid['moreinfo'].winfo_rooty()
-            + wid['moreinfo'].winfo_reqheight()
-            )
-        moreinfo_win.geometry('+' + str(x) + '+' + str(y))
-
-
-def more_info_hide_url(e):
-    moreinfo_win.withdraw()
+        tooltip.show(
+            wid['moreinfo'],
+            selected_item.url,
+        )
 
 
 def open_event(e):
@@ -181,6 +166,26 @@ def set_item_version(_=None):
     load_item_data()
 
 
+def get_description(global_last, glob_desc, style_desc):
+    """Join together the general and style description for an item."""
+    if glob_desc and style_desc:
+        # We have both, we need to join them together.
+        if global_last:
+            yield from style_desc
+            yield (('line', ''))
+            yield from glob_desc
+        else:
+            yield from glob_desc
+            yield (('line', ''))
+            yield from style_desc
+    elif glob_desc:
+        yield from glob_desc
+    elif style_desc:
+        yield from style_desc
+    else:
+        return # No description
+
+
 def load_item_data():
     """Refresh the window to use the selected item's data."""
     global version_lookup
@@ -199,7 +204,13 @@ def load_item_data():
     wid['name']['text'] = selected_sub_item.name
     wid['ent_count']['text'] = item_data['ent']
 
-    wid['desc'].set_text(item_data['desc'])
+    wid['desc'].set_text(
+        get_description(
+            global_last=selected_item.item.glob_desc_last,
+            glob_desc=selected_item.item.glob_desc,
+            style_desc=item_data['desc']
+        )
+    )
 
     if itemPropWin.can_edit(selected_item.properties()):
         wid['changedefaults'].state(['!disabled'])
@@ -238,19 +249,21 @@ def load_item_data():
         wid['moreinfo'].state(['disabled'])
     else:
         wid['moreinfo'].state(['!disabled'])
+    wid['moreinfo'].tooltip_text = selected_item.url
+
     editor_data = item_data['editor']
     has_inputs = False
     has_polarity = False
     has_outputs = False
     for inp_list in editor_data.find_all("Exporting", "Inputs"):
         for inp in inp_list:
-            if inp.name == "CONNECTION_STANDARD":
+            if inp.name == "connection_standard":
                 has_inputs = True
-            elif inp.name == "CONNECTION_TBEAM_POLARITY":
+            elif inp.name == "connection_tbeam_polarity":
                 has_polarity = True
     for out_list in editor_data.find_all("Exporting", "Outputs"):
         for out in out_list:
-            if out.name == "CONNECTION_STANDARD":
+            if out.name == "connection_standard":
                 has_outputs = True
                 break
     has_timer = any(editor_data.find_all("Properties", "TimerDelay"))
@@ -371,8 +384,14 @@ def init_widgets():
             image=png.png('BEE2/alpha_64'),
         )
         wid['subitem'][i].grid(row=0, column=i)
-        wid['subitem'][i].bind(utils.EVENTS['LEFT'], functools.partial(sub_sel, i))
-        wid['subitem'][i].bind(utils.EVENTS['RIGHT'], functools.partial(sub_open, i))
+        utils.bind_leftclick(
+            wid['subitem'][i],
+            functools.partial(sub_sel, i),
+        )
+        utils.bind_rightclick(
+            wid['subitem'][i],
+            functools.partial(sub_open, i),
+        )
 
     wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
     wid['wip_dep'].grid(row=4, column=0, sticky="NW")
@@ -394,11 +413,12 @@ def init_widgets():
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
+    desc_frame.columnconfigure(0, weight=1)
 
     wid['desc'] = tkRichText(desc_frame, width=40, height=8, font=None)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
-    desc_scroll = ttk.Scrollbar(
+    desc_scroll = tk_tools.HidingScroll(
         desc_frame,
         orient=VERTICAL,
         command=wid['desc'].yview,
@@ -431,23 +451,7 @@ def init_widgets():
 
     wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
-    wid['moreinfo'].bind('<Enter>', more_info_show_url)
-    wid['moreinfo'].bind('<Leave>', more_info_hide_url)
-
-    moreinfo_win = Toplevel(TK_ROOT)
-    moreinfo_win.withdraw()
-    moreinfo_win.transient(master=TK_ROOT)
-    moreinfo_win.overrideredirect(1)
-    moreinfo_win.resizable(False, False)
-
-    wid['moreinfo_context'] = ttk.Label(
-        moreinfo_win,
-        text='',
-        relief="groove",
-        font="TkSmallCaptionFont",
-        padding=(5, 2),
-        )
-    wid['moreinfo_context'].grid(row=0, column=0)
+    tooltip.add_tooltip(wid['moreinfo'])
 
     menu_info = Menu(wid['moreinfo'])
     menu_info.add_command(label='', state='disabled')
@@ -466,8 +470,18 @@ def init_widgets():
         command=show_item_props,
         )
     wid['changedefaults'].grid(row=6, column=1)
+    tooltip.add_tooltip(
+        wid['changedefaults'],
+        'Change the default settings for this item when placed.'
+    )
 
-    wid['variant'] = ttk.Combobox(f, values=['VERSION'], exportselection=0)
+    wid['variant'] = ttk.Combobox(
+        f,
+        values=['VERSION'],
+        exportselection=0,
+        # On Mac this defaults to being way too wide!
+        width=7 if utils.MAC else None,
+    )
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
     wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
     wid['variant'].current(0)

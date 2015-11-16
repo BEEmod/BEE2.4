@@ -1,7 +1,8 @@
 from tkinter import *
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk
 
+from collections import namedtuple
 import functools
 import operator
 
@@ -9,25 +10,65 @@ import img as png
 
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane
+import tooltip
+import utils
+
+stylevar = namedtuple('stylevar', 'id name enabled desc')
 
 # Special StyleVars that are hardcoded into the BEE2
 # These are effectively attributes of Portal 2 itself, and always work
 # in every style.
 styleOptions = [
     # ID, Name, default value
-    # Do the DLC2 Cave lines play?
-    ('MultiverseCave', 'Multiverse Cave', 1),
-    # Add bumpers to glass
-    ('FixPortalBump', 'Prevent Portal Bump  (glass)', 0),
-    # Add bumpers to fizzler
-    ('FixFizzlerBump', 'Prevent Portal Bump  (fizzler)', 0),
-    # Disable voice lines in the mid-chamber catagory
-    ('NoMidVoices', 'Suppress Mid-Chamber Dialogue', 0),
-    # Allow removing and placing exit doors, obs rooms
-    ('UnlockDefault', 'Unlock Default Items', 0),
-    # Enable adding mist to goo (some styles only)
-    ('AllowGooMist', 'Allow Adding Goo Mist', 1),
-    ]
+    stylevar(
+        id='MultiverseCave',
+        name='Multiverse Cave',
+        enabled=1,
+        desc='Play the Workshop Cave Johnson lines on map start.'
+    ),
+
+    stylevar(
+        id='FixPortalBump',
+        name='Prevent Portal Bump  (glass)',
+        enabled=0,
+        desc='Add portal bumpers to make it more difficult to portal through '
+             'glass panes.'
+    ),
+
+    stylevar(
+        id='FixFizzlerBump',
+        name='Prevent Portal Bump  (fizzler)',
+        enabled=0,
+        desc='Add portal bumpers to make it more difficult to portal across '
+             'fizzler edges. This can prevent placing portals in tight spaces '
+             'near fizzlers, or fizzle portals on activation.'
+    ),
+
+    stylevar(
+        id='NoMidVoices',
+        name='Suppress Mid-Chamber Dialogue',
+        enabled=0,
+        desc='Disable all voicelines other than entry and exit lines.'
+    ),
+
+    stylevar(
+        id='UnlockDefault',
+        name='Unlock Default Items',
+        enabled=0,
+        desc='Allow placing and deleting the mandatory Entry/Exit Doors and '
+             'Large Observation Room. Use with caution, this can have weird '
+             'results!'
+    ),
+
+    stylevar(
+        id='AllowGooMist',
+        name='Allow Adding Goo Mist',
+        enabled=1,
+        desc='Add mist particles above Toxic Goo in certain styles. This can '
+             'increase the entity count significantly with large, complex '
+             'goo pits, so disable if needed.'
+    ),
+]
 
 checkbox_special = {}
 checkbox_chosen = {}
@@ -63,10 +104,6 @@ def set_stylevar(var):
     GEN_OPTS['StyleVar'][var] = val
     if var == 'UnlockDefault':
         update_filter()
-
-
-def scroll(delta):
-    UI['style_can'].yview_scroll(delta, "units")
 
 
 def refresh(selected_style):
@@ -121,7 +158,7 @@ def make_pane(tool_frame):
         resize_y=True,
         tool_frame=tool_frame,
         tool_img=png.png('icons/win_stylevar'),
-        tool_col=2,
+        tool_col=3,
     )
 
     UI['style_can'] = Canvas(window, highlightthickness=0)
@@ -136,6 +173,9 @@ def make_pane(tool_frame):
         )
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
+
+    utils.add_mousewheel(UI['style_can'], window)
+
     canvas_frame = ttk.Frame(UI['style_can'])
 
     frame_all = ttk.Labelframe(canvas_frame, text="All:")
@@ -165,18 +205,24 @@ def make_pane(tool_frame):
         justify='center',
         )
 
-    for pos, (var_id, name, default) in enumerate(styleOptions):
+    for pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
-        tk_vars[var_id] = IntVar(
-            value=GEN_OPTS.get_bool('StyleVar', var_id, default)
+        tk_vars[var.id] = IntVar(
+            value=GEN_OPTS.get_bool('StyleVar', var.id, var.enabled)
         )
-        checkbox_special[var_id] = ttk.Checkbutton(
+        checkbox_special[var.id] = ttk.Checkbutton(
             frame_all,
-            variable=tk_vars[var_id],
-            text=name,
-            command=functools.partial(set_stylevar, var_id)
+            variable=tk_vars[var.id],
+            text=var.name,
+            command=functools.partial(set_stylevar, var.id)
             )
-        checkbox_special[var_id].grid(row=pos, column=0, sticky="W", padx=3)
+        checkbox_special[var.id].grid(row=pos, column=0, sticky="W", padx=3)
+
+        if var.desc:
+            tooltip.add_tooltip(
+                checkbox_special[var.id],
+                var.desc,
+            )
 
     for var in var_list:
         tk_vars[var.id] = IntVar(value=var.default)
@@ -187,30 +233,27 @@ def make_pane(tool_frame):
             }
         checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
         checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
+        if var.desc:
+            tooltip.add_tooltip(
+                checkbox_chosen[var.id],
+                var.desc,
+            )
+            tooltip.add_tooltip(
+                checkbox_other[var.id],
+                var.desc,
+            )
 
     UI['style_can'].create_window(0, 0, window=canvas_frame, anchor="nw")
     UI['style_can'].update_idletasks()
     UI['style_can'].config(
         scrollregion=UI['style_can'].bbox(ALL),
         width=canvas_frame.winfo_reqwidth(),
-        )
-    ttk.Sizegrip(
-        window,
-        cursor="sb_v_double_arrow",
+    )
+
+    if utils.USE_SIZEGRIP:
+        ttk.Sizegrip(
+            window,
+            cursor=utils.CURSORS['stretch_vert'],
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
-
-    # Scroll globally even if canvas is not selected.
-    window.bind(
-        "<MouseWheel>",
-        lambda e: scroll(int(-1*(e.delta/120))),
-        )
-    window.bind(
-        "<Button-4>",
-        lambda e: scroll(1),
-        )
-    window.bind(
-        "<Button-5>",
-        lambda e: scroll(-1),
-        )

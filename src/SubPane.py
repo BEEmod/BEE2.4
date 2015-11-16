@@ -4,6 +4,28 @@ from tkinter import ttk
 import utils
 import sound as snd
 
+# This is a bit of an ugly hack. On OSX the buttons are set to have
+# default padding on the left and right, spreading out the toolbar
+# icons too much. This retracts the padding so they are more square
+# around the images instead of wasting space.
+style = ttk.Style()
+style.configure(
+    'Toolbar.TButton',
+    padding='-20',
+)
+
+
+def make_tool_button(frame, img, command):
+    """Make a toolbar icon."""
+    button = ttk.Button(
+        frame,
+        style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
+        image=img,
+        command=command,
+    )
+
+    return button
+
 
 class SubPane(Toplevel):
     """A Toplevel window that can be shown/hidden.
@@ -32,15 +54,21 @@ class SubPane(Toplevel):
         self.can_resize_x = resize_x
         self.can_resize_y = resize_y
         self.config_file = options
-        super().__init__(parent)
+        super().__init__(parent, name='pane_' + name)
+        self.withdraw()  # Hide by default
 
-        self.tool_button = ttk.Button(
-            tool_frame,
-            style='BG.TButton',
-            image=tool_img,
-            command=self.toggle_win)
+        self.tool_button = make_tool_button(
+            frame=tool_frame,
+            img=tool_img,
+            command=self.toggle_win,
+        )
         self.tool_button.state(('pressed',))
-        self.tool_button.grid(row=0, column=tool_col, padx=(5, 2))
+        self.tool_button.grid(
+            row=0,
+            column=tool_col,
+            # Contract the spacing to allow the icons to fit.
+            padx=(2 if utils.MAC else (5, 2)),
+        )
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)

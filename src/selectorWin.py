@@ -7,24 +7,38 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
+from tk_tools import TK_ROOT
+from collections import namedtuple
 import functools
 import math
 
 import img  # png library for TKinter
 from richTextBox import tkRichText
 import utils
+import tk_tools
 
 ICON_SIZE = 96  # Size of the selector win icons
-ITEM_WIDTH = ICON_SIZE+16
-ITEM_HEIGHT = ICON_SIZE+51
+ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
+ITEM_HEIGHT = ICON_SIZE + 51
 
 # The larger error icon used if an image is not found
 err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
+
+# The two icons used for boolean item attributes
+ICON_CHECK = img.png('icons/check')
+ICON_CROSS = img.png('icons/cross')
 
 
 def _NO_OP(*args):
     """The default callback, triggered whenever the chosen item is changed."""
     pass
+
+AttrDef = namedtuple('AttrDef', 'id desc default')
+
+SelitemData = namedtuple(
+    'SelitemData',
+    'name, short_name, auth, icon, desc, group',
+)
 
 
 class Item:
@@ -43,6 +57,7 @@ class Item:
     - desc: A list of tuples, following the richTextBox text format.
     - authors: A list of the item's authors.
     - group: Items with the same group name will be shown together.
+    - attrs: a dictionary containing the attribute values for this item.
 
     - button, win: Set later, the button and window TK objects for this item
     """
@@ -58,17 +73,19 @@ class Item:
         'win',
         'context_lbl',
         'ico_file',
+        'attrs',
         ]
 
     def __init__(
             self,
-            name,
-            short_name,
-            long_name=None,
+            name: str,
+            short_name: str,
+            long_name: str=None,
             icon=None,
-            authors=None,
+            authors: list=None,
             desc=(('line', ''),),
-            group=None,
+            group: str=None,
+            attributes: dict=None,
             ):
         self.name = name
         self.shortName = short_name
@@ -93,7 +110,8 @@ class Item:
             )
             self.ico_file = icon
         self.desc = desc
-        self.authors = [] if authors is None else authors
+        self.authors = authors or []
+        self.attrs = attributes or {}
         self.button = None
         self.win = None
 
@@ -113,6 +131,20 @@ class Item:
     def __str__(self):
         return '<Item:' + self.name + '>'
 
+    @classmethod
+    def from_data(cls, obj_id, data: SelitemData, attrs=None):
+        """Create a selector Item from a SelitemData tuple."""
+        return Item(
+            name=obj_id,
+            short_name=data.short_name,
+            long_name=data.name,
+            icon=data.icon,
+            authors=data.auth,
+            desc=data.desc,
+            group=data.group,
+            attributes=attrs
+        )
+
 
 class selWin:
     """The selection window for skyboxes, music, goo and voice packs.
@@ -130,6 +162,8 @@ class selWin:
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
+
+    :type suggested: Item | None
     """
     def __init__(
             self,
@@ -141,6 +175,7 @@ class selWin:
             title='BEE2',
             callback=_NO_OP,
             callback_params=(),
+            attributes=(),
             ):
         """Create a window object.
 
@@ -164,6 +199,10 @@ class selWin:
           The first arguement to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
           context menu.
+        - attributes is a list of AttrDef tuples.
+          Each tuple should contain an ID, display text, and default value.
+          If the values are True or False a check/cross will be displayed,
+          otherwise they're a string.
         """
         self.noneItem = Item('NONE', '', desc=none_desc)
         self.noneItem.icon = img.png('BEE2/none_96')
@@ -194,6 +233,9 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
 
+        self.win.columnconfigure(0, weight=1)
+        self.win.rowconfigure(0, weight=1)
+
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
             self.win,
@@ -203,11 +245,11 @@ class selWin:
             sashrelief=RAISED,  # Raise the border between panes
         )
         self.pane_win.grid(row=0, column=0, sticky="NSEW")
+        self.win.columnconfigure(0, weight=1)
+        self.win.rowconfigure(0, weight=1)
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
-        self.win.rowconfigure(0, weight=1)
-        self.win.columnconfigure(0, weight=1)
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
 
@@ -219,7 +261,7 @@ class selWin:
         self.pal_frame = ttk.Frame(self.wid_canvas)
         self.wid_canvas.create_window(1, 1, window=self.pal_frame, anchor="nw")
 
-        self.wid_scroll = ttk.Scrollbar(
+        self.wid_scroll = tk_tools.HidingScroll(
             shim,
             orient=VERTICAL,
             command=self.wid_canvas.yview,
@@ -227,12 +269,22 @@ class selWin:
         self.wid_scroll.grid(row=0, column=1, sticky="NS")
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
 
-        self.sugg_lbl = ttk.LabelFrame(
-            self.pal_frame,
-            text="Suggested",
-            labelanchor=N,
-            height=50,
-        )
+        utils.add_mousewheel(self.wid_canvas, self.win)
+
+        if utils.MAC:
+            # Labelframe doesn't look good here on OSX
+            self.sugg_lbl = ttk.Label(
+                self.pal_frame,
+                # Draw lines with box drawing characters
+                text="\u250E\u2500Suggested\u2500\u2512"
+            )
+        else:
+            self.sugg_lbl = ttk.LabelFrame(
+                self.pal_frame,
+                text="Suggested",
+                labelanchor=N,
+                height=50,
+            )
 
         # Holds all the widgets which provide info for the current item.
         self.prop_frm = ttk.Frame(self.pane_win, borderwidth=4, relief='raised')
@@ -272,7 +324,7 @@ class selWin:
         self.prop_desc = tkRichText(
             self.prop_desc_frm,
             width=40,
-            height=16,
+            height=4,
             font="TkSmallCaptionFont",
             )
         self.prop_desc.grid(
@@ -283,7 +335,7 @@ class selWin:
             sticky='NSEW',
             )
 
-        self.prop_scroll = ttk.Scrollbar(
+        self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
             orient=VERTICAL,
             command=self.prop_desc.yview,
@@ -302,7 +354,7 @@ class selWin:
             text="OK",
             command=self.save,
             ).grid(
-                row=5,
+                row=6,
                 column=0,
                 padx=(8, 8),
                 )
@@ -314,7 +366,7 @@ class selWin:
                 command=self.sel_suggested,
                 )
             self.prop_reset.grid(
-                row=5,
+                row=6,
                 column=1,
                 sticky='EW',
                 )
@@ -324,7 +376,7 @@ class selWin:
             text="Cancel",
             command=self.exit,
             ).grid(
-                row=5,
+                row=6,
                 column=2,
                 padx=(8, 8),
                 )
@@ -380,11 +432,14 @@ class selWin:
                 )
 
             item.win = self.win
-            item.button.bind(
-                utils.EVENTS['LEFT'],
+            utils.bind_leftclick(
+                item.button,
                 functools.partial(self.sel_item, item),
             )
-            item.button.bind(utils.EVENTS['LEFT_DOUBLE'], self.save)
+            utils.bind_leftclick_double(
+                item.button,
+                self.save,
+            )
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -400,6 +455,46 @@ class selWin:
             stretch='never',
         )
 
+        if attributes:
+            attr_frame = ttk.Frame(self.prop_frm)
+            attr_frame.grid(
+                row=5,
+                column=0,
+                columnspan=3,
+                sticky=EW,
+            )
+
+            self.attr = {}
+            # Add in all the attribute labels
+            for index, (at_id, desc, value) in enumerate(attributes):
+                desc_label = ttk.Label(
+                    attr_frame,
+                    text=desc,
+                )
+                self.attr[at_id] = val_label = ttk.Label(
+                    attr_frame,
+                )
+                val_label.default = value
+                if isinstance(value, bool):
+                    # It's a tick/cross label
+                    val_label['image'] = (
+                        ICON_CHECK
+                        if value else
+                        ICON_CROSS,
+                    )
+                # Position in a 2-wide grid
+                desc_label.grid(
+                    row=index // 2,
+                    column=(index % 2)*2,
+                    sticky=E,
+                )
+                val_label.grid(
+                    row=index // 2,
+                    column=(index % 2)*2 + 1,
+                    sticky=W,
+                )
+        else:
+            self.attr = None
 
     def widget(self, frame) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
@@ -408,14 +503,20 @@ class selWin:
         and place the textbox.
         """
 
-        self.display = ttk.Entry(
+        self.display = tk_tools.ReadOnlyEntry(
             frame,
             textvariable=self.disp_label,
-            cursor='arrow',
+            cursor=utils.CURSORS['regular'],
         )
-        self.display.bind(utils.EVENTS['LEFT'], self.open_win)
+        utils.bind_leftclick(
+            self.display,
+            self.open_win,
+        )
         self.display.bind("<Key>", self.set_disp)
-        self.display.bind(utils.EVENTS['RIGHT'], self.open_context)
+        utils.bind_rightclick(
+            self.display,
+            self.open_context,
+        )
 
         self.disp_btn = ttk.Button(
             self.display,
@@ -552,11 +653,30 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+
         if self.has_def:
             if self.suggested is None or self.selected == self.suggested:
                 self.prop_reset.state(('disabled',))
             else:
                 self.prop_reset.state(('!disabled',))
+
+        if self.attr:
+            for attr_id, label in self.attr.items():
+                val = item.attrs.get(attr_id, None)
+                if val is None:
+                    val = label.default
+                if isinstance(label.default, bool):
+                    label['image'] = (
+                        ICON_CHECK
+                        if val else
+                        ICON_CROSS
+                    )
+                else:
+                    # Display as text. If it's a container, sort alphabetically.
+                    if isinstance(val, (list, tuple, set)):
+                        val = ', '.join(sorted(val))
+                    label['text'] = val
+
 
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
@@ -639,7 +759,6 @@ class selWin:
         self.flow_items()  # Refresh
 
 if __name__ == '__main__':  # test the window if directly executing this file
-    from tk_root import TK_ROOT
     lbl = ttk.Label(TK_ROOT, text="I am a demo window.")
     lbl.grid()
     TK_ROOT.geometry("+500+500")
@@ -662,12 +781,14 @@ if __name__ == '__main__':  # test the window if directly executing this file
             icon="voices/glados",
             authors=["TeamSpen210"],
             desc=[
-                ('line', 'The dark constuction and office areas of Aperture.'
-                         'Catwalks extend between different buildings, with'
-                         'vactubes and cranes carrying objects throughout'
+                ('line', 'The dark constuction and office areas of Aperture. '
+                         'Catwalks extend between different buildings, with '
+                         'vactubes and cranes carrying objects throughout '
                          'the facility.'),
                 ('rule', ''),
-                ('line', 'Abandoned offices can often be found here.')
+                ('line', 'Abandoned offices can often be found here.'),
+                ('bullet', 'This is a bullet point, with a\n second line'),
+                ('invert', 'white-on-black text')
                 ],
             ),
         ]

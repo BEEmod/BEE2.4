@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
+from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 import extract_packages
 import utils
@@ -27,6 +28,7 @@ __all__ = [
 all_obj = {}
 obj_override = {}
 packages = {}
+OBJ_TYPES = {}
 
 data = {}
 
@@ -35,6 +37,26 @@ res_count = -1
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
 PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
+ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+
+
+def pak_object(name, allow_mult=False, has_img=True):
+    """Decorator to add a class to the list of objects.
+
+    Each object class needs two methods:
+    parse() gets called with a ParseData object, to read from info.txt.
+    The return value gets saved.
+
+    For override items, they are parsed normally. The original item then
+    gets the add_over(override) method called for each override to add values.
+
+    If allow_mult is true, duplicate items will be treated as overrides,
+    with one randomly chosen to be the 'parent'.
+    """
+    def x(cls):
+        OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+        return cls
+    return x
 
 
 def reraise_keyerror(err, obj_id):
@@ -55,6 +77,7 @@ def reraise_keyerror(err, obj_id):
             id=obj_id,
         )
     ) from err
+
 
 def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     """Extract a config file refered to by the given property block.
@@ -87,7 +110,7 @@ def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
 def find_packages(pak_dir, zips, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
-    for name in os.listdir(pak_dir): # Both files and dirs
+    for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
         is_dir = os.path.isdir(name)
         if name.endswith('.zip') and os.path.isfile(name):
@@ -105,7 +128,10 @@ def find_packages(pak_dir, zips, zip_name_lst):
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
             pak_id = info['ID']
-            disp_name = info['Name', pak_id]
+            disp_name = info['Name', None]
+            if disp_name is None:
+                print('Warning: {} has no display name!'.format(pak_id))
+                disp_name = pak_id.lower()
             packages[pak_id] = PackageData(
                 zip_file,
                 info,
@@ -124,9 +150,9 @@ def find_packages(pak_dir, zips, zip_name_lst):
     if not found_pak:
         print('No packages in folder!')
 
+
 def load_packages(
         pak_dir,
-        load_res,
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
@@ -134,6 +160,22 @@ def load_packages(
     """Scan and read in all packages in the specified directory."""
     global LOG_ENT_COUNT
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
+
+    if not os.path.isdir(pak_dir):
+        from tkinter import messagebox
+        import sys
+        # We don't have a packages directory!
+        messagebox.showerror(
+            master=loader,
+            title='BEE2 - Invalid Packages Directory!',
+            message='The given packages directory is not present!\n'
+                    'Get the packages from '
+                    '"http://github.com/TeamSpen210/BEE2-items" '
+                    'and place them in "' + pak_dir +
+                    os.path.sep + '".',
+                    # Add slash to the end to indicate it's a folder.
+        )
+        sys.exit('No Packages Directory!')
 
     LOG_ENT_COUNT = log_missing_ent_count
     print('ENT_COUNT:', LOG_ENT_COUNT)
@@ -144,42 +186,52 @@ def load_packages(
 
         loader.set_length("PAK", len(packages))
 
-        for obj_type in obj_types:
+        for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        objects = 0
         images = 0
         for pak_id, (zip_file, info, name, dispName) in packages.items():
             print(
                 ("Reading objects from '" + pak_id + "'...").ljust(50),
                 end=''
             )
-            obj_count, img_count = parse_package(
+            img_count = parse_package(
                 zip_file,
                 info,
                 pak_id,
                 dispName,
             )
-            objects += obj_count
             images += img_count
             loader.step("PAK")
             print("Done!")
 
-        loader.set_length("OBJ", objects)
+        loader.set_length("OBJ", sum(
+            len(obj_type)
+            for obj_type in
+            all_obj.values()
+        ))
         loader.set_length("IMG_EX", images)
 
-        # Except for StyleVars, each object will have at least 1 image -
-        # in UI.py we step the progress once per object.
-        loader.set_length("IMG", objects - len(all_obj['StyleVar']))
+        # The number of images we need to load is the number of objects,
+        # excluding some types like Stylevars or PackLists.
+        loader.set_length(
+            "IMG",
+            sum(
+                len(all_obj[key])
+                for key, opts in
+                OBJ_TYPES.items()
+                if opts.has_img
+            )
+        )
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 print("Loading " + obj_type + ' "' + obj_id + '"!')
                 # parse through the object and return the resultant class
                 try:
-                    object_ = obj_types[obj_type].parse(
+                    object_ = OBJ_TYPES[obj_type].cls.parse(
                         ParseData(
                             obj_data.zip_file,
                             obj_id,
@@ -193,21 +245,23 @@ def load_packages(
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
                 for override_data in obj_override[obj_type].get(obj_id, []):
-                    override = obj_types[obj_type].parse(
+                    override = OBJ_TYPES[obj_type].cls.parse(
                         override_data
                     )
                     object_.add_over(override)
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        shutil.rmtree('../cache/', ignore_errors=True)
+        cache_folder = os.path.abspath('../cache/')
+
+        shutil.rmtree(cache_folder, ignore_errors=True)
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
-                loc = os.path.normcase(path)
+                loc = os.path.normcase(path).casefold()
                 if loc.startswith(img_loc):
                     loader.step("IMG_EX")
-                    zip_file.extract(path, path="../cache/")
+                    zip_file.extract(path, path=cache_folder)
 
         shutil.rmtree('../images/cache', ignore_errors=True)
         if os.path.isdir("../cache/resources/bee2"):
@@ -226,7 +280,6 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    print(data['zips'])
     print('Done!')
     return data
 
@@ -243,10 +296,10 @@ def parse_package(zip_file, info, pak_id, disp_name):
                 '" - ignoring package!'
             )
             return False
-    objects = 0
     # First read through all the components we have, so we can match
     # overrides to the originals
-    for comp_type in obj_types:
+    for comp_type in OBJ_TYPES:
+        allow_dupes = OBJ_TYPES[comp_type].allow_mult
         # Look for overrides
         for obj in info.find_all("Overrides", comp_type):
             obj_id = obj['id']
@@ -257,8 +310,13 @@ def parse_package(zip_file, info, pak_id, disp_name):
         for obj in info.find_all(comp_type):
             obj_id = obj['id']
             if obj_id in all_obj[comp_type]:
-                raise Exception('ERROR! "' + obj_id + '" defined twice!')
-            objects += 1
+                if allow_dupes:
+                    # Pretend this is an override
+                    obj_override[comp_type][obj_id].append(
+                        ParseData(zip_file, obj_id, obj, pak_id)
+                    )
+                else:
+                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
                 zip_file,
                 obj,
@@ -269,12 +327,12 @@ def parse_package(zip_file, info, pak_id, disp_name):
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
     for item in zip_names(zip_file):
-        item = os.path.normcase(item)
+        item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
                 img_count += 1
-    return objects, img_count
+    return img_count
 
 
 def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
@@ -420,6 +478,7 @@ def parse_item_folder(folders, zip_file, pak_id):
             folders[fold]['vbsp'] = Property(None, [])
 
 
+@pak_object('Style')
 class Style:
     def __init__(
             self,
@@ -512,6 +571,7 @@ class Style:
         return '<Style:' + self.id + '>'
 
 
+@pak_object('Item')
 class Item:
     def __init__(
             self,
@@ -521,6 +581,8 @@ class Item:
             needs_unlock=False,
             all_conf=None,
             unstyled=False,
+            glob_desc=(),
+            desc_last=False
             ):
         self.id = item_id
         self.versions = versions
@@ -529,6 +591,8 @@ class Item:
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
         self.unstyled = unstyled
+        self.glob_desc = glob_desc
+        self.glob_desc_last = desc_last
 
     @classmethod
     def parse(cls, data):
@@ -537,6 +601,9 @@ class Item:
         def_version = None
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
+
+        glob_desc = list(desc_parse(data.info))
+        desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
             data.info,
@@ -580,11 +647,13 @@ class Item:
 
         return cls(
             data.id,
-            versions,
-            def_version,
-            needs_unlock,
-            all_config,
-            unstyled,
+            versions=versions,
+            def_version=def_version,
+            needs_unlock=needs_unlock,
+            all_conf=all_config,
+            unstyled=unstyled,
+            glob_desc=glob_desc,
+            desc_last=desc_last,
         )
 
     def add_over(self, override):
@@ -613,22 +682,31 @@ class Item:
         return '<Item:' + self.id + '>'
 
 
+@pak_object('QuotePack')
 class QuotePack:
     def __init__(
             self,
             quote_id,
             selitem_data: 'SelitemData',
             config,
+            chars=None,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
         self.config = config
+        self.chars = chars or ['??']
 
     @classmethod
     def parse(cls, data):
         """Parse a voice line definition."""
         selitem_data = get_selitem_data(data.info)
-        path = 'voice/' + data.info['file'] + '.cfg'
+        chars = {
+            char.strip()
+            for char in
+            data.info['characters', ''].split(',')
+            if char.strip()
+        }
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -641,6 +719,7 @@ class QuotePack:
             data.id,
             selitem_data,
             config,
+            chars=chars,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -656,6 +735,7 @@ class QuotePack:
         return '<Voice:' + self.id + '>'
 
 
+@pak_object('Skybox')
 class Skybox:
     def __init__(
             self,
@@ -696,6 +776,7 @@ class Skybox:
         return '<Skybox ' + self.id + '>'
 
 
+@pak_object('Music')
 class Music:
     def __init__(
             self,
@@ -742,11 +823,21 @@ class Music:
         return '<Music ' + self.id + '>'
 
 
+@pak_object('StyleVar', allow_mult=True, has_img=False)
 class StyleVar:
-    def __init__(self, var_id, name, styles, unstyled=False, default=False):
+    def __init__(
+            self,
+            var_id,
+            name,
+            styles,
+            unstyled=False,
+            default=False,
+            desc='',
+            ):
         self.id = var_id
         self.name = name
         self.default = default
+        self.desc = desc
         if unstyled:
             self.styles = None
         else:
@@ -759,14 +850,21 @@ class StyleVar:
         default = utils.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
-            for prop in data.info.find_all('Style')
+            for prop in
+            data.info.find_all('Style')
         ]
+        desc = '\n'.join(
+            prop.value
+            for prop in
+            data.info.find_all('description')
+        )
         return cls(
             data.id,
             name,
             styles,
             unstyled=unstyled,
             default=default,
+            desc=desc,
         )
 
     def add_over(self, override):
@@ -778,6 +876,13 @@ class StyleVar:
             self.styles = None
         else:
             self.styles.extend(override.styles)
+        # If they both have descriptions, add them together.
+        # Don't do it if they're both identical though.
+        if override.desc and override.desc not in self.desc:
+            if self.desc:
+                self.desc += '\n\n' + override.desc
+            else:
+                self.desc = override.desc
 
     def __repr__(self):
         return '<StyleVar ' + self.id + '>'
@@ -799,10 +904,11 @@ class StyleVar:
         )
 
 
+@pak_object('Elevator')
 class ElevatorVid:
     """An elevator video definition.
 
-    This is mainly defined just for Valve's items.
+    This is mainly defined just for Valve's items - you can't pack BIKs.
     """
     def __init__(
             self,
@@ -850,6 +956,87 @@ class ElevatorVid:
         return '<ElevatorVid ' + self.id + '>'
 
 
+@pak_object('PackList', allow_mult=True, has_img=False)
+class PackList:
+    def __init__(self, pak_id, files, mats):
+        self.id = pak_id
+        self.files = files
+        self.trigger_mats = mats
+
+    @classmethod
+    def parse(cls, data):
+        conf = data.info.find_key('Config', '')
+        mats = [
+            prop.value
+            for prop in
+            data.info.find_all('AddIfMat')
+        ]
+        if conf.has_children():
+            # Allow having a child block to define packlists inline
+            files = [
+                prop.value
+                for prop in conf
+            ]
+        else:
+            path = 'pack/' + conf.value + '.cfg'
+            try:
+                with data.zip_file.open(path) as f:
+                    # Each line is a file to pack.
+                    # Skip blank lines, strip whitespace, and
+                    # alow // comments.
+                    files = []
+                    for line in f:
+                        line = utils.clean_line(line)
+                        if line:
+                            files.append(line)
+            except KeyError as ex:
+                raise FileNotFoundError(
+                    '"{}:{}" not in zip!'.format(
+                        data.id,
+                        path,
+                    )
+                ) from ex
+
+        return cls(
+            data.id,
+            files,
+            mats,
+        )
+
+    def add_over(self, override):
+        """Override items just append to the list of files."""
+        # Dont copy over if it's already present
+        for item in override.files:
+            if item not in self.files:
+                self.file.append(item)
+
+        for item in override.trigger_mats:
+            if item not in self.trigger_mats:
+                self.trigger_mats.append(item)
+
+
+@pak_object('EditorSound')
+class EditorSound:
+    """Add sounds that are usable in the editor.
+
+    The editor only reads in game_sounds_editor, so custom sounds must be
+    added here.
+    The ID is the name of the sound, prefixed with 'BEE2_Editor.'.
+    The values in 'keys' will form the soundscript body.
+    """
+    def __init__(self, snd_name, data):
+        self.id = 'BEE2_Editor.' + snd_name
+        self.data = data
+        data.name = self.id
+
+    @classmethod
+    def parse(cls, data):
+        return cls(
+            snd_name=data.id,
+            data=data.info.find_key('keys', [])
+        )
+
+
 def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
 
@@ -860,12 +1047,6 @@ def desc_parse(info):
                 yield (line.name, line.value)
         else:
             yield ("line", prop.value)
-
-
-SelitemData = namedtuple(
-    'SelitemData',
-    'name, short_name, auth, icon, desc, group',
-)
 
 
 def get_selitem_data(info):
@@ -911,16 +1092,6 @@ def sep_values(string, delimiters=',;/'):
         (val.strip() for val in vals)
         if stripped
     ]
-
-obj_types = {
-    'Style':     Style,
-    'Item':      Item,
-    'QuotePack': QuotePack,
-    'Skybox':    Skybox,
-    'Music':     Music,
-    'StyleVar':  StyleVar,
-    'Elevator':  ElevatorVid,
-    }
 
 if __name__ == '__main__':
     load_packages('packages//', False)

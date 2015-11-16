@@ -5,23 +5,20 @@ specifics of VMF files.
 import io
 from collections import defaultdict, namedtuple
 from contextlib import suppress
+import itertools
 
 from property_parser import Property
 from utils import Vec
 import utils
 
+from typing import (
+    Optional, Union,
+    Dict, List, Tuple, Set, Iterator,
+)
+
 # Used to set the defaults for versioninfo
 CURRENT_HAMMER_VERSION = 400
 CURRENT_HAMMER_BUILD = 5304
-
-
-# According to VBSP code, fixups don't appear to have a size limit
-# More than 50 shouldn't be needed, since Hammer only allows 10.
-_FIXUP_KEYS = (
-    ["replace0" + str(i) for i in range(1, 10)] +
-    ["replace" + str(i) for i in range(10, 51)]
-)
-# = ['replace01', 'replace02', ..., 'replace50']
 
 # all the rows that displacements have, in the form
 # "row0" "???"
@@ -36,6 +33,35 @@ _DISP_ROWS = (
     'triangle_tags',
 )
 
+# Return value for VMF.make_prism()
+PrismFace = namedtuple(
+    "PrismFace",
+    "solid, top, bottom, north, south, east, west"
+)
+
+
+class IDMan(set):
+    """Allocate and manage a set of unique IDs."""
+    __slots__ = ()
+
+    def get_id(self, desired=-1):
+        """Get a valid ID."""
+
+        if desired == -1:
+            # Start with the lowest ID, and look upwards
+            desired = 1
+
+        if desired not in self:
+            # The desired ID is avalible!
+            self.add(desired)
+            return desired
+
+        # Check every ID in order to find a valid one
+        for poss_id in itertools.count(start=1):
+            if poss_id not in self:
+                self.add(poss_id)
+                return poss_id
+
 
 def find_empty_id(used_id, desired=-1):
         """Ensure this item has a unique ID.
@@ -43,8 +69,6 @@ def find_empty_id(used_id, desired=-1):
         Used by entities, solids and brush sides to keep their IDs valid.
         used_id must be sorted, and will be kept sorted.
         """
-        # Add_sorted adds the items while keeping the list sorted, so we never
-        # have to actually sort the list.
 
         if desired == -1:
             desired = 1
@@ -58,6 +82,16 @@ def find_empty_id(used_id, desired=-1):
             if poss_id not in used_id:
                 used_id.append(poss_id)
                 return poss_id
+
+
+def overlay_bounds(over):
+    """Compute the bounding box of an overlay."""
+    origin = Vec.from_str(over['origin'])
+    return Vec.bbox(
+        (origin + Vec.from_str(over['uv' + str(x)]))
+        for x in
+        range(4)
+    )
 
 
 class CopySet(set):
@@ -92,20 +126,20 @@ class VMF:
             cameras=None,
             cordons=None,
             visgroups=None):
-        self.solid_id = []  # All occupied solid ids
-        self.face_id = []  # Ditto for faces
-        self.ent_id = []  # Same for entities
+        self.solid_id = IDMan()  # All occupied solid ids
+        self.face_id = IDMan()  # Ditto for faces
+        self.ent_id = IDMan()  # Same for entities
 
         # Allow quick searching for particular groups, without checking
         # the whole map
-        self.by_target = defaultdict(CopySet)
-        self.by_class = defaultdict(CopySet)
+        self.by_target = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
+        self.by_class = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
 
-        self.entities = []
-        self.add_ents(entities or [])  # need to set the by_ dicts too.
-        self.brushes = brushes or []
-        self.cameras = cameras or []
-        self.cordons = cordons or []
+        self.entities = []  # type: List[Entity]
+        self.add_ents(entities or [])  # We need to set the by_ dicts too.
+        self.brushes = brushes or []  # type: List[Solid]
+        self.cameras = cameras or []  # type: List[Camera]
+        self.cordons = cordons or []  # type: List[Cordon]
         self.visgroups = visgroups or []
 
         # mapspawn entity, which is the entity world brushes are saved
@@ -183,7 +217,7 @@ class VMF:
         for i in item:
             self.add_ent(i)
 
-    def create_ent(self, **kargs):
+    def create_ent(self, **kargs) -> 'Entity':
         """Quick method to allow creating point entities.
 
         This constructs an entity, adds it to the map, and then returns
@@ -194,7 +228,7 @@ class VMF:
         return ent
 
     @staticmethod
-    def parse(tree):
+    def parse(tree: Union[Property, str]):
         """Convert a property_parser tree into VMF classes.
         """
         if not isinstance(tree, Property):
@@ -279,7 +313,7 @@ class VMF:
           inc_version to False to suppress this.
         """
         if dest_file is None:
-            dest_file = io.stringIO()
+            dest_file = io.StringIO()
             # acts like a file object but is actually a string. We're
             # using this to prevent having Python duplicate the entire
             # string every time we append
@@ -349,30 +383,18 @@ class VMF:
             dest_file.close()
             return string
 
-    def get_face_id(self, desired=-1):
-        """Get an unused face ID.
-        """
-        return find_empty_id(self.face_id, desired)
-
-    def get_brush_id(self, desired=-1):
-        """Get an unused solid ID.
-        """
-        return find_empty_id(self.solid_id, desired)
-
-    def get_ent_id(self, desired=-1):
-        """Get an unused entity ID.
-        """
-        return find_empty_id(self.ent_id, desired)
-
     def iter_wbrushes(self, world=True, detail=True):
         """Iterate through all world and detail solids in the map."""
         if world:
-            for br in self.brushes:
-                yield br
+            yield from self.brushes
         if detail:
             for ent in self.iter_ents(classname='func_detail'):
-                for solid in ent.solids:
-                    yield solid
+                yield from ent.solids
+
+    def iter_wfaces(self, world=True, detail=True):
+        """Iterate through the faces of world and detail solids."""
+        for brush in self.iter_wbrushes(world, detail):
+            yield from brush
 
     def iter_ents(self, **cond):
         """Iterate through entities having the given keyvalue values."""
@@ -429,6 +451,111 @@ class VMF:
                         if out.target == name:  # target
                             yield out
 
+    def make_prism(self, p1, p2, mat='tools/toolsnodraw') -> PrismFace:
+        """Create an axis-aligned brush connecting the two points.
+
+        A PrismFaces tuple will be returned which containes the six
+        faces, as well as the solid.
+        All faces will be textured with 'mat'.
+        """
+        b_min = Vec(p1)
+        b_max = Vec(p1)
+        b_min.min(p2)
+        b_max.max(p2)
+
+        f_bottom = Side(
+            self,
+            planes=[  # -z side
+                (b_min.x, b_min.y, b_min.z),
+                (b_max.x, b_min.y, b_min.z),
+                (b_max.x, b_max.y, b_min.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, -1, 0),
+        )
+
+        f_top = Side(
+            self,
+            planes=[  # +z side
+                (b_min.x, b_max.y, b_max.z),
+                (b_max.x, b_max.y, b_max.z),
+                (b_max.x, b_min.y, b_max.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, -1, 0),
+        )
+
+        f_west = Side(
+            self,
+            planes=[  # -x side
+                (b_min.x, b_max.y, b_max.z),
+                (b_min.x, b_min.y, b_max.z),
+                (b_min.x, b_min.y, b_min.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(0, 1, 0),
+            vaxis=UVAxis(0, 0, -1),
+        )
+
+        f_east = Side(
+            self,
+            planes=[  # +x side
+                (b_max.x, b_max.y, b_min.z),
+                (b_max.x, b_min.y, b_min.z),
+                (b_max.x, b_min.y, b_max.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(0, 1, 0),
+            vaxis=UVAxis(0, 0, -1),
+        )
+
+        f_south = Side(
+            self,
+            planes=[  # -y side
+                (b_max.x, b_min.y, b_min.z),
+                (b_min.x, b_min.y, b_min.z),
+                (b_min.x, b_min.y, b_max.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, 0, -1),
+        )
+
+        f_north = Side(
+            self,
+            planes=[  # +y side
+                (b_min.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_min.z),
+                (b_max.x, b_max.y, b_max.z),
+            ],
+            mat=mat,
+            uaxis=UVAxis(1, 0, 0),
+            vaxis=UVAxis(0, 0, -1),
+        )
+
+        solid = Solid(
+            self,
+            sides=[
+                f_bottom,
+                f_top,
+                f_north,
+                f_south,
+                f_east,
+                f_west,
+            ],
+        )
+        return PrismFace(
+            solid=solid,
+            top=f_top,
+            bottom=f_bottom,
+            north=f_north,
+            south=f_south,
+            east=f_east,
+            west=f_west,
+        )
+
 
 class Camera:
     def __init__(self, vmf_file, pos, targ):
@@ -481,7 +608,14 @@ class Camera:
 
 class Cordon:
     """Represents one cordon volume."""
-    def __init__(self, vmf_file, min_, max_, is_active=True, name='Cordon'):
+    def __init__(
+            self,
+            vmf_file: VMF,
+            min_: Vec,
+            max_: Vec,
+            is_active=True,
+            name='Cordon',
+            ):
         self.map = vmf_file
         self.name = name
         self.bounds_min = min_
@@ -535,19 +669,19 @@ class Solid:
     """A single brush, serving as both world brushes and brush entities."""
     def __init__(
             self,
-            vmf_file,
+            vmf_file: VMF,
             des_id=-1,
             sides=None,
             editor=None,
             hidden=False,
             ):
         self.map = vmf_file
-        self.sides = sides or []
-        self.id = vmf_file.get_brush_id(des_id)
+        self.sides = sides or []  # type: List[Side]
+        self.id = vmf_file.solid_id.get_id(des_id)
         self.editor = editor or {}
         self.hidden = hidden
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush."""
         editor = {}
         for key in ('color', 'groupid', 'visgroupshown', 'visgroupautoshown'):
@@ -555,9 +689,9 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy() for s in self.sides]
+        sides = [s.copy(map=VMF) for s in self.sides]
         return Solid(
-            self.map,
+            map or self.map,
             des_id=des_id,
             sides=sides,
             editor=editor,
@@ -653,7 +787,7 @@ class Solid:
         if self.id in self.map.solid_id:
             self.map.solid_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Get two vectors representing the space this brush takes up."""
         bbox_min, bbox_max = self.sides[0].get_bbox()
         for s in self.sides[1:]:
@@ -662,20 +796,69 @@ class Solid:
             bbox_min.min(side_min)
         return bbox_min, bbox_max
 
-    def get_origin(self, bbox_min=None, bbox_max=None):
+    def get_origin(self, bbox_min=None, bbox_max=None) -> Vec:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
-        return (bbox_min+bbox_max)/2
+        return (bbox_min + bbox_max) / 2
 
-    def translate(self, diff):
-        """Move this solid by the specified vector.
-
-        - This does not translate textures as well.
-        - A tuple can be passed in instead if desired.
-        """
+    def translate(self, diff: Vec):
+        """Move this solid by the specified vector."""
         for s in self.sides:
             s.translate(diff)
+
+    def localise(self, origin: Vec, angles: Vec):
+        """Shift this brush by the given origin/angles."""
+        for s in self.sides:
+            s.localise(origin, angles)
+
+
+class UVAxis:
+    """Values saved into Side.uaxis and Side.vaxis.
+
+    These define the alignment of textures on a face.
+    """
+    __slots__ = [
+        'x', 'y', 'z',
+        'scale',
+        'offset',
+    ]
+
+    def __init__(self, x, y, z, offset=0.0, scale=0.25):
+        self.x = x  # type: float
+        self.y = y  # type: float
+        self.z = z  # type: float
+        self.offset = offset
+        self.scale = scale
+
+    @staticmethod
+    def parse(value):
+        vals = value.split()
+        return UVAxis(
+            x=float(vals[0].lstrip('[')),
+            y=float(vals[1]),
+            z=float(vals[2]),
+            offset=float(vals[3].rstrip(']')),
+            scale=float(vals[4]),
+        )
+
+    def copy(self):
+        return UVAxis(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            offset=self.offset,
+            scale=self.scale,
+        )
+
+    def __str__(self):
+        return '[{x} {y} {z} {off}] {scale}'.format(
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            off=self.offset,
+            scale=self.scale,
+        )
 
 
 class Side:
@@ -703,30 +886,35 @@ class Side:
     def __init__(
             self,
             vmf_file,
-            planes=[
+            planes=(
                 (0, 0, 0),
                 (0, 0, 0),
                 (0, 0, 0)
-                ],
-            opt=utils.EmptyMapping,
+            ),
             des_id=-1,
-            disp_data={},
+            lightmap=16,
+            smoothing=0,
+            mat='tools/toolsnodraw',
+            rotation=0,
+            uaxis=None,
+            vaxis=None,
+            disp_data: dict=None,
             ):
         """
         :type planes: list of [(int, int, int)]
         """
         self.map = vmf_file
         self.planes = [Vec(), Vec(), Vec()]
-        self.id = vmf_file.get_face_id(des_id)
+        self.id = vmf_file.face_id.get_id(des_id)
         for i, pln in enumerate(planes):
             self.planes[i] = Vec(x=pln[0], y=pln[1], z=pln[2])
-        self.lightmap = opt.get("lightmap", 16)
-        self.smooth = opt.get("smoothing", 0)
-        self.mat = opt.get("material", "")
-        self.ham_rot = opt.get("rotation", 0)
-        self.uaxis = opt.get("uaxis", "[0 1 0 0] 0.25")
-        self.vaxis = opt.get("vaxis", "[0 1 -1 0] 0.25")
-        if len(disp_data) > 0:
+        self.lightmap = lightmap
+        self.smooth = smoothing
+        self.mat = mat
+        self.ham_rot = rotation
+        self.uaxis = uaxis or UVAxis(0, 1, 0)
+        self.vaxis = vaxis or UVAxis(0, 0, -1)
+        if disp_data is not None:
             self.disp_power = utils.conv_int(
                 disp_data.get('power', '_'), 4)
             self.disp_pos = Vec.from_str(
@@ -765,26 +953,16 @@ class Side:
                                  tree['plane', ''] +
                                  '"!')
 
-        opt = {
-            'material': tree['material', ''],
-            'uaxis': tree['uaxis', '[0 1  0 0] 0.25'],
-            'vaxis': tree['vaxis', '[0 0 -1 0] 0.25'],
-            'rotation': utils.conv_int(
-                tree['rotation', '0']),
-            'lightmap': utils.conv_int(
-                tree['lightmapscale', '16'], 16),
-            'smoothing': utils.conv_int(
-                tree['smoothing_groups', '0']),
-            }
         disp_tree = tree.find_key('dispinfo', [])
-        disp_data = {}
         if len(disp_tree) > 0:
-            disp_data['power'] = disp_tree['power', '4']
-            disp_data['pos'] = disp_tree['startposition', '4']
-            disp_data['flags'] = disp_tree['flags', '0']
-            disp_data['elevation'] = disp_tree['elevation', '0']
-            disp_data['subdiv'] = disp_tree['subdiv', '0']
-            disp_data['allowed_verts'] = {}
+            disp_data = {
+                'power': disp_tree['power', '4'],
+                'pos': disp_tree['startposition', '4'],
+                'flags': disp_tree['flags', '0'],
+                'elevation': disp_tree['elevation', '0'],
+                'subdiv': disp_tree['subdiv', '0'],
+                'allowed_verts': {},
+            }
             for prop in disp_tree.find_key('allowed_verts', []):
                 disp_data['allowed_verts'][prop.name] = prop.value
             for v in _DISP_ROWS:
@@ -792,26 +970,50 @@ class Side:
                 if len(rows) > 0:
                     rows.sort(key=lambda x: utils.conv_int(x.name[3:]))
                     disp_data[v] = [v.value for v in rows]
+        else:
+            disp_data = None
+
         return Side(
             vmf_file,
             planes=planes,
-            opt=opt,
             des_id=side_id,
             disp_data=disp_data,
+            mat=tree['material', ''],
+            uaxis=UVAxis.parse(tree['uaxis', '[0 1 0 0] 0.25']),
+            vaxis=UVAxis.parse(tree['vaxis', '[0 0 -1 0] 0.25']),
+            rotation=utils.conv_int(
+                tree['rotation', '0']),
+            lightmap=utils.conv_int(
+                tree['lightmapscale', '16'], 16),
+            smoothing=utils.conv_int(
+                tree['smoothing_groups', '0']),
         )
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush side."""
         planes = [p.as_tuple() for p in self.planes]
-        opt = {
-            'material': self.mat,
-            'rotation': self.ham_rot,
-            'uaxis': self.uaxis,
-            'vaxis': self.vaxis,
-            'smoothing': self.smooth,
-            'lightmap': self.lightmap,
-            }
-        return Side(self.map, planes=planes, opt=opt, des_id=des_id)
+        if self.is_disp:
+            disp_data = self.disp_data.copy()
+            disp_data['power'] = self.disp_power
+            disp_data['flags'] = self.disp_flags
+            disp_data['elevation'] = self.disp_elev
+            disp_data['subdiv'] = self.disp_is_subdiv
+            disp_data['allowed_verts'] = self.disp_allowed_verts
+        else:
+            disp_data = None
+
+        return Side(
+            map or self.map,
+            planes=planes,
+            des_id=des_id,
+            mat=self.mat,
+            rotation=self.ham_rot,
+            uaxis=self.uaxis.copy(),
+            vaxis=self.vaxis.copy(),
+            smoothing=self.smooth,
+            lightmap=self.lightmap,
+            disp_data=disp_data,
+        )
 
     def export(self, buffer, ind=''):
         """Generate the strings required to define this side in a VMF."""
@@ -821,8 +1023,8 @@ class Side:
         pl_str = ('(' + p.join(' ') + ')' for p in self.planes)
         buffer.write(ind + '\t"plane" "' + ' '.join(pl_str) + '"\n')
         buffer.write(ind + '\t"material" "' + self.mat + '"\n')
-        buffer.write(ind + '\t"uaxis" "' + self.uaxis + '"\n')
-        buffer.write(ind + '\t"vaxis" "' + self.vaxis + '"\n')
+        buffer.write(ind + '\t"uaxis" "' + str(self.uaxis) + '"\n')
+        buffer.write(ind + '\t"vaxis" "' + str(self.vaxis) + '"\n')
         buffer.write(ind + '\t"rotation" "' + str(self.ham_rot) + '"\n')
         buffer.write(ind + '\t"lightmapscale" "' + str(self.lightmap) + '"\n')
         buffer.write(ind + '\t"smoothing_groups" "' + str(self.smooth) + '"\n')
@@ -872,7 +1074,7 @@ class Side:
         if self.id in self.map.face_id:
             self.map.face_id.remove(self.id)
 
-    def get_bbox(self):
+    def get_bbox(self) -> Tuple[Vec, Vec]:
         """Generate the highest and lowest points these planes form."""
         bbox_max = self.planes[0].copy()
         bbox_min = self.planes[0].copy()
@@ -881,7 +1083,7 @@ class Side:
             bbox_min.min(v)
         return bbox_min, bbox_max
 
-    def get_origin(self):
+    def get_origin(self) -> Vec:
         """Calculates a vector representing the exact center of this plane."""
         size_min, size_max = self.get_bbox()
         origin = (size_min + size_max) / 2
@@ -890,11 +1092,45 @@ class Side:
     def translate(self, diff):
         """Move this side by the specified vector.
 
-        - This does not translate textures as well.
         - A tuple can be passed in instead if desired.
         """
         for p in self.planes:
             p += diff
+
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= diff.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= diff.dot(v_axis) / self.vaxis.scale
+
+    def localise(self, origin: Vec, angles: Vec=None):
+        """Shift the face by the given origin and angles.
+
+        This preserves texture offsets
+        """
+        for p in self.planes:
+            p.localise(origin, angles)
+        # Rotate the uaxis values
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        u_axis.rotate(angles.x, angles.y, angles.z)
+        v_axis.rotate(angles.x, angles.y, angles.z)
+
+        self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
+        self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= origin.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= origin.dot(v_axis) / self.vaxis.scale
+
+        # Keep the values low. The highest texture size in P2 is 1024, so
+        # do the next power just to be safe.
+        # Add and subtract 1024 so the value is between -1024, 1024 not 0, 2048
+        # (This just looks nicer)
+        self.uaxis.offset = (self.uaxis.offset + 1024) % 2048 - 1024
+        self.vaxis.offset = (self.vaxis.offset + 1024) % 2048 - 1024
 
     def plane_desc(self):
         """Return a string which describes this face.
@@ -907,7 +1143,7 @@ class Side:
             self.planes[2].join(' ')
             )
 
-    def normal(self):
+    def normal(self) -> Vec:
         """Compute the unit vector which extends perpendicular to the face.
 
         """
@@ -918,6 +1154,16 @@ class Side:
         point_2 = self.planes[2] - self.planes[1]
 
         return point_2.cross(point_1).norm()
+
+    def scale(self, value):
+        self.uaxis.scale = value
+        self.vaxis.scale = value
+    scale = property(fset=scale, doc='Set both scale attributes easily.')
+
+    def offset(self, value):
+        self.uaxis.offset = value
+        self.vaxis.offset = value
+    offset = property(fset=offset, doc='Set both offset attributes easily.')
 
 
 class Entity:
@@ -933,7 +1179,7 @@ class Entity:
     """
     def __init__(
             self,
-            vmf_file,
+            vmf_file: VMF,
             keys=None,
             fixup=None,
             ent_id=-1,
@@ -944,9 +1190,9 @@ class Entity:
         self.map = vmf_file
         self.keys = keys or {}
         self.fixup = EntityFixup(fixup or {})
-        self.outputs = outputs or []
-        self.solids = solids or []
-        self.id = vmf_file.get_ent_id(ent_id)
+        self.outputs = outputs or []  # type: List[Output]
+        self.solids = solids or []  # type: List[Solid]
+        self.id = vmf_file.ent_id.get_id(ent_id)
         self.hidden = hidden
         self.editor = editor or {'visgroup': []}
 
@@ -959,7 +1205,7 @@ class Entity:
         if 'color' not in self.editor:
             self.editor['color'] = '255 255 255'
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this entity entirely, including solids and outputs."""
         new_keys = {}
         new_fixup = self.fixup.copy_dict()
@@ -972,11 +1218,11 @@ class Entity:
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
 
-        new_solids = [s.copy() for s in self.solids]
+        new_solids = [s.copy(map=map) for s in self.solids]
         outs = [o.copy() for o in self.outputs]
 
         return Entity(
-            vmf_file=self.map,
+            vmf_file=map or self.map,
             keys=new_keys,
             fixup=new_fixup,
             ent_id=des_id,
@@ -987,7 +1233,7 @@ class Entity:
         )
 
     @staticmethod
-    def parse(vmf_file, tree_list, hidden=False):
+    def parse(vmf_file, tree_list: Property, hidden=False):
         """Parse a property tree into an Entity object."""
         ent_id = -1
         solids = []
@@ -998,30 +1244,30 @@ class Entity:
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
-                ent_id = item.value
-            elif name in _FIXUP_KEYS:
-                vals = item.value.split(" ", 1)
-                var = vals[0][1:]  # Strip the $ sign
-                value = vals[1]
+                ent_id = int(item.value)
+            elif name.startswith('replace'):
                 index = item.name[-2:]  # Index is the last 2 digits
-                fixup[var.casefold()] = FixupTuple(var, value, index)
-            elif name == "solid":
-                if item.has_children():
-                    solids.append(Solid.parse(vmf_file, item))
+                try:
+                    index = int(index)
+                except TypeError:  # Not a replace value!
+                    keys[name] = item.value
                 else:
-                    keys[item.name] = item.value
+                    # Parse the $replace value
+                    vals = item.value.split(" ", 1)
+                    var = vals[0][1:]  # Strip the $ sign
+                    value = vals[1]
+                    fixup[var.casefold()] = FixupTuple(var, value, int(index))
+            elif name == "solid" and item.has_children():
+                solids.append(Solid.parse(vmf_file, item))
             elif name == "connections" and item.has_children():
                 for out in item:
                     outputs.append(Output.parse(out))
-            elif name == "hidden":
-                if item.has_children():
+            elif name == "hidden" and item.has_children():
                     solids.extend(
                         Solid.parse(vmf_file, br, hidden=True)
                         for br in
                         item
                     )
-                else:
-                    keys[item.name] = item.value
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1284,6 +1530,7 @@ class Entity:
 
 FixupTuple = namedtuple('FixupTuple', 'var value id')
 
+
 class EntityFixup:
     """A speciallised mapping which keeps track of the variable indexes.
 
@@ -1325,13 +1572,9 @@ class EntityFixup:
         if folded_var not in self:
             max_id = 0
             for fixup in self._fixup.values():
-                if int(fixup.id) > max_id:
-                    max_id = int(fixup.id)
+                if fixup.id > max_id:
+                    max_id = fixup.id
             max_id += 1
-            if max_id < 9:
-                max_id = "0" + str(max_id)
-            else:
-                max_id = str(max_id)
             self._fixup[folded_var] = FixupTuple(var, val, max_id)
         else:
             self._fixup[folded_var] = FixupTuple(var, val, self._fixup[var].id)
@@ -1364,11 +1607,9 @@ class EntityFixup:
         """Export all the replace values into the VMF."""
         if len(self._fixup) > 0:
             for (key, value, index) in sorted(
-                    self._fixup.values(), key=lambda x: x[2]
-                    ):
-                # we end up with (key, val, index) and we want to sort
-                # by the index
-                buffer.write(ind + '\t"replace{}" "${} {}"\n'.format(
+                    self._fixup.values(), key=lambda x: x.id):
+                # When exporting, pad with zeros if needed
+                buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
 
 

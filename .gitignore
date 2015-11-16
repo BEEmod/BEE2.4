@@ -76,3 +76,4 @@ config/config.cfg
 config/games.cfg
 config/compile.cfg
 config/voice/
+config/screenshot.jpg

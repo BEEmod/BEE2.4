@@ -12,18 +12,18 @@ import shutil
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
 from tkinter import filedialog  # open/save as dialog creator
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 from query_dialogs import ask_string
 from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
-import UI
 import loadScreen
 import extract_packages
+import backup
 
 all_games = []
-selected_game = None
+selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None
 
@@ -34,7 +34,11 @@ config = ConfigFile('games.cfg')
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
     ('VBSP',        'bin/vbsp',                         '.exe'),
-    ('VRAD',        'bin/vrad',                         '.exe')
+    ('VRAD',        'bin/vrad',                         '.exe'),
+    ('VBSP',        'bin/vbsp_osx',   ''),
+    ('VRAD',        'bin/vrad_osx',   ''),
+    ('VBSP',        'bin/vbsp_linux', ''),
+    ('VRAD',        'bin/vrad_linux', ''),
 ]
 
 VOICE_PATHS = [
@@ -54,18 +58,25 @@ _UNLOCK_ITEMS = [
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
-# We always add ours such that it's the highest priority.
+# We always add ours such that it's the highest priority, other
+# than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t"BEE2"'
+
+# We inject this line to recognise where our sounds start, so we can modify
+# them.
+EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
+    (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
     ('CONF', 'Generate Config Files'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
     title_text='Exporting',
 )
+
 
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
@@ -75,7 +86,7 @@ def init_trans():
     """
     global trans_data
     try:
-        with open('../basemodui.txt', "r") as trans:
+        with open('../basemodui.txt') as trans:
             trans_prop = Property.parse(trans, 'basemodui.txt')
         trans_data = {
             item.real_name: item.value
@@ -91,7 +102,17 @@ def translate(string):
 
 
 def setgame_callback(selected_game):
+    """Callback function run when games are selected."""
     pass
+
+
+def quit_application():
+    """Command run to quit the application.
+
+    This is overwritten by UI later.
+    """
+    import sys
+    sys.exit()
 
 
 class Game:
@@ -128,18 +149,50 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
 
-    def is_modded(self):
-        return os.path.isfile(self.abs_path('BEE2_EDIT_FLAG'))
+    def add_editor_sounds(self, sounds):
+        """Add soundscript items so they can be used in the editor."""
+        # PeTI only loads game_sounds_editor, so we must modify that.
+        # First find the highest-priority file
+        for folder in self.dlc_priority():
+            file = self.abs_path(os.path.join(
+                folder,
+                'scripts',
+                'game_sounds_editor.txt'
+            ))
+            if os.path.isfile(file):
+                break # We found it
+        else:
+            # Assume it's in dlc2
+            file = self.abs_path(os.path.join(
+                'portal2_dlc2',
+                'scripts',
+                'game_sounds_editor.txt',
+            ))
+        try:
+            with open(file) as f:
+                file_data = list(f)
+        except FileNotFoundError:
+            # If the file doesn't exist, we'll just write our stuff in.
+            file_data = []
+        for i, line in enumerate(file_data):
+            if line.strip() == EDITOR_SOUND_LINE:
+                # Delete our marker line and everything after it
+                del file_data[i:]
+
+        # Then add our stuff!
+        with open(file, 'w') as f:
+            f.writelines(file_data)
+            f.write(EDITOR_SOUND_LINE + '\n')
+            for sound in sounds:
+                for line in sound.data.export():
+                    f.write(line)
+                f.write('\n')  # Add a little spacing
 
     def edit_gameinfo(self, add_line=False):
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
         """
-
-        if self.is_modded() == add_line:
-            # It's already in the correct state!
-            return
 
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
@@ -177,11 +230,7 @@ class Game:
                 with open(info_path, 'w') as file:
                     for line in data:
                         file.write(line)
-        if add_line:
-            with open(self.abs_path('BEE2_EDIT_FLAG'), 'w') as file:
-                file.write('')
-        else:
-            os.remove(self.abs_path('BEE2_EDIT_FLAG'))
+        if not add_line:
             # Restore the original files!
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
@@ -200,6 +249,7 @@ class Game:
 
         screen_func = export_screen.step
         copy2 = shutil.copy2
+
         def copy_func(src, dest):
             screen_func('RES')
             copy2(src, dest)
@@ -208,6 +258,8 @@ class Game:
             source = os.path.join('../cache/resources/', folder)
             if folder == 'instances':
                 dest = self.abs_path(INST_PATH)
+            elif folder.casefold() == 'bee2':
+                continue  # Skip app icons
             else:
                 dest = self.abs_path(os.path.join('bee2', folder))
             print('Copying to "' + dest + '" ...', end='')
@@ -234,6 +286,8 @@ class Game:
             voice,
             style_vars,
             elevator,
+            pack_list,
+            editor_sounds,
             should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
@@ -242,7 +296,7 @@ class Game:
         - We unlock the mandatory items if specified
         -
         """
-        print('--------------------')
+        print('-' * 20)
         print('Exporting Items and Style for "' + self.name + '"!')
         print('Style =', style)
         print('Music =', music)
@@ -253,18 +307,22 @@ class Game:
         for key, val in style_vars.items():
             print('  {} = {!s}'.format(key, val))
         print('  }')
+        print(len(pack_list), 'Pack Lists!')
+        print(len(editor_sounds), 'Editor Sounds!')
+        print('-' * 20)
 
         # VBSP, VRAD, editoritems
-        export_screen.set_length('BACK', 3)
+        export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         export_screen.set_length(
             'CONF',
-            # VBSP_conf, Editoritems, instances, gameinfo
-            4 +
+            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists,
+            # editor_sounds
+            6 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
-        # files in compiler/ + pakrat
-        export_screen.set_length('COMP', len(os.listdir('../compiler')) + 1)
+        # files in compiler/
+        export_screen.set_length('COMP', len(os.listdir('../compiler')))
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)
@@ -272,13 +330,13 @@ class Game:
             export_screen.skip_stage('RES')
 
         export_screen.show()
-        export_screen.grab_set_global() # Stop interaction with other windows
+        export_screen.grab_set_global()  # Stop interaction with other windows
 
         vbsp_config = style.config.copy()
 
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
         # "Renderables" sections.
-        editoritems = Property("ItemData", *style.editor.find_all('Item'))
+        editoritems = Property("ItemData", list(style.editor.find_all('Item')))
 
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()
@@ -296,6 +354,39 @@ class Game:
             )
             vbsp_config += skybox.config
 
+        if style.has_video:
+            if elevator is None:
+                # Use a randomised video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'RAND',
+                )
+            elif elevator.id == 'VALVE_BLUESCREEN':
+                # This video gets a special script and handling
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'BSOD',
+                )
+            else:
+                # Use the particular selected video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'FORCE',
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'horiz'),
+                    elevator.horiz_video,
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'vert'),
+                    elevator.vert_video,
+                )
+        else:  # No elevator video for this style
+            vbsp_config.set_key(
+                ('Elevator', 'type'),
+                'NONE',
+            )
+
         if music is not None:
             if music.sound is not None:
                 vbsp_config.set_key(
@@ -311,17 +402,23 @@ class Game:
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
 
-        vbsp_config.set_key(('Options', 'BEE2_loc'),
-            os.path.dirname(os.getcwd()) # Go up one dir to our actual location
-        )
+        if voice is not None:
+            vbsp_config.set_key(
+                ('Options', 'voice_pack'),
+                voice.id,
+            )
+            vbsp_config.set_key(
+                ('Options', 'voice_char'),
+                ','.join(voice.chars)
+            )
 
-        # If there are multiple of these blocks, merge them together
-        vbsp_config.merge_children(
-            'Conditions',
-            'StyleVars',
-            'Textures',
-            'Voice',
-            'Options',
+        vbsp_config.set_key(
+            ('Options', 'BEE2_loc'),
+            os.path.dirname(os.getcwd())  # Go up one dir to our actual location
+        )
+        vbsp_config.set_key(
+            ('Options', 'Game_ID'),
+            self.steamID,
         )
 
         vbsp_config.ensure_exists('StyleVars')
@@ -331,6 +428,41 @@ class Game:
             style_vars.items()
         ]
 
+        pack_block = Property('PackList', [])
+        # A list of materials which will casue a specific packlist to be used.
+        pack_triggers = Property('PackTriggers', [])
+
+        for key, pack in pack_list.items():
+            pack_block.append(Property(
+                key,
+                [
+                    Property('File', file)
+                    for file in
+                    pack.files
+                ]
+            ))
+            for trigger_mat in pack.trigger_mats:
+                pack_triggers.append(
+                    Property('Material', [
+                        Property('Texture', trigger_mat),
+                        Property('PackList', pack.id),
+                    ])
+                )
+        if pack_triggers.value:
+            vbsp_config.append(pack_triggers)
+
+        # If there are multiple of these blocks, merge them together
+        # They will end up in this order.
+        vbsp_config.merge_children(
+            'Textures',
+            'Fizzler',
+            'Options',
+            'StyleVars',
+            'Conditions',
+            'Voice',
+            'PackTriggers',
+        )
+
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
@@ -338,6 +470,9 @@ class Game:
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
             export_screen.step('BACK')
+
+        # Backup puzzles, if desired
+        backup.auto_backup(selected_game, export_screen)
 
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
@@ -359,10 +494,12 @@ class Game:
                 # If the Unlock Default Items stylevar is enabled, we
                 # want to force the corridors and obs room to be
                 # deletable and copyable
+                # Also add DESIRES_UP, so they place in the correct orientation
                 if item['type', ''] in _UNLOCK_ITEMS:
-                    for prop in item.find_key("Editor", []):
-                        if prop.name == 'deletable' or prop.name == 'copyable':
-                            prop.value = '1'
+                    editor_section = item.find_key("Editor", [])
+                    editor_section['deletable'] = '1'
+                    editor_section['copyable'] = '1'
+                    editor_section['DesiredFacing'] = 'DESIRES_UP'
 
         print('Editing Gameinfo!')
         self.edit_gameinfo(True)
@@ -388,6 +525,16 @@ class Game:
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
             for line in all_instances.export():
                 inst_file.write(line)
+        export_screen.step('CONF')
+
+        print('Writing packing list!')
+        with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
+            for line in pack_block.export():
+                pack_file.write(line)
+        export_screen.step('CONF')
+
+        print('Editing game_sounds!')
+        self.add_editor_sounds(editor_sounds.values())
         export_screen.step('CONF')
 
         if voice is not None:
@@ -418,11 +565,6 @@ class Game:
                 self.abs_path('bin/')
             )
             export_screen.step('COMP')
-
-        print('Copying PakRat...', end='')
-        shutil.copy('../pakrat.jar', self.abs_path('bin/bee2/pakrat.jar'))
-        export_screen.step('COMP')
-        print(' Done!')
 
         if should_refresh:
             print('Copying Resources!')
@@ -497,7 +639,7 @@ def load():
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            UI.quit_application()
+            quit_application()
         loadScreen.main_loader.deiconify()  # Show it again
     selected_game = all_games[0]
 
@@ -532,6 +674,7 @@ def add_game(_=None, refresh_menu=True):
             name = ask_string(
                 prompt="Enter the name of this game:",
                 title='BEE2 - Add Game',
+                initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(
@@ -584,7 +727,7 @@ def remove_game(_=None):
         config.save()
 
         if not all_games:
-            UI.quit_application()  # If we have no games, nothing can be done
+            quit_application()  # If we have no games, nothing can be done
 
         selected_game = all_games[0]
         selectedGame_radio.set(0)
