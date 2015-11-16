@@ -105,6 +105,13 @@ setup(
             base=base,
             icon=ico_path,
             compress=True,
+        ),
+        Executable(
+            'backup.py',
+            base=base,
+            icon=ico_path,
+            compress=True,
+            targetName='backup_tool' + ('.exe' if utils.WIN else ''),
         )
     ],
 )
