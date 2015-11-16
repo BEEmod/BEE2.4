@@ -52,7 +52,7 @@ class FakeZip:
 
     def open(self, name, mode='r', pwd=None):
         try:
-            return open(os.path.join(self.folder, name))
+            return open(os.path.join(self.folder, name), mode)
         except FileNotFoundError as err:
             raise KeyError from err  # This is what zips raise
 
@@ -111,3 +111,11 @@ def zip_names(zip):
         return zip.names()
     else:
         return zip.namelist()
+
+
+def zip_open_bin(zip, filename):
+    """Open in binary mode if a fake zip."""
+    if isinstance(zip, FakeZip):
+        return zip.open(filename, 'rb')
+    else:
+        return zip.open(filename, 'r')

@@ -11,13 +11,21 @@ elif utils.MAC:
 elif utils.LINUX:
     suffix = '_linux'
 
+# Unneeded packages that cx_freeze detects:
+EXCLUDES = [
+    'email',
+    'distutils',  # Found in shutil, used if zipfile is not availible
+    'doctest',  # Used in __main__ of decimal and heapq
+    'dis',  # From inspect, not needed
+]
 setup(
     name='VBSP_VRAD',
     version='0.1',
     options={
         'build_exe':
             {
-                'build_exe': '../compiler'
+                'build_exe': '../compiler',
+                'excludes': EXCLUDES,
             }
     },
     description='BEE2 VBSP and VRAD compilation hooks, '

@@ -5,7 +5,7 @@ Call add_tooltip with a widget to add all the events automatically,
 or call show and hide to directly move the window.
 """
 import tkinter as tk
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 import utils
 

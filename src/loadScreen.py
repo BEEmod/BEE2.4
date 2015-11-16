@@ -1,6 +1,6 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 
 import utils
@@ -48,15 +48,17 @@ class LoadScreen(Toplevel):
             ).grid(row=1, sticky="EW", columnspan=2)
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
-            ttk.Label(
-                self.frame,
-                text=stage_name + ':',
-                cursor=utils.CURSORS['wait'],
-                ).grid(
-                    row=ind*2+2,
-                    columnspan=2,
-                    sticky="W",
-                    )
+            if stage_name:
+                # If stage name is blank, don't add a caption
+                ttk.Label(
+                    self.frame,
+                    text=stage_name + ':',
+                    cursor=utils.CURSORS['wait'],
+                    ).grid(
+                        row=ind*2+2,
+                        columnspan=2,
+                        sticky="W",
+                        )
             self.bar_var[st_id] = IntVar()
             self.bar_val[st_id] = 0
             self.maxes[st_id] = 10
@@ -133,6 +135,19 @@ class LoadScreen(Toplevel):
             del self.bar_var
             del self.bar_val
             self.active = False
+
+    def __enter__(self):
+        """LoadScreen can be used as a context manager.
+
+        Inside the block, the screen will be visible.
+        """
+        self.show()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Hide the loading screen, and passthrough execptions.
+        """
+        self.reset()
 
 main_loader = LoadScreen(
     ('PAK', 'Packages'),

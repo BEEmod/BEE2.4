@@ -8,7 +8,7 @@ various item properties.
   clicked widget from the event
 """
 from tkinter import *
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
 
@@ -20,6 +20,7 @@ import img as png
 import sound as snd
 import itemPropWin
 import tooltip
+import tk_tools
 import utils
 
 OPEN_IN_TAB = 2
@@ -417,7 +418,7 @@ def init_widgets():
     wid['desc'] = tkRichText(desc_frame, width=40, height=8, font=None)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
-    desc_scroll = ttk.Scrollbar(
+    desc_scroll = tk_tools.HidingScroll(
         desc_frame,
         orient=VERTICAL,
         command=wid['desc'].yview,
