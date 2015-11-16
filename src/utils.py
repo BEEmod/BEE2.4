@@ -711,6 +711,17 @@ class Vec:
             bbox_max.max(point)
         return bbox_min, bbox_max
 
+    def axis(self):
+        """For a normal vector, return the axis it is on.
+
+        This will not function correctly if not a on-axis normal vector!
+        """
+        return (
+            'x' if self.x != 0 else
+            'y' if self.y != 0 else
+            'z'
+        )
+
     def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
         """+ operation.
 

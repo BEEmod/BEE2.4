@@ -90,6 +90,7 @@ TEX_DEFAULTS = [
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
     ('', 'special.edge_special'),
+    ('', 'special.fizz_border'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -168,6 +169,8 @@ DEFAULTS = {
     # Reset offsets for all white/black brushes, so embedface has correct
     # texture matching
     "tile_texture_lock":        "1",
+
+    "flip_fizz_border":         "0", # Swap U/V for fizz border overlays
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -474,6 +477,68 @@ def add_voice(inst):
         mode=GAME_MODE,
         map_seed=MAP_SEED,
         )
+
+
+@conditions.meta_cond(priority=-250)
+def add_fizz_borders(_):
+    """Generate overlays at the top and bottom of fizzlers.
+
+    This is used in 50s and BTS styles.
+    """
+    tex = settings['textures']['special.fizz_border']
+    if tex == ['']:
+        return
+
+    flip_uv = get_bool_opt('flip_fizz_border')
+
+    # First, figure out the orientation of every fizzler via their model.
+    fizz_directions = {}
+    for inst in VMF.by_class['func_instance']:
+        if '_modelStart' not in inst['targetname', '']:
+            continue
+        name = inst['targetname'].rsplit('_modelStart', 1)[0] + '_brush'
+        # Once per fizzler only!
+        if name not in fizz_directions:
+            fizz_directions[name] = (
+                # Normal direction of surface
+                Vec(1, 0, 0).rotate_by_str(inst['angles']).axis(),
+                # 'Horizontal' direction (for vertical fizz attached to walls)
+                Vec(0, 0, 1).rotate_by_str(inst['angles']).axis(),
+                # 'Vertical' direction (for vertical fizz attached to walls)
+                Vec(0, 1, 0).rotate_by_str(inst['angles']).axis(),
+            )
+
+    for brush_ent in (VMF.by_class['trigger_portal_cleanser'] |
+                      VMF.by_class['func_brush']):
+        try:
+            normal, horiz, vert = fizz_directions[brush_ent['targetname']]
+        except KeyError:
+            continue
+
+        bbox_min, bbox_max = brush_ent.get_bbox()
+        dimensions = bbox_max - bbox_min
+
+        # We need to snap the axis normal_axis to the grid, since it could
+        # be forward or back.
+        min_pos = bbox_min.copy()
+        min_pos[normal] = min_pos[normal] // 128 * 128 + 64
+
+        max_pos = min_pos.copy()
+        max_pos[vert] += 128
+
+        min_faces = []
+        max_faces = []
+
+        print(brush_ent['targetname'], dimensions, normal, horiz, vert)
+        for offset in range(64, int(dimensions[horiz]) - 1, 128):
+            # Each position on top or bottom
+            max_pos[horiz] = min_pos[horiz] = bbox_min[horiz] + offset
+            solid = conditions.SOLIDS.get(min_pos.as_tuple())
+            if solid is not None:
+                min_faces.append(solid.face)
+            solid = conditions.SOLIDS.get(max_pos.as_tuple())
+            if solid is not None:
+                max_faces.append(solid.face)
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
