@@ -2387,7 +2387,7 @@ def main():
             )
 
         fix_inst()
-        alter_flip_panel() # Must be done before conditions!
+        alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
