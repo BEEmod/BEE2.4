@@ -321,7 +321,7 @@ def is_identifier(name, forbidden='{}\'"'):
             return False
     return True
 
-FILE_CHARS = string.ascii_letters + string.digits + '-_ .|'
+FILE_CHARS = set(string.ascii_letters + string.digits + '-_ .|')
 
 
 def is_plain_text(name, valid_chars=FILE_CHARS):
@@ -332,6 +332,24 @@ def is_plain_text(name, valid_chars=FILE_CHARS):
         if char not in valid_chars:
             return False
     return True
+
+
+def whitelist(string, valid_chars=FILE_CHARS, rep_char='_'):
+    """Replace any characters not in the whitelist with the replacement char."""
+    chars = list(string)
+    for ind, char in enumerate(chars):
+        if char not in valid_chars:
+            chars[ind] = rep_char
+    return ''.join(chars)
+
+
+def blacklist(string, invalid_chars='', rep_char='_'):
+    """Replace any characters in the blacklist with the replacement char."""
+    chars = list(string)
+    for ind, char in enumerate(chars):
+        if char in invalid_chars:
+            chars[ind] = rep_char
+    return ''.join(chars)
 
 
 def get_indent(line: str):
