@@ -20,9 +20,10 @@ from property_parser import Property
 import utils
 import loadScreen
 import extract_packages
+import backup
 
 all_games = []
-selected_game = None
+selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None
 
@@ -69,6 +70,7 @@ EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
+    (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
     ('CONF', 'Generate Config Files'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
@@ -147,7 +149,7 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
 
-    def add_editor_sounds(self, sounds: Property):
+    def add_editor_sounds(self, sounds):
         """Add soundscript items so they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
@@ -469,6 +471,9 @@ class Game:
                 shutil.copy(item_path, backup_path)
             export_screen.step('BACK')
 
+        # Backup puzzles, if desired
+        backup.auto_backup(selected_game, export_screen)
+
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
 
@@ -722,7 +727,7 @@ def remove_game(_=None):
         config.save()
 
         if not all_games:
-            UI.quit_application()  # If we have no games, nothing can be done
+            quit_application()  # If we have no games, nothing can be done
 
         selected_game = all_games[0]
         selectedGame_radio.set(0)

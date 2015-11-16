@@ -1,6 +1,7 @@
 """Backup and restore P2C maps.
 
 """
+import string
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -26,12 +27,20 @@ import utils
 import tk_tools
 import gameMan
 
-
+# The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
 
-UI = {}
+UI = {} # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
+
+# Stage name for the exporting screen
+AUTO_BACKUP_STAGE = 'BACKUP_ZIP'
+
+# Characters allowed in the backup filename
+BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
+# Format for the backup filename
+AUTO_BACKUP_FILE = 'back_{game}{ind}.zip'
 
 HEADERS = ['Name', 'Mode', 'Date']
 
@@ -63,6 +72,7 @@ BACKUPS = {
 backup_name = tk.StringVar()
 game_name = tk.StringVar()
 
+# Loadscreens used as basic progress bars
 copy_loader = LoadScreen(
     ('COPY', ''),
     title_text='Copying maps',
@@ -225,23 +235,38 @@ def load_backup(zip_file):
     return maps
 
 
-def load_game(game: gameMan.Game):
+def load_game(game: 'gameMan.Game'):
     """Callback for gameMan, load in files for a game."""
     game_name.set(game.name)
 
+    puzz_path = find_puzzles(game)
+    if puzz_path:
+        BACKUPS['game_path'] = puzz_path
+        BACKUPS['game_zip'] = zip_file = FakeZip(puzz_path)
+        maps = load_backup(zip_file)
+
+        BACKUPS['game'] = maps
+        refresh_game_details()
+
+
+def find_puzzles(game: 'gameMan.Game'):
+    """Find the path for the p2c files."""
+    # The puzzles are located in:
+    # <game_folder>/portal2/puzzles/<steam_id>
+    # 'portal2' changes with different games.
+
     puzzle_folder = PUZZLE_FOLDERS.get(str(game.steamID), 'portal2')
     path = game.abs_path(puzzle_folder + '/puzzles/')
+
     for folder in os.listdir(path):
+        # The steam ID is all digits, so look for a folder with only digits
+        # in the name
         if not folder.isdigit():
             continue
         abs_path = os.path.join(path, folder)
         if os.path.isdir(abs_path):
-            BACKUPS['game_path'] = abs_path
-            BACKUPS['game_zip'] = zip_file = FakeZip(abs_path)
-            maps = load_backup(zip_file)
-
-            BACKUPS['game'] = maps
-            refresh_game_details()
+            return abs_path
+    return None
 
 
 def backup_maps(maps):
@@ -279,6 +304,77 @@ def backup_maps(maps):
 
     BACKUPS['back'] = list(map_dict.values())
     refresh_back_details()
+
+
+def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
+    """Perform an automatic backup for the given game.
+
+    We do this seperately since we don't need to read the property files.
+    """
+    from BEE2_config import GEN_OPTS
+    if not GEN_OPTS.get_bool('General', 'enable_auto_backup'):
+        # Don't backup!
+        loader.skip_stage(AUTO_BACKUP_STAGE)
+        return
+
+    folder = find_puzzles(game)
+    if not folder:
+        loader.skip_stage(AUTO_BACKUP_STAGE)
+        return
+
+    # Keep this many previous
+    extra_back_count = GEN_OPTS.get_int('General', 'auto_backup_count', 0)
+
+    to_backup = os.listdir(folder)
+    backup_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
+
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # A version of the name stripped of special characters
+    # Allowed: a-z, A-Z, 0-9, '_-.'
+    safe_name = utils.whitelist(
+        game.name,
+        valid_chars=BACKUP_CHARS,
+    )
+
+    loader.set_length(AUTO_BACKUP_STAGE, len(to_backup))
+
+    if extra_back_count:
+        back_files = [
+            AUTO_BACKUP_FILE.format(game=safe_name, ind='')
+        ] + [
+            AUTO_BACKUP_FILE.format(game=safe_name, ind='_'+str(i+1))
+            for i in range(extra_back_count)
+        ]
+        # Move each file over by 1 index, ignoring missing ones
+        # We need to reverse to ensure we don't overwrite any zips
+        for old_name, new_name in reversed(
+                list(zip(back_files, back_files[1:]))
+                ):
+            print('Moving:', old_name, '->', new_name)
+            old_name = os.path.join(backup_dir, old_name)
+            new_name = os.path.join(backup_dir, new_name)
+            try:
+                # Overwrites!
+                shutil.copyfile(old_name, new_name)
+                os.remove(old_name)
+            except FileNotFoundError:
+                pass
+
+    final_backup = os.path.join(
+        backup_dir,
+        AUTO_BACKUP_FILE.format(game=safe_name, ind=''),
+    )
+    print('Writing backup to "{}"'.format(final_backup))
+    with open(final_backup, 'wb') as f:
+        with ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
+            for file in to_backup:
+                zip_file.write(
+                    os.path.join(folder, file),
+                    file,
+                    ZIP_LZMA,
+                )
+                loader.step(AUTO_BACKUP_STAGE)
 
 
 def save_backup():
@@ -650,7 +746,7 @@ def init_backup_settings():
     check_var = tk.IntVar(
         value=GEN_OPTS.get_bool('General', 'enable_auto_backup')
     )
-    count_value = GEN_OPTS.get_int('General', 'auto_backup_count', 1)
+    count_value = GEN_OPTS.get_int('General', 'auto_backup_count', 0)
     back_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
 
     def check_callback():
@@ -659,7 +755,7 @@ def init_backup_settings():
         )
 
     def count_callback():
-        GEN_OPTS['General']['enable_auto_backup'] = str(count.value)
+        GEN_OPTS['General']['auto_backup_count'] = str(count.value)
 
     def directory_callback(path):
         GEN_OPTS['Directories']['backup_loc'] = path
@@ -706,7 +802,7 @@ def init_backup_settings():
 
     count = tk_tools.ttk_Spinbox(
         count_frame,
-        range=range(1, 50),
+        range=range(50),
         command=count_callback,
     )
     count.grid(row=1, column=0)
