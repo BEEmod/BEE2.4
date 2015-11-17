@@ -176,6 +176,7 @@ DEFAULTS = {
 
     "fizz_border_vertical":     "0",  # The texture is oriented vertically
     "fizz_border_thickness":    "8",  # The width of the overlays
+    "fizz_border_repeat":       "128",  # The width lengthways
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -496,6 +497,7 @@ def add_fizz_borders(_):
 
     flip_uv = get_bool_opt('fizz_border_vertical')
     overlay_thickness = utils.conv_int(get_opt('fizz_border_thickness'), 8)
+    overlay_repeat = utils.conv_int(get_opt('fizz_border_repeat'), 128)
 
     # First, figure out the orientation of every fizzler via their model.
     fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
@@ -552,6 +554,13 @@ def add_fizz_borders(_):
             if solid is not None:
                 max_faces.append(solid.face)
 
+        if flip_uv:
+            u_rep = 1
+            v_rep = overlay_len / overlay_repeat
+        else:
+            u_rep = overlay_len / overlay_repeat
+            v_rep = 1
+
         if min_faces:
             min_origin = bbox_min.copy()
             min_origin[norm_dir] += 1
@@ -565,7 +574,8 @@ def add_fizz_borders(_):
                 vax=norm * overlay_thickness,
                 material=random.choice(tex),
                 surfaces=min_faces,
-                v_repeat=overlay_len / 128,
+                u_repeat=u_rep,
+                v_repeat=v_rep,
                 swap=flip_uv,
             )
         if max_faces:
@@ -581,7 +591,8 @@ def add_fizz_borders(_):
                 vax=norm * overlay_thickness,
                 material=random.choice(tex),
                 surfaces=max_faces,
-                v_repeat=overlay_len / 128,
+                u_repeat=u_rep,
+                v_repeat=v_rep,
                 swap=flip_uv,
             )
 

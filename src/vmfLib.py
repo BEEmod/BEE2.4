@@ -105,13 +105,14 @@ def make_overlay(
         u_repeat=1,
         v_repeat=1,
         swap=False,
+        render_order=0
         ) -> 'Entity':
     """Generate an overlay on an axis-aligned surface.
 
     - origin is the center point of the overlay.
     - uax is the direction and distance for the texture's width ('right').
     - vax is the direction and distance for the texture's height ('up').
-    - normal is the normal of the surfaces.
+    - normal is the normal of the surfaces (axis-aligned).
     - material is the material used.
     - u_ and v_repeat define how many times to repeat the texture in that
       direction.
