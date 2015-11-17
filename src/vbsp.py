@@ -17,6 +17,10 @@ import voiceLine
 import instanceLocs
 import conditions
 
+from typing import (
+    Dict, Tuple,
+)
+
 
 # Configuration data extracted from VBSP_config
 settings = {
@@ -170,7 +174,8 @@ DEFAULTS = {
     # texture matching
     "tile_texture_lock":        "1",
 
-    "flip_fizz_border":         "0", # Swap U/V for fizz border overlays
+    "fizz_border_vertical":     "0",  # The texture is oriented vertically
+    "fizz_border_thickness":    "8",  # The width of the overlays
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -489,10 +494,11 @@ def add_fizz_borders(_):
     if tex == ['']:
         return
 
-    flip_uv = get_bool_opt('flip_fizz_border')
+    flip_uv = get_bool_opt('fizz_border_vertical')
+    overlay_thickness = utils.conv_int(get_opt('fizz_border_thickness'), 8)
 
     # First, figure out the orientation of every fizzler via their model.
-    fizz_directions = {}
+    fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
     for inst in VMF.by_class['func_instance']:
         if '_modelStart' not in inst['targetname', '']:
             continue
@@ -501,19 +507,22 @@ def add_fizz_borders(_):
         if name not in fizz_directions:
             fizz_directions[name] = (
                 # Normal direction of surface
-                Vec(1, 0, 0).rotate_by_str(inst['angles']).axis(),
+                Vec(1, 0, 0).rotate_by_str(inst['angles']),
                 # 'Horizontal' direction (for vertical fizz attached to walls)
-                Vec(0, 0, 1).rotate_by_str(inst['angles']).axis(),
+                Vec(0, 0, 1).rotate_by_str(inst['angles']),
                 # 'Vertical' direction (for vertical fizz attached to walls)
-                Vec(0, 1, 0).rotate_by_str(inst['angles']).axis(),
+                Vec(0, 1, 0).rotate_by_str(inst['angles']),
             )
 
     for brush_ent in (VMF.by_class['trigger_portal_cleanser'] |
                       VMF.by_class['func_brush']):
         try:
-            normal, horiz, vert = fizz_directions[brush_ent['targetname']]
+            norm, horiz, vert = fizz_directions[brush_ent['targetname']]
         except KeyError:
             continue
+        norm_dir = norm.axis()
+        horiz_dir = horiz.axis()
+        vert_dir = vert.axis()
 
         bbox_min, bbox_max = brush_ent.get_bbox()
         dimensions = bbox_max - bbox_min
@@ -521,24 +530,60 @@ def add_fizz_borders(_):
         # We need to snap the axis normal_axis to the grid, since it could
         # be forward or back.
         min_pos = bbox_min.copy()
-        min_pos[normal] = min_pos[normal] // 128 * 128 + 64
+        min_pos[norm_dir] = min_pos[norm_dir] // 128 * 128 + 64
 
         max_pos = min_pos.copy()
-        max_pos[vert] += 128
+        max_pos[vert_dir] += 128
 
         min_faces = []
         max_faces = []
 
-        print(brush_ent['targetname'], dimensions, normal, horiz, vert)
-        for offset in range(64, int(dimensions[horiz]) - 1, 128):
-            # Each position on top or bottom
-            max_pos[horiz] = min_pos[horiz] = bbox_min[horiz] + offset
+        overlay_len = int(dimensions[horiz_dir])
+
+        for offset in range(64, overlay_len, 128):
+            # Each position on top or bottom, inset 64 from each end
+            min_pos[horiz_dir] = bbox_min[horiz_dir] + offset
+            max_pos[horiz_dir] = min_pos[horiz_dir]
+
             solid = conditions.SOLIDS.get(min_pos.as_tuple())
             if solid is not None:
                 min_faces.append(solid.face)
             solid = conditions.SOLIDS.get(max_pos.as_tuple())
             if solid is not None:
                 max_faces.append(solid.face)
+
+        if min_faces:
+            min_origin = bbox_min.copy()
+            min_origin[norm_dir] += 1
+            min_origin[horiz_dir] += overlay_len/2
+            min_origin[vert_dir] += 16
+            VLib.make_overlay(
+                VMF,
+                normal=abs(vert),
+                origin=min_origin,
+                uax=horiz * overlay_len,
+                vax=norm * overlay_thickness,
+                material=random.choice(tex),
+                surfaces=min_faces,
+                v_repeat=overlay_len / 128,
+                swap=flip_uv,
+            )
+        if max_faces:
+            max_origin = bbox_max.copy()
+            max_origin[norm_dir] -= 1
+            max_origin[horiz_dir] -= overlay_len/2
+            max_origin[vert_dir] -= 16
+            VLib.make_overlay(
+                VMF,
+                normal=-abs(vert),
+                origin=max_origin,
+                uax=horiz * overlay_len,
+                vax=norm * overlay_thickness,
+                material=random.choice(tex),
+                surfaces=max_faces,
+                v_repeat=overlay_len / 128,
+                swap=flip_uv,
+            )
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
