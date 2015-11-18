@@ -29,6 +29,9 @@ FORCE_TILE_MATS = {
 
 FORCE_LOCATIONS = set()
 
+# The template used to seal sides open to the void.
+SIDE_BRUSH_TEMPLATE = 'BEE2_CUTOUT_TILE_FLOOR_SIDE'
+
 
 @conditions.meta_cond(priority=-1000, only_once=False)
 def find_indicator_panels(inst):
@@ -110,8 +113,6 @@ def res_cutout_tile(inst, res):
             res['ceilingGlueChance', '0']),
 
         'beam_skin': res['squarebeamsSkin', '0'],
-
-        'floor_edge': res['floorEdgeInst', ''],
 
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
@@ -218,15 +219,15 @@ def res_cutout_tile(inst, res):
         # Mark borders we need to fill in, and the angle (for func_instance)
         for x in range(int(box_min.x), int(box_max.x)+1, 128):
             # North, South
-            floor_edges.append((Vec(x, box_max.y + 64, z-64), '0 270 0'))
-            floor_edges.append((Vec(x, box_min.y - 64, z-64), '0 90 0'))
+            floor_edges.append((Vec(x, box_max.y + 64, z-64), 270))
+            floor_edges.append((Vec(x, box_min.y - 64, z-64), 90))
 
         for y in range(int(box_min.y), int(box_max.y)+1, 128):
             # East, West
-            floor_edges.append((Vec(box_max.x + 64, y, z-64), '0 180 0'))
-            floor_edges.append((Vec(box_min.x - 64, y, z-64), '0 0 0'))
+            floor_edges.append((Vec(box_max.x + 64, y, z-64), 180))
+            floor_edges.append((Vec(box_min.x - 64, y, z-64), 0))
 
-    add_floor_sides(floor_edges, MATS['squarebeams'], SETTINGS['floor_edge'])
+    add_floor_sides(floor_edges, MATS['squarebeams'])
 
     reallocate_overlays(overlay_ids)
 
@@ -488,7 +489,7 @@ def reallocate_overlays(mapping):
             overlay['sides'] = ' '.join(sides)
 
 
-def add_floor_sides(locs, tex, file):
+def add_floor_sides(locs, tex):
     """We need to replace nodraw textures around the outside of the holes.
 
     This requires looping through all faces, since these will have been
@@ -515,15 +516,24 @@ def add_floor_sides(locs, tex, file):
             vbsp.IGNORED_FACES.add(face)
 
     # Look for the ones without a texture - these are open to the void and
-    # need to be sealed. We use an instance to allow chamfering the edges
+    # need to be sealed. The template chamfers the edges
     # to prevent showing void at outside corners.
-    for loc, angles in locs:
+    for loc, rot in locs:
         if added_locations[loc.as_tuple()]:
             continue
 
-        conditions.VMF.create_ent(
-            classname='func_instance',
-            file=file,
-            origin=loc.join(' '),
-            angles=angles,
+        world, detail = conditions.import_template(
+            SIDE_BRUSH_TEMPLATE,
+            origin=loc,
+            angles=Vec(0, rot, 0),
+            force_type=conditions.TEMP_TYPES.world,
+        )
+        conditions.retexture_template(
+            world,
+            detail,
+            loc,
+            # Switch to use the configured squarebeams texture
+            replace_tex={
+                'anim_wp/framework/squarebeams': random.choice(tex),
+            }
         )
