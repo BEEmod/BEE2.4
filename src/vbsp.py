@@ -1926,6 +1926,9 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
+            if side in IGNORED_FACES:
+                continue
+
             if side.mat.casefold() == "anim_wp/framework/squarebeams":
                 side.mat = get_tex(edge_tex)
                 fix_squarebeams(

@@ -697,7 +697,7 @@ def import_template(
     returned instead of an invalid entity.
     """
     import vbsp
-    orig_world, orig_detail = TEMPLATES[temp_name]
+    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
     new_world = []
     new_detail = []
 
@@ -709,6 +709,11 @@ def import_template(
             brush = old_brush.copy(map=VMF)
             brush.localise(origin, angles)
             new_list.append(brush)
+
+    # Don't let these get retextured normally - that should be
+    # done by retexture_template(), if at all!
+    for brush in new_world + new_detail:
+        vbsp.IGNORED_FACES.update(brush.sides)
 
     if force_type is TEMP_TYPES.detail:
         new_detail.extend(new_world)
@@ -726,10 +731,6 @@ def import_template(
         detail_ent.solids = new_detail
     else:
         detail_ent = None
-
-    # Don't let these get retextured normally - that should be
-    # done by retexture_template(), if at all!
-    vbsp.IGNORED_FACES.update(new_world, new_detail)
 
     return new_world, detail_ent
 
