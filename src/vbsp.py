@@ -196,8 +196,6 @@ DEFAULTS = {
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
 
-    "draw_clumps":              "0",  # Debug, add skip brushes for clumps
-
     # Default to the origin of the elevator instance - that's likely to
     # be enclosed
     "music_location_sp":        "-2000 2000 0",
@@ -1580,18 +1578,20 @@ def clump_walls():
         for face in
         VMF.iter_wfaces(world=True, detail=True)
         if face not in IGNORED_FACES
-        if face.mat.casefold() != 'tools/toolsnodraw'
+        if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
     ]
 
     clump_size = utils.conv_int(get_opt("clump_size"), 4)
     clump_wid = utils.conv_int(get_opt("clump_width"), 2)
 
-    clump_numb = len(possible_locs) // clump_size
+    clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
     clump_numb *= utils.conv_int(get_opt("clump_number"), 6)
 
     # Also clump ceilings or floors?
     clump_ceil = get_bool_opt('clump_ceil')
     clump_floor = get_bool_opt('clump_floor')
+
+    utils.con_log('Clumping: {} clumps'.format(clump_numb))
 
     random.seed(MAP_SEED)
 
@@ -1600,7 +1600,7 @@ def clump_walls():
     for _ in range(clump_numb):
         # Picking out of the map origins helps ensure at least 1 texture is
         # modded by a clump
-        pos = random.choice(possible_locs) // 128 * 128 # type: Vec
+        pos = random.choice(possible_locs) // 128 * 128  # type: Vec
 
         pos_min = Vec()
         pos_max = Vec()
@@ -1628,14 +1628,6 @@ def clump_walls():
         ))
         random.setstate(cur_state)
 
-    if get_bool_opt('draw_clumps'):
-        for clump in clumps:
-            VMF.add_brush(VMF.make_prism(
-                clump.min_pos,
-                clump.max_pos,
-                mat='tools/toolsskip',
-            ).solid)
-
     # Now modify each texture!
     for face in VMF.iter_wfaces(world=True, detail=True):
         if face in IGNORED_FACES:
@@ -1649,9 +1641,10 @@ def clump_walls():
             fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
             continue
 
-        if mat not in WHITE_PAN or mat not in BLACK_PAN:
+        if mat not in WHITE_PAN and mat not in BLACK_PAN:
             # Don't clump non-wall textures
             alter_mat(face, face_seed(face), texture_lock)
+            continue
 
         orient = get_face_orient(face)
 
@@ -1662,14 +1655,12 @@ def clump_walls():
             alter_mat(face, face_seed(face), texture_lock)
             continue
 
-        mat = face.mat.casefold()
-
         # Clump the texture!
         origin = face.get_origin()
         for clump in clumps:
-            if not (clump.min_pos <= origin <= clump.max_pos):
-                continue
-            face.mat = clump.tex[get_tile_type(mat, orient)]
+            if clump.min_pos <= origin <= clump.max_pos:
+                face.mat = clump.tex[get_tile_type(mat, orient)]
+                break
         else:
             # Not in a clump!
             # Allow using special textures for these, to fill in gaps.
@@ -1679,7 +1670,7 @@ def clump_walls():
                 if not face.mat:
                     face.mat = orig_mat
                     alter_mat(face, texture_lock=texture_lock)
-            if mat in WHITE_PAN:
+            elif mat in BLACK_PAN:
                 face.mat = get_tex("special.black_gap")
                 if not face.mat:
                     face.mat = orig_mat
