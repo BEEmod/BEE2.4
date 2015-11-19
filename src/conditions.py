@@ -698,7 +698,7 @@ def import_template(
     returned instead of an invalid entity.
     """
     import vbsp
-    orig_world, orig_detail = TEMPLATES[temp_name]
+    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
     new_world = []
     new_detail = []
 
@@ -710,6 +710,11 @@ def import_template(
             brush = old_brush.copy(map=VMF)
             brush.localise(origin, angles)
             new_list.append(brush)
+
+    # Don't let these get retextured normally - that should be
+    # done by retexture_template(), if at all!
+    for brush in new_world + new_detail:
+        vbsp.IGNORED_FACES.update(brush.sides)
 
     if force_type is TEMP_TYPES.detail:
         new_detail.extend(new_world)
@@ -768,6 +773,8 @@ def retexture_template(
     # floor/ceiling (+-40 degrees)
     # sin(40) = ~0.707
     floor_tolerance = 0.8
+
+    can_clump = vbsp.can_clump()
 
     for brush in all_brushes:
         for face in brush:
@@ -846,9 +853,28 @@ def retexture_template(
                 if norm.z < -floor_tolerance:
                     grid_size = 'floor'
 
-            face.mat = vbsp.get_tex(
-                '{!s}.{!s}'.format(tex_colour, grid_size)
-            )
+            if can_clump:
+                # For the clumping algorithm, set to Valve PeTI and let
+                # clumping handle retexturing.
+                vbsp.IGNORED_FACES.remove(face)
+                if tex_colour is MAT_TYPES.white:
+                    if grid_size == '4x4':
+                        face.mat = 'tile/white_wall_tile003f'
+                    elif grid_size == '2x2':
+                        face.mat = 'tile/white_wall_tile003c'
+                    else:
+                        face.mat = 'tile/white_wall_tile003h'
+                elif tex_colour is MAT_TYPES.black:
+                    if grid_size == '4x4':
+                        face.mat = 'metal/black_wall_metal_002b'
+                    elif grid_size == '2x2':
+                        face.mat = 'metal/black_wall_metal_002a'
+                    else:
+                        face.mat = 'metal/black_wall_metal_002e'
+            else:
+                face.mat = vbsp.get_tex(
+                    '{!s}.{!s}'.format(tex_colour, grid_size)
+                )
 
 
 @make_flag('debug')
