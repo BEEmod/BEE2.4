@@ -766,6 +766,8 @@ def retexture_template(
     # sin(40) = ~0.707
     floor_tolerance = 0.8
 
+    can_clump = vbsp.can_clump()
+
     for brush in all_brushes:
         for face in brush:
             folded_mat = face.mat.casefold()
@@ -843,9 +845,28 @@ def retexture_template(
                 if norm.z < -floor_tolerance:
                     grid_size = 'floor'
 
-            face.mat = vbsp.get_tex(
-                '{!s}.{!s}'.format(tex_colour, grid_size)
-            )
+            if can_clump:
+                # For the clumping algorithm, set to Valve PeTI and let
+                # clumping handle retexturing.
+                vbsp.IGNORED_FACES.remove(face)
+                if tex_colour is MAT_TYPES.white:
+                    if grid_size == '4x4':
+                        face.mat = 'tile/white_wall_tile003f'
+                    elif grid_size == '2x2':
+                        face.mat = 'tile/white_wall_tile003c'
+                    else:
+                        face.mat = 'tile/white_wall_tile003h'
+                elif tex_colour is MAT_TYPES.black:
+                    if grid_size == '4x4':
+                        face.mat = 'metal/black_wall_metal_002b'
+                    elif grid_size == '2x2':
+                        face.mat = 'metal/black_wall_metal_002a'
+                    else:
+                        face.mat = 'metal/black_wall_metal_002e'
+            else:
+                face.mat = vbsp.get_tex(
+                    '{!s}.{!s}'.format(tex_colour, grid_size)
+                )
 
 
 @make_flag('debug')
