@@ -1682,10 +1682,12 @@ def clump_walls():
 def get_face_orient(face):
     """Determine the orientation of an on-grid face."""
     norm = face.normal()
-    if norm == (0, 0, -1):
+    # Even if not axis-aligned, make mostly-flat surfaces
+    # floor/ceiling (+-40 degrees)
+    # sin(40) = ~0.707
+    if norm.z < -0.8:
         return ORIENT.floor
-
-    if norm == (0, 0, 1):
+    if norm.z > 0.8:
         return ORIENT.ceiling
     return ORIENT.wall
 
