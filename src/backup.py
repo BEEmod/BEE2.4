@@ -704,6 +704,10 @@ def init_application():
     """Initialise the standalone application."""
     global window
     window = TK_ROOT
+    TK_ROOT.title(
+        'BEEMOD {} - Backup / Restore Puzzles'.format(utils.BEE_VERSION)
+    )
+
     init()
 
     UI['bar'] = bar = tk.Menu(TK_ROOT)
@@ -815,6 +819,7 @@ def init_toplevel():
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
+    window.title('Backup/Restore Puzzles')
 
     def quit_command():
         from BEE2_config import GEN_OPTS

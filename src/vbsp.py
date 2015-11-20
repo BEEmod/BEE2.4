@@ -2299,7 +2299,7 @@ def main():
 
     """
     global MAP_SEED, IS_PREVIEW, GAME_MODE
-    utils.con_log("BEE2 VBSP hook initiallised.")
+    utils.con_log("BEE{} VBSP hook initiallised.".format(utils.BEE_VERSION))
 
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]

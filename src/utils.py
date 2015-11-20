@@ -12,13 +12,22 @@ from typing import (
     SupportsFloat, Iterator,
 )
 
+try:
+    # This module is generated when cx_freeze compiles the app.
+    from BUILD_CONSTANTS import BEE_VERSION
+except ImportError:
+    # We're running from source!
+    BEE_VERSION = "(dev)"
+    FROZEN = False
+else:
+    FROZEN = True
 
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
 
-BEE_VERSION = "2.4"
-
+# App IDs for various games. Used to determine which game we're modding
+# and activate special support for them
 STEAM_IDS = {
     'PORTAL2': '620',
 

@@ -89,6 +89,8 @@ if utils.WIN:
 else:
     base = None
 
+bee_version = input('BEE2 Version: ')
+
 setup(
     name='BEE2',
     version='2.4',
@@ -97,6 +99,8 @@ setup(
         'build_exe': {
             'build_exe': '../build_BEE2/bin',
             'excludes': EXCLUDES,
+            # These values are added to the generated BUILD_CONSTANTS module.
+            'constants': 'BEE_VERSION=' + repr(bee_version),
         },
     },
     executables=[
