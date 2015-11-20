@@ -180,6 +180,7 @@ DEFAULTS = {
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
+    "signPack":                 "",  # Packlist to use when sign inst is added
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -1743,6 +1744,8 @@ def change_overlays():
     if sign_inst == "NONE":
         sign_inst = None
 
+    sign_inst_pack = get_opt('signPack')
+
     ant_str = settings['textures']['overlay.antline']
     ant_str_floor = settings['textures']['overlay.antlinefloor']
     ant_corn = settings['textures']['overlay.antlinecorner']
@@ -1775,6 +1778,8 @@ def change_overlays():
                     angles=over['angles', '0 0 0'],
                     file=sign_inst,
                 )
+                if sign_inst_pack:
+                    TO_PACK.add(sign_inst_pack.casefold())
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
