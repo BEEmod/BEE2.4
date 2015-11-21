@@ -751,7 +751,7 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
-    gameMan.selected_game.export(
+    sucess = gameMan.selected_game.export(
         chosen_style,
         item_list,
         music=musics.get(music_win.chosen_id, None),
@@ -768,10 +768,13 @@ def export_editoritems(_=None):
         )
     )
 
+    if not sucess:
+        return
+
     messagebox.showinfo(
         'BEEMOD2',
         message='Selected Items and Style successfully exported!',
-        )
+    )
 
     for pal in palettes[:]:
         if pal.name == '<Last Export>':

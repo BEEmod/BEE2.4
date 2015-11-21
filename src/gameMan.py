@@ -566,10 +566,26 @@ class Game:
         print('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
             print('\t* compiler/{0} -> bin/{0}'.format(file))
-            shutil.copy(
-                os.path.join('../compiler', file),
-                self.abs_path('bin/')
-            )
+            try:
+                shutil.copy(
+                    os.path.join('../compiler', file),
+                    self.abs_path('bin/')
+                )
+            except PermissionError:
+                # We might not have permissions, if the compiler is currently
+                # running.
+                export_screen.grab_release()
+                export_screen.reset()
+                messagebox.showerror(
+                    title='BEE2 - Export Failed!',
+                    message='Copying compiler file {file} failed.'
+                            'Ensure the {game} is not running.'.format(
+                                file=file,
+                                game=self.name,
+                            ),
+                    master=TK_ROOT,
+                )
+                return False
             export_screen.step('COMP')
 
         if should_refresh:
@@ -578,6 +594,7 @@ class Game:
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
+        return True
 
 
 def find_steam_info(game_dir):
