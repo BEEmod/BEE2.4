@@ -2213,7 +2213,7 @@ def res_make_catwalk(_, res):
         markers[inst['targetname']] = inst
 
     if not markers:
-        return True  # No catwalks!
+        return RES_EXHAUSTED
 
     utils.con_log('Conn:', connections)
     utils.con_log('Markers:', markers)
