@@ -355,9 +355,11 @@ def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
             try:
-                # Overwrites!
-                shutil.copyfile(old_name, new_name)
-                os.remove(old_name)
+                os.remove(new_name)
+            except FileNotFoundError:
+                pass  # We're overwriting this anyway
+            try:
+                os.rename(old_name, new_name)
             except FileNotFoundError:
                 pass
 
