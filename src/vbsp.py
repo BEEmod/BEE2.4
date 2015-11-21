@@ -223,6 +223,7 @@ DEFAULTS = {
     "elev_vert":                "",  # The vertical elevator video to use
     "voice_id":                 "<NONE>",  # The voice pack which was selected
     "voice_char":               "",  # Characters in the pack
+    "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
     }
 
 # angles needed to ensure fizzlers are not upside-down

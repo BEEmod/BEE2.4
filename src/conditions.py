@@ -1078,6 +1078,16 @@ def flag_voice_char(_, flag):
     return False
 
 
+@make_flag('HasCavePortrait')
+def res_cave_portrait(inst, res):
+    """Checks to see if the Cave Portrait option is set for the given
+
+    skin pack.
+    """
+    import vbsp
+    return vbsp.get_opt('cave_port_skin') != ''
+
+
 @make_flag('ifOption')
 def flag_option(_, flag):
     bits = flag.value.split(' ', 1)
@@ -1524,6 +1534,22 @@ def res_add_overlay_inst(inst, res):
         overlay_inst['origin'] = (
             offset + Vec.from_str(inst['origin'])
         ).join(' ')
+    return overlay_inst
+
+
+@make_result('addCavePortrait')
+def res_cave_portrait(inst, res):
+    """A variant of AddOverlay for adding Cave Portraits.
+
+    If the set quote pack is not Cave Johnson, this does nothing.
+    Otherwise, this overlays an instance, setting the $skin variable
+    appropriately.
+    """
+    import vbsp
+    skin = vbsp.get_opt('cave_port_skin')
+    if skin != '':
+        new_inst = res_add_overlay_inst(inst, res)
+        new_inst.fixup['$skin'] = skin
 
 
 @make_result('OffsetInst', 'offsetinstance')

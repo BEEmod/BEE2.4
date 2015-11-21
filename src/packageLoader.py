@@ -693,9 +693,11 @@ class QuotePack:
             selitem_data: 'SelitemData',
             config,
             chars=None,
+            skin=None,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
+        self.cave_skin = skin
         self.config = config
         self.chars = chars or ['??']
 
@@ -710,6 +712,10 @@ class QuotePack:
             if char.strip()
         }
 
+        # For Cave Johnson voicelines, this indicates what skin to use on the
+        # portrait.
+        port_skin = utils.conv_int(data.info['caveSkin', None], None)
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -723,6 +729,7 @@ class QuotePack:
             selitem_data,
             config,
             chars=chars,
+            skin=port_skin,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -733,6 +740,8 @@ class QuotePack:
             'quotes_sp',
             'quotes_coop',
         )
+        if self.cave_skin is None:
+            self.cave_skin = override.cave_skin
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'

@@ -412,6 +412,11 @@ class Game:
                 ('Options', 'voice_char'),
                 ','.join(voice.chars)
             )
+            if voice.cave_skin is not None:
+                vbsp_config.set_key(
+                    ('Options', 'cave_port_skin'),
+                    voice.cave_skin,
+                )
 
         vbsp_config.set_key(
             ('Options', 'BEE2_loc'),
