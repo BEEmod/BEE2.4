@@ -2138,6 +2138,8 @@ def packlist_cond(_, res):
     """Add the files in the given packlist to the map."""
     TO_PACK.add(res.value.casefold())
 
+    return conditions.RES_EXHAUSTED
+
 
 def make_packlist(map_path):
     """Write the list of files that VRAD should pack."""

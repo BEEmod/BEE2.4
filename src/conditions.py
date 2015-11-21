@@ -179,6 +179,10 @@ class EndCondition(Exception):
     """Raised to skip the condition entirely, from the EndCond result."""
     pass
 
+# Flag to indicate a result doesn't need to be exectuted anymore,
+# and can be cleaned up - adding a global instance, for example.
+RES_EXHAUSTED = object()
+
 
 class Condition:
     __slots__ = ['flags', 'results', 'else_results', 'priority']
@@ -287,7 +291,7 @@ class Condition:
         results = self.results if success else self.else_results
         for res in results[:]:
             should_del = self.test_result(inst, res)
-            if should_del is True:
+            if should_del is RES_EXHAUSTED:
                 results.remove(res)
 
 
@@ -1242,7 +1246,7 @@ def res_set_style_var(_, res):
             STYLE_VARS[opt.value.casefold()] = True
         elif opt.name == 'setfalse':
             STYLE_VARS[opt.value.casefold()] = False
-    return True  # Remove this result
+    return RES_EXHAUSTED
 
 
 @make_result('has')
@@ -1257,7 +1261,7 @@ def res_set_voice_attr(_, res):
             VOICE_ATTR[opt.name] = True
     else:
         VOICE_ATTR[res.value.casefold()] = 1
-    return True  # Remove this result
+    return RES_EXHAUSTED
 
 
 @make_result('setOption')
@@ -1269,7 +1273,7 @@ def res_set_option(_, res):
     for opt in res.value:
         if opt.name in OPTIONS:
             OPTIONS[opt.name] = opt.value
-    return True  # Remove this result
+    return RES_EXHAUSTED
 
 
 @make_result('setKey')
@@ -1476,7 +1480,7 @@ def res_add_global_inst(_, res):
                 new_inst['targetname'] = "inst_"
                 new_inst.make_unique()
             VMF.add_ent(new_inst)
-    return True  # Remove this result
+    return RES_EXHAUSTED
 
 
 @make_result('addOverlay', 'overlayinst')
@@ -2292,7 +2296,7 @@ def res_make_catwalk(_, res):
             )
 
     utils.con_log('Finished catwalk generation!')
-    return True  # Don't run this again
+    return RES_EXHAUSTED
 
 
 @make_result_setup('staticPiston')
@@ -2500,7 +2504,7 @@ def res_track_plat(_, res):
         if plat_var != '':
             # Skip the '_mirrored' section if needed
             plat_inst.fixup[plat_var] = track_facing[:5].lower()
-    return True  # Only run once!
+            return RES_EXHAUSTED
 
 
 def track_scan(
@@ -3044,7 +3048,7 @@ def res_unst_scaffold(_, res):
     # The instance types we're modifying
     if res.value not in SCAFFOLD_CONFIGS:
         # We've already executed this config group
-        return True
+        return RES_EXHAUSTED
 
     utils.con_log(
         'Running Scaffold Generator (' + res.value + ')...'
@@ -3235,7 +3239,7 @@ def res_unst_scaffold(_, res):
                 ent['file'] = new_file
 
     utils.con_log('Finished Scaffold generation!')
-    return True  # Don't run this again
+    return RES_EXHAUSTED
 
 
 @make_result('RandomNum')
@@ -3343,7 +3347,7 @@ def res_goo_debris(_, res):
             angles='0 {} 0'.format(random.randrange(0, 3600)/10)
         )
 
-    return True  # Only run once!
+    return RES_EXHAUSTED
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}
@@ -3356,7 +3360,7 @@ def res_find_potential_tag_fizzlers(inst):
     This is used for Aperture Tag paint fizzlers.
     """
     if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
-        return True # We don't need to bother running this check
+        return RES_EXHAUSTED
 
     if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
         # The key list in the dict will be a set of all fizzler items!
