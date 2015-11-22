@@ -22,6 +22,7 @@ import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
+import packageMan
 import StyleVarPane
 import CompilerPane
 import tagsPane
@@ -1467,8 +1468,12 @@ def init_menu_bar(win):
         command=gameMan.remove_game,
         )
     file_menu.add_command(
-        label="Backup/Restore Puzzles",
+        label="Backup/Restore Puzzles...",
         command=backupWin.show_window,
+    )
+    file_menu.add_command(
+        label="Manage Packages...",
+        command=packageMan.show,
     )
     file_menu.add_separator()
     file_menu.add_command(
@@ -1637,6 +1642,9 @@ def init_windows():
     windows['pal'].rowconfigure(0, weight=1)
 
     init_palette(pal_frame)
+    loader.step('UI')
+
+    packageMan.make_window()
     loader.step('UI')
 
     windows['opt'] = SubPane.SubPane(
