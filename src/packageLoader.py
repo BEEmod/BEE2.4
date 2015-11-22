@@ -11,6 +11,7 @@ from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
+from packageMan import PACK_CONFIG
 import vmfLib as VLib
 import extract_packages
 import utils
@@ -29,8 +30,10 @@ TEMPLATE_FILE = VLib.VMF()
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
-PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+
+# This package contains necessary components, and must be available.
+CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -102,8 +105,9 @@ def get_config(
         path += extension
     try:
         with zip_file.open(path) as f:
-            return Property.parse(f,
-            pak_id + ':' + path,
+            return Property.parse(
+                f,
+                pak_id + ':' + path,
             )
     except KeyError:
         print('"{}:{}" not in zip!'.format(pak_id, path))
@@ -131,15 +135,11 @@ def find_packages(pak_dir, zips, zip_name_lst):
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
             pak_id = info['ID']
-            disp_name = info['Name', None]
-            if disp_name is None:
-                print('Warning: {} has no display name!'.format(pak_id))
-                disp_name = pak_id.lower()
-            packages[pak_id] = PackageData(
+            packages[pak_id] = Package(
+                pak_id,
                 zip_file,
                 info,
                 name,
-                disp_name,
             )
             found_pak = True
         else:
@@ -195,20 +195,22 @@ def load_packages(
             data[obj_type] = []
 
         images = 0
-        for pak_id, (zip_file, info, name, dispName) in packages.items():
+        for pak_id, pack in packages.items():
+            if not pack.enabled:
+                print('Package {} disabled!'.format(pack.id).ljust(50))
+                continue
+
             print(
                 ("Reading objects from '" + pak_id + "'...").ljust(50),
                 end=''
             )
-            img_count = parse_package(
-                zip_file,
-                info,
-                pak_id,
-                dispName,
-            )
+            img_count = parse_package(pack)
             images += img_count
             loader.step("PAK")
             print("Done!")
+
+        # If new packages were added, update the config!
+        PACK_CONFIG.save_check()
 
         loader.set_length("OBJ", sum(
             len(obj_type)
@@ -287,16 +289,16 @@ def load_packages(
     return data
 
 
-def parse_package(zip_file, info, pak_id, disp_name):
+def parse_package(pack: 'Package'):
     """Parse through the given package to find all the components."""
-    for pre in Property.find_key(info, 'Prerequisites', []).value:
+    for pre in Property.find_key(pack.info, 'Prerequisites', []):
         if pre.value not in packages:
             utils.con_log(
-                'Package "' +
-                pre.value +
-                '" required for "' +
-                pak_id +
-                '" - ignoring package!'
+                'Package "{pre}" required for "{id}" - '
+                'ignoring package!'.format(
+                    pre=pre.value,
+                    id=pack.id,
+                )
             )
             return False
     # First read through all the components we have, so we can match
@@ -304,32 +306,32 @@ def parse_package(zip_file, info, pak_id, disp_name):
     for comp_type in OBJ_TYPES:
         allow_dupes = OBJ_TYPES[comp_type].allow_mult
         # Look for overrides
-        for obj in info.find_all("Overrides", comp_type):
+        for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(zip_file, obj_id, obj, pak_id)
+                ParseData(pack.zip, obj_id, obj, pack.id)
             )
 
-        for obj in info.find_all(comp_type):
+        for obj in pack.info.find_all(comp_type):
             obj_id = obj['id']
             if obj_id in all_obj[comp_type]:
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(zip_file, obj_id, obj, pak_id)
+                        ParseData(pack.zip, obj_id, obj, pack.id)
                     )
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
-                zip_file,
+                pack.zip,
                 obj,
-                pak_id,
-                disp_name,
+                pack.id,
+                pack.disp_name,
             )
 
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
-    for item in zip_names(zip_file):
+    for item in zip_names(pack.zip):
         item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
@@ -479,6 +481,44 @@ def parse_item_folder(folders, zip_file, pak_id):
                 )
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
+
+class Package:
+    """Represents a package."""
+    def __init__(
+            self,
+            pak_id: str,
+            zip_file: ZipFile,
+            info: Property,
+            name: str,
+            ):
+        disp_name = info['Name', None]
+        if disp_name is None:
+            print('Warning: {} has no display name!'.format(pak_id))
+            disp_name = pak_id.lower()
+
+        self.id = pak_id
+        self.zip = zip_file
+        self.info = info
+        self.name = name
+        self.disp_name = disp_name
+        self.desc = info['desc', '']
+
+    @property
+    def enabled(self):
+        """Should this package be loaded?"""
+        if self.id == CLEAN_PACKAGE:
+            # The clean style package is special!
+            # It must be present.
+            return True
+
+        return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
+
+    @enabled.setter
+    def enabled(self, value: bool):
+        if self.id == CLEAN_PACKAGE:
+            raise ValueError('The Clean Style package cannot be disabled!')
+
+        PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
 
 
 @pak_object('Style')

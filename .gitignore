@@ -57,13 +57,6 @@ packages/
 # The auto-generated palette
 palettes/LAST_EXPORT.zip
 
-# Error file
-BEE2-error.log
-
-# Ignore dev output
-test_out.vmf
-preview_styled.vmf
-
 #These folders are generated automatically by the BEE2
 images/cache/
 inst_cache/
@@ -75,5 +68,6 @@ config/item_configs.cfg
 config/config.cfg
 config/games.cfg
 config/compile.cfg
+config/packages.cfg
 config/voice/
 config/screenshot.jpg
