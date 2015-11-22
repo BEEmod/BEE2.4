@@ -16,10 +16,15 @@ import vmfLib as VLib
 import extract_packages
 import utils
 
+from typing import (
+    Union, Optional,
+    List, Dict, Tuple,
+)
+
 
 all_obj = {}
 obj_override = {}
-packages = {}
+packages = {}  # type: Dict[str, Package]
 OBJ_TYPES = {}
 
 data = {}
@@ -187,7 +192,8 @@ def load_packages(
     try:
         find_packages(pak_dir, zips, data['zips'])
 
-        loader.set_length("PAK", len(packages))
+        pack_count = len(packages)
+        loader.set_length("PAK", pack_count)
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
@@ -198,6 +204,8 @@ def load_packages(
         for pak_id, pack in packages.items():
             if not pack.enabled:
                 print('Package {} disabled!'.format(pack.id).ljust(50))
+                pack_count -= 1
+                loader.set_length("PAK", pack_count)
                 continue
 
             print(
@@ -482,6 +490,7 @@ def parse_item_folder(folders, zip_file, pak_id):
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
 
+
 class Package:
     """Represents a package."""
     def __init__(
@@ -513,12 +522,12 @@ class Package:
 
         return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
 
-    @enabled.setter
-    def enabled(self, value: bool):
+    def set_enabled(self, value: bool):
         if self.id == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
+    enabled.setter(set_enabled)
 
 
 @pak_object('Style')
