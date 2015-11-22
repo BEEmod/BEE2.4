@@ -7,7 +7,7 @@
 import utils
 
 from typing import (
-    Optional, Union,
+    Optional, Union, Any,
     Dict, List, Tuple, Iterator,
 )
 
@@ -418,7 +418,7 @@ class Property:
                 str,
                 int,
                 slice,
-                Tuple[Union[str, int, slice], _Prop_Value],
+                Tuple[Union[str, int, slice], Union[_Prop_Value, Any]],
             ],
             ):
         """Allow indexing the children directly.
