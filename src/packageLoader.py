@@ -527,7 +527,7 @@ class Package:
             raise ValueError('The Clean Style package cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
-    enabled.setter(set_enabled)
+    enabled = enabled.setter(set_enabled)
 
 
 @pak_object('Style')
