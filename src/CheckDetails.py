@@ -54,11 +54,26 @@ class Item:
     """Represents one item in a CheckDetails list.
 
     """
-    def __init__(self, *values, hover_text=None):
+    def __init__(
+            self,
+            *values,
+            hover_text=None,
+            callback=None,
+            lock_check=False
+            ):
+        """Initialise an item.
+        - values are the text to show in each column, in order.
+        - hover_text will set text to show in the tooltip. If not defined,
+            tooltips will be used to show any text that does not fit
+            in the column width.
+        - callback is a function to be called with the state, whenever changed.
+        - If lock_check is true, this checkbox cannot be changed.
+        """
         self.values = values
         self.state_var = tk.IntVar(value=0)
         self.master = None  # type: CheckDetails
         self.check = None  # type: ttk.Checkbutton
+        self.locked = lock_check
         self.hover_text = hover_text
         self.val_widgets = []
 
@@ -84,6 +99,8 @@ class Item:
             style='CheckDetails.TCheckbutton',
             command=self.master.update_allcheck,
         )
+        if self.locked:
+            self.check.state(['readonly'])
 
         self.val_widgets = []
         for value in self.values:
@@ -102,11 +119,12 @@ class Item:
                 wid.tooltip_text = ''
                 wid.hover_override = False
 
-            # Allow clicking on the row to toggle the checkbox
-            wid.bind('<Enter>', self.hover_start, add='+')
-            wid.bind('<Leave>', self.hover_stop, add='+')
-            utils.bind_leftclick(wid, self.row_click, add='+')
-            wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add='+')
+            if not self.locked:
+                # Allow clicking on the row to toggle the checkbox
+                wid.bind('<Enter>', self.hover_start, add='+')
+                wid.bind('<Leave>', self.hover_stop, add='+')
+                utils.bind_leftclick(wid, self.row_click, add='+')
+                wid.bind(utils.EVENTS['LEFT_RELEASE'], self.row_unclick, add='+')
 
             self.val_widgets.append(wid)
 
@@ -369,8 +387,12 @@ class CheckDetails(ttk.Frame):
 
     def toggle_allcheck(self):
         value = self.head_check_var.get()
-        for item in self.items:
-            # Bypass the update function
+        for item in self.items:  # type: Item
+            if item.locked:
+                continue  # Don't change!
+
+            # We can't use item.state, since that calls update_allcheck()
+            # which would infinite-loop.
             item.state_var.set(value)
         if value and self.items:  # Don't enable if we don't have items
             self.event_generate(EVENT_HAS_CHECKS)
