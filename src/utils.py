@@ -539,6 +539,23 @@ def fit(dist, obj):
     return list(items)  # Dump the deque
 
 
+def restart_app():
+    """Restart this python application.
+
+    This will not return!
+    """
+    import os, sys
+    # sys.executable is the program which ran us - when frozen,
+    # it'll our program.
+    # We need to add the program to the arguments list, since python
+    # strips that off.
+    args = [sys.executable] + sys.argv
+    print('Restarting using "{}", with args {!r}'.format(
+        sys.executable, args
+    ), flush=True)
+    os.execv(sys.executable, args)
+
+
 class EmptyMapping(abc.Mapping):
     """A Mapping class which is always empty."""
     __slots__ = []
