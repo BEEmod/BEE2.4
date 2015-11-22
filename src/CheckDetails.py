@@ -58,19 +58,19 @@ class Item:
             self,
             *values,
             hover_text=None,
-            callback=None,
-            lock_check=False
+            lock_check=False,
+            state=False
             ):
         """Initialise an item.
         - values are the text to show in each column, in order.
         - hover_text will set text to show in the tooltip. If not defined,
             tooltips will be used to show any text that does not fit
             in the column width.
-        - callback is a function to be called with the state, whenever changed.
         - If lock_check is true, this checkbox cannot be changed.
+        - state is the initial state of the checkbox.
         """
         self.values = values
-        self.state_var = tk.IntVar(value=0)
+        self.state_var = tk.IntVar(value=bool(state))
         self.master = None  # type: CheckDetails
         self.check = None  # type: ttk.Checkbutton
         self.locked = lock_check
@@ -100,7 +100,7 @@ class Item:
             command=self.master.update_allcheck,
         )
         if self.locked:
-            self.check.state(['readonly'])
+            self.check.state(['disabled'])
 
         self.val_widgets = []
         for value in self.values:
