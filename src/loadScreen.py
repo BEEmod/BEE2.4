@@ -97,13 +97,13 @@ class LoadScreen(Toplevel):
         """Increment a step by one."""
         if self.active:
             self.bar_val[stage] += 1
-            self.bar_var[stage].set(
-                1000 * self.bar_val[stage] / self.maxes[stage]
-            )
-            self.widgets[stage].update()
             self.set_nums(stage)
+            self.widgets[stage].update()
 
     def set_nums(self, stage):
+        self.bar_var[stage].set(
+            1000 * self.bar_val[stage] / self.maxes[stage]
+        )
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.bar_val[stage],
             self.maxes[stage],
