@@ -9,7 +9,6 @@ from CheckDetails import CheckDetails, Item as CheckItem
 from BEE2_config import ConfigFile
 import packageLoader
 import utils
-import tk_tools
 
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
@@ -26,6 +25,8 @@ HEADERS = ['Name']
 def show():
     """Show the manager window."""
     window.deiconify()
+    window.lift(TK_ROOT)
+    window.grab_set()
     utils.center_win(window, TK_ROOT)
     window.after(100, UI['details'].refresh)
 
@@ -36,13 +37,45 @@ def make_packitems():
     for pack in packageLoader.packages.values():  # type: packageLoader.Package
         pack_items[pack.id] = item = CheckItem(
             pack.disp_name,
-            hover_text=pack.desc or None,
+            hover_text=pack.desc or 'No description!',
             # The clean package can't be disabled!
             lock_check=(pack.id == packageLoader.CLEAN_PACKAGE),
+            state=pack.enabled
         )
-        item.state = pack.enabled
         item.package = pack
     return pack_items.values()
+
+
+def apply_changes():
+    values_changed = any(
+        item.package.enabled != item.state
+        for item in
+        pack_items.values()
+    )
+    if not values_changed:
+        # We don't need to do anything!
+        window.withdraw()
+        return
+
+    if messagebox.askokcancel(
+            title='BEE2 - Restart Required!',
+            message='Changing enabled packages requires a restart.\n'
+                    'Continue?',
+            master=window,
+            ):
+        window.withdraw()
+        for item in UI['details'].items:
+            pack = item.package
+            if pack.id != packageLoader.CLEAN_PACKAGE:
+                pack.enabled = item.state
+        PACK_CONFIG.save_check()
+        utils.restart_app()
+
+
+def cancel():
+    window.withdraw()
+    UI['details'].remove_all()
+    UI['details'].add_items(*make_packitems())
 
 
 def make_window():
@@ -64,19 +97,18 @@ def make_window():
         items=make_packitems(),
     )
 
-    UI['details'].grid(row=0, column=0, sticky='NSEW')
+    UI['details'].grid(row=0, column=0, columnspan=2, sticky='NSEW')
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    btn_frame = ttk.Frame(frame)
-    btn_frame.grid(row=0, column=1, sticky='NSE')
-
     ttk.Button(
-        btn_frame,
+        frame,
         text='Ok',
-    ).grid(row=0, column=0)
+        command=apply_changes,
+    ).grid(row=1, column=0, sticky='W')
 
     ttk.Button(
-        btn_frame,
+        frame,
         text='Cancel',
-    ).grid(row=1, column=0)
+        command=cancel,
+    ).grid(row=1, column=1, sticky='E')
