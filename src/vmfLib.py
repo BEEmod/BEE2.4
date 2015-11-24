@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional, Union,
-    Dict, List, Tuple, Iterator,
+    Dict, List, Tuple, Set, Iterable,
 )
 
 # Used to set the defaults for versioninfo
@@ -88,11 +88,72 @@ def overlay_bounds(over):
     """Compute the bounding box of an overlay."""
     origin = Vec.from_str(over['origin'])
     return Vec.bbox(
-        Vec.from_str(
-            (origin + Vec.from_str(over['uv' + str(x)]))
-            for x in
-            range(4)
-        )
+        (origin + Vec.from_str(over['uv' + str(x)]))
+        for x in
+        range(4)
+    )
+
+
+def make_overlay(
+        vmf: 'VMF',
+        normal: Vec,
+        origin: Vec,
+        uax: Vec,
+        vax: Vec,
+        material: str,
+        surfaces: Iterable['Side'],
+        u_repeat=1,
+        v_repeat=1,
+        swap=False,
+        render_order=0
+        ) -> 'Entity':
+    """Generate an overlay on an axis-aligned surface.
+
+    - origin is the center point of the overlay.
+    - uax is the direction and distance for the texture's width ('right').
+    - vax is the direction and distance for the texture's height ('up').
+    - normal is the normal of the surfaces (axis-aligned).
+    - material is the material used.
+    - u_ and v_repeat define how many times to repeat the texture in that
+      direction.
+    - If swap is true, the texture will be rotated 90.
+    """
+    if swap:
+        uax, vax = vax, uax
+
+    u_dist = uax.mag()/2
+    v_dist = vax.mag()/2
+    basis_u = uax.norm()
+    basis_v = vax.norm()
+
+    if normal.x < 0 or normal.y < 0:
+        basis_v *= -1
+    if normal.z < 0:
+        basis_u *= -1
+
+
+    return vmf.create_ent(
+        classname='info_overlay',
+        angles='0 0 0',  # Not actually used by VBSP!
+        origin=origin.join(' '),
+
+        basisNormal=normal.join(' '),
+        basisOrigin=origin.join(' '),
+        basisU=basis_u.join(' '),
+        basisV=basis_v.join(' '),
+
+        material=material,
+        sides=' '.join(str(side.id) for side in surfaces),
+
+        startU='0',
+        startV='0',
+        endU=str(u_repeat),
+        endV=str(v_repeat),
+
+        uv0='-{} -{} 0'.format(u_dist, v_dist),
+        uv1='-{} {} 0'.format(u_dist, v_dist),
+        uv2='{} {} 0'.format(u_dist, v_dist),
+        uv3='{} -{} 0'.format(u_dist, v_dist),
     )
 
 
@@ -134,14 +195,14 @@ class VMF:
 
         # Allow quick searching for particular groups, without checking
         # the whole map
-        self.by_target = defaultdict(CopySet)
-        self.by_class = defaultdict(CopySet)
+        self.by_target = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
+        self.by_class = defaultdict(CopySet)  # type: Dict[str, Set[Entity]]
 
-        self.entities = []
-        self.add_ents(entities or [])  # need to set the by_ dicts too.
-        self.brushes = brushes or []
-        self.cameras = cameras or []
-        self.cordons = cordons or []
+        self.entities = []  # type: List[Entity]
+        self.add_ents(entities or [])  # We need to set the by_ dicts too.
+        self.brushes = brushes or []  # type: List[Solid]
+        self.cameras = cameras or []  # type: List[Camera]
+        self.cordons = cordons or []  # type: List[Cordon]
         self.visgroups = visgroups or []
 
         # mapspawn entity, which is the entity world brushes are saved
@@ -230,7 +291,7 @@ class VMF:
         return ent
 
     @staticmethod
-    def parse(tree):
+    def parse(tree: Union[Property, str]):
         """Convert a property_parser tree into VMF classes.
         """
         if not isinstance(tree, Property):
@@ -610,7 +671,14 @@ class Camera:
 
 class Cordon:
     """Represents one cordon volume."""
-    def __init__(self, vmf_file, min_, max_, is_active=True, name='Cordon'):
+    def __init__(
+            self,
+            vmf_file: VMF,
+            min_: Vec,
+            max_: Vec,
+            is_active=True,
+            name='Cordon',
+            ):
         self.map = vmf_file
         self.name = name
         self.bounds_min = min_
@@ -671,12 +739,12 @@ class Solid:
             hidden=False,
             ):
         self.map = vmf_file
-        self.sides = sides or []
+        self.sides = sides or []  # type: List[Side]
         self.id = vmf_file.solid_id.get_id(des_id)
         self.editor = editor or {}
         self.hidden = hidden
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush."""
         editor = {}
         for key in ('color', 'groupid', 'visgroupshown', 'visgroupautoshown'):
@@ -684,9 +752,9 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy() for s in self.sides]
+        sides = [s.copy(map=map) for s in self.sides]
         return Solid(
-            self.map,
+            map or self.map,
             des_id=des_id,
             sides=sides,
             editor=editor,
@@ -795,16 +863,17 @@ class Solid:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()
-        return (bbox_min+bbox_max)/2
+        return (bbox_min + bbox_max) / 2
 
-    def translate(self, diff):
-        """Move this solid by the specified vector.
-
-        - This does not translate textures as well.
-        - A tuple can be passed in instead if desired.
-        """
+    def translate(self, diff: Vec):
+        """Move this solid by the specified vector."""
         for s in self.sides:
             s.translate(diff)
+
+    def localise(self, origin: Vec, angles: Vec):
+        """Shift this brush by the given origin/angles."""
+        for s in self.sides:
+            s.localise(origin, angles)
 
 
 class UVAxis:
@@ -983,7 +1052,7 @@ class Side:
                 tree['smoothing_groups', '0']),
         )
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this brush side."""
         planes = [p.as_tuple() for p in self.planes]
         if self.is_disp:
@@ -997,7 +1066,7 @@ class Side:
             disp_data = None
 
         return Side(
-            self.map,
+            map or self.map,
             planes=planes,
             des_id=des_id,
             mat=self.mat,
@@ -1086,11 +1155,45 @@ class Side:
     def translate(self, diff):
         """Move this side by the specified vector.
 
-        - This does not translate textures as well.
         - A tuple can be passed in instead if desired.
         """
         for p in self.planes:
             p += diff
+
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= diff.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= diff.dot(v_axis) / self.vaxis.scale
+
+    def localise(self, origin: Vec, angles: Vec=None):
+        """Shift the face by the given origin and angles.
+
+        This preserves texture offsets
+        """
+        for p in self.planes:
+            p.localise(origin, angles)
+        # Rotate the uaxis values
+        u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
+        v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
+
+        u_axis.rotate(angles.x, angles.y, angles.z)
+        v_axis.rotate(angles.x, angles.y, angles.z)
+
+        self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
+        self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
+
+        # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
+        self.uaxis.offset -= origin.dot(u_axis) / self.uaxis.scale
+        self.vaxis.offset -= origin.dot(v_axis) / self.vaxis.scale
+
+        # Keep the values low. The highest texture size in P2 is 1024, so
+        # do the next power just to be safe.
+        # Add and subtract 1024 so the value is between -1024, 1024 not 0, 2048
+        # (This just looks nicer)
+        self.uaxis.offset = (self.uaxis.offset + 1024) % 2048 - 1024
+        self.vaxis.offset = (self.vaxis.offset + 1024) % 2048 - 1024
 
     def plane_desc(self):
         """Return a string which describes this face.
@@ -1150,8 +1253,8 @@ class Entity:
         self.map = vmf_file
         self.keys = keys or {}
         self.fixup = EntityFixup(fixup or {})
-        self.outputs = outputs or []
-        self.solids = solids or []
+        self.outputs = outputs or []  # type: List[Output]
+        self.solids = solids or []  # type: List[Solid]
         self.id = vmf_file.ent_id.get_id(ent_id)
         self.hidden = hidden
         self.editor = editor or {'visgroup': []}
@@ -1165,7 +1268,7 @@ class Entity:
         if 'color' not in self.editor:
             self.editor['color'] = '255 255 255'
 
-    def copy(self, des_id=-1):
+    def copy(self, des_id=-1, map=None):
         """Duplicate this entity entirely, including solids and outputs."""
         new_keys = {}
         new_fixup = self.fixup.copy_dict()
@@ -1178,11 +1281,11 @@ class Entity:
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
 
-        new_solids = [s.copy() for s in self.solids]
+        new_solids = [s.copy(map=map) for s in self.solids]
         outs = [o.copy() for o in self.outputs]
 
         return Entity(
-            vmf_file=self.map,
+            vmf_file=map or self.map,
             keys=new_keys,
             fixup=new_fixup,
             ent_id=des_id,
@@ -1193,7 +1296,7 @@ class Entity:
         )
 
     @staticmethod
-    def parse(vmf_file, tree_list, hidden=False):
+    def parse(vmf_file, tree_list: Property, hidden=False):
         """Parse a property tree into an Entity object."""
         ent_id = -1
         solids = []
@@ -1489,6 +1592,7 @@ class Entity:
             return Vec(self['origin'].split(" "))
 
 FixupTuple = namedtuple('FixupTuple', 'var value id')
+
 
 class EntityFixup:
     """A speciallised mapping which keeps track of the variable indexes.

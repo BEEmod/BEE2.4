@@ -6,13 +6,28 @@ from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
 
+from typing import (
+    Union,
+    Tuple,
+    SupportsFloat, Iterator,
+)
+
+try:
+    # This module is generated when cx_freeze compiles the app.
+    from BUILD_CONSTANTS import BEE_VERSION
+except ImportError:
+    # We're running from source!
+    BEE_VERSION = "(dev)"
+    FROZEN = False
+else:
+    FROZEN = True
 
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
 
-BEE_VERSION = "2.4"
-
+# App IDs for various games. Used to determine which game we're modding
+# and activate special support for them
 STEAM_IDS = {
     'PORTAL2': '620',
 
@@ -70,6 +85,23 @@ if WIN:
         'destroy_item': 'x_cursor',
         'invalid_drag': 'no',
     }
+
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frames should be the TK objects to bind to - mainly Frame or
+        Toplevel objects.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - Windows needs the delta value to be divided by 120.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def mousewheel_handler(event):
+            scroll_func(int(event.delta / -120), "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
+
 elif MAC:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -108,6 +140,21 @@ elif MAC:
         'destroy_item': 'poof',
         'invalid_drag': 'notallowed',
     }
+
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frame should be a sequence of any TK objects, like a Toplevel or Frame.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - OS X needs the delta value passed unmodified.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def mousewheel_handler(event):
+            scroll_func(event.delta, "units")
+        for frame in frames:
+            frame.bind('<MouseWheel>', mousewheel_handler, add='+')
 elif LINUX:
     EVENTS = {
         'LEFT': '<Button-1>',
@@ -145,9 +192,42 @@ elif LINUX:
         'invalid_drag': 'no',
     }
 
+    def add_mousewheel(target, *frames, orient='y'):
+        """Add events so scrolling anywhere in a frame will scroll a target.
+
+        frame should be a sequence of any TK objects, like a Toplevel or Frame.
+        Set orient to 'x' or 'y'.
+        This is needed since different platforms handle mousewheel events
+        differently - Linux uses Button-4 and Button-5 events instead of
+        a MouseWheel event.
+        """
+        scroll_func = getattr(target, orient + 'view_scroll')
+
+        def scroll_up(_):
+            scroll_func(-1, "units")
+
+        def scroll_down(_):
+            scroll_func(1, "units")
+
+        for frame in frames:
+            frame.bind('<Button-4>', scroll_up, add='+')
+            frame.bind('<Button-5>', scroll_down, add='+')
+
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
-    def bind_leftclick(wid, func):
+    def bind_leftclick(wid, func, add='+'):
+        """On OSX, left-clicks are converted to right-clicks
+
+        when control is held.
+        """
+        def event_handler(e):
+            # e.state is a set of binary flags
+            # Don't run the event if control is held!
+            if e.state & 4 == 0:
+                func()
+        wid.bind(EVENTS['LEFT'], event_handler, add=add)
+
+    def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
         when control is held."""
@@ -156,35 +236,24 @@ if MAC:
             # Don't run the event if control is held!
             if e.state & 4 == 0:
                 func()
-        wid.bind(EVENTS['LEFT'], event_handler)
-
-    def bind_leftclick_double(wid, func):
-        """On OSX, left-clicks are converted to right-clicks
-
-        when control is held."""
-        def event_handler(e):
-            # e.state is a set of binary flags
-            # Don't run the event if control is held!
-            if e.state & 4 == 0:
-                func()
-        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler)
+        wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     def bind_rightclick(wid, func):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func)
         wid.bind(EVENTS['LEFT_CTRL'], func)
 else:
-    def bind_leftclick(wid, func):
+    def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT'], func)
+        wid.bind(EVENTS['LEFT'], func, add=add)
 
-    def bind_leftclick_double(wid, func):
+    def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['LEFT_DOUBLE'], func)
+        wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
-    def bind_rightclick(wid, func):
+    def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
-        wid.bind(EVENTS['RIGHT'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
 
 USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
 
@@ -261,7 +330,7 @@ def is_identifier(name, forbidden='{}\'"'):
             return False
     return True
 
-FILE_CHARS = string.ascii_letters + string.digits + '-_ .|'
+FILE_CHARS = set(string.ascii_letters + string.digits + '-_ .|')
 
 
 def is_plain_text(name, valid_chars=FILE_CHARS):
@@ -274,7 +343,25 @@ def is_plain_text(name, valid_chars=FILE_CHARS):
     return True
 
 
-def get_indent(line):
+def whitelist(string, valid_chars=FILE_CHARS, rep_char='_'):
+    """Replace any characters not in the whitelist with the replacement char."""
+    chars = list(string)
+    for ind, char in enumerate(chars):
+        if char not in valid_chars:
+            chars[ind] = rep_char
+    return ''.join(chars)
+
+
+def blacklist(string, invalid_chars='', rep_char='_'):
+    """Replace any characters in the blacklist with the replacement char."""
+    chars = list(string)
+    for ind, char in enumerate(chars):
+        if char in invalid_chars:
+            chars[ind] = rep_char
+    return ''.join(chars)
+
+
+def get_indent(line: str):
     """Return the whitespace which this line starts with.
 
     """
@@ -295,7 +382,7 @@ def con_log(*text):
     print(*text, flush=True)
 
 
-def bool_as_int(val):
+def bool_as_int(val: bool):
     """Convert a True/False value into '1' or '0'.
 
     Valve uses these strings for True/False in editoritems and other
@@ -307,7 +394,7 @@ def bool_as_int(val):
         return '0'
 
 
-def conv_bool(val, default=False):
+def conv_bool(val: Union[str, int, bool, None], default=False):
     """Converts a string to a boolean, using a default if it fails.
 
     Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1, None.
@@ -334,7 +421,7 @@ def conv_float(val, default=0.0):
         return default
 
 
-def conv_int(val, default=0):
+def conv_int(val: str, default=0):
     """Converts a string to an integer, using a default if it fails.
 
     """
@@ -344,7 +431,7 @@ def conv_int(val, default=0):
         return default
 
 
-def parse_str(val, x=0.0, y=0.0, z=0.0):
+def parse_str(val: str, x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
     """Convert a string in the form '(4 6 -4)' into a set of floats.
 
      If the string is unparsable, this uses the defaults (x,y,z).
@@ -370,7 +457,13 @@ def parse_str(val, x=0.0, y=0.0, z=0.0):
         return x, y, z
 
 
-def iter_grid(max_x, max_y, min_x=0, min_y=0, stride=1):
+def iter_grid(
+        max_x: int,
+        max_y: int,
+        min_x: int=0,
+        min_y: int=0,
+        stride: int=1,
+        ) -> Iterator[Tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
         for y in range(min_y, max_y, stride):
@@ -444,6 +537,24 @@ def fit(dist, obj):
 
     assert sum(items) == orig_dist
     return list(items)  # Dump the deque
+
+
+def restart_app():
+    """Restart this python application.
+
+    This will not return!
+    """
+    import os, sys
+    # sys.executable is the program which ran us - when frozen,
+    # it'll our program.
+    # We need to add the program to the arguments list, since python
+    # strips that off.
+    args = [sys.executable] + sys.argv
+    print('Restarting using "{}", with args {!r}'.format(
+        sys.executable, args
+    ), flush=True)
+    os.execv(sys.executable, args)
+
 
 class EmptyMapping(abc.Mapping):
     """A Mapping class which is always empty."""
@@ -527,12 +638,11 @@ class Vec:
                     except (TypeError, KeyError):
                         self.z = 0.0
 
-
     def copy(self):
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val, x=0.0, y=0.0, z=0.0):
+    def from_str(cls, val: str, x=0.0, y=0.0, z=0.0):
         """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
@@ -553,7 +663,6 @@ class Vec:
         self.x = x*a + y*b + z*c
         self.y = x*d + y*e + z*f
         self.z = x*g + y*h + z*i
-        return self
 
     def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
@@ -628,7 +737,37 @@ class Vec:
             bbox_max.max(point)
         return bbox_min, bbox_max
 
-    def __add__(self, other) -> 'Vec':
+    def axis(self):
+        """For a normal vector, return the axis it is on.
+
+        This will not function correctly if not a on-axis normal vector!
+        """
+        return (
+            'x' if self.x != 0 else
+            'y' if self.y != 0 else
+            'z'
+        )
+
+    def to_angle(self, roll=0):
+        """Convert a normal to a Source Engine angle."""
+        # Pitch is applied first, so we need to reconstruct the x-value
+        horiz_dist = math.sqrt(self.x ** 2 + self.y ** 2)
+        return Vec(
+            math.degrees(math.atan2(self.z, horiz_dist)),
+            math.degrees(math.atan2(self.y, self.x)) % 360,
+            roll,
+        )
+
+    def __abs__(self):
+        """Performing abs() on a Vec takes the absolute value of all axes."""
+        return Vec(
+            abs(self.x),
+            abs(self.y),
+            abs(self.z),
+        )
+
+
+    def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -709,12 +848,8 @@ class Vec:
                 return NotImplemented
     __rmul__ = __mul__
 
-    def __div__(self, other) -> 'Vec':
-        """Divide the Vector by a scalar.
-
-        If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero.
-        """
+    def __div__(self, other: float) -> 'Vec':
+        """Divide the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -727,7 +862,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __rdiv__(self, other) -> 'Vec':
+    def __rdiv__(self, other: float) -> 'Vec':
         """Divide a scalar by a Vector.
 
         """
@@ -775,7 +910,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other) -> ('Vec', 'Vec'):
+    def __divmod__(self, other) -> Tuple['Vec', 'Vec']:
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -893,7 +1028,10 @@ class Vec:
         """Vectors are True if any axis is non-zero."""
         return self.x != 0 or self.y != 0 or self.z != 0
 
-    def __eq__(self, other) -> bool:
+    def __eq__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """== test.
 
         Two Vectors are compared based on the axes.
@@ -914,7 +1052,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __lt__(self, other) -> bool:
+    def __lt__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A<B test.
 
         Two Vectors are compared based on the axes.
@@ -939,7 +1080,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __le__(self, other) -> bool:
+    def __le__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A<=B test.
 
         Two Vectors are compared based on the axes.
@@ -964,7 +1108,10 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def __gt__(self, other) -> bool:
+    def __gt__(
+            self,
+            other: Union['Vec', abc.Sequence, SupportsFloat],
+            ) -> bool:
         """A>B test.
 
         Two Vectors are compared based on the axes.
@@ -989,7 +1136,7 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
-    def max(self, other):
+    def max(self, other: Union['Vec', Vec_tuple]):
         """Set this vector's values to the maximum of the two vectors."""
         if self.x < other.x:
             self.x = other.x
@@ -998,7 +1145,7 @@ class Vec:
         if self.z < other.z:
             self.z = other.z
 
-    def min(self, other):
+    def min(self, other: Union['Vec', Vec_tuple]):
         """Set this vector's values to be the minimum of the two vectors."""
         if self.x > other.x:
             self.x = other.x
@@ -1054,13 +1201,13 @@ class Vec:
         """Code required to reproduce this vector."""
         return self.__class__.__name__ + "(" + self.join() + ")"
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[float]:
         """Allow iterating through the dimensions."""
         yield self.x
         yield self.y
         yield self.z
 
-    def __getitem__(self, ind):
+    def __getitem__(self, ind: Union[str, int]) -> float:
         """Allow reading values by index instead of name if desired.
 
         This accepts either 0,1,2 or 'x','y','z' to read values.
@@ -1075,7 +1222,7 @@ class Vec:
         else:
             return NotImplemented
 
-    def __setitem__(self, ind, val):
+    def __setitem__(self, ind: Union[str, int], val: float):
         """Allow editing values by index instead of name if desired.
 
         This accepts either 0,1,2 or 'x','y','z' to edit values.
@@ -1118,7 +1265,7 @@ class Vec:
         """+ on a Vector simply copies it."""
         return Vec(self.x, self.y, self.z)
 
-    def norm(self):
+    def norm(self) -> 'Vec':
         """Normalise the Vector.
 
          This is done by transforming it to have a magnitude of 1 but the same
@@ -1146,6 +1293,18 @@ class Vec:
             self.z * other.x - self.x * other.z,
             self.x * other.y - self.y * other.x,
             )
+
+    def localise(
+            self,
+            origin: Union['Vec', Vec_tuple],
+            angles: Union['Vec', Vec_tuple]=None
+            ):
+        """Shift this point to be local to the given position and angles
+
+        """
+        if angles is not None:
+            self.rotate(angles.x, angles.y, angles.z)
+        self.__iadd__(origin)
 
     len = mag
     mag_sq = len_sq

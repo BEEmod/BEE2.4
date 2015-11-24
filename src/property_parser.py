@@ -7,7 +7,7 @@
 import utils
 
 from typing import (
-    Optional, Union,
+    Optional, Union, Any,
     Dict, List, Tuple, Iterator,
 )
 
@@ -26,6 +26,7 @@ _NO_KEY_FOUND = object()
 
 _Prop_Value = Union[List['Property'], str]
 _as_dict_return = Dict[str, Union[str, 'as_dict_return']]
+
 
 class KeyValError(Exception):
     """An error that occured when parsing a Valve KeyValues file.
@@ -83,6 +84,25 @@ class NoKeyError(Exception):
 
     def __str__(self):
         return "No key " + self.key + "!"
+
+
+def read_multiline_value(file, line_num, filename):
+    """Pull lines out until a quote character is reached."""
+    lines = ['']  # We return with a beginning newline
+    # Re-looping over the same iterator means we don't repeat lines
+    for line_num, line in file:
+        line = utils.clean_line(line)
+        if line.endswith('"'):
+            lines.append(line[:-1])
+            return '\n'.join(lines)
+        lines.append(line)
+    else:
+        # We hit EOF!
+        raise KeyValError(
+            "Reached EOF without ending quote!",
+            filename,
+            line_num,
+        )
 
 
 class Property:
@@ -145,7 +165,8 @@ class Property:
         file_contents should be an iterable of strings
         """
         open_properties = [Property(None, [])]
-        for line_num, line in enumerate(file_contents, start=1):
+        file_iter = enumerate(file_contents, start=1)
+        for line_num, line in file_iter:
             values = open_properties[-1].value
             freshline = utils.clean_line(line)
             if not freshline:
@@ -163,16 +184,18 @@ class Property:
                         )
                 try:
                     value = line_contents[3]
-                    if not freshline.endswith('"'):
-                        raise KeyValError(
-                            'Key has value, but incomplete quotes!',
-                            filename,
-                            line_num,
-                            )
-                    for orig, new in REPLACE_CHARS.items():
-                        value = value.replace(orig, new)
                 except IndexError:
                     value = None
+                else:
+                    if not freshline.endswith('"'):
+                        # It's a multiline value!
+                        value += read_multiline_value(
+                            file_iter,
+                            line_num,
+                            filename,
+                        )
+                    for orig, new in REPLACE_CHARS.items():
+                        value = value.replace(orig, new)
 
                 values.append(Property(name, value))
             elif freshline.startswith('{'):
@@ -395,7 +418,7 @@ class Property:
                 str,
                 int,
                 slice,
-                Tuple[Union[str, int, slice], _Prop_Value],
+                Tuple[Union[str, int, slice], Union[_Prop_Value, Any]],
             ],
             ):
         """Allow indexing the children directly.

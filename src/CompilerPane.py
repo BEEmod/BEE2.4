@@ -1,5 +1,5 @@
 from tkinter import *
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import filedialog
 
@@ -11,8 +11,8 @@ import os.path
 import img as png
 
 from BEE2_config import ConfigFile, GEN_OPTS
-from SubPane import SubPane
 from tooltip import add_tooltip
+import SubPane
 import utils
 
 MAX_ENTS = 2048
@@ -254,7 +254,7 @@ def make_pane(tool_frame):
 
     """
     global window
-    window = SubPane(
+    window = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
         title='Compile Opt',
@@ -546,11 +546,12 @@ def make_pane(tool_frame):
     )
     UI['count_over'].grid(row=3, column=0, sticky=EW, padx=5)
 
-    ttk.Button(
+    UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
-        image=png.png('icons/tool_sub'),
-        command=refresh_counts,
-    ).grid(row=3, column=1)
+        png.png('icons/tool_sub', resize_to=16),
+        refresh_counts,
+    )
+    UI['refresh_counts'].grid(row=3, column=1)
 
     ttk.Label(
         count_frame,

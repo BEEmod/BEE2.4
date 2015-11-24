@@ -11,33 +11,34 @@ from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
+from packageMan import PACK_CONFIG
+import vmfLib as VLib
 import extract_packages
 import utils
 
+from typing import (
+    Union, Optional,
+    List, Dict, Tuple,
+)
 
-__all__ = [
-    'load_packages',
-    'Style',
-    'Item',
-    'QuotePack',
-    'Skybox',
-    'Music',
-    'StyleVar',
-    ]
 
 all_obj = {}
 obj_override = {}
-packages = {}
+packages = {}  # type: Dict[str, Package]
 OBJ_TYPES = {}
 
 data = {}
 
 res_count = -1
 
+TEMPLATE_FILE = VLib.VMF()
+
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
-PackageData = namedtuple('package_data', 'zip_file, info, name, disp_name')
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+
+# This package contains necessary components, and must be available.
+CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -79,7 +80,14 @@ def reraise_keyerror(err, obj_id):
     ) from err
 
 
-def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
+def get_config(
+        prop_block,
+        zip_file,
+        folder,
+        pak_id='',
+        prop_name='config',
+        extension='.cfg',
+        ):
     """Extract a config file refered to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
@@ -96,11 +104,15 @@ def get_config(prop_block, zip_file, folder, pak_id='', prop_name='config'):
     if prop_block.value == '':
         return Property(None, [])
 
-    path = os.path.join(folder, prop_block.value) + '.cfg'
+    path = os.path.join(folder, prop_block.value)
+    if len(path) < 3 or path[-4] != '.':
+        # Add extension
+        path += extension
     try:
         with zip_file.open(path) as f:
-            return Property.parse(f,
-            pak_id + ':' + path,
+            return Property.parse(
+                f,
+                pak_id + ':' + path,
             )
     except KeyError:
         print('"{}:{}" not in zip!'.format(pak_id, path))
@@ -128,15 +140,11 @@ def find_packages(pak_dir, zips, zip_name_lst):
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
             pak_id = info['ID']
-            disp_name = info['Name', None]
-            if disp_name is None:
-                print('Warning: {} has no display name!'.format(pak_id))
-                disp_name = pak_id.lower()
-            packages[pak_id] = PackageData(
+            packages[pak_id] = Package(
+                pak_id,
                 zip_file,
                 info,
                 name,
-                disp_name,
             )
             found_pak = True
         else:
@@ -184,32 +192,39 @@ def load_packages(
     try:
         find_packages(pak_dir, zips, data['zips'])
 
-        loader.set_length("PAK", len(packages))
+        pack_count = len(packages)
+        loader.set_length("PAK", pack_count)
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        objects = 0
         images = 0
-        for pak_id, (zip_file, info, name, dispName) in packages.items():
+        for pak_id, pack in packages.items():
+            if not pack.enabled:
+                print('Package {} disabled!'.format(pack.id).ljust(50))
+                pack_count -= 1
+                loader.set_length("PAK", pack_count)
+                continue
+
             print(
                 ("Reading objects from '" + pak_id + "'...").ljust(50),
                 end=''
             )
-            obj_count, img_count = parse_package(
-                zip_file,
-                info,
-                pak_id,
-                dispName,
-            )
-            objects += obj_count
+            img_count = parse_package(pack)
             images += img_count
             loader.step("PAK")
             print("Done!")
 
-        loader.set_length("OBJ", objects)
+        # If new packages were added, update the config!
+        PACK_CONFIG.save_check()
+
+        loader.set_length("OBJ", sum(
+            len(obj_type)
+            for obj_type in
+            all_obj.values()
+        ))
         loader.set_length("IMG_EX", images)
 
         # The number of images we need to load is the number of objects,
@@ -278,62 +293,59 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    print(data['zips'])
     print('Done!')
     return data
 
 
-def parse_package(zip_file, info, pak_id, disp_name):
+def parse_package(pack: 'Package'):
     """Parse through the given package to find all the components."""
-    for pre in Property.find_key(info, 'Prerequisites', []).value:
+    for pre in Property.find_key(pack.info, 'Prerequisites', []):
         if pre.value not in packages:
             utils.con_log(
-                'Package "' +
-                pre.value +
-                '" required for "' +
-                pak_id +
-                '" - ignoring package!'
+                'Package "{pre}" required for "{id}" - '
+                'ignoring package!'.format(
+                    pre=pre.value,
+                    id=pack.id,
+                )
             )
             return False
-    objects = 0
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in OBJ_TYPES:
         allow_dupes = OBJ_TYPES[comp_type].allow_mult
         # Look for overrides
-        for obj in info.find_all("Overrides", comp_type):
+        for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(zip_file, obj_id, obj, pak_id)
+                ParseData(pack.zip, obj_id, obj, pack.id)
             )
 
-        for obj in info.find_all(comp_type):
+        for obj in pack.info.find_all(comp_type):
             obj_id = obj['id']
             if obj_id in all_obj[comp_type]:
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(zip_file, obj_id, obj, pak_id)
+                        ParseData(pack.zip, obj_id, obj, pack.id)
                     )
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
-            objects += 1
             all_obj[comp_type][obj_id] = ObjData(
-                zip_file,
+                pack.zip,
                 obj,
-                pak_id,
-                disp_name,
+                pack.id,
+                pack.disp_name,
             )
 
     img_count = 0
     img_loc = os.path.join('resources', 'bee2')
-    for item in zip_names(zip_file):
+    for item in zip_names(pack.zip):
         item = os.path.normcase(item).casefold()
         if item.startswith("resources"):
             extract_packages.res_count += 1
             if item.startswith(img_loc):
                 img_count += 1
-    return objects, img_count
+    return img_count
 
 
 def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
@@ -477,6 +489,45 @@ def parse_item_folder(folders, zip_file, pak_id):
                 )
         except KeyError:
             folders[fold]['vbsp'] = Property(None, [])
+
+
+class Package:
+    """Represents a package."""
+    def __init__(
+            self,
+            pak_id: str,
+            zip_file: ZipFile,
+            info: Property,
+            name: str,
+            ):
+        disp_name = info['Name', None]
+        if disp_name is None:
+            print('Warning: {} has no display name!'.format(pak_id))
+            disp_name = pak_id.lower()
+
+        self.id = pak_id
+        self.zip = zip_file
+        self.info = info
+        self.name = name
+        self.disp_name = disp_name
+        self.desc = info['desc', '']
+
+    @property
+    def enabled(self):
+        """Should this package be loaded?"""
+        if self.id == CLEAN_PACKAGE:
+            # The clean style package is special!
+            # It must be present.
+            return True
+
+        return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
+
+    def set_enabled(self, value: bool):
+        if self.id == CLEAN_PACKAGE:
+            raise ValueError('The Clean Style package cannot be disabled!')
+
+        PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
+    enabled = enabled.setter(set_enabled)
 
 
 @pak_object('Style')
@@ -691,9 +742,11 @@ class QuotePack:
             selitem_data: 'SelitemData',
             config,
             chars=None,
+            skin=None,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
+        self.cave_skin = skin
         self.config = config
         self.chars = chars or ['??']
 
@@ -708,6 +761,10 @@ class QuotePack:
             if char.strip()
         }
 
+        # For Cave Johnson voicelines, this indicates what skin to use on the
+        # portrait.
+        port_skin = utils.conv_int(data.info['caveSkin', None], None)
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -721,6 +778,7 @@ class QuotePack:
             selitem_data,
             config,
             chars=chars,
+            skin=port_skin,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -731,6 +789,8 @@ class QuotePack:
             'quotes_sp',
             'quotes_coop',
         )
+        if self.cave_skin is None:
+            self.cave_skin = override.cave_skin
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'
@@ -1016,7 +1076,7 @@ class PackList:
                 self.trigger_mats.append(item)
 
 
-@pak_object('EditorSound')
+@pak_object('EditorSound', has_img=False)
 class EditorSound:
     """Add sounds that are usable in the editor.
 
@@ -1035,6 +1095,60 @@ class EditorSound:
         return cls(
             snd_name=data.id,
             data=data.info.find_key('keys', [])
+        )
+
+
+@pak_object('BrushTemplate', has_img=False)
+class BrushTemplate:
+    """A template brush which will be copied into the map, then retextured.
+
+    This allows the sides of the brush to swap between wall/floor textures
+    based on orientation.
+    All world and detail brushes from the given VMF will be copied.
+    """
+    def __init__(self, temp_id, vmf_file: VLib.VMF):
+        self.id = temp_id
+        # We don't actually store the solids here - put them in
+        # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+        if vmf_file.brushes:
+            self.temp_world = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_world',
+                template_id=self.id,
+            )
+            self.temp_world.solids = [
+                solid.copy(map=TEMPLATE_FILE)
+                for solid in
+                vmf_file.brushes
+            ]
+        else:
+            self.temp_world = None
+        if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
+            self.temp_detail = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_detail',
+                template_id=self.id,
+            )
+            for ent in vmf_file.by_class['func_detail']:
+                self.temp_detail.solids.extend(
+                    solid.copy(map=TEMPLATE_FILE)
+                    for solid in
+                    ent.solids
+                )
+        else:
+            self.temp_detail = None
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        file = get_config(
+            prop_block=data.info,
+            zip_file=data.zip_file,
+            folder='templates',
+            pak_id=data.pak_id,
+            prop_name='file',
+        )
+        file = VLib.VMF.parse(file)
+        return cls(
+            data.id,
+            file,
         )
 
 

@@ -1,7 +1,7 @@
 # coding=utf-8
 from tkinter import *
 from tkinter import ttk
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 from BEE2_config import GEN_OPTS
 from tooltip import add_tooltip

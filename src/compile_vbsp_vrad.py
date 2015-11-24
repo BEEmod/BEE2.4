@@ -10,15 +10,29 @@ elif utils.MAC:
     suffix = '_osx'
 elif utils.LINUX:
     suffix = '_linux'
+else:
+    suffix = ''
+
+# Unneeded packages that cx_freeze detects:
+EXCLUDES = [
+    'email',
+    'distutils',  # Found in shutil, used if zipfile is not availible
+    'doctest',  # Used in __main__ of decimal and heapq
+    'dis',  # From inspect, not needed
+]
+
+bee_version = input('BEE2 Version: ')
 
 setup(
     name='VBSP_VRAD',
     version='0.1',
     options={
-        'build_exe':
-            {
-                'build_exe': '../compiler'
-            }
+        'build_exe': {
+            'build_exe': '../compiler',
+            'excludes': EXCLUDES,
+            # These values are added to the generated BUILD_CONSTANTS module.
+            'constants': 'BEE_VERSION=' + repr(bee_version),
+        },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '
                 'for modifying PeTI maps during compilation.',
@@ -34,6 +48,6 @@ setup(
             base='Console',
             icon=ico_path,
             targetName='vrad' + suffix,
-        )
+        ),
     ]
 )

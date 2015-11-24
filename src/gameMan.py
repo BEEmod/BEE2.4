@@ -12,18 +12,19 @@ import shutil
 from tkinter import *  # ui library
 from tkinter import messagebox  # simple, standard modal dialogs
 from tkinter import filedialog  # open/save as dialog creator
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 
 from query_dialogs import ask_string
 from BEE2_config import ConfigFile
 from property_parser import Property
 import utils
-import UI
 import loadScreen
+import packageLoader
 import extract_packages
+import backup
 
 all_games = []
-selected_game = None
+selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None
 
@@ -70,6 +71,7 @@ EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
+    (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
     ('CONF', 'Generate Config Files'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
@@ -101,7 +103,17 @@ def translate(string):
 
 
 def setgame_callback(selected_game):
+    """Callback function run when games are selected."""
     pass
+
+
+def quit_application():
+    """Command run to quit the application.
+
+    This is overwritten by UI later.
+    """
+    import sys
+    sys.exit()
 
 
 class Game:
@@ -138,7 +150,7 @@ class Game:
     def abs_path(self, path):
         return os.path.normcase(os.path.join(self.root, path))
 
-    def add_editor_sounds(self, sounds: Property):
+    def add_editor_sounds(self, sounds):
         """Add soundscript items so they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
@@ -305,8 +317,8 @@ class Game:
         export_screen.set_length(
             'CONF',
             # VBSP_conf, Editoritems, instances, gameinfo, pack_lists,
-            # editor_sounds
-            6 +
+            # editor_sounds, template VMF
+            7 +
             # Don't add the voicelines to the progress bar if not selected
             (0 if voice is None else len(VOICE_PATHS)),
         )
@@ -400,6 +412,11 @@ class Game:
                 ('Options', 'voice_char'),
                 ','.join(voice.chars)
             )
+            if voice.cave_skin is not None:
+                vbsp_config.set_key(
+                    ('Options', 'cave_port_skin'),
+                    voice.cave_skin,
+                )
 
         vbsp_config.set_key(
             ('Options', 'BEE2_loc'),
@@ -459,6 +476,9 @@ class Game:
                 print('Backing up original ' + name + '!')
                 shutil.copy(item_path, backup_path)
             export_screen.step('BACK')
+
+        # Backup puzzles, if desired
+        backup.auto_backup(selected_game, export_screen)
 
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
@@ -523,6 +543,11 @@ class Game:
         self.add_editor_sounds(editor_sounds.values())
         export_screen.step('CONF')
 
+        print('Writing template VMF!')
+        with open(self.abs_path('bin/bee2/templates.vmf'), 'w') as temp_file:
+            packageLoader.TEMPLATE_FILE.export(temp_file)
+        export_screen.step('CONF')
+
         if voice is not None:
             for prefix, dest, pretty in VOICE_PATHS:
                 path = os.path.join(
@@ -546,10 +571,26 @@ class Game:
         print('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
             print('\t* compiler/{0} -> bin/{0}'.format(file))
-            shutil.copy(
-                os.path.join('../compiler', file),
-                self.abs_path('bin/')
-            )
+            try:
+                shutil.copy(
+                    os.path.join('../compiler', file),
+                    self.abs_path('bin/')
+                )
+            except PermissionError:
+                # We might not have permissions, if the compiler is currently
+                # running.
+                export_screen.grab_release()
+                export_screen.reset()
+                messagebox.showerror(
+                    title='BEE2 - Export Failed!',
+                    message='Copying compiler file {file} failed.'
+                            'Ensure the {game} is not running.'.format(
+                                file=file,
+                                game=self.name,
+                            ),
+                    master=TK_ROOT,
+                )
+                return False
             export_screen.step('COMP')
 
         if should_refresh:
@@ -558,6 +599,7 @@ class Game:
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
+        return True
 
 
 def find_steam_info(game_dir):
@@ -625,7 +667,7 @@ def load():
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
-            UI.quit_application()
+            quit_application()
         loadScreen.main_loader.deiconify()  # Show it again
     selected_game = all_games[0]
 
@@ -713,7 +755,7 @@ def remove_game(_=None):
         config.save()
 
         if not all_games:
-            UI.quit_application()  # If we have no games, nothing can be done
+            quit_application()  # If we have no games, nothing can be done
 
         selected_game = all_games[0]
         selectedGame_radio.set(0)

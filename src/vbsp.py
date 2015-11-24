@@ -5,7 +5,7 @@ import subprocess
 import shutil
 import random
 from enum import Enum
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from decimal import Decimal
 
 from property_parser import Property
@@ -16,6 +16,10 @@ import utils
 import voiceLine
 import instanceLocs
 import conditions
+
+from typing import (
+    Dict, Tuple,
+)
 
 
 # Configuration data extracted from VBSP_config
@@ -90,6 +94,7 @@ TEX_DEFAULTS = [
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
     ('', 'special.edge_special'),
+    ('', 'special.fizz_border'),
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
@@ -169,6 +174,10 @@ DEFAULTS = {
     # texture matching
     "tile_texture_lock":        "1",
 
+    "fizz_border_vertical":     "0",  # The texture is oriented vertically
+    "fizz_border_thickness":    "8",  # The width of the overlays
+    "fizz_border_repeat":       "128",  # The width lengthways
+
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
 
@@ -180,6 +189,7 @@ DEFAULTS = {
     "staticPan":                "NONE",  # folder for static panels
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
+    "signPack":                 "",  # Packlist to use when sign inst is added
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -190,9 +200,12 @@ DEFAULTS = {
     "grating_inst":              "NONE",
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
+    "clump_ceil":               "0",  # Use if for ceilings?
+    "clump_floor":              "0",  # Use it for floors?
     "clump_size":               "4",  # The maximum length of a clump
     "clump_width":              "2",  # The width of a clump
     "clump_number":             "6",  # The number of clumps created
+
     # Default to the origin of the elevator instance - that's likely to
     # be enclosed
     "music_location_sp":        "-2000 2000 0",
@@ -219,6 +232,7 @@ DEFAULTS = {
     "elev_vert":                "",  # The vertical elevator video to use
     "voice_id":                 "<NONE>",  # The voice pack which was selected
     "voice_char":               "",  # Characters in the pack
+    "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -248,7 +262,7 @@ FIZZ_OPTIONS = {
     "scanline": "0",
     }
 
-BEE2_config = None # ConfigFile
+BEE2_config = None  # ConfigFile
 
 GAME_MODE = 'ERR'
 IS_PREVIEW = 'ERR'
@@ -299,27 +313,8 @@ def alter_mat(face, seed=None, texture_lock=True):
         face.mat = get_tex(TEX_VALVE[mat])
         return True
     elif mat in BLACK_PAN or mat in WHITE_PAN:
-        surf_type = 'white' if mat in WHITE_PAN else 'black'
         orient = get_face_orient(face)
-        # We need to handle specially the 4x4 and 2x4 variants.
-        # These are used in the embedface brushes, so they should
-        # remain having small tile size. Wall textures have 4x4 and 2x2,
-        # but floor/ceilings only have 4x4 sizes (since they usually
-        # just stay the same).
-        if orient == ORIENT.wall:
-            if (mat == 'metal/black_wall_metal_002b' or
-                    mat == 'tile/white_wall_tile003f'):
-                orient = '4x4'
-            elif (mat == 'metal/black_wall_metal_002a' or
-                    mat == 'tile/white_wall_tile003c'):
-                orient = '2x2'
-            else:
-                orient = 'wall'
-        elif orient == ORIENT.floor:
-            orient = 'floor'
-        elif orient == ORIENT.ceiling:
-            orient = 'ceiling'
-        face.mat = get_tex(surf_type + '.' + orient)
+        face.mat = get_tex(get_tile_type(mat, orient))
 
         if not texture_lock:
             face.offset = 0
@@ -329,6 +324,30 @@ def alter_mat(face, seed=None, texture_lock=True):
         face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
+
+
+def get_tile_type(mat, orient):
+    """Get the texture command for a texture."""
+    surf_type = 'white' if mat in WHITE_PAN else 'black'
+    # We need to handle specially the 4x4 and 2x4 variants.
+    # These are used in the embedface brushes, so they should
+    # remain having small tile size. Wall textures have 4x4 and 2x2,
+    # but floor/ceilings only have 4x4 sizes (since they usually
+    # just stay the same).
+    if orient == ORIENT.wall:
+        if (mat == 'metal/black_wall_metal_002b' or
+                mat == 'tile/white_wall_tile003f'):
+            orient = '4x4'
+        elif (mat == 'metal/black_wall_metal_002a' or
+                mat == 'tile/white_wall_tile003c'):
+            orient = '2x2'
+        else:
+            orient = 'wall'
+    elif orient == ORIENT.floor:
+        orient = 'floor'
+    elif orient == ORIENT.ceiling:
+        orient = 'ceiling'
+    return surf_type + '.' + orient
 
 ##################
 # MAIN functions #
@@ -474,6 +493,118 @@ def add_voice(inst):
         mode=GAME_MODE,
         map_seed=MAP_SEED,
         )
+
+
+@conditions.meta_cond(priority=-250)
+def add_fizz_borders(_):
+    """Generate overlays at the top and bottom of fizzlers.
+
+    This is used in 50s and BTS styles.
+    """
+    tex = settings['textures']['special.fizz_border']
+    if tex == ['']:
+        return
+
+    flip_uv = get_bool_opt('fizz_border_vertical')
+    overlay_thickness = utils.conv_int(get_opt('fizz_border_thickness'), 8)
+    overlay_repeat = utils.conv_int(get_opt('fizz_border_repeat'), 128)
+
+    # First, figure out the orientation of every fizzler via their model.
+    fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
+    for inst in VMF.by_class['func_instance']:
+        if '_modelStart' not in inst['targetname', '']:
+            continue
+        name = inst['targetname'].rsplit('_modelStart', 1)[0] + '_brush'
+        # Once per fizzler only!
+        if name not in fizz_directions:
+            fizz_directions[name] = (
+                # Normal direction of surface
+                Vec(1, 0, 0).rotate_by_str(inst['angles']),
+                # 'Horizontal' direction (for vertical fizz attached to walls)
+                Vec(0, 0, 1).rotate_by_str(inst['angles']),
+                # 'Vertical' direction (for vertical fizz attached to walls)
+                Vec(0, 1, 0).rotate_by_str(inst['angles']),
+            )
+
+    for brush_ent in (VMF.by_class['trigger_portal_cleanser'] |
+                      VMF.by_class['func_brush']):
+        try:
+            norm, horiz, vert = fizz_directions[brush_ent['targetname']]
+        except KeyError:
+            continue
+        norm_dir = norm.axis()
+        horiz_dir = horiz.axis()
+        vert_dir = vert.axis()
+
+        bbox_min, bbox_max = brush_ent.get_bbox()
+        dimensions = bbox_max - bbox_min
+
+        # We need to snap the axis normal_axis to the grid, since it could
+        # be forward or back.
+        min_pos = bbox_min.copy()
+        min_pos[norm_dir] = min_pos[norm_dir] // 128 * 128 + 64
+
+        max_pos = min_pos.copy()
+        max_pos[vert_dir] += 128
+
+        min_faces = []
+        max_faces = []
+
+        overlay_len = int(dimensions[horiz_dir])
+
+        for offset in range(64, overlay_len, 128):
+            # Each position on top or bottom, inset 64 from each end
+            min_pos[horiz_dir] = bbox_min[horiz_dir] + offset
+            max_pos[horiz_dir] = min_pos[horiz_dir]
+
+            solid = conditions.SOLIDS.get(min_pos.as_tuple())
+            if solid is not None:
+                min_faces.append(solid.face)
+            solid = conditions.SOLIDS.get(max_pos.as_tuple())
+            if solid is not None:
+                max_faces.append(solid.face)
+
+        if flip_uv:
+            u_rep = 1
+            v_rep = overlay_len / overlay_repeat
+        else:
+            u_rep = overlay_len / overlay_repeat
+            v_rep = 1
+
+        if min_faces:
+            min_origin = bbox_min.copy()
+            min_origin[norm_dir] += 1
+            min_origin[horiz_dir] += overlay_len/2
+            min_origin[vert_dir] += 16
+            VLib.make_overlay(
+                VMF,
+                normal=abs(vert),
+                origin=min_origin,
+                uax=horiz * overlay_len,
+                vax=norm * overlay_thickness,
+                material=random.choice(tex),
+                surfaces=min_faces,
+                u_repeat=u_rep,
+                v_repeat=v_rep,
+                swap=flip_uv,
+            )
+        if max_faces:
+            max_origin = bbox_max.copy()
+            max_origin[norm_dir] -= 1
+            max_origin[horiz_dir] -= overlay_len/2
+            max_origin[vert_dir] -= 16
+            VLib.make_overlay(
+                VMF,
+                normal=-abs(vert),
+                origin=max_origin,
+                uax=horiz * overlay_len,
+                vax=norm * overlay_thickness,
+                material=random.choice(tex),
+                surfaces=max_faces,
+                u_repeat=u_rep,
+                v_repeat=v_rep,
+                swap=flip_uv,
+            )
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
@@ -1353,12 +1484,6 @@ def change_brush():
     )
     mist_solids = set()
 
-    # Check the clump algorithm has all its arguements
-    can_clump = (get_bool_opt("clump_wall_tex") and
-                 get_opt("clump_size").isnumeric() and
-                 get_opt("clump_width").isnumeric() and
-                 get_opt("clump_number").isnumeric())
-
     if utils.conv_bool(get_opt('remove_pedestal_plat')):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
@@ -1426,10 +1551,21 @@ def change_brush():
         add_goo_mist(mist_solids)
         utils.con_log('Done!')
 
-    if can_clump:
+    if can_clump():
         clump_walls()
     else:
         random_walls()
+
+
+def can_clump():
+    """Check the clump algorithm has all its arguments."""
+    if not get_bool_opt("clump_wall_tex"):
+        return False
+    if not get_opt("clump_size").isnumeric():
+        return False
+    if not get_opt("clump_width").isnumeric():
+        return False
+    return get_opt("clump_number").isnumeric()
 
 
 def switch_glass_inst(origin, new_file):
@@ -1517,7 +1653,6 @@ def get_grid_sizes(face: VLib.Side):
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
-    scale_walls = get_bool_opt("random_blackwall_scale")
     rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
     edge_off = get_bool_opt('reset_edge_off', False)
@@ -1531,18 +1666,14 @@ def random_walls():
             if face.mat.casefold() == 'anim_wp/framework/squarebeams':
                 fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
 
-            orient = get_face_orient(face)
-            # Only modify black walls and ceilings
-            if (scale_walls and
-                    face.mat.casefold() in BLACK_PAN and
-                    orient is not ORIENT.floor):
-
-                random.seed(face_seed(face) + '_SCALE_VAL')
-                # randomly scale textures to achieve the P1 multi-sized
-                #  black tile look without custom textues
-                scale = random.choice(get_grid_sizes(face))
-                face.scale = scale
             alter_mat(face, face_seed(face), texture_lock)
+
+
+Clump = namedtuple('Clump', [
+    'min_pos',
+    'max_pos',
+    'tex',
+])
 
 
 def clump_walls():
@@ -1556,141 +1687,130 @@ def clump_walls():
     # These are 2x2x4 maximum rectangular areas (configurable), which all get
     #  the same texture. We don't overwrite previously-set ones though.
     # After that, we fill in any unset textures with the white/black_gap ones.
-    # This makes it look like those areas were patched up
-    # The floor and ceiling are made normally.
-
-    # Additionally, we are able to nodraw all attached faces.
-    walls = {}
-
-    # we keep a list for the others, so we can nodraw them if needed
-    others = {}
+    # This makes it look like those areas were patched up.
 
     texture_lock = get_bool_opt('tile_texture_lock', True)
     rotate_edge = get_bool_opt('rotate_edge')
     edge_off = get_bool_opt('reset_edge_off', False)
     edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
 
-    for solid in VMF.iter_wbrushes(world=True, detail=True):
-        # first build a dict of all textures and their locations...
-        for face in solid:
-            if face in IGNORED_FACES:
-                continue
+    # Possible locations for clumps - every face origin, not including
+    # ignored faces or nodraw
+    possible_locs = [
+        face.get_origin()
+        for face in
+        VMF.iter_wfaces(world=True, detail=True)
+        if face not in IGNORED_FACES
+        if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
+    ]
 
-            mat = face.mat.casefold()
-            if mat in (
-                    'glass/glasswindow007a_less_shiny',
-                    'metal/metalgrate018',
-                    'anim_wp/framework/squarebeams',
-                    'tools/toolsnodraw',
-                    'anim_wp/framework/backpanels_cheap'
-                    ):
-                # These textures aren't wall textures, and usually never
-                # use random textures. Don't add them here. They also aren't
-                # on grid.
-                alter_mat(face)
-                if mat == 'anim_wp/framework/squarebeams':
-                    fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
-                continue
+    clump_size = utils.conv_int(get_opt("clump_size"), 4)
+    clump_wid = utils.conv_int(get_opt("clump_width"), 2)
 
-            if face.mat in GOO_TEX:
-                # For goo textures, don't add them to the dicts
-                # or floors will be nodrawed.
-                alter_mat(face)
-                break
+    clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
+    clump_numb *= utils.conv_int(get_opt("clump_number"), 6)
 
-            origin = face.get_origin().as_tuple()
-            orient = get_face_orient(face)
-            if orient is ORIENT.wall:
-                # placeholder to indicate these can be replaced.
-                if mat in WHITE_PAN:
-                    face.mat = "WHITE"
-                elif mat in BLACK_PAN:
-                    face.mat = "BLACK"
-                if origin in walls:
-                    # The only time two textures will be in the same
-                    # place is if they are covering each other -
-                    # nodraw them both and ignore them
-                    face.mat = "tools/toolsnodraw"
-                    walls[origin].mat = "tools/toolsnodraw"
-                    del walls[origin]
-                else:
-                    walls[origin] = face
-            else:
-                if origin in others:
-                    # The only time two textures will be in the same
-                    # place is if they are covering each other - delete
-                    #  them both.
-                    face.mat = "tools/toolsnodraw"
-                    others[origin].mat = "tools/toolsnodraw"
-                    del others[origin]
-                else:
-                    others[origin] = face
-                    alter_mat(face, face_seed(face), texture_lock)
+    # Also clump ceilings or floors?
+    clump_ceil = get_bool_opt('clump_ceil')
+    clump_floor = get_bool_opt('clump_floor')
 
-    todo_walls = len(walls)  # number of walls un-edited
-    clump_size = int(get_opt("clump_size"))
-    clump_wid = int(get_opt("clump_width"))
-    clump_numb = (todo_walls // clump_size) * int(get_opt("clump_number"))
-    wall_pos = sorted(list(walls.keys()))
+    utils.con_log('Clumping: {} clumps'.format(clump_numb))
+
     random.seed(MAP_SEED)
+
+    clumps = []
+
     for _ in range(clump_numb):
-        pos = random.choice(wall_pos)
-        wall_type = walls[pos].mat
-        pos = Vec(pos) // 128 * 128
-        ':type pos: Vec'
-        state = random.getstate()  # keep using the map_seed for the clumps
-        if wall_type == "WHITE" or wall_type == "BLACK":
-            random.seed(pos.as_tuple())
-            pos_min = Vec()
-            pos_max = Vec()
-            # these are long strips extended in one direction
-            direction = random.randint(0, 2)
-            for i in range(3):
-                if i == direction:
-                    dist = clump_size
-                else:
-                    dist = clump_wid
-                pos_min[i] = int(
-                    pos[i] - random.randint(0, dist) * 128)
-                pos_max[i] = int(
-                    pos[i] + random.randint(0, dist) * 128)
+        # Picking out of the map origins helps ensure at least 1 texture is
+        # modded by a clump
+        pos = random.choice(possible_locs) // 128 * 128  # type: Vec
 
-            tex = get_tex(wall_type.lower() + '.wall')
-            # Loop though all these grid points, and set to the given
-            # texture if they have the same wall type
-            for pos, side in walls.items():
-                if pos_min <= Vec(pos) <= pos_max and side.mat == wall_type:
-                    side.mat = tex
-                    if not texture_lock:
-                        side.offset = 0
-        # Return to the map_seed state.
-        random.setstate(state)
+        pos_min = Vec()
+        pos_max = Vec()
+        # Clumps are long strips mainly extended in one direction
+        # In the other directions extend by 'width'. It can point any axis.
+        direction = random.choice('xyz')
+        for axis in 'xyz':
+            if axis == direction:
+                dist = clump_size
+            else:
+                dist = clump_wid
+            pos_min[axis] = pos[axis] - random.randint(0, dist) * 128
+            pos_max[axis] = pos[axis] + random.randint(0, dist) * 128
+        cur_state = random.getstate()
+        random.seed('CLUMP_TEX_' + pos_min.join() + '_' + pos_max.join(' '))
+        clumps.append(Clump(
+            pos_min,
+            pos_max,
+            # For each clump, every tile gets the same texture!
+            {
+                (color + '.' + size): get_tex(color + '.' + size)
+                for color in ('white', 'black')
+                for size in ('wall', 'floor', 'ceiling', '2x2', '4x4')
+            }
+        ))
+        random.setstate(cur_state)
 
-    for pos, face in walls.items():
-        random.seed(pos)
-        # We missed these ones!
-        if face.mat == "WHITE":
-            # Allow using special textures for these, to fill in gaps.
-            if not get_tex("special.white_gap") == "":
-                face.mat = get_tex("special.white_gap")
-            else:
-                face.mat = get_tex("white.wall")
-        elif face.mat == "BLACK":
-            if not get_tex("special.black_gap") == "":
-                face.mat = get_tex("special.black_gap")
-            else:
-                face.mat = get_tex("black.wall")
+    # Now modify each texture!
+    for face in VMF.iter_wfaces(world=True, detail=True):
+        if face in IGNORED_FACES:
+            continue
+
+        mat = face.mat.casefold()
+
+        if mat == 'anim_wp/framework/squarebeams':
+            # Handle squarebeam transformations
+            alter_mat(face, face_seed(face), texture_lock)
+            fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
+            continue
+
+        if mat not in WHITE_PAN and mat not in BLACK_PAN:
+            # Don't clump non-wall textures
+            alter_mat(face, face_seed(face), texture_lock)
+            continue
+
+        orient = get_face_orient(face)
+
+        if (
+                (orient is ORIENT.floor and not clump_floor) or
+                (orient is ORIENT.ceiling and not clump_ceil)):
+            # Don't clump if configured not to for this orientation
+            alter_mat(face, face_seed(face), texture_lock)
+            continue
+
+        # Clump the texture!
+        origin = face.get_origin()
+        for clump in clumps:
+            if clump.min_pos <= origin <= clump.max_pos:
+                face.mat = clump.tex[get_tile_type(mat, orient)]
+                break
         else:
-            alter_mat(face, seed=pos, texture_lock=texture_lock)
+            # Not in a clump!
+            # Allow using special textures for these, to fill in gaps.
+            orig_mat = mat
+            if mat in WHITE_PAN:
+                face.mat = get_tex("special.white_gap")
+                if not face.mat:
+                    face.mat = orig_mat
+                    alter_mat(face, texture_lock=texture_lock)
+            elif mat in BLACK_PAN:
+                face.mat = get_tex("special.black_gap")
+                if not face.mat:
+                    face.mat = orig_mat
+                    alter_mat(face, texture_lock=texture_lock)
+            else:
+                alter_mat(face, texture_lock=texture_lock)
 
 
 def get_face_orient(face):
     """Determine the orientation of an on-grid face."""
     norm = face.normal()
-    if norm == (0, 0, -1):
+    # Even if not axis-aligned, make mostly-flat surfaces
+    # floor/ceiling (+-40 degrees)
+    # sin(40) = ~0.707
+    if norm.z < -0.8:
         return ORIENT.floor
-
-    if norm == (0, 0, 1):
+    if norm.z > 0.8:
         return ORIENT.ceiling
     return ORIENT.wall
 
@@ -1746,6 +1866,8 @@ def change_overlays():
     if sign_inst == "NONE":
         sign_inst = None
 
+    sign_inst_pack = get_opt('signPack')
+
     ant_str = settings['textures']['overlay.antline']
     ant_str_floor = settings['textures']['overlay.antlinefloor']
     ant_corn = settings['textures']['overlay.antlinecorner']
@@ -1778,6 +1900,8 @@ def change_overlays():
                     angles=over['angles', '0 0 0'],
                     file=sign_inst,
                 )
+                if sign_inst_pack:
+                    TO_PACK.add(sign_inst_pack.casefold())
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
 
             over['material'] = get_tex(sign_type)
@@ -1926,6 +2050,9 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
+            if side in IGNORED_FACES:
+                continue
+
             if side.mat.casefold() == "anim_wp/framework/squarebeams":
                 side.mat = get_tex(edge_tex)
                 fix_squarebeams(
@@ -2133,6 +2260,8 @@ def packlist_cond(_, res):
     """Add the files in the given packlist to the map."""
     TO_PACK.add(res.value.casefold())
 
+    return conditions.RES_EXHAUSTED
+
 
 def make_packlist(map_path):
     """Write the list of files that VRAD should pack."""
@@ -2294,7 +2423,7 @@ def main():
 
     """
     global MAP_SEED, IS_PREVIEW, GAME_MODE
-    utils.con_log("BEE2 VBSP hook initiallised.")
+    utils.con_log("BEE{} VBSP hook initiallised.".format(utils.BEE_VERSION))
 
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
@@ -2387,7 +2516,7 @@ def main():
             )
 
         fix_inst()
-        alter_flip_panel() # Must be done before conditions!
+        alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 

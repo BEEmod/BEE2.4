@@ -2,12 +2,11 @@
 from tkinter import *  # ui library
 from tkinter import ttk  # themed ui components that match the OS
 from tkinter import messagebox  # simple, standard modal dialogs
-from functools import partial as func_partial
 import itertools
 import operator
 import random
 
-from tk_root import TK_ROOT
+from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
@@ -16,16 +15,19 @@ from loadScreen import main_loader as loader
 import paletteLoader
 import img
 import utils
+import tk_tools
 import SubPane
 from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
+import packageMan
 import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
+import backup as backupWin
 import tooltip
 
 
@@ -426,7 +428,7 @@ def quit_application():
     # Destroy the TK windows
     TK_ROOT.destroy()
     exit(0)
-gameMan.quit_app = quit_application
+gameMan.quit_application = quit_application
 
 
 def load_palette(data):
@@ -750,7 +752,7 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
-    gameMan.selected_game.export(
+    sucess = gameMan.selected_game.export(
         chosen_style,
         item_list,
         music=musics.get(music_win.chosen_id, None),
@@ -767,10 +769,13 @@ def export_editoritems(_=None):
         )
     )
 
+    if not sucess:
+        return
+
     messagebox.showinfo(
         'BEEMOD2',
         message='Selected Items and Style successfully exported!',
-        )
+    )
 
     for pal in palettes[:]:
         if pal.name == '<Last Export>':
@@ -1097,7 +1102,11 @@ def init_palette(f):
     # selected.
     UI['palette'].selection_set(0)
 
-    pal_scroll = ttk.Scrollbar(f, orient=VERTICAL, command=UI['palette'].yview)
+    pal_scroll = tk_tools.HidingScroll(
+        f,
+        orient=VERTICAL,
+        command=UI['palette'].yview,
+    )
     pal_scroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand'] = pal_scroll.set
 
@@ -1320,7 +1329,11 @@ def init_picker(f):
     cframe.rowconfigure(0, weight=1)
     cframe.columnconfigure(0, weight=1)
 
-    scroll = ttk.Scrollbar(cframe, orient=VERTICAL, command=pal_canvas.yview)
+    scroll = tk_tools.HidingScroll(
+        cframe,
+        orient=VERTICAL,
+        command=pal_canvas.yview,
+    )
     scroll.grid(column=1, row=0, sticky="NS")
     pal_canvas['yscrollcommand'] = scroll.set
 
@@ -1444,7 +1457,7 @@ def init_menu_bar(win):
         # This will be enabled when the resources have been unpacked
         state=DISABLED,
         )
-    file_menu.export_btn_index = 0 # Change this if the menu is reordered
+    file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
     file_menu.add_command(
         label="Add Game",
@@ -1454,6 +1467,14 @@ def init_menu_bar(win):
         label="Remove Selected Game",
         command=gameMan.remove_game,
         )
+    file_menu.add_command(
+        label="Backup/Restore Puzzles...",
+        command=backupWin.show_window,
+    )
+    file_menu.add_command(
+        label="Manage Packages...",
+        command=packageMan.show,
+    )
     file_menu.add_separator()
     file_menu.add_command(
         label="Options",
@@ -1552,8 +1573,6 @@ def init_windows():
         )  # Prevent making the window smaller than the preview pane
     loader.step('UI')
 
-    loader.step('UI')
-
     ttk.Separator(
         ui_bg,
         orient=VERTICAL,
@@ -1625,6 +1644,9 @@ def init_windows():
     init_palette(pal_frame)
     loader.step('UI')
 
+    packageMan.make_window()
+    loader.step('UI')
+
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
@@ -1659,36 +1681,8 @@ def init_windows():
         'Fill empty spots in the palette with random items.',
     )
 
-    # make scrollbar work globally
-    if utils.WIN:
-        TK_ROOT.bind(
-            "<MouseWheel>",
-            lambda e: pal_canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
-            )
-    elif utils.LINUX:
-        TK_ROOT.bind(
-            "<Button-4>",
-            lambda e: pal_canvas.yview_scroll(1, "units"),
-            )
-        TK_ROOT.bind(
-            "<Button-5>",
-            lambda e: pal_canvas.yview_scroll(-1, "units"),
-            )
-
-    if utils.WIN:
-        StyleVarPane.window.bind(
-            "<MouseWheel>",
-            lambda e: UI['style_can'].yview_scroll(int(-1*(e.delta/120)), "units"),
-            )
-    elif utils.LINUX:
-        StyleVarPane.window.bind(
-            "<Button-4>",
-            lambda e: UI['style_can'].yview_scroll(1, "units"),
-            )
-        StyleVarPane.window.bind(
-            "<Button-5>",
-            lambda e: UI['style_can'].yview_scroll(-1, "units"),
-            )
+    # Make scrollbar work globally
+    utils.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
     utils.bind_leftclick(TK_ROOT, contextWin.hide_context)
@@ -1697,9 +1691,14 @@ def init_windows():
     utils.bind_leftclick(windows['opt'], contextWin.hide_context)
     utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
+    backupWin.init_toplevel()
+    loader.step('UI')
     voiceEditor.init_widgets()
+    loader.step('UI')
     contextWin.init_widgets()
+    loader.step('UI')
     optionWindow.init_widgets()
+    loader.step('UI')
     init_drag_icon()
     loader.step('UI')
 

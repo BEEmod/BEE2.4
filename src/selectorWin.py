@@ -7,14 +7,15 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
+from tk_tools import TK_ROOT
 from collections import namedtuple
-from tk_root import TK_ROOT
 import functools
 import math
 
 import img  # png library for TKinter
 from richTextBox import tkRichText
 import utils
+import tk_tools
 
 ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
@@ -260,13 +261,15 @@ class selWin:
         self.pal_frame = ttk.Frame(self.wid_canvas)
         self.wid_canvas.create_window(1, 1, window=self.pal_frame, anchor="nw")
 
-        self.wid_scroll = ttk.Scrollbar(
+        self.wid_scroll = tk_tools.HidingScroll(
             shim,
             orient=VERTICAL,
             command=self.wid_canvas.yview,
         )
         self.wid_scroll.grid(row=0, column=1, sticky="NS")
         self.wid_canvas['yscrollcommand'] = self.wid_scroll.set
+
+        utils.add_mousewheel(self.wid_canvas, self.win)
 
         if utils.MAC:
             # Labelframe doesn't look good here on OSX
@@ -332,7 +335,7 @@ class selWin:
             sticky='NSEW',
             )
 
-        self.prop_scroll = ttk.Scrollbar(
+        self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
             orient=VERTICAL,
             command=self.prop_desc.yview,
@@ -500,7 +503,7 @@ class selWin:
         and place the textbox.
         """
 
-        self.display = ttk.Entry(
+        self.display = tk_tools.ReadOnlyEntry(
             frame,
             textvariable=self.disp_label,
             cursor=utils.CURSORS['regular'],
