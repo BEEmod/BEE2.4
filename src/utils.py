@@ -737,6 +737,36 @@ class Vec:
             bbox_max.max(point)
         return bbox_min, bbox_max
 
+    def axis(self):
+        """For a normal vector, return the axis it is on.
+
+        This will not function correctly if not a on-axis normal vector!
+        """
+        return (
+            'x' if self.x != 0 else
+            'y' if self.y != 0 else
+            'z'
+        )
+
+    def to_angle(self, roll=0):
+        """Convert a normal to a Source Engine angle."""
+        # Pitch is applied first, so we need to reconstruct the x-value
+        horiz_dist = math.sqrt(self.x ** 2 + self.y ** 2)
+        return Vec(
+            math.degrees(math.atan2(self.z, horiz_dist)),
+            math.degrees(math.atan2(self.y, self.x)) % 360,
+            roll,
+        )
+
+    def __abs__(self):
+        """Performing abs() on a Vec takes the absolute value of all axes."""
+        return Vec(
+            abs(self.x),
+            abs(self.y),
+            abs(self.z),
+        )
+
+
     def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
         """+ operation.
 

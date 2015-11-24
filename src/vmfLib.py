@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional, Union,
-    Dict, List, Tuple, Set, Iterator,
+    Dict, List, Tuple, Set, Iterable,
 )
 
 # Used to set the defaults for versioninfo
@@ -91,6 +91,68 @@ def overlay_bounds(over):
         (origin + Vec.from_str(over['uv' + str(x)]))
         for x in
         range(4)
+    )
+
+
+def make_overlay(
+        vmf: 'VMF',
+        normal: Vec,
+        origin: Vec,
+        uax: Vec,
+        vax: Vec,
+        material: str,
+        surfaces: Iterable['Side'],
+        u_repeat=1,
+        v_repeat=1,
+        swap=False,
+        ) -> 'Entity':
+    """Generate an overlay on an axis-aligned surface.
+
+    - origin is the center point of the overlay.
+    - uax is the direction and distance for the texture's width ('right').
+    - vax is the direction and distance for the texture's height ('up').
+    - normal is the normal of the surfaces.
+    - material is the material used.
+    - u_ and v_repeat define how many times to repeat the texture in that
+      direction.
+    - If swap is true, the texture will be rotated 90.
+    """
+    if swap:
+        uax, vax = vax, uax
+
+    u_dist = uax.mag()/2
+    v_dist = vax.mag()/2
+    basis_u = uax.norm()
+    basis_v = vax.norm()
+
+    if normal.x < 0 or normal.y < 0:
+        basis_v *= -1
+    if normal.z < 0:
+        basis_u *= -1
+
+
+    return vmf.create_ent(
+        classname='info_overlay',
+        angles='0 0 0',  # Not actually used by VBSP!
+        origin=origin.join(' '),
+
+        basisNormal=normal.join(' '),
+        basisOrigin=origin.join(' '),
+        basisU=basis_u.join(' '),
+        basisV=basis_v.join(' '),
+
+        material=material,
+        sides=' '.join(str(side.id) for side in surfaces),
+
+        startU='0',
+        startV='0',
+        endU=str(u_repeat),
+        endV=str(v_repeat),
+
+        uv0='-{} -{} 0'.format(u_dist, v_dist),
+        uv1='-{} {} 0'.format(u_dist, v_dist),
+        uv2='{} {} 0'.format(u_dist, v_dist),
+        uv3='{} -{} 0'.format(u_dist, v_dist),
     )
 
 
