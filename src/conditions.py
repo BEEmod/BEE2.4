@@ -673,13 +673,13 @@ def load_templates():
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
     for ent in vmf.by_class['bee2_template_world']:
-        world_ents[ent['template_id']].extend(ent.solids)
+        world_ents[ent['template_id'].casefold()].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[ent['template_id']].extend(ent.solids)
+        detail_ents[ent['template_id'].casefold()].extend(ent.solids)
 
     for temp_id in set(detail_ents.keys()).union(world_ents.keys()):
-        TEMPLATES[temp_id.casefold()] = (
+        TEMPLATES[temp_id] = (
             world_ents[temp_id],
             detail_ents[temp_id],
         )
