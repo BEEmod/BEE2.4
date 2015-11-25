@@ -1,9 +1,9 @@
 """Generate random quarter tiles, like in Destroyed or Retro maps."""
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 import random
 
-from utils import Vec
+from utils import Vec, Vec_tuple
 from instanceLocs import resolve as resolve_inst
 
 import utils
@@ -19,6 +19,9 @@ TEX_DEFAULT = [
     ('clip', 'tools/toolsplayerclip'),
 ]
 
+# Materials set for the cutout tile
+MATS = defaultdict(list)
+
 # We want to force tiles with these overlay materials to appear!
 FORCE_TILE_MATS = {
     mat
@@ -30,7 +33,13 @@ FORCE_TILE_MATS = {
 FORCE_LOCATIONS = set()
 
 # The template used to seal sides open to the void.
-SIDE_BRUSH_TEMPLATE = 'BEE2_CUTOUT_TILE_FLOOR_SIDE'
+FLOOR_TEMP_SIDE_WORLD = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_WORLD'
+FLOOR_TEMP_SIDE_DETAIL = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_DETAIL'
+
+# Template used to seal floor sections 'covered' by a block.
+FLOOR_TEMP_PILLAR = 'BEE2_CUTOUT_TILE_FLOOR_PILLAR'
+
+BorderPoints = namedtuple('BorderPoints', 'wall ceil rot')
 
 
 @conditions.meta_cond(priority=-1000, only_once=False)
@@ -76,12 +85,7 @@ def res_cutout_tile(inst, res):
     overlay_ids = {}  # When we replace brushes, we need to fix any overlays
     # on that surface.
 
-    # The brushes which we're removing from the map. By leaving them
-    # in the map until after the condition is evaulated, floor sections will
-    # harmlessly modify each other's side textures instead of generating
-    # brushes at the junction points of seperate tile 'groups'.
-    brushes_to_remove = set()
-
+    MATS.clear()
     floor_edges = []  # Values to pass to add_floor_sides() at the end
 
     sign_loc = set(FORCE_LOCATIONS)
@@ -101,7 +105,6 @@ def res_cutout_tile(inst, res):
             sign_loc.add(loc_min.as_tuple())
             sign_loc.add(loc_max.as_tuple())
 
-    MATS = defaultdict(list)
     SETTINGS = {
         'floor_chance': utils.conv_int(
             res['floorChance', '100'], 100),
@@ -213,27 +216,45 @@ def res_cutout_tile(inst, res):
                 SETTINGS,
                 sign_loc,
                 detail_ent,
-                brushes_to_remove,
             )
 
         # Mark borders we need to fill in, and the angle (for func_instance)
-        for x in range(int(box_min.x), int(box_max.x)+1, 128):
-            # North, South
-            floor_edges.append((Vec(x, box_max.y + 64, z-64), 270))
-            floor_edges.append((Vec(x, box_min.y - 64, z-64), 90))
+        # The wall is the face pointing inwards towards the bottom brush,
+        # and the ceil is the ceiling of the block above the bordering grid
+        # points.
+        for x in range(int(box_min.x), int(box_max.x) + 1, 128):
+            # North
+            floor_edges.append(BorderPoints(
+                wall=Vec(x, box_max.y + 64, z - 64),
+                ceil=Vec_tuple(x, box_max.y + 128, z),
+                rot=270,
+            ))
+            # South
+            floor_edges.append(BorderPoints(
+                wall=Vec(x, box_min.y - 64, z - 64),
+                ceil=Vec_tuple(x, box_min.y - 128, z),
+                rot=90,
+            ))
 
-        for y in range(int(box_min.y), int(box_max.y)+1, 128):
-            # East, West
-            floor_edges.append((Vec(box_max.x + 64, y, z-64), 180))
-            floor_edges.append((Vec(box_min.x - 64, y, z-64), 0))
+        for y in range(int(box_min.y), int(box_max.y) + 1, 128):
+            # East
+            floor_edges.append(BorderPoints(
+                wall=Vec(box_max.x + 64, y, z - 64),
+                ceil=Vec_tuple(box_max.x + 128, y, z),
+                rot=180,
+            ))
 
-    add_floor_sides(floor_edges, MATS['squarebeams'])
+            # West
+            floor_edges.append(BorderPoints(
+                wall=Vec(box_min.x - 64, y, z - 64),
+                ceil=Vec_tuple(box_min.x - 128, y, z),
+                rot=0,
+            ))
+
+    add_floor_sides(floor_edges)
 
     reallocate_overlays(overlay_ids)
 
-    for loc, brush in brushes_to_remove:
-        del conditions.SOLIDS[loc]
-        conditions.VMF.remove_brush(brush)
     return True
 
 
@@ -244,7 +265,6 @@ def convert_floor(
         settings,
         signage_loc,
         detail,
-        brushes_to_remove,
 ):
     """Cut out tiles at the specified location."""
     try:
@@ -252,13 +272,36 @@ def convert_floor(
     except KeyError:
         return False  # No tile here!
 
+    if brush.normal == (0, 0, 1):
+        # This is a pillar block - there isn't actually tiles here!
+        # We need to generate a squarebeams brush to fill this gap.
+
+        brush.face.mat = 'tools/toolsnodraw' # It won't be visible
+        world, detail = conditions.import_template(
+            temp_name=FLOOR_TEMP_PILLAR,
+            origin=loc,
+        )
+        conditions.retexture_template(
+            world,
+            detail,
+            loc,
+            # Switch to use the configured squarebeams texture
+            replace_tex={
+                'anim_wp/framework/squarebeams': random.choice(
+                    MATS['squarebeams']
+                ),
+            }
+        )
+        return False
+
     # The new brush IDs overlays need to use
     # NOTE: strings, not ints!
     ant_locs = overlay_ids[str(brush.face.id)] = []
 
-    # Defer removing brushes until later -
-    # otherwise adding border textures doesn't work correctly
-    brushes_to_remove.add((loc.as_tuple(), brush.solid))
+    # Move the floor brush down and switch to the floorbase texture.
+    for plane in brush.face.planes:
+        plane.z -= 8
+    brush.face.mat = random.choice(mats['floorbase'])
 
     loc.x -= 64
     loc.y -= 64
@@ -301,13 +344,6 @@ def convert_floor(
         else:
             # No tile at this loc!
             pass
-
-    base_brush = conditions.VMF.make_prism(
-        p1=loc + (0, 0, -9),
-        p2=loc + (128, 128, -8)
-    )
-    base_brush.top.mat = random.choice(mats['floorbase'])
-    conditions.VMF.add_brush(base_brush.solid)
 
     return True
 
@@ -489,17 +525,19 @@ def reallocate_overlays(mapping):
             overlay['sides'] = ' '.join(sides)
 
 
-def add_floor_sides(locs, tex):
+def add_floor_sides(locs):
     """We need to replace nodraw textures around the outside of the holes.
 
     This requires looping through all faces, since these will have been
     nodrawed.
     """
     added_locations = {
-        loc.as_tuple(): False
-        for loc, _ in
+        barrier.wall.as_tuple(): False
+        for barrier in
         locs
     }
+
+    utils.con_log('ADD FLOOR SIDES:')
 
     for face in conditions.VMF.iter_wfaces(world=True, detail=False):
         if face.mat != 'tools/toolsnodraw':
@@ -507,7 +545,7 @@ def add_floor_sides(locs, tex):
         loc = face.get_origin().as_tuple()
         if loc in added_locations:
             random.seed('floor_side_{}_{}_{}'.format(*loc))
-            face.mat = random.choice(tex)
+            face.mat = random.choice(MATS['squarebeams'])
             added_locations[loc] = True
             # Swap these to flip the texture diagonally, so the beam is at top
             face.uaxis, face.vaxis = face.vaxis, face.uaxis
@@ -518,22 +556,34 @@ def add_floor_sides(locs, tex):
     # Look for the ones without a texture - these are open to the void and
     # need to be sealed. The template chamfers the edges
     # to prevent showing void at outside corners.
-    for loc, rot in locs:
-        if added_locations[loc.as_tuple()]:
+    for wall_loc, ceil_loc, rot in locs:
+        if added_locations[wall_loc.as_tuple()]:
             continue
 
+        diag_loc = (wall_loc.x, wall_loc.y, wall_loc.z + 128)
+
         world, detail = conditions.import_template(
-            SIDE_BRUSH_TEMPLATE,
-            origin=loc,
+            # If there's a wall surface directly above this point
+            # or a ceiling brush in the next block over
+            # we want to use a world brush to seal the leak.
+            # Otherwise we use the detail version for inside the map.
+            temp_name=(
+                FLOOR_TEMP_SIDE_DETAIL if
+                ceil_loc not in conditions.SOLIDS and
+                diag_loc not in conditions.SOLIDS
+                else FLOOR_TEMP_SIDE_WORLD
+            ),
+            origin=wall_loc,
             angles=Vec(0, rot, 0),
-            force_type=conditions.TEMP_TYPES.world,
         )
         conditions.retexture_template(
             world,
             detail,
-            loc,
+            wall_loc,
             # Switch to use the configured squarebeams texture
             replace_tex={
-                'anim_wp/framework/squarebeams': random.choice(tex),
+                'anim_wp/framework/squarebeams': random.choice(
+                    MATS['squarebeams']
+                ),
             }
         )
