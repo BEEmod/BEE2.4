@@ -1178,11 +1178,12 @@ class Side:
         u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
         v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
 
-        u_axis.rotate(angles.x, angles.y, angles.z)
-        v_axis.rotate(angles.x, angles.y, angles.z)
+        if angles is not None:
+            u_axis.rotate(angles.x, angles.y, angles.z)
+            v_axis.rotate(angles.x, angles.y, angles.z)
 
-        self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
-        self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
+            self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
+            self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
 
         # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
         self.uaxis.offset -= origin.dot(u_axis) / self.uaxis.scale
