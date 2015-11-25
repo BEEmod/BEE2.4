@@ -537,8 +537,6 @@ def add_floor_sides(locs):
         locs
     }
 
-    utils.con_log('ADD FLOOR SIDES:')
-
     for face in conditions.VMF.iter_wfaces(world=True, detail=False):
         if face.mat != 'tools/toolsnodraw':
             continue
