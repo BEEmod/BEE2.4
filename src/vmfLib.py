@@ -870,7 +870,7 @@ class Solid:
         for s in self.sides:
             s.translate(diff)
 
-    def localise(self, origin: Vec, angles: Vec):
+    def localise(self, origin: Vec, angles: Vec=None):
         """Shift this brush by the given origin/angles."""
         for s in self.sides:
             s.localise(origin, angles)

@@ -688,7 +688,7 @@ def load_templates():
 def import_template(
         temp_name,
         origin,
-        angles,
+        angles=None,
         force_type=TEMP_TYPES.default,
     ) -> Tuple[
         List[VLib.Solid],
