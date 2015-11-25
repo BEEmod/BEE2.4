@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional, Union,
-    Dict, List, Tuple, Set, Iterable,
+    Dict, List, Tuple, Set, Iterable, Iterator
 )
 
 # Used to set the defaults for versioninfo
@@ -446,7 +446,7 @@ class VMF:
             dest_file.close()
             return string
 
-    def iter_wbrushes(self, world=True, detail=True):
+    def iter_wbrushes(self, world=True, detail=True) -> Iterator['Solid']:
         """Iterate through all world and detail solids in the map."""
         if world:
             yield from self.brushes
@@ -454,7 +454,7 @@ class VMF:
             for ent in self.iter_ents(classname='func_detail'):
                 yield from ent.solids
 
-    def iter_wfaces(self, world=True, detail=True):
+    def iter_wfaces(self, world=True, detail=True) -> Iterator['Side']:
         """Iterate through the faces of world and detail solids."""
         for brush in self.iter_wbrushes(world, detail):
             yield from brush
