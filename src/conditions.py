@@ -702,7 +702,18 @@ def import_template(
     returned instead of an invalid entity.
     """
     import vbsp
-    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+    try:
+        orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        utils.con_log('Templates:')
+        utils.con_log('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
     new_world = []
     new_detail = []
 
