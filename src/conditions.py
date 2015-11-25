@@ -1200,6 +1200,8 @@ def flag_brush_at_loc(inst, flag):
       - "Black" requires a non-portalable surface.
     - SetVar defines an instvar which will be given a value of "black",
       "white" or "none" to allow the result to be reused.
+    - If gridPos is true, the position will be snapped so it aligns with
+      the 128 brushes (Useful with fizzler/light strip items).
     - RemoveBrush: If set to 1, the brush will be removed if found.
       Only do this to EmbedFace brushes, since it will remove the other
       sides as well.
@@ -1214,6 +1216,13 @@ def flag_brush_at_loc(inst, flag):
     norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
         inst['angles', '0 0 0']
     )
+
+    if utils.conv_bool(flag['gridpos', '0']):
+        for axis in 'xyz':
+            # Don't realign things in the normal's axis -
+            # those are already fine.
+            if norm[axis] == 0:
+                pos[axis] = pos[axis] // 128 * 128 + 64
 
     result_var = flag['setVar', '']
     should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
