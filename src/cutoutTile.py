@@ -43,6 +43,8 @@ BEAM_ROT_PRECISION = 100  # How many DP to use for the random digits.
 
 BorderPoints = namedtuple('BorderPoints', 'wall ceil rot')
 
+FLOOR_DEPTH = 8  # Distance we drop the floor
+
 
 @conditions.meta_cond(priority=-1000, only_once=False)
 def find_indicator_panels(inst):
@@ -123,12 +125,19 @@ def res_cutout_tile(inst, res):
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
+        'base_is_disp': utils.conv_bool(res['dispBase']),
+
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
     }
 
     for mat_prop in res['Materials', []]:
         MATS[mat_prop.name].append(mat_prop.value)
+
+    if SETTINGS['base_is_disp']:
+        # We want the normal brushes to become nodraw.
+        MATS['floorbase_disp'] = MATS['floorbase']
+        MATS['floorbase'] = ['tools/toolsnodraw']
 
     for key, default in TEX_DEFAULT:
         if key not in MATS:
@@ -197,7 +206,7 @@ def res_cutout_tile(inst, res):
 
         # Add a player_clip brush across the whole area
         conditions.VMF.add_brush(conditions.VMF.make_prism(
-            p1=box_min - (64, 64, 8),
+            p1=box_min - (64, 64, FLOOR_DEPTH),
             p2=box_max + (64, 64, 0),
             mat=MATS['clip'][0],
         ).solid)
@@ -216,6 +225,13 @@ def res_cutout_tile(inst, res):
             origin=box_min.join(' '),
         )
         noportal_ent.solids.append(noportal_solid)
+
+        if SETTINGS['base_is_disp']:
+            # Use displacements for the base instead.
+            make_alpha_base(
+                box_min + (-64, -64, 0),
+                box_max + (64, 64, 0),
+            )
 
         for x, y in utils.iter_grid(
                 min_x=int(box_min.x),
@@ -315,7 +331,7 @@ def convert_floor(
 
     # Move the floor brush down and switch to the floorbase texture.
     for plane in brush.face.planes:
-        plane.z -= 8
+        plane.z -= FLOOR_DEPTH
     brush.face.mat = random.choice(mats['floorbase'])
 
     loc.x -= 64
@@ -542,6 +558,93 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
                     mat='tools/toolsnodraw',
                 ).solid
             )
+
+
+def make_alpha_base(bbox_min, bbox_max):
+    """Add the base to a CutoutTile, using displacements."""
+    # We want to limit the size of brushes to 512, so the vertexes don't
+    # get too far apart.
+    # This now contains each point from beginning to end inclusive.
+    x, y, z = bbox_min
+
+    dim_x = bbox_max.x - bbox_min.x
+    dim_y = bbox_max.y - bbox_min.y
+
+    widths = [
+        x
+        for x in
+        range(0, int(dim_x), 512)
+    ] + [dim_x]
+    heights = [
+        y
+        for y in
+        range(0, int(dim_y), 512)
+    ] + [dim_y]
+
+    # Loop over two offset copies, so we get a min and max each time.
+    for x1, x2 in zip(widths, widths[1:]):
+        for y1, y2 in zip(heights, heights[1:]):
+            # We place our displacement 1 unit above the surface, then offset
+            # the verts down.
+            brush = conditions.VMF.make_prism(
+                Vec(x + x1, y + y1, z - FLOOR_DEPTH),
+                Vec(x + x2, y + y2, z - FLOOR_DEPTH - 1),
+            )
+            brush.top.mat = random.choice(MATS['floorbase_disp'])
+            make_displacement(
+                brush.top,
+                alpha_min=0,
+                alpha_max=128,
+                offset=-1,
+            )
+            conditions.VMF.add_brush(brush.solid)
+
+
+def make_displacement(
+        face: VLib.Side,
+        alpha_min=0,
+        alpha_max=255,
+        power=3,
+        offset=0,
+        ):
+    """Convert the given face to a displacement with random paint alpha."""
+    bbox_min, bbox_max = face.get_bbox()
+    face.is_disp = True
+    face.disp_elev = offset  # An overall +- to z.
+    face.disp_flags = 0  # Leave it solid
+    face.disp_is_subdiv = False
+    face.disp_power = power
+    face.disp_pos = bbox_min.copy()
+    face.disp_allowed_verts = {
+        '10': '-1 -1 -1 -1 -1 -1 -1 -1 -1 -1',
+    }
+
+    utils.con_log('Making displacement in: {} {}'.format(bbox_min, bbox_max))
+
+    # Number of rows/columns needed
+    grid_size = 2 ** power + 1
+
+    face.disp_data = {
+        # We just want these values repeated the right number of times!
+        'normals': '0 0 1',
+        'distances': '0',
+        'offsets': '0',
+        'offset_normals': '0 0 1',
+        'triangle_tags': '9',  # Walkable
+    }
+    for key, val in face.disp_data.items():
+        # We can duplicate immutable strings fine..
+        face.disp_data[key] = [val * grid_size] * grid_size
+
+    face.disp_data['alphas'] = [
+        ' '.join(
+            str(random.randint(alpha_min, alpha_max))
+            for x in
+            range(grid_size)
+        )
+        for y in range(grid_size)
+    ]
+
 
 
 def reallocate_overlays(mapping):
