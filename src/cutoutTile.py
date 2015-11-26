@@ -39,6 +39,8 @@ FLOOR_TEMP_SIDE_DETAIL = 'BEE2_CUTOUT_TILE_FLOOR_SIDE_DETAIL'
 # Template used to seal floor sections 'covered' by a block.
 FLOOR_TEMP_PILLAR = 'BEE2_CUTOUT_TILE_FLOOR_PILLAR'
 
+BEAM_ROT_PRECISION = 100  # How many DP to use for the random digits.
+
 BorderPoints = namedtuple('BorderPoints', 'wall ceil rot')
 
 
@@ -65,6 +67,7 @@ def res_cutout_tile(inst, res):
 
     - "MarkerItem" is the instance to look for.
     - "TileSize" can be "2x2" or "4x4".
+    - rotateMax is the amount of degrees to rotate squarebeam models.
 
     Materials:
     - "squarebeams" is the squarebeams variant to use.
@@ -114,6 +117,9 @@ def res_cutout_tile(inst, res):
             res['floorGlueChance', '0']),
         'ceil_glue_chance': utils.conv_int(
             res['ceilingGlueChance', '0']),
+
+        'rotate_beams': int(utils.conv_float(
+            res['rotateMax', '0']) * BEAM_ROT_PRECISION),
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
@@ -173,12 +179,21 @@ def res_cutout_tile(inst, res):
             continue  # They're not in the same level!
         z = box_min.z
 
-        # Make the squarebeams props, using big models if possible
-        gen_squarebeams(
-            box_min + (-64, -64, 0),
-            box_max + (64, 64, -8),
-            skin=SETTINGS['beam_skin']
-        )
+        if SETTINGS['rotate_beams']:
+            # We have to generate 1 model per 64x64 block to do rotation...
+            gen_rotated_squarebeams(
+                box_min - (64, 64, 0),
+                box_max + (64, 64, -8),
+                skin=SETTINGS['beam_skin'],
+                max_rot=SETTINGS['rotate_beams'],
+            )
+        else:
+            # Make the squarebeams props, using big models if possible
+            gen_squarebeams(
+                box_min + (-64, -64, 0),
+                box_max + (64, 64, -8),
+                skin=SETTINGS['beam_skin']
+            )
 
         # Add a player_clip brush across the whole area
         conditions.VMF.add_brush(conditions.VMF.make_prism(
@@ -399,16 +414,38 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
     return prism
 
 
-def _make_squarebeam(x, y, z, skin='0', size=''):
+def _make_squarebeam(origin, skin='0', size=''):
     """Make a squarebeam prop at the given location."""
-    conditions.VMF.create_ent(
+    return conditions.VMF.create_ent(
         classname='prop_static',
         angles='0 0 0',
-        origin='{} {} {}'.format(x, y, z),
+        origin=origin.join(' '),
         model='models/anim_wp/framework/squarebeam_off' + size + '.mdl',
         skin=skin,
         disableshadows='1',
     )
+
+
+def gen_rotated_squarebeams(p1: Vec, p2: Vec, skin, max_rot: int):
+    """Generate broken/rotated squarebeams in a region.
+
+    They will be rotated around their centers, not the model origin.
+    """
+    z = min(p1.z, p2.z) + 3  # The center of the beams
+    for x, y in utils.iter_grid(
+            min_x=int(p1.x),
+            min_y=int(p1.y),
+            max_x=int(p2.x),
+            max_y=int(p2.y),
+            stride=64):
+        rand_x = random.randint(-max_rot, max_rot) / BEAM_ROT_PRECISION
+        rand_z = random.randint(-max_rot, max_rot) / BEAM_ROT_PRECISION
+        # Don't rotate around yaw - the vertical axis.
+
+        # Squarebeams are offset 5 units from their real center
+        offset = Vec(0, 0, 5).rotate(rand_x, 0, rand_z)
+        prop = _make_squarebeam(Vec(x + 32, y + 32, z) + offset, skin=skin)
+        prop['angles'] = '{} 0 {}'.format(rand_x, rand_z)
 
 
 def gen_squarebeams(p1, p2, skin, gen_collision=True):
@@ -444,25 +481,25 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             # Make 1 prop every 512 units, at the center
             if x % 512 == 0 and y % 512 == 0:
                 _make_squarebeam(
-                    min_x+x+256, min_y+y+256, z,
+                    Vec(min_x + x + 256, min_y +  y + 256, z),
                     skin, '_8x8',
                 )
         elif x < cutoff_256_x and y < cutoff_256_y:
             if x % 256 == 0 and y % 256 == 0:
                 _make_squarebeam(
-                    min_x+x+128, min_y+y+128, z,
+                    Vec(min_x + x + 128, min_y + y + 128, z),
                     skin, '_4x4',
                 )
         elif x < cutoff_128_x and y < cutoff_128_y:
             if x % 128 == 0 and y % 128 == 0:
                 _make_squarebeam(
-                    min_x+x+64, min_y+y+64, z,
+                    Vec(min_x + x + 64, min_y + y + 64, z),
                     skin, '_2x2',
                 )
         else:
             # Make squarebeams for every point!
             _make_squarebeam(
-                min_x + x + 32, min_y+y + 32, z,
+                Vec(min_x + x + 32, min_y + y + 32, z),
                 skin,
             )
 
