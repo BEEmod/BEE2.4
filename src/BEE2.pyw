@@ -60,6 +60,8 @@ if __name__ == '__main__':
             'log_missing_styles': '0',
             # Print message for items that are missing ent_count values
             'log_missing_ent_count': '0',
+            # Warn if a file is missing that a packfile refers to
+            'log_incorrect_packfile': '0',
         },
     }
     loadScreen.main_loader.set_length('UI', 14)
@@ -92,6 +94,8 @@ if __name__ == '__main__':
                 'Debug', 'log_missing_styles'),
             log_missing_ent_count=GEN_OPTS.get_bool(
                 'Debug', 'log_missing_ent_count'),
+            log_incorrect_packfile=GEN_OPTS.get_bool(
+                'Debug', 'log_incorrect_packfile'),
         )
         UI.load_packages(pack_data)
         print('Done!')

@@ -273,6 +273,16 @@ def init_dev_tab(f):
     make_checkbox(
         f,
         section='Debug',
+        item='log_incorrect_packfile',
+        desc="Log missing packfile resources",
+        tooltip='Log when the resources a PackFile object refers to are not '
+                'present in the zip. This may be fine (in a prerequisite zip),'
+                ' but it often indicates an error.',
+    ).grid(row=4, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
         item='show_errors',
         desc="Show detailed error message",
         tooltip='If an error occurs, show the error and traceback '

@@ -40,6 +40,9 @@ ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
+# Check to see if the zip contains the resources referred to by the packfile.
+CHECK_PACKFILE_CORRECTNESS = False
+
 
 def pak_object(name, allow_mult=False, has_img=True):
     """Decorator to add a class to the list of objects.
@@ -164,9 +167,10 @@ def load_packages(
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
+        log_incorrect_packfile=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global LOG_ENT_COUNT
+    global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
     if not os.path.isdir(pak_dir):
@@ -186,7 +190,7 @@ def load_packages(
         sys.exit('No Packages Directory!')
 
     LOG_ENT_COUNT = log_missing_ent_count
-    print('ENT_COUNT:', LOG_ENT_COUNT)
+    CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
     zips = []
     data['zips'] = []
     try:
@@ -1057,20 +1061,22 @@ class PackList:
                         path,
                     )
                 ) from ex
-        # Use normpath so sep differences are ignored, plus case.
-        zip_files = {
-            os.path.normpath(file).casefold()
-            for file in
-            zip_names(data.zip_file)
-        }
-        for file in files:
-            #  Check to make sure the files exist...
-            file = os.path.join('resources', os.path.normpath(file)).casefold()
-            if file not in zip_files:
-                utils.con_log('Warning: "{}" not in zip! ({})'.format(
-                    file,
-                    data.pak_id,
-                ))
+        if CHECK_PACKFILE_CORRECTNESS:
+            # Use normpath so sep differences are ignored, plus case.
+            zip_files = {
+                os.path.normpath(file).casefold()
+                for file in
+                zip_names(data.zip_file)
+                if file.startswith('resources')
+            }
+            for file in files:
+                #  Check to make sure the files exist...
+                file = os.path.join('resources', os.path.normpath(file)).casefold()
+                if file not in zip_files:
+                    utils.con_log('Warning: "{}" not in zip! ({})'.format(
+                        file,
+                        data.pak_id,
+                    ))
 
         return cls(
             data.id,
