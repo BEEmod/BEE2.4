@@ -1057,6 +1057,20 @@ class PackList:
                         path,
                     )
                 ) from ex
+        # Use normpath so sep differences are ignored, plus case.
+        zip_files = {
+            os.path.normpath(file)
+            for file in
+            zip_names(data.zip_file)
+        }
+        for file in files:
+            #  Check to make sure the files exist...
+            file = os.path.join('resources', os.path.normpath(file))
+            if file not in zip_files:
+                utils.con_log('Warning: "{}" not in zip! ({})'.format(
+                    file,
+                    data.pak_id,
+                ))
 
         return cls(
             data.id,
