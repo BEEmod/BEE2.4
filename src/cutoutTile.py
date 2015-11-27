@@ -125,7 +125,7 @@ def res_cutout_tile(inst, res):
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
-        'base_is_disp': utils.conv_bool(res['dispBase']),
+        'base_is_disp': utils.conv_bool(res['dispBase', '0']),
 
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
