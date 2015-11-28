@@ -1089,7 +1089,7 @@ class Side:
             lightmap=self.lightmap,
             disp_data=disp_data,
         )
-        side_mapping[self.id] = copy.id
+        side_mapping[str(self.id)] = str(copy.id)
         return copy
 
 
