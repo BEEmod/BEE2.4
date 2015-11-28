@@ -744,7 +744,7 @@ class Solid:
         self.editor = editor or {}
         self.hidden = hidden
 
-    def copy(self, des_id=-1, map=None):
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
         """Duplicate this brush."""
         editor = {}
         for key in ('color', 'groupid', 'visgroupshown', 'visgroupautoshown'):
@@ -752,7 +752,11 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy(map=map) for s in self.sides]
+        sides = [
+            s.copy(map=map, side_mapping=side_mapping)
+            for s in
+            self.sides
+        ]
         return Solid(
             map or self.map,
             des_id=des_id,
@@ -1052,8 +1056,13 @@ class Side:
                 tree['smoothing_groups', '0']),
         )
 
-    def copy(self, des_id=-1, map=None):
-        """Duplicate this brush side."""
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
+        """Duplicate this brush side.
+
+        des_id is the id which is desired for the new side.
+        map is the VMF to add the new side to (defaults to the same map).
+        If passed, side_mapping will be updated with a old -> new ID pair.
+        """
         planes = [p.as_tuple() for p in self.planes]
         if self.is_disp:
             disp_data = self.disp_data.copy()
@@ -1065,7 +1074,10 @@ class Side:
         else:
             disp_data = None
 
-        return Side(
+        if map is not None and des_id == -1:
+            des_id = self.id
+
+        copy = Side(
             map or self.map,
             planes=planes,
             des_id=des_id,
@@ -1077,6 +1089,9 @@ class Side:
             lightmap=self.lightmap,
             disp_data=disp_data,
         )
+        side_mapping[self.id] = copy.id
+        return copy
+
 
     def export(self, buffer, ind=''):
         """Generate the strings required to define this side in a VMF."""
@@ -1269,7 +1284,7 @@ class Entity:
         if 'color' not in self.editor:
             self.editor['color'] = '255 255 255'
 
-    def copy(self, des_id=-1, map=None):
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
         """Duplicate this entity entirely, including solids and outputs."""
         new_keys = {}
         new_fixup = self.fixup.copy_dict()
@@ -1282,7 +1297,11 @@ class Entity:
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
 
-        new_solids = [s.copy(map=map) for s in self.solids]
+        new_solids = [
+            solid.copy(map=map, side_mapping=side_mapping)
+            for solid in
+            self.solids
+        ]
         outs = [o.copy() for o in self.outputs]
 
         return Entity(
