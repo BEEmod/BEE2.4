@@ -307,14 +307,15 @@ def convert_floor(
         # This is a pillar block - there isn't actually tiles here!
         # We need to generate a squarebeams brush to fill this gap.
 
-        brush.face.mat = 'tools/toolsnodraw' # It won't be visible
-        world, detail = conditions.import_template(
+        brush.face.mat = 'tools/toolsnodraw'  # It won't be visible
+        world, detail, over = conditions.import_template(
             temp_name=FLOOR_TEMP_PILLAR,
             origin=loc,
         )
         conditions.retexture_template(
             world,
             detail,
+            over,
             loc,
             # Switch to use the configured squarebeams texture
             replace_tex={
@@ -700,7 +701,7 @@ def add_floor_sides(locs):
 
         diag_loc = (wall_loc.x, wall_loc.y, wall_loc.z + 128)
 
-        world, detail = conditions.import_template(
+        world, detail, over = conditions.import_template(
             # If there's a wall surface directly above this point
             # or a ceiling brush in the next block over
             # we want to use a world brush to seal the leak.
@@ -717,6 +718,7 @@ def add_floor_sides(locs):
         conditions.retexture_template(
             world,
             detail,
+            over,
             wall_loc,
             # Switch to use the configured squarebeams texture
             replace_tex={

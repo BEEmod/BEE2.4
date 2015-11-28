@@ -556,8 +556,11 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
-class EmptyMapping(abc.Mapping):
-    """A Mapping class which is always empty."""
+class EmptyMapping(abc.MutableMapping):
+    """A Mapping class which is always empty.
+
+    Any modifications will be ignored.
+    """
     __slots__ = []
 
     def __call__(self):
@@ -585,14 +588,23 @@ class EmptyMapping(abc.Mapping):
     def __iter__(self):
         return self
 
-    def items(self):
-        return self
+    items = values = keys = __iter__
 
-    def values(self):
-        return self
+    # Mutable functions
+    setdefault = get
 
-    def keys(self):
-        return self
+    def update(*args, **kwds):
+        pass
+
+    __setitem__ = __delitem__ = clear = update
+
+    __marker = object()
+
+    def pop(self, key, default=__marker):
+        raise KeyError
+
+    def popitem(self):
+        raise KeyError
 
 EmptyMapping = EmptyMapping()  # We only need the one instance
 

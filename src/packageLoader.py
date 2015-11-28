@@ -1130,18 +1130,24 @@ class BrushTemplate:
         self.id = temp_id
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+
+        # If we have overlays, we need to ensure the IDs crossover correctly
+        id_mapping = {}
+
         if vmf_file.brushes:
             self.temp_world = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_world',
                 template_id=self.id,
             )
             self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE)
+                solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                 for solid in
                 vmf_file.brushes
             ]
         else:
             self.temp_world = None
+
+        # Add detail brushes
         if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
             self.temp_detail = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_detail',
@@ -1149,12 +1155,31 @@ class BrushTemplate:
             )
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE)
+                    solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                     for solid in
                     ent.solids
                 )
         else:
             self.temp_detail = None
+
+        self.temp_overlays = []
+
+        # Look for overlays, and translate their IDS.
+        for overlay in vmf_file.by_class['info_overlay']:  # type: VLib.Entity
+            new_overlay = overlay.copy(
+                map=TEMPLATE_FILE,
+            )
+            new_overlay['template_id'] = self.id
+            new_overlay['classname'] = 'bee2_template_overlay'
+            sides = overlay['sides'].split()
+            new_overlay['sides'] = ' '.join(
+                id_mapping[side]
+                for side in sides
+                if side in id_mapping
+            )
+            TEMPLATE_FILE.add_ent(new_overlay)
+
+            self.temp_overlays.append(new_overlay)
 
     @classmethod
     def parse(cls, data: ParseData):

@@ -672,16 +672,22 @@ def load_templates():
     vmf = VLib.VMF.parse(props)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
+    overlay_ents = defaultdict(list)
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[ent['template_id'].casefold()].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
         detail_ents[ent['template_id'].casefold()].extend(ent.solids)
 
-    for temp_id in set(detail_ents.keys()).union(world_ents.keys()):
+    for ent in vmf.by_class['bee2_template_overlay']:
+        overlay_ents[ent['template_id'].casefold()].append(ent)
+
+    for temp_id in set(detail_ents.keys()
+            ).union(world_ents.keys(), overlay_ents.keys()):
         TEMPLATES[temp_id] = (
             world_ents[temp_id],
             detail_ents[temp_id],
+            overlay_ents[temp_id]
         )
 
 
@@ -689,10 +695,12 @@ def import_template(
         temp_name,
         origin,
         angles=None,
+        targetname='',
         force_type=TEMP_TYPES.default,
     ) -> Tuple[
         List[VLib.Solid],
         Optional[VLib.Entity],
+        List[VLib.Entity],
         ]:
     """Import the given template at a location.
 
@@ -700,10 +708,12 @@ def import_template(
     to the specified type instead. A list of world brushes and the func_detail
     entity will be returned. If there are no detail brushes, None will be
     returned instead of an invalid entity.
+
+    If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
     try:
-        orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
     except KeyError as err:
         utils.con_log('Templates:')
         utils.con_log('\n'.join(
@@ -716,15 +726,48 @@ def import_template(
         raise err
     new_world = []
     new_detail = []
+    new_over = []
+
+    id_mapping = {}
 
     for orig_list, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
         for old_brush in orig_list:
-            brush = old_brush.copy(map=VMF)
+            brush = old_brush.copy(map=VMF, side_mapping=id_mapping)
             brush.localise(origin, angles)
             new_list.append(brush)
+
+    for overlay in orig_over:  # type: VLib.Entity
+        new_overlay = overlay.copy(
+            map=VMF,
+        )
+        del new_overlay['template_id']  # Remove this, it's not part of overlays
+        new_overlay['classname'] = 'info_overlay'
+
+        sides = overlay['sides'].split()
+        new_overlay['sides'] = ' '.join(
+            id_mapping[side]
+            for side in sides
+            if side in id_mapping
+        )
+
+        VLib.localise_overlay(new_overlay, origin, angles)
+        orig_target = new_overlay['targetname']
+
+        # Only change the targetname if the overlay is not global, and we have
+        # a passed name.
+        if targetname and orig_target and orig_target[0] != '@':
+            new_overlay['targetname'] = targetname + '-' + orig_target
+
+        VMF.add_ent(new_overlay)
+        new_over.append(new_overlay)
+
+        # Don't let the overlays get retextured too!
+        vbsp.IGNORED_OVERLAYS.add(new_overlay)
+
+    utils.con_log(''.join(map(str, new_over)))
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
@@ -755,12 +798,13 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return new_world, detail_ent
+    return new_world, detail_ent, new_over
 
 
 def retexture_template(
         world: List[VLib.Solid],
         detail: VLib.Entity,
+        overlays: List[VLib.Entity],
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
@@ -862,7 +906,6 @@ def retexture_template(
                     continue  # Set to a special texture,
                     # don't use the wall one
             else:
-                utils.con_log(grid_size, norm.z)
                 if norm.z > floor_tolerance:
                     grid_size = 'ceiling'
                 if norm.z < -floor_tolerance:
@@ -890,6 +933,14 @@ def retexture_template(
                 face.mat = vbsp.get_tex(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
+
+    for over in overlays:
+        mat = over['material'].casefold()
+        if mat in replace_tex:
+            over['material'] = random.choice(replace_tex[mat])
+        elif mat in vbsp.TEX_VALVE:
+            over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+
 
 
 @make_flag('debug')
@@ -2995,15 +3046,17 @@ def res_import_template(inst, res):
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    world, detail = import_template(
+    world, detail, over = import_template(
         temp_id,
         origin,
         angles,
-        force_type,
+        targetname=inst['targetname', ''],
+        force_type=force_type,
     )
     retexture_template(
         world,
         detail,
+        over,
         origin,
         replace_tex,
         force_colour,
