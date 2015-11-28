@@ -1173,8 +1173,9 @@ class BrushTemplate:
             new_overlay['classname'] = 'bee2_template_overlay'
             sides = overlay['sides'].split()
             new_overlay['sides'] = ' '.join(
-                str(id_mapping.get(side, side))
+                id_mapping[side]
                 for side in sides
+                if side in id_mapping
             )
             TEMPLATE_FILE.add_ent(new_overlay)
 

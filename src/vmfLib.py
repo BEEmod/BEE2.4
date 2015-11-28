@@ -131,7 +131,6 @@ def make_overlay(
     if normal.z < 0:
         basis_u *= -1
 
-
     return vmf.create_ent(
         classname='info_overlay',
         angles='0 0 0',  # Not actually used by VBSP!
@@ -155,6 +154,21 @@ def make_overlay(
         uv2='{} {} 0'.format(u_dist, v_dist),
         uv3='{} -{} 0'.format(u_dist, v_dist),
     )
+
+
+def localise_overlay(over, origin, angles=None):
+    """Rotate an overlay like what is done in instances."""
+    if angles is not None:
+        for key in ('basisNormal', 'basisU', 'basisV'):
+            ang = Vec.from_str(over[key]).rotate(angles.x, angles.y, angles.z)
+            over[key] = ang.join(' ')
+    else:
+        angles = Vec(0, 0, 0)
+
+    for key in ('basisOrigin', 'origin'):
+        ang = Vec.from_str(over[key]).rotate(angles.x, angles.y, angles.z)
+        ang += origin
+        over[key] = ang.join(' ')
 
 
 class CopySet(set):
@@ -1091,7 +1105,6 @@ class Side:
         )
         side_mapping[str(self.id)] = str(copy.id)
         return copy
-
 
     def export(self, buffer, ind=''):
         """Generate the strings required to define this side in a VMF."""
