@@ -3368,6 +3368,38 @@ def res_rand_num(inst, res):
     inst.fixup[var] = str(func(min_val, max_val))
 
 
+@make_result('RandomVec')
+def res_rand_vec(inst, res):
+    """A modification to RandomNum which generates a random vector instead.
+
+    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
+    are for each section. If the min and max are equal that number will be used
+    instead.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    value = Vec()
+
+    for axis in 'xyz':
+        max_val = utils.conv_float(res['max_' + axis, 0.0])
+        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        if min_val == max_val:
+            value[axis] = min_val
+        else:
+            value[axis] = func(min_val, max_val)
+
+    inst.fixup[var] = value.join(' ')
+
+
 @make_result('GooDebris')
 def res_goo_debris(_, res):
     """Add random instances to goo squares.
