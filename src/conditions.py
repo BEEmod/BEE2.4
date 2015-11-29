@@ -1433,7 +1433,7 @@ def res_random(inst, res):
                 inst,
                 sub_res,
             )
-            if should_del:
+            if should_del is RES_EXHAUSTED:
                 # This Result doesn't do anything!
                 sub_res.name = 'nop'
                 sub_res.value = None
