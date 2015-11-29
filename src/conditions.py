@@ -1426,7 +1426,7 @@ def res_random(inst, res):
         return
 
     ind = random.choice(weight)
-    choice = results[ind]
+    choice = results[ind]  # type: Property
     if choice.name == 'group':
         for sub_res in choice.value:
             should_del = Condition.test_result(
@@ -1436,13 +1436,15 @@ def res_random(inst, res):
             if should_del:
                 # This Result doesn't do anything!
                 sub_res.name = 'nop'
+                sub_res.value = None
     else:
         should_del = Condition.test_result(
             inst,
             choice,
         )
-        if should_del:
+        if should_del is RES_EXHAUSTED:
             choice.name = 'nop'
+            choice.value = None
 
 
 @make_result('forceUpright')
