@@ -1426,23 +1426,25 @@ def res_random(inst, res):
         return
 
     ind = random.choice(weight)
-    choice = results[ind]
+    choice = results[ind]  # type: Property
     if choice.name == 'group':
         for sub_res in choice.value:
             should_del = Condition.test_result(
                 inst,
                 sub_res,
             )
-            if should_del:
+            if should_del is RES_EXHAUSTED:
                 # This Result doesn't do anything!
                 sub_res.name = 'nop'
+                sub_res.value = None
     else:
         should_del = Condition.test_result(
             inst,
             choice,
         )
-        if should_del:
+        if should_del is RES_EXHAUSTED:
             choice.name = 'nop'
+            choice.value = None
 
 
 @make_result('forceUpright')
@@ -3366,6 +3368,38 @@ def res_rand_num(inst, res):
     inst.fixup[var] = str(func(min_val, max_val))
 
 
+@make_result('RandomVec')
+def res_rand_vec(inst, res):
+    """A modification to RandomNum which generates a random vector instead.
+
+    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
+    are for each section. If the min and max are equal that number will be used
+    instead.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    value = Vec()
+
+    for axis in 'xyz':
+        max_val = utils.conv_float(res['max_' + axis, 0.0])
+        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        if min_val == max_val:
+            value[axis] = min_val
+        else:
+            value[axis] = func(min_val, max_val)
+
+    inst.fixup[var] = value.join(' ')
+
+
 @make_result('GooDebris')
 def res_goo_debris(_, res):
     """Add random instances to goo squares.
@@ -3447,6 +3481,83 @@ def res_goo_debris(_, res):
         )
 
     return RES_EXHAUSTED
+
+WP_STRIP_COL_COUNT = 8  # Number of strip instances placed per row
+WP_LIMIT = 30  # Limit to this many portal instances
+
+
+@make_result_setup('WPLightstrip')
+def res_portal_lightstrip_setup(res):
+    do_offset = utils.conv_bool(res['doOffset', '0'])
+    hole_inst = res['HoleInst']
+    fallback = res['FallbackInst']
+    location = Vec.from_str(res['location', '0 8192 0'])
+    strip_name = res['strip_name']
+    hole_name = res['hole_name']
+    return [
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        0,
+    ]
+
+
+@make_result('WPLightstrip')
+def res_portal_lightstrip(inst, res):
+    """Special result used for P1 light strips."""
+    (
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        count,
+    ) = res.value
+
+    if do_offset:
+        random.seed('random_case_{}:{}_{}_{}'.format(
+            'WP_LightStrip',
+            inst['targetname', ''],
+            inst['origin'],
+            inst['angles'],
+        ))
+
+        off = Vec(
+            y=random.choice((-48, -16, 16, 48))
+        ).rotate_by_str(inst['angles'])
+        inst['origin'] = (Vec.from_str(inst['origin']) + off).join(' ')
+
+    if count > WP_LIMIT:
+        inst['file'] = fallback
+        return
+
+    disp_inst = VMF.create_ent(
+        classname='func_instance',
+        angles='0 0 0',
+        origin=(location + Vec(
+            x=128 * (count % WP_STRIP_COL_COUNT),
+            y=128 * (count // WP_STRIP_COL_COUNT),
+        )).join(' '),
+        file=hole_inst,
+    )
+    if '{}' in strip_name:
+        strip_name = strip_name.replace('{}', str(count))
+    else:
+        strip_name += str(count)
+
+    if '{}' in hole_name:
+        hole_name = hole_name.replace('{}', str(count))
+    else:
+        hole_name += str(count)
+
+    disp_inst.fixup['port_name'] = inst.fixup['link_name'] = strip_name
+    inst.fixup['port_name'] = disp_inst.fixup['link_name'] = hole_name
+
+    res.value[-1] = count + 1
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}
