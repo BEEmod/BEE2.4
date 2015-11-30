@@ -4,6 +4,7 @@ import sys
 import subprocess
 import shutil
 import random
+import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
@@ -112,8 +113,10 @@ TEX_DEFAULTS = [
     # Only used if set - replace the decals with textures
     ('', 'special.bullseye_white_wall'),
     ('', 'special.bullseye_white_floor'),
+    ('', 'special.bullseye_white_ceiling'),
     ('', 'special.bullseye_black_wall'),
     ('', 'special.bullseye_black_floor'),
+    ('', 'special.bullseye_black_ceiling'),
 ]
 
 
@@ -650,6 +653,95 @@ def static_pan(inst):
     if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
+
+
+ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush faces
+
+
+@conditions.meta_cond(-1000)
+def find_panel_locs(_):
+    """Find the locations of panels, used for FaithBullseye."""
+    for brush in VMF.by_class['func_brush']:
+        if "-model_arms" not in brush['parentname']:
+            continue
+        for face in brush.sides():
+            # Find the face which isn't backpanel/squarebeams
+            if face.mat.casefold() not in (
+                    'anim_wp/framework/squarebeams',
+                    'anim_wp/framework/backpanels_cheap'):
+                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = face
+                break
+
+
+@conditions.make_result_setup('FaithBullseye')
+def res_faith_bullseye_check(res):
+    """Do a check to ensure there are actually textures availble."""
+    for col in ('white', 'black'):
+        for orient in ('wall', 'floor', 'ceiling'):
+            if settings['textures'][
+                    'special.bullseye_{}_{}'.format(col, orient)
+                                        ] != ['']:
+                return res.value
+    return None  # No textures!
+
+
+@conditions.make_result('FaithBullseye')
+def res_faith_bullseye(inst, res):
+    """Replace the bullseye instances with textures instead."""
+
+    pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    pos = (pos + Vec.from_str(inst['origin'])).as_tuple()
+
+    norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
+
+    face = None
+    color = None
+
+    orig_file = inst['file']
+
+    # Look for a world brush
+    if pos in conditions.SOLIDS:
+        solid = conditions.SOLIDS[pos]
+        if solid.normal == norm:
+            face = solid.face
+            color = solid.color
+            # Use an alternate instance, without the decal ent.
+            inst['file'] = res.value
+
+    # Look for angled panels
+    if face is None:
+        if pos in ANGLED_PAN_BRUSH:
+            face = ANGLED_PAN_BRUSH[pos]
+            if face.mat.casefold() in WHITE_PAN:
+                color = conditions.MAT_TYPES.white
+                inst['file'] = ''  # The instance won't be used -
+                # there's already a helper
+            elif face.mat.casefold() in BLACK_PAN:
+                color = conditions.MAT_TYPES.black
+                inst['file'] = ''
+            else:
+                # Should never happen - no angled panel should be textured
+                # yet. Act as if the panel wasn't there.
+                face = None
+
+    # There isn't a surface - blank the instance, it's in goo or similar
+    if face is None:
+        inst['file'] = ''
+        return
+
+    orient = get_face_orient(face)
+    orig_mat = face.mat
+    face.mat = get_tex('special.bullseye_{}_{}'.format(color, orient))
+    # Fallback to floor texture if using ceiling or wall
+    if orient is not ORIENT.floor and face.mat == '':
+        face.mat = get_tex('special.bullseye_{}_floor'.format(color))
+
+    # There isn't a texture! Revert our changes..
+    if face.mat == '':
+        face.mat = orig_mat
+        inst['file'] = orig_file
+    else:
+        IGNORED_FACES.add(face)
 
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
