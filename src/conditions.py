@@ -34,7 +34,8 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-GOO_LOCS = set()  # A set of all goo solid origins.
+GOO_LOCS = set()  # A set of all blocks containing goo
+GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list are world brushes, the second are func_detail brushes.
@@ -483,7 +484,19 @@ def build_solid_dict():
             if face.mat.casefold() in (
                     'nature/toxicslime_a2_bridge_intro',
                     'nature/toxicslime_puzzlemaker_cheap'):
-                GOO_LOCS.add(face.get_origin().as_tuple())
+                # Record all locations containing goo.
+                bbox_min, bbox_max = solid.get_bbox()
+                x = bbox_min.x + 64
+                y = bbox_min.y + 64
+                # If goo is multi-level, we want to record all pos!
+                for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
+                    GOO_LOCS.add(Vec_tuple(x, y, z))
+
+                # Add the location of the top face
+                GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
+
+                # Indicate that this map contains goo...
+                VOICE_ATTR['goo'] = True
                 continue
 
             try:
@@ -3432,7 +3445,7 @@ def res_goo_debris(_, res):
 
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in GOO_LOCS]
+        possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
     else:
         possible_locs = []
         utils.con_log('Pos:', *utils.iter_grid(
@@ -3442,7 +3455,7 @@ def res_goo_debris(_, res):
                     max_y=space+1,
                     )
         )
-        for x, y, z in set(GOO_LOCS):
+        for x, y, z in set(GOO_FACE_LOC):
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
                     max_x=space+1,
@@ -3451,13 +3464,13 @@ def res_goo_debris(_, res):
                     ):
                 if x_off == y_off == 0:
                     continue
-                if (x + x_off*128, y + y_off*128, z) not in GOO_LOCS:
+                if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
                     break  # This doesn't qualify
             else:
                 possible_locs.append(Vec(x,y,z))
 
     utils.con_log('GooDebris: {}/{} locations'.format(
-        len(possible_locs), len(GOO_LOCS)
+        len(possible_locs), len(GOO_FACE_LOC)
     ))
 
     suff = ''
