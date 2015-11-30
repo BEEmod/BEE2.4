@@ -1609,7 +1609,9 @@ def res_add_overlay_inst(inst, res):
             instance will be copied over.
         move_outputs: If true, outputs will be moved to this instance.
         offset: The offset (relative to the base) that the instance
-            will be placed.
+            will be placed. Can be set to '<piston_top>' and
+            '<piston_bottom>' to offset based on the configuration
+            of piston platform handles.
         angles: If set, overrides the base instance angles. This does
             not affect the offset property.
     """
@@ -1631,8 +1633,22 @@ def res_add_overlay_inst(inst, res):
         inst.outputs = []
 
     if 'offset' in res:
+        folded_off = res['offset'].casefold()
         # Offset the overlay by the given distance
-        offset = Vec.from_str(res['offset']).rotate_by_str(
+        # Some special placeholder values:
+        if folded_off == '<piston_bottom>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$bottom_level']) * 128,
+            )
+        elif folded_off == '<piston_top>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$top_level'], 1) * 128,
+            )
+        else:
+            # Regular vector
+            offset = Vec.from_str(res['offset'])
+
+        offset.rotate_by_str(
             inst['angles', '0 0 0']
         )
         overlay_inst['origin'] = (
