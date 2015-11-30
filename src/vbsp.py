@@ -2320,10 +2320,10 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         facing_dir = Vec(0, 1, 0).rotate_by_str(ent['angles'])
         # Rotating counterclockwise
         if facing_dir.z == 1:
-            temp_angles.y = (temp_angles.y + int(angle)) % 360
+            temp_angles.y = (temp_angles.y - int(angle)) % 360
         # Rotating clockwise
         elif facing_dir.z == -1:
-            temp_angles.y = (temp_angles.y - int(angle)) % 360
+            temp_angles.y = (temp_angles.y + int(angle)) % 360
         else:
             normal = Vec(0, 0, 1).rotate_by_str(ent['angles'])
             if normal.z == -1:
@@ -2331,7 +2331,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
                 temp_angles.x = (temp_angles.x + int(angle)) % 360
             else:
                 # Floor or rotating upright on walls
-                temp_angles.x = (temp_angles.x + int(angle)) % 360
+                temp_angles.x = (temp_angles.x - int(angle)) % 360
 
         world, detail, overlays = conditions.import_template(
             get_opt('static_pan_temp_' + pan_type),
