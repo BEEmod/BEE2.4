@@ -198,7 +198,7 @@ DEFAULTS = {
     "staticPan":                "NONE",  # folder for static panels
     # Template used for static panels set to 0 degrees
     "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
-    # Template used for white static panels
+    # Template used for angled static panels
     "static_pan_temp_white":     "BEE2_STATIC_PAN_ANGLED",
     "static_pan_temp_black":     "BEE2_STATIC_PAN_ANGLED",
 
