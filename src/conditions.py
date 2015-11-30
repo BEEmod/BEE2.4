@@ -1312,6 +1312,24 @@ def flag_brush_at_loc(inst, flag):
     return des_type == br_type
 
 
+@make_flag('PosIsGoo')
+def flag_goo_at_loc(inst, flag):
+    """Check to see if a given location is submerged in goo.
+
+    0 0 0 is the origin of the instance, values are in 128 increments.
+    """
+    pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
+    pos *= 128
+    pos += Vec.from_str(inst['origin'])
+
+    # Round to 128 units, then offset to the center
+    pos = pos // 128 * 128 + 64  # type: Vec
+    utils.con_log(pos.as_tuple(), GOO_LOCS)
+    val = pos.as_tuple() in GOO_LOCS
+    utils.con_log(val)
+    return val
+
+
 ###########
 # RESULTS #
 ###########
