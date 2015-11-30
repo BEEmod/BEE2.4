@@ -2540,12 +2540,16 @@ def res_track_plat(_, res):
         VMF.by_class['func_instance']
         if inst['file'].casefold() in track_files
     }
+
     utils.con_log('Track instances:')
     utils.con_log('\n'.join(
         '{!s}: {}'.format(k, v['file'])
         for k, v in
         track_instances.items()
     ))
+
+    if not track_instances:
+        return RES_EXHAUSTED
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
@@ -2650,7 +2654,8 @@ def res_track_plat(_, res):
         if plat_var != '':
             # Skip the '_mirrored' section if needed
             plat_inst.fixup[plat_var] = track_facing[:5].lower()
-            return RES_EXHAUSTED
+
+    return RES_EXHAUSTED # Don't re-run
 
 
 def track_scan(
