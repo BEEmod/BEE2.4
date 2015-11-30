@@ -108,7 +108,13 @@ TEX_DEFAULTS = [
     # We just use the regular version if unset.
     ('', 'overlay.antlinecornerfloor'),
     ('', 'overlay.antlinefloor'),
-    ]
+
+    # Only used if set - replace the decals with textures
+    ('', 'special.bullseye_white_wall'),
+    ('', 'special.bullseye_white_floor'),
+    ('', 'special.bullseye_black_wall'),
+    ('', 'special.bullseye_black_floor'),
+]
 
 
 class ORIENT(Enum):
