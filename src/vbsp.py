@@ -2315,14 +2315,28 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         temp_origin += Vec.from_str(ent['origin'])
 
         temp_angles = Vec.from_str(ent['angles'])
-        # Subtract from pitch to rotate appropriately.
-        temp_angles.x -= int(angle)
-        temp_angles.x %= 360
+
+        # figure out the right axis to rotate for the face
+        facing_dir = Vec(0, 1, 0).rotate_by_str(ent['angles'])
+        # Rotating counterclockwise
+        if facing_dir.z == 1:
+            temp_angles.y = (temp_angles.y + int(angle)) % 360
+        # Rotating clockwise
+        elif facing_dir.z == -1:
+            temp_angles.y = (temp_angles.y - int(angle)) % 360
+        else:
+            normal = Vec(0, 0, 1).rotate_by_str(ent['angles'])
+            if normal.z == -1:
+                # On ceiling
+                temp_angles.x = (temp_angles.x + int(angle)) % 360
+            else:
+                # Floor or rotating upright on walls
+                temp_angles.x = (temp_angles.x + int(angle)) % 360
 
         world, detail, overlays = conditions.import_template(
             get_opt('static_pan_temp_' + pan_type),
-            ent['origin'],
-            ent['angles'],
+            temp_origin,
+            temp_angles,
             force_type=conditions.TEMP_TYPES.detail,
         )
     conditions.retexture_template(

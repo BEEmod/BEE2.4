@@ -943,7 +943,7 @@ def retexture_template(
                 # If those aren't defined, try the wall texture..
                 if face.mat == '':
                     face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_walll'.format(tex_colour)
+                        'special.bullseye_{}_wall'.format(tex_colour)
                     )
                 if face.mat != '':
                     continue  # Set to a bullseye texture,
@@ -963,14 +963,17 @@ def retexture_template(
                     face.mat = vbsp.get_tex(
                         'special.{!s}'.format(tex_colour)
                     )
-                if face.mat != '':
-                    continue  # Set to a special texture,
-                    # don't use the wall one
-            else:
-                if norm.z > floor_tolerance:
-                    grid_size = 'ceiling'
-                if norm.z < -floor_tolerance:
-                    grid_size = 'floor'
+                if face.mat == '':
+                    # No special texture - use a wall one.
+                    grid_size = 'wall'
+                else:
+                    # Set to a special texture,
+                    continue # don't use the wall one
+
+            if norm.z > floor_tolerance:
+                grid_size = 'ceiling'
+            if norm.z < -floor_tolerance:
+                grid_size = 'floor'
 
             if can_clump:
                 # For the clumping algorithm, set to Valve PeTI and let
