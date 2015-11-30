@@ -4,8 +4,9 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 import random
 import math
+import operator
 
-from utils import Vec
+from utils import Vec, Vec_tuple
 from property_parser import Property
 from instanceLocs import resolve as resolve_inst
 import vmfLib as VLib
@@ -166,6 +167,8 @@ TEMPLATE_RETEXTURE = {
     'anim_wp/framework/squarebeams': 'special.edge',
     'glass/glasswindow007a_less_shiny': 'special.glass',
     'metal/metalgrate018': 'special.grating',
+
+    'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
 
 del B, W
@@ -868,6 +871,25 @@ def retexture_template(
                 # It's something like squarebeams or backpanels, just look
                 # it up
                 face.mat = vbsp.get_tex(tex_type)
+
+                if tex_type == 'special.goo_cheap':
+                    if face.normal() != (0, 0, 1):
+                        # Goo must be facing upright!
+                        # Retexture to nodraw, so a template can be made with
+                        # all faces goo to work in multiple orientations.
+                        face.mat = 'tools/toolsnodraw'
+                    else:
+                        # Goo always has the same orientation!
+                        face.uaxis = VLib.UVAxis(
+                            1, 0, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
+                        face.vaxis = VLib.UVAxis(
+                            0, -1, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
                 continue
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
