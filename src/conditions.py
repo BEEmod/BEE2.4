@@ -1100,16 +1100,46 @@ def flag_has_inst(_, flag):
         ALL_INST
     )
 
+INSTVAR_COMP = {
+    '=': operator.eq,
+    '==': operator.eq,
+
+    '!=': operator.ne,
+    '<>': operator.ne,
+    '=/=': operator.ne,
+
+    '<': operator.lt,
+    '>': operator.gt,
+
+    '>=': operator.ge,
+    '=>': operator.ge,
+    '<=': operator.le,
+    '=<': operator.le,
+}
+
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form "$start_enabled 1", with or without
+    The flag value follows the form "$start_enabled == 1", with or without
     the $.
+    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
+    If ommitted, the operation is assumed to be ==.
     """
-    bits = flag.value.split(' ', 1)
-    return inst.fixup[bits[0]] == bits[1]
+    values = flag.value.split(' ')
+    if len(values) == 3:
+        variable, op, comp_val = values
+        value = inst.fixup[variable]
+        try:
+            # Convert to floats if possible, otherwise handle both as strings
+            comp_val, value = float(comp_val), float(value)
+        except ValueError:
+            pass
+        return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
+    else:
+        variable, value = values
+        return inst.fixup[variable] == value
 
 
 @make_flag('styleVar')
