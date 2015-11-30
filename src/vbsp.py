@@ -159,7 +159,7 @@ GOO_TEX = [
     ]
 
 ANTLINES = {
-    'straight' : "signage/indicator_lights/indicator_lights_floor",
+    'straight': "signage/indicator_lights/indicator_lights_floor",
     'corner': "signage/indicator_lights/indicator_lights_corner_floor",
     }
 
@@ -196,6 +196,12 @@ DEFAULTS = {
 
 
     "staticPan":                "NONE",  # folder for static panels
+    # Template used for static panels set to 0 degrees
+    "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
+    # Template used for white static panels
+    "static_pan_temp_white":     "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_black":     "BEE2_STATIC_PAN_ANGLED",
+
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
     "signPack":                 "",  # Packlist to use when sign inst is added
@@ -2114,6 +2120,16 @@ def change_func_brush():
     grating_inst = get_opt("grating_inst")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
+    # All the textures used for faith plate bullseyes
+    bullseye_white = set(itertools.chain.from_iterable(
+        settings['textures']['special.bullseye_white_' + orient]
+        for orient in ('floor', 'wall', 'ceiling')
+    ))
+    bullseye_black = set(itertools.chain.from_iterable(
+        settings['textures']['special.bullseye_black_' + orient]
+        for orient in ('floor', 'wall', 'ceiling')
+    ))
+
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
         rotate_edge = get_bool_opt('rotate_edge', False)
@@ -2134,7 +2150,9 @@ def change_func_brush():
             ):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
+        # Used when creating static panels
         brush_type = ""
+        is_bullseye = False
 
         target = brush['targetname', '']
         # Fizzlers need their custom outputs.
@@ -2148,6 +2166,15 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
+            # If it's set to a bullseye texture, it's in the ignored_faces
+            # set!
+            if side.mat in bullseye_white:
+                brush_type = 'white'
+                is_bullseye = True
+            elif side.mat in bullseye_black:
+                brush_type = 'black_bullseye'
+                is_bullseye = True
+
             if side in IGNORED_FACES:
                 continue
 
@@ -2199,7 +2226,7 @@ def change_func_brush():
                     VMF.by_class['func_instance'] &
                     VMF.by_target[targ]
                     ):
-                if make_static_pan(ins, brush_type):
+                if make_static_pan(ins, brush_type, is_bullseye):
                     # delete the brush, we don't want it if we made a
                     # static one
                     VMF.remove_ent(brush)
@@ -2248,7 +2275,7 @@ def set_special_mat(face, side_type):
         face.mat = get_tex(side_type + '.' + str(orient))
 
 
-def make_static_pan(ent, pan_type):
+def make_static_pan(ent, pan_type, is_bullseye=False):
     """Convert a regular panel into a static version.
 
     This is done to save entities and improve lighting."""
@@ -2263,8 +2290,54 @@ def make_static_pan(ent, pan_type):
         angle = "00"  # different instance flat with the wall
     if ent.fixup['connectioncount', '0'] != "0":
         return False
-    # something like "static_pan/45_white.vmf"
-    ent["file"] = get_opt("staticPan") + angle + "_" + pan_type + ".vmf"
+    # Handle glass panels
+    if pan_type == 'glass':
+        ent["file"] = get_opt("staticPan") + angle + '_glass.vmf'
+        return True
+
+    # Handle white/black panels:
+    ent['file'] = get_opt("staticPan") + angle + '_surf.vmf'
+
+    # We use a template for the surface, so it can use correct textures.
+    if angle == '00':
+        # Special case: flat panels use different templates
+        world, detail, overlays = conditions.import_template(
+            get_opt('static_pan_temp_flat'),
+            origin=Vec.from_str(ent['origin']),
+            angles=Vec.from_str(ent['angles']),
+            targetname=ent['targetname'],
+            force_type=conditions.TEMP_TYPES.detail,
+        )
+    else:
+        # For normal surfaces, we need an  origin and angles
+        #  rotated around the hinge point!
+        temp_origin = Vec(-64, 0, -64).rotate_by_str(ent['angles'])
+        temp_origin += Vec.from_str(ent['origin'])
+
+        temp_angles = Vec.from_str(ent['angles'])
+        # Subtract from pitch to rotate appropriately.
+        temp_angles.x -= int(angle)
+        temp_angles.x %= 360
+
+        world, detail, overlays = conditions.import_template(
+            get_opt('static_pan_temp_' + pan_type),
+            ent['origin'],
+            ent['angles'],
+            force_type=conditions.TEMP_TYPES.detail,
+        )
+    conditions.retexture_template(
+        world,
+        detail,
+        overlays,
+        origin=Vec.from_str(ent['origin']),
+        force_colour=(
+            conditions.MAT_TYPES.white
+            if pan_type == 'white' else
+            conditions.MAT_TYPES.black
+        ),
+        use_bullseye=is_bullseye,
+    )
+
     return True
 
 
