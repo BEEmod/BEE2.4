@@ -825,6 +825,7 @@ def retexture_template(
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
+        use_bullseye=False,
         ):
     """Retexture a template at the given location.
 
@@ -837,6 +838,8 @@ def retexture_template(
     - If force_colour is set, all tile textures will be switched accordingly.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
+    - If use_bullseye is true, the bullseye textures will be used for all panel
+      sides instead of the normal textures. (This overrides force_grid.)
     """
     import vbsp
     all_brushes = list(world)
@@ -922,6 +925,29 @@ def retexture_template(
                 elif norm == (0, -1, 0) or norm == (0, 1, 0):
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
+
+            if use_bullseye:
+                # We want to use the bullseye textures, instead of normal
+                # ones
+                if norm.z < -floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_floor'.format(tex_colour)
+                    )
+                elif norm.z > floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_ceil'.format(tex_colour)
+                    )
+                else:
+                    face.mat = ''  # Ensure next if statement triggers
+
+                # If those aren't defined, try the wall texture..
+                if face.mat == '':
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_walll'.format(tex_colour)
+                    )
+                if face.mat != '':
+                    continue  # Set to a bullseye texture,
+                    # don't use the wall one
 
             if grid_size == 'special':
                 # Don't use wall on faces similar to floor/ceiling:
