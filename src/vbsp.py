@@ -2172,7 +2172,7 @@ def change_func_brush():
                 brush_type = 'white'
                 is_bullseye = True
             elif side.mat in bullseye_black:
-                brush_type = 'black_bullseye'
+                brush_type = 'black'
                 is_bullseye = True
 
             if side in IGNORED_FACES:
