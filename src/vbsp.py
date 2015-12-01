@@ -737,7 +737,7 @@ def res_faith_bullseye(inst, res):
 
     orient = get_face_orient(face)
     orig_mat = face.mat
-    face.mat = get_tex('special.bullseye_{}_{}'.format(color, orient))
+    face.mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
     # Fallback to floor texture if using ceiling or wall
     if orient is not ORIENT.floor and face.mat == '':
         face.mat = get_tex('special.bullseye_{}_floor'.format(color))
