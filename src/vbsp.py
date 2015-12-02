@@ -738,8 +738,9 @@ def res_faith_bullseye(inst, res):
         if solid.normal == norm:
             face = solid.face
             color = solid.color
-            # Use an alternate instance, without the decal ent.
-            inst['file'] = res.value
+            if make_bullseye_face(face, color):
+                # Use an alternate instance, without the decal ent.
+                inst['file'] = res.value
 
     # Look for angled panels
     if face is None and pos in ANGLED_PAN_BRUSH:
