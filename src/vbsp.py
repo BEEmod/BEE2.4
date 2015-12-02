@@ -661,12 +661,14 @@ def static_pan(inst):
         make_static_pan(inst, "glass")
 
 
-ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush faces
+ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
+FLIP_PAN_BRUSH = {}  # locations -> white, black faces
 
 
 @conditions.meta_cond(-1000)
 def find_panel_locs(_):
     """Find the locations of panels, used for FaithBullseye."""
+    # Angled Panels
     for brush in VMF.by_class['func_brush']:
         if "-model_arms" not in brush['parentname']:
             continue
@@ -675,8 +677,32 @@ def find_panel_locs(_):
             if face.mat.casefold() not in (
                     'anim_wp/framework/squarebeams',
                     'anim_wp/framework/backpanels_cheap'):
-                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = face
+                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = (
+                    face,
+                    # Repeat the change done later in change_func_brush()
+                    brush['targetname'].replace(
+                        '_panel_top',
+                        '-brush',
+                    ),
+                )
                 break
+
+    # Flip panels
+    for brush in VMF.by_class['func_door_rotating']:
+        white_face = None
+        black_face = None
+        for face in brush.sides():
+            if face.mat.casefold() in WHITE_PAN:
+                white_face = face
+            if face.mat.casefold() in BLACK_PAN:
+                black_face = face
+        if white_face and black_face:
+            # The white face is positioned facing outward, so its origin is
+            # centered nicely.
+            FLIP_PAN_BRUSH[white_face.get_origin().as_tuple()] = (
+                white_face,
+                black_face,
+            )
 
 
 @conditions.make_result_setup('FaithBullseye')
@@ -703,8 +729,6 @@ def res_faith_bullseye(inst, res):
     face = None
     color = None
 
-    orig_file = inst['file']
-
     # Look for a world brush
     if pos in conditions.SOLIDS:
         solid = conditions.SOLIDS[pos]
@@ -715,40 +739,63 @@ def res_faith_bullseye(inst, res):
             inst['file'] = res.value
 
     # Look for angled panels
-    if face is None:
-        if pos in ANGLED_PAN_BRUSH:
-            face = ANGLED_PAN_BRUSH[pos]
-            if face.mat.casefold() in WHITE_PAN:
-                color = conditions.MAT_TYPES.white
-                inst['file'] = ''  # The instance won't be used -
-                # there's already a helper
-            elif face.mat.casefold() in BLACK_PAN:
-                color = conditions.MAT_TYPES.black
+    if face is None and pos in ANGLED_PAN_BRUSH:
+        face, br_name = ANGLED_PAN_BRUSH[pos]
+        if face.mat.casefold() in WHITE_PAN:
+            color = 'white'
+        elif face.mat.casefold() in BLACK_PAN:
+            color = 'black'
+        else:
+            # Should never happen - no angled panel should be textured
+            # yet. Act as if the panel wasn't there.
+            face = None
+
+        if face is not None and make_bullseye_face(face, color):
+            # The instance won't be used -
+            # there's already a helper
+            inst['file'] = ''
+
+    # Look for flip panels
+    if face is None and pos in FLIP_PAN_BRUSH:
+        white_face, black_face = FLIP_PAN_BRUSH[pos]
+        flip_orient = get_face_orient(white_face)
+        if make_bullseye_face(white_face, 'white', flip_orient):
+            # Use the white panel orient for both sides since the
+            # black panel spawns facing backward.
+            if make_bullseye_face(black_face, 'black', flip_orient):
+                # Flip panels also have their own helper..
                 inst['file'] = ''
-            else:
-                # Should never happen - no angled panel should be textured
-                # yet. Act as if the panel wasn't there.
-                face = None
 
     # There isn't a surface - blank the instance, it's in goo or similar
     if face is None:
         inst['file'] = ''
         return
 
-    orient = get_face_orient(face)
-    orig_mat = face.mat
-    face.mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
+
+def make_bullseye_face(
+    face: VLib.Side,
+    color,
+    orient: ORIENT=None,
+    ) -> bool:
+    """Switch the given face to use a bullseye texture.
+
+    Returns whether it was sucessful or not.
+    """
+    if orient is None:
+        orient = get_face_orient(face)
+
+    mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
+
     # Fallback to floor texture if using ceiling or wall
-    if orient is not ORIENT.floor and face.mat == '':
+    if orient is not ORIENT.floor and mat == '':
         face.mat = get_tex('special.bullseye_{}_floor'.format(color))
 
-    # There isn't a texture! Revert our changes..
     if face.mat == '':
-        face.mat = orig_mat
-        inst['file'] = orig_file
+        return False
     else:
+        face.mat = mat
         IGNORED_FACES.add(face)
-
+        return True
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
