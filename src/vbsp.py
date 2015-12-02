@@ -663,6 +663,9 @@ def static_pan(inst):
 
 ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
 FLIP_PAN_BRUSH = {}  # locations -> white, black faces
+# Record info_targets at the angled panel positions, so we can correct
+# their locations for static panels
+PANEL_FAITH_TARGETS = defaultdict(list)
 
 
 @conditions.meta_cond(-1000)
@@ -754,6 +757,15 @@ def res_faith_bullseye(inst, res):
             # The instance won't be used -
             # there's already a helper
             inst['file'] = ''
+            # We want to find the info_target, and parent it to the panel.
+
+            # The target is located at the center of the brush, which
+            # we already calculated.
+
+            for targ in VMF.by_class['info_target']:
+                if Vec.from_str(targ['origin']) == pos:
+                    targ['parentname'] = br_name
+                    PANEL_FAITH_TARGETS[pos].append(targ)
 
     # Look for flip panels
     if face is None and pos in FLIP_PAN_BRUSH:
@@ -2355,6 +2367,10 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
             targetname=ent['targetname'],
             force_type=conditions.TEMP_TYPES.detail,
         )
+        # Some styles have 8-unit thick flat panels, others use 4-units.
+        # Put the target halfway.
+        faith_targ_pos = Vec(0, 0, -64 + 6).rotate_by_str(ent['angles'])
+        faith_targ_pos += Vec.from_str(ent['origin'])
     else:
         # For normal surfaces, we need an  origin and angles
         #  rotated around the hinge point!
@@ -2379,6 +2395,9 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
             else:
                 # Floor or rotating upright on walls
                 temp_angles.x = (temp_angles.x - int(angle)) % 360
+        # The target should be centered on the rotated panel!
+        faith_targ_pos = Vec(64, 0, 0)
+        faith_targ_pos.localise(temp_origin, temp_angles)
 
         world, detail, overlays = conditions.import_template(
             get_opt('static_pan_temp_' + pan_type),
@@ -2398,6 +2417,16 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         ),
         use_bullseye=is_bullseye,
     )
+
+    # Search for the info_targets of catapults aimed at the panel,
+    # and adjust them so they're placed precicely on the surface.
+    base_pos = Vec(0, 0, -64).rotate_by_str(ent['angles'])
+    base_pos += Vec.from_str(ent['origin'])
+    # Since it's a defaultdict, misses will give an empty list.
+    for target in PANEL_FAITH_TARGETS[base_pos.as_tuple()]:
+        target['origin'] = faith_targ_pos.join(' ')
+        # Clear the parentname, since the brush is now gone!
+        del target['parentname']
 
     return True
 
