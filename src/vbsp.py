@@ -4,6 +4,7 @@ import sys
 import subprocess
 import shutil
 import random
+import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
@@ -108,7 +109,15 @@ TEX_DEFAULTS = [
     # We just use the regular version if unset.
     ('', 'overlay.antlinecornerfloor'),
     ('', 'overlay.antlinefloor'),
-    ]
+
+    # Only used if set - replace the decals with textures
+    ('', 'special.bullseye_white_wall'),
+    ('', 'special.bullseye_white_floor'),
+    ('', 'special.bullseye_white_ceiling'),
+    ('', 'special.bullseye_black_wall'),
+    ('', 'special.bullseye_black_floor'),
+    ('', 'special.bullseye_black_ceiling'),
+]
 
 
 class ORIENT(Enum):
@@ -150,7 +159,7 @@ GOO_TEX = [
     ]
 
 ANTLINES = {
-    'straight' : "signage/indicator_lights/indicator_lights_floor",
+    'straight': "signage/indicator_lights/indicator_lights_floor",
     'corner': "signage/indicator_lights/indicator_lights_corner_floor",
     }
 
@@ -187,6 +196,12 @@ DEFAULTS = {
 
 
     "staticPan":                "NONE",  # folder for static panels
+    # Template used for static panels set to 0 degrees
+    "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
+    # Template used for angled static panels
+    "static_pan_temp_white":     "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_black":     "BEE2_STATIC_PAN_ANGLED",
+
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
     "signPack":                 "",  # Packlist to use when sign inst is added
@@ -645,6 +660,155 @@ def static_pan(inst):
         # white/black are found via the func_brush
         make_static_pan(inst, "glass")
 
+
+ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
+FLIP_PAN_BRUSH = {}  # locations -> white, black faces
+# Record info_targets at the angled panel positions, so we can correct
+# their locations for static panels
+PANEL_FAITH_TARGETS = defaultdict(list)
+
+
+@conditions.meta_cond(-1000)
+def find_panel_locs(_):
+    """Find the locations of panels, used for FaithBullseye."""
+    # Angled Panels
+    for brush in VMF.by_class['func_brush']:
+        if "-model_arms" not in brush['parentname']:
+            continue
+        for face in brush.sides():
+            # Find the face which isn't backpanel/squarebeams
+            if face.mat.casefold() not in (
+                    'anim_wp/framework/squarebeams',
+                    'anim_wp/framework/backpanels_cheap'):
+                ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = (
+                    face,
+                    # Repeat the change done later in change_func_brush()
+                    brush['targetname'].replace(
+                        '_panel_top',
+                        '-brush',
+                    ),
+                )
+                break
+
+    # Flip panels
+    for brush in VMF.by_class['func_door_rotating']:
+        white_face = None
+        black_face = None
+        for face in brush.sides():
+            if face.mat.casefold() in WHITE_PAN:
+                white_face = face
+            if face.mat.casefold() in BLACK_PAN:
+                black_face = face
+        if white_face and black_face:
+            # The white face is positioned facing outward, so its origin is
+            # centered nicely.
+            FLIP_PAN_BRUSH[white_face.get_origin().as_tuple()] = (
+                white_face,
+                black_face,
+            )
+
+
+@conditions.make_result_setup('FaithBullseye')
+def res_faith_bullseye_check(res):
+    """Do a check to ensure there are actually textures availble."""
+    for col in ('white', 'black'):
+        for orient in ('wall', 'floor', 'ceiling'):
+            if settings['textures'][
+                    'special.bullseye_{}_{}'.format(col, orient)
+                                        ] != ['']:
+                return res.value
+    return None  # No textures!
+
+
+@conditions.make_result('FaithBullseye')
+def res_faith_bullseye(inst, res):
+    """Replace the bullseye instances with textures instead."""
+
+    pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    pos = (pos + Vec.from_str(inst['origin'])).as_tuple()
+
+    norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
+
+    face = None
+    color = None
+
+    # Look for a world brush
+    if pos in conditions.SOLIDS:
+        solid = conditions.SOLIDS[pos]
+        if solid.normal == norm:
+            face = solid.face
+            color = solid.color
+            if make_bullseye_face(face, color):
+                # Use an alternate instance, without the decal ent.
+                inst['file'] = res.value
+
+    # Look for angled panels
+    if face is None and pos in ANGLED_PAN_BRUSH:
+        face, br_name = ANGLED_PAN_BRUSH[pos]
+        if face.mat.casefold() in WHITE_PAN:
+            color = 'white'
+        elif face.mat.casefold() in BLACK_PAN:
+            color = 'black'
+        else:
+            # Should never happen - no angled panel should be textured
+            # yet. Act as if the panel wasn't there.
+            face = None
+
+        if face is not None and make_bullseye_face(face, color):
+            # The instance won't be used -
+            # there's already a helper
+            inst['file'] = ''
+            # We want to find the info_target, and parent it to the panel.
+
+            # The target is located at the center of the brush, which
+            # we already calculated.
+
+            for targ in VMF.by_class['info_target']:
+                if Vec.from_str(targ['origin']) == pos:
+                    targ['parentname'] = br_name
+                    PANEL_FAITH_TARGETS[pos].append(targ)
+
+    # Look for flip panels
+    if face is None and pos in FLIP_PAN_BRUSH:
+        white_face, black_face = FLIP_PAN_BRUSH[pos]
+        flip_orient = get_face_orient(white_face)
+        if make_bullseye_face(white_face, 'white', flip_orient):
+            # Use the white panel orient for both sides since the
+            # black panel spawns facing backward.
+            if make_bullseye_face(black_face, 'black', flip_orient):
+                # Flip panels also have their own helper..
+                inst['file'] = ''
+
+    # There isn't a surface - blank the instance, it's in goo or similar
+    if face is None:
+        inst['file'] = ''
+        return
+
+
+def make_bullseye_face(
+    face: VLib.Side,
+    color,
+    orient: ORIENT=None,
+    ) -> bool:
+    """Switch the given face to use a bullseye texture.
+
+    Returns whether it was sucessful or not.
+    """
+    if orient is None:
+        orient = get_face_orient(face)
+
+    mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
+
+    # Fallback to floor texture if using ceiling or wall
+    if orient is not ORIENT.floor and mat == '':
+        face.mat = get_tex('special.bullseye_{}_floor'.format(color))
+
+    if face.mat == '':
+        return False
+    else:
+        face.mat = mat
+        IGNORED_FACES.add(face)
+        return True
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
@@ -2016,6 +2180,16 @@ def change_func_brush():
     grating_inst = get_opt("grating_inst")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
+    # All the textures used for faith plate bullseyes
+    bullseye_white = set(itertools.chain.from_iterable(
+        settings['textures']['special.bullseye_white_' + orient]
+        for orient in ('floor', 'wall', 'ceiling')
+    ))
+    bullseye_black = set(itertools.chain.from_iterable(
+        settings['textures']['special.bullseye_black_' + orient]
+        for orient in ('floor', 'wall', 'ceiling')
+    ))
+
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
         rotate_edge = get_bool_opt('rotate_edge', False)
@@ -2036,7 +2210,9 @@ def change_func_brush():
             ):
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
+        # Used when creating static panels
         brush_type = ""
+        is_bullseye = False
 
         target = brush['targetname', '']
         # Fizzlers need their custom outputs.
@@ -2050,6 +2226,15 @@ def change_func_brush():
         is_grating = False
         delete_brush = False
         for side in brush.sides():
+            # If it's set to a bullseye texture, it's in the ignored_faces
+            # set!
+            if side.mat in bullseye_white:
+                brush_type = 'white'
+                is_bullseye = True
+            elif side.mat in bullseye_black:
+                brush_type = 'black'
+                is_bullseye = True
+
             if side in IGNORED_FACES:
                 continue
 
@@ -2101,7 +2286,7 @@ def change_func_brush():
                     VMF.by_class['func_instance'] &
                     VMF.by_target[targ]
                     ):
-                if make_static_pan(ins, brush_type):
+                if make_static_pan(ins, brush_type, is_bullseye):
                     # delete the brush, we don't want it if we made a
                     # static one
                     VMF.remove_ent(brush)
@@ -2150,7 +2335,7 @@ def set_special_mat(face, side_type):
         face.mat = get_tex(side_type + '.' + str(orient))
 
 
-def make_static_pan(ent, pan_type):
+def make_static_pan(ent, pan_type, is_bullseye=False):
     """Convert a regular panel into a static version.
 
     This is done to save entities and improve lighting."""
@@ -2165,8 +2350,85 @@ def make_static_pan(ent, pan_type):
         angle = "00"  # different instance flat with the wall
     if ent.fixup['connectioncount', '0'] != "0":
         return False
-    # something like "static_pan/45_white.vmf"
-    ent["file"] = get_opt("staticPan") + angle + "_" + pan_type + ".vmf"
+    # Handle glass panels
+    if pan_type == 'glass':
+        ent["file"] = get_opt("staticPan") + angle + '_glass.vmf'
+        return True
+
+    # Handle white/black panels:
+    ent['file'] = get_opt("staticPan") + angle + '_surf.vmf'
+
+    # We use a template for the surface, so it can use correct textures.
+    if angle == '00':
+        # Special case: flat panels use different templates
+        world, detail, overlays = conditions.import_template(
+            get_opt('static_pan_temp_flat'),
+            origin=Vec.from_str(ent['origin']),
+            angles=Vec.from_str(ent['angles']),
+            targetname=ent['targetname'],
+            force_type=conditions.TEMP_TYPES.detail,
+        )
+        # Some styles have 8-unit thick flat panels, others use 4-units.
+        # Put the target halfway.
+        faith_targ_pos = Vec(0, 0, -64 + 6).rotate_by_str(ent['angles'])
+        faith_targ_pos += Vec.from_str(ent['origin'])
+    else:
+        # For normal surfaces, we need an  origin and angles
+        #  rotated around the hinge point!
+        temp_origin = Vec(-64, 0, -64).rotate_by_str(ent['angles'])
+        temp_origin += Vec.from_str(ent['origin'])
+
+        temp_angles = Vec.from_str(ent['angles'])
+
+        # figure out the right axis to rotate for the face
+        facing_dir = Vec(0, 1, 0).rotate_by_str(ent['angles'])
+        # Rotating counterclockwise
+        if facing_dir.z == 1:
+            temp_angles.y = (temp_angles.y - int(angle)) % 360
+        # Rotating clockwise
+        elif facing_dir.z == -1:
+            temp_angles.y = (temp_angles.y + int(angle)) % 360
+        else:
+            normal = Vec(0, 0, 1).rotate_by_str(ent['angles'])
+            if normal.z == -1:
+                # On ceiling
+                temp_angles.x = (temp_angles.x + int(angle)) % 360
+            else:
+                # Floor or rotating upright on walls
+                temp_angles.x = (temp_angles.x - int(angle)) % 360
+        # The target should be centered on the rotated panel!
+        faith_targ_pos = Vec(64, 0, 0)
+        faith_targ_pos.localise(temp_origin, temp_angles)
+
+        world, detail, overlays = conditions.import_template(
+            get_opt('static_pan_temp_' + pan_type),
+            temp_origin,
+            temp_angles,
+            force_type=conditions.TEMP_TYPES.detail,
+        )
+    conditions.retexture_template(
+        world,
+        detail,
+        overlays,
+        origin=Vec.from_str(ent['origin']),
+        force_colour=(
+            conditions.MAT_TYPES.white
+            if pan_type == 'white' else
+            conditions.MAT_TYPES.black
+        ),
+        use_bullseye=is_bullseye,
+    )
+
+    # Search for the info_targets of catapults aimed at the panel,
+    # and adjust them so they're placed precicely on the surface.
+    base_pos = Vec(0, 0, -64).rotate_by_str(ent['angles'])
+    base_pos += Vec.from_str(ent['origin'])
+    # Since it's a defaultdict, misses will give an empty list.
+    for target in PANEL_FAITH_TARGETS[base_pos.as_tuple()]:
+        target['origin'] = faith_targ_pos.join(' ')
+        # Clear the parentname, since the brush is now gone!
+        del target['parentname']
+
     return True
 
 
