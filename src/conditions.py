@@ -1695,6 +1695,9 @@ def res_add_overlay_inst(inst, res):
             of piston platform handles.
         angles: If set, overrides the base instance angles. This does
             not affect the offset property.
+        fixup: Keyvalues in this block will be copied to the overlay entity.
+            If the value starts with $, the variable will be copied over.
+            If this is present, copy_fixup will be disabled
     """
     angle = res['angles', inst['angles', '0 0 0']]
     overlay_inst = VMF.create_ent(
@@ -1705,10 +1708,19 @@ def res_add_overlay_inst(inst, res):
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
-    if utils.conv_bool(res['copy_fixup', '1']):
+    # Don't run if the fixup block exists..
+    if utils.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+
+    # Copy additional fixup values over
+    for prop in res.find_key('Fixup', []):  # type: Property
+        if prop.value.startswith('$'):
+            overlay_inst.fixup[prop.real_name] = inst.fixup[prop.value]
+        else:
+            overlay_inst.fixup[prop.real_name] = prop.value
+
     if utils.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
