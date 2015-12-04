@@ -107,7 +107,8 @@ def get_config(
     if prop_block.value == '':
         return Property(None, [])
 
-    path = os.path.join(folder, prop_block.value)
+    # Zips must use '/' for the seperator, even on Windows!
+    path = folder + '/' + prop_block.value
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
@@ -1189,6 +1190,7 @@ class BrushTemplate:
             folder='templates',
             pak_id=data.pak_id,
             prop_name='file',
+            extension='.vmf',
         )
         file = VLib.VMF.parse(file)
         return cls(
