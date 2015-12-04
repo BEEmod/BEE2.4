@@ -55,6 +55,7 @@ def apply_changes():
     if not values_changed:
         # We don't need to do anything!
         window.withdraw()
+        window.grab_release()
         return
 
     if messagebox.askokcancel(
@@ -64,6 +65,7 @@ def apply_changes():
             master=window,
             ):
         window.withdraw()
+        window.grab_release()
         for item in UI['details'].items:
             pack = item.package
             if pack.id != packageLoader.CLEAN_PACKAGE:
@@ -74,6 +76,7 @@ def apply_changes():
 
 def cancel():
     window.withdraw()
+    window.grab_release()
     UI['details'].remove_all()
     UI['details'].add_items(*make_packitems())
 

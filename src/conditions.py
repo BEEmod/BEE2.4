@@ -4,8 +4,9 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 import random
 import math
+import operator
 
-from utils import Vec
+from utils import Vec, Vec_tuple
 from property_parser import Property
 from instanceLocs import resolve as resolve_inst
 import vmfLib as VLib
@@ -34,7 +35,8 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-GOO_LOCS = set()  # A set of all goo solid origins.
+GOO_LOCS = set()  # A set of all blocks containing goo
+GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list are world brushes, the second are func_detail brushes.
@@ -165,6 +167,8 @@ TEMPLATE_RETEXTURE = {
     'anim_wp/framework/squarebeams': 'special.edge',
     'glass/glasswindow007a_less_shiny': 'special.glass',
     'metal/metalgrate018': 'special.grating',
+
+    'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
 
 del B, W
@@ -483,7 +487,19 @@ def build_solid_dict():
             if face.mat.casefold() in (
                     'nature/toxicslime_a2_bridge_intro',
                     'nature/toxicslime_puzzlemaker_cheap'):
-                GOO_LOCS.add(face.get_origin().as_tuple())
+                # Record all locations containing goo.
+                bbox_min, bbox_max = solid.get_bbox()
+                x = bbox_min.x + 64
+                y = bbox_min.y + 64
+                # If goo is multi-level, we want to record all pos!
+                for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
+                    GOO_LOCS.add(Vec_tuple(x, y, z))
+
+                # Add the location of the top face
+                GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
+
+                # Indicate that this map contains goo...
+                VOICE_ATTR['goo'] = True
                 continue
 
             try:
@@ -672,27 +688,35 @@ def load_templates():
     vmf = VLib.VMF.parse(props)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
+    overlay_ents = defaultdict(list)
     for ent in vmf.by_class['bee2_template_world']:
-        world_ents[ent['template_id']].extend(ent.solids)
+        world_ents[ent['template_id'].casefold()].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[ent['template_id']].extend(ent.solids)
+        detail_ents[ent['template_id'].casefold()].extend(ent.solids)
 
-    for temp_id in set(detail_ents.keys()).union(world_ents.keys()):
-        TEMPLATES[temp_id.casefold()] = (
+    for ent in vmf.by_class['bee2_template_overlay']:
+        overlay_ents[ent['template_id'].casefold()].append(ent)
+
+    for temp_id in set(detail_ents.keys()
+            ).union(world_ents.keys(), overlay_ents.keys()):
+        TEMPLATES[temp_id] = (
             world_ents[temp_id],
             detail_ents[temp_id],
+            overlay_ents[temp_id]
         )
 
 
 def import_template(
         temp_name,
         origin,
-        angles,
+        angles=None,
+        targetname='',
         force_type=TEMP_TYPES.default,
     ) -> Tuple[
         List[VLib.Solid],
         Optional[VLib.Entity],
+        List[VLib.Entity],
         ]:
     """Import the given template at a location.
 
@@ -700,20 +724,66 @@ def import_template(
     to the specified type instead. A list of world brushes and the func_detail
     entity will be returned. If there are no detail brushes, None will be
     returned instead of an invalid entity.
+
+    If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
-    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+    try:
+        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        utils.con_log('Templates:')
+        utils.con_log('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
     new_world = []
     new_detail = []
+    new_over = []
+
+    id_mapping = {}
 
     for orig_list, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
         for old_brush in orig_list:
-            brush = old_brush.copy(map=VMF)
+            brush = old_brush.copy(map=VMF, side_mapping=id_mapping)
             brush.localise(origin, angles)
             new_list.append(brush)
+
+    for overlay in orig_over:  # type: VLib.Entity
+        new_overlay = overlay.copy(
+            map=VMF,
+        )
+        del new_overlay['template_id']  # Remove this, it's not part of overlays
+        new_overlay['classname'] = 'info_overlay'
+
+        sides = overlay['sides'].split()
+        new_overlay['sides'] = ' '.join(
+            id_mapping[side]
+            for side in sides
+            if side in id_mapping
+        )
+
+        VLib.localise_overlay(new_overlay, origin, angles)
+        orig_target = new_overlay['targetname']
+
+        # Only change the targetname if the overlay is not global, and we have
+        # a passed name.
+        if targetname and orig_target and orig_target[0] != '@':
+            new_overlay['targetname'] = targetname + '-' + orig_target
+
+        VMF.add_ent(new_overlay)
+        new_over.append(new_overlay)
+
+        # Don't let the overlays get retextured too!
+        vbsp.IGNORED_OVERLAYS.add(new_overlay)
+
+    utils.con_log(''.join(map(str, new_over)))
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
@@ -744,16 +814,18 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return new_world, detail_ent
+    return new_world, detail_ent, new_over
 
 
 def retexture_template(
         world: List[VLib.Solid],
         detail: VLib.Entity,
+        overlays: List[VLib.Entity],
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
+        use_bullseye=False,
         ):
     """Retexture a template at the given location.
 
@@ -766,6 +838,8 @@ def retexture_template(
     - If force_colour is set, all tile textures will be switched accordingly.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
+    - If use_bullseye is true, the bullseye textures will be used for all panel
+      sides instead of the normal textures. (This overrides force_grid.)
     """
     import vbsp
     all_brushes = list(world)
@@ -800,6 +874,25 @@ def retexture_template(
                 # It's something like squarebeams or backpanels, just look
                 # it up
                 face.mat = vbsp.get_tex(tex_type)
+
+                if tex_type == 'special.goo_cheap':
+                    if face.normal() != (0, 0, 1):
+                        # Goo must be facing upright!
+                        # Retexture to nodraw, so a template can be made with
+                        # all faces goo to work in multiple orientations.
+                        face.mat = 'tools/toolsnodraw'
+                    else:
+                        # Goo always has the same orientation!
+                        face.uaxis = VLib.UVAxis(
+                            1, 0, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
+                        face.vaxis = VLib.UVAxis(
+                            0, -1, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
                 continue
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
@@ -833,6 +926,29 @@ def retexture_template(
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
 
+            if use_bullseye:
+                # We want to use the bullseye textures, instead of normal
+                # ones
+                if norm.z < -floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_floor'.format(tex_colour)
+                    )
+                elif norm.z > floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_ceil'.format(tex_colour)
+                    )
+                else:
+                    face.mat = ''  # Ensure next if statement triggers
+
+                # If those aren't defined, try the wall texture..
+                if face.mat == '':
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_wall'.format(tex_colour)
+                    )
+                if face.mat != '':
+                    continue  # Set to a bullseye texture,
+                    # don't use the wall one
+
             if grid_size == 'special':
                 # Don't use wall on faces similar to floor/ceiling:
                 if -floor_tolerance < norm.z < floor_tolerance:
@@ -847,15 +963,17 @@ def retexture_template(
                     face.mat = vbsp.get_tex(
                         'special.{!s}'.format(tex_colour)
                     )
-                if face.mat != '':
-                    continue  # Set to a special texture,
-                    # don't use the wall one
-            else:
-                utils.con_log(grid_size, norm.z)
-                if norm.z > floor_tolerance:
-                    grid_size = 'ceiling'
-                if norm.z < -floor_tolerance:
-                    grid_size = 'floor'
+                if face.mat == '':
+                    # No special texture - use a wall one.
+                    grid_size = 'wall'
+                else:
+                    # Set to a special texture,
+                    continue # don't use the wall one
+
+            if norm.z > floor_tolerance:
+                grid_size = 'ceiling'
+            if norm.z < -floor_tolerance:
+                grid_size = 'floor'
 
             if can_clump:
                 # For the clumping algorithm, set to Valve PeTI and let
@@ -879,6 +997,14 @@ def retexture_template(
                 face.mat = vbsp.get_tex(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
+
+    for over in overlays:
+        mat = over['material'].casefold()
+        if mat in replace_tex:
+            over['material'] = random.choice(replace_tex[mat])
+        elif mat in vbsp.TEX_VALVE:
+            over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+
 
 
 @make_flag('debug')
@@ -949,8 +1075,8 @@ def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
             return False
-        # If the AND block is empty, return True
-        return len(sub_flag.value) == 0
+    # If the AND block is empty, return True
+    return len(sub_flag.value) == 0
 
 
 @make_flag('OR')
@@ -1003,16 +1129,46 @@ def flag_has_inst(_, flag):
         ALL_INST
     )
 
+INSTVAR_COMP = {
+    '=': operator.eq,
+    '==': operator.eq,
+
+    '!=': operator.ne,
+    '<>': operator.ne,
+    '=/=': operator.ne,
+
+    '<': operator.lt,
+    '>': operator.gt,
+
+    '>=': operator.ge,
+    '=>': operator.ge,
+    '<=': operator.le,
+    '=<': operator.le,
+}
+
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form "$start_enabled 1", with or without
+    The flag value follows the form "$start_enabled == 1", with or without
     the $.
+    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
+    If ommitted, the operation is assumed to be ==.
     """
-    bits = flag.value.split(' ', 1)
-    return inst.fixup[bits[0]] == bits[1]
+    values = flag.value.split(' ')
+    if len(values) == 3:
+        variable, op, comp_val = values
+        value = inst.fixup[variable]
+        try:
+            # Convert to floats if possible, otherwise handle both as strings
+            comp_val, value = float(comp_val), float(value)
+        except ValueError:
+            pass
+        return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
+    else:
+        variable, value = values
+        return inst.fixup[variable] == value
 
 
 @make_flag('styleVar')
@@ -1189,6 +1345,8 @@ def flag_brush_at_loc(inst, flag):
       - "Black" requires a non-portalable surface.
     - SetVar defines an instvar which will be given a value of "black",
       "white" or "none" to allow the result to be reused.
+    - If gridPos is true, the position will be snapped so it aligns with
+      the 128 brushes (Useful with fizzler/light strip items).
     - RemoveBrush: If set to 1, the brush will be removed if found.
       Only do this to EmbedFace brushes, since it will remove the other
       sides as well.
@@ -1203,6 +1361,13 @@ def flag_brush_at_loc(inst, flag):
     norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
         inst['angles', '0 0 0']
     )
+
+    if utils.conv_bool(flag['gridpos', '0']):
+        for axis in 'xyz':
+            # Don't realign things in the normal's axis -
+            # those are already fine.
+            if norm[axis] == 0:
+                pos[axis] = pos[axis] // 128 * 128 + 64
 
     result_var = flag['setVar', '']
     should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
@@ -1226,6 +1391,24 @@ def flag_brush_at_loc(inst, flag):
         return True
 
     return des_type == br_type
+
+
+@make_flag('PosIsGoo')
+def flag_goo_at_loc(inst, flag):
+    """Check to see if a given location is submerged in goo.
+
+    0 0 0 is the origin of the instance, values are in 128 increments.
+    """
+    pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
+    pos *= 128
+    pos += Vec.from_str(inst['origin'])
+
+    # Round to 128 units, then offset to the center
+    pos = pos // 128 * 128 + 64  # type: Vec
+    utils.con_log(pos.as_tuple(), GOO_LOCS)
+    val = pos.as_tuple() in GOO_LOCS
+    utils.con_log(val)
+    return val
 
 
 ###########
@@ -1355,23 +1538,25 @@ def res_random(inst, res):
         return
 
     ind = random.choice(weight)
-    choice = results[ind]
+    choice = results[ind]  # type: Property
     if choice.name == 'group':
         for sub_res in choice.value:
             should_del = Condition.test_result(
                 inst,
                 sub_res,
             )
-            if should_del:
+            if should_del is RES_EXHAUSTED:
                 # This Result doesn't do anything!
                 sub_res.name = 'nop'
+                sub_res.value = None
     else:
         should_del = Condition.test_result(
             inst,
             choice,
         )
-        if should_del:
+        if should_del is RES_EXHAUSTED:
             choice.name = 'nop'
+            choice.value = None
 
 
 @make_result('forceUpright')
@@ -1505,9 +1690,14 @@ def res_add_overlay_inst(inst, res):
             instance will be copied over.
         move_outputs: If true, outputs will be moved to this instance.
         offset: The offset (relative to the base) that the instance
-            will be placed.
+            will be placed. Can be set to '<piston_top>' and
+            '<piston_bottom>' to offset based on the configuration
+            of piston platform handles.
         angles: If set, overrides the base instance angles. This does
             not affect the offset property.
+        fixup: Keyvalues in this block will be copied to the overlay entity.
+            If the value starts with $, the variable will be copied over.
+            If this is present, copy_fixup will be disabled
     """
     angle = res['angles', inst['angles', '0 0 0']]
     overlay_inst = VMF.create_ent(
@@ -1518,17 +1708,40 @@ def res_add_overlay_inst(inst, res):
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
-    if utils.conv_bool(res['copy_fixup', '1']):
+    # Don't run if the fixup block exists..
+    if utils.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+
+    # Copy additional fixup values over
+    for prop in res.find_key('Fixup', []):  # type: Property
+        if prop.value.startswith('$'):
+            overlay_inst.fixup[prop.real_name] = inst.fixup[prop.value]
+        else:
+            overlay_inst.fixup[prop.real_name] = prop.value
+
     if utils.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
 
     if 'offset' in res:
+        folded_off = res['offset'].casefold()
         # Offset the overlay by the given distance
-        offset = Vec.from_str(res['offset']).rotate_by_str(
+        # Some special placeholder values:
+        if folded_off == '<piston_bottom>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$bottom_level']) * 128,
+            )
+        elif folded_off == '<piston_top>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$top_level'], 1) * 128,
+            )
+        else:
+            # Regular vector
+            offset = Vec.from_str(res['offset'])
+
+        offset.rotate_by_str(
             inst['angles', '0 0 0']
         )
         overlay_inst['origin'] = (
@@ -2420,12 +2633,16 @@ def res_track_plat(_, res):
         VMF.by_class['func_instance']
         if inst['file'].casefold() in track_files
     }
+
     utils.con_log('Track instances:')
     utils.con_log('\n'.join(
         '{!s}: {}'.format(k, v['file'])
         for k, v in
         track_instances.items()
     ))
+
+    if not track_instances:
+        return RES_EXHAUSTED
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
@@ -2530,7 +2747,8 @@ def res_track_plat(_, res):
         if plat_var != '':
             # Skip the '_mirrored' section if needed
             plat_inst.fixup[plat_var] = track_facing[:5].lower()
-            return RES_EXHAUSTED
+
+    return RES_EXHAUSTED # Don't re-run
 
 
 def track_scan(
@@ -2975,15 +3193,17 @@ def res_import_template(inst, res):
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    world, detail = import_template(
+    world, detail, over = import_template(
         temp_id,
         origin,
         angles,
-        force_type,
+        targetname=inst['targetname', ''],
+        force_type=force_type,
     )
     retexture_template(
         world,
         detail,
+        over,
         origin,
         replace_tex,
         force_colour,
@@ -3293,6 +3513,38 @@ def res_rand_num(inst, res):
     inst.fixup[var] = str(func(min_val, max_val))
 
 
+@make_result('RandomVec')
+def res_rand_vec(inst, res):
+    """A modification to RandomNum which generates a random vector instead.
+
+    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
+    are for each section. If the min and max are equal that number will be used
+    instead.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    value = Vec()
+
+    for axis in 'xyz':
+        max_val = utils.conv_float(res['max_' + axis, 0.0])
+        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        if min_val == max_val:
+            value[axis] = min_val
+        else:
+            value[axis] = func(min_val, max_val)
+
+    inst.fixup[var] = value.join(' ')
+
+
 @make_result('GooDebris')
 def res_goo_debris(_, res):
     """Add random instances to goo squares.
@@ -3325,7 +3577,7 @@ def res_goo_debris(_, res):
 
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in GOO_LOCS]
+        possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
     else:
         possible_locs = []
         utils.con_log('Pos:', *utils.iter_grid(
@@ -3335,7 +3587,7 @@ def res_goo_debris(_, res):
                     max_y=space+1,
                     )
         )
-        for x, y, z in set(GOO_LOCS):
+        for x, y, z in set(GOO_FACE_LOC):
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
                     max_x=space+1,
@@ -3344,13 +3596,13 @@ def res_goo_debris(_, res):
                     ):
                 if x_off == y_off == 0:
                     continue
-                if (x + x_off*128, y + y_off*128, z) not in GOO_LOCS:
+                if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
                     break  # This doesn't qualify
             else:
                 possible_locs.append(Vec(x,y,z))
 
     utils.con_log('GooDebris: {}/{} locations'.format(
-        len(possible_locs), len(GOO_LOCS)
+        len(possible_locs), len(GOO_FACE_LOC)
     ))
 
     suff = ''
@@ -3374,6 +3626,83 @@ def res_goo_debris(_, res):
         )
 
     return RES_EXHAUSTED
+
+WP_STRIP_COL_COUNT = 8  # Number of strip instances placed per row
+WP_LIMIT = 30  # Limit to this many portal instances
+
+
+@make_result_setup('WPLightstrip')
+def res_portal_lightstrip_setup(res):
+    do_offset = utils.conv_bool(res['doOffset', '0'])
+    hole_inst = res['HoleInst']
+    fallback = res['FallbackInst']
+    location = Vec.from_str(res['location', '0 8192 0'])
+    strip_name = res['strip_name']
+    hole_name = res['hole_name']
+    return [
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        0,
+    ]
+
+
+@make_result('WPLightstrip')
+def res_portal_lightstrip(inst, res):
+    """Special result used for P1 light strips."""
+    (
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        count,
+    ) = res.value
+
+    if do_offset:
+        random.seed('random_case_{}:{}_{}_{}'.format(
+            'WP_LightStrip',
+            inst['targetname', ''],
+            inst['origin'],
+            inst['angles'],
+        ))
+
+        off = Vec(
+            y=random.choice((-48, -16, 16, 48))
+        ).rotate_by_str(inst['angles'])
+        inst['origin'] = (Vec.from_str(inst['origin']) + off).join(' ')
+
+    if count > WP_LIMIT:
+        inst['file'] = fallback
+        return
+
+    disp_inst = VMF.create_ent(
+        classname='func_instance',
+        angles='0 0 0',
+        origin=(location + Vec(
+            x=128 * (count % WP_STRIP_COL_COUNT),
+            y=128 * (count // WP_STRIP_COL_COUNT),
+        )).join(' '),
+        file=hole_inst,
+    )
+    if '{}' in strip_name:
+        strip_name = strip_name.replace('{}', str(count))
+    else:
+        strip_name += str(count)
+
+    if '{}' in hole_name:
+        hole_name = hole_name.replace('{}', str(count))
+    else:
+        hole_name += str(count)
+
+    disp_inst.fixup['port_name'] = inst.fixup['link_name'] = strip_name
+    inst.fixup['port_name'] = disp_inst.fixup['link_name'] = hole_name
+
+    res.value[-1] = count + 1
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}

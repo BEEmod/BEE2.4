@@ -543,7 +543,9 @@ class Game:
         self.add_editor_sounds(editor_sounds.values())
         export_screen.step('CONF')
 
-        print('Writing template VMF!')
+        print('Exporting {} templates!'.format(
+            len(packageLoader.data['BrushTemplate'])
+        ))
         with open(self.abs_path('bin/bee2/templates.vmf'), 'w') as temp_file:
             packageLoader.TEMPLATE_FILE.export(temp_file)
         export_screen.step('CONF')

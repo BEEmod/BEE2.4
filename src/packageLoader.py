@@ -40,6 +40,9 @@ ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
+# Check to see if the zip contains the resources referred to by the packfile.
+CHECK_PACKFILE_CORRECTNESS = False
+
 
 def pak_object(name, allow_mult=False, has_img=True):
     """Decorator to add a class to the list of objects.
@@ -104,7 +107,8 @@ def get_config(
     if prop_block.value == '':
         return Property(None, [])
 
-    path = os.path.join(folder, prop_block.value)
+    # Zips must use '/' for the seperator, even on Windows!
+    path = folder + '/' + prop_block.value
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
@@ -164,9 +168,10 @@ def load_packages(
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
+        log_incorrect_packfile=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global LOG_ENT_COUNT
+    global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
     if not os.path.isdir(pak_dir):
@@ -186,7 +191,7 @@ def load_packages(
         sys.exit('No Packages Directory!')
 
     LOG_ENT_COUNT = log_missing_ent_count
-    print('ENT_COUNT:', LOG_ENT_COUNT)
+    CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
     zips = []
     data['zips'] = []
     try:
@@ -1057,6 +1062,22 @@ class PackList:
                         path,
                     )
                 ) from ex
+        if CHECK_PACKFILE_CORRECTNESS:
+            # Use normpath so sep differences are ignored, plus case.
+            zip_files = {
+                os.path.normpath(file).casefold()
+                for file in
+                zip_names(data.zip_file)
+                if file.startswith('resources')
+            }
+            for file in files:
+                #  Check to make sure the files exist...
+                file = os.path.join('resources', os.path.normpath(file)).casefold()
+                if file not in zip_files:
+                    utils.con_log('Warning: "{}" not in zip! ({})'.format(
+                        file,
+                        data.pak_id,
+                    ))
 
         return cls(
             data.id,
@@ -1110,18 +1131,24 @@ class BrushTemplate:
         self.id = temp_id
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+
+        # If we have overlays, we need to ensure the IDs crossover correctly
+        id_mapping = {}
+
         if vmf_file.brushes:
             self.temp_world = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_world',
                 template_id=self.id,
             )
             self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE)
+                solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                 for solid in
                 vmf_file.brushes
             ]
         else:
             self.temp_world = None
+
+        # Add detail brushes
         if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
             self.temp_detail = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_detail',
@@ -1129,12 +1156,31 @@ class BrushTemplate:
             )
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE)
+                    solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                     for solid in
                     ent.solids
                 )
         else:
             self.temp_detail = None
+
+        self.temp_overlays = []
+
+        # Look for overlays, and translate their IDS.
+        for overlay in vmf_file.by_class['info_overlay']:  # type: VLib.Entity
+            new_overlay = overlay.copy(
+                map=TEMPLATE_FILE,
+            )
+            new_overlay['template_id'] = self.id
+            new_overlay['classname'] = 'bee2_template_overlay'
+            sides = overlay['sides'].split()
+            new_overlay['sides'] = ' '.join(
+                id_mapping[side]
+                for side in sides
+                if side in id_mapping
+            )
+            TEMPLATE_FILE.add_ent(new_overlay)
+
+            self.temp_overlays.append(new_overlay)
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1144,6 +1190,7 @@ class BrushTemplate:
             folder='templates',
             pak_id=data.pak_id,
             prop_name='file',
+            extension='.vmf',
         )
         file = VLib.VMF.parse(file)
         return cls(

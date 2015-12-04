@@ -13,7 +13,7 @@ import utils
 
 from typing import (
     Optional, Union,
-    Dict, List, Tuple, Set, Iterable,
+    Dict, List, Tuple, Set, Iterable, Iterator
 )
 
 # Used to set the defaults for versioninfo
@@ -131,7 +131,6 @@ def make_overlay(
     if normal.z < 0:
         basis_u *= -1
 
-
     return vmf.create_ent(
         classname='info_overlay',
         angles='0 0 0',  # Not actually used by VBSP!
@@ -155,6 +154,21 @@ def make_overlay(
         uv2='{} {} 0'.format(u_dist, v_dist),
         uv3='{} -{} 0'.format(u_dist, v_dist),
     )
+
+
+def localise_overlay(over, origin, angles=None):
+    """Rotate an overlay like what is done in instances."""
+    if angles is not None:
+        for key in ('basisNormal', 'basisU', 'basisV'):
+            ang = Vec.from_str(over[key]).rotate(angles.x, angles.y, angles.z)
+            over[key] = ang.join(' ')
+    else:
+        angles = Vec(0, 0, 0)
+
+    for key in ('basisOrigin', 'origin'):
+        ang = Vec.from_str(over[key]).rotate(angles.x, angles.y, angles.z)
+        ang += origin
+        over[key] = ang.join(' ')
 
 
 class CopySet(set):
@@ -446,7 +460,7 @@ class VMF:
             dest_file.close()
             return string
 
-    def iter_wbrushes(self, world=True, detail=True):
+    def iter_wbrushes(self, world=True, detail=True) -> Iterator['Solid']:
         """Iterate through all world and detail solids in the map."""
         if world:
             yield from self.brushes
@@ -454,7 +468,7 @@ class VMF:
             for ent in self.iter_ents(classname='func_detail'):
                 yield from ent.solids
 
-    def iter_wfaces(self, world=True, detail=True):
+    def iter_wfaces(self, world=True, detail=True) -> Iterator['Side']:
         """Iterate through the faces of world and detail solids."""
         for brush in self.iter_wbrushes(world, detail):
             yield from brush
@@ -744,7 +758,7 @@ class Solid:
         self.editor = editor or {}
         self.hidden = hidden
 
-    def copy(self, des_id=-1, map=None):
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
         """Duplicate this brush."""
         editor = {}
         for key in ('color', 'groupid', 'visgroupshown', 'visgroupautoshown'):
@@ -752,7 +766,11 @@ class Solid:
                 editor[key] = self.editor[key]
         if 'visgroup' in self.editor:
             editor['visgroup'] = self.editor['visgroup'][:]
-        sides = [s.copy(map=map) for s in self.sides]
+        sides = [
+            s.copy(map=map, side_mapping=side_mapping)
+            for s in
+            self.sides
+        ]
         return Solid(
             map or self.map,
             des_id=des_id,
@@ -870,7 +888,7 @@ class Solid:
         for s in self.sides:
             s.translate(diff)
 
-    def localise(self, origin: Vec, angles: Vec):
+    def localise(self, origin: Vec, angles: Vec=None):
         """Shift this brush by the given origin/angles."""
         for s in self.sides:
             s.localise(origin, angles)
@@ -1052,8 +1070,13 @@ class Side:
                 tree['smoothing_groups', '0']),
         )
 
-    def copy(self, des_id=-1, map=None):
-        """Duplicate this brush side."""
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
+        """Duplicate this brush side.
+
+        des_id is the id which is desired for the new side.
+        map is the VMF to add the new side to (defaults to the same map).
+        If passed, side_mapping will be updated with a old -> new ID pair.
+        """
         planes = [p.as_tuple() for p in self.planes]
         if self.is_disp:
             disp_data = self.disp_data.copy()
@@ -1065,7 +1088,10 @@ class Side:
         else:
             disp_data = None
 
-        return Side(
+        if map is not None and des_id == -1:
+            des_id = self.id
+
+        copy = Side(
             map or self.map,
             planes=planes,
             des_id=des_id,
@@ -1077,6 +1103,8 @@ class Side:
             lightmap=self.lightmap,
             disp_data=disp_data,
         )
+        side_mapping[str(self.id)] = str(copy.id)
+        return copy
 
     def export(self, buffer, ind=''):
         """Generate the strings required to define this side in a VMF."""
@@ -1178,11 +1206,12 @@ class Side:
         u_axis = Vec(self.uaxis.x, self.uaxis.y, self.uaxis.z)
         v_axis = Vec(self.vaxis.x, self.vaxis.y, self.vaxis.z)
 
-        u_axis.rotate(angles.x, angles.y, angles.z)
-        v_axis.rotate(angles.x, angles.y, angles.z)
+        if angles is not None:
+            u_axis.rotate(angles.x, angles.y, angles.z)
+            v_axis.rotate(angles.x, angles.y, angles.z)
 
-        self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
-        self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
+            self.uaxis.x, self.uaxis.y, self.uaxis.z = u_axis
+            self.vaxis.x, self.vaxis.y, self.vaxis.z = v_axis
 
         # Fix offset - see source-sdk: utils/vbsp/map.cpp line 2237
         self.uaxis.offset -= origin.dot(u_axis) / self.uaxis.scale
@@ -1244,7 +1273,7 @@ class Entity:
             self,
             vmf_file: VMF,
             keys=None,
-            fixup=None,
+            fixup=(),
             ent_id=-1,
             outputs=None,
             solids=None,
@@ -1252,7 +1281,7 @@ class Entity:
             hidden=False):
         self.map = vmf_file
         self.keys = keys or {}
-        self.fixup = EntityFixup(fixup or {})
+        self.fixup = EntityFixup(fixup)
         self.outputs = outputs or []  # type: List[Output]
         self.solids = solids or []  # type: List[Solid]
         self.id = vmf_file.ent_id.get_id(ent_id)
@@ -1268,10 +1297,10 @@ class Entity:
         if 'color' not in self.editor:
             self.editor['color'] = '255 255 255'
 
-    def copy(self, des_id=-1, map=None):
+    def copy(self, des_id=-1, map=None, side_mapping=utils.EmptyMapping):
         """Duplicate this entity entirely, including solids and outputs."""
         new_keys = {}
-        new_fixup = self.fixup.copy_dict()
+        new_fixup = self.fixup.copy_values()
         new_editor = {}
         for key, value in self.keys.items():
             new_keys[key] = value
@@ -1281,7 +1310,11 @@ class Entity:
                 new_editor[key] = value
         new_editor['visgroup'] = self.editor['visgroup'][:]
 
-        new_solids = [s.copy(map=map) for s in self.solids]
+        new_solids = [
+            solid.copy(map=map, side_mapping=side_mapping)
+            for solid in
+            self.solids
+        ]
         outs = [o.copy() for o in self.outputs]
 
         return Entity(
@@ -1303,7 +1336,7 @@ class Entity:
         keys = {}
         outputs = []
         editor = {'visgroup': []}
-        fixup = {}
+        fixup = []
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
@@ -1317,9 +1350,9 @@ class Entity:
                 else:
                     # Parse the $replace value
                     vals = item.value.split(" ", 1)
-                    var = vals[0][1:]  # Strip the $ sign
+                    var = vals[0].lstrip('$')
                     value = vals[1]
-                    fixup[var.casefold()] = FixupTuple(var, value, int(index))
+                    fixup.append(FixupTuple(var, value, int(index)))
             elif name == "solid" and item.has_children():
                 solids.append(Solid.parse(vmf_file, item))
             elif name == "connections" and item.has_children():
@@ -1601,10 +1634,23 @@ class EntityFixup:
     signs off the front of them.
     """
 
-    def __init__(self, fixes=None):
-        self._fixup = fixes or {}
+    def __init__(self, fixup=()):
+        self._fixup = {}
         # In _fixup each variable is stored as a tuple of (var_name,
         # value, index) with keys equal to the casefolded var name.
+
+        # Do a check to ensure all fixup values have valid indexes:
+        used_indexes = set()
+        extra_vals = []
+        for fix in fixup:
+            if fix.id not in used_indexes:
+                used_indexes.add(fix.id)
+                self._fixup[fix.var.casefold()] = fix
+            else:
+                extra_vals.append(fix)
+        for fix in extra_vals:
+            # Add these values wherever they'll fit.
+            self[fix.var] = fix.value
 
     def get(self, var, default: str=None):
         """Get the value of an instance $replace variable."""
@@ -1612,12 +1658,13 @@ class EntityFixup:
             var = var[1:]
         folded_var = var.casefold()
         if folded_var in self._fixup:
-            return self._fixup[folded_var][1]  # don't return the index
+            return self._fixup[folded_var].value
         else:
             return default
 
-    def copy_dict(self):
-        return self._fixup.copy()
+    def copy_values(self):
+        """Generate a list that can be passed to the constructor."""
+        return list(self._fixup.values())
 
     def __getitem__(self, key):
         if isinstance(key, tuple):
@@ -1632,15 +1679,23 @@ class EntityFixup:
         if var[0] == '$':
             var = var[1:]
         folded_var = var.casefold()
-        if folded_var not in self:
-            max_id = 0
-            for fixup in self._fixup.values():
-                if fixup.id > max_id:
-                    max_id = fixup.id
-            max_id += 1
-            self._fixup[folded_var] = FixupTuple(var, val, max_id)
+        if folded_var not in self._fixup:
+            # Insert a new value. Use the lowest unused index.
+            indexes = {
+                fixup.id
+                for fixup in
+                self._fixup.values()
+            }
+            for ind in itertools.count(start=1):
+                if ind not in indexes:
+                    self._fixup[folded_var] = FixupTuple(var, val, ind)
+                    break
         else:
-            self._fixup[folded_var] = FixupTuple(var, val, self._fixup[var].id)
+            self._fixup[folded_var] = FixupTuple(
+                var,
+                val,
+                self._fixup[folded_var].id,
+            )
 
     def __delitem__(self, var):
         """Delete a instance $replace variable."""

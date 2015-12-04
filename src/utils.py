@@ -556,8 +556,11 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
-class EmptyMapping(abc.Mapping):
-    """A Mapping class which is always empty."""
+class EmptyMapping(abc.MutableMapping):
+    """A Mapping class which is always empty.
+
+    Any modifications will be ignored.
+    """
     __slots__ = []
 
     def __call__(self):
@@ -585,14 +588,23 @@ class EmptyMapping(abc.Mapping):
     def __iter__(self):
         return self
 
-    def items(self):
-        return self
+    items = values = keys = __iter__
 
-    def values(self):
-        return self
+    # Mutable functions
+    setdefault = get
 
-    def keys(self):
-        return self
+    def update(*args, **kwds):
+        pass
+
+    __setitem__ = __delitem__ = clear = update
+
+    __marker = object()
+
+    def pop(self, key, default=__marker):
+        raise KeyError
+
+    def popitem(self):
+        raise KeyError
 
 EmptyMapping = EmptyMapping()  # We only need the one instance
 
@@ -660,9 +672,9 @@ class Vec:
         [a, b, c], [d, e, f], [g, h, i] = matrix
         x, y, z = self.x, self.y, self.z
 
-        self.x = x*a + y*b + z*c
-        self.y = x*d + y*e + z*f
-        self.z = x*g + y*h + z*i
+        self.x = (x * a) + (y * b) + (z * c)
+        self.y = (x * d) + (y * e) + (z * f)
+        self.z = (x * g) + (y * h) + (z * i)
 
     def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
@@ -767,7 +779,7 @@ class Vec:
         )
 
 
-    def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
+    def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -780,7 +792,7 @@ class Vec:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
 
-    def __sub__(self, other) -> 'Vec':
+    def __sub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -806,7 +818,7 @@ class Vec:
         else:
             return Vec(x, y, z)
 
-    def __rsub__(self, other) -> 'Vec':
+    def __rsub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -833,7 +845,7 @@ class Vec:
         else:
             return Vec(x, y, z)
 
-    def __mul__(self, other) -> 'Vec':
+    def __mul__(self, other: float) -> 'Vec':
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -878,12 +890,8 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __floordiv__(self, other) -> 'Vec':
-        """Divide the Vector by a scalar, discarding the remainder.
-
-        If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero
-        """
+    def __floordiv__(self, other: float) -> 'Vec':
+        """Divide the Vector by a scalar, discarding the remainder."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -896,7 +904,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __mod__(self, other) -> 'Vec':
+    def __mod__(self, other: float) -> 'Vec':
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -910,7 +918,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other) -> Tuple['Vec', 'Vec']:
+    def __divmod__(self, other: float) -> Tuple['Vec', 'Vec']:
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -926,7 +934,7 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-    def __iadd__(self, other) -> 'Vec':
+    def __iadd__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+= operation.
 
         Like the normal one except without duplication.
@@ -949,7 +957,7 @@ class Vec:
                 ) from e
             return self
 
-    def __isub__(self, other) -> 'Vec':
+    def __isub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """-= operation.
 
         Like the normal one except without duplication.
@@ -972,7 +980,7 @@ class Vec:
                 ) from e
             return self
 
-    def __imul__(self, other) -> 'Vec':
+    def __imul__(self, other: float) -> 'Vec':
         """*= operation.
 
         Like the normal one except without duplication.
@@ -985,7 +993,7 @@ class Vec:
             self.z *= other
             return self
 
-    def __idiv__(self, other) -> 'Vec':
+    def __idiv__(self, other: float) -> 'Vec':
         """/= operation.
 
         Like the normal one except without duplication.
@@ -998,7 +1006,7 @@ class Vec:
             self.z /= other
             return self
 
-    def __ifloordiv__(self, other) -> 'Vec':
+    def __ifloordiv__(self, other: float) -> 'Vec':
         """//= operation.
 
         Like the normal one except without duplication.
@@ -1011,7 +1019,7 @@ class Vec:
             self.z //= other
             return self
 
-    def __imod__(self, other) -> 'Vec':
+    def __imod__(self, other: float) -> 'Vec':
         """%= operation.
 
         Like the normal one except without duplication.
@@ -1067,13 +1075,13 @@ class Vec:
                 self.x < other.x and
                 self.y < other.y and
                 self.z < other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x < other[0] and
                 self.y < other[1] and
                 self.z < other[2]
-                )
+            )
         else:
             try:
                 return self.mag() < float(other)
@@ -1095,13 +1103,13 @@ class Vec:
                 self.x <= other.x and
                 self.y <= other.y and
                 self.z <= other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x <= other[0] and
                 self.y <= other[1] and
                 self.z <= other[2]
-                )
+            )
         else:
             try:
                 return self.mag() <= float(other)
@@ -1123,13 +1131,13 @@ class Vec:
                 self.x > other.x and
                 self.y > other.y and
                 self.z > other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x > other[0] and
                 self.y > other[1] and
                 self.z > other[2]
-                )
+            )
         else:
             try:
                 return self.mag() > float(other)
@@ -1273,7 +1281,8 @@ class Vec:
          The vector is left unchanged if it is equal to (0,0,0)
          """
         if self.x == 0 and self.y == 0 and self.z == 0:
-            # Don't do anything for this - otherwise we'd get
+            # Don't do anything for this - otherwise we'd get division
+            # by zero errors - we want this to be a valid normal!
             return self.copy()
         else:
             return self / self.mag()
@@ -1284,7 +1293,7 @@ class Vec:
             self.x * other.x +
             self.y * other.y +
             self.z * other.z
-            )
+        )
 
     def cross(self, other):
         """Return the cross product of both Vectors."""
@@ -1296,14 +1305,14 @@ class Vec:
 
     def localise(
             self,
-            origin: Union['Vec', Vec_tuple],
-            angles: Union['Vec', Vec_tuple]=None
+            origin: Union['Vec', tuple],
+            angles: Union['Vec', tuple]=None
             ):
         """Shift this point to be local to the given position and angles
 
         """
         if angles is not None:
-            self.rotate(angles.x, angles.y, angles.z)
+            self.rotate(angles[0], angles[1], angles[2])
         self.__iadd__(origin)
 
     len = mag
