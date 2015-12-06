@@ -791,7 +791,7 @@ class Solid:
         for side in tree.find_all("side"):
             sides.append(Side.parse(vmf_file, side))
 
-        editor = {'visgroup': []}
+        editor = {}
         for v in tree.find_key("editor", []):
             if v.name in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
                 editor[v.name] = utils.conv_bool(v.value, default=True)
@@ -804,9 +804,7 @@ class Solid:
             elif v.name == 'visgroupid':
                 val = utils.conv_int(v.value, default=-1)
                 if val:
-                    editor['visgroup'].append(val)
-        if len(editor['visgroup']) == 0:
-            del editor['visgroup']
+                    editor.setdefault('visgroup', []).append(val)
         return Solid(
             vmf_file,
             des_id=solid_id,
@@ -835,9 +833,8 @@ class Solid:
         if 'groupid' in self.editor:
             buffer.write(ind + '\t\t"groupid" "' +
                          self.editor['groupid'] + '"\n')
-        if 'visgroup' in self.editor:
-            for vis_id in self.editor['visgroup']:
-                buffer.write(ind + '\t\t"groupid" "' + str(vis_id) + '"\n')
+        for vis_id in self.editor.get('visgroup', []):
+            buffer.write(ind + '\t\t"groupid" "' + str(vis_id) + '"\n')
         for key in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
             if key in self.editor:
                 buffer.write(
