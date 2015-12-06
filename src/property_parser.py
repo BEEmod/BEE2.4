@@ -411,8 +411,8 @@ class Property:
         """
         key = key.casefold()
         if self.has_children():
-            for prop in self.value:
-                if prop.name == key:
+            for prop in self.value:  # type: Property
+                if prop._folded_name == key:
                     return True
             return False
         else:
