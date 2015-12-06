@@ -357,18 +357,17 @@ class VMF:
         for ent in cordons.find_all('cordon'):
             Cordon.parse(map_obj, ent)
 
-        map_obj.add_ents(
-            Entity.parse(map_obj, ent, hidden=False)
-            for ent in
-            tree.find_all('Entity')
-        )
+        for ent in tree.find_all('Entity'):
+            map_obj.add_ent(
+                Entity.parse(map_obj, ent, hidden=False)
+            )
+
         # find hidden entities
         for hidden_ent in tree.find_all('hidden'):
-            map_obj.add_ents(
-                Entity.parse(map_obj, ent, hidden=True)
-                for ent in
-                hidden_ent
-            )
+            for ent in hidden_ent:
+                map_obj.add_ent(
+                    Entity.parse(map_obj, ent, hidden=True)
+                )
 
         map_spawn = tree.find_key('world', [])
         if map_spawn is None:
