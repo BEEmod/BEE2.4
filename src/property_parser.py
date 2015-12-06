@@ -170,12 +170,6 @@ class Property:
             if freshline.startswith('"'):   # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
-                if not utils.is_identifier(name):
-                    raise KeyValError(
-                        'Invalid name ' + name + '!',
-                        filename,
-                        line_num,
-                        )
                 try:
                     value = line_contents[3]
                 except IndexError:
