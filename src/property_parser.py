@@ -158,11 +158,22 @@ class Property:
         filename, if set should be the source of the text for debug purposes.
         file_contents should be an iterable of strings
         """
-        open_properties = [Property(None, [])]
+        from utils import clean_line, is_identifier
+
         file_iter = enumerate(file_contents, start=1)
+
+        # The block we are currently adding to.
+
+        # The special name 'None' marks it as the root property, which
+        # just outputs its children when exported. This way we can handle
+        # multiple root blocks in the file, while still returning a single
+        # Property object which has all the methods.
+        cur_block = Property(None, [])
+
+        # A queue of the properties we are currently in (outside to inside).
+        open_properties = [cur_block]
         for line_num, line in file_iter:
-            values = open_properties[-1].value
-            freshline = utils.clean_line(line)
+            freshline = clean_line(line)
             if not freshline:
                 # Skip blank lines!
                 continue
@@ -172,7 +183,7 @@ class Property:
                 name = line_contents[1]
                 try:
                     value = line_contents[3]
-                except IndexError:
+                except IndexError:  # It doesn't have a value, likely a block
                     value = None
                 else:
                     if not freshline.endswith('"'):
@@ -186,23 +197,29 @@ class Property:
                         for orig, new in REPLACE_CHARS.items():
                             value = value.replace(orig, new)
 
-                values.append(Property(name, value))
+                cur_block.append(Property(name, value))
             elif freshline.startswith('{'):
-                if values[-1].value:
+                # Open a new block.
+                # If we're expecting a block, the value will be None.
+                if cur_block[-1].value is not None:
                     raise KeyValError(
                         'Property cannot have sub-section if it already'
                         'has an in-line value.',
                         filename,
                         line_num,
-                        )
-                values[-1].value = []
-                open_properties.append(values[-1])
+                    )
+                cur_block = cur_block[-1]
+                cur_block.value = []
+                open_properties.append(cur_block)
             elif freshline.startswith('}'):
+                # Move back a block
                 open_properties.pop()
+                cur_block = open_properties[-1].value
+
             # handle name bare on one line, will need a brace on
             # the next line
-            elif utils.is_identifier(freshline):
-                values.append(Property(freshline, []))
+            elif is_identifier(freshline):
+                cur_block.append(Property(freshline, None))
             else:
                 raise KeyValError(
                     "Unexpected beginning character '"
@@ -255,8 +272,8 @@ class Property:
         - This prefers keys located closer to the end of the value list.
         """
         key = key.casefold()
-        for prop in reversed(self.value):
-            if prop.name == key:
+        for prop in reversed(self.value):  # type: Property
+            if prop._folded_name == key:
                 return prop
         if def_ is _NO_KEY_FOUND:
             raise NoKeyError(key)
