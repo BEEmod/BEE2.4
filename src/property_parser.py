@@ -182,8 +182,9 @@ class Property:
                             line_num,
                             filename,
                         )
-                    for orig, new in REPLACE_CHARS.items():
-                        value = value.replace(orig, new)
+                    if '\\' in value:
+                        for orig, new in REPLACE_CHARS.items():
+                            value = value.replace(orig, new)
 
                 values.append(Property(name, value))
             elif freshline.startswith('{'):
