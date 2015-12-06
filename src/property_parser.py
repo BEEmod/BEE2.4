@@ -1,9 +1,3 @@
-# TODO: Add comment support. Read in, and export comments.
-# - Single comments should appear as properties with the name of '//'
-# - A new member level property called 'comment' should be added when a
-#   comment is tacked onto the end of a line.
-# - Comments on bracketed lines should be separated into their own
-#   comment properties.
 import utils
 
 from typing import (
@@ -19,7 +13,7 @@ REPLACE_CHARS = {
     r'\t':  '\t',
     '\\\\': '\\',
     r'\/':   '/',
-    }
+}
 
 # Sentinel value to indicate that no default was given to find_key()
 _NO_KEY_FOUND = object()
@@ -120,7 +114,7 @@ class Property:
     def __init__(
             self: 'Property',
             name: Optional[str],
-            value=_Prop_Value,
+            value: _Prop_Value,
             ):
         """Create a new property instance.
 
@@ -221,20 +215,20 @@ class Property:
                     + '"!',
                     filename,
                     line_num,
-                    )
+                )
 
             if not open_properties:
                 raise KeyValError(
                     'Too many closing brackets.',
                     filename,
                     line_num,
-                    )
+                )
         if len(open_properties) > 1:
             raise KeyValError(
                 'End of text reached with remaining open sections.',
                 filename,
                 line=None,
-                )
+            )
         return open_properties[0]
 
     def find_all(self, *keys) -> Iterator['Property']:
