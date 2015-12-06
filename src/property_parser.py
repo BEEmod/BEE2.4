@@ -234,13 +234,13 @@ class Property:
         if depth == 0:
             raise ValueError("Cannot find_all without commands!")
 
-        keys = [key.casefold() for key in keys]
+        targ_key = keys[0].casefold()
         for prop in self:
             if not isinstance(prop, Property):
                 raise ValueError(
                     'Cannot find_all on a value that is not a Property!'
                 )
-            if prop.name is not None and prop.name == keys[0]:
+            if prop._folded_name == targ_key is not None:
                 if depth > 1:
                     if prop.has_children():
                         yield from Property.find_all(prop, *keys[1:])
@@ -317,7 +317,7 @@ class Property:
         This keeps only the last if multiple items have the same name.
         """
         if self.has_children():
-            return {item.name: item.as_dict() for item in self}
+            return {item._folded_name: item.as_dict() for item in self}
         else:
             return self.value
 
@@ -329,7 +329,7 @@ class Property:
         if isinstance(other, Property):
             return self.value == other.value
         else:
-            return self.value == other # Just compare values
+            return self.value == other  # Just compare values
 
     def __ne__(self, other):
         """Not-Equal To comparison. This ignores names.
@@ -399,7 +399,7 @@ class Property:
                     return True
             return False
         else:
-            return self.name == key
+            return self._folded_name == key
 
     def __getitem__(
             self,
@@ -488,7 +488,7 @@ class Property:
         if self.has_children():
             copy = self.copy()
             if isinstance(other, Property):
-                if other.name is None:
+                if other._folded_name is None:
                     copy.value.extend(other.value)
                 else:
                     # We want to add the other property tree to our
@@ -507,7 +507,7 @@ class Property:
         """
         if self.has_children():
             if isinstance(other, Property):
-                if other.name is None:
+                if other._folded_name is None:
                     self.value.extend(other.value)
                 else:
                     self.value.append(other)
@@ -534,9 +534,9 @@ class Property:
             names
         }
         if self.has_children():
-            for item in self.value[:]:
-                if item.name in folded_names:
-                    merge[item.name].value.extend(item.value)
+            for item in self.value[:]:  # type: Property
+                if item._folded_name in folded_names:
+                    merge[item._folded_name].value.extend(item.value)
                 else:
                     new_list.append(item)
         for prop_name in names:
@@ -556,7 +556,7 @@ class Property:
         return isinstance(self.value, list)
 
     def __repr__(self):
-        return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
+        return 'Property(' + repr(self.real_name) + ', ' + repr(self.value) + ')'
 
     def __str__(self):
         return ''.join(self.export())
