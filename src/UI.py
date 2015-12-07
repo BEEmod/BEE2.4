@@ -120,6 +120,8 @@ class Item:
 
     def load_data(self):
         """Load data from the item."""
+        from tagsPane import Section
+
         version = self.item.versions[self.selected_ver]
         self.data = version['styles'].get(
             selected_style,
@@ -148,15 +150,16 @@ class Item:
         self.tags = set()
 
         for tag in self.data['tags']:
-            self.filter_tags.add('TAG_' + tag.casefold())
-            tagsPane.add_tag('TAG_' + tag, pretty=tag)
-
-        self.filter_tags.add('PACK_' + self.pak_id.casefold())
-        self.filter_tags.update({
-            'AUTH_' + auth.casefold()
-            for auth in
-            self.data['auth']
-        })
+            self.filter_tags.add(
+                tagsPane.add_tag(Section.TAG, tag, pretty=tag)
+            )
+        for auth in self.data['auth']:
+            self.filter_tags.add(
+                tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
+            )
+        self.filter_tags.add(
+            tagsPane.add_tag(Section.PACK, self.pak_id, pretty=self.pak_name)
+        )
 
     def get_icon(self, subKey, allow_single=False, single_num=1):
         """Get an icon for the given subkey.
@@ -465,11 +468,6 @@ def load_packages(data):
     for item in data['Item']:
         it = Item(item)
         item_list[it.id] = it
-        for tag in it.tags:
-            tagsPane.add_tag('TAG_' + tag, pretty=tag)
-        for auth in it.authors:
-            tagsPane.add_tag('AUTH_' + auth, pretty=auth)
-        tagsPane.add_tag('PACK_' + it.pak_id, pretty=it.pak_name)
         loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'])
