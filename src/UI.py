@@ -76,6 +76,7 @@ class Item:
         'num_sub',
         'authors',
         'tags',
+        'filter_tags',
         'id',
         'pak_id',
         'pak_name',
@@ -140,15 +141,18 @@ class Item:
                           self.data['all_name'] is not None and
                           self.data['all_icon'] is not None)
 
-        # Item tags, used for filtering
+        # attributes used for filtering (tags, authors, packages...)
+        self.filter_tags = set()
+
+        # The custom tags set for this item
         self.tags = set()
 
         for tag in self.data['tags']:
-            self.tags.add('TAG_' + tag.casefold())
+            self.filter_tags.add('TAG_' + tag.casefold())
             tagsPane.add_tag('TAG_' + tag, pretty=tag)
 
-        self.tags.add('PACK_' + self.pak_id.casefold())
-        self.tags.update({
+        self.filter_tags.add('PACK_' + self.pak_id.casefold())
+        self.filter_tags.update({
             'AUTH_' + auth.casefold()
             for auth in
             self.data['auth']

@@ -57,7 +57,7 @@ def filter_items():
             item_tags = {
                 tag.casefold()
                 for tag in
-                item.item.tags
+                item.item.filter_tags
             }
             item.visible = func(
                 tag in item_tags
@@ -242,8 +242,8 @@ def refresh_tags():
             (),
         )
     # delete the trailing comma and space
-    all_text.delete(all_text.index('end')+"-2char", "end")
-    sel_text.delete(all_text.index('end')+"-2char", "end")
+    all_text.delete(all_text.index('end') + "-2char", "end")
+    sel_text.delete(all_text.index('end') + "-2char", "end")
 
     all_text['state'] = "disabled"
     sel_text['state'] = "disabled"
