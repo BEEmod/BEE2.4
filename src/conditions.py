@@ -3560,10 +3560,10 @@ def res_goo_debris(_, res):
         - offset: A random xy offset applied to the instances.
     """
     space = utils.conv_int(res['spacing', '1'], 1)
-    rand_count = utils.conv_int(res['count', ''], None)
+    rand_count = utils.conv_int(res['number', ''], None)
     if rand_count:
         rand_list = weighted_random(
-            utils.conv_int(res['Number', '']),
+            rand_count,
             res['weights', ''],
         )
     else:
@@ -3612,7 +3612,7 @@ def res_goo_debris(_, res):
             continue
 
         if rand_list is not None:
-            suff = '_' + random.choice(rand_list)
+            suff = '_' + str(random.choice(rand_list))
 
         if offset > 0:
             loc.x += random.randint(-offset, offset)
