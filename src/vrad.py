@@ -13,7 +13,7 @@ from property_parser import Property
 from BSP import BSP, BSP_LUMPS
 import utils
 
-CONF = Property('Config')
+CONF = Property('Config', [])
 SCREENSHOT_DIR = os.path.join(
     '..',
     'portal2',  # This is hardcoded into P2, it won't change for mods.
