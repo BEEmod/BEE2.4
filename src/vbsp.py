@@ -464,6 +464,7 @@ def load_settings():
             'skybox': pit['sky_inst', ''],
             'skybox_ceil': pit['sky_inst_ceil', ''],
             'targ': pit['targ_inst', ''],
+            'blend_light': pit['blend_light', '']
         }
         pit_inst = settings['pit']['inst'] = {}
         for inst_type in (
@@ -1292,6 +1293,10 @@ def make_bottomless_pit(solids, max_height):
 
     tele_off_x = settings['pit']['off_x']+64
     tele_off_y = settings['pit']['off_y']+64
+
+    # Controlled by the style, not skybox!
+    blend_light = get_opt('pit_blend_light')
+
     for solid, wat_face in solids:
         wat_face.mat = tex_sky
         for vec in wat_face.planes:
@@ -1383,6 +1388,32 @@ def make_bottomless_pit(solids, max_height):
                     side = edges[x + xoff, y + yoff]
                     if side is not None:
                         side[i] = origin.z - 13
+
+                if blend_light:
+                    # Generate dim lights at the skybox location,
+                    # to blend the lighting together.
+                    VMF.create_ent(
+                        classname='light',
+                        origin='{} {} {}'.format(
+                            x + 64,
+                            y + 64,
+                            origin.z + 3,
+                        ),
+                        _light=blend_light,
+                        _fifty_percent_distance='256',
+                        _zero_percent_distance='512',
+                    )
+                    VMF.create_ent(
+                        classname='light',
+                        origin='{} {} {}'.format(
+                            x + tele_off_x,
+                            y + tele_off_y,
+                            origin.z + 3,
+                        ),
+                        _light=blend_light,
+                        _fifty_percent_distance='256',
+                        _zero_percent_distance='512',
+                    )
 
             # The triggers are 26 high, make them 10 units thick to
             # make it harder to see the teleport
