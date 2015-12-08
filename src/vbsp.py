@@ -1286,8 +1286,10 @@ def make_bottomless_pit(solids, max_height):
     """Transform all the goo pits into bottomless pits."""
     tex_sky = settings['pit']['tex_sky']
     teleport = settings['pit']['should_tele']
+
     tele_ref = settings['pit']['tele_ref']
     tele_dest = settings['pit']['tele_dest']
+
     tele_off_x = settings['pit']['off_x']+64
     tele_off_y = settings['pit']['off_y']+64
     for solid, wat_face in solids:
@@ -1354,32 +1356,40 @@ def make_bottomless_pit(solids, max_height):
         # transform the skybox physics triggers into teleports to move cubes
             # into the skybox zone
         for trig in VMF.by_class['trigger_multiple']:
-            if trig['wait'] == '0.1':
-                bbox_min, bbox_max = trig.get_bbox()
-                origin = (bbox_min + bbox_max)/2
-                """:type :Vec"""
-                # We only modify triggers which are below the given z-index
-                if origin.z < pit_height:
-                    trig['classname'] = 'trigger_teleport'
-                    trig['spawnflags'] = '4106'  # Physics and npcs
-                    trig['landmark'] = tele_ref
-                    trig['target'] = tele_dest
-                    trig.outputs.clear()
-                    for x in range(int(bbox_min.x), int(bbox_max.x), 128):
-                        for y in range(int(bbox_min.y), int(bbox_max.y), 128):
-                            # Remove the pillar from the center of the item
-                            edges[x, y] = None
-                            for i, (xoff, yoff) in enumerate(dirs):
-                                side = edges[x+xoff, y+yoff]
-                                if side is not None:
-                                    side[i] = origin.z - 13
+            if trig['wait'] != '0.1':
+                continue
 
-                    # The triggers are 26 high, make them 10 units thick to
-                    # make it harder to see the teleport
-                    for side in trig.sides():
-                        for plane in side.planes:
-                            if plane.z > origin.z:
-                                plane.z -= 16
+            bbox_min, bbox_max = trig.get_bbox()
+            origin = (bbox_min + bbox_max) / 2  # type: Vec
+            # We only modify triggers which are below the given z-index
+            if origin.z >= pit_height:
+                continue
+
+            trig['classname'] = 'trigger_teleport'
+            trig['spawnflags'] = '4106'  # Physics and npcs
+            trig['landmark'] = tele_ref
+            trig['target'] = tele_dest
+            trig.outputs.clear()
+            for x, y in utils.iter_grid(
+                min_x=int(bbox_min.x),
+                max_x=int(bbox_max.x),
+                min_y=int(bbox_min.y),
+                max_y=int(bbox_max.y),
+                stride=128,
+            ):
+                # Remove the pillar from the center of the item
+                edges[x, y] = None
+                for i, (xoff, yoff) in enumerate(dirs):
+                    side = edges[x + xoff, y + yoff]
+                    if side is not None:
+                        side[i] = origin.z - 13
+
+            # The triggers are 26 high, make them 10 units thick to
+            # make it harder to see the teleport
+            for side in trig.sides():
+                for plane in side.planes:
+                    if plane.z > origin.z:
+                        plane.z -= 16
 
     instances = settings['pit']['inst']
 
