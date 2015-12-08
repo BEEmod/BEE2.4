@@ -673,7 +673,7 @@ def find_panel_locs(_):
     """Find the locations of panels, used for FaithBullseye."""
     # Angled Panels
     for brush in VMF.by_class['func_brush']:
-        if "-model_arms" not in brush['parentname']:
+        if "-model_arms" not in brush['parentname', '']:
             continue
         for face in brush.sides():
             # Find the face which isn't backpanel/squarebeams
