@@ -210,9 +210,14 @@ DEFAULTS = {
     "grating_scale":            "0.15",  # Scale of grating texture
     "goo_scale":                "1",  # Scale of goo material
 
-    # If set, use these as the glass/grating 128x128 instances
-    "glass_inst":                "NONE",
-    "grating_inst":              "NONE",
+    # Textures used for the glass/grating clips.
+    "glass_clip":               "BEE2/glass_player_clip",
+    "grating_clip":             "BEE2/grate_player_clip",
+    # Packlists for glass and gratings
+    "glass_pack":               "PACK_PLAYER_CLIP_GLASS",
+    "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
+    # Filter used on grating vphysics_clips
+    "grating_filter":           "@not_paint_bomb",
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
@@ -1614,6 +1619,22 @@ def remove_static_ind_toggles():
     utils.con_log('Done!')
 
 
+def remove_barrier_ents():
+    """If glass_clip or grating_clip is defined, we should remove the glass instances.
+
+    They're not used since we added their contents into the map directly.
+    """
+    if not get_opt('grating_clip') or not get_opt('glass_clip'):
+        return  # They're being used.
+
+    barrier_file = instanceLocs.resolve('[glass_128]')
+    print('Barrier: ', barrier_file)
+
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() in barrier_file:
+            inst.remove()
+
+
 def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     '''Fix a squarebeams brush for use in other styles.
 
@@ -1638,7 +1659,7 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     utils.con_log("Editing Brushes...")
-    glass_inst = get_opt('glass_inst')
+    glass_clip_mat = get_opt('glass_clip')
     glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
     goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
 
@@ -1662,9 +1683,6 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
-
-    if glass_inst == "NONE":
-        glass_inst = None
 
     highest_brush = 0
 
@@ -1702,8 +1720,12 @@ def change_brush():
                 face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
-        if is_glass and glass_inst is not None:
-            switch_glass_inst(solid.get_origin(), glass_inst)
+        if is_glass and glass_clip_mat:
+            glass_clip = make_barrier_solid(solid.get_origin(), glass_clip_mat)
+            VMF.add_brush(glass_clip.solid)
+
+    if get_opt('glass_pack') and settings['has_attr']['glass']:
+        TO_PACK.add(get_opt('glass_pack').casefold())
 
     if make_bottomless:
         utils.con_log('Creating Bottomless Pits...')
@@ -1732,51 +1754,30 @@ def can_clump():
     return get_opt("clump_number").isnumeric()
 
 
-def switch_glass_inst(origin, new_file):
-    """Find the glass instance placed in the specified location.
-
-    Also works with grating.
+def make_barrier_solid(origin, material):
+    """Make a brush covering a given glass/grating location.
     """
-    # Find the center point of this location to find where the instance
+    # Find the center point of this location to find where the brush
     # will be.
     loc = Vec(
-        origin.x//128 * 128 + 64,
-        origin.y//128 * 128 + 64,
-        origin.z//128 * 128 + 64,
+        origin.x // 128 * 128 + 64,
+        origin.y // 128 * 128 + 64,
+        origin.z // 128 * 128 + 64,
         )
-    direction = (origin-loc).norm()
-    loc_str = loc.join(' ')
-    gls_file = instanceLocs.resolve('[glass_128]')
+    normal = (origin - loc).norm()  # This points outward.
+    # This sets the two side axes to 1, and the normal axis to 0.
+    side_offset = 1 - abs(normal)  # type: Vec
+    side_offset *= 64
 
-    # Sometimes PeTI generates more than one segment instance. We should
-    # delete the extras!
-    targ = None
-    gls_file.append(new_file)  # Also search for already-changed bits
+    return VMF.make_prism(
+        # Adding the side_offset moves the other directions out 64
+        # to make it 128 large in total.
+        # We want the brush to be 4 units thick.
+        (loc + normal * 60 + side_offset),
+        (loc + normal * 64 - side_offset),
+        mat=material,
+    )
 
-    for inst in VMF.by_class['func_instance']:
-        # Are they a glass file at the right location?
-        if (
-                inst['origin', ''] == loc_str and
-                inst['file', ''].casefold() in gls_file
-                ):
-            # (45, 45, 45) will never match any of the directions, so we
-            # effectively skip instances without angles
-            inst_ang = Vec.from_str
-            # The brush parts are on this side!
-            rot = Vec(-1, 0, 0).rotate_by_str(
-                inst['angles', ''],
-                45,
-                45,
-                45,
-            )
-            if rot == direction:
-                if targ is None:
-                    targ = inst
-                else:
-                    # We already found one!
-                    inst.remove()
-    if targ is not None:
-        targ['file'] = new_file
 
 
 def face_seed(face):
@@ -2177,7 +2178,7 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     utils.con_log("Editing Brush Entities...")
-    grating_inst = get_opt("grating_inst")
+    grating_clip_mat = get_opt("grating_clip")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
     # All the textures used for faith plate bullseyes
@@ -2200,10 +2201,12 @@ def change_func_brush():
         rotate_edge = get_bool_opt('rotate_edge_special', False)
         edge_off = get_bool_opt('reset_edge_off_special')
         edge_scale = utils.conv_float(get_opt('edge_scale_special'), 0.15)
-    utils.con_log('Special tex:', rotate_edge, edge_off, edge_scale)
 
-    if grating_inst == "NONE":
-        grating_inst = None
+    # Clips are shared every 512 grid spaces
+    grate_clips = {}
+    # Merge nearby grating brushes
+    grating_brush = {}
+
     for brush in (
             VMF.by_class['func_brush'] |
             VMF.by_class['func_door_rotating']
@@ -2274,10 +2277,36 @@ def change_func_brush():
             # Set solidbsp to true on grating brushes. This makes the
             # correct footstep sounds play.
             brush['solidbsp'] = '1'
-
-        if is_grating and grating_inst is not None:
             settings['has_attr']['grating'] = True
-            switch_glass_inst(brush.get_origin(), grating_inst)
+
+            brush_loc = brush.get_origin()  # type: Vec
+            brush_key = (brush_loc // 512 * 512).as_tuple()
+
+            # Merge nearby grating brush entities
+            if brush_key not in grating_brush:
+                grating_brush[brush_key] = brush
+            else:
+                grating_brush[brush_key].solids += brush.solids
+                VMF.remove_ent(brush)
+
+        if is_grating and grating_clip_mat:
+            grate_clip = make_barrier_solid(brush.get_origin(), grating_clip_mat)
+            VMF.add_brush(grate_clip.solid)
+
+            grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
+            for face in grate_phys_clip_solid.sides:
+                face.mat = 'tools/toolstrigger'
+
+            if brush_key not in grate_clips:
+                grate_clips[brush_key] = clip_ent = VMF.create_ent(
+                    classname='func_clip_vphysics',
+                    origin=brush_loc.join(' '),
+                    filtername=get_opt('grating_filter')
+                )
+            else:
+                clip_ent = grate_clips[brush_key]
+            clip_ent.solids.append(grate_phys_clip_solid)
+
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
             targ = '-'.join(parent.split("-")[:-1])
@@ -2300,6 +2329,9 @@ def change_func_brush():
                     # Add the attachment name to the parent, so it
                     # automatically sets the attachment point for us.
                     brush['parentname'] += ',panel_attach'
+
+    if get_opt('grating_pack') and settings['has_attr']['grating']:
+        TO_PACK.add(get_opt('grating_pack').casefold())
 
 
 def alter_flip_panel():
@@ -2790,6 +2822,7 @@ def main():
         collapse_goo_trig()  # Do after make_bottomless_pits
         change_func_brush()
         remove_static_ind_toggles()
+        remove_barrier_ents()
         fix_worldspawn()
 
         make_packlist(path)
