@@ -3580,13 +3580,6 @@ def res_goo_debris(_, res):
         possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
     else:
         possible_locs = []
-        utils.con_log('Pos:', *utils.iter_grid(
-                    min_x=-space,
-                    max_x=space+1,
-                    min_y=-space,
-                    max_y=space+1,
-                    )
-        )
         for x, y, z in set(GOO_FACE_LOC):
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
