@@ -514,7 +514,6 @@ def add_voice(inst):
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        mode=GAME_MODE,
         map_seed=MAP_SEED,
         )
 
