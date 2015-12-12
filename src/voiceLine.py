@@ -7,6 +7,7 @@ from BEE2_config import ConfigFile
 import conditions
 import utils
 import vmfLib
+import vbsp
 
 map_attr = {}
 style_vars = {}
@@ -14,7 +15,6 @@ style_vars = {}
 ADDED_BULLSEYES = set()
 
 ALLOW_MID_VOICES = False
-GAME_MODE = 'ERR'
 VMF = None
 
 INST_PREFIX = 'instances/BEE2/voice/'
@@ -31,7 +31,7 @@ fake_inst = vmfLib.VMF().create_ent(
 
 def mode_quotes(prop_block):
     """Get the quotes from a block which match the game mode."""
-    is_sp = GAME_MODE == 'SP'
+    is_sp = (vbsp.GAME_MODE == 'SP')
     for prop in prop_block:
         if prop.name == 'line':
             # Ones that apply to both modes
@@ -44,7 +44,7 @@ def mode_quotes(prop_block):
 
 def find_group_quotes(group, mid_quotes, conf):
     """Scan through a group, looking for applicable quote options."""
-    is_mid = group.name == 'midinst'
+    is_mid = (group.name == 'midinst')
     group_id = group['name']
 
     for quote in group.find_all('quote'):
@@ -59,8 +59,6 @@ def find_group_quotes(group, mid_quotes, conf):
                 break
 
         quote_id = quote['id', quote['name', '']]
-
-        utils.con_log(quote_id, valid_quote)
 
         if valid_quote:
             # Check if the ID is enabled!
@@ -91,7 +89,6 @@ def add_quote(quote, targetname, quote_loc):
                 fixup_style='2',  # No fixup
             )
         elif name == 'choreo':
-
             c_line = prop.value
             # Add this to the beginning, since all scenes need it...
             if not c_line.startswith('scenes/'):
@@ -163,6 +160,17 @@ def add_quote(quote, targetname, quote_loc):
             # This is useful so some styles can react to which line was
             # chosen.
             style_vars[prop.value.casefold()] = True
+        elif name == 'packlist':
+            vbsp.TO_PACK.add(prop.value.casefold())
+        elif name == 'pack':
+            if prop.has_children():
+                vbsp.PACK_FILES.update(
+                    subprop.value
+                    for subprop in
+                    prop
+                )
+            else:
+                vbsp.PACK_FILES.add(prop.value)
 
 
 def sort_func(quote):
@@ -182,10 +190,9 @@ def add_voice(
         style_vars_,
         vmf_file,
         map_seed,
-        mode='SP',
         ):
     """Add a voice line to the map."""
-    global ALLOW_MID_VOICES, VMF, map_attr, style_vars, GAME_MODE
+    global ALLOW_MID_VOICES, VMF, map_attr, style_vars
     utils.con_log('Adding Voice Lines!')
 
     if len(voice_data.value) == 0:
@@ -195,7 +202,6 @@ def add_voice(
     VMF = vmf_file
     map_attr = has_items
     style_vars = style_vars_
-    GAME_MODE = mode
 
     norm_config = ConfigFile('voice.cfg', root='bee2')
     mid_config = ConfigFile('mid_voice.cfg', root='bee2')
