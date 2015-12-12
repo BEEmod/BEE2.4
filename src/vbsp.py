@@ -210,6 +210,9 @@ DEFAULTS = {
     "grating_scale":            "0.15",  # Scale of grating texture
     "goo_scale":                "1",  # Scale of goo material
 
+    # Add lights to disguise the bottomless pit transition
+    "pit_blend_light":          "",
+
     # Textures used for the glass/grating clips.
     "glass_clip":               "BEE2/glass_player_clip",
     "grating_clip":             "BEE2/grate_player_clip",
