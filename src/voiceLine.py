@@ -45,7 +45,11 @@ def mode_quotes(prop_block):
 def find_group_quotes(group, mid_quotes, conf):
     """Scan through a group, looking for applicable quote options."""
     is_mid = (group.name == 'midinst')
-    group_id = group['name']
+
+    if is_mid:
+        group_id = 'MIDCHAMBER'
+    else:
+        group_id = group['name'].upper()
 
     for quote in group.find_all('quote'):
         valid_quote = True
@@ -58,20 +62,29 @@ def find_group_quotes(group, mid_quotes, conf):
                 valid_quote = False
                 break
 
-        quote_id = quote['id', quote['name', '']]
+        if not valid_quote:
+            continue
 
-        if valid_quote:
+        poss_quotes = []
+        for line in mode_quotes(quote):
+            line_id = line['id', line['name', '']].casefold()
+
             # Check if the ID is enabled!
-            if conf.get_bool(group_id, quote_id, True):
+            if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.extend(mode_quotes(quote))
+                    mid_quotes.append(ALLOW_MID_VOICES)
                 else:
-                    inst_list = list(mode_quotes(quote))
-                    if inst_list:
-                        yield (
-                            quote['priority', '0'],
-                            inst_list,
-                            )
+                    poss_quotes.append(line)
+            else:
+                utils.con_log(
+                    'Line "{}" is disabled..'.format(line['name', '??'])
+                )
+
+        if poss_quotes:
+            yield (
+                quote['priority', '0'],
+                poss_quotes,
+                )
 
 
 def add_quote(quote, targetname, quote_loc):
