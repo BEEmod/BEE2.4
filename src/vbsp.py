@@ -384,12 +384,16 @@ def load_settings():
         with open("bee2/vbsp_config.cfg") as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
     except FileNotFoundError:
+        utils.con_log('Error: No vbsp_config file!')
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
 
-    for item, key in tex_defaults:  # collect textures from config
+    # Collect texture values from the config.
+    # They are collected in a list for each option, allowing
+    # multiple random textures for each slot.
+    for item, key in tex_defaults:
         cat, name = key.split(".")
         value = [
             prop.value
@@ -402,7 +406,8 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
-    # get misc options
+    # Get main config options. All options must be in the DEFAULTS dict -
+    # if not set, they fallback to that value.
     for option_block in conf.find_all('options'):
         for opt in option_block:
             settings['options'][opt.name.casefold()] = opt.value
@@ -423,9 +428,11 @@ def load_settings():
         for key, item in FIZZ_OPTIONS.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
+    # The voice line property block
     for quote_block in conf.find_all("quotes"):
         settings['voice_data'] += quote_block.value
 
+    # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][
@@ -436,6 +443,8 @@ def load_settings():
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
+    # These are custom textures we need to pack, if they're in the map.
+    # (World brush textures, antlines, signage, glass...)
     for trigger in conf.find_all('PackTriggers', 'material'):
         mat = trigger['texture', ''].casefold()
         packlist = trigger['packlist', '']
@@ -502,17 +511,17 @@ def load_settings():
 
 
 def load_map(map_path):
+    """Load in the VMF file."""
     global VMF
     with open(map_path) as file:
         utils.con_log("Parsing Map...")
         props = Property.parse(file, map_path)
-    file.close()
     VMF = VLib.VMF.parse(props)
     utils.con_log("Parsing complete!")
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(inst):
+def add_voice(_):
     """Add voice lines to the map."""
     voiceLine.add_voice(
         voice_data=settings['voice_data'],
@@ -531,6 +540,7 @@ def add_fizz_borders(_):
     """
     tex = settings['textures']['special.fizz_border']
     if tex == ['']:
+        # No textures were defined!
         return
 
     flip_uv = get_bool_opt('fizz_border_vertical')
