@@ -442,6 +442,11 @@ def load_settings():
         if mat and packlist:
             settings['packtrigger'][mat].append(packlist)
 
+    # Files that the BEE2.4 app knows we need to pack - music, style, etc.
+    # This is a bit better than a lot of extra conditions.
+    for force_files in conf.find_all('PackTriggers', 'Forced', 'File'):
+        PACK_FILES.add(force_files.value)
+
     # Get configuration for the elevator, defaulting to ''.
     elev = conf.find_key('elevator', [])
     settings['elevator'] = {
