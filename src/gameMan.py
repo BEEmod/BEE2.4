@@ -399,6 +399,15 @@ class Game:
                     ('Options', 'music_instance'),
                     music.inst,
                 )
+            if music.packfiles:
+                vbsp_config.set_key(
+                    ('PackTriggers', 'Forced'),
+                    [
+                        Property('File', file)
+                        for file in
+                        music.packfiles
+                    ],
+                )
 
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config

@@ -851,11 +851,13 @@ class Music:
             config=None,
             inst=None,
             sound=None,
+            pack=(),
             ):
         self.id = music_id
         self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
+        self.packfiles = list(pack)
 
         self.selitem_data = selitem_data
 
@@ -866,10 +868,16 @@ class Music:
         inst = data.info['instance', None]
         sound = data.info['soundscript', None]
 
+        packfiles = [
+            prop.value
+            for prop in
+            data.info.find_all('pack')
+        ]
+
         config = get_config(
             data.info,
             data.zip_file,
-            'skybox',
+            'music',
             pak_id=data.pak_id,
         )
         return cls(
@@ -878,6 +886,7 @@ class Music:
             inst=inst,
             sound=sound,
             config=config,
+            pack=packfiles,
             )
 
     def add_over(self, override: 'Music'):
