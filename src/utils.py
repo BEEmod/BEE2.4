@@ -1181,17 +1181,16 @@ class Vec:
 
         This strips off the .0 if no decimal portion exists.
         """
-        if self.x.is_integer():
-            x = int(self.x)
-        else:
+        x = int(self.x)
+        if x != self.x:
             x = self.x
-        if self.y.is_integer():
-            y = int(self.y)
-        else:
+
+        y = int(self.y)
+        if y != self.y:
             y = self.y
-        if self.z.is_integer():
-            z = int(self.z)
-        else:
+
+        z = int(self.z)
+        if z != self.z:
             z = self.z
         # convert to int to strip off .0 at end if whole number
         return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
