@@ -739,11 +739,11 @@ class Vec:
         )
 
     @staticmethod
-    def bbox(*points):
+    def bbox(points):
         """Compute the bounding box for a set of points."""
         first, *points = points
-        bbox_min = Vec(first)
-        bbox_max = Vec(first)
+        bbox_min = first.copy()
+        bbox_max = first.copy()
         for point in points:
             bbox_min.min(point)
             bbox_max.max(point)
