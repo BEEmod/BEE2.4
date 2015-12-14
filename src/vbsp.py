@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import random
 import itertools
+import math
 from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
@@ -110,6 +111,12 @@ TEX_DEFAULTS = [
     ('', 'overlay.antlinecornerfloor'),
     ('', 'overlay.antlinefloor'),
 
+    # Broken version of antlines
+    ('', 'overlay.antlinebroken'),
+    ('', 'overlay.antlinebrokencorner'),
+    ('', 'overlay.antlinebrokenfloor'),
+    ('', 'overlay.antlinebrokenfloorcorner'),
+
     # Only used if set - replace the decals with textures
     ('', 'special.bullseye_white_wall'),
     ('', 'special.bullseye_white_floor'),
@@ -205,6 +212,10 @@ DEFAULTS = {
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
     "signPack":                 "",  # Packlist to use when sign inst is added
+
+	"broken_antline_chance":    "0", # The chance an antline will be 'broken'
+    # The maximum distance of a single broken section
+    "broken_antline_distance":  "3",
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
@@ -2041,7 +2052,11 @@ def get_face_orient(face):
 def set_antline_mat(
         over,
         mats: list,
-        floor_mats: list=None,
+        floor_mats: list=(),
+        broken_chance=0,
+        broken_dist=0,
+        broken: list=(),
+        broken_floor: list=(),
         ):
     """Set the material on an overlay to the given value, applying options.
 
@@ -2053,32 +2068,49 @@ def set_antline_mat(
       makes it non-dynamic, and removes the info_overlay_accessor
       entity from the compiled map.
     If only 2 parts are given, the overlay is assumed to be dynamic.
-    If one part is given, the scale is assumed to be 0.25
-    """
-    if floor_mats and any(floor_mats): # Ensure there's actually a value
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        direction = Vec(0, 0, 1).rotate_by_str(over['angles'])
-        if direction == (0, 0, 1) or direction == (0, 0, -1):
-            mats = floor_mats
+    If one part is given, the scale is assumed to be 0.25.
 
+    For broken antlines,  'broken_chance' is the percentage chance for
+    brokenness. broken_dist is the largest run of lights that can be broken.
+    """
     # Choose a random one
     random.seed(over['origin'])
-    utils.con_log(mats)
+
+    if broken_chance:  # We can have `broken` antlines.
+        bbox_min, bbox_max = VLib.overlay_bounds(over)
+        # Number of 'circles' and the length-wise axis
+        length = max(bbox_max - bbox_min)
+        long_axis = Vec(0, 1, 0).rotate_by_str(over['angles']).axis()
+
+        # It's a corner or short antline - replace instead of adding more
+        if length // 16 < broken_dist:
+            if random.randrange(100) < broken_chance:
+                mats = broken
+                floor_mats = broken_floor
+
+    if any(floor_mats):  # Ensure there's actually a value
+        # For P1 style, check to see if the antline is on the floor or
+        # walls.
+        if Vec.from_str(over['basisNormal']).z != 0:
+            mats = floor_mats
+
     mat = random.choice(mats).split('|')
+    opts = []
 
     if len(mat) == 2:
         # rescale antlines if needed
         over['endu'], over['material'] = mat
-    elif len(mat) == 3:
-        over['endu'], over['material'], static = mat
-        if static == 'static':
-            # If specified, remove the targetname so the overlay
-            # becomes static.
-            over['targetname'] = ''
+    elif len(mat) > 2:
+        over['endu'], over['material'], *opts = mat
     else:
+        # Unpack to ensure it only has 1 section
         over['material'], = mat
         over['endu'] = '0.25'
+
+    if 'static' in opts:
+        # If specified, remove the targetname so the overlay
+        # becomes static.
+        over['targetname'] = ''
 
 
 def change_overlays():
@@ -2091,10 +2123,19 @@ def change_overlays():
 
     sign_inst_pack = get_opt('signPack')
 
-    ant_str = settings['textures']['overlay.antline']
-    ant_str_floor = settings['textures']['overlay.antlinefloor']
-    ant_corn = settings['textures']['overlay.antlinecorner']
-    ant_corn_floor = settings['textures']['overlay.antlinecornerfloor']
+    tex_dict = settings['textures']
+    ant_str = tex_dict['overlay.antline']
+    ant_str_floor = tex_dict['overlay.antlinefloor']
+    ant_corn = tex_dict['overlay.antlinecorner']
+    ant_corn_floor = tex_dict['overlay.antlinecornerfloor']
+
+    broken_ant_str = tex_dict['overlay.antlinebroken']
+    broken_ant_corn = tex_dict['overlay.antlinebrokencorner']
+    broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
+    broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
+
+    broken_chance = utils.conv_float(get_opt('broken_antline_chance'))
+    broken_dist = utils.conv_float(get_opt('broken_antline_distance'))
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2142,12 +2183,20 @@ def change_overlays():
                 over,
                 ant_str,
                 ant_str_floor,
+                broken_chance,
+                broken_dist,
+                broken_ant_str,
+                broken_ant_str_floor,
             )
         elif case_mat == ANTLINES['corner']:
             set_antline_mat(
                 over,
                 ant_corn,
                 ant_corn_floor,
+                broken_chance,
+                broken_dist,
+                broken_ant_corn,
+                broken_ant_corn_floor,
             )
 
 
