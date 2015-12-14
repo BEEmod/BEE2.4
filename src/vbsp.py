@@ -2049,6 +2049,23 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
+def broken_antline_iter(dist, max_step):
+    """Iterator used in set_antline_mat().
+
+    This produces min,max pairs which fill the space from 0-dist.
+    Their width is random, from 1-max_step.
+    """
+    last_val = 0
+    while True:
+        next_val = last_val + random.randint(1, max_step)
+        if next_val >= dist:
+            yield last_val, dist
+            return
+        else:
+            yield last_val, next_val
+        last_val = next_val
+
+
 def set_antline_mat(
         over,
         mats: list,
@@ -2087,6 +2104,55 @@ def set_antline_mat(
             if random.randrange(100) < broken_chance:
                 mats = broken
                 floor_mats = broken_floor
+        else:
+            min_origin = Vec.from_str(over['origin'])
+            min_origin[long_axis] -= length/2
+
+            broken_iter = broken_antline_iter(length // 16, broken_dist)
+            for sect_min, sect_max in broken_iter:
+
+                if random.randrange(100) >= broken_chance:
+                    continue
+
+                sect_length = sect_max - sect_min
+
+                utils.con_log('SECT:', sect_min, sect_max, sect_length)
+
+                # Make a section - base it off the original, and shrink it
+                new_over = over.copy()
+                VMF.add_ent(new_over)
+
+                # Repeats lengthways
+                new_over['startV'] = str(sect_length)
+                # Render over the top of the original
+                new_over['RenderOrder'] = '1'
+
+                # Floor divide so the origin is always on the 16-unit axis.
+                # That keeps the texture aligned. Use the center to find the
+                # vertexes - the origin != the real center when there's an odd
+                # number of indicators.
+                sect_center = (sect_min + sect_max) // 2
+
+                sect_origin = min_origin.copy()
+                sect_origin[long_axis] += sect_center * 16
+                new_over['basisorigin'] = new_over['origin'] = sect_origin.join(' ')
+
+                # Set the 4 corner locations to determine the overlay size.
+                # They're in local space - x is -8/+8, y=length, z=0
+                # Match the sign of the current value
+                for axis in '0123':
+                    pos = Vec.from_str(new_over['uv' + axis])
+                    if pos.y < 0:
+                        pos.y = 16 * (sect_min - sect_center)
+                    else:
+                        pos.y = 16 * (sect_max - sect_center)
+                    new_over['uv' + axis] = pos.join(' ')
+
+                # Recurse to allow having values in the material value
+                set_antline_mat(new_over, broken, broken_floor)
+
+                # Skip the next one to ensure there's some space
+                next(broken_iter, None)
 
     if any(floor_mats):  # Ensure there's actually a value
         # For P1 style, check to see if the antline is on the floor or
