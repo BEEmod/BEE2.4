@@ -213,7 +213,7 @@ DEFAULTS = {
     "signSize":                 "32",  # Allow resizing the sign overlays
     "signPack":                 "",  # Packlist to use when sign inst is added
 
-	"broken_antline_chance":    "0", # The chance an antline will be 'broken'
+    "broken_antline_chance":    "0", # The chance an antline will be 'broken'
     # The maximum distance of a single broken section
     "broken_antline_distance":  "3",
 
