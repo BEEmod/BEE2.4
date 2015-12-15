@@ -39,6 +39,8 @@ PrismFace = namedtuple(
     "solid, top, bottom, north, south, east, west"
 )
 
+# The character used to separate output values.
+OUTPUT_SEP = chr(27)
 
 class IDMan(set):
     """Allocate and manage a set of unique IDs."""
@@ -1759,45 +1761,50 @@ class Output:
         self.params = param
         self.delay = delay
         self.times = times
-        self.sep = ',' if comma_sep else chr(27)
-
+        self.sep = ',' if comma_sep else OUTPUT_SEP
 
     @staticmethod
     def parse(prop):
         """Convert the VMF Property into an Output object."""
-        if chr(27) in prop.value:
+        if OUTPUT_SEP in prop.value:
             sep = False
-            vals = prop.value.split(chr(27))
+            vals = prop.value.split(OUTPUT_SEP)
         else:
             sep = True
             vals = prop.value.split(',')
-        if len(vals) == 5:
-            if prop.name.startswith('instance:'):
-                out = prop.real_name.split(';')
-                inst_out = out[0][9:]
-                out = out[1]
-            else:
-                inst_out = None
-                out = prop.real_name
 
-            if vals[1].startswith('instance:'):
-                inp = vals[1].split(';')
-                inst_inp = inp[0][9:]
-                inp = inp[1]
+        targ, inp, param, delay, times = vals
+
+        inst_out, out = Output.parse_name(prop.real_name)
+        inst_inp, inp = Output.parse_name(inp)
+
+        return Output(
+            out,
+            targ,
+            inp,
+            param=param,
+            delay=float(delay),
+            times=int(times),
+            inst_out=inst_out,
+            inst_in=inst_inp,
+            comma_sep=sep,
+        )
+
+    @staticmethod
+    def parse_name(name):
+        """Extranct the instance name from values of the form:
+
+        'instance:local_name;Command'
+        If not of this form, the
+        """
+        if name.casefold().startswith('instance:'):
+            try:
+                inst_part, command = name.split(';', 1)
+            except ValueError:
+                pass
             else:
-                inst_inp = None
-                inp = vals[1]
-            return Output(
-                out,
-                vals[0],
-                inp,
-                param=vals[2],
-                delay=float(vals[3]),
-                times=int(vals[4]),
-                inst_out=inst_out,
-                inst_in=inst_inp,
-                comma_sep=sep,
-                )
+                return inst_part[9:], command
+        return None, name
 
     def exp_out(self):
         if self.inst_out:
