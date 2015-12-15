@@ -1912,6 +1912,34 @@ def res_cust_antline(inst, res):
                 break  # Stop looking!
 
 
+@make_result_setup('changeOutputs')
+def res_change_outputs_setup(res):
+    return [
+        (
+            VLib.Output.parse_name(prop.real_name),
+            VLib.Output.parse_name(prop.value)
+        )
+        for prop in
+        res
+    ]
+
+
+@make_result('changeOutputs')
+def res_change_outputs(inst: VLib.Entity, res):
+    """Switch the outputs on an instance.
+
+    Each child is a original -> replace value. These match the values
+    in editoritems.txt. Use a blank value to indicate it should be deleted.
+    """
+    for output in inst.outputs[:]:  # type: VLib.Output
+        for (orig_name, orig_comm), rep in res.value:
+            if output.inst_out == orig_name and output.output == orig_comm:
+                if rep == (None, ''):
+                    inst.outputs.remove(output)
+                else:
+                    output.inst_out, output.output = rep
+
+
 @make_result('faithMods')
 def res_faith_mods(inst, res):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
