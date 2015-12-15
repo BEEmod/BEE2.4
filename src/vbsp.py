@@ -213,7 +213,7 @@ DEFAULTS = {
     "signSize":                 "32",  # Allow resizing the sign overlays
     "signPack":                 "",  # Packlist to use when sign inst is added
 
-    "broken_antline_chance":    "0", # The chance an antline will be 'broken'
+    "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
     # The maximum distance of a single broken section
     "broken_antline_distance":  "3",
 
@@ -2049,20 +2049,33 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
-def broken_antline_iter(dist, max_step):
+def broken_antline_iter(dist, max_step, chance):
     """Iterator used in set_antline_mat().
 
     This produces min,max pairs which fill the space from 0-dist.
     Their width is random, from 1-max_step.
+    Neighbouring sections will be merged when they have the same type.
     """
-    last_val = 0
+    last_val = next_val = 0
+    last_type = random.randrange(100) < chance
+
     while True:
-        next_val = last_val + random.randint(1, max_step)
+        is_broken = (random.randrange(100) < chance)
+
+        next_val += random.randint(1, max_step)
+
         if next_val >= dist:
-            yield last_val, dist
+            # We hit the end - make sure we don't overstep.
+            yield last_val, dist, is_broken
             return
-        else:
-            yield last_val, next_val
+
+        if is_broken == last_type:
+            # Merge the two sections - don't make more overlays
+            # than needed..
+            continue
+
+        yield last_val, next_val, last_type
+        last_type = is_broken
         last_val = next_val
 
 
@@ -2093,7 +2106,7 @@ def set_antline_mat(
     # Choose a random one
     random.seed(over['origin'])
 
-    if broken_chance:  # We can have `broken` antlines.
+    if broken_chance and any(broken):  # We can have `broken` antlines.
         bbox_min, bbox_max = VLib.overlay_bounds(over)
         # Number of 'circles' and the length-wise axis
         length = max(bbox_max - bbox_min)
@@ -2106,32 +2119,36 @@ def set_antline_mat(
                 floor_mats = broken_floor
         else:
             min_origin = Vec.from_str(over['origin'])
-            min_origin[long_axis] -= length/2
+            min_origin[long_axis] -= length / 2
 
-            broken_iter = broken_antline_iter(length // 16, broken_dist)
-            for sect_min, sect_max in broken_iter:
+            VMF.create_ent(
+                classname='info_null',
+                origin=min_origin.join(' ')
+            )
 
-                if random.randrange(100) >= broken_chance:
-                    continue
+            broken_iter = broken_antline_iter(
+                length // 16,
+                broken_dist,
+                broken_chance,
+            )
+            for sect_min, sect_max, is_broken in broken_iter:
+
+                if is_broken:
+                    tex, floor_tex = broken, broken_floor
+                else:
+                    tex, floor_tex = mats, floor_mats
 
                 sect_length = sect_max - sect_min
-
-                utils.con_log('SECT:', sect_min, sect_max, sect_length)
 
                 # Make a section - base it off the original, and shrink it
                 new_over = over.copy()
                 VMF.add_ent(new_over)
+                # Make sure we don't restyle this twice.
+                IGNORED_OVERLAYS.add(new_over)
 
                 # Repeats lengthways
                 new_over['startV'] = str(sect_length)
-                # Render over the top of the original
-                new_over['RenderOrder'] = '1'
-
-                # Floor divide so the origin is always on the 16-unit axis.
-                # That keeps the texture aligned. Use the center to find the
-                # vertexes - the origin != the real center when there's an odd
-                # number of indicators.
-                sect_center = (sect_min + sect_max) // 2
+                sect_center = (sect_min + sect_max) / 2
 
                 sect_origin = min_origin.copy()
                 sect_origin[long_axis] += sect_center * 16
@@ -2143,16 +2160,15 @@ def set_antline_mat(
                 for axis in '0123':
                     pos = Vec.from_str(new_over['uv' + axis])
                     if pos.y < 0:
-                        pos.y = 16 * (sect_min - sect_center)
+                        pos.y = -8 * sect_length
                     else:
-                        pos.y = 16 * (sect_max - sect_center)
+                        pos.y = 8 * sect_length
                     new_over['uv' + axis] = pos.join(' ')
 
                 # Recurse to allow having values in the material value
-                set_antline_mat(new_over, broken, broken_floor)
-
-                # Skip the next one to ensure there's some space
-                next(broken_iter, None)
+                set_antline_mat(new_over, tex, floor_tex, broken_chance=0)
+            # Remove the original overlay
+            VMF.remove_ent(over)
 
     if any(floor_mats):  # Ensure there's actually a value
         # For P1 style, check to see if the antline is on the floor or
@@ -2176,7 +2192,7 @@ def set_antline_mat(
     if 'static' in opts:
         # If specified, remove the targetname so the overlay
         # becomes static.
-        over['targetname'] = ''
+        del over['targetname']
 
 
 def change_overlays():
