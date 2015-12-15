@@ -247,6 +247,8 @@ DEFAULTS = {
     # Instance used for pti_ents
     "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
     # Default pos is next to arrival_departure_ents
+    # Note that many other ents are added at this point, since it's
+    # boxed in.
     "global_pti_ents_loc":      "-2400 -2800 0",
     # Location of the model changer instance if needed
     "model_changer_loc":        "-2400 -2800 -256",
@@ -256,7 +258,7 @@ DEFAULTS = {
 
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
-    "game_id":                  "620", # The game's steam ID
+    "game_id":                  "620",  # The game's steam ID
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
@@ -2088,7 +2090,7 @@ def set_antline_mat(
         broken: list=(),
         broken_floor: list=(),
         ):
-    """Set the material on an overlay to the given value, applying options.
+    """Retexture an antline, with various options encoded into the material.
 
     floor_mat, if set is an alternate material to use for floors.
     The material is split into 3 parts, separated by '|':
@@ -2102,6 +2104,7 @@ def set_antline_mat(
 
     For broken antlines,  'broken_chance' is the percentage chance for
     brokenness. broken_dist is the largest run of lights that can be broken.
+    broken and broken_floor are the textures used for the broken lights.
     """
     # Choose a random one
     random.seed(over['origin'])
@@ -2120,11 +2123,6 @@ def set_antline_mat(
         else:
             min_origin = Vec.from_str(over['origin'])
             min_origin[long_axis] -= length / 2
-
-            VMF.create_ent(
-                classname='info_null',
-                origin=min_origin.join(' ')
-            )
 
             broken_iter = broken_antline_iter(
                 length // 16,
@@ -2198,12 +2196,19 @@ def set_antline_mat(
 def change_overlays():
     """Alter the overlays."""
     utils.con_log("Editing Overlays...")
+
+    # A frame instance to add around all the 32x32 signs
     sign_inst = get_opt('signInst')
+    # Resize the signs to this size. 4 vertexes are saved relative
+    # to the origin, so we must divide by 2.
     sign_size = utils.conv_int(get_opt('signSize'), 32) / 2
     if sign_inst == "NONE":
         sign_inst = None
 
+    # A packlist associated with the sign_inst.
     sign_inst_pack = get_opt('signPack')
+
+    # Grab all the textures we're using...
 
     tex_dict = settings['textures']
     ant_str = tex_dict['overlay.antline']
@@ -2254,7 +2259,7 @@ def change_overlays():
             if sign_size != 16:
                 # Resize the signage overlays
                 # These are the 4 vertex locations
-                # Each axis is set to -16, 16 or 0
+                # Each axis is set to -16, 16 or 0 by default
                 for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
                     val = Vec.from_str(over[prop])
                     val /= 16
@@ -2285,13 +2290,17 @@ def change_overlays():
 def change_trig():
     """Check the triggers and fizzlers."""
     utils.con_log("Editing Triggers...")
+
     for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
             alter_mat(side)
         target = trig['targetname', '']
+
         # Change this so the base instance can directly modify the brush.
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_fizz'
+
+        # Apply some config options - scanline and Fast Reflections
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
 
@@ -2305,13 +2314,17 @@ def change_trig():
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     utils.con_log("Adding Music...")
+
     if mode == "COOP":
         loc = get_opt('music_location_coop')
     else:
         loc = get_opt('music_location_sp')
 
+    # These values are exported by the BEE2 app, indicating the
+    # options on the music item.
     sound = get_opt('music_soundscript')
     inst = get_opt('music_instance')
+
     if sound != '':
         VMF.create_ent(
             classname='ambient_generic',
@@ -2331,6 +2344,10 @@ def add_extra_ents(mode):
             file=inst,
             fixup_style='0',
             )
+
+    # Add the global_pti_ents instance automatically, with disable_pti_audio
+    # set.
+
     pti_file = get_opt("global_pti_ents")
     pti_loc = get_opt("global_pti_ents_loc")
     if pti_file != '':
@@ -2343,6 +2360,7 @@ def add_extra_ents(mode):
             file=pti_file,
             fixup_style='0',
             )
+
         has_cave = utils.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
         )
@@ -2350,9 +2368,11 @@ def add_extra_ents(mode):
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
 
+    # Add the model changer instance.
+    # We don't change the player model in Coop, or if Bendy is selected.
+
     model_changer_loc = get_opt('model_changer_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI')
-    # We don't change the player model in Coop, or if Bendy is selected.
     if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
         VMF.create_ent(
             classname='func_instance',
