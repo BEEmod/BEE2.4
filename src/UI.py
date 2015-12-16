@@ -754,7 +754,7 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
-    sucess = gameMan.selected_game.export(
+    success = gameMan.selected_game.export(
         chosen_style,
         item_list,
         music=musics.get(music_win.chosen_id, None),
@@ -771,12 +771,13 @@ def export_editoritems(_=None):
         )
     )
 
-    if not sucess:
+    if not success:
         return
 
-    messagebox.showinfo(
+    launch_game = messagebox.askyesno(
         'BEEMOD2',
-        message='Selected Items and Style successfully exported!',
+        message='Selected Items and Style successfully exported!\n'
+                'Launch game?',
     )
 
     for pal in palettes[:]:
@@ -798,6 +799,9 @@ def export_editoritems(_=None):
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
     refresh_pal_ui()
+
+    if launch_game:
+        gameMan.selected_game.launch()
 
 
 def set_disp_name(item, _=None):

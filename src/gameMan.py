@@ -612,6 +612,13 @@ class Game:
         export_screen.reset()  # Hide loading screen, we're done
         return True
 
+    def launch(self):
+        """Try and launch the game."""
+        import webbrowser
+        url = 'steam://rungameid/' + str(self.steamID)
+        webbrowser.open(url)
+
+
 
 def find_steam_info(game_dir):
     """Determine the steam ID and game name of this folder, if it has one.
