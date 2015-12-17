@@ -17,6 +17,8 @@ from typing import (
     Dict, List, Tuple, NamedTuple
     )
 
+LOGGER = utils.getLogger(__name__)
+
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
 OPTIONS = {}
@@ -40,7 +42,7 @@ GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list are world brushes, the second are func_detail brushes.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 
@@ -277,10 +279,9 @@ class Condition:
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            utils.con_log(
-                '"{}" is not a valid condition result!'.format(
-                    res.real_name,
-                )
+            LOGGER.warning(
+                '"{name}" is not a valid condition result!',
+                name=res.real_name,
             )
         else:
             return func(inst, res)
@@ -334,10 +335,10 @@ def add_meta(func, priority, only_once=True):
     # be entered into property files.
     # The qualname will be unique across modules.
     name = '"' + func.__qualname__ + '"'
-    print("Adding metacondition ({}) with priority {!s}!".format(
+    LOGGER.debug("Adding metacondition ({}) with priority {!s}!",
         name,
         priority,
-    ))
+    )
 
     # Don't pass the prop_block onto the function,
     # it doesn't contain any useful data.
@@ -426,7 +427,7 @@ def init(seed, inst_list, vmf_file):
 
 def check_all():
     """Check all conditions."""
-    utils.con_log('Checking Conditions...')
+    LOGGER.info('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.by_class['func_instance']:
             try:
@@ -440,17 +441,17 @@ def check_all():
                 # this condition, and skip to the next condtion.
                 break
             if not condition.results and not condition.else_results:
-                utils.con_log('Exiting empty condition!')
+                LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
-    utils.con_log('Map has attributes: ', [
+    LOGGER.info('Map has attributes: ', [
         key
         for key, value in
         VOICE_ATTR.items()
         if value
     ])
-    utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
-    utils.con_log('Global instances: ', GLOBAL_INSTANCES)
+    LOGGER.info('Style Vars:', dict(STYLE_VARS.items()))
+    LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
 
 
 def check_flag(flag, inst):
@@ -462,7 +463,7 @@ def check_flag(flag, inst):
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
-        utils.con_log('"' + flag.name + '" is not a valid condition flag!')
+        LOGGER.warning('"' + flag.name + '" is not a valid condition flag!')
         return False
     else:
         res = func(inst, flag)
@@ -530,31 +531,31 @@ def dump_conditions():
     to the screen, and then quit.
     """
 
-    utils.con_log('Dumping conditions:')
-    utils.con_log('-------------------')
+    print('Dumping conditions:')
+    print('-------------------')
 
     for lookup, name in [
             (ALL_FLAGS, 'Flags'),
             (ALL_RESULTS, 'Results'),
             ]:
-        utils.con_log(name + ':')
-        utils.con_log('-'*len(name) + '-')
+        print(name + ':')
+        print('-'*len(name) + '-')
         lookup.sort()
         for flag_key, aliases, func in lookup:
-            utils.con_log('"{}":'.format(flag_key))
+            print('"{}":'.format(flag_key))
             if aliases:
-                utils.con_log('\tAliases: "' + '", "'.join(aliases) + '"')
+                print('\tAliases: "' + '", "'.join(aliases) + '"')
             dump_func_docs(func)
         input('...')
-        utils.con_log('')
+        print('')
 
-    utils.con_log('MetaConditions:')
-    utils.con_log('---------------')
+    print('MetaConditions:')
+    print('---------------')
     ALL_META.sort(key=lambda i: i[1]) # Sort by priority
     for flag_key, priority, func in ALL_META:
-        utils.con_log('{} ({}):'.format(flag_key, priority))
+        print('{} ({}):'.format(flag_key, priority))
         dump_func_docs(func)
-        utils.con_log('')
+        print('')
 
 
 def dump_func_docs(func):
@@ -563,9 +564,9 @@ def dump_func_docs(func):
     if docs:
         for line in docs.split('\n'):
             if line.strip():
-                utils.con_log('\t'+line.rstrip('\n'))
+                print('\t' + line.rstrip('\n'))
     else:
-        utils.con_log('\tNo documentation!')
+        print('\tNo documentation!')
 
 
 def weighted_random(count: int, weights: str):
@@ -575,7 +576,7 @@ def weighted_random(count: int, weights: str):
     repeated indexes corresponding to the comma-separated weight values.
     """
     if weights == '' or ',' not in weights:
-        utils.con_log('Invalid weight! (' + weights + ')')
+        LOGGER.warning('Invalid weight! ({}})', weights)
         weight = list(range(count))
     else:
         # Parse the weight
@@ -593,7 +594,7 @@ def weighted_random(count: int, weights: str):
                     # Abandon parsing
                     break
         if len(weight) == 0:
-            utils.con_log('Failed parsing weight! ({!s})'.format(weight))
+            LOGGER.warning('Failed parsing weight! ({!s})',weight)
             weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
@@ -756,8 +757,10 @@ def import_template(
     try:
         orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
     except KeyError as err:
-        utils.con_log('Templates:')
-        utils.con_log('\n'.join(
+        # Replace the KeyError with a more useful error message, and
+        # list all the templates that are available.
+        LOGGER.info('Templates:')
+        LOGGER.info('\n'.join(
             ('* "' + temp + '"')
             for temp in
             TEMPLATES.keys()
@@ -808,7 +811,6 @@ def import_template(
         # Don't let the overlays get retextured too!
         vbsp.IGNORED_OVERLAYS.add(new_overlay)
 
-    utils.con_log(''.join(map(str, new_over)))
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
@@ -1039,17 +1041,18 @@ def debug_flag(inst, props):
     If the text ends with an '=', the instance will also be displayed.
     As a flag, this always evaluates as true.
     """
+    # Mark as a warning so it's more easily seen.
     if props.has_children():
-        utils.con_log('Debug:')
-        utils.con_log(str(props))
-        utils.con_log(str(inst))
+        LOGGER.warning('Debug:')
+        LOGGER.warning(str(props))
+        LOGGER.warning(str(inst))
     elif props.value.strip().endswith('='):
-        utils.con_log('Debug: {props}{inst!s}'.format(
+        LOGGER.warning('Debug: {props}{inst!s}'.format(
             inst=inst,
             props=props.value,
         ))
     else:
-        utils.con_log('Debug: ' + props.value)
+        LOGGER.warning('Debug: ' + props.value)
     return True  # The flag is always true
 
 
@@ -1430,9 +1433,7 @@ def flag_goo_at_loc(inst, flag):
 
     # Round to 128 units, then offset to the center
     pos = pos // 128 * 128 + 64  # type: Vec
-    utils.con_log(pos.as_tuple(), GOO_LOCS)
     val = pos.as_tuple() in GOO_LOCS
-    utils.con_log(val)
     return val
 
 
@@ -1864,7 +1865,7 @@ def res_cust_output(inst, res):
                         con_inst.fixup['connectioncount'] = str(val-1)
                     except ValueError:
                         # skip if it's invalid
-                        utils.con_log(
+                        LOGGER.warning(
                             con_inst['targetname'] +
                             ' has invalid ConnectionCount!'
                         )
@@ -1889,7 +1890,7 @@ def res_cust_antline_setup(res):
             not result['wall_crn']
             ):
         # If we don't have two textures, something's wrong. Remove this result.
-        utils.con_log('custAntline has missing values!')
+        LOGGER.warning('custAntline has missing values!')
         return None
     else:
         return result
@@ -2143,7 +2144,7 @@ def res_cust_fizzler(base_inst, res):
 
     if is_laser:
         # This is a laserfield! We can't edit those brushes!
-        utils.con_log('CustFizzler excecuted on LaserField!')
+        LOGGER.warning('CustFizzler excecuted on LaserField!')
         return
 
     for orig_brush in (
@@ -2368,7 +2369,7 @@ def res_fizzler_pair(begin_inst, res):
             length = int(end_pos[main_axis] - begin_pos[main_axis])
             break
     else:
-        utils.con_log('No matching pair for {}!!'.format(orig_target))
+        LOGGER.warning('No matching pair for {}!!', orig_target)
         return
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
@@ -2462,10 +2463,10 @@ def place_catwalk_connections(instances, point_a, point_b):
     elif diff.z < 0:
         # We need to add downward stairs
         # They point opposite to normal ones
-        utils.con_log('down from', point_a)
+        LOGGER.debug('down from [}', point_a)
         angle = INST_ANGLE[(-direction).as_tuple()]
         for stair_pos in range(0, -int(diff.z), 128):
-            utils.con_log(stair_pos)
+            LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
             loc = point_a + (2 * stair_pos + 256) * direction
             # Do the vertical offset plus additional 128 units
@@ -2483,7 +2484,7 @@ def place_catwalk_connections(instances, point_a, point_b):
     distance -= abs(diff.z) * 2
 
     # Now do straight sections
-    utils.con_log('Stretching ', distance, direction)
+    LOGGER.debug('Stretching {} {}', distance, direction)
     angle = INST_ANGLE[direction.as_tuple()]
     loc = point_a + (direction * 128)
 
@@ -2498,7 +2499,6 @@ def place_catwalk_connections(instances, point_a, point_b):
             angles=angle,
             file=instances['straight_' + str(segment_len)],
         )
-        utils.con_log(loc)
         loc += (segment_len * direction)
 
 
@@ -2521,7 +2521,7 @@ def res_make_catwalk(_, res):
         Support_Floor: A support extending from the floor.
         Single_Wall: A section connecting to an East wall.
     """
-    utils.con_log("Starting catwalk generator...")
+    LOGGER.info("Starting catwalk generator...")
     marker = resolve_inst(res['markerInst'])
     output_target = res['output_name', 'MARKER']
 
@@ -2553,8 +2553,8 @@ def res_make_catwalk(_, res):
     if not markers:
         return RES_EXHAUSTED
 
-    utils.con_log('Conn:', connections)
-    utils.con_log('Markers:', markers)
+    LOGGER.info('Conn:', connections)
+    LOGGER.info('Markers:', markers)
 
     # First loop through all the markers, adding connecting sections
     for inst in markers.values():
@@ -2571,7 +2571,7 @@ def res_make_catwalk(_, res):
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
-                utils.con_log('Instances not aligned!')
+                LOGGER.warning('Instances not aligned!')
                 continue
 
             y_dir = origin1.x == origin2.x  # Which way the connection is
@@ -2581,11 +2581,11 @@ def res_make_catwalk(_, res):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            utils.con_log('Dist =', dist, ', Vert =', vert_dist)
+            LOGGER.debug('Dist =', dist, ', Vert =', vert_dist)
 
             if dist//2 < vert_dist:
                 # The stairs are 2 long, 1 high.
-                utils.con_log('Not enough room for stairs!')
+                LOGGER.warning('Not enough room for stairs!')
                 continue
 
             if dist > 128:
@@ -2659,7 +2659,7 @@ def res_make_catwalk(_, res):
                 file=supp,
             )
 
-    utils.con_log('Finished catwalk generation!')
+    LOGGER.info('Finished catwalk generation!')
     return RES_EXHAUSTED
 
 
@@ -2759,8 +2759,8 @@ def res_track_plat(_, res):
         if inst['file'].casefold() in track_files
     }
 
-    utils.con_log('Track instances:')
-    utils.con_log('\n'.join(
+    LOGGER.debug('Track instances:')
+    LOGGER.debug('\n'.join(
         '{!s}: {}'.format(k, v['file'])
         for k, v in
         track_instances.items()
@@ -2775,7 +2775,7 @@ def res_track_plat(_, res):
         if plat_inst['file'].casefold() not in platforms:
             continue  # Not a platform!
 
-        utils.con_log('Modifying "' + plat_inst['targetname'] + '"!')
+        LOGGER.debug('Modifying "' + plat_inst['targetname'] + '"!')
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
@@ -3187,9 +3187,10 @@ def res_add_brush(inst, res):
 
     tex_type = res['type', None]
     if tex_type not in ('white', 'black'):
-        utils.con_log(
+        LOGGER.warning(
             'AddBrush: "{}" is not a valid brush '
-            'color! (white or black)'.format(tex_type)
+            'color! (white or black)',
+            tex_type,
         )
         tex_type = 'black'
 
@@ -3313,7 +3314,7 @@ def res_import_template(inst, res):
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        utils.con_log('"{}" not a valid template!'.format(temp_id))
+        LOGGER.warning('"{}" not a valid template!', temp_id)
         return
 
     origin = Vec.from_str(inst['origin'])
@@ -3421,8 +3422,9 @@ def res_unst_scaffold(_, res):
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    utils.con_log(
-        'Running Scaffold Generator (' + res.value + ')...'
+    LOGGER.info(
+        'Running Scaffold Generator ({})...',
+        res.value
     )
     TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value] # Don't let this run twice
@@ -3609,7 +3611,7 @@ def res_unst_scaffold(_, res):
             if new_file != '':
                 ent['file'] = new_file
 
-    utils.con_log('Finished Scaffold generation!')
+    LOGGER.info('Finished Scaffold generation!')
     return RES_EXHAUSTED
 
 
@@ -3719,9 +3721,11 @@ def res_goo_debris(_, res):
             else:
                 possible_locs.append(Vec(x,y,z))
 
-    utils.con_log('GooDebris: {}/{} locations'.format(
-        len(possible_locs), len(GOO_FACE_LOC)
-    ))
+    LOGGER.info(
+        'GooDebris: {}/{} locations',
+        len(possible_locs),
+        len(GOO_FACE_LOC),
+    )
 
     suff = ''
     for loc in possible_locs:
@@ -3967,7 +3971,6 @@ def res_make_tag_fizzler(inst, res):
     ))
 
     if 'model_inst' in res:
-        utils.con_log(VMF.by_target.keys())
         model_inst = resolve_inst(res['model_inst'])[0]
         for mdl_inst in VMF.by_class['func_instance']:
             if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
