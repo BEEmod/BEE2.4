@@ -1,7 +1,9 @@
 # coding=utf-8
+import logging
 import math
 import string
 import collections.abc as abc
+
 from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
@@ -554,6 +556,122 @@ def restart_app():
         sys.executable, args
     ), flush=True)
     os.execv(sys.executable, args)
+
+
+class LogMessage:
+    def __init__(self, fmt, args, kwargs):
+        self.fmt = fmt
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        return str(self.fmt).format(*self.args, **self.kwargs)
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+    """Fix loggers to use str.format().
+
+    """
+    def __init__(self, logger: logging.Logger):
+        super(LoggerAdapter, self).__init__(logger, extra={})
+
+    def log(self, level, msg, *args, **kwargs):
+        if self.isEnabledFor(level):
+            msg, kwargs = self.process(msg, kwargs)
+            self.logger._log(
+                level,
+                LogMessage(msg, args, kwargs),
+                (),
+            )
+
+
+def init_logging(filename):
+    """Setup the logger and logging handlers."""
+    import logging
+    from logging import handlers
+    import sys, io
+
+    logger = logging.getLogger('BEE2')
+    logger.setLevel(logging.DEBUG)
+
+    # Put more info in the log file, since it's not onscreen.
+    ext_format = logging.Formatter(
+        '[{levelname}] {module}.{funcName}(): {message}',
+        style='{',
+    )
+    # Console messages, etc.
+    short_formt = logging.Formatter(
+        # One letter for level name
+        '[{levelname[0]}] {name}: {message}',
+        style='{',
+    )
+
+    # {levelname}:{name}:{message}
+    # The log contains INFO and above logs.
+    # We rotate through logs of 1kb each, so it doesn't increase too much.
+    log_handler = handlers.RotatingFileHandler(
+        filename,
+        maxBytes=1024,
+        backupCount=10,
+    )
+    log_handler.setLevel(logging.INFO)
+    log_handler.setFormatter(ext_format)
+
+    logger.addHandler(log_handler)
+
+    # This is needed for multiprocessing, since it tries to flush stdout.
+    # That'll fail if it is None.
+    class NullStream(io.IOBase):
+        """A stream object that discards all data."""
+        def __init__(self):
+            super(NullStream, self).__init__()
+
+        @staticmethod
+        def write(self, *args, **kwargs):
+            pass
+
+        @staticmethod
+        def read(*args, **kwargs):
+            return ''
+
+    if sys.stdout:
+        out_handler = logging.StreamHandler(sys.stdout)
+        out_handler.setLevel(logging.INFO)
+        out_handler.setFormatter(short_formt)
+        logger.addHandler(out_handler)
+
+        if sys.stderr:
+            def ignore_warnings(record: logging.LogRecord):
+                """Filter out messages higher than WARNING, since that's
+
+                handled by stdError.
+                """
+                return record.levelno < logging.WARNING
+            out_handler.addFilter(ignore_warnings)
+    else:
+        sys.stdout = NullStream()
+
+    if sys.stderr:
+        err_handler = logging.StreamHandler(sys.stderr)
+        err_handler.setLevel(logging.WARNING)
+        err_handler.setFormatter(short_formt)
+        logger.addHandler(err_handler)
+    else:
+        sys.stderr = NullStream()
+
+
+    print(logger.handlers)
+
+    return logger
+
+
+def getLogger(name) -> logging.getLogger():
+    """Get the named logger object.
+
+    This puts the logger into the BEE2 namespace, and wraps it to
+    use str.format() instead of % formatting.
+    """
+    return LoggerAdapter(logging.getLogger('BEE2.' + name))
 
 
 class EmptyMapping(abc.MutableMapping):

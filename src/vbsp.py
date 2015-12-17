@@ -1,3 +1,7 @@
+import utils
+# Do this very early, so we log the startup sequence.
+LOGGER = utils.init_logging('bee2/vbsp.log')
+
 import os
 import os.path
 import sys
@@ -5,7 +9,6 @@ import subprocess
 import shutil
 import random
 import itertools
-import math
 from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
@@ -14,7 +17,6 @@ from property_parser import Property
 from utils import Vec
 from BEE2_config import ConfigFile
 import vmfLib as VLib
-import utils
 import voiceLine
 import instanceLocs
 import conditions
@@ -3049,4 +3051,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        LOGGER.exception()
