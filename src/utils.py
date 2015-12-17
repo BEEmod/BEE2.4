@@ -585,7 +585,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename):
+def init_logging(filename) -> logging.Logger:
     """Setup the logger and logging handlers."""
     import logging
     from logging import handlers
@@ -659,13 +659,10 @@ def init_logging(filename):
     else:
         sys.stderr = NullStream()
 
-
-    print(logger.handlers)
-
     return logger
 
 
-def getLogger(name) -> logging.getLogger():
+def getLogger(name: str) -> logging.Logger:
     """Get the named logger object.
 
     This puts the logger into the BEE2 namespace, and wraps it to

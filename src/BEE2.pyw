@@ -128,7 +128,7 @@ if __name__ == '__main__':
                 )
 
         # Log the error.
-        LOGGER.exception()
+        LOGGER.exception('Exception Occurred:')
         logging.shutdown()
 
         # We still want to crash!
