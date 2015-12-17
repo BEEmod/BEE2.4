@@ -7,6 +7,8 @@ import shutil
 from property_parser import Property
 import utils
 
+LOGGER = utils.getLogger(__name__)
+
 PAL_DIR = "palettes\\"
 
 pal_list = []
@@ -24,14 +26,14 @@ class Palette:
 
     def save(self, allow_overwrite, name=None):
         """Save the palette file into the specified location."""
-        print('Saving "' + self.name + '"!')
+        LOGGER.info('Saving "' + self.name + '"!')
         if name is None:
             name = self.filename
         is_zip = name.endswith('.zip')
         path = os.path.join(PAL_DIR, name)
         if not allow_overwrite:
             if os.path.isdir(path) or os.path.isfile(path):
-                print('"' + name + '" exists already!')
+                LOGGER.warning('"' + name + '" exists already!')
                 return False
         try:
             if is_zip:
@@ -44,7 +46,7 @@ class Palette:
                 prop_file = open(os.path.join(path, 'properties.txt'), 'w')
 
             for ind, (item_id, item_sub) in enumerate(self.pos):
-                if ind%4 == 0:
+                if ind % 4 == 0:
                     if ind != 0:
                         pos_file.write('\n') # Don't start the file with a newline
                     pos_file.write("//Row " + str(ind//4) + '\n')
@@ -73,6 +75,7 @@ class Palette:
         else:
             shutil.rmtree(path)
 
+
 def load_palettes(pal_dir):
     "Scan and read in all palettes in the specified directory."
     global PAL_DIR, pal_list
@@ -82,22 +85,22 @@ def load_palettes(pal_dir):
 
     pal_list = []
     for name in contents:
-        print("Loading '"+name+"'")
+        LOGGER.info('Loading "{}"', name)
         path = os.path.join(full_dir, name)
         pos_file, prop_file = None, None
         try:
             if name.endswith('.zip'):
                 # Extract from a zip
                 with zipfile.ZipFile(path, ) as zip_file:
-                    pos_file = zip_file.open('positions.txt',)
-                    prop_file = zip_file.open('properties.txt',)
+                    pos_file = zip_file.open('positions.txt')
+                    prop_file = zip_file.open('properties.txt')
             elif os.path.isdir(path):
                 # Open from the subfolder
                 pos_file = open(os.path.join(path, 'positions.txt'))
                 prop_file = open(os.path.join(path, 'properties.txt'))
         except (KeyError, FileNotFoundError):
             #  KeyError is returned by zipFile.open() if file is not present
-            print("ERROR: Bad palette file '"+name+"'!")
+            LOGGER.warning('Bad palette file "{}"!', name)
         else:
             pal = parse(pos_file, prop_file, name)
             if pal is not None:
@@ -108,6 +111,7 @@ def load_palettes(pal_dir):
             if prop_file:
                 prop_file.close()
     return pal_list
+
 
 def parse(posfile, propfile, path):
     "Parse through the given palette file to get all data."
@@ -134,14 +138,15 @@ def parse(posfile, propfile, path):
                         int(val[1].strip()), # Item subtype
                         ))
                 else:
-                    print("Malformed row '"+line+"'!")
+                    LOGGER.warning('Malformed row "{}"!', line)
                     return None
     return Palette(name, pos, opts, filename=path)
+
 
 def save_pal(items, name):
     """Save a palette under the specified name."""
     pos = [(it.id, it.subKey) for it in items]
-    print(name, pos, name, [])
+    LOGGER.debug(name, pos, name, [])
     new_palette = Palette(name, pos)
 
     for pal in pal_list[:]:
