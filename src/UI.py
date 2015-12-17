@@ -30,6 +30,7 @@ import optionWindow
 import backup as backupWin
 import tooltip
 
+LOGGER = utils.getLogger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -943,7 +944,6 @@ def drag_fast(e):
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        print('flowing')
         flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
@@ -988,7 +988,7 @@ def set_palette(_=None):
                 is_pre=True
                 ))
         else:
-            print('Unknown item "' + item + '"!')
+            LOGGER.warning('Unknown item "{}"!', item)
     flow_preview()
 
 
@@ -1808,7 +1808,7 @@ def init_windows():
             state=NORMAL,
         )
         TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
-        print('Done extracting resources!')
+        LOGGER.info('Done extracting resources!')
     extract_packages.done_callback = copy_done_callback
 
     style_win.callback = style_select_callback

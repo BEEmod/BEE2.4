@@ -9,6 +9,8 @@ import utils
 import vmfLib
 import vbsp
 
+LOGGER = utils.getLogger(__name__)
+
 map_attr = {}
 style_vars = {}
 
@@ -76,8 +78,9 @@ def find_group_quotes(group, mid_quotes, conf):
                 else:
                     poss_quotes.append(line)
             else:
-                utils.con_log(
-                    'Line "{}" is disabled..'.format(line['name', '??'])
+                LOGGER.info(
+                    'Line "{}" is disabled..',
+                    line['name', '??'],
                 )
 
         if poss_quotes:
@@ -89,7 +92,7 @@ def find_group_quotes(group, mid_quotes, conf):
 
 def add_quote(quote, targetname, quote_loc):
     """Add a quote to the map."""
-    utils.con_log('Adding quote: ', quote)
+    LOGGER.info('Adding quote: {}', quote)
 
     for prop in quote:
         name = prop.name.casefold()
@@ -206,10 +209,10 @@ def add_voice(
         ):
     """Add a voice line to the map."""
     global ALLOW_MID_VOICES, VMF, map_attr, style_vars
-    utils.con_log('Adding Voice Lines!')
+    LOGGER.info('Adding Voice Lines!')
 
     if len(voice_data.value) == 0:
-        utils.con_log('Error - No Voice Line Data!')
+        LOGGER.info('Error - No Voice Line Data!')
         return
 
     VMF = vmf_file
@@ -222,7 +225,7 @@ def add_voice(
     quote_base = voice_data['base', False]
     quote_loc = voice_data['quote_loc', '-10000 0 0']
     if quote_base:
-        print('Adding Base instance!')
+        LOGGER.info('Adding Base instance!')
         VMF.create_ent(
             classname='func_instance',
             targetname='voice',
@@ -259,7 +262,7 @@ def add_voice(
 
             chosen = possible_quotes[0][1]
 
-            utils.con_log('Chosen:', '\n'.join(map(repr, chosen)))
+            LOGGER.info('Chosen: {}', '\n'.join(map(repr, chosen)))
 
             # Join the IDs for the voice lines to the map seed,
             # so each quote block will chose different lines.
@@ -271,11 +274,11 @@ def add_voice(
             # Add one of the associated quotes
             add_quote(random.choice(chosen), quote_targetname, choreo_loc)
 
-    print('Mid quotes: ', mid_quotes)
+    LOGGER.info('Mid quotes: {}', mid_quotes)
     for mid_item in mid_quotes:
         # Add all the mid quotes
         target = mid_item['target', '']
         for prop in mid_item:
             add_quote(prop, target, quote_loc)
 
-    utils.con_log('Done!')
+    LOGGER.info('Done!')

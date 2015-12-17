@@ -296,7 +296,6 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    LOGGER.info('Done!')
     return data
 
 

@@ -11,6 +11,8 @@ import vmfLib as VLib
 import conditions
 import vbsp
 
+LOGGER = utils.getLogger(__name__)
+
 TEX_DEFAULT = [
     ('squarebeams', 'anim_wp/framework/squarebeams'),
     ('ceilingwalls', 'anim_wp/framework/backpanels_cheap'),
@@ -620,7 +622,7 @@ def make_displacement(
         '10': '-1 -1 -1 -1 -1 -1 -1 -1 -1 -1',
     }
 
-    utils.con_log('Making displacement in: {} {}'.format(bbox_min, bbox_max))
+    LOGGER.info('Making displacement in: {} {}', bbox_min, bbox_max)
 
     # Number of rows/columns needed
     grid_size = 2 ** power + 1

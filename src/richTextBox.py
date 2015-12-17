@@ -2,6 +2,9 @@ import tkinter
 from tkinter.constants import *
 from tkinter.font import Font as tkFont
 
+import utils
+
+LOGGER = utils.getLogger(__name__)
 
 class tkRichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting.
@@ -85,7 +88,7 @@ class tkRichText(tkinter.Text):
                     # It decreases the text size (to shrink it vertically),
                     # and gives a border
                 else:
-                    print('Unknown description type "' + line_type + '"!')
+                    LOGGER.warning('Unknown description type "{}"!', line_type)
             # delete the trailing newline
             self.delete(self.index(END)+"-1char", "end")
         self['state'] = "disabled"

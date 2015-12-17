@@ -163,7 +163,6 @@ def set_screen_type():
     chosen = chosen_thumb.get()
     COMPILE_CFG['Screenshot']['type'] = chosen
     if chosen == 'CUST':
-        print('Showing')
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     else:
         UI['thumb_label'].grid_forget()

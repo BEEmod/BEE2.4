@@ -23,6 +23,8 @@ import tooltip
 import tk_tools
 import utils
 
+LOGGER = utils.getLogger(__name__)
+
 OPEN_IN_TAB = 2
 
 wid = dict()
@@ -73,7 +75,6 @@ def pos_for_item():
 
 def hide_item_props(vals):
     snd.fx('contract')
-    print(vals)
     selected_item.set_properties(vals)
 
 
@@ -441,7 +442,7 @@ def init_widgets():
                         detail='"{!s}"'.format(url),
                         parent=prop_window
                         ):
-                    print("Saving " + url + "to clipboard!")
+                    LOGGER.info("Saving {} to clipboard!", url)
                     TK_ROOT.clipboard_clear()
                     TK_ROOT.clipboard_append(url)
             # Either the webbrowser or the messagebox could cause the

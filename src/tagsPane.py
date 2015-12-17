@@ -64,7 +64,6 @@ def filter_items():
         if enabled
     ]
     no_tags = len(sel_tags) == 0
-    print(sel_tags)
 
     for item in UI.pal_items:
         if item.needs_unlock and not style_unlocked:

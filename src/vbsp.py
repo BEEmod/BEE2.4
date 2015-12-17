@@ -399,7 +399,7 @@ def load_settings():
         with open("bee2/vbsp_config.cfg") as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
     except FileNotFoundError:
-        utils.con_log('Error: No vbsp_config file!')
+        LOGGER.warning('Error: No vbsp_config file!')
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
@@ -522,17 +522,17 @@ def load_settings():
     else:
         BEE2_config = ConfigFile(None)
 
-    utils.con_log("Settings Loaded!")
+    LOGGER.info("Settings Loaded!")
 
 
 def load_map(map_path):
     """Load in the VMF file."""
     global VMF
     with open(map_path) as file:
-        utils.con_log("Parsing Map...")
+        LOGGER.info("Parsing Map...")
         props = Property.parse(file, map_path)
     VMF = VLib.VMF.parse(props)
-    utils.con_log("Parsing complete!")
+    LOGGER.info("Parsing complete!")
 
 
 @conditions.meta_cond(priority=100)
@@ -869,7 +869,7 @@ def anti_fizz_bump(inst):
     # Only use 1 bumper entity for each fizzler, since we can.
     bumpers = {}
 
-    utils.con_log('Adding Portal Bumpers to fizzlers...')
+    LOGGER.info('Adding Portal Bumpers to fizzlers...')
     for cleanser in VMF.by_class['trigger_portal_cleanser']:
         # Client bit flag = 1, triggers without it won't destroy portals
         # - so don't add a bumper.
@@ -934,7 +934,7 @@ def anti_fizz_bump(inst):
         for face in noportal_brush:
             face.mat = 'tools/toolsinvisible'
 
-    utils.con_log('Done!')
+    LOGGER.info('Done!')
 
 
 @conditions.meta_cond(priority=500, only_once=True)
@@ -958,17 +958,17 @@ def set_player_portalgun(inst):
     if get_opt('game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
-    utils.con_log('Setting Portalgun:')
+    LOGGER.info('Setting Portalgun:')
 
     has = settings['has_attr']
 
     blue_portal = not has['blueportal']
     oran_portal = not has['orangeportal']
 
-    utils.con_log('Blue: {}, Orange: {!s}'.format(
+    LOGGER.info('Blue: {}, Orange: {!s}',
         'Y' if blue_portal else 'N',
         'Y' if oran_portal else 'N',
-    ))
+    )
 
     if blue_portal and oran_portal:
         has['spawn_dual'] = True
@@ -1023,7 +1023,7 @@ def set_player_portalgun(inst):
                 times=1,
             ))
 
-    utils.con_log('Done!')
+    LOGGER.info('Done!')
 
 
 @conditions.meta_cond(priority=750, only_once=True)
@@ -1038,14 +1038,14 @@ def add_screenshot_logic(inst):
             origin=get_opt('global_pti_ents_loc'),
             angles='0 0 0',
         )
-        utils.con_log('Added Screenshot Logic')
+        LOGGER.info('Added Screenshot Logic')
 
 
 @conditions.meta_cond(priority=50, only_once=True)
 def set_elev_videos(_):
     vid_type = settings['elevator']['type'].casefold()
 
-    utils.con_log('Elevator type: ', vid_type.upper())
+    LOGGER.info('Elevator type: {}', vid_type.upper())
 
     if vid_type == 'none' or GAME_MODE == 'COOP':
         # The style doesn't have an elevator...
@@ -1065,7 +1065,7 @@ def set_elev_videos(_):
         vert_vid = None
         horiz_vid = None
     else:
-        utils.con_log('Invalid elevator type!')
+        LOGGER.warning('Invalid elevator type!')
         return
 
     transition_ents = instanceLocs.resolve('[transitionents]')
@@ -1101,7 +1101,7 @@ def ap_tag_modifications(_):
     if get_opt('game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
 
-    print('Performing Aperture Tag modifications...')
+    LOGGER.info('Performing Aperture Tag modifications...')
 
     has = settings['has_attr']
     # This will enable the PaintInMap property.
@@ -1147,14 +1147,14 @@ def ap_tag_modifications(_):
     try:
         puzz_folders = os.listdir('../aperturetag/puzzles')
     except FileNotFoundError:
-        print("Aperturetag/puzzles/ doesn't exist??")
+        LOGGER.warning("Aperturetag/puzzles/ doesn't exist??")
     else:
         for puzz_folder in puzz_folders:
             new_folder = os.path.abspath(os.path.join(
                 '../portal2/maps/puzzlemaker',
                 puzz_folder,
             ))
-            print('Creating', new_folder)
+            LOGGER.info('Creating', new_folder)
             os.makedirs(
                 new_folder,
                 exist_ok=True,
@@ -1186,7 +1186,7 @@ def get_map_info():
 
     if elev_override:
         # Make conditions set appropriately
-        utils.con_log('Forcing elevator spawn!')
+        LOGGER.info('Forcing elevator spawn!')
         IS_PREVIEW = False
 
     no_player_start_inst = (
@@ -1207,7 +1207,6 @@ def get_map_info():
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
 
-    utils.con_log(file_sp_exit_corr)
     for item in VMF.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
@@ -1221,7 +1220,7 @@ def get_map_info():
         # later
 
         file = item['file'].casefold()
-        utils.con_log('File:', file)
+        LOGGER.debug('File:', file)
         if file in no_player_start_inst:
             if elev_override:
                 item.fixup['no_player_start'] = '1'
@@ -1231,36 +1230,33 @@ def get_map_info():
             GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
             if override_sp_exit == 0:
-                utils.con_log(
-                    'Using random exit (' +
-                    str(file_sp_exit_corr.index(file) + 1) +
-                    ')'
+                LOGGER.info(
+                    'Using random exit ({})',
+                    str(file_sp_exit_corr.index(file) + 1)
                 )
             else:
-                utils.con_log('Setting exit to ' + str(override_sp_exit))
+                LOGGER.info('Setting exit to {}', override_sp_exit)
                 item['file'] = file_sp_exit_corr[override_sp_exit-1]
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
             if override_sp_entry == 0:
-                utils.con_log(
-                    'Using random entry (' +
-                    str(file_sp_entry_corr.index(file) + 1) +
-                    ')'
+                LOGGER.info(
+                    'Using random entry ({})',
+                    str(file_sp_entry_corr.index(file) + 1),
                 )
             else:
-                utils.con_log('Setting entry to ' + str(override_sp_entry))
+                LOGGER.info('Setting entry to {}', override_sp_entry)
                 item['file'] = file_sp_entry_corr[override_sp_entry-1]
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
             if override_coop_corr == 0:
-                utils.con_log(
-                    'Using random exit (' +
-                    str(file_coop_corr.index(file) + 1) +
-                    ')'
+                LOGGER.info(
+                    'Using random exit ({})',
+                    str(file_coop_corr.index(file) + 1),
                 )
             else:
-                utils.con_log('Setting coop exit to ' + str(override_coop_corr))
+                LOGGER.info('Setting coop exit to {}', override_coop_corr)
                 item['file'] = file_coop_corr[override_coop_corr-1]
         elif file in file_coop_exit:
             GAME_MODE = 'COOP'
@@ -1270,8 +1266,8 @@ def get_map_info():
             door_frames.append(item)
         inst_files.add(item['file'])
 
-    utils.con_log("Game Mode: " + GAME_MODE)
-    utils.con_log("Is Preview: " + str(IS_PREVIEW))
+    LOGGER.info("Game Mode: " + GAME_MODE)
+    LOGGER.info("Is Preview: " + str(IS_PREVIEW))
 
     if GAME_MODE == 'ERR':
         raise Exception(
@@ -1465,7 +1461,6 @@ def make_bottomless_pit(solids, max_height):
         utils.CONN_TYPES.none: [''],  # Never add instance if no walls
     }
 
-    utils.con_log('Pillar:', instances)
     for (x, y), mask in edges.items():
         if mask is None:
             continue  # This is goo
@@ -1601,7 +1596,7 @@ def change_goo_sides():
     """
     if settings['textures']['special.goo_wall'] == ['']:
         return
-    utils.con_log("Changing goo sides...")
+    LOGGER.info("Changing goo sides...")
     face_dict = {}
     for solid in VMF.iter_wbrushes(world=True, detail=False):
         for face in solid:
@@ -1631,18 +1626,17 @@ def change_goo_sides():
                     except KeyError:
                         continue
 
-                    utils.con_log('Success: ', face.mat.casefold())
                     if (
                             face.mat.casefold() in BLACK_PAN or
                             face.mat.casefold() == 'tools/toolsnodraw'
                             ):
                         face.mat = get_tex('special.goo_wall')
-    utils.con_log("Done!")
+    LOGGER.info("Done!")
 
 
 def collapse_goo_trig():
     """Collapse the goo triggers to only use 2 entities for all pits."""
-    utils.con_log('Collapsing goo triggers...')
+    LOGGER.info('Collapsing goo triggers...')
 
     hurt_trig = None
     cube_trig = None
@@ -1672,7 +1666,7 @@ def collapse_goo_trig():
             ),
         )
 
-    utils.con_log('Done!')
+    LOGGER.info('Done!')
 
 
 def remove_static_ind_toggles():
@@ -1680,7 +1674,7 @@ def remove_static_ind_toggles():
 
     If a style has static overlays, this will make antlines basically free.
     """
-    utils.con_log('Removing static indicator toggles...')
+    LOGGER.info('Removing static indicator toggles...')
     toggle_file = instanceLocs.resolve('<ITEM_INDICATOR_TOGGLE>')
     for inst in VMF.by_class['func_instance']:
         if inst['file'].casefold() not in toggle_file:
@@ -1689,7 +1683,7 @@ def remove_static_ind_toggles():
         overlay = inst.fixup['$indicator_name', '']
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
-    utils.con_log('Done!')
+    LOGGER.info('Done!')
 
 
 def remove_barrier_ents():
@@ -1701,7 +1695,6 @@ def remove_barrier_ents():
         return  # They're being used.
 
     barrier_file = instanceLocs.resolve('[glass_128]')
-    print('Barrier: ', barrier_file)
 
     for inst in VMF.by_class['func_instance']:
         if inst['file'].casefold() in barrier_file:
@@ -1731,7 +1724,7 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
 
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
-    utils.con_log("Editing Brushes...")
+    LOGGER.info("Editing Brushes...")
     glass_clip_mat = get_opt('glass_clip')
     glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
     goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
@@ -1751,7 +1744,7 @@ def change_brush():
                     break  # Skip to next entity
 
     make_bottomless = settings['pit'] is not None
-    utils.con_log('Bottomless Pit:', make_bottomless)
+    LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
     if make_bottomless:
         pit_solids = []
         pit_height = settings['pit']['height']
@@ -1801,14 +1794,14 @@ def change_brush():
         TO_PACK.add(get_opt('glass_pack').casefold())
 
     if make_bottomless:
-        utils.con_log('Creating Bottomless Pits...')
+        LOGGER.info('Creating Bottomless Pits...')
         make_bottomless_pit(pit_solids, highest_brush)
-        utils.con_log('Done!')
+        LOGGER.info('Done!')
 
     if make_goo_mist:
-        utils.con_log('Adding Goo Mist...')
+        LOGGER.info('Adding Goo Mist...')
         add_goo_mist(mist_solids)
-        utils.con_log('Done!')
+        LOGGER.info('Done!')
 
     if can_clump():
         clump_walls()
@@ -1952,7 +1945,7 @@ def clump_walls():
     clump_ceil = get_bool_opt('clump_ceil')
     clump_floor = get_bool_opt('clump_floor')
 
-    utils.con_log('Clumping: {} clumps'.format(clump_numb))
+    LOGGER.info('Clumping: {} clumps', clump_numb)
 
     random.seed(MAP_SEED)
 
@@ -2197,7 +2190,7 @@ def set_antline_mat(
 
 def change_overlays():
     """Alter the overlays."""
-    utils.con_log("Editing Overlays...")
+    LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
     sign_inst = get_opt('signInst')
@@ -2291,7 +2284,7 @@ def change_overlays():
 
 def change_trig():
     """Check the triggers and fizzlers."""
-    utils.con_log("Editing Triggers...")
+    LOGGER.info("Editing Triggers...")
 
     for trig in VMF.by_class['trigger_portal_cleanser']:
         for side in trig.sides():
@@ -2315,7 +2308,7 @@ def change_trig():
 
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
-    utils.con_log("Adding Music...")
+    LOGGER.info("Adding Music...")
 
     if mode == "COOP":
         loc = get_opt('music_location_coop')
@@ -2353,7 +2346,7 @@ def add_extra_ents(mode):
     pti_file = get_opt("global_pti_ents")
     pti_loc = get_opt("global_pti_ents_loc")
     if pti_file != '':
-        utils.con_log('Adding Global PTI Ents')
+        LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = VMF.create_ent(
             classname='func_instance',
             targetname='global_pti_ents',
@@ -2388,7 +2381,7 @@ def add_extra_ents(mode):
 
 def change_func_brush():
     """Edit func_brushes."""
-    utils.con_log("Editing Brush Entities...")
+    LOGGER.info("Editing Brush Entities...")
     grating_clip_mat = get_opt("grating_clip")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
@@ -2548,7 +2541,6 @@ def change_func_brush():
 def alter_flip_panel():
     flip_panel_start = get_opt('flip_sound_start')
     flip_panel_stop = get_opt('flip_sound_stop')
-    utils.con_log(flip_panel_stop, DEFAULTS['flip_sound_stop'])
     if (
             flip_panel_start != DEFAULTS['flip_sound_start'] or
             flip_panel_stop != DEFAULTS['flip_sound_stop']
@@ -2677,7 +2669,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
 
 def change_ents():
     """Edit misc entities."""
-    utils.con_log("Editing Other Entities...")
+    LOGGER.info("Editing Other Entities...")
     if get_bool_opt("remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
@@ -2748,7 +2740,7 @@ def fix_inst():
 
 def fix_worldspawn():
     """Adjust some properties on WorldSpawn."""
-    utils.con_log("Editing WorldSpawn")
+    LOGGER.info("Editing WorldSpawn")
     if VMF.spawn['paintinmap'] != '1':
         # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
@@ -2775,7 +2767,6 @@ def make_packlist(map_path):
     # This way world-brush materials can be packed.
     pack_triggers = settings['packtrigger']
 
-    utils.con_log(pack_triggers)
     if pack_triggers:
         def face_iter():
             """Check all these locations for the target textures."""
@@ -2805,7 +2796,7 @@ def make_packlist(map_path):
         # Nothing to pack - wipe the packfile!
         open(map_path[:-4] + '.filelist.txt', 'w').close()
 
-    utils.con_log('Making Pack list...')
+    LOGGER.info('Making Pack list...')
 
     with open('bee2/pack_list.cfg') as f:
         props = Property.parse(
@@ -2823,9 +2814,9 @@ def make_packlist(map_path):
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
         for file in sorted(PACK_FILES):
             f.write(file + '\n')
-            utils.con_log(file)
+            LOGGER.info(file)
 
-    utils.con_log('Packlist written!')
+    LOGGER.info('Packlist written!')
 
 
 def make_vrad_config():
@@ -2833,7 +2824,7 @@ def make_vrad_config():
 
     This way VRAD doesn't need to parse through vbsp_config, or anything else.
     """
-    utils.con_log('Generating VRAD config...')
+    LOGGER.info('Generating VRAD config...')
     conf = Property('Config', [
     ])
     conf['force_full'] = utils.bool_as_int(
@@ -2861,11 +2852,11 @@ def make_vrad_config():
 def save(path):
     """Save the modified map back to the correct location.
     """
-    utils.con_log("Saving New Map...")
+    LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w') as f:
         VMF.export(dest_file=f, inc_version=True)
-    utils.con_log("Complete!")
+    LOGGER.info("Complete!")
 
 
 def run_vbsp(vbsp_args, do_swap, path, new_path):
@@ -2928,7 +2919,7 @@ def main():
 
     """
     global MAP_SEED, IS_PREVIEW, GAME_MODE
-    utils.con_log("BEE{} VBSP hook initiallised.".format(utils.BEE_VERSION))
+    LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
@@ -2937,7 +2928,7 @@ def main():
 
     if not old_args:
         # No arguments!
-        utils.con_log(
+        LOGGER.info(
             'No arguments!\n'
             "The BEE2 VBSP takes all the regular VBSP's "
             'arguments, with some extra arguments:\n'
@@ -2977,25 +2968,25 @@ def main():
             if len(new_args) > i+1 and new_args[i+1] == '1750':
                 new_args[i+1] = ''
 
-    utils.con_log('Map path is "' + path + '"')
-    utils.con_log('New path: "' + new_path + '"')
+    LOGGER.info('Map path is "' + path + '"')
+    LOGGER.info('New path: "' + new_path + '"')
     if path == "":
         raise Exception("No map passed!")
 
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
         if '-force_peti' in args:
-            utils.con_log('OVERRIDE: Attempting to convert!')
+            LOGGER.warning('OVERRIDE: Attempting to convert!')
             is_hammer = False
         else:
-            utils.con_log('OVERRIDE: Abandoning conversion!')
+            LOGGER.warning('OVERRIDE: Abandoning conversion!')
             is_hammer = True
     else:
         # If we don't get the special -force args, check for the entity
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
     if is_hammer:
-        utils.con_log("Hammer map detected! skipping conversion..")
+        LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
             vbsp_args=old_args,
             do_swap=False,
@@ -3003,9 +2994,9 @@ def main():
             new_path=new_path,
         )
     else:
-        utils.con_log("PeTI map detected!")
+        LOGGER.info("PeTI map detected!")
 
-        utils.con_log("Loading settings...")
+        LOGGER.info("Loading settings...")
         load_settings()
 
         load_map(path)
@@ -3047,7 +3038,7 @@ def main():
             new_path=new_path,
         )
 
-    utils.con_log("BEE2 VBSP hook finished!")
+    LOGGER.info("BEE2 VBSP hook finished!")
 
 
 if __name__ == '__main__':

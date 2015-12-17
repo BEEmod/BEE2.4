@@ -12,6 +12,8 @@ import img
 import utils
 import tk_tools
 
+LOGGER = utils.getLogger(__name__)
+
 voice_item = None
 
 UI = {}
@@ -142,7 +144,7 @@ def configure_canv(e):
 
 
 def save():
-    print('Saving Configs!')
+    LOGGER.info('Saving Configs!')
     config.save_check()
     config_mid.save_check()
     win.withdraw()

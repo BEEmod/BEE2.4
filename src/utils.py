@@ -552,9 +552,12 @@ def restart_app():
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    print('Restarting using "{}", with args {!r}'.format(
-        sys.executable, args
-    ), flush=True)
+    getLogger(__name__).info(
+        'Restarting using "{}", with args {!r}',
+        sys.executable,
+        args,
+    )
+    logging.shutdown()
     os.execv(sys.executable, args)
 
 
@@ -642,9 +645,9 @@ def init_logging(filename) -> logging.Logger:
 
         if sys.stderr:
             def ignore_warnings(record: logging.LogRecord):
-                """Filter out messages higher than WARNING, since that's
+                """Filter out messages higher than WARNING.
 
-                handled by stdError.
+                Those are handled by stdError, and we don't want duplicates.
                 """
                 return record.levelno < logging.WARNING
             out_handler.addFilter(ignore_warnings)
