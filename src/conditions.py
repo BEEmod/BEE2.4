@@ -1767,8 +1767,28 @@ def res_cave_portrait(inst, res):
 
 @make_result('OffsetInst', 'offsetinstance')
 def res_translate_inst(inst, res):
-    """Translate the instance locally by the given amount."""
-    offset = Vec.from_str(res.value).rotate_by_str(inst['angles'])
+    """Translate the instance locally by the given amount.
+
+    The special values <piston>, <piston_bottom> and <piston_top> can be
+    used to offset it based on the starting position, bottom or top position
+    of a piston platform.
+    """
+    folded_val = res.value.casefold()
+    if folded_val == '<piston>':
+        folded_val = (
+            '<piston_top>' if
+            utils.conv_bool(inst.fixup['$start_up'])
+            else '<piston_bottom>'
+        )
+
+    if folded_val == '<piston_top>':
+        val = Vec(z=128 * utils.conv_int(inst.fixup['$top_level', '1'], 1))
+    elif folded_val == '<piston_bottom>':
+        val = Vec(z=128 * utils.conv_int(inst.fixup['$bottom_level', '0'], 0))
+    else:
+        val = Vec.from_str(res.value)
+
+    offset = val.rotate_by_str(inst['angles'])
     inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
 
 
