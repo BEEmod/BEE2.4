@@ -605,7 +605,7 @@ def init_logging(filename) -> logging.Logger:
     # Console messages, etc.
     short_formt = logging.Formatter(
         # One letter for level name
-        '[{levelname[0]}] {name}: {message}',
+        '[{levelname[0]}] {module}: {message}',
         style='{',
     )
 
@@ -662,7 +662,7 @@ def init_logging(filename) -> logging.Logger:
     else:
         sys.stderr = NullStream()
 
-    return logger
+    return LoggerAdapter(logger)
 
 
 def getLogger(name: str) -> logging.Logger:

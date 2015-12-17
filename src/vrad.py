@@ -222,7 +222,6 @@ def mod_screenshots():
                     'Screenshot "{scr}" too old ({diff!s})',
                     scr=scr_shot,
                     diff=diff,
-
                 )
                 continue
 
