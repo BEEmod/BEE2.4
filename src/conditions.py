@@ -619,6 +619,31 @@ def add_suffix(inst, suff):
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
+def local_name(inst: VLib.Entity, name: str):
+    """Fixup the given name for inside an instance.
+
+    This handles @names, !activator, and obeys the fixup_style option.
+    """
+    # If blank, keep it blank, and don't fix special or global names
+    if not name or name.startswith('!') or name.startswith('@'):
+        return name
+
+    fixup = inst['fixup_style', '0']
+    targ_name = inst['targetname', '']
+
+    if fixup == '2' or not targ_name:
+        # We can't do fixup..
+        return name
+
+    if fixup == '0':
+        # Prefix
+        return targ_name + '-' + name
+
+    if fixup == '1':
+        # Postfix
+        return name + '-' + targ_name
+
+
 def widen_fizz_brush(brush, thickness, bounds=None):
     """Move the two faces of a fizzler brush outward.
 
@@ -1960,6 +1985,54 @@ def res_change_outputs(inst: VLib.Entity, res):
                     output.inst_out, output.output = rep
 
 
+@make_result_setup('timedRelay')
+def res_timed_relay_setup(res):
+    var = res['variable', '$timer_delay']
+    name = res['targetname']
+    disabled = res['disabled', '0']
+    flags = res['spawnflags', '0']
+
+    outs = [
+        VLib.Output.parse(subprop)
+        for prop in res.find_all('Outputs')
+        for subprop in prop
+    ]
+    return var, name, disabled, flags, outs
+
+
+@make_result('timedRelay')
+def res_timed_relay(inst: VLib.Entity, res):
+    """Generate a logic_relay with outputs delayed by a certain amount.
+
+    This allows triggering outputs based $timer_delay values.
+    """
+    var, name, disabled, flags, outs = res.value
+
+    relay = VMF.create_ent(
+        classname='logic_relay',
+        spawnflags=flags,
+        origin=inst['origin'],
+        targetname=local_name(inst, name),
+    )
+
+    relay['StartDisabled'] = (
+        inst.fixup[disabled]
+        if disabled.startswith('$') else
+        disabled
+    )
+
+    delay = utils.conv_float(
+        relay.fixup[var]
+        if var.startswith('$') else
+        var
+    )
+
+    for out in outs:  # type: VLib.Output
+        new_out = out.copy()
+        new_out.delay += delay
+        relay.add_out(new_out)
+
+
 @make_result('faithMods')
 def res_faith_mods(inst, res):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
@@ -1988,13 +2061,17 @@ def res_faith_mods(inst, res):
                 for solid in trig.solids:
                     solid.translate(offset)
 
+            # Inspect the outputs to determine the type.
+            # We also change them if desired, since that's not possible
+            # otherwise.
+
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
                     out.inst_in = res['angled_targ', 'animate_angled_relay']
                     out.input = res['angled_in', 'Trigger']
                     if fixup_var:
                         inst.fixup[fixup_var] = 'angled'
-                    break
+                    break # There's only one output we want to look for...
                 elif out.inst_in == 'animate_straightup_relay':
                     out.inst_in = res[
                         'straight_targ', 'animate_straightup_relay'
