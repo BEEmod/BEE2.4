@@ -57,6 +57,7 @@ if __name__ == '__main__':
     loadScreen.main_loader.set_length('UI', 14)
     loadScreen.main_loader.show()
 
+    # OS X starts behind other windows, fix that.
     if utils.MAC:
         TK_ROOT.lift()
 
@@ -76,7 +77,7 @@ if __name__ == '__main__':
             GEN_OPTS.get_val('Last_Selected', 'Game', ''),
             )
 
-        print('Loading Packages...')
+        LOGGER.info('Loading Packages...')
         pack_data = packageLoader.load_packages(
             GEN_OPTS['Directories']['package'],
             log_item_fallbacks=GEN_OPTS.get_bool(
@@ -89,21 +90,21 @@ if __name__ == '__main__':
                 'Debug', 'log_incorrect_packfile'),
         )
         UI.load_packages(pack_data)
-        print('Done!')
+        LOGGER.info('Done!')
 
-        print('Loading Palettes...')
+        LOGGER.info('Loading Palettes...')
         UI.load_palette(
             paletteLoader.load_palettes(GEN_OPTS['Directories']['palette']),
             )
-        print('Done!')
+        LOGGER.info('Done!')
 
-        print('Loading Item Translations...', end='')
+        LOGGER.info('Loading Item Translations...')
         gameMan.init_trans()
-        print('Done')
+        LOGGER.info('Done')
 
-        print('Initialising UI...')
+        LOGGER.info('Initialising UI...')
         UI.init_windows()  # create all windows
-        print('Done!')
+        LOGGER.info('Done!')
 
         loadScreen.main_loader.destroy()
 
