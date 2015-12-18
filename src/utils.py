@@ -648,7 +648,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stdout:
         out_handler = logging.StreamHandler(sys.stdout)
         out_handler.setLevel(logging.INFO)
-        out_handler.setFormatter(short_formt)
+        out_handler.setFormatter(short_log_format)
         logger.addHandler(out_handler)
 
         if sys.stderr:
