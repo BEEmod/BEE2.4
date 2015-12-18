@@ -610,6 +610,9 @@ def init_logging(filename: str=None) -> logging.Logger:
     )
 
     if filename is not None:
+        # Make the directories the logs are in, if needed.
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
         # The log contains INFO and above logs.
         # We rotate through logs of 1kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
