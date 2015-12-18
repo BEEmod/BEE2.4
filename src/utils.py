@@ -28,6 +28,10 @@ WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
 
+# Formatters for the logger handlers.
+short_log_format = None
+long_log_format = None
+
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
 STEAM_IDS = {
@@ -590,20 +594,21 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 def init_logging(filename: str=None) -> logging.Logger:
     """Setup the logger and logging handlers."""
+    global short_log_format, long_log_format
     import logging
     from logging import handlers
-    import sys, io
+    import sys, io, os
 
     logger = logging.getLogger('BEE2')
     logger.setLevel(logging.DEBUG)
 
     # Put more info in the log file, since it's not onscreen.
-    ext_format = logging.Formatter(
+    long_log_format = logging.Formatter(
         '[{levelname}] {module}.{funcName}(): {message}',
         style='{',
     )
     # Console messages, etc.
-    short_formt = logging.Formatter(
+    short_log_format = logging.Formatter(
         # One letter for level name
         '[{levelname[0]}] {module}: {message}',
         style='{',
@@ -660,7 +665,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stderr:
         err_handler = logging.StreamHandler(sys.stderr)
         err_handler.setLevel(logging.WARNING)
-        err_handler.setFormatter(short_formt)
+        err_handler.setFormatter(short_log_format)
         logger.addHandler(err_handler)
     else:
         sys.stderr = NullStream()
