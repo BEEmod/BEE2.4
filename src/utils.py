@@ -2,9 +2,9 @@
 import logging
 import math
 import string
-import collections.abc as abc
+from collections import abc
+import collections
 
-from collections import namedtuple, deque
 from sys import platform
 from enum import Enum
 
@@ -523,7 +523,7 @@ def fit(dist, obj):
         return []
     orig_dist = dist
     smallest = obj[-1]
-    items = deque()
+    items = collections.deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = append_bothsides(items)
@@ -730,7 +730,7 @@ class EmptyMapping(abc.MutableMapping):
 EmptyMapping = EmptyMapping()  # We only need the one instance
 
 
-Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
+Vec_tuple = collections.namedtuple('Vec_tuple', ['x', 'y', 'z'])
 
 
 class Vec:
