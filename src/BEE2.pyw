@@ -1,5 +1,5 @@
 import utils
-LOGGER = utils.init_logging('../BEE2-error.log')
+LOGGER = utils.init_logging('../logs/BEE2-error.log')
 
 from tkinter import messagebox
 
@@ -17,6 +17,7 @@ import paletteLoader
 import packageLoader
 import gameMan
 import extract_packages
+import logWindow
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -40,6 +41,11 @@ DEFAULT_SETTINGS = {
         'log_missing_ent_count': '0',
         # Warn if a file is missing that a packfile refers to
         'log_incorrect_packfile': '0',
+
+        # Show the log window on startup
+        'show_log_win': '0',
+        # The lowest level which will be shown.
+        'window_log_level': 'INFO',
     },
 }
 
@@ -63,6 +69,11 @@ if __name__ == '__main__':
 
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
+
+    logWindow.init(
+        GEN_OPTS.get_bool('Debug', 'show_log_win'),
+        GEN_OPTS['Debug']['window_log_level']
+    )
 
     show_errors = False
 
