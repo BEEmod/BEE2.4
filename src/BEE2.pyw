@@ -143,5 +143,12 @@ if __name__ == '__main__':
         LOGGER.exception('Exception Occurred:')
         logging.shutdown()
 
+        try:
+            # Try to turn on the logging window for next time..
+            GEN_OPTS['Debug']['show_log_win'] = '1'
+            GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
+        except Exception:
+            pass
+
         # We still want to crash!
         raise
