@@ -588,7 +588,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename) -> logging.Logger:
+def init_logging(filename: str=None) -> logging.Logger:
     """Setup the logger and logging handlers."""
     import logging
     from logging import handlers
@@ -609,18 +609,18 @@ def init_logging(filename) -> logging.Logger:
         style='{',
     )
 
-    # {levelname}:{name}:{message}
-    # The log contains INFO and above logs.
-    # We rotate through logs of 1kb each, so it doesn't increase too much.
-    log_handler = handlers.RotatingFileHandler(
-        filename,
-        maxBytes=1024,
-        backupCount=10,
-    )
-    log_handler.setLevel(logging.INFO)
-    log_handler.setFormatter(ext_format)
+    if filename is not None:
+        # The log contains INFO and above logs.
+        # We rotate through logs of 1kb each, so it doesn't increase too much.
+        log_handler = handlers.RotatingFileHandler(
+            filename,
+            maxBytes=1024,
+            backupCount=10,
+        )
+        log_handler.setLevel(logging.INFO)
+        log_handler.setFormatter(long_log_format)
 
-    logger.addHandler(log_handler)
+        logger.addHandler(log_handler)
 
     # This is needed for multiprocessing, since it tries to flush stdout.
     # That'll fail if it is None.
