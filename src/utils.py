@@ -591,10 +591,14 @@ class LoggerAdapter(logging.LoggerAdapter):
 
     def log(self, level, msg, *args, **kwargs):
         if self.isEnabledFor(level):
-            msg, kwargs = self.process(msg, kwargs)
             self.logger._log(
                 level,
-                LogMessage(msg, args, kwargs),
+                # Only use the format adapter if arguments exist
+                (
+                    LogMessage(msg, args, kwargs)
+                    if kwargs or args else
+                    msg
+                ),
                 (),
             )
 
