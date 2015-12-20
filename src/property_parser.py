@@ -85,7 +85,7 @@ def read_multiline_value(file, line_num, filename):
     lines = ['']  # We return with a beginning newline
     # Re-looping over the same iterator means we don't repeat lines
     for line_num, line in file:
-        line = utils.clean_line(line)
+        line = line.strip()
         if line.endswith('"'):
             lines.append(line[:-1])
             return '\n'.join(lines)
@@ -158,7 +158,7 @@ class Property:
         filename, if set should be the source of the text for debug purposes.
         file_contents should be an iterable of strings
         """
-        from utils import clean_line, is_identifier
+        from utils import is_identifier
 
         file_iter = enumerate(file_contents, start=1)
 
@@ -173,9 +173,13 @@ class Property:
         # A queue of the properties we are currently in (outside to inside).
         open_properties = [cur_block]
         for line_num, line in file_iter:
-            freshline = clean_line(line)
-            if not freshline:
-                # Skip blank lines!
+            if isinstance(line, bytes):
+                # Decode bytes using utf-8
+                line = line.decode('utf-8')
+            freshline = line.strip()
+
+            if not freshline or freshline[:2] == '//':
+                # Skip blank lines and comments!
                 continue
 
             if freshline.startswith('"'):   # data string
@@ -186,16 +190,34 @@ class Property:
                 except IndexError:  # It doesn't have a value, likely a block
                     value = None
                 else:
-                    if not freshline.endswith('"'):
-                        # It's a multiline value!
-                        value += read_multiline_value(
-                            file_iter,
-                            line_num,
+                    # Special case - comment between name/value sections -
+                    # it's a name block then.
+                    if line_contents[2].lstrip().startswith('//'):
+                        value = None
+                        del line_contents[3:]
+                    else:
+                        if len(line_contents) < 5:
+                            # It's a multiline value - no ending quote!
+                            value += read_multiline_value(
+                                file_iter,
+                                line_num,
+                                filename,
+                            )
+                        if value and '\\' in value:
+                            for orig, new in REPLACE_CHARS.items():
+                                value = value.replace(orig, new)
+                # Line_contents[4] is the start of the comment, ensure that it's
+                # blank or starts with a comment.
+                if len(line_contents) >= 5:
+                    comment = line_contents[4].lstrip()
+                    # same as: not (comment or comment.startswith('//'))
+                    if comment and not comment.startswith('//'):
+                        raise KeyValError(
+                            'Extra text after '
+                            'line: "{}"'.format(line_contents[4]),
                             filename,
+                            line_num,
                         )
-                    if '\\' in value:
-                        for orig, new in REPLACE_CHARS.items():
-                            value = value.replace(orig, new)
 
                 cur_block.append(Property(name, value))
             elif freshline.startswith('{'):
