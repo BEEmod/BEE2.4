@@ -425,13 +425,13 @@ def make_pane(tool_frame):
     UI['elev_elevator'].grid(row=0, column=1, sticky=W)
 
     add_tooltip(
-        UI['elev_preview'],
+        UI['elev_elevator'],
         "When previewing in SP, spawn inside the entry elevator. "
         "This also disables the map restarts when you reach the "
         "exit door. Use this to examine the entry and exit corridors."
     )
     add_tooltip(
-        UI['elev_elevator'],
+        UI['elev_preview'],
         "When previewing in SP, spawn just before the entry door. "
         "When you reach the exit door, the map will restart."
     )
