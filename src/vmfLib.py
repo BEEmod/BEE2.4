@@ -941,7 +941,7 @@ class UVAxis:
             z=self.z,
             off=self.offset,
             scale=self.scale,
-        )
+        ).replace('.0', '')
 
 
 class Side:
@@ -1778,7 +1778,10 @@ class Output:
             sep = True
             vals = prop.value.split(',')
 
-        targ, inp, param, delay, times = vals
+        try:
+            targ, inp, param, delay, times = vals
+        except ValueError as e:
+            raise ValueError('Bad output value: "{}"'.format(prop.value)) from e
 
         inst_out, out = Output.parse_name(prop.real_name)
         inst_inp, inp = Output.parse_name(inp)
