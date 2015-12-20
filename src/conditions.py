@@ -576,7 +576,7 @@ def weighted_random(count: int, weights: str):
     repeated indexes corresponding to the comma-separated weight values.
     """
     if weights == '' or ',' not in weights:
-        LOGGER.warning('Invalid weight! ({}})', weights)
+        LOGGER.warning('Invalid weight! ({})', weights)
         weight = list(range(count))
     else:
         # Parse the weight
