@@ -437,13 +437,18 @@ def conv_int(val: str, default=0):
         return default
 
 
-def parse_str(val: str, x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
+def parse_str(val: Union[str, 'Vec'], x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
     """Convert a string in the form '(4 6 -4)' into a set of floats.
 
      If the string is unparsable, this uses the defaults (x,y,z).
      The string can start with any of the (), {}, [], <> bracket
      types.
+
+     If the 'string' is actually a Vec, the values will be returned.
      """
+    if isinstance(val, Vec):
+        return val.x, val.y, val.z
+
     parts = val.split(' ')
     if len(parts) == 3:
         # Strip off the brackets if present
@@ -572,7 +577,9 @@ class LogMessage:
         self.kwargs = kwargs
 
     def __str__(self):
+        # Only format if we have arguments!
         return str(self.fmt).format(*self.args, **self.kwargs)
+
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -780,13 +787,16 @@ class Vec:
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val: str, x=0.0, y=0.0, z=0.0):
+    def from_str(cls, val: Union[str, 'Vec'], x=0.0, y=0.0, z=0.0):
         """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
          The string can start with any of the (), {}, [], <> bracket
          types.
+
+         If the value is already a vector, a copy will be returned.
          """
+
         x, y, z = parse_str(val, x, y, z)
         return cls(x, y, z)
 
