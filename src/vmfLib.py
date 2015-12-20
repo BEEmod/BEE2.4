@@ -383,12 +383,14 @@ class VMF:
         return map_obj
     pass
 
-    def export(self, dest_file=None, inc_version=True):
+    def export(self, dest_file=None, inc_version=True, minimal=False):
         """Serialises the object's contents into a VMF file.
 
         - If no file is given the map will be returned as a string.
         - By default, this will increment the map's version - set
           inc_version to False to suppress this.
+        - If minimal is True, several blocks will be skipped
+          (Viewsettings, cameras, cordons and visgroups)
         """
         if dest_file is None:
             dest_file = io.StringIO()
@@ -413,17 +415,18 @@ class VMF:
 
         # TODO: Visgroups
 
-        dest_file.write('viewsettings\n{\n')
-        dest_file.write('\t"bSnapToGrid" "' +
-                        utils.bool_as_int(self.snap_grid) + '"\n')
-        dest_file.write('\t"bShowGrid" "' +
-                        utils.bool_as_int(self.show_grid) + '"\n')
-        dest_file.write('\t"bShowLogicalGrid" "' +
-                        utils.bool_as_int(self.show_logic_grid) + '"\n')
-        dest_file.write('\t"nGridSpacing" "' +
-                        str(self.grid_spacing) + '"\n')
-        dest_file.write('\t"bShow3DGrid" "' +
-                        utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
+        if not minimal:
+            dest_file.write('viewsettings\n{\n')
+            dest_file.write('\t"bSnapToGrid" "' +
+                            utils.bool_as_int(self.snap_grid) + '"\n')
+            dest_file.write('\t"bShowGrid" "' +
+                            utils.bool_as_int(self.show_grid) + '"\n')
+            dest_file.write('\t"bShowLogicalGrid" "' +
+                            utils.bool_as_int(self.show_logic_grid) + '"\n')
+            dest_file.write('\t"nGridSpacing" "' +
+                            str(self.grid_spacing) + '"\n')
+            dest_file.write('\t"bShow3DGrid" "' +
+                            utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
 
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(dest_file, ent_name='world')
@@ -432,24 +435,25 @@ class VMF:
         for ent in self.entities:
             ent.export(dest_file)
 
-        dest_file.write('cameras\n{\n')
-        if len(self.cameras) == 0:
-            self.active_cam = -1
-        dest_file.write('\t"activecamera" "' + str(self.active_cam) + '"\n')
-        for cam in self.cameras:
-            cam.export(dest_file, '\t')
-        dest_file.write('}\n')
+        if not minimal:
+            dest_file.write('cameras\n{\n')
+            if len(self.cameras) == 0:
+                self.active_cam = -1
+            dest_file.write('\t"activecamera" "' + str(self.active_cam) + '"\n')
+            for cam in self.cameras:
+                cam.export(dest_file, '\t')
+            dest_file.write('}\n')
 
-        dest_file.write('cordons\n{\n')
-        if len(self.cordons) > 0:
-            dest_file.write('\t"active" "' +
-                            utils.bool_as_int(self.cordon_enabled) +
-                            '"\n')
-            for cord in self.cordons:
-                cord.export(dest_file, '\t')
-        else:
-            dest_file.write('\t"active" "0"\n')
-        dest_file.write('}\n')
+            dest_file.write('cordons\n{\n')
+            if len(self.cordons) > 0:
+                dest_file.write('\t"active" "' +
+                                utils.bool_as_int(self.cordon_enabled) +
+                                '"\n')
+                for cord in self.cordons:
+                    cord.export(dest_file, '\t')
+            else:
+                dest_file.write('\t"active" "0"\n')
+            dest_file.write('}\n')
 
         if self.quickhide_count > 0:
             dest_file.write('quickhide\n{\n')
@@ -1362,6 +1366,7 @@ class Entity:
                         for br in
                         item
                     )
+            # TODO: handle "group" blocks.
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
