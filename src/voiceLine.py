@@ -16,9 +16,14 @@ style_vars = {}
 
 ADDED_BULLSEYES = set()
 
+# Special quote instances assoicated with an item/style.
+# These are only added if the condition executes.
+QUOTE_EVENTS = {} # id -> instance mapping
+
 ALLOW_MID_VOICES = False
 VMF = None
 
+# The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -42,6 +47,14 @@ def mode_quotes(prop_block):
             yield prop
         elif prop.name == 'line_coop' and not is_sp:
             yield prop
+
+
+@conditions.make_result('QuoteEvent')
+def res_quote_event(inst, res):
+    """Enable a quote event. The given file is the default instance."""
+    QUOTE_EVENTS[res['id'].casefold()] = res['file']
+
+    return conditions.RES_EXHAUSTED
 
 
 def find_group_quotes(group, mid_quotes, conf):
@@ -239,6 +252,30 @@ def add_voice(
 
     mid_quotes = []
 
+    # QuoteEvents allows specifiying an instance for particular items,
+    # so a voice line can be played at a certain time. It's only active
+    # in certain styles, but uses the default if not set.
+    for event in voice_data.find_all('QuoteEvents', 'Event'):
+        event_id = event['id', ''].casefold()
+        # We ignore the config if no result was executed.
+        if event_id and event_id in QUOTE_EVENTS:
+            # Instances from the voiceline config are in this subfolder,
+            # but not the default item - that's set from the conditions
+            QUOTE_EVENTS[event_id] = INST_PREFIX + event['file']
+
+    LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
+
+    for ind, file in enumerate(QUOTE_EVENTS.values()):
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='voice_event_' + str(ind),
+            file=file,
+            angles='0 0 0',
+            origin=quote_loc,
+            fixup_style='0',
+        )
+
+    # For each group, locate the voice lines.
     for group in itertools.chain(
             voice_data.find_all('group'),
             voice_data.find_all('midinst'),
