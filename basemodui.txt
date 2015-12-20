@@ -733,7 +733,7 @@
 "PORTAL2_PuzzleEditor_Hint_Puzzlecraft_28"				"Avoid using floor-portal orientations as a puzzle mechanic, as most players are unaware portals even have an orientation."
 "PORTAL2_PuzzleEditor_Hint_Puzzlecraft_29"				"People's eyes are drawn towards brighter areas. Use lighting to direct player attention."
 "PORTAL2_PuzzleEditor_Hint_Puzzlecraft_30"				"Use strip light array, lasers, and other linear features to direct player view along a line."
-"PORTAL2_PuzzleEditor_Hint_Puzzlecraft_31"				"Avoid "chambers within chambers" where players can't see the consequences of their actions on the puzzle state."
+"PORTAL2_PuzzleEditor_Hint_Puzzlecraft_31"				"Avoid 'chambers within chambers' where players can't see the consequences of their actions on the puzzle state."
 "PORTAL2_PuzzleEditor_Hint_Puzzlecraft_32"				"Testers want to help you improve your map. Listen to their feedback carefullly and always remember to thank them for their time."
 "PORTAL2_EditorMenu_QuickPlayTestChambers" "Quick Play Test Chambers"
 "PORTAL2_EditorMenu_Created"	"Created"
