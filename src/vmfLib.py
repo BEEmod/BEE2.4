@@ -1886,7 +1886,8 @@ class Output:
                 self.target,
                 self.exp_in(),
                 self.params,
-                str(self.delay),
+                # Strip the trailing 0 if it's really an integer.
+                str(self.delay).replace('.0', ''),
                 str(self.times),
             )) +
             '"\n'
