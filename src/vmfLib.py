@@ -1735,7 +1735,23 @@ class EntityFixup:
 
 
 class Output:
-    """An output from one entity pointing to another."""
+    """An output from one entity pointing to another.
+
+    Attributes:
+        output: The output which triggers this.
+        target: The target entity.
+        input: The input to fire.
+        params: Parameters to give the input, or '' for none.
+        delay: The number of seconds before the output should fire.
+        times: The number of times to fire before being deleted.
+            -1 means forever, Hammer only uses (-1, 1).
+        inst_out: The local entity for an instance output (instance:name;Output)
+        inst_in: The local entity we are really triggering in instance inputs
+            (instance:name;Input)
+        comma_sep: Use a comma as a separator, instead of the OUTPUT_SEP
+            character.
+
+    """
     __slots__ = [
         'output',
         'inst_out',
@@ -1745,8 +1761,8 @@ class Output:
         'params',
         'delay',
         'times',
-        'sep',
-        ]
+        'comma_sep',
+    ]
 
     def __init__(self,
                  out,
@@ -1766,7 +1782,7 @@ class Output:
         self.params = param
         self.delay = delay
         self.times = times
-        self.sep = ',' if comma_sep else OUTPUT_SEP
+        self.comma_sep = comma_sep
 
     @staticmethod
     def parse(prop):
@@ -1833,7 +1849,7 @@ class Output:
             ' {comma})'.format(
                 s=self,
                 cls=self.__class__.__name__,
-                comma=(self.sep == ','),
+                comma=self.comma_sep,
             )
         )
 
@@ -1869,7 +1885,7 @@ class Output:
 
         buffer.write(
             '" "' +
-            self.sep.join((
+            sep.join((
                 self.target,
                 inp,
                 self.params,
@@ -1889,7 +1905,7 @@ class Output:
             times=self.times,
             inst_out=self.inst_out,
             inst_in=self.inst_in,
-            comma_sep=(self.sep == ','),
+            comma_sep=self.comma_sep,
             )
 
 if __name__ == '__main__':
