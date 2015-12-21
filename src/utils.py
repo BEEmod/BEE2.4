@@ -630,10 +630,10 @@ def init_logging(filename: str=None) -> logging.Logger:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         # The log contains INFO and above logs.
-        # We rotate through logs of 1kb each, so it doesn't increase too much.
+        # We rotate through logs of 500kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
             filename,
-            maxBytes=1024,
+            maxBytes=500 * 1024,
             backupCount=10,
         )
         log_handler.setLevel(logging.INFO)
