@@ -1878,16 +1878,13 @@ class Output:
         """Generate the text required to define this output in the VMF."""
         buffer.write(ind + '"' + self.exp_out())
 
-        if self.inst_in:
-            inp = 'instance:' + self.inst_in + ';' + self.input
-        else:
-            inp = self.input
+        sep = ',' if self.comma_sep else OUTPUT_SEP
 
         buffer.write(
             '" "' +
             sep.join((
                 self.target,
-                inp,
+                self.exp_in(),
                 self.params,
                 str(self.delay),
                 str(self.times),
