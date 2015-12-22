@@ -264,12 +264,23 @@ else:
 USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
 
 BOOL_LOOKUP = {
-    '1': True,
+    False: False,
+    0: False,
     '0': False,
-    'true': True,
-    'false': False,
-    'yes': True,
     'no': False,
+    'false': False,
+    'FALSE': False,
+    'n': False,
+    'f': False,
+
+    1: True,
+    True: True,
+    '1': True,
+    'yes': True,
+    'true': True,
+    'TRUE': True,
+    'y': True,
+    't': True,
 }
 
 
@@ -400,20 +411,20 @@ def bool_as_int(val: bool):
         return '0'
 
 
-def conv_bool(val: Union[str, int, bool, None], default=False):
+def conv_bool(val: Union[str, bool, None], default=False):
     """Converts a string to a boolean, using a default if it fails.
 
-    Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1, None.
+    Accepts any of '0', '1', 'false', 'true', 'yes', 'no'.
+    If Val is None, this always returns the default.
+    0, 1, True and False will be passed through unchanged.
     """
-    if val is False:
-        return False
-    elif val is True:
-        return True
-    elif val is None:
+    if val is None:
         return default
-    elif isinstance(val, int):
-        return bool(val)
-    else:
+    try:
+        # Lookup bools, ints, and normal strings
+        return BOOL_LOOKUP[val]
+    except KeyError:
+        # Try again with casefolded strings
         return BOOL_LOOKUP.get(val.casefold(), default)
 
 
