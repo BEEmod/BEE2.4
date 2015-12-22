@@ -453,8 +453,16 @@ def load_settings():
             settings['style_vars'][
                 var.name.casefold()] = utils.conv_bool(var.value)
 
-    instanceLocs.load_conf()
+    # Load in the config file holding item data.
+    # This is used to lookup item's instances, or their connection commands.
+    with open('bee2/instances.cfg') as f:
+        instance_file = Property.parse(
+            f, 'bee2/instances.cfg'
+        )
+    # Parse that data in the relevant modules.
+    instanceLocs.load_conf(instance_file)
 
+    # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
@@ -482,6 +490,7 @@ def load_settings():
         )
     }
 
+    # Bottomless pit configuration
     pit = conf.find_key("bottomless_pit", [])
     if pit:
         settings['pit'] = {

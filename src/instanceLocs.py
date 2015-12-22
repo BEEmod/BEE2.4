@@ -119,15 +119,11 @@ SUBITEMS = {
 }
 
 
-def load_conf():
+def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
-    with open('bee2/instances.cfg') as f:
-        prop_block = Property.parse(
-            f, 'bee2/instances.cfg'
-        ).find_key('Allinstances')
 
-    for prop in prop_block:
+    for prop in prop_block.find_key('Allinstances'):
         INSTANCE_FILES[prop.real_name] = [
             inst.value.casefold()
             for inst in
