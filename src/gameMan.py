@@ -69,6 +69,9 @@ GAMEINFO_LINE = 'Game\t"BEE2"'
 # them.
 EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
+# The name given to standard connections - regular input/outputs in editoritems.
+CONN_NORM = 'CONNECTION_STANDARD'
+CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
@@ -611,19 +614,45 @@ class Game:
     @staticmethod
     def build_instance_data(editoritems: Property):
         """Build a property tree listing all of the instances for each item.
+        as well as another listing the input and output commands.
+        VBSP uses this to reduce duplication in VBSP_config files.
         """
         instance_locs = Property("AllInstances", [])
+        commands = Property("Connections", [])
         root_block = Property(None, [instance_locs, commands])
 
         for item in editoritems.find_all("Item"):
             instance_block = Property(item['Type'], [])
             instance_locs.append(instance_block)
 
+            comm_block = Property(item['Type'], [])
+
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block:
                     instance_block.append(
                         Property('Instance', inst['Name'])
                     )
+
+            # Look in the Inputs and Outputs blocks to find the io definitions.
+            # Copy them to property names like 'Input_Activate'.
+            for io_type in ('Inputs', 'Outputs'):
+                for block in item.find_all('Exporting', io_type, CONN_NORM):
+                    for io_prop in block:
+                        comm_block[
+                            io_type[:-1] + '_' + io_prop.real_name
+                        ] = io_prop.value
+
+            # The funnel item type is special, having the additional input type.
+            # Handle that specially.
+            if item['type'] == 'item_tbeam':
+                for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
+                    for io_prop in block:
+                        comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
+
+            # Only add the block if the item actually has IO.
+            if comm_block.value:
+                commands.append(comm_block)
+
         return root_block.export()
 
     def launch(self):
