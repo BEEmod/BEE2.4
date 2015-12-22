@@ -531,6 +531,7 @@ def load_map(map_path):
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
         props = Property.parse(file, map_path)
+    LOGGER.info('Reading Map...')
     VMF = VLib.VMF.parse(props)
     LOGGER.info("Parsing complete!")
 
