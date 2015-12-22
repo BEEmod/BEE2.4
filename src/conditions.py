@@ -1993,12 +1993,23 @@ def res_timed_relay_setup(res):
     disabled = res['disabled', '0']
     flags = res['spawnflags', '0']
 
-    outs = [
+    final_outs = [
         VLib.Output.parse(subprop)
-        for prop in res.find_all('Outputs')
+        for prop in res.find_all('FinalOutputs')
         for subprop in prop
     ]
-    return var, name, disabled, flags, outs
+
+    rep_outs = [
+        VLib.Output.parse(subprop)
+        for prop in res.find_all('RepOutputs')
+        for subprop in prop
+    ]
+
+    # Never use the comma seperator in the final output for consistency.
+    for out in itertools.chain(rep_outs, final_outs):
+        out.comma_sep = False
+
+    return var, name, disabled, flags, final_outs, rep_outs
 
 
 @make_result('timedRelay')
@@ -2007,7 +2018,7 @@ def res_timed_relay(inst: VLib.Entity, res):
 
     This allows triggering outputs based $timer_delay values.
     """
-    var, name, disabled, flags, outs = res.value
+    var, name, disabled, flags, final_outs, rep_outs = res.value
 
     relay = VMF.create_ent(
         classname='logic_relay',
@@ -2023,14 +2034,24 @@ def res_timed_relay(inst: VLib.Entity, res):
     )
 
     delay = utils.conv_float(
-        relay.fixup[var]
+        inst.fixup[var, '0']
         if var.startswith('$') else
         var
     )
 
-    for out in outs:  # type: VLib.Output
-        new_out = out.copy()
+    for off in range(int(math.ceil(delay))):
+        for out in rep_outs:
+            new_out = out.copy()  # type: VLib.Output
+            new_out.target = local_name(inst, new_out.target)
+            new_out.delay += off
+            new_out.comma_sep = False
+            relay.add_out(new_out)
+
+    for out in final_outs:
+        new_out = out.copy()  # type: VLib.Output
+        new_out.target = local_name(inst, new_out.target)
         new_out.delay += delay
+        new_out.comma_sep = False
         relay.add_out(new_out)
 
 
