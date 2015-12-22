@@ -1856,13 +1856,32 @@ def res_translate_inst(inst, res):
     offset = val.rotate_by_str(inst['angles'])
     inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
 
+IND_PANEL_TYPES = {
+    'check': ('item_indicator_panel', '[indPanCheck]'),
+    'timer': ('item_indicator_panel_timer', '[indPanTimer]'),
+    'none': '',
+}
+
 
 @make_result_setup('custOutput')
 def res_cust_output_setup(res):
-    for sub_res in res:
-        if sub_res.name == 'targcondition':
-            sub_res.value = Condition.parse(sub_res)
-    return res.value
+    conds = [
+        Condition.parse(sub_res)
+        for sub_res in res
+        if sub_res.name == 'targcondition'
+    ]
+    outputs = list(res.find_all('addOut'))
+    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
+    sign_type = IND_PANEL_TYPES.get(res['sign_type', None], None)
+
+    if sign_type is None:
+        sign_act = sign_deact = (None, '')
+    else:
+        # The outputs which trigger the sign.
+        sign_act = VLib.Output.parse_name(res['sign_activate', ''])
+        sign_deact = VLib.Output.parse_name(res['sign_deactivate', ''])
+
+    return outputs, dec_con_count, conds, sign_type, sign_act, sign_deact
 
 
 @make_result('custOutput')
@@ -1870,7 +1889,18 @@ def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
 
     Always points to the targeted item.
+
+    If DecConCount is 1, connections
     """
+    (
+        outputs,
+        dec_con_count,
+        targ_conditions,
+        force_sign_type,
+        (sign_act_name, sign_act_out),
+        (sign_deact_name, sign_deact_out),
+    ) = res.value
+
     over_name = '@' + inst['targetname'] + '_indicator'
     for toggle in VMF.by_class['func_instance']:
         if toggle.fixup['indicator_name', ''] == over_name:
@@ -1879,38 +1909,90 @@ def res_cust_output(inst, res):
     else:
         toggle_name = ''  # we want to ignore the toggle instance, if it exists
 
-    # Make this a set to ignore repeated targetnames
-    targets = {o.target for o in inst.outputs if o.target != toggle_name}
-
-    kill_signs = utils.conv_bool(res["remIndSign", '0'], False)
-    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
-    targ_conditions = list(res.find_all("targCondition"))
+    # Build a mapping from names to targets.
+    # This is also the set of all output items, plus indicators.
+    targets = defaultdict(list)
+    for out in inst.outputs:
+        if out.target != toggle_name:
+            targets[out.target].append(out)
 
     pan_files = resolve_inst('[indPan]')
 
-    if kill_signs or dec_con_count or targ_conditions:
-        for con_inst in VMF.by_class['func_instance']:
-            if con_inst['targetname'] in targets:
-                if kill_signs and con_inst in pan_files:
+    # These all require us to search through the instances.
+    if force_sign_type or dec_con_count or targ_conditions:
+        for con_inst in VMF.by_class['func_instance']:  # type: VLib.Entity
+            if con_inst['targetname'] not in targets:
+                # Not our instance
+                continue
+
+            # Is it an indicator panel, and should we be modding it?
+            if force_sign_type is not None and con_inst['file'].casefold() in pan_files:
+                # Remove the panel
+                if force_sign_type == '':
                     VMF.remove_ent(con_inst)
-                if targ_conditions:
-                    for cond in targ_conditions:
-                        cond.value.test(con_inst)
-                if dec_con_count and 'connectioncount' in con_inst.fixup:
-                    # decrease ConnectionCount on the ents,
-                    # so they can still process normal inputs
-                    try:
-                        val = int(con_inst.fixup['connectioncount'])
-                        con_inst.fixup['connectioncount'] = str(val-1)
-                    except ValueError:
-                        # skip if it's invalid
-                        LOGGER.warning(
-                            con_inst['targetname'] +
-                            ' has invalid ConnectionCount!'
-                        )
-    for targ in targets:
-        for out in res.find_all('addOut'):
-            add_output(inst, out, targ)
+                    continue
+
+                # Overwrite the signage instance, and then add the
+                # appropriate outputs to control it.
+                sign_id, sign_file_id = force_sign_type
+                con_inst['file'] = resolve_inst(sign_file_id)[0]
+
+                # First delete the original outputs:
+                for out in targets[con_inst['targetname']]:
+                    inst.outputs.remove(out)
+
+                inputs = CONNECTIONS[sign_id]
+                act_name, act_inp = inputs.in_act
+                deact_name, deact_inp = inputs.in_deact
+
+                LOGGER.info(
+                    'outputs: a="{}" d="{}"\n'
+                    'inputs: a="{}" d="{}"'.format(
+                        (sign_act_name, sign_act_out),
+                        (sign_deact_name, sign_deact_out),
+                        inputs.in_act,
+                        inputs.in_deact
+                    )
+                )
+
+                if act_inp and sign_act_out:
+                    inst.add_out(VLib.Output(
+                        inst_out=sign_act_name,
+                        out=sign_act_out,
+                        inst_in=act_name,
+                        inp=act_inp,
+                        targ=con_inst['targetname'],
+                    ))
+
+                if deact_inp and sign_deact_out:
+                    inst.add_out(VLib.Output(
+                        inst_out=sign_deact_name,
+                        out=sign_deact_out,
+                        inst_in=deact_name,
+                        inp=deact_inp,
+                        targ=con_inst['targetname'],
+                    ))
+
+            if targ_conditions:
+                for cond in targ_conditions:
+                    cond.value.test(con_inst)
+            if dec_con_count and 'connectioncount' in con_inst.fixup:
+                # decrease ConnectionCount on the ents,
+                # so they can still process normal inputs
+                try:
+                    val = int(con_inst.fixup['connectioncount'])
+                    con_inst.fixup['connectioncount'] = str(val-1)
+                except ValueError:
+                    # skip if it's invalid
+                    LOGGER.warning(
+                        con_inst['targetname'] +
+                        ' has invalid ConnectionCount!'
+                    )
+
+    if outputs:
+        for targ in targets:
+            for out in outputs:
+                add_output(inst, out, targ)
 
 
 @make_result_setup('custAntline')
