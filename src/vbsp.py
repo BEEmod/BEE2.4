@@ -461,6 +461,7 @@ def load_settings():
         )
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
+    conditions.build_connections_dict(instance_file)
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
@@ -523,6 +524,8 @@ def load_settings():
     else:
         settings['pit'] = None
 
+    # Find the location of the BEE2 app, and load the options
+    # set in the 'Compiler Pane'.
     if get_opt('BEE2_loc') != '':
         BEE2_config = ConfigFile(
             'config/compile.cfg',
@@ -542,7 +545,7 @@ def load_map(map_path):
         props = Property.parse(file, map_path)
     LOGGER.info('Reading Map...')
     VMF = VLib.VMF.parse(props)
-    LOGGER.info("Parsing complete!")
+    LOGGER.info("Loading complete!")
 
 
 @conditions.meta_cond(priority=100)
