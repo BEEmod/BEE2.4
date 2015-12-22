@@ -298,8 +298,8 @@ class Game:
             ):
         """Generate the editoritems.txt and vbsp_config.
 
-        - If no backup is present, the original editoritems is backed up
-        - We unlock the mandatory items if specified
+        - If no backup is present, the original editoritems is backed up.
+        - We unlock the mandatory items if specified.
         -
         """
         LOGGER.info('-' * 20)
@@ -498,16 +498,6 @@ class Game:
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
 
-        # Build a property tree listing all of the instances for each item
-        all_instances = Property("AllInstances", [])
-        for item in editoritems.find_all("Item"):
-            item_prop = Property(item['Type'], [])
-            all_instances.append(item_prop)
-            for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block:
-                    item_prop.append(
-                        Property('Instance', inst['Name'])
-                    )
 
         if style_vars.get('UnlockDefault', False):
             LOGGER.info('Unlocking Items!')
@@ -544,7 +534,7 @@ class Game:
 
         LOGGER.info('Writing instance list!')
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
-            for line in all_instances.export():
+            for line in self.build_instance_data(editoritems):
                 inst_file.write(line)
         export_screen.step('CONF')
 
@@ -617,6 +607,24 @@ class Game:
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
         return True
+
+    @staticmethod
+    def build_instance_data(editoritems: Property):
+        """Build a property tree listing all of the instances for each item.
+        """
+        instance_locs = Property("AllInstances", [])
+        root_block = Property(None, [instance_locs, commands])
+
+        for item in editoritems.find_all("Item"):
+            instance_block = Property(item['Type'], [])
+            instance_locs.append(instance_block)
+
+            for inst_block in item.find_all("Exporting", "instances"):
+                for inst in inst_block:
+                    instance_block.append(
+                        Property('Instance', inst['Name'])
+                    )
+        return root_block.export()
 
     def launch(self):
         """Try and launch the game."""
