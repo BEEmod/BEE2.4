@@ -10,7 +10,7 @@ import shutil
 import random
 import itertools
 from enum import Enum
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, ChainMap
 from decimal import Decimal
 
 from property_parser import Property
@@ -430,17 +430,15 @@ def load_settings():
         if key.casefold() not in settings['options']:
             settings['options'][key.casefold()] = default
 
-    for item, key in TEX_FIZZLER.items():
-        settings['fizzler'][key] = item
+    # Load in fizzler options and textures. This works similarly to the normal
+    # textures/options.
 
-    for key, item in FIZZ_OPTIONS.items():
+    fizz_defaults = ChainMap(TEX_FIZZLER, FIZZ_OPTIONS)
+    for item, key in fizz_defaults.items():
         settings['fizzler'][key] = item
 
     for fizz_opt in conf.find_all('fizzler'):
-        for item, key in TEX_FIZZLER.items():
-            settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
-
-        for key, item in FIZZ_OPTIONS.items():
+        for item, key in fizz_defaults.items():
             settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
 
     # The voice line property block
