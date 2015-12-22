@@ -2578,7 +2578,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         return False  # no conversion allowed!
 
     angle = "00"
-    if ent.fixup['animation'] is not None:
+    if ent.fixup['animation']:
         # the 5:7 is the number in "ramp_45_deg_open"
         angle = ent.fixup['animation'][5:7]
     if ent.fixup['start_deployed'] == "0":
