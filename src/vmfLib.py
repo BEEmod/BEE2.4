@@ -1507,11 +1507,10 @@ class Entity:
         st += "}\n"
         return st
 
-    def __getitem__(self, key, default=None):
+    def __getitem__(self, key, default=''):
         """Allow using [] syntax to search for keyvalues.
 
-        - This will return None instead of KeyError if the value is not
-          found.
+        - This will return '' if the value is not present.
         - It ignores case-matching, but will use the first given version
           of a key.
         - If used via Entity.get() the default argument is available.
@@ -1585,6 +1584,7 @@ class Entity:
 
     def clear_keys(self):
         """Remove all keyvalues from an item."""
+        # Delete these so the .by_class/name values are cleared.
         del self['targetname']
         del self['classname']
         self.keys.clear()
@@ -1655,8 +1655,11 @@ class EntityFixup:
             # Add these values wherever they'll fit.
             self[fix.var] = fix.value
 
-    def get(self, var, default: str=None):
-        """Get the value of an instance $replace variable."""
+    def get(self, var, default=''):
+        """Get the value of an instance $replace variable.
+
+        If not found, the default will be returned (an empty string).
+        """
         if var[0] == '$':
             var = var[1:]
         folded_var = var.casefold()
