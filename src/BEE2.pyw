@@ -135,18 +135,22 @@ if __name__ == '__main__':
             # Put it onscreen if desired.
             messagebox.showinfo(
                 title='BEE2 Error!',
-                message=str(e).strip('".') + '!',
+                message='{cls}: {msg}!'.format(
+                    cls=e.__class__.__name__,
+                    msg=str(e).rstrip('.'),
+                ),
                 icon=messagebox.ERROR,
-                )
+            )
 
         # Log the error.
-        LOGGER.exception('Exception Occurred:')
+        LOGGER.exception('Exception Occurred:\n' + err)
         logging.shutdown()
 
         try:
             # Try to turn on the logging window for next time..
             GEN_OPTS['Debug']['show_log_win'] = '1'
             GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
+            GEN_OPTS.save()
         except Exception:
             pass
 
