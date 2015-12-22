@@ -342,8 +342,8 @@ def is_identifier(name, forbidden='{}\'"'):
     """Check to see if any forbidden characters are part of a candidate name.
 
     """
-    for char in name:
-        if char in forbidden:
+    for char in forbidden:
+        if char in name:
             return False
     return True
 
