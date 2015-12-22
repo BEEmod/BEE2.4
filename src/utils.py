@@ -338,7 +338,7 @@ def clean_line(line: str):
     return line.strip()
 
 
-def is_identifier(name, forbidden='{}\'"'):
+def is_identifier(name, forbidden='{}"'):
     """Check to see if any forbidden characters are part of a candidate name.
 
     """
