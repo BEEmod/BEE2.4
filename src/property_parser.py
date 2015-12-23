@@ -85,6 +85,9 @@ def read_multiline_value(file, line_num, filename):
     lines = ['']  # We return with a beginning newline
     # Re-looping over the same iterator means we don't repeat lines
     for line_num, line in file:
+        if isinstance(line, bytes):
+            # Decode bytes using utf-8
+            line = line.decode('utf-8')
         line = line.strip()
         if line.endswith('"'):
             lines.append(line[:-1])
@@ -614,6 +617,7 @@ class Property:
                 for prop in self.value:
                     yield from prop.export()
             else:
+                yield '"' + self.real_name + '"\n'
                 yield '\t{\n'
                 yield from (
                     '\t' + line
