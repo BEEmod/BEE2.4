@@ -1972,10 +1972,6 @@ def res_cust_output(inst, res):
                         inp=deact_inp,
                         targ=con_inst['targetname'],
                     ))
-
-            if targ_conditions:
-                for cond in targ_conditions:  # type: Condition
-                    cond.test(con_inst)
             if dec_con_count and 'connectioncount' in con_inst.fixup:
                 # decrease ConnectionCount on the ents,
                 # so they can still process normal inputs
@@ -1988,6 +1984,10 @@ def res_cust_output(inst, res):
                         con_inst['targetname'] +
                         ' has invalid ConnectionCount!'
                     )
+
+            if targ_conditions:
+                for cond in targ_conditions:  # type: Condition
+                    cond.test(con_inst)
 
     if outputs:
         for targ in targets:
