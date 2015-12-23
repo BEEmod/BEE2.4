@@ -606,25 +606,20 @@ class Property:
         Recursively calls itself for all child properties.
         If the Property is marked invalid, it will immediately return.
         """
-        out_val = '"' + str(self.real_name) + '"'
         if isinstance(self.value, list):
             if self.name is None:
                 # If the name is None, we just output the chilren
                 # without a "Name" { } surround. These Property
                 # objects represent the root.
-                yield from (
-                    line
-                    for prop in self.value
-                    for line in prop.export()
-                    )
+                for prop in self.value:
+                    yield from prop.export()
             else:
-                yield out_val + '\n'
                 yield '\t{\n'
                 yield from (
-                    '\t'+line
+                    '\t' + line
                     for prop in self.value
                     for line in prop.export()
                     )
                 yield '\t}\n'
         else:
-            yield out_val + ' "' + str(self.value) + '"\n'
+            yield '"' + self.real_name + '" "' + str(self.value) + '"\n'
