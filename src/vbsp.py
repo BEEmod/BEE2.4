@@ -10,7 +10,7 @@ import shutil
 import random
 import itertools
 from enum import Enum
-from collections import defaultdict, namedtuple, ChainMap
+from collections import defaultdict, namedtuple
 from decimal import Decimal
 
 from property_parser import Property
@@ -296,9 +296,9 @@ TEX_FIZZLER = {
     "tools/toolsnodraw": "nodraw",
     }
 
-FIZZ_OPTIONS = {
-    "scanline": "0",
-    }
+FIZZ_OPTIONS = [
+    ('0', 'scanline'),
+]
 
 BEE2_config = None  # ConfigFile
 
@@ -433,13 +433,13 @@ def load_settings():
     # Load in fizzler options and textures. This works similarly to the normal
     # textures/options.
 
-    fizz_defaults = ChainMap(TEX_FIZZLER, FIZZ_OPTIONS)
-    for item, key in fizz_defaults.items():
+    fizz_defaults = list(TEX_FIZZLER.items()) + FIZZ_OPTIONS
+    for item, key in fizz_defaults:
         settings['fizzler'][key] = item
 
-    for fizz_opt in conf.find_all('fizzler'):
-        for item, key in fizz_defaults.items():
-            settings['fizzler'][key] = fizz_opt[key, settings['fizzler'][key]]
+    for fizz_block in conf.find_all('fizzler'):
+        for default, key in fizz_defaults:
+            settings['fizzler'][key] = fizz_block[key, settings['fizzler'][key]]
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
