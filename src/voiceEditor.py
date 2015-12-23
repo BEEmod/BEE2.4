@@ -12,6 +12,8 @@ import img
 import utils
 import tk_tools
 
+LOGGER = utils.getLogger(__name__)
+
 voice_item = None
 
 UI = {}
@@ -142,7 +144,7 @@ def configure_canv(e):
 
 
 def save():
-    print('Saving Configs!')
+    LOGGER.info('Saving Configs!')
     config.save_check()
     config_mid.save_check()
     win.withdraw()
@@ -233,8 +235,18 @@ def show(quote_pack):
 
 def make_tab(group, config, is_mid=False):
     """Create all the widgets for a tab."""
-    group_name = group['name', 'No Name!']
-    group_desc = group['desc', '']
+    if is_mid:
+        # Mid-chamber voice lines have predefined values.
+        group_name = 'Mid - Chamber'
+        group_id = 'MIDCHAMBER'
+        group_desc = (
+            'Lines played during the actual chamber, '
+            'after specific events have occurred.'
+        )
+    else:
+        group_name = group['name', 'No Name!']
+        group_id = group_name.upper()
+        group_desc = group['desc', '']
 
     # This is just to hold the canvas and scrollbar
     outer_frame = ttk.Frame(UI['tabs'])
@@ -273,10 +285,6 @@ def make_tab(group, config, is_mid=False):
     # We do this so we can adjust the scrollregion later in
     # <Configure>.
     canv.frame = frame
-
-    if is_mid:
-        group_name = 'Mid - Chamber'
-        group_desc = 'Lines played during normal gameplay'
 
     ttk.Label(
         frame,
@@ -329,14 +337,14 @@ def make_tab(group, config, is_mid=False):
                 image=badge,
                 )
             check.quote_var = IntVar(
-                value=config.get_bool(group_name, line_id, True),
+                value=config.get_bool(group_id, line_id, True),
                 )
             check['variable'] = check.quote_var
 
             check['command'] = functools.partial(
                 check_toggled,
                 check.quote_var,
-                config[group_name],
+                config[group_id],
                 line_id,
                 )
 

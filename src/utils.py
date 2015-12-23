@@ -1,8 +1,10 @@
 # coding=utf-8
+import logging
 import math
 import string
-import collections.abc as abc
-from collections import namedtuple, deque
+from collections import abc
+import collections
+
 from sys import platform
 from enum import Enum
 
@@ -25,6 +27,10 @@ else:
 WIN = platform.startswith('win')
 MAC = platform.startswith('darwin')
 LINUX = platform.startswith('linux')
+
+# Formatters for the logger handlers.
+short_log_format = None
+long_log_format = None
 
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
@@ -258,12 +264,23 @@ else:
 USE_SIZEGRIP = not MAC  # On Mac, we don't want to use the sizegrip widget
 
 BOOL_LOOKUP = {
-    '1': True,
+    False: False,
+    0: False,
     '0': False,
-    'true': True,
-    'false': False,
-    'yes': True,
     'no': False,
+    'false': False,
+    'FALSE': False,
+    'n': False,
+    'f': False,
+
+    1: True,
+    True: True,
+    '1': True,
+    'yes': True,
+    'true': True,
+    'TRUE': True,
+    'y': True,
+    't': True,
 }
 
 
@@ -321,12 +338,12 @@ def clean_line(line: str):
     return line.strip()
 
 
-def is_identifier(name, forbidden='{}\'"'):
+def is_identifier(name, forbidden='{}"'):
     """Check to see if any forbidden characters are part of a candidate name.
 
     """
-    for char in name:
-        if char in forbidden:
+    for char in forbidden:
+        if char in name:
             return False
     return True
 
@@ -394,20 +411,20 @@ def bool_as_int(val: bool):
         return '0'
 
 
-def conv_bool(val: Union[str, int, bool, None], default=False):
+def conv_bool(val: Union[str, bool, None], default=False):
     """Converts a string to a boolean, using a default if it fails.
 
-    Accepts any of '0', '1', 'false', 'true', 'yes', 'no', 0 and 1, None.
+    Accepts any of '0', '1', 'false', 'true', 'yes', 'no'.
+    If Val is None, this always returns the default.
+    0, 1, True and False will be passed through unchanged.
     """
-    if val is False:
-        return False
-    elif val is True:
-        return True
-    elif val is None:
+    if val is None:
         return default
-    elif isinstance(val, int):
-        return bool(val)
-    else:
+    try:
+        # Lookup bools, ints, and normal strings
+        return BOOL_LOOKUP[val]
+    except KeyError:
+        # Try again with casefolded strings
         return BOOL_LOOKUP.get(val.casefold(), default)
 
 
@@ -431,13 +448,18 @@ def conv_int(val: str, default=0):
         return default
 
 
-def parse_str(val: str, x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
+def parse_str(val: Union[str, 'Vec'], x=0.0, y=0.0, z=0.0) -> Tuple[int, int, int]:
     """Convert a string in the form '(4 6 -4)' into a set of floats.
 
      If the string is unparsable, this uses the defaults (x,y,z).
      The string can start with any of the (), {}, [], <> bracket
      types.
+
+     If the 'string' is actually a Vec, the values will be returned.
      """
+    if isinstance(val, Vec):
+        return val.x, val.y, val.z
+
     parts = val.split(' ')
     if len(parts) == 3:
         # Strip off the brackets if present
@@ -521,7 +543,7 @@ def fit(dist, obj):
         return []
     orig_dist = dist
     smallest = obj[-1]
-    items = deque()
+    items = collections.deque()
 
     # We use this so the small sections appear on both sides of the area.
     adder = append_bothsides(items)
@@ -550,14 +572,143 @@ def restart_app():
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    print('Restarting using "{}", with args {!r}'.format(
-        sys.executable, args
-    ), flush=True)
+    getLogger(__name__).info(
+        'Restarting using "{}", with args {!r}',
+        sys.executable,
+        args,
+    )
+    logging.shutdown()
     os.execv(sys.executable, args)
 
 
-class EmptyMapping(abc.Mapping):
-    """A Mapping class which is always empty."""
+class LogMessage:
+    def __init__(self, fmt, args, kwargs):
+        self.fmt = fmt
+        self.args = args
+        self.kwargs = kwargs
+
+    def __str__(self):
+        # Only format if we have arguments!
+        return str(self.fmt).format(*self.args, **self.kwargs)
+
+
+
+class LoggerAdapter(logging.LoggerAdapter):
+    """Fix loggers to use str.format().
+
+    """
+    def __init__(self, logger: logging.Logger):
+        super(LoggerAdapter, self).__init__(logger, extra={})
+
+    def log(self, level, msg, *args, **kwargs):
+        if self.isEnabledFor(level):
+            self.logger._log(
+                level,
+                # Only use the format adapter if arguments exist
+                (
+                    LogMessage(msg, args, kwargs)
+                    if kwargs or args else
+                    msg
+                ),
+                (),
+            )
+
+
+def init_logging(filename: str=None) -> logging.Logger:
+    """Setup the logger and logging handlers."""
+    global short_log_format, long_log_format
+    import logging
+    from logging import handlers
+    import sys, io, os
+
+    logger = logging.getLogger('BEE2')
+    logger.setLevel(logging.DEBUG)
+
+    # Put more info in the log file, since it's not onscreen.
+    long_log_format = logging.Formatter(
+        '[{levelname}] {module}.{funcName}(): {message}',
+        style='{',
+    )
+    # Console messages, etc.
+    short_log_format = logging.Formatter(
+        # One letter for level name
+        '[{levelname[0]}] {module}: {message}',
+        style='{',
+    )
+
+    if filename is not None:
+        # Make the directories the logs are in, if needed.
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        # The log contains INFO and above logs.
+        # We rotate through logs of 500kb each, so it doesn't increase too much.
+        log_handler = handlers.RotatingFileHandler(
+            filename,
+            maxBytes=500 * 1024,
+            backupCount=10,
+        )
+        log_handler.setLevel(logging.INFO)
+        log_handler.setFormatter(long_log_format)
+
+        logger.addHandler(log_handler)
+
+    # This is needed for multiprocessing, since it tries to flush stdout.
+    # That'll fail if it is None.
+    class NullStream(io.IOBase):
+        """A stream object that discards all data."""
+        def __init__(self):
+            super(NullStream, self).__init__()
+
+        @staticmethod
+        def write(self, *args, **kwargs):
+            pass
+
+        @staticmethod
+        def read(*args, **kwargs):
+            return ''
+
+    if sys.stdout:
+        out_handler = logging.StreamHandler(sys.stdout)
+        out_handler.setLevel(logging.INFO)
+        out_handler.setFormatter(short_log_format)
+        logger.addHandler(out_handler)
+
+        if sys.stderr:
+            def ignore_warnings(record: logging.LogRecord):
+                """Filter out messages higher than WARNING.
+
+                Those are handled by stdError, and we don't want duplicates.
+                """
+                return record.levelno < logging.WARNING
+            out_handler.addFilter(ignore_warnings)
+    else:
+        sys.stdout = NullStream()
+
+    if sys.stderr:
+        err_handler = logging.StreamHandler(sys.stderr)
+        err_handler.setLevel(logging.WARNING)
+        err_handler.setFormatter(short_log_format)
+        logger.addHandler(err_handler)
+    else:
+        sys.stderr = NullStream()
+
+    return LoggerAdapter(logger)
+
+
+def getLogger(name: str) -> logging.Logger:
+    """Get the named logger object.
+
+    This puts the logger into the BEE2 namespace, and wraps it to
+    use str.format() instead of % formatting.
+    """
+    return LoggerAdapter(logging.getLogger('BEE2.' + name))
+
+
+class EmptyMapping(abc.MutableMapping):
+    """A Mapping class which is always empty.
+
+    Any modifications will be ignored.
+    """
     __slots__ = []
 
     def __call__(self):
@@ -585,19 +736,28 @@ class EmptyMapping(abc.Mapping):
     def __iter__(self):
         return self
 
-    def items(self):
-        return self
+    items = values = keys = __iter__
 
-    def values(self):
-        return self
+    # Mutable functions
+    setdefault = get
 
-    def keys(self):
-        return self
+    def update(*args, **kwds):
+        pass
+
+    __setitem__ = __delitem__ = clear = update
+
+    __marker = object()
+
+    def pop(self, key, default=__marker):
+        raise KeyError
+
+    def popitem(self):
+        raise KeyError
 
 EmptyMapping = EmptyMapping()  # We only need the one instance
 
 
-Vec_tuple = namedtuple('Vec_tuple', ['x', 'y', 'z'])
+Vec_tuple = collections.namedtuple('Vec_tuple', ['x', 'y', 'z'])
 
 
 class Vec:
@@ -642,13 +802,16 @@ class Vec:
         return Vec(self.x, self.y, self.z)
 
     @classmethod
-    def from_str(cls, val: str, x=0.0, y=0.0, z=0.0):
+    def from_str(cls, val: Union[str, 'Vec'], x=0.0, y=0.0, z=0.0):
         """Convert a string in the form '(4 6 -4)' into a Vector.
 
          If the string is unparsable, this uses the defaults (x,y,z).
          The string can start with any of the (), {}, [], <> bracket
          types.
+
+         If the value is already a vector, a copy will be returned.
          """
+
         x, y, z = parse_str(val, x, y, z)
         return cls(x, y, z)
 
@@ -660,9 +823,9 @@ class Vec:
         [a, b, c], [d, e, f], [g, h, i] = matrix
         x, y, z = self.x, self.y, self.z
 
-        self.x = x*a + y*b + z*c
-        self.y = x*d + y*e + z*f
-        self.z = x*g + y*h + z*i
+        self.x = (x * a) + (y * b) + (z * c)
+        self.y = (x * d) + (y * e) + (z * f)
+        self.z = (x * g) + (y * h) + (z * i)
 
     def rotate(self, pitch=0.0, yaw=0.0, roll=0.0, round_vals=True):
         """Rotate a vector by a Source rotational angle.
@@ -727,11 +890,11 @@ class Vec:
         )
 
     @staticmethod
-    def bbox(*points):
+    def bbox(points):
         """Compute the bounding box for a set of points."""
         first, *points = points
-        bbox_min = Vec(first)
-        bbox_max = Vec(first)
+        bbox_min = first.copy()
+        bbox_max = first.copy()
         for point in points:
             bbox_min.min(point)
             bbox_max.max(point)
@@ -767,7 +930,7 @@ class Vec:
         )
 
 
-    def __add__(self, other: Union['Vec', Vec_tuple, float]) -> 'Vec':
+    def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+ operation.
 
         This additionally works on scalars (adds to all axes).
@@ -780,7 +943,7 @@ class Vec:
             return Vec(self.x + other, self.y + other, self.z + other)
     __radd__ = __add__
 
-    def __sub__(self, other) -> 'Vec':
+    def __sub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -806,7 +969,7 @@ class Vec:
         else:
             return Vec(x, y, z)
 
-    def __rsub__(self, other) -> 'Vec':
+    def __rsub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """- operation.
 
         This additionally works on scalars (adds to all axes).
@@ -833,7 +996,7 @@ class Vec:
         else:
             return Vec(x, y, z)
 
-    def __mul__(self, other) -> 'Vec':
+    def __mul__(self, other: float) -> 'Vec':
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -878,12 +1041,8 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __floordiv__(self, other) -> 'Vec':
-        """Divide the Vector by a scalar, discarding the remainder.
-
-        If any axis is equal to zero, it will be kept as zero as long
-        as the magnitude is greater than zero
-        """
+    def __floordiv__(self, other: float) -> 'Vec':
+        """Divide the Vector by a scalar, discarding the remainder."""
         if isinstance(other, Vec):
             return NotImplemented
         else:
@@ -896,7 +1055,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __mod__(self, other) -> 'Vec':
+    def __mod__(self, other: float) -> 'Vec':
         """Compute the remainder of the Vector divided by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -910,7 +1069,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __divmod__(self, other) -> Tuple['Vec', 'Vec']:
+    def __divmod__(self, other: float) -> Tuple['Vec', 'Vec']:
         """Divide the vector by a scalar, returning the result and remainder.
 
         """
@@ -926,7 +1085,7 @@ class Vec:
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-    def __iadd__(self, other) -> 'Vec':
+    def __iadd__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+= operation.
 
         Like the normal one except without duplication.
@@ -949,7 +1108,7 @@ class Vec:
                 ) from e
             return self
 
-    def __isub__(self, other) -> 'Vec':
+    def __isub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """-= operation.
 
         Like the normal one except without duplication.
@@ -972,7 +1131,7 @@ class Vec:
                 ) from e
             return self
 
-    def __imul__(self, other) -> 'Vec':
+    def __imul__(self, other: float) -> 'Vec':
         """*= operation.
 
         Like the normal one except without duplication.
@@ -985,7 +1144,7 @@ class Vec:
             self.z *= other
             return self
 
-    def __idiv__(self, other) -> 'Vec':
+    def __idiv__(self, other: float) -> 'Vec':
         """/= operation.
 
         Like the normal one except without duplication.
@@ -998,7 +1157,7 @@ class Vec:
             self.z /= other
             return self
 
-    def __ifloordiv__(self, other) -> 'Vec':
+    def __ifloordiv__(self, other: float) -> 'Vec':
         """//= operation.
 
         Like the normal one except without duplication.
@@ -1011,7 +1170,7 @@ class Vec:
             self.z //= other
             return self
 
-    def __imod__(self, other) -> 'Vec':
+    def __imod__(self, other: float) -> 'Vec':
         """%= operation.
 
         Like the normal one except without duplication.
@@ -1067,13 +1226,13 @@ class Vec:
                 self.x < other.x and
                 self.y < other.y and
                 self.z < other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x < other[0] and
                 self.y < other[1] and
                 self.z < other[2]
-                )
+            )
         else:
             try:
                 return self.mag() < float(other)
@@ -1095,13 +1254,13 @@ class Vec:
                 self.x <= other.x and
                 self.y <= other.y and
                 self.z <= other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x <= other[0] and
                 self.y <= other[1] and
                 self.z <= other[2]
-                )
+            )
         else:
             try:
                 return self.mag() <= float(other)
@@ -1123,13 +1282,13 @@ class Vec:
                 self.x > other.x and
                 self.y > other.y and
                 self.z > other.z
-                )
+            )
         elif isinstance(other, abc.Sequence):
             return (
                 self.x > other[0] and
                 self.y > other[1] and
                 self.z > other[2]
-                )
+            )
         else:
             try:
                 return self.mag() > float(other)
@@ -1173,17 +1332,16 @@ class Vec:
 
         This strips off the .0 if no decimal portion exists.
         """
-        if self.x.is_integer():
-            x = int(self.x)
-        else:
+        x = int(self.x)
+        if x != self.x:
             x = self.x
-        if self.y.is_integer():
-            y = int(self.y)
-        else:
+
+        y = int(self.y)
+        if y != self.y:
             y = self.y
-        if self.z.is_integer():
-            z = int(self.z)
-        else:
+
+        z = int(self.z)
+        if z != self.z:
             z = self.z
         # convert to int to strip off .0 at end if whole number
         return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
@@ -1273,7 +1431,8 @@ class Vec:
          The vector is left unchanged if it is equal to (0,0,0)
          """
         if self.x == 0 and self.y == 0 and self.z == 0:
-            # Don't do anything for this - otherwise we'd get
+            # Don't do anything for this - otherwise we'd get division
+            # by zero errors - we want this to be a valid normal!
             return self.copy()
         else:
             return self / self.mag()
@@ -1284,7 +1443,7 @@ class Vec:
             self.x * other.x +
             self.y * other.y +
             self.z * other.z
-            )
+        )
 
     def cross(self, other):
         """Return the cross product of both Vectors."""
@@ -1296,14 +1455,14 @@ class Vec:
 
     def localise(
             self,
-            origin: Union['Vec', Vec_tuple],
-            angles: Union['Vec', Vec_tuple]=None
+            origin: Union['Vec', tuple],
+            angles: Union['Vec', tuple]=None
             ):
         """Shift this point to be local to the given position and angles
 
         """
         if angles is not None:
-            self.rotate(angles.x, angles.y, angles.z)
+            self.rotate(angles[0], angles[1], angles[2])
         self.__iadd__(origin)
 
     len = mag

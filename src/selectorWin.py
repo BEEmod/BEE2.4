@@ -17,6 +17,8 @@ from richTextBox import tkRichText
 import utils
 import tk_tools
 
+LOGGER = utils.getLogger(__name__)
+
 ICON_SIZE = 96  # Size of the selector win icons
 ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = ICON_SIZE + 51
@@ -799,7 +801,7 @@ if __name__ == '__main__':  # test the window if directly executing this file
         has_none=True,
         has_def=True,
         callback=functools.partial(
-            print,
+            LOGGER.info,
             'Selected:',
         )
     )

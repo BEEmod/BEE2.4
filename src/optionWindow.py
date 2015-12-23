@@ -9,11 +9,14 @@ from tooltip import add_tooltip
 import sound
 import utils
 import contextWin
+import logWindow
 
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
+SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_keep_win_inside')
+
 refresh_callbacks = []  # functions called to apply settings.
 
 VARS = {}
@@ -52,6 +55,7 @@ def save():
 
     sound.play_sound = PLAY_SOUND.get()
     utils.DISABLE_ADJUST = not KEEP_WIN_INSIDE.get()
+    logWindow.set_visible(SHOW_LOG_WIN.get())
 
     for func in refresh_callbacks:
         func()
@@ -273,6 +277,16 @@ def init_dev_tab(f):
     make_checkbox(
         f,
         section='Debug',
+        item='log_incorrect_packfile',
+        desc="Log missing packfile resources",
+        tooltip='Log when the resources a PackFile object refers to are not '
+                'present in the zip. This may be fine (in a prerequisite zip),'
+                ' but it often indicates an error.',
+    ).grid(row=4, column=0, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
         item='show_errors',
         desc="Show detailed error message",
         tooltip='If an error occurs, show the error and traceback '
@@ -290,3 +304,12 @@ def init_dev_tab(f):
                 ' developing new content, to ensure it is not '
                 'overwritten.',
     ).grid(row=1, column=1, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='show_log_win',
+        desc='Show Log Window',
+        var=SHOW_LOG_WIN,
+        tooltip='Show the log file in real-time.',
+    ).grid(row=2, column=1, sticky=W)

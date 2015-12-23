@@ -4,8 +4,10 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 import random
 import math
+import operator
+import itertools
 
-from utils import Vec
+from utils import Vec, Vec_tuple
 from property_parser import Property
 from instanceLocs import resolve as resolve_inst
 import vmfLib as VLib
@@ -15,6 +17,8 @@ from typing import (
     Optional,
     Dict, List, Tuple, NamedTuple
     )
+
+LOGGER = utils.getLogger(__name__)
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
@@ -34,11 +38,12 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-GOO_LOCS = set()  # A set of all goo solid origins.
+GOO_LOCS = set()  # A set of all blocks containing goo
+GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list are world brushes, the second are func_detail brushes.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 
@@ -69,6 +74,19 @@ solidGroup = NamedTuple('solidGroup', [
     ('color', MAT_TYPES)
 ])
 SOLIDS = {}  # type: Dict[utils.Vec_tuple, solidGroup]
+
+# The input/output connection values defined for each item.
+# Each is a tuple of (inst_name, command) values, ready to be passed to
+# VLib.Output().
+# If the command is '', no in/output is present.
+ItemConnections = namedtuple('ItemConnections', [
+    'in_act', 'in_deact', 'out_act', 'out_deact',
+])
+CONNECTIONS = {}
+
+# The special tbeam polarity input from ITEM_TBEAM. Works like above.
+TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
+
 
 
 xp = utils.Vec_tuple(1, 0, 0)
@@ -165,6 +183,8 @@ TEMPLATE_RETEXTURE = {
     'anim_wp/framework/squarebeams': 'special.edge',
     'glass/glasswindow007a_less_shiny': 'special.glass',
     'metal/metalgrate018': 'special.grating',
+
+    'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
 
 del B, W
@@ -273,10 +293,9 @@ class Condition:
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            utils.con_log(
-                '"{}" is not a valid condition result!'.format(
-                    res.real_name,
-                )
+            LOGGER.warning(
+                '"{name}" is not a valid condition result!',
+                name=res.real_name,
             )
         else:
             return func(inst, res)
@@ -330,10 +349,10 @@ def add_meta(func, priority, only_once=True):
     # be entered into property files.
     # The qualname will be unique across modules.
     name = '"' + func.__qualname__ + '"'
-    print("Adding metacondition ({}) with priority {!s}!".format(
+    LOGGER.debug("Adding metacondition ({}) with priority {!s}!",
         name,
         priority,
-    ))
+    )
 
     # Don't pass the prop_block onto the function,
     # it doesn't contain any useful data.
@@ -422,7 +441,7 @@ def init(seed, inst_list, vmf_file):
 
 def check_all():
     """Check all conditions."""
-    utils.con_log('Checking Conditions...')
+    LOGGER.info('Checking Conditions...')
     for condition in conditions:
         for inst in VMF.by_class['func_instance']:
             try:
@@ -436,17 +455,17 @@ def check_all():
                 # this condition, and skip to the next condtion.
                 break
             if not condition.results and not condition.else_results:
-                utils.con_log('Exiting empty condition!')
+                LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
-    utils.con_log('Map has attributes: ', [
+    LOGGER.info('Map has attributes: ', [
         key
         for key, value in
         VOICE_ATTR.items()
         if value
     ])
-    utils.con_log('Style Vars:', dict(STYLE_VARS.items()))
-    utils.con_log('Global instances: ', GLOBAL_INSTANCES)
+    LOGGER.info('Style Vars:', dict(STYLE_VARS.items()))
+    LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
 
 
 def check_flag(flag, inst):
@@ -458,7 +477,7 @@ def check_flag(flag, inst):
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
-        utils.con_log('"' + flag.name + '" is not a valid condition flag!')
+        LOGGER.warning('"' + flag.name + '" is not a valid condition flag!')
         return False
     else:
         res = func(inst, flag)
@@ -483,7 +502,19 @@ def build_solid_dict():
             if face.mat.casefold() in (
                     'nature/toxicslime_a2_bridge_intro',
                     'nature/toxicslime_puzzlemaker_cheap'):
-                GOO_LOCS.add(face.get_origin().as_tuple())
+                # Record all locations containing goo.
+                bbox_min, bbox_max = solid.get_bbox()
+                x = bbox_min.x + 64
+                y = bbox_min.y + 64
+                # If goo is multi-level, we want to record all pos!
+                for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
+                    GOO_LOCS.add(Vec_tuple(x, y, z))
+
+                # Add the location of the top face
+                GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
+
+                # Indicate that this map contains goo...
+                VOICE_ATTR['goo'] = True
                 continue
 
             try:
@@ -508,37 +539,62 @@ def build_solid_dict():
                 )
 
 
+def build_connections_dict(prop_block: Property):
+    """Load in the dictionary mapping item ids to connections."""
+    global TBEAM_CONN_ACT, TBEAM_CONN_DEACT
+
+    def parse(item, key):
+        """Parse the output value, handling values that aren't present."""
+        val = item[key, '']
+        if not val:
+            return None, ''
+        return VLib.Output.parse_name(val)
+
+    for item_data in prop_block.find_key('Connections', []):
+        CONNECTIONS[item_data.name] = ItemConnections(
+            in_act=parse(item_data, 'input_activate'),
+            in_deact=parse(item_data, 'input_deactivate'),
+
+            out_act=parse(item_data, 'output_activate'),
+            out_deact=parse(item_data, 'output_deactivate'),
+        )
+
+        if item_data.name == 'item_tbeam':
+            TBEAM_CONN_ACT = parse(item_data, 'tbeam_activate')
+            TBEAM_CONN_DEACT = parse(item_data, 'tbeam_deactivate')
+
+
 def dump_conditions():
     """Print a list of all the condition flags, results, metaconditions
 
     to the screen, and then quit.
     """
 
-    utils.con_log('Dumping conditions:')
-    utils.con_log('-------------------')
+    print('Dumping conditions:')
+    print('-------------------')
 
     for lookup, name in [
             (ALL_FLAGS, 'Flags'),
             (ALL_RESULTS, 'Results'),
             ]:
-        utils.con_log(name + ':')
-        utils.con_log('-'*len(name) + '-')
+        print(name + ':')
+        print('-'*len(name) + '-')
         lookup.sort()
         for flag_key, aliases, func in lookup:
-            utils.con_log('"{}":'.format(flag_key))
+            print('"{}":'.format(flag_key))
             if aliases:
-                utils.con_log('\tAliases: "' + '", "'.join(aliases) + '"')
+                print('\tAliases: "' + '", "'.join(aliases) + '"')
             dump_func_docs(func)
         input('...')
-        utils.con_log('')
+        print('')
 
-    utils.con_log('MetaConditions:')
-    utils.con_log('---------------')
+    print('MetaConditions:')
+    print('---------------')
     ALL_META.sort(key=lambda i: i[1]) # Sort by priority
     for flag_key, priority, func in ALL_META:
-        utils.con_log('{} ({}):'.format(flag_key, priority))
+        print('{} ({}):'.format(flag_key, priority))
         dump_func_docs(func)
-        utils.con_log('')
+        print('')
 
 
 def dump_func_docs(func):
@@ -547,9 +603,9 @@ def dump_func_docs(func):
     if docs:
         for line in docs.split('\n'):
             if line.strip():
-                utils.con_log('\t'+line.rstrip('\n'))
+                print('\t' + line.rstrip('\n'))
     else:
-        utils.con_log('\tNo documentation!')
+        print('\tNo documentation!')
 
 
 def weighted_random(count: int, weights: str):
@@ -559,7 +615,7 @@ def weighted_random(count: int, weights: str):
     repeated indexes corresponding to the comma-separated weight values.
     """
     if weights == '' or ',' not in weights:
-        utils.con_log('Invalid weight! (' + weights + ')')
+        LOGGER.warning('Invalid weight! ({})', weights)
         weight = list(range(count))
     else:
         # Parse the weight
@@ -577,7 +633,7 @@ def weighted_random(count: int, weights: str):
                     # Abandon parsing
                     break
         if len(weight) == 0:
-            utils.con_log('Failed parsing weight! ({!s})'.format(weight))
+            LOGGER.warning('Failed parsing weight! ({!s})',weight)
             weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
@@ -601,6 +657,31 @@ def add_suffix(inst, suff):
     file = inst['file']
     old_name, dot, ext = file.partition('.')
     inst['file'] = ''.join((old_name, suff, dot, ext))
+
+
+def local_name(inst: VLib.Entity, name: str):
+    """Fixup the given name for inside an instance.
+
+    This handles @names, !activator, and obeys the fixup_style option.
+    """
+    # If blank, keep it blank, and don't fix special or global names
+    if not name or name.startswith('!') or name.startswith('@'):
+        return name
+
+    fixup = inst['fixup_style', '0']
+    targ_name = inst['targetname', '']
+
+    if fixup == '2' or not targ_name:
+        # We can't do fixup..
+        return name
+
+    if fixup == '0':
+        # Prefix
+        return targ_name + '-' + name
+
+    if fixup == '1':
+        # Postfix
+        return name + '-' + targ_name
 
 
 def widen_fizz_brush(brush, thickness, bounds=None):
@@ -672,27 +753,35 @@ def load_templates():
     vmf = VLib.VMF.parse(props)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
+    overlay_ents = defaultdict(list)
     for ent in vmf.by_class['bee2_template_world']:
-        world_ents[ent['template_id']].extend(ent.solids)
+        world_ents[ent['template_id'].casefold()].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[ent['template_id']].extend(ent.solids)
+        detail_ents[ent['template_id'].casefold()].extend(ent.solids)
 
-    for temp_id in set(detail_ents.keys()).union(world_ents.keys()):
-        TEMPLATES[temp_id.casefold()] = (
+    for ent in vmf.by_class['bee2_template_overlay']:
+        overlay_ents[ent['template_id'].casefold()].append(ent)
+
+    for temp_id in set(detail_ents.keys()
+            ).union(world_ents.keys(), overlay_ents.keys()):
+        TEMPLATES[temp_id] = (
             world_ents[temp_id],
             detail_ents[temp_id],
+            overlay_ents[temp_id]
         )
 
 
 def import_template(
         temp_name,
         origin,
-        angles,
+        angles=None,
+        targetname='',
         force_type=TEMP_TYPES.default,
     ) -> Tuple[
         List[VLib.Solid],
         Optional[VLib.Entity],
+        List[VLib.Entity],
         ]:
     """Import the given template at a location.
 
@@ -700,20 +789,67 @@ def import_template(
     to the specified type instead. A list of world brushes and the func_detail
     entity will be returned. If there are no detail brushes, None will be
     returned instead of an invalid entity.
+
+    If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
-    orig_world, orig_detail = TEMPLATES[temp_name.casefold()]
+    try:
+        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        # Replace the KeyError with a more useful error message, and
+        # list all the templates that are available.
+        LOGGER.info('Templates:')
+        LOGGER.info('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
     new_world = []
     new_detail = []
+    new_over = []
+
+    id_mapping = {}
 
     for orig_list, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
         for old_brush in orig_list:
-            brush = old_brush.copy(map=VMF)
+            brush = old_brush.copy(map=VMF, side_mapping=id_mapping)
             brush.localise(origin, angles)
             new_list.append(brush)
+
+    for overlay in orig_over:  # type: VLib.Entity
+        new_overlay = overlay.copy(
+            map=VMF,
+        )
+        del new_overlay['template_id']  # Remove this, it's not part of overlays
+        new_overlay['classname'] = 'info_overlay'
+
+        sides = overlay['sides'].split()
+        new_overlay['sides'] = ' '.join(
+            id_mapping[side]
+            for side in sides
+            if side in id_mapping
+        )
+
+        VLib.localise_overlay(new_overlay, origin, angles)
+        orig_target = new_overlay['targetname']
+
+        # Only change the targetname if the overlay is not global, and we have
+        # a passed name.
+        if targetname and orig_target and orig_target[0] != '@':
+            new_overlay['targetname'] = targetname + '-' + orig_target
+
+        VMF.add_ent(new_overlay)
+        new_over.append(new_overlay)
+
+        # Don't let the overlays get retextured too!
+        vbsp.IGNORED_OVERLAYS.add(new_overlay)
+
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
@@ -744,16 +880,18 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return new_world, detail_ent
+    return new_world, detail_ent, new_over
 
 
 def retexture_template(
         world: List[VLib.Solid],
         detail: VLib.Entity,
+        overlays: List[VLib.Entity],
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
+        use_bullseye=False,
         ):
     """Retexture a template at the given location.
 
@@ -766,6 +904,8 @@ def retexture_template(
     - If force_colour is set, all tile textures will be switched accordingly.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
+    - If use_bullseye is true, the bullseye textures will be used for all panel
+      sides instead of the normal textures. (This overrides force_grid.)
     """
     import vbsp
     all_brushes = list(world)
@@ -800,6 +940,25 @@ def retexture_template(
                 # It's something like squarebeams or backpanels, just look
                 # it up
                 face.mat = vbsp.get_tex(tex_type)
+
+                if tex_type == 'special.goo_cheap':
+                    if face.normal() != (0, 0, 1):
+                        # Goo must be facing upright!
+                        # Retexture to nodraw, so a template can be made with
+                        # all faces goo to work in multiple orientations.
+                        face.mat = 'tools/toolsnodraw'
+                    else:
+                        # Goo always has the same orientation!
+                        face.uaxis = VLib.UVAxis(
+                            1, 0, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
+                        face.vaxis = VLib.UVAxis(
+                            0, -1, 0,
+                            offset=0,
+                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                        )
                 continue
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
@@ -833,6 +992,29 @@ def retexture_template(
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
 
+            if use_bullseye:
+                # We want to use the bullseye textures, instead of normal
+                # ones
+                if norm.z < -floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_floor'.format(tex_colour)
+                    )
+                elif norm.z > floor_tolerance:
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_ceil'.format(tex_colour)
+                    )
+                else:
+                    face.mat = ''  # Ensure next if statement triggers
+
+                # If those aren't defined, try the wall texture..
+                if face.mat == '':
+                    face.mat = vbsp.get_tex(
+                        'special.bullseye_{}_wall'.format(tex_colour)
+                    )
+                if face.mat != '':
+                    continue  # Set to a bullseye texture,
+                    # don't use the wall one
+
             if grid_size == 'special':
                 # Don't use wall on faces similar to floor/ceiling:
                 if -floor_tolerance < norm.z < floor_tolerance:
@@ -847,15 +1029,17 @@ def retexture_template(
                     face.mat = vbsp.get_tex(
                         'special.{!s}'.format(tex_colour)
                     )
-                if face.mat != '':
-                    continue  # Set to a special texture,
-                    # don't use the wall one
-            else:
-                utils.con_log(grid_size, norm.z)
-                if norm.z > floor_tolerance:
-                    grid_size = 'ceiling'
-                if norm.z < -floor_tolerance:
-                    grid_size = 'floor'
+                if face.mat == '':
+                    # No special texture - use a wall one.
+                    grid_size = 'wall'
+                else:
+                    # Set to a special texture,
+                    continue # don't use the wall one
+
+            if norm.z > floor_tolerance:
+                grid_size = 'ceiling'
+            if norm.z < -floor_tolerance:
+                grid_size = 'floor'
 
             if can_clump:
                 # For the clumping algorithm, set to Valve PeTI and let
@@ -880,6 +1064,14 @@ def retexture_template(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
 
+    for over in overlays:
+        mat = over['material'].casefold()
+        if mat in replace_tex:
+            over['material'] = random.choice(replace_tex[mat])
+        elif mat in vbsp.TEX_VALVE:
+            over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+
+
 
 @make_flag('debug')
 def debug_flag(inst, props):
@@ -888,17 +1080,18 @@ def debug_flag(inst, props):
     If the text ends with an '=', the instance will also be displayed.
     As a flag, this always evaluates as true.
     """
+    # Mark as a warning so it's more easily seen.
     if props.has_children():
-        utils.con_log('Debug:')
-        utils.con_log(str(props))
-        utils.con_log(str(inst))
+        LOGGER.warning('Debug:')
+        LOGGER.warning(str(props))
+        LOGGER.warning(str(inst))
     elif props.value.strip().endswith('='):
-        utils.con_log('Debug: {props}{inst!s}'.format(
+        LOGGER.warning('Debug: {props}{inst!s}'.format(
             inst=inst,
             props=props.value,
         ))
     else:
-        utils.con_log('Debug: ' + props.value)
+        LOGGER.warning('Debug: ' + props.value)
     return True  # The flag is always true
 
 
@@ -949,8 +1142,8 @@ def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
             return False
-        # If the AND block is empty, return True
-        return len(sub_flag.value) == 0
+    # If the AND block is empty, return True
+    return len(sub_flag.value) == 0
 
 
 @make_flag('OR')
@@ -1003,16 +1196,46 @@ def flag_has_inst(_, flag):
         ALL_INST
     )
 
+INSTVAR_COMP = {
+    '=': operator.eq,
+    '==': operator.eq,
+
+    '!=': operator.ne,
+    '<>': operator.ne,
+    '=/=': operator.ne,
+
+    '<': operator.lt,
+    '>': operator.gt,
+
+    '>=': operator.ge,
+    '=>': operator.ge,
+    '<=': operator.le,
+    '=<': operator.le,
+}
+
 
 @make_flag('instVar')
 def flag_instvar(inst, flag):
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form "$start_enabled 1", with or without
+    The flag value follows the form "$start_enabled == 1", with or without
     the $.
+    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
+    If ommitted, the operation is assumed to be ==.
     """
-    bits = flag.value.split(' ', 1)
-    return inst.fixup[bits[0]] == bits[1]
+    values = flag.value.split(' ')
+    if len(values) == 3:
+        variable, op, comp_val = values
+        value = inst.fixup[variable]
+        try:
+            # Convert to floats if possible, otherwise handle both as strings
+            comp_val, value = float(comp_val), float(value)
+        except ValueError:
+            pass
+        return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
+    else:
+        variable, value = values
+        return inst.fixup[variable] == value
 
 
 @make_flag('styleVar')
@@ -1189,6 +1412,8 @@ def flag_brush_at_loc(inst, flag):
       - "Black" requires a non-portalable surface.
     - SetVar defines an instvar which will be given a value of "black",
       "white" or "none" to allow the result to be reused.
+    - If gridPos is true, the position will be snapped so it aligns with
+      the 128 brushes (Useful with fizzler/light strip items).
     - RemoveBrush: If set to 1, the brush will be removed if found.
       Only do this to EmbedFace brushes, since it will remove the other
       sides as well.
@@ -1203,6 +1428,13 @@ def flag_brush_at_loc(inst, flag):
     norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
         inst['angles', '0 0 0']
     )
+
+    if utils.conv_bool(flag['gridpos', '0']):
+        for axis in 'xyz':
+            # Don't realign things in the normal's axis -
+            # those are already fine.
+            if norm[axis] == 0:
+                pos[axis] = pos[axis] // 128 * 128 + 64
 
     result_var = flag['setVar', '']
     should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
@@ -1226,6 +1458,22 @@ def flag_brush_at_loc(inst, flag):
         return True
 
     return des_type == br_type
+
+
+@make_flag('PosIsGoo')
+def flag_goo_at_loc(inst, flag):
+    """Check to see if a given location is submerged in goo.
+
+    0 0 0 is the origin of the instance, values are in 128 increments.
+    """
+    pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
+    pos *= 128
+    pos += Vec.from_str(inst['origin'])
+
+    # Round to 128 units, then offset to the center
+    pos = pos // 128 * 128 + 64  # type: Vec
+    val = pos.as_tuple() in GOO_LOCS
+    return val
 
 
 ###########
@@ -1355,23 +1603,25 @@ def res_random(inst, res):
         return
 
     ind = random.choice(weight)
-    choice = results[ind]
+    choice = results[ind]  # type: Property
     if choice.name == 'group':
         for sub_res in choice.value:
             should_del = Condition.test_result(
                 inst,
                 sub_res,
             )
-            if should_del:
+            if should_del is RES_EXHAUSTED:
                 # This Result doesn't do anything!
                 sub_res.name = 'nop'
+                sub_res.value = None
     else:
         should_del = Condition.test_result(
             inst,
             choice,
         )
-        if should_del:
+        if should_del is RES_EXHAUSTED:
             choice.name = 'nop'
+            choice.value = None
 
 
 @make_result('forceUpright')
@@ -1505,9 +1755,14 @@ def res_add_overlay_inst(inst, res):
             instance will be copied over.
         move_outputs: If true, outputs will be moved to this instance.
         offset: The offset (relative to the base) that the instance
-            will be placed.
+            will be placed. Can be set to '<piston_top>' and
+            '<piston_bottom>' to offset based on the configuration
+            of piston platform handles.
         angles: If set, overrides the base instance angles. This does
             not affect the offset property.
+        fixup: Keyvalues in this block will be copied to the overlay entity.
+            If the value starts with $, the variable will be copied over.
+            If this is present, copy_fixup will be disabled
     """
     angle = res['angles', inst['angles', '0 0 0']]
     overlay_inst = VMF.create_ent(
@@ -1518,17 +1773,40 @@ def res_add_overlay_inst(inst, res):
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
     )
-    if utils.conv_bool(res['copy_fixup', '1']):
+    # Don't run if the fixup block exists..
+    if utils.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
+
+    # Copy additional fixup values over
+    for prop in res.find_key('Fixup', []):  # type: Property
+        if prop.value.startswith('$'):
+            overlay_inst.fixup[prop.real_name] = inst.fixup[prop.value]
+        else:
+            overlay_inst.fixup[prop.real_name] = prop.value
+
     if utils.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
 
     if 'offset' in res:
+        folded_off = res['offset'].casefold()
         # Offset the overlay by the given distance
-        offset = Vec.from_str(res['offset']).rotate_by_str(
+        # Some special placeholder values:
+        if folded_off == '<piston_bottom>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$bottom_level']) * 128,
+            )
+        elif folded_off == '<piston_top>':
+            offset = Vec(
+                z=utils.conv_int(inst.fixup['$top_level'], 1) * 128,
+            )
+        else:
+            # Regular vector
+            offset = Vec.from_str(res['offset'])
+
+        offset.rotate_by_str(
             inst['angles', '0 0 0']
         )
         overlay_inst['origin'] = (
@@ -1554,17 +1832,56 @@ def res_cave_portrait(inst, res):
 
 @make_result('OffsetInst', 'offsetinstance')
 def res_translate_inst(inst, res):
-    """Translate the instance locally by the given amount."""
-    offset = Vec.from_str(res.value).rotate_by_str(inst['angles'])
+    """Translate the instance locally by the given amount.
+
+    The special values <piston>, <piston_bottom> and <piston_top> can be
+    used to offset it based on the starting position, bottom or top position
+    of a piston platform.
+    """
+    folded_val = res.value.casefold()
+    if folded_val == '<piston>':
+        folded_val = (
+            '<piston_top>' if
+            utils.conv_bool(inst.fixup['$start_up'])
+            else '<piston_bottom>'
+        )
+
+    if folded_val == '<piston_top>':
+        val = Vec(z=128 * utils.conv_int(inst.fixup['$top_level', '1'], 1))
+    elif folded_val == '<piston_bottom>':
+        val = Vec(z=128 * utils.conv_int(inst.fixup['$bottom_level', '0'], 0))
+    else:
+        val = Vec.from_str(res.value)
+
+    offset = val.rotate_by_str(inst['angles'])
     inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
+
+IND_PANEL_TYPES = {
+    'check': ('item_indicator_panel', '[indPanCheck]'),
+    'timer': ('item_indicator_panel_timer', '[indPanTimer]'),
+    'none': '',
+}
 
 
 @make_result_setup('custOutput')
 def res_cust_output_setup(res):
-    for sub_res in res:
-        if sub_res.name == 'targcondition':
-            sub_res.value = Condition.parse(sub_res)
-    return res.value
+    conds = [
+        Condition.parse(sub_res)
+        for sub_res in res
+        if sub_res.name == 'targcondition'
+    ]
+    outputs = list(res.find_all('addOut'))
+    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
+    sign_type = IND_PANEL_TYPES.get(res['sign_type', None], None)
+
+    if sign_type is None:
+        sign_act = sign_deact = (None, '')
+    else:
+        # The outputs which trigger the sign.
+        sign_act = VLib.Output.parse_name(res['sign_activate', ''])
+        sign_deact = VLib.Output.parse_name(res['sign_deactivate', ''])
+
+    return outputs, dec_con_count, conds, sign_type, sign_act, sign_deact
 
 
 @make_result('custOutput')
@@ -1572,7 +1889,18 @@ def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
 
     Always points to the targeted item.
+
+    If DecConCount is 1, connections
     """
+    (
+        outputs,
+        dec_con_count,
+        targ_conditions,
+        force_sign_type,
+        (sign_act_name, sign_act_out),
+        (sign_deact_name, sign_deact_out),
+    ) = res.value
+
     over_name = '@' + inst['targetname'] + '_indicator'
     for toggle in VMF.by_class['func_instance']:
         if toggle.fixup['indicator_name', ''] == over_name:
@@ -1581,60 +1909,145 @@ def res_cust_output(inst, res):
     else:
         toggle_name = ''  # we want to ignore the toggle instance, if it exists
 
-    # Make this a set to ignore repeated targetnames
-    targets = {o.target for o in inst.outputs if o.target != toggle_name}
-
-    kill_signs = utils.conv_bool(res["remIndSign", '0'], False)
-    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
-    targ_conditions = list(res.find_all("targCondition"))
+    # Build a mapping from names to targets.
+    # This is also the set of all output items, plus indicators.
+    targets = defaultdict(list)
+    for out in inst.outputs:
+        if out.target != toggle_name:
+            targets[out.target].append(out)
 
     pan_files = resolve_inst('[indPan]')
 
-    if kill_signs or dec_con_count or targ_conditions:
-        for con_inst in VMF.by_class['func_instance']:
-            if con_inst['targetname'] in targets:
-                if kill_signs and con_inst in pan_files:
+    # These all require us to search through the instances.
+    if force_sign_type or dec_con_count or targ_conditions:
+        for con_inst in VMF.by_class['func_instance']:  # type: VLib.Entity
+            if con_inst['targetname'] not in targets:
+                # Not our instance
+                continue
+
+            # Is it an indicator panel, and should we be modding it?
+            if force_sign_type is not None and con_inst['file'].casefold() in pan_files:
+                # Remove the panel
+                if force_sign_type == '':
                     VMF.remove_ent(con_inst)
-                if targ_conditions:
-                    for cond in targ_conditions:
-                        cond.value.test(con_inst)
-                if dec_con_count and 'connectioncount' in con_inst.fixup:
-                    # decrease ConnectionCount on the ents,
-                    # so they can still process normal inputs
-                    try:
-                        val = int(con_inst.fixup['connectioncount'])
-                        con_inst.fixup['connectioncount'] = str(val-1)
-                    except ValueError:
-                        # skip if it's invalid
-                        utils.con_log(
-                            con_inst['targetname'] +
-                            ' has invalid ConnectionCount!'
-                        )
-    for targ in targets:
-        for out in res.find_all('addOut'):
-            add_output(inst, out, targ)
+                    continue
+
+                # Overwrite the signage instance, and then add the
+                # appropriate outputs to control it.
+                sign_id, sign_file_id = force_sign_type
+                con_inst['file'] = resolve_inst(sign_file_id)[0]
+
+                # First delete the original outputs:
+                for out in targets[con_inst['targetname']]:
+                    inst.outputs.remove(out)
+
+                inputs = CONNECTIONS[sign_id]
+                act_name, act_inp = inputs.in_act
+                deact_name, deact_inp = inputs.in_deact
+
+                LOGGER.info(
+                    'outputs: a="{}" d="{}"\n'
+                    'inputs: a="{}" d="{}"'.format(
+                        (sign_act_name, sign_act_out),
+                        (sign_deact_name, sign_deact_out),
+                        inputs.in_act,
+                        inputs.in_deact
+                    )
+                )
+
+                if act_inp and sign_act_out:
+                    inst.add_out(VLib.Output(
+                        inst_out=sign_act_name,
+                        out=sign_act_out,
+                        inst_in=act_name,
+                        inp=act_inp,
+                        targ=con_inst['targetname'],
+                    ))
+
+                if deact_inp and sign_deact_out:
+                    inst.add_out(VLib.Output(
+                        inst_out=sign_deact_name,
+                        out=sign_deact_out,
+                        inst_in=deact_name,
+                        inp=deact_inp,
+                        targ=con_inst['targetname'],
+                    ))
+            if dec_con_count and 'connectioncount' in con_inst.fixup:
+                # decrease ConnectionCount on the ents,
+                # so they can still process normal inputs
+                try:
+                    val = int(con_inst.fixup['connectioncount'])
+                    con_inst.fixup['connectioncount'] = str(val-1)
+                except ValueError:
+                    # skip if it's invalid
+                    LOGGER.warning(
+                        con_inst['targetname'] +
+                        ' has invalid ConnectionCount!'
+                    )
+
+            if targ_conditions:
+                for cond in targ_conditions:  # type: Condition
+                    cond.test(con_inst)
+
+    if outputs:
+        for targ in targets:
+            for out in outputs:
+                add_output(inst, out, targ)
 
 
 @make_result_setup('custAntline')
 def res_cust_antline_setup(res):
-    result = {
-        'instance': res['instance', ''],
-        'wall_str': [p.value for p in res.find_all('straight')],
-        'wall_crn': [p.value for p in res.find_all('corner')],
-        # If this isn't defined, None signals to use the above textures.
-        'floor_str': [p.value for p in res.find_all('straightFloor')] or None,
-        'floor_crn': [p.value for p in res.find_all('cornerFloor')] or None,
-        'outputs': list(res.find_all('addOut')),
-        }
-    if (
-            not result['wall_str'] or
-            not result['wall_crn']
-            ):
+    import vbsp
+
+    def find(cat):
+        """Helper to reduce code duplication."""
+        return [p.value for p in res.find_all(cat)]
+
+    # Allow overriding these options. If unset use the style's value - the
+    # amount of destruction will usually be the same.
+    broken_chance = utils.conv_float(res[
+        'broken_antline_chance',
+        vbsp.get_opt('broken_antline_chance')
+    ])
+    broken_dist = utils.conv_float(res[
+        'broken_antline_distance',
+        vbsp.get_opt('broken_antline_distance')
+    ])
+
+    toggle_inst = res['instance', '']
+    toggle_out = list(res.find_all('addOut'))
+
+    # These textures are required - the base ones.
+    straight_tex = find('straight')
+    corner_tex = find('corner')
+
+    # Arguments to pass to setAntlineMat
+    straight_args = [
+        straight_tex,
+        find('straightFloor') or (),
+        # Extra broken antline textures / options, if desired.
+        broken_chance,
+        broken_dist,
+        find('brokenStraight') or (),
+        find('brokenStraightFloor') or (),
+    ]
+
+    # The same but for corners.
+    corner_args = [
+        corner_tex,
+        find('cornerFloor') or (),
+        broken_chance,
+        broken_dist,
+        find('brokenCorner') or (),
+        find('brokenCornerFloor') or (),
+    ]
+
+    if not straight_tex or not corner_tex:
         # If we don't have two textures, something's wrong. Remove this result.
-        utils.con_log('custAntline has missing values!')
+        LOGGER.warning('custAntline has no textures!')
         return None
     else:
-        return result
+        return straight_args, corner_args, toggle_inst, toggle_out
 
 
 @make_result('custAntline')
@@ -1654,49 +2067,140 @@ def res_cust_antline(inst, res):
     """
     import vbsp
 
-    opts = res.value
+    straight_args, corner_args, toggle_inst, toggle_out = res.value
 
     # The original textures for straight and corner antlines
     straight_ant = vbsp.ANTLINES['straight']
     corner_ant = vbsp.ANTLINES['corner']
 
     over_name = '@' + inst['targetname'] + '_indicator'
+
     for over in (
             VMF.by_class['info_overlay'] &
             VMF.by_target[over_name]
             ):
         folded_mat = over['material'].casefold()
         if folded_mat == straight_ant:
-            vbsp.set_antline_mat(
-                over,
-                opts['wall_str'],
-                opts['floor_str'],
-            )
+            vbsp.set_antline_mat(over, *straight_args)
         elif folded_mat == corner_ant:
-            vbsp.set_antline_mat(
-                over,
-                opts['wall_crn'],
-                opts['floor_crn'],
-            )
+            vbsp.set_antline_mat(over, *corner_args)
 
         # Ensure this isn't overriden later!
         vbsp.IGNORED_OVERLAYS.add(over)
 
     # allow replacing the indicator_toggle instance
-    if opts['instance']:
+    if toggle_inst:
         for toggle in VMF.by_class['func_instance']:
-            if toggle.fixup['indicator_name', ''] == over_name:
-                toggle['file'] = opts['instance']
-                if len(opts['outputs']) > 0:
-                    for out in inst.outputs[:]:
-                        if out.target == toggle['targetname']:
-                            # remove the original outputs
-                            inst.outputs.remove(out)
-                    for out in opts['outputs']:
-                        # Allow adding extra outputs to customly
-                        # trigger the toggle
-                        add_output(inst, out, toggle['targetname'])
-                break  # Stop looking!
+            if toggle.fixup['indicator_name', ''] != over_name:
+                continue
+            toggle['file'] = toggle_inst
+            if len(toggle_out) > 0:
+                for out in inst.outputs[:]:
+                    if out.target == toggle['targetname']:
+                        # remove the original outputs
+                        inst.outputs.remove(out)
+                for out in toggle_out:
+                    # Allow adding extra outputs to customly
+                    # trigger the toggle
+                    add_output(inst, out, toggle['targetname'])
+            break  # Stop looking!
+
+
+@make_result_setup('changeOutputs')
+def res_change_outputs_setup(res):
+    return [
+        (
+            VLib.Output.parse_name(prop.real_name),
+            VLib.Output.parse_name(prop.value)
+        )
+        for prop in
+        res
+    ]
+
+
+@make_result('changeOutputs')
+def res_change_outputs(inst: VLib.Entity, res):
+    """Switch the outputs on an instance.
+
+    Each child is a original -> replace value. These match the values
+    in editoritems.txt. Use a blank value to indicate it should be deleted.
+    """
+    for output in inst.outputs[:]:  # type: VLib.Output
+        for (orig_name, orig_comm), rep in res.value:
+            if output.inst_out == orig_name and output.output == orig_comm:
+                if rep == (None, ''):
+                    inst.outputs.remove(output)
+                else:
+                    output.inst_out, output.output = rep
+
+
+@make_result_setup('timedRelay')
+def res_timed_relay_setup(res):
+    var = res['variable', '$timer_delay']
+    name = res['targetname']
+    disabled = res['disabled', '0']
+    flags = res['spawnflags', '0']
+
+    final_outs = [
+        VLib.Output.parse(subprop)
+        for prop in res.find_all('FinalOutputs')
+        for subprop in prop
+    ]
+
+    rep_outs = [
+        VLib.Output.parse(subprop)
+        for prop in res.find_all('RepOutputs')
+        for subprop in prop
+    ]
+
+    # Never use the comma seperator in the final output for consistency.
+    for out in itertools.chain(rep_outs, final_outs):
+        out.comma_sep = False
+
+    return var, name, disabled, flags, final_outs, rep_outs
+
+
+@make_result('timedRelay')
+def res_timed_relay(inst: VLib.Entity, res):
+    """Generate a logic_relay with outputs delayed by a certain amount.
+
+    This allows triggering outputs based $timer_delay values.
+    """
+    var, name, disabled, flags, final_outs, rep_outs = res.value
+
+    relay = VMF.create_ent(
+        classname='logic_relay',
+        spawnflags=flags,
+        origin=inst['origin'],
+        targetname=local_name(inst, name),
+    )
+
+    relay['StartDisabled'] = (
+        inst.fixup[disabled]
+        if disabled.startswith('$') else
+        disabled
+    )
+
+    delay = utils.conv_float(
+        inst.fixup[var, '0']
+        if var.startswith('$') else
+        var
+    )
+
+    for off in range(int(math.ceil(delay))):
+        for out in rep_outs:
+            new_out = out.copy()  # type: VLib.Output
+            new_out.target = local_name(inst, new_out.target)
+            new_out.delay += off
+            new_out.comma_sep = False
+            relay.add_out(new_out)
+
+    for out in final_outs:
+        new_out = out.copy()  # type: VLib.Output
+        new_out.target = local_name(inst, new_out.target)
+        new_out.delay += delay
+        new_out.comma_sep = False
+        relay.add_out(new_out)
 
 
 @make_result('faithMods')
@@ -1727,13 +2231,17 @@ def res_faith_mods(inst, res):
                 for solid in trig.solids:
                     solid.translate(offset)
 
+            # Inspect the outputs to determine the type.
+            # We also change them if desired, since that's not possible
+            # otherwise.
+
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
                     out.inst_in = res['angled_targ', 'animate_angled_relay']
                     out.input = res['angled_in', 'Trigger']
                     if fixup_var:
                         inst.fixup[fixup_var] = 'angled'
-                    break
+                    break # There's only one output we want to look for...
                 elif out.inst_in == 'animate_straightup_relay':
                     out.inst_in = res[
                         'straight_targ', 'animate_straightup_relay'
@@ -1805,7 +2313,7 @@ def res_cust_fizzler(base_inst, res):
 
     if is_laser:
         # This is a laserfield! We can't edit those brushes!
-        utils.con_log('CustFizzler excecuted on LaserField!')
+        LOGGER.warning('CustFizzler excecuted on LaserField!')
         return
 
     for orig_brush in (
@@ -2030,7 +2538,7 @@ def res_fizzler_pair(begin_inst, res):
             length = int(end_pos[main_axis] - begin_pos[main_axis])
             break
     else:
-        utils.con_log('No matching pair for {}!!'.format(orig_target))
+        LOGGER.warning('No matching pair for {}!!', orig_target)
         return
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
@@ -2124,10 +2632,10 @@ def place_catwalk_connections(instances, point_a, point_b):
     elif diff.z < 0:
         # We need to add downward stairs
         # They point opposite to normal ones
-        utils.con_log('down from', point_a)
+        LOGGER.debug('down from [}', point_a)
         angle = INST_ANGLE[(-direction).as_tuple()]
         for stair_pos in range(0, -int(diff.z), 128):
-            utils.con_log(stair_pos)
+            LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
             loc = point_a + (2 * stair_pos + 256) * direction
             # Do the vertical offset plus additional 128 units
@@ -2145,7 +2653,7 @@ def place_catwalk_connections(instances, point_a, point_b):
     distance -= abs(diff.z) * 2
 
     # Now do straight sections
-    utils.con_log('Stretching ', distance, direction)
+    LOGGER.debug('Stretching {} {}', distance, direction)
     angle = INST_ANGLE[direction.as_tuple()]
     loc = point_a + (direction * 128)
 
@@ -2160,7 +2668,6 @@ def place_catwalk_connections(instances, point_a, point_b):
             angles=angle,
             file=instances['straight_' + str(segment_len)],
         )
-        utils.con_log(loc)
         loc += (segment_len * direction)
 
 
@@ -2183,7 +2690,7 @@ def res_make_catwalk(_, res):
         Support_Floor: A support extending from the floor.
         Single_Wall: A section connecting to an East wall.
     """
-    utils.con_log("Starting catwalk generator...")
+    LOGGER.info("Starting catwalk generator...")
     marker = resolve_inst(res['markerInst'])
     output_target = res['output_name', 'MARKER']
 
@@ -2215,8 +2722,8 @@ def res_make_catwalk(_, res):
     if not markers:
         return RES_EXHAUSTED
 
-    utils.con_log('Conn:', connections)
-    utils.con_log('Markers:', markers)
+    LOGGER.info('Conn:', connections)
+    LOGGER.info('Markers:', markers)
 
     # First loop through all the markers, adding connecting sections
     for inst in markers.values():
@@ -2233,7 +2740,7 @@ def res_make_catwalk(_, res):
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
-                utils.con_log('Instances not aligned!')
+                LOGGER.warning('Instances not aligned!')
                 continue
 
             y_dir = origin1.x == origin2.x  # Which way the connection is
@@ -2243,11 +2750,11 @@ def res_make_catwalk(_, res):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            utils.con_log('Dist =', dist, ', Vert =', vert_dist)
+            LOGGER.debug('Dist =', dist, ', Vert =', vert_dist)
 
             if dist//2 < vert_dist:
                 # The stairs are 2 long, 1 high.
-                utils.con_log('Not enough room for stairs!')
+                LOGGER.warning('Not enough room for stairs!')
                 continue
 
             if dist > 128:
@@ -2321,7 +2828,7 @@ def res_make_catwalk(_, res):
                 file=supp,
             )
 
-    utils.con_log('Finished catwalk generation!')
+    LOGGER.info('Finished catwalk generation!')
     return RES_EXHAUSTED
 
 
@@ -2420,12 +2927,16 @@ def res_track_plat(_, res):
         VMF.by_class['func_instance']
         if inst['file'].casefold() in track_files
     }
-    utils.con_log('Track instances:')
-    utils.con_log('\n'.join(
+
+    LOGGER.debug('Track instances:')
+    LOGGER.debug('\n'.join(
         '{!s}: {}'.format(k, v['file'])
         for k, v in
         track_instances.items()
     ))
+
+    if not track_instances:
+        return RES_EXHAUSTED
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
@@ -2433,7 +2944,7 @@ def res_track_plat(_, res):
         if plat_inst['file'].casefold() not in platforms:
             continue  # Not a platform!
 
-        utils.con_log('Modifying "' + plat_inst['targetname'] + '"!')
+        LOGGER.debug('Modifying "' + plat_inst['targetname'] + '"!')
 
         plat_loc = Vec.from_str(plat_inst['origin'])
         # The direction away from the wall/floor/ceil
@@ -2530,7 +3041,8 @@ def res_track_plat(_, res):
         if plat_var != '':
             # Skip the '_mirrored' section if needed
             plat_inst.fixup[plat_var] = track_facing[:5].lower()
-            return RES_EXHAUSTED
+
+    return RES_EXHAUSTED # Don't re-run
 
 
 def track_scan(
@@ -2844,9 +3356,10 @@ def res_add_brush(inst, res):
 
     tex_type = res['type', None]
     if tex_type not in ('white', 'black'):
-        utils.con_log(
+        LOGGER.warning(
             'AddBrush: "{}" is not a valid brush '
-            'color! (white or black)'.format(tex_type)
+            'color! (white or black)',
+            tex_type,
         )
         tex_type = 'black'
 
@@ -2970,20 +3483,22 @@ def res_import_template(inst, res):
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        utils.con_log('"{}" not a valid template!'.format(temp_id))
+        LOGGER.warning('"{}" not a valid template!', temp_id)
         return
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    world, detail = import_template(
+    world, detail, over = import_template(
         temp_id,
         origin,
         angles,
-        force_type,
+        targetname=inst['targetname', ''],
+        force_type=force_type,
     )
     retexture_template(
         world,
         detail,
+        over,
         origin,
         replace_tex,
         force_colour,
@@ -3076,8 +3591,9 @@ def res_unst_scaffold(_, res):
         # We've already executed this config group
         return RES_EXHAUSTED
 
-    utils.con_log(
-        'Running Scaffold Generator (' + res.value + ')...'
+    LOGGER.info(
+        'Running Scaffold Generator ({})...',
+        res.value
     )
     TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value] # Don't let this run twice
@@ -3264,7 +3780,7 @@ def res_unst_scaffold(_, res):
             if new_file != '':
                 ent['file'] = new_file
 
-    utils.con_log('Finished Scaffold generation!')
+    LOGGER.info('Finished Scaffold generation!')
     return RES_EXHAUSTED
 
 
@@ -3293,6 +3809,38 @@ def res_rand_num(inst, res):
     inst.fixup[var] = str(func(min_val, max_val))
 
 
+@make_result('RandomVec')
+def res_rand_vec(inst, res):
+    """A modification to RandomNum which generates a random vector instead.
+
+    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
+    are for each section. If the min and max are equal that number will be used
+    instead.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    value = Vec()
+
+    for axis in 'xyz':
+        max_val = utils.conv_float(res['max_' + axis, 0.0])
+        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        if min_val == max_val:
+            value[axis] = min_val
+        else:
+            value[axis] = func(min_val, max_val)
+
+    inst.fixup[var] = value.join(' ')
+
+
 @make_result('GooDebris')
 def res_goo_debris(_, res):
     """Add random instances to goo squares.
@@ -3308,10 +3856,10 @@ def res_goo_debris(_, res):
         - offset: A random xy offset applied to the instances.
     """
     space = utils.conv_int(res['spacing', '1'], 1)
-    rand_count = utils.conv_int(res['count', ''], None)
+    rand_count = utils.conv_int(res['number', ''], None)
     if rand_count:
         rand_list = weighted_random(
-            utils.conv_int(res['Number', '']),
+            rand_count,
             res['weights', ''],
         )
     else:
@@ -3325,17 +3873,10 @@ def res_goo_debris(_, res):
 
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in GOO_LOCS]
+        possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
     else:
         possible_locs = []
-        utils.con_log('Pos:', *utils.iter_grid(
-                    min_x=-space,
-                    max_x=space+1,
-                    min_y=-space,
-                    max_y=space+1,
-                    )
-        )
-        for x, y, z in set(GOO_LOCS):
+        for x, y, z in set(GOO_FACE_LOC):
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
                     max_x=space+1,
@@ -3344,14 +3885,16 @@ def res_goo_debris(_, res):
                     ):
                 if x_off == y_off == 0:
                     continue
-                if (x + x_off*128, y + y_off*128, z) not in GOO_LOCS:
+                if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
                     break  # This doesn't qualify
             else:
                 possible_locs.append(Vec(x,y,z))
 
-    utils.con_log('GooDebris: {}/{} locations'.format(
-        len(possible_locs), len(GOO_LOCS)
-    ))
+    LOGGER.info(
+        'GooDebris: {}/{} locations',
+        len(possible_locs),
+        len(GOO_FACE_LOC),
+    )
 
     suff = ''
     for loc in possible_locs:
@@ -3360,7 +3903,7 @@ def res_goo_debris(_, res):
             continue
 
         if rand_list is not None:
-            suff = '_' + random.choice(rand_list)
+            suff = '_' + str(random.choice(rand_list))
 
         if offset > 0:
             loc.x += random.randint(-offset, offset)
@@ -3374,6 +3917,83 @@ def res_goo_debris(_, res):
         )
 
     return RES_EXHAUSTED
+
+WP_STRIP_COL_COUNT = 8  # Number of strip instances placed per row
+WP_LIMIT = 30  # Limit to this many portal instances
+
+
+@make_result_setup('WPLightstrip')
+def res_portal_lightstrip_setup(res):
+    do_offset = utils.conv_bool(res['doOffset', '0'])
+    hole_inst = res['HoleInst']
+    fallback = res['FallbackInst']
+    location = Vec.from_str(res['location', '0 8192 0'])
+    strip_name = res['strip_name']
+    hole_name = res['hole_name']
+    return [
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        0,
+    ]
+
+
+@make_result('WPLightstrip')
+def res_portal_lightstrip(inst, res):
+    """Special result used for P1 light strips."""
+    (
+        do_offset,
+        hole_inst,
+        location,
+        fallback,
+        strip_name,
+        hole_name,
+        count,
+    ) = res.value
+
+    if do_offset:
+        random.seed('random_case_{}:{}_{}_{}'.format(
+            'WP_LightStrip',
+            inst['targetname', ''],
+            inst['origin'],
+            inst['angles'],
+        ))
+
+        off = Vec(
+            y=random.choice((-48, -16, 16, 48))
+        ).rotate_by_str(inst['angles'])
+        inst['origin'] = (Vec.from_str(inst['origin']) + off).join(' ')
+
+    if count > WP_LIMIT:
+        inst['file'] = fallback
+        return
+
+    disp_inst = VMF.create_ent(
+        classname='func_instance',
+        angles='0 0 0',
+        origin=(location + Vec(
+            x=128 * (count % WP_STRIP_COL_COUNT),
+            y=128 * (count // WP_STRIP_COL_COUNT),
+        )).join(' '),
+        file=hole_inst,
+    )
+    if '{}' in strip_name:
+        strip_name = strip_name.replace('{}', str(count))
+    else:
+        strip_name += str(count)
+
+    if '{}' in hole_name:
+        hole_name = hole_name.replace('{}', str(count))
+    else:
+        hole_name += str(count)
+
+    disp_inst.fixup['port_name'] = inst.fixup['link_name'] = strip_name
+    inst.fixup['port_name'] = disp_inst.fixup['link_name'] = hole_name
+
+    res.value[-1] = count + 1
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}
@@ -3520,7 +4140,6 @@ def res_make_tag_fizzler(inst, res):
     ))
 
     if 'model_inst' in res:
-        utils.con_log(VMF.by_target.keys())
         model_inst = resolve_inst(res['model_inst'])[0]
         for mdl_inst in VMF.by_class['func_instance']:
             if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):

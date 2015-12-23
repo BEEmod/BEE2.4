@@ -13,7 +13,9 @@ from property_parser import Property
 from BSP import BSP, BSP_LUMPS
 import utils
 
-CONF = Property('Config')
+LOGGER = utils.init_logging('bee2/VRAD.log')
+
+CONF = Property('Config', [])
 SCREENSHOT_DIR = os.path.join(
     '..',
     'portal2',  # This is hardcoded into P2, it won't change for mods.
@@ -69,7 +71,7 @@ def unset_readonly(file):
 
 def load_config():
     global CONF
-    utils.con_log('Loading Settings...')
+    LOGGER.info('Loading Settings...')
     try:
         with open("bee2/vrad_config.cfg") as config:
             CONF = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
@@ -77,7 +79,7 @@ def load_config():
             )
     except FileNotFoundError:
         pass
-    utils.con_log('Config Loaded!')
+    LOGGER.info('Config Loaded!')
 
 
 def pack_file(zipfile, filename):
@@ -94,7 +96,7 @@ def pack_file(zipfile, filename):
             )
             break
     else:
-        utils.con_log('"bee2/' + filename + '" not found!')
+        LOGGER.warning('"bee2/' + filename + '" not found!')
 
 
 def pack_content(path):
@@ -114,28 +116,28 @@ def pack_content(path):
         files.remove('')
 
     if not files:
-        utils.con_log('No files to pack!')
+        LOGGER.info('No files to pack!')
         return
 
-    utils.con_log('Files to pack:')
+    LOGGER.info('Files to pack:')
     for file in sorted(files):
-        utils.con_log(' # "' + file + '"')
+        LOGGER.info(' # "' + file + '"')
 
-    utils.con_log("Packing Files!")
+    LOGGER.info("Packing Files!")
     bsp_file = BSP(path)
-    utils.con_log(' - Header read')
+    LOGGER.debug(' - Header read')
     bsp_file.read_header()
 
     # Manipulate the zip entirely in memory
     zip_data = BytesIO()
     zip_data.write(bsp_file.get_lump(BSP_LUMPS.PAKFILE))
     zipfile = ZipFile(zip_data, mode='a')
-    utils.con_log(' - Existing zip read')
+    LOGGER.debug(' - Existing zip read')
 
     for file in files:
         pack_file(zipfile, file)
 
-    utils.con_log(' - Added files')
+    LOGGER.debug(' - Added files')
 
     zipfile.close()  # Finalise the zip modification
 
@@ -145,9 +147,9 @@ def pack_content(path):
         BSP_LUMPS.PAKFILE,
         zip_data.getvalue(),  # Get the binary data we need
     )
-    utils.con_log(' - BSP written!')
+    LOGGER.debug(' - BSP written!')
 
-    utils.con_log("Packing complete!")
+    LOGGER.info("Packing complete!")
 
 
 def find_screenshots():
@@ -170,10 +172,10 @@ def mod_screenshots():
     mod_type = CONF['screenshot_type', 'PETI'].lower()
 
     if mod_type == 'cust':
-        utils.con_log('Using custom screenshot!')
+        LOGGER.info('Using custom screenshot!')
         scr_loc = CONF['screenshot', '']
     elif mod_type == 'auto':
-        utils.con_log('Using automatic screenshot!')
+        LOGGER.info('Using automatic screenshot!')
         scr_loc = None
         # The automatic screenshots are found at this location:
         auto_path = os.path.join(
@@ -200,7 +202,6 @@ def mod_screenshots():
         )
         playtested = False
         for scr_shot in screens:
-            utils.con_log(scr_shot)
             filename = os.path.basename(scr_shot)
             if filename.startswith('bee2_playtest_flag'):
                 # Previewcomplete is a flag to indicate the map's
@@ -217,30 +218,32 @@ def mod_screenshots():
             )
             diff = datetime.now() - date
             if diff.total_seconds() > 2 * 3600:
-                utils.con_log('Screenshot "{scr}" too old ({diff!s})'.format(
-                    scr=scr_shot, diff=diff
-                ))
+                LOGGER.info(
+                    'Screenshot "{scr}" too old ({diff!s})',
+                    scr=scr_shot,
+                    diff=diff,
+                )
                 continue
 
             # If we got here, it's a good screenshot!
-            utils.con_log('Chosen "{}"'.format(scr_shot))
-            utils.con_log('Map Playtested:', playtested)
+            LOGGER.info('Chosen "{}"', scr_shot)
+            LOGGER.info('Map Playtested: {}', playtested)
             scr_loc = scr_shot
             break
         else:
             # If we get to the end, we failed to find an automatic
             # screenshot!
-            utils.con_log('No Auto Screenshot found!')
+            LOGGER.info('No Auto Screenshot found!')
             mod_type = 'peti'  # Suppress the "None not found" error
 
         if utils.conv_bool(CONF['clean_screenshots', '0']):
-            utils.con_log('Cleaning up screenshots...')
+            LOGGER.info('Cleaning up screenshots...')
             # Clean up this folder - otherwise users will get thousands of
             # pics in there!
             for screen in screens:
                 if screen != scr_loc:
                     os.remove(screen)
-            utils.con_log('Done!')
+            LOGGER.info('Done!')
     else:
         # PeTI type, or something else
         scr_loc = None
@@ -248,7 +251,7 @@ def mod_screenshots():
     if scr_loc is not None and os.path.isfile(scr_loc):
         # We should use a screenshot!
         for screen in find_screenshots():
-            utils.con_log('Replacing "{}"...'.format(screen))
+            LOGGER.info('Replacing "{}"...', screen)
             # Allow us to edit the file...
             unset_readonly(screen)
             shutil.copy(scr_loc, screen)
@@ -258,12 +261,12 @@ def mod_screenshots():
 
     else:
         if mod_type != 'peti':
-            # Error if the screenshot doesn't exist
-            utils.con_log('"{}" not found!'.format(scr_loc))
-        utils.con_log('Using PeTI screenshot!')
+            # Error if we were looking for a screenshot
+            LOGGER.warning('"{}" not found!', scr_loc)
+        LOGGER.info('Using PeTI screenshot!')
         for screen in find_screenshots():
             # Make the screenshot writeable, so P2 will replace it
-            utils.con_log('Making "{}" replaceable...'.format(screen))
+            LOGGER.info('Making "{}" replaceable...', screen)
             unset_readonly(screen)
 
 
@@ -288,8 +291,8 @@ def run_vrad(args):
             for x in args
             )
         )
-    utils.con_log("Calling original VRAD...")
-    utils.con_log(joined_args)
+    LOGGER.info("Calling original VRAD...")
+    LOGGER.info(joined_args)
     code = subprocess.call(
         joined_args,
         stdout=None,
@@ -297,14 +300,14 @@ def run_vrad(args):
         shell=True,
     )
     if code == 0:
-        utils.con_log("Done!")
+        LOGGER.info("Done!")
     else:
-        utils.con_log("VRAD failed! (" + str(code) + ")")
+        LOGGER.warning("VRAD failed! (" + str(code) + ")")
         sys.exit(code)
 
 
 def main(argv):
-    utils.con_log('BEE2 VRAD hook started!')
+    LOGGER.info('BEE2 VRAD hook started!')
     args = " ".join(argv)
     fast_args = argv[1:]
     full_args = argv[1:]
@@ -313,7 +316,7 @@ def main(argv):
     # P2 adds wrong slashes sometimes, so fix that.
     fast_args[-1] = path = os.path.normpath(argv[-1])
 
-    utils.con_log("Map path is " + path)
+    LOGGER.info("Map path is " + path)
     if path == "":
         raise Exception("No map passed!")
 
@@ -346,10 +349,10 @@ def main(argv):
     if '-force_peti' in args or '-force_hammer' in args:
         # we have override command!
         if '-force_peti' in args:
-            utils.con_log('OVERRIDE: Applying cheap lighting!')
+            LOGGER.warning('OVERRIDE: Applying cheap lighting!')
             is_peti = True
         else:
-            utils.con_log('OVERRIDE: Preserving args!')
+            LOGGER.warning('OVERRIDE: Preserving args!')
             is_peti = False
     else:
         # If we don't get the special -force args, check for the name
@@ -364,17 +367,24 @@ def main(argv):
     mod_screenshots()
 
     if is_peti:
-        utils.con_log("Forcing Cheap Lighting!")
+        LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
     else:
-        utils.con_log("Hammer map detected! Not forcing cheap lighting..")
+        LOGGER.info("Hammer map detected! Not forcing cheap lighting..")
         run_vrad(full_args)
 
     if '-no_pack' not in args:
         pack_content(path)
     else:
-        utils.con_log("No items to pack!")
-    utils.con_log("BEE2 VRAD hook finished!")
+        LOGGER.warning("No items to pack!")
+    LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
-    main(sys.argv)
+    try:
+        main(sys.argv)
+    except Exception as e:
+        import logging
+        # Log the error, finalise the logs, and then crash.
+        LOGGER.exception('Exception Occurred:')
+        logging.shutdown()
+        raise

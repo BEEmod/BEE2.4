@@ -4,8 +4,12 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-import os.path
 from PIL import ImageTk, Image
+import os.path
+
+import utils
+
+LOGGER = utils.getLogger('img')
 
 cached_img = {}
 
@@ -52,7 +56,7 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     if os.path.isfile(path):
         image = Image.open(path)
     else:
-        print('ERROR: "images/' + orig_path + '" does not exist!')
+        LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
         return error or img_error
 
     if resize_to:

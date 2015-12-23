@@ -1,9 +1,3 @@
-# TODO: Add comment support. Read in, and export comments.
-# - Single comments should appear as properties with the name of '//'
-# - A new member level property called 'comment' should be added when a
-#   comment is tacked onto the end of a line.
-# - Comments on bracketed lines should be separated into their own
-#   comment properties.
 import utils
 
 from typing import (
@@ -19,7 +13,7 @@ REPLACE_CHARS = {
     r'\t':  '\t',
     '\\\\': '\\',
     r'\/':   '/',
-    }
+}
 
 # Sentinel value to indicate that no default was given to find_key()
 _NO_KEY_FOUND = object()
@@ -91,7 +85,10 @@ def read_multiline_value(file, line_num, filename):
     lines = ['']  # We return with a beginning newline
     # Re-looping over the same iterator means we don't repeat lines
     for line_num, line in file:
-        line = utils.clean_line(line)
+        if isinstance(line, bytes):
+            # Decode bytes using utf-8
+            line = line.decode('utf-8')
+        line = line.strip()
         if line.endswith('"'):
             lines.append(line[:-1])
             return '\n'.join(lines)
@@ -120,7 +117,7 @@ class Property:
     def __init__(
             self: 'Property',
             name: Optional[str],
-            value=_Prop_Value,
+            value: _Prop_Value,
             ):
         """Create a new property instance.
 
@@ -164,56 +161,90 @@ class Property:
         filename, if set should be the source of the text for debug purposes.
         file_contents should be an iterable of strings
         """
-        open_properties = [Property(None, [])]
+        from utils import is_identifier
+
         file_iter = enumerate(file_contents, start=1)
+
+        # The block we are currently adding to.
+
+        # The special name 'None' marks it as the root property, which
+        # just outputs its children when exported. This way we can handle
+        # multiple root blocks in the file, while still returning a single
+        # Property object which has all the methods.
+        cur_block = Property(None, [])
+
+        # A queue of the properties we are currently in (outside to inside).
+        open_properties = [cur_block]
         for line_num, line in file_iter:
-            values = open_properties[-1].value
-            freshline = utils.clean_line(line)
-            if not freshline:
-                # Skip blank lines!
+            if isinstance(line, bytes):
+                # Decode bytes using utf-8
+                line = line.decode('utf-8')
+            freshline = line.strip()
+
+            if not freshline or freshline[:2] == '//':
+                # Skip blank lines and comments!
                 continue
 
             if freshline.startswith('"'):   # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
-                if not utils.is_identifier(name):
-                    raise KeyValError(
-                        'Invalid name ' + name + '!',
-                        filename,
-                        line_num,
-                        )
                 try:
                     value = line_contents[3]
-                except IndexError:
+                except IndexError:  # It doesn't have a value, likely a block
                     value = None
                 else:
-                    if not freshline.endswith('"'):
-                        # It's a multiline value!
-                        value += read_multiline_value(
-                            file_iter,
-                            line_num,
+                    # Special case - comment between name/value sections -
+                    # it's a name block then.
+                    if line_contents[2].lstrip().startswith('//'):
+                        value = None
+                        del line_contents[3:]
+                    else:
+                        if len(line_contents) < 5:
+                            # It's a multiline value - no ending quote!
+                            value += read_multiline_value(
+                                file_iter,
+                                line_num,
+                                filename,
+                            )
+                        if value and '\\' in value:
+                            for orig, new in REPLACE_CHARS.items():
+                                value = value.replace(orig, new)
+                # Line_contents[4] is the start of the comment, ensure that it's
+                # blank or starts with a comment.
+                if len(line_contents) >= 5:
+                    comment = line_contents[4].lstrip()
+                    # same as: not (comment or comment.startswith('//'))
+                    if comment and not comment.startswith('//'):
+                        raise KeyValError(
+                            'Extra text after '
+                            'line: "{}"'.format(line_contents[4]),
                             filename,
+                            line_num,
                         )
-                    for orig, new in REPLACE_CHARS.items():
-                        value = value.replace(orig, new)
 
-                values.append(Property(name, value))
+                cur_block.append(Property(name, value))
             elif freshline.startswith('{'):
-                if values[-1].value:
+                # Open a new block.
+                # If we're expecting a block, the value will be None.
+                if cur_block[-1].value is not None:
                     raise KeyValError(
                         'Property cannot have sub-section if it already'
                         'has an in-line value.',
                         filename,
                         line_num,
-                        )
-                values[-1].value = []
-                open_properties.append(values[-1])
+                    )
+                cur_block = cur_block[-1]
+                cur_block.value = []
+                open_properties.append(cur_block)
             elif freshline.startswith('}'):
+                # Move back a block
                 open_properties.pop()
+                cur_block = open_properties[-1].value
+
             # handle name bare on one line, will need a brace on
             # the next line
-            elif utils.is_identifier(freshline):
-                values.append(Property(freshline, []))
+            elif is_identifier(freshline):
+                cur_block.append(Property(freshline, None))
             else:
                 raise KeyValError(
                     "Unexpected beginning character '"
@@ -221,20 +252,20 @@ class Property:
                     + '"!',
                     filename,
                     line_num,
-                    )
+                )
 
             if not open_properties:
                 raise KeyValError(
                     'Too many closing brackets.',
                     filename,
                     line_num,
-                    )
+                )
         if len(open_properties) > 1:
             raise KeyValError(
                 'End of text reached with remaining open sections.',
                 filename,
                 line=None,
-                )
+            )
         return open_properties[0]
 
     def find_all(self, *keys) -> Iterator['Property']:
@@ -245,13 +276,13 @@ class Property:
         if depth == 0:
             raise ValueError("Cannot find_all without commands!")
 
-        keys = [key.casefold() for key in keys]
+        targ_key = keys[0].casefold()
         for prop in self:
             if not isinstance(prop, Property):
                 raise ValueError(
                     'Cannot find_all on a value that is not a Property!'
                 )
-            if prop.name is not None and prop.name == keys[0]:
+            if prop._folded_name == targ_key is not None:
                 if depth > 1:
                     if prop.has_children():
                         yield from Property.find_all(prop, *keys[1:])
@@ -266,8 +297,8 @@ class Property:
         - This prefers keys located closer to the end of the value list.
         """
         key = key.casefold()
-        for prop in reversed(self.value):
-            if prop.name == key:
+        for prop in reversed(self.value):  # type: Property
+            if prop._folded_name == key:
                 return prop
         if def_ is _NO_KEY_FOUND:
             raise NoKeyError(key)
@@ -328,7 +359,7 @@ class Property:
         This keeps only the last if multiple items have the same name.
         """
         if self.has_children():
-            return {item.name: item.as_dict() for item in self}
+            return {item._folded_name: item.as_dict() for item in self}
         else:
             return self.value
 
@@ -340,7 +371,7 @@ class Property:
         if isinstance(other, Property):
             return self.value == other.value
         else:
-            return self.value == other # Just compare values
+            return self.value == other  # Just compare values
 
     def __ne__(self, other):
         """Not-Equal To comparison. This ignores names.
@@ -405,12 +436,12 @@ class Property:
         """
         key = key.casefold()
         if self.has_children():
-            for prop in self.value:
-                if prop.name == key:
+            for prop in self.value:  # type: Property
+                if prop._folded_name == key:
                     return True
             return False
         else:
-            return self.name == key
+            return self._folded_name == key
 
     def __getitem__(
             self,
@@ -499,7 +530,7 @@ class Property:
         if self.has_children():
             copy = self.copy()
             if isinstance(other, Property):
-                if other.name is None:
+                if other._folded_name is None:
                     copy.value.extend(other.value)
                 else:
                     # We want to add the other property tree to our
@@ -518,7 +549,7 @@ class Property:
         """
         if self.has_children():
             if isinstance(other, Property):
-                if other.name is None:
+                if other._folded_name is None:
                     self.value.extend(other.value)
                 else:
                     self.value.append(other)
@@ -545,9 +576,9 @@ class Property:
             names
         }
         if self.has_children():
-            for item in self.value[:]:
-                if item.name in folded_names:
-                    merge[item.name].value.extend(item.value)
+            for item in self.value[:]:  # type: Property
+                if item._folded_name in folded_names:
+                    merge[item._folded_name].value.extend(item.value)
                 else:
                     new_list.append(item)
         for prop_name in names:
@@ -567,7 +598,7 @@ class Property:
         return isinstance(self.value, list)
 
     def __repr__(self):
-        return 'Property(' + repr(self.name) + ', ' + repr(self.value) + ')'
+        return 'Property(' + repr(self.real_name) + ', ' + repr(self.value) + ')'
 
     def __str__(self):
         return ''.join(self.export())
@@ -578,25 +609,21 @@ class Property:
         Recursively calls itself for all child properties.
         If the Property is marked invalid, it will immediately return.
         """
-        out_val = '"' + str(self.real_name) + '"'
         if isinstance(self.value, list):
             if self.name is None:
                 # If the name is None, we just output the chilren
                 # without a "Name" { } surround. These Property
                 # objects represent the root.
-                yield from (
-                    line
-                    for prop in self.value
-                    for line in prop.export()
-                    )
+                for prop in self.value:
+                    yield from prop.export()
             else:
-                yield out_val + '\n'
+                yield '"' + self.real_name + '"\n'
                 yield '\t{\n'
                 yield from (
-                    '\t'+line
+                    '\t' + line
                     for prop in self.value
                     for line in prop.export()
                     )
                 yield '\t}\n'
         else:
-            yield out_val + ' "' + str(self.value) + '"\n'
+            yield '"' + self.real_name + '" "' + str(self.value) + '"\n'

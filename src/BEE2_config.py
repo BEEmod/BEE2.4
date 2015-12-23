@@ -1,6 +1,9 @@
 import os.path
-
 from configparser import ConfigParser, NoOptionError
+
+import utils
+
+LOGGER = utils.getLogger(__name__)
 
 
 class ConfigFile(ConfigParser):
@@ -32,7 +35,10 @@ class ConfigFile(ConfigParser):
             with open(self.filename, 'r') as conf:
                 self.read_file(conf)
         except (FileNotFoundError, IOError):
-            print('Config "' + self.filename + '" not found! Using defaults...')
+            LOGGER.warning(
+                'Config "{}" not found! Using defaults...',
+                self.filename,
+            )
             # If we fail, just continue - we just use the default values
         self.has_changed = False
 
@@ -52,7 +58,7 @@ class ConfigFile(ConfigParser):
     def save_check(self):
         """Check to see if we have different values, and save if needed."""
         if self.has_changed:
-            print('Saving changes in config "' + self.filename + '"!')
+            LOGGER.info('Saving changes in config "{}"!', self.filename)
             self.save()
 
     def set_defaults(self, def_settings):

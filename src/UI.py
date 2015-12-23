@@ -30,6 +30,7 @@ import optionWindow
 import backup as backupWin
 import tooltip
 
+LOGGER = utils.getLogger(__name__)
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows = {}
@@ -76,6 +77,7 @@ class Item:
         'num_sub',
         'authors',
         'tags',
+        'filter_tags',
         'id',
         'pak_id',
         'pak_name',
@@ -119,6 +121,8 @@ class Item:
 
     def load_data(self):
         """Load data from the item."""
+        from tagsPane import Section
+
         version = self.item.versions[self.selected_ver]
         self.data = version['styles'].get(
             selected_style,
@@ -140,19 +144,23 @@ class Item:
                           self.data['all_name'] is not None and
                           self.data['all_icon'] is not None)
 
-        # Item tags, used for filtering
+        # attributes used for filtering (tags, authors, packages...)
+        self.filter_tags = set()
+
+        # The custom tags set for this item
         self.tags = set()
 
         for tag in self.data['tags']:
-            self.tags.add('TAG_' + tag.casefold())
-            tagsPane.add_tag('TAG_' + tag, pretty=tag)
-
-        self.tags.add('PACK_' + self.pak_id.casefold())
-        self.tags.update({
-            'AUTH_' + auth.casefold()
-            for auth in
-            self.data['auth']
-        })
+            self.filter_tags.add(
+                tagsPane.add_tag(Section.TAG, tag, pretty=tag)
+            )
+        for auth in self.data['auth']:
+            self.filter_tags.add(
+                tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
+            )
+        self.filter_tags.add(
+            tagsPane.add_tag(Section.PACK, self.pak_id, pretty=self.pak_name)
+        )
 
     def get_icon(self, subKey, allow_single=False, single_num=1):
         """Get an icon for the given subkey.
@@ -461,11 +469,6 @@ def load_packages(data):
     for item in data['Item']:
         it = Item(item)
         item_list[it.id] = it
-        for tag in it.tags:
-            tagsPane.add_tag('TAG_' + tag, pretty=tag)
-        for auth in it.authors:
-            tagsPane.add_tag('AUTH_' + auth, pretty=auth)
-        tagsPane.add_tag('PACK_' + it.pak_id, pretty=it.pak_name)
         loader.step("IMG")
 
     StyleVarPane.add_vars(data['StyleVar'])
@@ -752,7 +755,7 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
-    sucess = gameMan.selected_game.export(
+    success = gameMan.selected_game.export(
         chosen_style,
         item_list,
         music=musics.get(music_win.chosen_id, None),
@@ -769,12 +772,13 @@ def export_editoritems(_=None):
         )
     )
 
-    if not sucess:
+    if not success:
         return
 
-    messagebox.showinfo(
+    launch_game = messagebox.askyesno(
         'BEEMOD2',
-        message='Selected Items and Style successfully exported!',
+        message='Selected Items and Style successfully exported!\n'
+                'Launch game?',
     )
 
     for pal in palettes[:]:
@@ -796,6 +800,9 @@ def export_editoritems(_=None):
     palettes.append(new_pal)
     new_pal.save(allow_overwrite=True)
     refresh_pal_ui()
+
+    if launch_game:
+        gameMan.selected_game.launch()
 
 
 def set_disp_name(item, _=None):
@@ -937,7 +944,6 @@ def drag_fast(e):
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        print('flowing')
         flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
@@ -982,7 +988,7 @@ def set_palette(_=None):
                 is_pre=True
                 ))
         else:
-            print('Unknown item "' + item + '"!')
+            LOGGER.warning('Unknown item "{}"!', item)
     flow_preview()
 
 
@@ -1802,7 +1808,7 @@ def init_windows():
             state=NORMAL,
         )
         TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
-        print('Done extracting resources!')
+        LOGGER.info('Done extracting resources!')
     extract_packages.done_callback = copy_done_callback
 
     style_win.callback = style_select_callback

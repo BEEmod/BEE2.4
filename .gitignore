@@ -71,3 +71,6 @@ config/compile.cfg
 config/packages.cfg
 config/voice/
 config/screenshot.jpg
+
+# Logs
+BEE2-error.log*

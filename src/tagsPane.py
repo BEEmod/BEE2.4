@@ -1,8 +1,12 @@
 from tkinter import ttk
+from tkinter import font
+from tk_tools import TK_ROOT
 import tkinter as tk
 
 from functools import partial
 from operator import itemgetter
+from collections import defaultdict
+from enum import Enum
 
 import sound as snd
 import optionWindow
@@ -25,6 +29,25 @@ TAGS = {}
 # A 'pretty' name for a tag, if it exists
 PRETTY_TAG = {}
 
+# A list of tags, sorted into sections
+TAG_BY_SECTION = defaultdict(list)
+
+BOLD_FONT = font.nametofont('TkDefaultFont').copy()
+BOLD_FONT.configure(weight='bold')
+
+class Section(Enum):
+    """Sections to group tags in."""
+    TAG = 'Tags'
+    AUTH = 'Authors'
+    PACK = 'Packages'
+
+    def __lt__(self, other):
+        return self.index(self) < self.index(other)
+
+# __members__ is an OrderedDict, so this method gives the original order of
+# items.
+Section.index = [Section[key] for key in Section.__members__.keys()].index
+
 
 def filter_items():
     """Update items based on selected tags."""
@@ -41,7 +64,6 @@ def filter_items():
         if enabled
     ]
     no_tags = len(sel_tags) == 0
-    print(sel_tags)
 
     for item in UI.pal_items:
         if item.needs_unlock and not style_unlocked:
@@ -54,11 +76,7 @@ def filter_items():
         if no_tags:
             item.visible = True
         else:
-            item_tags = {
-                tag.casefold()
-                for tag in
-                item.item.tags
-            }
+            item_tags = item.item.filter_tags
             item.visible = func(
                 tag in item_tags
                 for tag in
@@ -80,6 +98,8 @@ def expand(_):
         columnspan=2,
         sticky='NSEW',
     )
+    wid['tag_list']['height'] = TK_ROOT.winfo_height() / 48
+
     snd.fx('expand')
     UI.flow_picker()
 
@@ -107,15 +127,21 @@ def event_remove_tag(tag, e):
     filter_items()
 
 
-def add_tag(tag, pretty=None):
-    """Add the tag to the list of known tags."""
-    tag = tag.casefold()
-    if tag in TAGS:
-        return  # Already added
 
-    TAGS[tag] = False
-    if pretty is not None:
-        PRETTY_TAG[tag] = pretty
+def add_tag(section: Section, tag, pretty=None):
+    """Add the tag to the list of known tags, and return the ID."""
+    if pretty is None:
+        pretty = tag
+    tag = tag.casefold()
+
+    key = (section, tag)
+
+    if key in TAGS:
+        return key  # Already added
+
+    TAGS[key] = False
+    TAG_BY_SECTION[section].append(tag)
+    PRETTY_TAG[key] = pretty
 
 
 def init(frm):
@@ -147,10 +173,7 @@ def init(frm):
         font='TkDefaultFont',
         width=10,
         height=2,
-    )
-    cur_tags.tag_config(
-        'highlight',
-        underline=1,
+        cursor=utils.CURSORS['regular'],
     )
     cur_tags.grid(row=0, rowspan=2, column=1, sticky='EW')
 
@@ -175,13 +198,10 @@ def init(frm):
         exp,
         font='TkDefaultFont',
         width=10,
-        height=6,
+        height=8,
+        cursor=utils.CURSORS['regular'],
     )
     tag_list.grid(row=1, column=0, sticky='NSEW')
-    tag_list.tag_config(
-        'highlight',
-        underline=1,
-    )
 
     wid['tag_scroll'] = tag_scroll = tk_tools.HidingScroll(
         exp,
@@ -190,14 +210,44 @@ def init(frm):
     )
     tag_scroll.grid(row=1, column=1, sticky='NS')
     tag_list['yscrollcommand'] = tag_scroll.set
-    tag_list['state'] = "disabled" # Prevent users from editing the text
+    tag_list['state'] = "disabled"  # Prevent users from editing the text
+
+    def event_hover_tag(text: tk.Text, e):
+        """When hovering over a tag, change the cursor."""
+        text['cursor'] = utils.CURSORS['link']
+
+    def event_unhover_tag(text: tk.Text, e):
+        text['cursor'] = utils.CURSORS['regular']
+
+    for text in (tag_list, cur_tags):
+        text.tag_config(
+            'highlight',
+            underline=1,
+        )
+        # We can't change the cursor property for individual tags, so
+        # change it globally when the cursor enters and leaves.
+        text.tag_bind(
+            'highlight',
+            '<Enter>',
+            partial(event_hover_tag, text)
+        )
+        text.tag_bind(
+            'highlight',
+            '<Leave>',
+            partial(event_unhover_tag, text)
+        )
+    tag_list.tag_config(
+        'header',
+        font=BOLD_FONT,
+    )
+
     refresh_tags()
 
 
 def refresh_tags():
     """Fill in both textboxes, adding the tags to the list."""
-    all_text = wid['tag_list']
-    sel_text = wid['cur_tags']
+    all_text = wid['tag_list']  # type: tk.Text
+    sel_text = wid['cur_tags']  # type: tk.Text
 
     # Remove existing textbox tags
     for tag in all_text.tag_names():
@@ -213,37 +263,51 @@ def refresh_tags():
     sel_text['state'] = "normal"
     sel_text.delete(1.0, tk.END)
 
-    for tag, value in sorted(TAGS.items(), key=itemgetter(0)):
-        if value:
-            sel_text.tag_bind(
-                'tag_' + tag,
-                utils.EVENTS['LEFT'],
-                partial(event_remove_tag, tag),
-            )
-            textbox = sel_text
-        else:
-            all_text.tag_bind(
-                'tag_' + tag,
-                utils.EVENTS['LEFT'],
-                partial(event_add_tag, tag),
-            )
-            textbox = all_text
-
-        textbox.insert(
+    for section, tags in sorted(TAG_BY_SECTION.items(), key=itemgetter(0)):
+        all_text.insert(
             'end',
-            # text, tag pairs
-            '[',
-            (),
-
-            PRETTY_TAG.get(tag, tag),
-            ('highlight', 'tag_' + tag),
-
-            '], ',
-            (),
+            section.value + ':\n',
+            ('header',)
         )
-    # delete the trailing comma and space
-    all_text.delete(all_text.index('end')+"-2char", "end")
-    sel_text.delete(all_text.index('end')+"-2char", "end")
+        for tag in sorted(tags):
+            bind_val = 'tag_' + section.name + '_' + tag
+            tag_key = (section, tag)
+            if TAGS[tag_key]:
+                sel_text.tag_bind(
+                    bind_val,
+                    utils.EVENTS['LEFT'],
+                    partial(event_remove_tag, tag_key),
+                )
+                textbox = sel_text
+            else:
+                all_text.tag_bind(
+                    bind_val,
+                    utils.EVENTS['LEFT'],
+                    partial(event_add_tag, tag_key),
+                )
+                textbox = all_text
+
+            textbox.insert(
+                'end',
+                # text, tag pairs
+                '[',
+                (),
+
+                PRETTY_TAG[tag_key],
+                ('highlight', bind_val),
+
+                '], ',
+                (),
+            )
+        # delete the trailing comma and space after each category
+        all_text.delete(all_text.index('end') + "-3char", "end")
+        # Line break between categories
+        all_text.insert('end', '\n', ('header',))
+
+    # Delete the last line break
+    all_text.delete(all_text.index('end') + "-1char", "end")
+    # Delete the trailing comma in the selected tags pane
+    sel_text.delete(all_text.index('end') + "-3char", "end")
 
     all_text['state'] = "disabled"
     sel_text['state'] = "disabled"

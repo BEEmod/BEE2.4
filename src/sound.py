@@ -4,6 +4,10 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
+import utils
+
+LOGGER = utils.getLogger(__name__)
+
 play_sound = True
 
 try:
@@ -12,7 +16,7 @@ try:
     # higher latency between play() and the sound actually playing.
     pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
 except ImportError:
-    print('ERROR:SOUNDS NOT INITIALISED!')
+    LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
 
     def fx(*args):
         """Pygame has failed to initialise!
@@ -45,8 +49,9 @@ else:
         'swap': 'extrude',
         }
 
-    for key in sounds:
-        sounds[key] = pygame.mixer.Sound('../sounds/' + sounds[key] + '.wav')
+    for key, filename in sounds.items():
+        LOGGER.debug('Loading {}', filename)
+        sounds[key] = pygame.mixer.Sound('../sounds/' + filename + '.wav')
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""

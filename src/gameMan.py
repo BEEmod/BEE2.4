@@ -23,6 +23,8 @@ import packageLoader
 import extract_packages
 import backup
 
+LOGGER = utils.getLogger(__name__)
+
 all_games = []
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
@@ -67,6 +69,9 @@ GAMEINFO_LINE = 'Game\t"BEE2"'
 # them.
 EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
+# The name given to standard connections - regular input/outputs in editoritems.
+CONN_NORM = 'CONNECTION_STANDARD'
+CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
@@ -207,7 +212,10 @@ class Game:
                         if clean_line == GAMEINFO_LINE:
                             break  # Already added!
                         elif '|gameinfo_path|' in clean_line:
-                            print("Adding gameinfo hook to " + info_path)
+                            LOGGER.debug(
+                                "Adding gameinfo hook to {}",
+                                info_path,
+                            )
                             # Match the line's indentation
                             data.insert(
                                 line_num+1,
@@ -216,15 +224,16 @@ class Game:
                             break
                     else:
                         if clean_line == GAMEINFO_LINE:
-                            print("Removing gameinfo hook from " + info_path)
+                            LOGGER.debug(
+                                "Removing gameinfo hook from {}", info_path
+                            )
                             data.pop(line_num)
                             break
                 else:
                     if add_line:
-                        print(
-                            'Failed editing "' +
-                            info_path +
-                            '" to add our special folder!'
+                        LOGGER.warning(
+                            'Failed editing "{}" to add our special folder!',
+                            info_path,
                         )
                     continue
 
@@ -238,10 +247,10 @@ class Game:
                 backup_path = self.abs_path(file + '_original' + ext)
                 old_version = self.abs_path(file + '_styles' + ext)
                 if os.path.isfile(old_version):
-                    print("Restoring Stylechanger version of " + name + "!")
+                    LOGGER.info('Restoring Stylechanger version of "{}"!', name)
                     shutil.copy(old_version, item_path)
                 elif os.path.isfile(backup_path):
-                    print("Restoring original " + name + "!")
+                    LOGGER.info('Restoring original "{}"!', name)
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
@@ -263,14 +272,13 @@ class Game:
                 continue  # Skip app icons
             else:
                 dest = self.abs_path(os.path.join('bee2', folder))
-            print('Copying to "' + dest + '" ...', end='')
+            LOGGER.info('Copying to "{}" ...', dest)
             try:
                 shutil.rmtree(dest)
             except (IOError, shutil.Error):
                 pass
 
             shutil.copytree(source, dest, copy_function=copy_func)
-            print(' Done!')
 
     def clear_cache(self):
         """Remove all resources from the game."""
@@ -293,24 +301,25 @@ class Game:
             ):
         """Generate the editoritems.txt and vbsp_config.
 
-        - If no backup is present, the original editoritems is backed up
-        - We unlock the mandatory items if specified
+        - If no backup is present, the original editoritems is backed up.
+        - We unlock the mandatory items if specified.
         -
         """
-        print('-' * 20)
-        print('Exporting Items and Style for "' + self.name + '"!')
-        print('Style =', style)
-        print('Music =', music)
-        print('Voice =', voice)
-        print('Skybox =', skybox)
-        print('Elevator = ', elevator)
-        print('Style Vars:\n  {')
+        LOGGER.info('-' * 20)
+        LOGGER.info('Exporting Items and Style for "{}"!', self.name)
+        LOGGER.info('Style = {}', style)
+        LOGGER.info('Music = {}', music)
+        LOGGER.info('Voice = {}', voice)
+        LOGGER.info('Skybox = {}', skybox)
+        LOGGER.info('Elevator = {}', elevator)
+        LOGGER.info('Style Vars:')
+        LOGGER.info('  {')
         for key, val in style_vars.items():
-            print('  {} = {!s}'.format(key, val))
-        print('  }')
-        print(len(pack_list), 'Pack Lists!')
-        print(len(editor_sounds), 'Editor Sounds!')
-        print('-' * 20)
+            LOGGER.info('  {} = {!s}', key, val)
+        LOGGER.info('  }')
+        LOGGER.info('{} Pack Lists!', len(pack_list))
+        LOGGER.info('{} Editor Sounds!', len(editor_sounds))
+        LOGGER.info('-' * 20)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
@@ -399,6 +408,15 @@ class Game:
                     ('Options', 'music_instance'),
                     music.inst,
                 )
+            if music.packfiles:
+                vbsp_config.set_key(
+                    ('PackTriggers', 'Forced'),
+                    [
+                        Property('File', file)
+                        for file in
+                        music.packfiles
+                    ],
+                )
 
             vbsp_config.set_key(('Options', 'music_ID'), music.id)
             vbsp_config += music.config
@@ -473,7 +491,7 @@ class Game:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
             if os.path.isfile(item_path) and not os.path.isfile(backup_path):
-                print('Backing up original ' + name + '!')
+                LOGGER.info('Backing up original {}!', name)
                 shutil.copy(item_path, backup_path)
             export_screen.step('BACK')
 
@@ -483,19 +501,9 @@ class Game:
         # This is the connections "heart" icon and "error" icon
         editoritems += style.editor.find_key("Renderables", [])
 
-        # Build a property tree listing all of the instances for each item
-        all_instances = Property("AllInstances", [])
-        for item in editoritems.find_all("Item"):
-            item_prop = Property(item['Type'], [])
-            all_instances.append(item_prop)
-            for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block:
-                    item_prop.append(
-                        Property('Instance', inst['Name'])
-                    )
 
         if style_vars.get('UnlockDefault', False):
-            print('Unlocking Items!')
+            LOGGER.info('Unlocking Items!')
             for item in editoritems.find_all('Item'):
                 # If the Unlock Default Items stylevar is enabled, we
                 # want to force the corridors and obs room to be
@@ -507,12 +515,12 @@ class Game:
                     editor_section['copyable'] = '1'
                     editor_section['DesiredFacing'] = 'DESIRES_UP'
 
-        print('Editing Gameinfo!')
+        LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
         export_screen.step('CONF')
 
-        print('Writing Editoritems!')
+        LOGGER.info('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path(
                 'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
@@ -520,30 +528,32 @@ class Game:
                 editor_file.write(line)
         export_screen.step('CONF')
 
-        print('Writing VBSP Config!')
+        LOGGER.info('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
         export_screen.step('CONF')
 
-        print('Writing instance list!')
+        LOGGER.info('Writing instance list!')
         with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
-            for line in all_instances.export():
+            for line in self.build_instance_data(editoritems):
                 inst_file.write(line)
         export_screen.step('CONF')
 
-        print('Writing packing list!')
+        LOGGER.info('Writing packing list!')
         with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
             for line in pack_block.export():
                 pack_file.write(line)
         export_screen.step('CONF')
 
-        print('Editing game_sounds!')
+        LOGGER.info('Editing game_sounds!')
         self.add_editor_sounds(editor_sounds.values())
         export_screen.step('CONF')
 
-        print('Writing template VMF!')
+        LOGGER.info('Exporting {} templates!',
+            len(packageLoader.data['BrushTemplate'])
+        )
         with open(self.abs_path('bin/bee2/templates.vmf'), 'w') as temp_file:
             packageLoader.TEMPLATE_FILE.export(temp_file)
         export_screen.step('CONF')
@@ -557,20 +567,20 @@ class Game:
                     'voice',
                     prefix + voice.id + '.cfg',
                 )
-                print(path)
+                LOGGER.info(path)
                 if os.path.isfile(path):
                     shutil.copy(
                         path,
                         self.abs_path('bin/bee2/{}voice.cfg'.format(dest))
                     )
-                    print('Written "{}voice.cfg"'.format(dest))
+                    LOGGER.info('Written "{}voice.cfg"', dest)
                 else:
-                    print('No ' + pretty + ' voice config!')
+                    LOGGER.info('No {} voice config!', pretty)
                 export_screen.step('CONF')
 
-        print('Copying Custom Compiler!')
+        LOGGER.info('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
-            print('\t* compiler/{0} -> bin/{0}'.format(file))
+            LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
             try:
                 shutil.copy(
                     os.path.join('../compiler', file),
@@ -594,12 +604,62 @@ class Game:
             export_screen.step('COMP')
 
         if should_refresh:
-            print('Copying Resources!')
+            LOGGER.info('Copying Resources!')
             self.refresh_cache()
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
         return True
+
+    @staticmethod
+    def build_instance_data(editoritems: Property):
+        """Build a property tree listing all of the instances for each item.
+        as well as another listing the input and output commands.
+        VBSP uses this to reduce duplication in VBSP_config files.
+        """
+        instance_locs = Property("AllInstances", [])
+        commands = Property("Connections", [])
+        root_block = Property(None, [instance_locs, commands])
+
+        for item in editoritems.find_all("Item"):
+            instance_block = Property(item['Type'], [])
+            instance_locs.append(instance_block)
+
+            comm_block = Property(item['Type'], [])
+
+            for inst_block in item.find_all("Exporting", "instances"):
+                for inst in inst_block:
+                    instance_block.append(
+                        Property('Instance', inst['Name'])
+                    )
+
+            # Look in the Inputs and Outputs blocks to find the io definitions.
+            # Copy them to property names like 'Input_Activate'.
+            for io_type in ('Inputs', 'Outputs'):
+                for block in item.find_all('Exporting', io_type, CONN_NORM):
+                    for io_prop in block:
+                        comm_block[
+                            io_type[:-1] + '_' + io_prop.real_name
+                        ] = io_prop.value
+
+            # The funnel item type is special, having the additional input type.
+            # Handle that specially.
+            if item['type'] == 'item_tbeam':
+                for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
+                    for io_prop in block:
+                        comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
+
+            # Only add the block if the item actually has IO.
+            if comm_block.value:
+                commands.append(comm_block)
+
+        return root_block.export()
+
+    def launch(self):
+        """Try and launch the game."""
+        import webbrowser
+        url = 'steam://rungameid/' + str(self.steamID)
+        webbrowser.open(url)
 
 
 def find_steam_info(game_dir):

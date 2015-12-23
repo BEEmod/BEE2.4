@@ -8,10 +8,14 @@ import tkinter as tk
 import multiprocessing
 import shutil
 import os.path
+
 from zipfile import ZipFile
 
 from FakeZip import zip_names, FakeZip
 from tk_tools import TK_ROOT
+import utils
+
+LOGGER = utils.getLogger(__name__)
 
 UPDATE_INTERVAL = 500  # Number of miliseconds between each progress check
 
@@ -48,6 +52,7 @@ def do_copy(zip_list, done_files):
                     with currently_done.get_lock():
                         done_files.value += 1
 
+
 def start_copying(zip_list):
     global copy_process
     copy_process = multiprocessing.Process(
@@ -55,8 +60,7 @@ def start_copying(zip_list):
         args=(zip_list, currently_done),
     )
     copy_process.daemon = True
-    print(copy_process)
-    print('Starting background process!')
+    LOGGER.info('Starting background process!')
     copy_process.start()
     TK_ROOT.after(UPDATE_INTERVAL, update)
 

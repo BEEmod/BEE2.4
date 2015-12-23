@@ -1,11 +1,12 @@
 """
 Handles scanning through the zip packages to find all items, styles, etc.
 """
+from zipfile import ZipFile
+from collections import defaultdict, namedtuple
+import logging
 import os
 import os.path
 import shutil
-from zipfile import ZipFile
-from collections import defaultdict, namedtuple
 
 from property_parser import Property, NoKeyError
 from FakeZip import FakeZip, zip_names
@@ -21,6 +22,7 @@ from typing import (
     List, Dict, Tuple,
 )
 
+LOGGER = utils.getLogger(__name__)
 
 all_obj = {}
 obj_override = {}
@@ -39,6 +41,9 @@ ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
+
+# Check to see if the zip contains the resources referred to by the packfile.
+CHECK_PACKFILE_CORRECTNESS = False
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -104,7 +109,8 @@ def get_config(
     if prop_block.value == '':
         return Property(None, [])
 
-    path = os.path.join(folder, prop_block.value)
+    # Zips must use '/' for the seperator, even on Windows!
+    path = folder + '/' + prop_block.value
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
@@ -115,7 +121,7 @@ def get_config(
                 pak_id + ':' + path,
             )
     except KeyError:
-        print('"{}:{}" not in zip!'.format(pak_id, path))
+        LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
         return Property(None, [])
 
 
@@ -130,13 +136,13 @@ def find_packages(pak_dir, zips, zip_name_lst):
         elif is_dir:
             zip_file = FakeZip(name)
         else:
-            utils.con_log('Extra file: ', name)
+            LOGGER.info('Extra file: {}', name)
             continue
 
         if 'info.txt' in zip_file.namelist():  # Is it valid?
             zips.append(zip_file)
             zip_name_lst.append(os.path.abspath(name))
-            print('Reading package "' + name + '"')
+            LOGGER.debug('Reading package "' + name + '"')
             with zip_file.open('info.txt') as info_file:
                 info = Property.parse(info_file, name + ':info.txt')
             pak_id = info['ID']
@@ -150,13 +156,13 @@ def find_packages(pak_dir, zips, zip_name_lst):
         else:
             if is_dir:
                 # This isn't a package, so check the subfolders too...
-                print('Checking subdir "{}" for packages...'.format(name))
+                LOGGER.debug('Checking subdir "{}" for packages...', name)
                 find_packages(name, zips, zip_name_lst)
             else:
                 zip_file.close()
-                print('ERROR: Bad package "{}"!'.format(name))
+                LOGGER.warning('ERROR: Bad package "{}"!', name)
     if not found_pak:
-        print('No packages in folder!')
+        LOGGER.debug('No packages in folder!')
 
 
 def load_packages(
@@ -164,9 +170,10 @@ def load_packages(
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
+        log_incorrect_packfile=False,
         ):
     """Scan and read in all packages in the specified directory."""
-    global LOG_ENT_COUNT
+    global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
     if not os.path.isdir(pak_dir):
@@ -186,7 +193,7 @@ def load_packages(
         sys.exit('No Packages Directory!')
 
     LOG_ENT_COUNT = log_missing_ent_count
-    print('ENT_COUNT:', LOG_ENT_COUNT)
+    CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
     zips = []
     data['zips'] = []
     try:
@@ -203,19 +210,15 @@ def load_packages(
         images = 0
         for pak_id, pack in packages.items():
             if not pack.enabled:
-                print('Package {} disabled!'.format(pack.id).ljust(50))
+                LOGGER.info('Package {id} disabled!', id=pak_id)
                 pack_count -= 1
                 loader.set_length("PAK", pack_count)
                 continue
 
-            print(
-                ("Reading objects from '" + pak_id + "'...").ljust(50),
-                end=''
-            )
+            LOGGER.info('Reading objects from "{id}"...', id=pak_id)
             img_count = parse_package(pack)
             images += img_count
             loader.step("PAK")
-            print("Done!")
 
         # If new packages were added, update the config!
         PACK_CONFIG.save_check()
@@ -241,7 +244,7 @@ def load_packages(
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                print("Loading " + obj_type + ' "' + obj_id + '"!')
+                LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
                 # parse through the object and return the resultant class
                 try:
                     object_ = OBJ_TYPES[obj_type].cls.parse(
@@ -286,14 +289,13 @@ def load_packages(
         for z in zips:
             z.close()
 
-    print('Allocating styled items...')
+    LOGGER.info('Allocating styled items...')
     setup_style_tree(
         data['Item'],
         data['Style'],
         log_item_fallbacks,
         log_missing_styles,
     )
-    print('Done!')
     return data
 
 
@@ -301,12 +303,11 @@ def parse_package(pack: 'Package'):
     """Parse through the given package to find all the components."""
     for pre in Property.find_key(pack.info, 'Prerequisites', []):
         if pre.value not in packages:
-            utils.con_log(
+            LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
-                'ignoring package!'.format(
-                    pre=pre.value,
-                    id=pack.id,
-                )
+                'ignoring package!',
+                pre=pre.value,
+                id=pack.id,
             )
             return False
     # First read through all the components we have, so we can match
@@ -395,13 +396,12 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                         # Copy the values for the parent to the child style
                         vers['styles'][sty_id] = vers['styles'][base_style.id]
                         if log_fallbacks and not item.unstyled:
-                            print(
+                            LOGGER.warning(
                                 'Item "{item}" using parent '
-                                '"{rep}" for "{style}"!'.format(
-                                    item=item.id,
-                                    rep=base_style.id,
-                                    style=sty_id,
-                                )
+                                '"{rep}" for "{style}"!',
+                                item=item.id,
+                                rep=base_style.id,
+                                style=sty_id,
                             )
                         break
                 else:
@@ -410,12 +410,11 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                     if vers['id'] == item.def_ver['id']:
                         vers['styles'][sty_id] = vers['def_style']
                         if log_missing_styles and not item.unstyled:
-                            print(
+                            LOGGER.warning(
                                 'Item "{item}" using '
-                                'inappropriate style for "{style}"!'.format(
-                                    item=item.id,
-                                    style=sty_id,
-                                )
+                                'inappropriate style for "{style}"!',
+                                item=item.id,
+                                style=sty_id,
                             )
                     else:
                         # For versions other than the first, use
@@ -463,9 +462,10 @@ def parse_item_folder(folders, zip_file, pak_id):
         }
 
         if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
-            print('Warning: "{}:{}" has missing entity count!'.format(
-                pak_id, prop_path,
-            ))
+            LOGGER.warning('"{id}:{path}" has missing entity count!',
+                id=pak_id,
+                path=prop_path,
+            )
 
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
@@ -475,11 +475,11 @@ def parse_item_folder(folders, zip_file, pak_id):
             + ('all' in folders[fold]['icons'])
         )
         if 0 < num_group_parts < 3:
-            print(
-                'Warning: "{}:{}" has incomplete grouping icon '
-                'definition!'.format(
-                    pak_id, prop_path
-                )
+            LOGGER.warning(
+                'Warning: "{id}:{path}" has incomplete grouping icon '
+                'definition!',
+                id=pak_id,
+                path=prop_path,
             )
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
@@ -502,7 +502,7 @@ class Package:
             ):
         disp_name = info['Name', None]
         if disp_name is None:
-            print('Warning: {} has no display name!'.format(pak_id))
+            LOGGER.warning('Warning: {id} has no display name!', id=pak_id)
             disp_name = pak_id.lower()
 
         self.id = pak_id
@@ -846,11 +846,13 @@ class Music:
             config=None,
             inst=None,
             sound=None,
+            pack=(),
             ):
         self.id = music_id
         self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
+        self.packfiles = list(pack)
 
         self.selitem_data = selitem_data
 
@@ -861,10 +863,16 @@ class Music:
         inst = data.info['instance', None]
         sound = data.info['soundscript', None]
 
+        packfiles = [
+            prop.value
+            for prop in
+            data.info.find_all('pack')
+        ]
+
         config = get_config(
             data.info,
             data.zip_file,
-            'skybox',
+            'music',
             pak_id=data.pak_id,
         )
         return cls(
@@ -873,6 +881,7 @@ class Music:
             inst=inst,
             sound=sound,
             config=config,
+            pack=packfiles,
             )
 
     def add_over(self, override: 'Music'):
@@ -1057,6 +1066,22 @@ class PackList:
                         path,
                     )
                 ) from ex
+        if CHECK_PACKFILE_CORRECTNESS:
+            # Use normpath so sep differences are ignored, plus case.
+            zip_files = {
+                os.path.normpath(file).casefold()
+                for file in
+                zip_names(data.zip_file)
+                if file.startswith('resources')
+            }
+            for file in files:
+                #  Check to make sure the files exist...
+                file = os.path.join('resources', os.path.normpath(file)).casefold()
+                if file not in zip_files:
+                    LOGGER.warning('Warning: "{file}" not in zip! ({pak_id})',
+                        file=file,
+                        pak_id=data.pak_id,
+                    )
 
         return cls(
             data.id,
@@ -1110,18 +1135,24 @@ class BrushTemplate:
         self.id = temp_id
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+
+        # If we have overlays, we need to ensure the IDs crossover correctly
+        id_mapping = {}
+
         if vmf_file.brushes:
             self.temp_world = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_world',
                 template_id=self.id,
             )
             self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE)
+                solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                 for solid in
                 vmf_file.brushes
             ]
         else:
             self.temp_world = None
+
+        # Add detail brushes
         if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
             self.temp_detail = TEMPLATE_FILE.create_ent(
                 classname='bee2_template_detail',
@@ -1129,12 +1160,31 @@ class BrushTemplate:
             )
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE)
+                    solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                     for solid in
                     ent.solids
                 )
         else:
             self.temp_detail = None
+
+        self.temp_overlays = []
+
+        # Look for overlays, and translate their IDS.
+        for overlay in vmf_file.by_class['info_overlay']:  # type: VLib.Entity
+            new_overlay = overlay.copy(
+                map=TEMPLATE_FILE,
+            )
+            new_overlay['template_id'] = self.id
+            new_overlay['classname'] = 'bee2_template_overlay'
+            sides = overlay['sides'].split()
+            new_overlay['sides'] = ' '.join(
+                id_mapping[side]
+                for side in sides
+                if side in id_mapping
+            )
+            TEMPLATE_FILE.add_ent(new_overlay)
+
+            self.temp_overlays.append(new_overlay)
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1144,6 +1194,7 @@ class BrushTemplate:
             folder='templates',
             pak_id=data.pak_id,
             prop_name='file',
+            extension='.vmf',
         )
         file = VLib.VMF.parse(file)
         return cls(

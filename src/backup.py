@@ -27,6 +27,8 @@ import utils
 import tk_tools
 import gameMan
 
+LOGGER = utils.getLogger(__name__)
+
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
 
@@ -351,7 +353,11 @@ def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
         for old_name, new_name in reversed(
                 list(zip(back_files, back_files[1:]))
                 ):
-            print('Moving:', old_name, '->', new_name)
+            LOGGER.info(
+                'Moving: {old} -> {new}',
+                old=old_name,
+                new=new_name,
+            )
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
             try:
@@ -367,7 +373,7 @@ def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
         backup_dir,
         AUTO_BACKUP_FILE.format(game=safe_name, ind=''),
     )
-    print('Writing backup to "{}"'.format(final_backup))
+    LOGGER.info('Writing backup to "{}"', final_backup)
     with open(final_backup, 'wb') as f:
         with ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
             for file in to_backup:

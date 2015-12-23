@@ -2,6 +2,9 @@ from functools import lru_cache
 
 from property_parser import Property
 import utils
+
+LOGGER = utils.getLogger(__name__)
+
 INSTANCE_FILES = {}
 
 # Special names for these specific instances
@@ -116,15 +119,11 @@ SUBITEMS = {
 }
 
 
-def load_conf():
+def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
-    with open('bee2/instances.cfg') as f:
-        prop_block = Property.parse(
-            f, 'bee2/instances.cfg'
-        ).find_key('Allinstances')
 
-    for prop in prop_block:
+    for prop in prop_block.find_key('Allinstances'):
         INSTANCE_FILES[prop.real_name] = [
             inst.value.casefold()
             for inst in
@@ -187,8 +186,9 @@ def resolve(path) -> list:
             try:
                 item_values = INSTANCE_FILES[item]
             except KeyError:
-                utils.con_log(
-                    '"{}" not a valid item!'.format(item)
+                LOGGER.warning(
+                    '"{}" not a valid item!',
+                    item,
                 )
                 return []
             out = []
@@ -198,13 +198,13 @@ def resolve(path) -> list:
                     try:
                         ind = int(val.strip())
                     except ValueError as e:
-                        utils.con_log('--------\nValid subitems:')
-                        utils.con_log('\n'.join(
+                        LOGGER.info('--------\nValid subitems:')
+                        LOGGER.info('\n'.join(
                             ('> ' + k + ' = ' + str(v))
                             for k, v in
                             SUBITEMS.items()
                         ))
-                        utils.con_log('--------')
+                        LOGGER.info('--------')
                         raise Exception(
                             '"' + val + '" is not a valid instance'
                             ' subtype or index!'
@@ -222,8 +222,9 @@ def resolve(path) -> list:
                     if inst != ''
                     ]
             except KeyError:
-                utils.con_log(
-                    '"{}" not a valid item!'.format(path)
+                LOGGER.warning(
+                    '"{}" not a valid item!',
+                    path,
                 )
                 return []
     elif path.startswith('[') and path.endswith(']'):
@@ -231,7 +232,7 @@ def resolve(path) -> list:
         try:
             return INST_SPECIAL[path]
         except KeyError:
-            utils.con_log('"{}" not a valid instance category!'.format(path))
+            LOGGER.warning('"{}" not a valid instance category!', path)
             return []
     else:  # Just a normal path
         return [path.casefold()]

@@ -7,16 +7,23 @@ from BEE2_config import ConfigFile
 import conditions
 import utils
 import vmfLib
+import vbsp
+
+LOGGER = utils.getLogger(__name__)
 
 map_attr = {}
 style_vars = {}
 
 ADDED_BULLSEYES = set()
 
+# Special quote instances assoicated with an item/style.
+# These are only added if the condition executes.
+QUOTE_EVENTS = {} # id -> instance mapping
+
 ALLOW_MID_VOICES = False
-GAME_MODE = 'ERR'
 VMF = None
 
+# The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -31,7 +38,7 @@ fake_inst = vmfLib.VMF().create_ent(
 
 def mode_quotes(prop_block):
     """Get the quotes from a block which match the game mode."""
-    is_sp = GAME_MODE == 'SP'
+    is_sp = (vbsp.GAME_MODE == 'SP')
     for prop in prop_block:
         if prop.name == 'line':
             # Ones that apply to both modes
@@ -42,10 +49,22 @@ def mode_quotes(prop_block):
             yield prop
 
 
+@conditions.make_result('QuoteEvent')
+def res_quote_event(inst, res):
+    """Enable a quote event. The given file is the default instance."""
+    QUOTE_EVENTS[res['id'].casefold()] = res['file']
+
+    return conditions.RES_EXHAUSTED
+
+
 def find_group_quotes(group, mid_quotes, conf):
     """Scan through a group, looking for applicable quote options."""
-    is_mid = group.name == 'midinst'
-    group_id = group['name']
+    is_mid = (group.name == 'midinst')
+
+    if is_mid:
+        group_id = 'MIDCHAMBER'
+    else:
+        group_id = group['name'].upper()
 
     for quote in group.find_all('quote'):
         valid_quote = True
@@ -58,27 +77,35 @@ def find_group_quotes(group, mid_quotes, conf):
                 valid_quote = False
                 break
 
-        quote_id = quote['id', quote['name', '']]
+        if not valid_quote:
+            continue
 
-        utils.con_log(quote_id, valid_quote)
+        poss_quotes = []
+        for line in mode_quotes(quote):
+            line_id = line['id', line['name', '']].casefold()
 
-        if valid_quote:
             # Check if the ID is enabled!
-            if conf.get_bool(group_id, quote_id, True):
+            if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.extend(mode_quotes(quote))
+                    mid_quotes.append(ALLOW_MID_VOICES)
                 else:
-                    inst_list = list(mode_quotes(quote))
-                    if inst_list:
-                        yield (
-                            quote['priority', '0'],
-                            inst_list,
-                            )
+                    poss_quotes.append(line)
+            else:
+                LOGGER.info(
+                    'Line "{}" is disabled..',
+                    line['name', '??'],
+                )
+
+        if poss_quotes:
+            yield (
+                quote['priority', '0'],
+                poss_quotes,
+                )
 
 
 def add_quote(quote, targetname, quote_loc):
     """Add a quote to the map."""
-    utils.con_log('Adding quote: ', quote)
+    LOGGER.info('Adding quote: {}', quote)
 
     for prop in quote:
         name = prop.name.casefold()
@@ -91,7 +118,6 @@ def add_quote(quote, targetname, quote_loc):
                 fixup_style='2',  # No fixup
             )
         elif name == 'choreo':
-
             c_line = prop.value
             # Add this to the beginning, since all scenes need it...
             if not c_line.startswith('scenes/'):
@@ -163,6 +189,17 @@ def add_quote(quote, targetname, quote_loc):
             # This is useful so some styles can react to which line was
             # chosen.
             style_vars[prop.value.casefold()] = True
+        elif name == 'packlist':
+            vbsp.TO_PACK.add(prop.value.casefold())
+        elif name == 'pack':
+            if prop.has_children():
+                vbsp.PACK_FILES.update(
+                    subprop.value
+                    for subprop in
+                    prop
+                )
+            else:
+                vbsp.PACK_FILES.add(prop.value)
 
 
 def sort_func(quote):
@@ -182,20 +219,18 @@ def add_voice(
         style_vars_,
         vmf_file,
         map_seed,
-        mode='SP',
         ):
     """Add a voice line to the map."""
-    global ALLOW_MID_VOICES, VMF, map_attr, style_vars, GAME_MODE
-    utils.con_log('Adding Voice Lines!')
+    global ALLOW_MID_VOICES, VMF, map_attr, style_vars
+    LOGGER.info('Adding Voice Lines!')
 
     if len(voice_data.value) == 0:
-        utils.con_log('Error - No Voice Line Data!')
+        LOGGER.info('Error - No Voice Line Data!')
         return
 
     VMF = vmf_file
     map_attr = has_items
     style_vars = style_vars_
-    GAME_MODE = mode
 
     norm_config = ConfigFile('voice.cfg', root='bee2')
     mid_config = ConfigFile('mid_voice.cfg', root='bee2')
@@ -203,7 +238,7 @@ def add_voice(
     quote_base = voice_data['base', False]
     quote_loc = voice_data['quote_loc', '-10000 0 0']
     if quote_base:
-        print('Adding Base instance!')
+        LOGGER.info('Adding Base instance!')
         VMF.create_ent(
             classname='func_instance',
             targetname='voice',
@@ -217,6 +252,30 @@ def add_voice(
 
     mid_quotes = []
 
+    # QuoteEvents allows specifiying an instance for particular items,
+    # so a voice line can be played at a certain time. It's only active
+    # in certain styles, but uses the default if not set.
+    for event in voice_data.find_all('QuoteEvents', 'Event'):
+        event_id = event['id', ''].casefold()
+        # We ignore the config if no result was executed.
+        if event_id and event_id in QUOTE_EVENTS:
+            # Instances from the voiceline config are in this subfolder,
+            # but not the default item - that's set from the conditions
+            QUOTE_EVENTS[event_id] = INST_PREFIX + event['file']
+
+    LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
+
+    for ind, file in enumerate(QUOTE_EVENTS.values()):
+        VMF.create_ent(
+            classname='func_instance',
+            targetname='voice_event_' + str(ind),
+            file=file,
+            angles='0 0 0',
+            origin=quote_loc,
+            fixup_style='0',
+        )
+
+    # For each group, locate the voice lines.
     for group in itertools.chain(
             voice_data.find_all('group'),
             voice_data.find_all('midinst'),
@@ -240,7 +299,7 @@ def add_voice(
 
             chosen = possible_quotes[0][1]
 
-            utils.con_log('Chosen:', '\n'.join(map(repr, chosen)))
+            LOGGER.info('Chosen: {}', '\n'.join(map(repr, chosen)))
 
             # Join the IDs for the voice lines to the map seed,
             # so each quote block will chose different lines.
@@ -252,11 +311,11 @@ def add_voice(
             # Add one of the associated quotes
             add_quote(random.choice(chosen), quote_targetname, choreo_loc)
 
-    print('Mid quotes: ', mid_quotes)
+    LOGGER.info('Mid quotes: {}', mid_quotes)
     for mid_item in mid_quotes:
         # Add all the mid quotes
         target = mid_item['target', '']
         for prop in mid_item:
             add_quote(prop, target, quote_loc)
 
-    utils.con_log('Done!')
+    LOGGER.info('Done!')
