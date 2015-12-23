@@ -1974,8 +1974,8 @@ def res_cust_output(inst, res):
                     ))
 
             if targ_conditions:
-                for cond in targ_conditions:
-                    cond.value.test(con_inst)
+                for cond in targ_conditions:  # type: Condition
+                    cond.test(con_inst)
             if dec_con_count and 'connectioncount' in con_inst.fixup:
                 # decrease ConnectionCount on the ents,
                 # so they can still process normal inputs
@@ -1997,24 +1997,57 @@ def res_cust_output(inst, res):
 
 @make_result_setup('custAntline')
 def res_cust_antline_setup(res):
-    result = {
-        'instance': res['instance', ''],
-        'wall_str': [p.value for p in res.find_all('straight')],
-        'wall_crn': [p.value for p in res.find_all('corner')],
-        # If this isn't defined, None signals to use the above textures.
-        'floor_str': [p.value for p in res.find_all('straightFloor')] or None,
-        'floor_crn': [p.value for p in res.find_all('cornerFloor')] or None,
-        'outputs': list(res.find_all('addOut')),
-        }
-    if (
-            not result['wall_str'] or
-            not result['wall_crn']
-            ):
+    import vbsp
+
+    def find(cat):
+        """Helper to reduce code duplication."""
+        return [p.value for p in res.find_all(cat)]
+
+    # Allow overriding these options. If unset use the style's value - the
+    # amount of destruction will usually be the same.
+    broken_chance = utils.conv_float(res[
+        'broken_antline_chance',
+        vbsp.get_opt('broken_antline_chance')
+    ])
+    broken_dist = utils.conv_float(res[
+        'broken_antline_distance',
+        vbsp.get_opt('broken_antline_distance')
+    ])
+
+    toggle_inst = res['instance', '']
+    toggle_out = list(res.find_all('addOut'))
+
+    # These textures are required - the base ones.
+    straight_tex = find('straight')
+    corner_tex = find('corner')
+
+    # Arguments to pass to setAntlineMat
+    straight_args = [
+        straight_tex,
+        find('straightFloor') or (),
+        # Extra broken antline textures / options, if desired.
+        broken_chance,
+        broken_dist,
+        find('brokenStraight') or (),
+        find('brokenStraightFloor') or (),
+    ]
+
+    # The same but for corners.
+    corner_args = [
+        corner_tex,
+        find('cornerFloor') or (),
+        broken_chance,
+        broken_dist,
+        find('brokenCorner') or (),
+        find('brokenCornerFloor') or (),
+    ]
+
+    if not straight_tex or not corner_tex:
         # If we don't have two textures, something's wrong. Remove this result.
-        LOGGER.warning('custAntline has missing values!')
+        LOGGER.warning('custAntline has no textures!')
         return None
     else:
-        return result
+        return straight_args, corner_args, toggle_inst, toggle_out
 
 
 @make_result('custAntline')
@@ -2034,49 +2067,43 @@ def res_cust_antline(inst, res):
     """
     import vbsp
 
-    opts = res.value
+    straight_args, corner_args, toggle_inst, toggle_out = res.value
 
     # The original textures for straight and corner antlines
     straight_ant = vbsp.ANTLINES['straight']
     corner_ant = vbsp.ANTLINES['corner']
 
     over_name = '@' + inst['targetname'] + '_indicator'
+
     for over in (
             VMF.by_class['info_overlay'] &
             VMF.by_target[over_name]
             ):
         folded_mat = over['material'].casefold()
         if folded_mat == straight_ant:
-            vbsp.set_antline_mat(
-                over,
-                opts['wall_str'],
-                opts['floor_str'],
-            )
+            vbsp.set_antline_mat(over, *straight_args)
         elif folded_mat == corner_ant:
-            vbsp.set_antline_mat(
-                over,
-                opts['wall_crn'],
-                opts['floor_crn'],
-            )
+            vbsp.set_antline_mat(over, *corner_args)
 
         # Ensure this isn't overriden later!
         vbsp.IGNORED_OVERLAYS.add(over)
 
     # allow replacing the indicator_toggle instance
-    if opts['instance']:
+    if toggle_inst:
         for toggle in VMF.by_class['func_instance']:
-            if toggle.fixup['indicator_name', ''] == over_name:
-                toggle['file'] = opts['instance']
-                if len(opts['outputs']) > 0:
-                    for out in inst.outputs[:]:
-                        if out.target == toggle['targetname']:
-                            # remove the original outputs
-                            inst.outputs.remove(out)
-                    for out in opts['outputs']:
-                        # Allow adding extra outputs to customly
-                        # trigger the toggle
-                        add_output(inst, out, toggle['targetname'])
-                break  # Stop looking!
+            if toggle.fixup['indicator_name', ''] != over_name:
+                continue
+            toggle['file'] = toggle_inst
+            if len(toggle_out) > 0:
+                for out in inst.outputs[:]:
+                    if out.target == toggle['targetname']:
+                        # remove the original outputs
+                        inst.outputs.remove(out)
+                for out in toggle_out:
+                    # Allow adding extra outputs to customly
+                    # trigger the toggle
+                    add_output(inst, out, toggle['targetname'])
+            break  # Stop looking!
 
 
 @make_result_setup('changeOutputs')
