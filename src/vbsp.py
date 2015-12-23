@@ -2260,6 +2260,10 @@ def change_overlays():
                 if sign_inst_pack:
                     TO_PACK.add(sign_inst_pack.casefold())
                 new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
+            # Delete the overlay's targetname - signs aren't ever dynamic
+            # This also means items set to signage only won't get toggle
+            # instances.
+            del over['targetname']
 
             over['material'] = get_tex(sign_type)
             if sign_size != 16:
