@@ -1,9 +1,15 @@
+from multiprocessing import freeze_support
+if __name__ == '__main__':
+    # Make multiprocessing work correctly when frozen.
+    # This must run immediately - in this case, multiprocessing overrides
+    # the whole application.
+    freeze_support()
+
 import utils
 LOGGER = utils.init_logging('../logs/BEE2-error.log')
 
 from tkinter import messagebox
 
-from multiprocessing import freeze_support
 import traceback
 import logging
 
@@ -50,8 +56,6 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    freeze_support()  # Make multiprocessing work correctly when frozen
-
     if utils.MAC or utils.LINUX:
         import os
         import sys
