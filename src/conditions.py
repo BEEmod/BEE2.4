@@ -2722,8 +2722,8 @@ def res_make_catwalk(_, res):
     if not markers:
         return RES_EXHAUSTED
 
-    LOGGER.info('Conn:', connections)
-    LOGGER.info('Markers:', markers)
+    LOGGER.info('Connections: {}', connections)
+    LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
     for inst in markers.values():
@@ -2750,7 +2750,7 @@ def res_make_catwalk(_, res):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            LOGGER.debug('Dist =', dist, ', Vert =', vert_dist)
+            LOGGER.debug('Dist = {}, Vert = {}', dist, vert_dist)
 
             if dist//2 < vert_dist:
                 # The stairs are 2 long, 1 high.
@@ -2782,12 +2782,10 @@ def res_make_catwalk(_, res):
 
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
-        print(inst['targetname'], dir_mask)
+        normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+
         new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
-
-        normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
-        ':type normal: Vec'
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
