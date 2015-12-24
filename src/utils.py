@@ -586,11 +586,26 @@ class LogMessage:
         self.fmt = fmt
         self.args = args
         self.kwargs = kwargs
+        self.has_args = kwargs or args
 
     def __str__(self):
         # Only format if we have arguments!
-        return str(self.fmt).format(*self.args, **self.kwargs)
-
+        # That way { or } can be used in regular messages.
+        if self.has_args:
+            msg = str(self.fmt).format(*self.args, **self.kwargs)
+        else:
+            msg = str(self.fmt)
+        if '\n' not in msg:
+            return msg
+        # For multi-line messages, add an indent so they're associated
+        # with the logging tag.
+        lines = msg.split('\n')
+        if lines[-1].isspace():
+            # Strip last line if it's blank
+            del lines[-1]
+        # '|' beside all the lines, '|_ beside the last. Add an empty
+        # line at the end.
+        return '\n | '.join(lines[:-1]) + '\n |_' + lines[-1] + '\n'
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -604,12 +619,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         if self.isEnabledFor(level):
             self.logger._log(
                 level,
-                # Only use the format adapter if arguments exist
-                (
-                    LogMessage(msg, args, kwargs)
-                    if kwargs or args else
-                    msg
-                ),
+                LogMessage(msg, args, kwargs),
                 (),
             )
 
