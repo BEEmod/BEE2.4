@@ -107,23 +107,26 @@ def add_quote(quote, targetname, quote_loc):
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
+    cc_emit_name = None
+    added_ents = []
+
     for prop in quote:
         name = prop.name.casefold()
         if name == 'file':
-            VMF.create_ent(
+            added_ents.append(VMF.create_ent(
                 classname='func_instance',
                 targetname='',
                 file=INST_PREFIX + prop.value,
                 origin=quote_loc,
                 fixup_style='2',  # No fixup
-            )
+            ))
         elif name == 'choreo':
             c_line = prop.value
             # Add this to the beginning, since all scenes need it...
             if not c_line.startswith('scenes/'):
                 c_line = 'scenes/' + c_line
 
-            VMF.create_ent(
+            choreo = VMF.create_ent(
                 classname='logic_choreographed_scene',
                 targetname=targetname,
                 origin=quote_loc,
@@ -131,8 +134,9 @@ def add_quote(quote, targetname, quote_loc):
                 busyactor="1",  # Wait for actor to stop talking
                 onplayerdeath='0',
             )
+            added_ents.append(choreo)
         elif name == 'snd':
-            VMF.create_ent(
+            snd = VMF.create_ent(
                 classname='ambient_generic',
                 spawnflags='49',  # Infinite Range, Starts Silent
                 targetname=targetname,
@@ -140,6 +144,7 @@ def add_quote(quote, targetname, quote_loc):
                 message=prop.value,
                 health='10',  # Volume
             )
+            added_ents.append(snd)
         elif name == 'ambientchoreo':
             # For some lines, they don't play globally. Workaround this
             # by placing an ambient_generic and choreo ent, and play the
@@ -151,7 +156,7 @@ def add_quote(quote, targetname, quote_loc):
                 origin=quote_loc,
                 message=prop['File'],
                 health='10',  # Volume
-            )
+            ))
 
             c_line = prop['choreo']
             # Add this to the beginning, since all scenes need it...
@@ -169,6 +174,7 @@ def add_quote(quote, targetname, quote_loc):
             choreo.outputs.append(
                 vmfLib.Output('OnStart', targetname + '_snd', 'PlaySound')
             )
+            added_ents.append(choreo)
         elif name == 'bullseye':
             # Cave's voice lines require a special named bullseye to
             # work correctly.
@@ -184,6 +190,12 @@ def add_quote(quote, targetname, quote_loc):
                     angles='0 0 0',
                 )
                 ADDED_BULLSEYES.add(prop.value)
+        elif name == 'cc_emit':
+            # In Aperture Tag, this additional console command is used
+            # to add the closed captions.
+            # Store in a variable, so we can be sure to add the output
+            # regardless of the property order.
+            cc_emit_name = prop.value
         elif name == 'setstylevar':
             # Set this stylevar to True
             # This is useful so some styles can react to which line was
@@ -200,6 +212,15 @@ def add_quote(quote, targetname, quote_loc):
                 )
             else:
                 vbsp.PACK_FILES.add(prop.value)
+
+    if cc_emit_name:
+        for ent in added_ents:
+            ent.outputs.append(vmfLib.Output(
+                'OnUser1',
+                '@command',
+                'Command',
+                param='cc_emit ' + cc_emit_name,
+            ))
 
 
 def sort_func(quote):
