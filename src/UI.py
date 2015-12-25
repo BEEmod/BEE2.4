@@ -577,6 +577,9 @@ def load_packages(data):
         title='Select Additional Voice Lines',
         has_none=True,
         none_desc='Add no extra voice lines.',
+        none_attrs={
+            'CHAR': '<Multiverse Cave only>',
+        },
         callback=voice_callback,
         attributes=[
             SelAttr('CHAR', 'Characters: ', '??'),
