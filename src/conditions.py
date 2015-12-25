@@ -2736,7 +2736,7 @@ def res_make_catwalk(_, res):
                 continue
 
             inst2 = markers[conn.target]
-            print(inst['targetname'], '<->', inst2['targetname'])
+            LOGGER.debug('{} <-> {}', inst['targetname'], inst2['targetname'])
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
@@ -2752,8 +2752,9 @@ def res_make_catwalk(_, res):
 
             LOGGER.debug('Dist = {}, Vert = {}', dist, vert_dist)
 
-            if dist//2 < vert_dist:
-                # The stairs are 2 long, 1 high.
+            if (dist - 128) // 2 < abs(vert_dist):
+                # The stairs are 2 long, 1 high. Check there's enough room
+                # Subtract the last block though, since that's a corner.
                 LOGGER.warning('Not enough room for stairs!')
                 continue
 
