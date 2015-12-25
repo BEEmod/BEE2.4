@@ -123,6 +123,9 @@ def get_config(
     except KeyError:
         LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
         return Property(None, [])
+    except UnicodeDecodeError:
+        LOGGER.exception('Unable to read "{id}:{path}"', id=pak_id, path=path)
+        raise
 
 
 def find_packages(pak_dir, zips, zip_name_lst):
