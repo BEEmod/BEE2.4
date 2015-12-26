@@ -720,6 +720,18 @@ def widen_fizz_brush(brush, thickness, bounds=None):
                     v[axis] = bound_min[axis]
 
 
+def remove_ant_toggle(toggle_ent):
+    """Remove a texture_toggle, plus the associated antline."""
+    toggle_ent.remove()
+
+    # Assume anything with '$indicator_name' is a toggle instance
+    # This will likely be called on the signs too, if present.
+    overlay_name = toggle_ent.fixup['$indicator_name', '']
+    if overlay_name != '':
+        for ent in VMF.by_target[overlay_name]:
+            ent.remove()
+
+
 def set_ent_keys(ent, inst, prop_block, suffix=''):
     """Copy the given key prop block to an entity.
 
@@ -2729,10 +2741,10 @@ def res_make_catwalk(_, res):
     for inst in markers.values():
         for conn in inst.outputs:
             if conn.output != output_target or conn.input != output_target:
-                # Indicator toggles or similar, delete these
-                print('Removing ', conn.target)
+                # Indicator toggles or similar, delete these entities.
+                # Find the associated overlays too.
                 for del_inst in VMF.by_target[conn.target]:
-                    del_inst.remove()
+                    remove_ant_toggle(del_inst)
                 continue
 
             inst2 = markers[conn.target]
@@ -3631,14 +3643,9 @@ def res_unst_scaffold(_, res):
             else:
                 # If it's not a scaffold, it's probably an indicator_toggle.
                 # We want to remove any them as well as the assoicated
-                # antlines! Assume anything with '$indicator_name' is a
-                # toggle instance
+                # antlines!
                 for toggle in VMF.by_target[ent_targ]:
-                    overlay_name = toggle.fixup['$indicator_name', '']
-                    if overlay_name != '':
-                        toggle.remove()
-                        for ent in VMF.by_target[overlay_name]:
-                            ent.remove()
+                    remove_ant_toggle(toggle)
         if scaff_targs > 1:
             raise Exception('A scaffold item has multiple destinations!')
         elif scaff_targs == 0:
@@ -4025,16 +4032,22 @@ def res_make_tag_fizzler(inst, res):
         inst.remove()
         return
 
+    fizz_base = fizz_name = None
+
     # Look for the fizzler instance we want to replace
-    # Use a set to avoid double-checking for the pairs
-    for out in inst.outputs:
-        if out.target in tag_fizzlers:
-            fizz_name = out.target
-            fizz_base = tag_fizzlers[out.target]
-            del tag_fizzlers[out.target]  # Don't let other signs mod this one!
-            break
-        # else: it's not a fizzler (indicator_toggle), ignore it.
-    else:
+    for targetname in inst.output_targets():
+        if targetname in tag_fizzlers:
+            fizz_name = targetname
+            fizz_base = tag_fizzlers[targetname]
+            del tag_fizzlers[targetname]  # Don't let other signs mod this one!
+            continue
+        else:
+            # It's an indicator toggle, remove it and the antline to clean up.
+            LOGGER.warning('Toggle: {}', targetname)
+            for ent in VMF.by_target[targetname]:
+                remove_ant_toggle(ent)
+
+    if fizz_base is None:
         # No fizzler - remove this sign
         inst.remove()
         return
