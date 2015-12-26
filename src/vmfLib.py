@@ -208,6 +208,7 @@ class VMF:
         self.solid_id = IDMan()  # All occupied solid ids
         self.face_id = IDMan()  # Ditto for faces
         self.ent_id = IDMan()  # Same for entities
+        self.group_id = IDMan()  # Group IDs (not visgroups)
 
         # Allow quick searching for particular groups, without checking
         # the whole map
@@ -787,11 +788,7 @@ class Solid:
     @staticmethod
     def parse(vmf_file, tree, hidden=False):
         """Parse a Property tree into a Solid object."""
-        solid_id = utils.conv_int(tree["id", '-1'])
-        try:
-            solid_id = int(solid_id)
-        except TypeError:
-            solid_id = -1
+        solid_id = utils.conv_int(tree["id", '-1'], -1)
         sides = []
         for side in tree.find_all("side"):
             sides.append(Side.parse(vmf_file, side))
@@ -935,7 +932,8 @@ class UVAxis:
         )
 
     def __str__(self):
-        return '[{x} {y} {z} {off}] {scale}'.format(
+        """Generate the text form for this UV data."""
+        return '[{x:g} {y:g} {z:g} {off:g}] {scale:g}'.format(
             x=self.x,
             y=self.y,
             z=self.z,
@@ -1280,7 +1278,8 @@ class Entity:
             outputs=None,
             solids=None,
             editor=None,
-            hidden=False):
+            hidden=False,
+            groups=()):
         self.map = vmf_file
         self.keys = keys or {}
         self.fixup = EntityFixup(fixup)
@@ -1289,6 +1288,7 @@ class Entity:
         self.id = vmf_file.ent_id.get_id(ent_id)
         self.hidden = hidden
         self.editor = editor or {'visgroup': []}
+        self.groups = list(groups)
 
         if 'logicalpos' not in self.editor:
             self.editor['logicalpos'] = '[0 ' + str(self.id) + ']'
@@ -1319,6 +1319,8 @@ class Entity:
         ]
         outs = [o.copy() for o in self.outputs]
 
+        new_groups = [group.copy() for group in self.groups]
+
         return Entity(
             vmf_file=map or self.map,
             keys=new_keys,
@@ -1328,6 +1330,7 @@ class Entity:
             solids=new_solids,
             editor=new_editor,
             hidden=self.hidden,
+            groups=new_groups,
         )
 
     @staticmethod
@@ -1339,6 +1342,7 @@ class Entity:
         outputs = []
         editor = {'visgroup': []}
         fixup = []
+        groups = []
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
@@ -1366,7 +1370,8 @@ class Entity:
                         for br in
                         item
                     )
-            # TODO: handle "group" blocks.
+            elif name == "group" and item.has_children():
+                groups.append(EntityGroup.parse(vmf_file, item))
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1394,13 +1399,15 @@ class Entity:
 
         return Entity(
             vmf_file,
-            keys=keys,
-            ent_id=ent_id,
-            solids=solids,
-            outputs=outputs,
-            editor=editor,
-            hidden=hidden,
-            fixup=fixup)
+            keys,
+            fixup,
+            ent_id,
+            outputs,
+            solids,
+            editor,
+            hidden,
+            groups,
+        )
 
     def is_brush(self):
         """Is this Entity a brush entity?"""
@@ -1743,6 +1750,64 @@ class EntityFixup:
                 # When exporting, pad with zeros if needed
                 buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
+
+
+class EntityGroup:
+    """Represents the 'group' blocks in entities.
+
+    This allows the grouping of brushes.
+    """
+    def __init__(
+            self,
+            map: VMF,
+            grp_id,
+            vis_shown=False,
+            vis_auto_shown=False,
+            ):
+        self.map = map
+        self.id = map.group_id.get_id(grp_id)
+        self.shown = vis_shown
+        self.auto_shown = vis_auto_shown
+
+    @classmethod
+    def parse(cls, vmf_file, props):
+        editor_block = props.find_key('editor', [])
+        return cls(
+            vmf_file,
+            props['id'],
+            vis_shown=utils.conv_bool(
+                editor_block['visgroupshown', None], True
+            ),
+            vis_auto_shown=utils.conv_bool(
+                editor_block['visgroupsautoshown', None], True
+            ),
+        )
+
+    def copy(self, map=None):
+        if map is None:
+            map = self.map
+        return EntityGroup(
+            map,
+            self.id,
+            self.shown,
+            self.auto_shown,
+        )
+
+    def export(self, buffer, ind):
+        buffer.write(ind + 'group\n')
+        buffer.write(ind + '\t{\n')
+        buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
+        buffer.write(ind + '\teditor\n')
+        buffer.write(ind + '\t\t{\n')
+        buffer.write(ind + '\t\t"visgroupshown" "{}"'.format(
+            utils.bool_as_int(self.shown)
+        ))
+        buffer.write(ind + '\t\t"visgroupautoshown" "{}"'.format(
+            utils.bool_as_int(self.auto_shown)
+        ))
+        buffer.write(ind + '\t\t}\n')
+        buffer.write(ind + '\t}')
+
 
 
 class Output:
