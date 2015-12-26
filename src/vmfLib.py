@@ -941,7 +941,7 @@ class UVAxis:
             z=self.z,
             off=self.offset,
             scale=self.scale,
-        ).replace('.0', '')
+        )
 
 
 class Side:

@@ -939,7 +939,6 @@ class Vec:
             abs(self.z),
         )
 
-
     def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+ operation.
 
@@ -1342,22 +1341,11 @@ class Vec:
 
         This strips off the .0 if no decimal portion exists.
         """
-        x = int(self.x)
-        if x != self.x:
-            x = self.x
-
-        y = int(self.y)
-        if y != self.y:
-            y = self.y
-
-        z = int(self.z)
-        if z != self.z:
-            z = self.z
-        # convert to int to strip off .0 at end if whole number
-        return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
-            x=x,
-            y=y,
-            z=z,
+        # :g strips the .0 off of floats if it's an integer.
+        return '{x:g}{delim}{y:g}{delim}{z:g}'.format(
+            x=self.x,
+            y=self.y,
+            z=self.z,
             delim=delim,
         )
 
