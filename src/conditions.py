@@ -913,6 +913,7 @@ def retexture_template(
     - Textures of the same type, normal and inst origin will randomise to the
       same type.
     - replace_tex is a replacement table. This overrides everything else.
+      The values should either be a list (random), or a single value.
     - If force_colour is set, all tile textures will be switched accordingly.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
@@ -932,21 +933,29 @@ def retexture_template(
 
     can_clump = vbsp.can_clump()
 
+    # Ensure all values are lists.
+    replace_tex = {
+        key: ([value] if isinstance(value, str) else value)
+        for key, value in
+        replace_tex.items()
+    }
+
     for brush in all_brushes:
         for face in brush:
             folded_mat = face.mat.casefold()
+
+            norm = face.normal()
+            random.seed(rand_prefix + norm.join('_'))
+
             if folded_mat in replace_tex:
                 # replace_tex overrides everything
-                face.mat = replace_tex[folded_mat]
+                face.mat = random.choice(replace_tex[folded_mat])
                 continue
 
             tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
 
             if tex_type is None:
-                continue # It's nodraw, or something we shouldn't change
-
-            norm = face.normal()
-            random.seed(rand_prefix + norm.join('_'))
+                continue  # It's nodraw, or something we shouldn't change
 
             if isinstance(tex_type, str):
                 # It's something like squarebeams or backpanels, just look
@@ -3452,14 +3461,13 @@ def res_import_template_setup(res):
     else:
         force_grid = None
 
-    replace_tex = {
-        prop.name: prop.value
-        for prop in
-        res.find_key('replace', [])
-    }
+    replace_tex = defaultdict(list)
+    for prop in res.find_key('replace', []):
+        replace_tex[prop.name].append(prop.value)
+
     return (
         temp_id,
-        replace_tex,
+        dict(replace_tex),
         force_colour,
         force_grid,
         force_type,
