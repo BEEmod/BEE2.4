@@ -1190,7 +1190,7 @@ def get_map_info():
     file_coop_corr = instanceLocs.resolve('[coopCorr]')
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
-    file_sp_door_frame = instanceLocs.resolve('[door_frame]')
+    file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
