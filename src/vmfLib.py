@@ -1486,6 +1486,14 @@ class Entity:
         """Add the output to our list."""
         self.outputs.append(output)
 
+    def output_targets(self):
+        """Return a set of the targetnames this entity triggers."""
+        return {
+            out.target
+            for out in
+            self.outputs
+        }
+
     def remove(self):
         """Remove this entity from the map."""
         self.map.remove_ent(self)
