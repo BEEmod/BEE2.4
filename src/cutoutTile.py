@@ -146,7 +146,7 @@ def res_cutout_tile(inst, res):
             MATS[key] = [default]
 
     # Find our marker ents
-    for inst in conditions.VMF.by_class['func_instance']:
+    for inst in conditions.VMF.by_class['func_instance']: # type: VLib.Entity
         if inst['file'].casefold() not in item:
             continue
         targ = inst['targetname']
@@ -161,10 +161,10 @@ def res_cutout_tile(inst, res):
         loc = (orient * -64) + Vec.from_str(inst['origin'])
         INST_LOCS[targ] = loc
 
-        outputs = {out.target for out in inst.outputs}
-        for out in outputs:
+        for out in inst.output_targets():
             io_list.append((targ, out))
-        if not outputs and inst.fixup['$connectioncount'] == '0':
+
+        if not inst.outputs and inst.fixup['$connectioncount'] == '0':
             # If the item doesn't have any connections, 'connect'
             # it to itself so we'll generate a 128x128 tile segment.
             io_list.append((targ, targ))
