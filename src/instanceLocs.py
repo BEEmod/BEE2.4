@@ -170,14 +170,14 @@ def load_conf(prop_block: Property):
         INST_SPECIAL['door_frame_coop']
     )
 
-    INST_SPECIAL['door_frame_white'] = (
-        INST_SPECIAL['door_frame_white_sp'] +
-        INST_SPECIAL['door_frame_white_coop']
+    INST_SPECIAL['white_frame'] = (
+        INST_SPECIAL['white_frame_sp'] +
+        INST_SPECIAL['white_frame_coop']
     )
 
-    INST_SPECIAL['door_frame_black'] = (
-        INST_SPECIAL['door_frame_black_sp'] +
-        INST_SPECIAL['door_frame_black_coop']
+    INST_SPECIAL['black_frame'] = (
+        INST_SPECIAL['black_frame_sp'] +
+        INST_SPECIAL['black_frame_coop']
     )
 
     # Arrival_departure_ents is set in both entry doors - it's usually the same
