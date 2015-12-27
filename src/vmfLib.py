@@ -3,6 +3,7 @@ Wraps property_parser tree in a set of classes which smartly handle
 specifics of VMF files.
 """
 import io
+import operator
 from collections import defaultdict, namedtuple
 from contextlib import suppress
 import itertools
@@ -224,7 +225,7 @@ class VMF:
 
         # mapspawn entity, which is the entity world brushes are saved
         # to.
-        self.spawn = spawn or Entity(self, [])
+        self.spawn = spawn or Entity(self)
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
 
@@ -1272,7 +1273,7 @@ class Entity:
     def __init__(
             self,
             vmf_file: VMF,
-            keys=None,
+            keys=utils.EmptyMapping,
             fixup=(),
             ent_id=-1,
             outputs=None,
@@ -1281,7 +1282,13 @@ class Entity:
             hidden=False,
             groups=()):
         self.map = vmf_file
-        self.keys = keys or {}
+        self.keys = {
+            # Ensure all values are strings. This allows passing ints and Vecs
+            # normally.
+            k: str(v)
+            for k, v in
+            keys.items()
+        }
         self.fixup = EntityFixup(fixup)
         self.outputs = outputs or []  # type: List[Output]
         self.solids = solids or []  # type: List[Solid]
@@ -1427,10 +1434,10 @@ class Entity:
         buffer.write(ind + ent_name + '\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
-        for key in sorted(self.keys.keys()):
+        for key, value in sorted(self.keys.items(), key=operator.itemgetter(0)):
             buffer.write(
                 ind +
-                '\t"{}" "{!s}"\n'.format(key, self.keys[key])
+                '\t"{}" "{!s}"\n'.format(key, value)
             )
 
         self.fixup.export(buffer, ind)
@@ -1533,8 +1540,7 @@ class Entity:
           [] syntax.
         """
         if isinstance(key, tuple):
-            default = key[1]
-            key = key[0]
+            key, default = key
         key = key.casefold()
         for k in self.keys:
             if k.casefold() == key:
@@ -1548,21 +1554,16 @@ class Entity:
         - It is case-insensitive, so it will overwrite a key which only
           differs by case.
         """
-        if isinstance(key, tuple):
-            # Allow using += syntax with default
-            key, default = key
-        else:
-            default = None
         key_fold = key.casefold()
         for k in self.keys:
             if k.casefold() == key_fold:
                 # Check case-insensitively for this key first
-                orig_val = self.keys.get(k, default)
-                self.keys[k] = val
+                orig_val = self.keys.get(k)
+                self.keys[k] = str(val)
                 break
         else:
-            orig_val = self.keys.get(key, default)
-            self.keys[key] = val
+            orig_val = self.keys.get(key)
+            self.keys[key] = str(val)
 
         # Update the by_class/target dicts with our new value
         if key_fold == 'classname':
