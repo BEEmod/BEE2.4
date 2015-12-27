@@ -718,6 +718,8 @@ class EmptyMapping(abc.MutableMapping):
     """A Mapping class which is always empty.
 
     Any modifications will be ignored.
+    This is used for default arguments, since it then ensures any changes
+    won't be kept, as well as allowing default.items() calls and similar.
     """
     __slots__ = []
 
@@ -759,7 +761,9 @@ class EmptyMapping(abc.MutableMapping):
     __marker = object()
 
     def pop(self, key, default=__marker):
-        raise KeyError
+        if default is self.__marker:
+            raise KeyError
+        return default
 
     def popitem(self):
         raise KeyError
