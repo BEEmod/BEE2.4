@@ -1335,10 +1335,7 @@ class Vec:
 
     def mag(self):
         """Compute the distance from the vector and the origin."""
-        if self.z == 0:
-            return math.sqrt(self.x**2+self.y**2)
-        else:
-            return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def join(self, delim=', '):
         """Return a string with all numbers joined by the passed delimiter.
@@ -1379,8 +1376,7 @@ class Vec:
             return self.y
         elif ind == 2 or ind == "z":
             return self.z
-        else:
-            return NotImplemented
+        raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def __setitem__(self, ind: Union[str, int], val: float):
         """Allow editing values by index instead of name if desired.
@@ -1395,7 +1391,7 @@ class Vec:
         elif ind == 2 or ind == "z":
             self.z = float(val)
         else:
-            return NotImplemented
+            raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def as_tuple(self):
         """Return the Vector as a tuple."""
@@ -1403,10 +1399,7 @@ class Vec:
 
     def len_sq(self):
         """Return the magnitude squared, which is slightly faster."""
-        if self.z == 0:
-            return self.x**2 + self.y**2
-        else:
-            return self.x**2 + self.y**2 + self.z**2
+        return self.x**2 + self.y**2 + self.z**2
 
     def __len__(self):
         """The len() of a vector is the number of non-zero axes."""
