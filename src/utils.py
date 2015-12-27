@@ -1351,8 +1351,11 @@ class Vec:
         )
 
     def __str__(self):
-        """Return a user-friendly representation of this vector."""
-        return "(" + self.join() + ")"
+        """Return the values, separated by spaces.
+
+        This is the main format in Valve's file formats.
+        """
+        return "{:g} {:g} {:g}".format(self.x, self.y, self.z)
 
     def __repr__(self):
         """Code required to reproduce this vector."""
