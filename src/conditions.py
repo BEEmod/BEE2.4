@@ -2638,7 +2638,7 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
             # plus 128 so we don't start in point A
-            loc = point_a + (2 * stair_pos + 128) * direction
+            loc = point_a + (2 * stair_pos + 128) * direction  # type: Vec
             # Do the vertical offset
             loc.z += stair_pos
             VMF.create_ent(
@@ -2658,7 +2658,7 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, -int(diff.z), 128):
             LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
-            loc = point_a + (2 * stair_pos + 256) * direction
+            loc = point_a + (2 * stair_pos + 256) * direction  # type: Vec
             # Do the vertical offset plus additional 128 units
             # to account for the moved instance
             loc.z -= (stair_pos + 128)
@@ -4011,6 +4011,11 @@ def res_portal_lightstrip(inst, res):
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}
+# Maps fizzler targetnames to a set of values. This is used to orient
+# floor-attached signs.
+tag_fizzler_locs = {}
+# The value is a tuple of either ('z', x, y, z),
+# ('x', x1, x2, y) or ('y', y1, y2, x).
 
 
 @meta_cond(priority=-110, only_once=False)
@@ -4022,9 +4027,54 @@ def res_find_potential_tag_fizzlers(inst):
     if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
-    if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
-        # The key list in the dict will be a set of all fizzler items!
-        tag_fizzlers[inst['targetname']] = inst
+    if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+        return
+
+    # The key list in the dict will be a set of all fizzler items!
+    tag_fizzlers[inst['targetname']] = inst
+
+    if tag_fizzler_locs:  # Only loop through fizzlers once.
+        return
+
+    # Determine the origins by first finding the bounding box of the brushes,
+    # then averaging.
+    for fizz in VMF.by_class['trigger_portal_cleanser']:
+        name = fizz['targetname'][:-6]  # Strip off '_brush'
+        bbox_min, bbox_max = fizz.get_bbox()
+        if name in tag_fizzler_locs:
+            orig_min, orig_max = tag_fizzler_locs[name]
+            orig_min.min(bbox_min)
+            orig_max.max(bbox_max)
+        else:
+            tag_fizzler_locs[name] = bbox_min, bbox_max
+
+    for name, (s, l) in tag_fizzler_locs.items():
+        # Figure out how to compare for this brush.
+        # If it's horizontal, signs should point to the center:
+        if abs(s.z - l.z) == 2:
+            tag_fizzler_locs[name] =(
+                'z',
+                s.x + l.x / 2,
+                s.y + l.y / 2,
+                s.z + 1,
+            )
+            continue
+        # For the vertical directions, we want to compare based on the line segment.
+        if abs(s.x - l.x) == 2:  # Y direction
+            tag_fizzler_locs[name] = (
+                'y',
+                s.y,
+                l.y,
+                s.x + 1,
+            )
+        else:  # Extends in X direction
+            tag_fizzler_locs[name] = (
+                'x',
+                s.x,
+                l.x,
+                s.y + 1,
+            )
+
 
 
 @make_result('TagFizzler')
@@ -4054,6 +4104,7 @@ def res_make_tag_fizzler(inst, res):
             LOGGER.warning('Toggle: {}', targetname)
             for ent in VMF.by_target[targetname]:
                 remove_ant_toggle(ent)
+    inst.outputs.clear()  # Remove the outptuts now, they're not valid anyway.
 
     if fizz_base is None:
         # No fizzler - remove this sign
@@ -4103,7 +4154,57 @@ def res_make_tag_fizzler(inst, res):
 
     if inst_normal.z != 0:
         # If on floors/ceilings, rotate to point at the fizzler!
-        sign_dir = sign_loc - Vec.from_str(fizz_base['origin'])
+        sign_floor_loc = sign_loc.copy()
+        sign_floor_loc.z = 0  # We don't care about z-positions.
+
+        # Grab the data saved earlier in res_find_potential_tag_fizzlers()
+        axis, side_min, side_max, normal = tag_fizzler_locs[fizz_name]
+
+        # The Z-axis fizzler (horizontal) must be treated differently.
+        if axis == 'z':
+            # For z-axis, just compare to the center point.
+            # The values are really x, y, z, not what they're named.
+            sign_dir = sign_floor_loc - (side_min, side_max, normal)
+        else:
+            # For the other two, we compare to the line,
+            # or compare to the closest side (in line with the fizz)
+            other_axis = 'x' if axis == 'y' else 'y'
+            if abs(sign_floor_loc[other_axis] - normal) < 32:
+                # Compare to the closest side. Use ** to swap x/y arguments
+                # appropriately. The closest side is the one with the
+                # smallest magnitude.
+                VMF.create_ent(
+                    classname='info_null',
+                    targetname=inst['targetname'] + '_min',
+                    origin=sign_floor_loc - Vec(**{
+                        axis: side_min,
+                        other_axis: normal,
+                    }),
+                )
+                VMF.create_ent(
+                    classname='info_null',
+                    targetname=inst['targetname'] + '_max',
+                    origin=sign_floor_loc - Vec(**{
+                        axis: side_max,
+                        other_axis: normal,
+                    }),
+                )
+                sign_dir = min(
+                    sign_floor_loc - Vec(**{
+                        axis: side_min,
+                        other_axis: normal,
+                    }),
+                    sign_floor_loc - Vec(**{
+                        axis: side_max,
+                        other_axis: normal,
+                    }),
+                    key=Vec.mag,
+                )
+            else:
+                # Align just based on whether we're in front or behind.
+                sign_dir = Vec()
+                sign_dir[other_axis] = sign_floor_loc[other_axis] - normal
+
         sign_angle = math.degrees(
             math.atan2(sign_dir.y, sign_dir.x)
         )
@@ -4116,7 +4217,7 @@ def res_make_tag_fizzler(inst, res):
         if inst_normal.z > 0:
             sign_angle = '0 {} 0'.format(sign_angle)
         elif inst_normal.z < 0:
-            # Flip upside-down
+            # Flip upside-down for ceilings
             sign_angle = '0 {} 180'.format(sign_angle)
     else:
         # On a wall, face upright
@@ -4182,10 +4283,6 @@ def res_make_tag_fizzler(inst, res):
     pos_oran = False
     neg_blue = False
     neg_oran = False
-    VMF.create_ent(
-        classname='info_null',
-        origin=sign_loc,
-    )
     if sign_loc[fizz_axis] < sign_center:
         pos_blue = blue_enabled
         pos_oran = oran_enabled
