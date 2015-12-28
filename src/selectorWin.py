@@ -174,6 +174,7 @@ class selWin:
             has_none=True,
             has_def=True,
             none_desc=(('line', 'Do not add anything.'),),
+            none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
             callback=_NO_OP,
             callback_params=(),
@@ -206,7 +207,12 @@ class selWin:
           If the values are True or False a check/cross will be displayed,
           otherwise they're a string.
         """
-        self.noneItem = Item('NONE', '', desc=none_desc)
+        self.noneItem = Item(
+            'NONE',
+            '',
+            desc=none_desc,
+            attributes=dict(none_attrs),
+        )
         self.noneItem.icon = img.png('BEE2/none_96')
         self.disp_label = StringVar()
         self.display = None

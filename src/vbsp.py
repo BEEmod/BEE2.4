@@ -1190,7 +1190,7 @@ def get_map_info():
     file_coop_corr = instanceLocs.resolve('[coopCorr]')
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
-    file_sp_door_frame = instanceLocs.resolve('[door_frame]')
+    file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1692,6 +1692,7 @@ def remove_static_ind_toggles():
             continue
 
         overlay = inst.fixup['$indicator_name', '']
+        # Remove if there isn't an overlay, or no associated ents.
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
     LOGGER.info('Done!')
@@ -2232,6 +2233,8 @@ def change_overlays():
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
+            # Overlays added by us, or conditions. These are styled aleady,
+            # don't touch them.
             continue
 
         if (over['targetname'] == 'exitdoor_stickman' or

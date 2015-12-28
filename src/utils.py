@@ -586,11 +586,26 @@ class LogMessage:
         self.fmt = fmt
         self.args = args
         self.kwargs = kwargs
+        self.has_args = kwargs or args
 
     def __str__(self):
         # Only format if we have arguments!
-        return str(self.fmt).format(*self.args, **self.kwargs)
-
+        # That way { or } can be used in regular messages.
+        if self.has_args:
+            msg = str(self.fmt).format(*self.args, **self.kwargs)
+        else:
+            msg = str(self.fmt)
+        if '\n' not in msg:
+            return msg
+        # For multi-line messages, add an indent so they're associated
+        # with the logging tag.
+        lines = msg.split('\n')
+        if lines[-1].isspace():
+            # Strip last line if it's blank
+            del lines[-1]
+        # '|' beside all the lines, '|_ beside the last. Add an empty
+        # line at the end.
+        return '\n | '.join(lines[:-1]) + '\n |_' + lines[-1] + '\n'
 
 
 class LoggerAdapter(logging.LoggerAdapter):
@@ -604,12 +619,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         if self.isEnabledFor(level):
             self.logger._log(
                 level,
-                # Only use the format adapter if arguments exist
-                (
-                    LogMessage(msg, args, kwargs)
-                    if kwargs or args else
-                    msg
-                ),
+                LogMessage(msg, args, kwargs),
                 (),
             )
 
@@ -640,14 +650,14 @@ def init_logging(filename: str=None) -> logging.Logger:
         # Make the directories the logs are in, if needed.
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        # The log contains INFO and above logs.
+        # The log contains DEBUG and above logs.
         # We rotate through logs of 500kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
             filename,
             maxBytes=500 * 1024,
             backupCount=10,
         )
-        log_handler.setLevel(logging.INFO)
+        log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
 
         logger.addHandler(log_handler)
@@ -708,6 +718,8 @@ class EmptyMapping(abc.MutableMapping):
     """A Mapping class which is always empty.
 
     Any modifications will be ignored.
+    This is used for default arguments, since it then ensures any changes
+    won't be kept, as well as allowing default.items() calls and similar.
     """
     __slots__ = []
 
@@ -749,7 +761,9 @@ class EmptyMapping(abc.MutableMapping):
     __marker = object()
 
     def pop(self, key, default=__marker):
-        raise KeyError
+        if default is self.__marker:
+            raise KeyError
+        return default
 
     def popitem(self):
         raise KeyError
@@ -928,7 +942,6 @@ class Vec:
             abs(self.y),
             abs(self.z),
         )
-
 
     def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+ operation.
@@ -1322,38 +1335,27 @@ class Vec:
 
     def mag(self):
         """Compute the distance from the vector and the origin."""
-        if self.z == 0:
-            return math.sqrt(self.x**2+self.y**2)
-        else:
-            return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def join(self, delim=', '):
         """Return a string with all numbers joined by the passed delimiter.
 
         This strips off the .0 if no decimal portion exists.
         """
-        x = int(self.x)
-        if x != self.x:
-            x = self.x
-
-        y = int(self.y)
-        if y != self.y:
-            y = self.y
-
-        z = int(self.z)
-        if z != self.z:
-            z = self.z
-        # convert to int to strip off .0 at end if whole number
-        return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
-            x=x,
-            y=y,
-            z=z,
+        # :g strips the .0 off of floats if it's an integer.
+        return '{x:g}{delim}{y:g}{delim}{z:g}'.format(
+            x=self.x,
+            y=self.y,
+            z=self.z,
             delim=delim,
         )
 
     def __str__(self):
-        """Return a user-friendly representation of this vector."""
-        return "(" + self.join() + ")"
+        """Return the values, separated by spaces.
+
+        This is the main format in Valve's file formats.
+        """
+        return "{:g} {:g} {:g}".format(self.x, self.y, self.z)
 
     def __repr__(self):
         """Code required to reproduce this vector."""
@@ -1377,8 +1379,7 @@ class Vec:
             return self.y
         elif ind == 2 or ind == "z":
             return self.z
-        else:
-            return NotImplemented
+        raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def __setitem__(self, ind: Union[str, int], val: float):
         """Allow editing values by index instead of name if desired.
@@ -1393,7 +1394,7 @@ class Vec:
         elif ind == 2 or ind == "z":
             self.z = float(val)
         else:
-            return NotImplemented
+            raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def as_tuple(self):
         """Return the Vector as a tuple."""
@@ -1401,10 +1402,7 @@ class Vec:
 
     def len_sq(self):
         """Return the magnitude squared, which is slightly faster."""
-        if self.z == 0:
-            return self.x**2 + self.y**2
-        else:
-            return self.x**2 + self.y**2 + self.z**2
+        return self.x**2 + self.y**2 + self.z**2
 
     def __len__(self):
         """The len() of a vector is the number of non-zero axes."""

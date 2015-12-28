@@ -36,8 +36,25 @@ SPECIAL_INST = {
     'elevatorExit':      '<ITEM_ENTRY_DOOR:10>',
 
     'spExitCorr':   '<ITEM_EXIT_DOOR:0,1,2,3>',
+    'spExitCorr1':  '<ITEM_EXIT_DOOR:0>',
+    'spExitCorr2':  '<ITEM_EXIT_DOOR:1>',
+    'spExitCorr3':  '<ITEM_EXIT_DOOR:2>',
+    'spExitCorr4':  '<ITEM_EXIT_DOOR:3>',
+
     'spEntryCorr':  '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
+    'spEntryCorr1': '<ITEM_ENTRY_DOOR:0>',
+    'spEntryCorr2': '<ITEM_ENTRY_DOOR:1>',
+    'spEntryCorr3': '<ITEM_ENTRY_DOOR:2>',
+    'spEntryCorr4': '<ITEM_ENTRY_DOOR:3>',
+    'spEntryCorr5': '<ITEM_ENTRY_DOOR:4>',
+    'spEntryCorr6': '<ITEM_ENTRY_DOOR:5>',
+    'spEntryCorr7': '<ITEM_ENTRY_DOOR:6>',
+
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
+    'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
+    'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
+    'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
+    'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
@@ -47,9 +64,14 @@ SPECIAL_INST = {
     # 'indpan' is defined below from these two
 
     # The values in ITEM_EXIT_DOOR aren't actually used!
-    'door_frame': '<ITEM_ENTRY_DOOR:7,8>',
-    'white_frame': '<ITEM_ENTRY_DOOR:7>',
-    'black_frame': '<ITEM_ENTRY_DOOR:8>',
+    'door_frame_sp': '<ITEM_ENTRY_DOOR:7,8>',
+    'white_frame_sp': '<ITEM_ENTRY_DOOR:7>',
+    'black_frame_sp': '<ITEM_ENTRY_DOOR:8>',
+
+    # These are though.
+    'door_frame_coop': '<ITEM_COOP_EXIT_DOOR:4,5>',
+    'white_frame_coop': '<ITEM_COOP_EXIT_DOOR:4>',
+    'black_frame_coop': '<ITEM_COOP_EXIT_DOOR:5>',
 }
 
 # Gives names to reusable instance fields, so you don't need to remember
@@ -141,6 +163,21 @@ def load_conf(prop_block: Property):
     INST_SPECIAL['indpan'] = (
         INST_SPECIAL['indpancheck'] +
         INST_SPECIAL['indpantimer']
+    )
+
+    INST_SPECIAL['door_frame'] = (
+        INST_SPECIAL['door_frame_sp'] +
+        INST_SPECIAL['door_frame_coop']
+    )
+
+    INST_SPECIAL['white_frame'] = (
+        INST_SPECIAL['white_frame_sp'] +
+        INST_SPECIAL['white_frame_coop']
+    )
+
+    INST_SPECIAL['black_frame'] = (
+        INST_SPECIAL['black_frame_sp'] +
+        INST_SPECIAL['black_frame_coop']
     )
 
     # Arrival_departure_ents is set in both entry doors - it's usually the same

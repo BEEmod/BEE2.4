@@ -720,6 +720,18 @@ def widen_fizz_brush(brush, thickness, bounds=None):
                     v[axis] = bound_min[axis]
 
 
+def remove_ant_toggle(toggle_ent):
+    """Remove a texture_toggle, plus the associated antline."""
+    toggle_ent.remove()
+
+    # Assume anything with '$indicator_name' is a toggle instance
+    # This will likely be called on the signs too, if present.
+    overlay_name = toggle_ent.fixup['$indicator_name', '']
+    if overlay_name != '':
+        for ent in VMF.by_target[overlay_name]:
+            ent.remove()
+
+
 def set_ent_keys(ent, inst, prop_block, suffix=''):
     """Copy the given key prop block to an entity.
 
@@ -901,6 +913,7 @@ def retexture_template(
     - Textures of the same type, normal and inst origin will randomise to the
       same type.
     - replace_tex is a replacement table. This overrides everything else.
+      The values should either be a list (random), or a single value.
     - If force_colour is set, all tile textures will be switched accordingly.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
@@ -920,21 +933,29 @@ def retexture_template(
 
     can_clump = vbsp.can_clump()
 
+    # Ensure all values are lists.
+    replace_tex = {
+        key: ([value] if isinstance(value, str) else value)
+        for key, value in
+        replace_tex.items()
+    }
+
     for brush in all_brushes:
         for face in brush:
             folded_mat = face.mat.casefold()
+
+            norm = face.normal()
+            random.seed(rand_prefix + norm.join('_'))
+
             if folded_mat in replace_tex:
                 # replace_tex overrides everything
-                face.mat = replace_tex[folded_mat]
+                face.mat = random.choice(replace_tex[folded_mat])
                 continue
 
             tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
 
             if tex_type is None:
-                continue # It's nodraw, or something we shouldn't change
-
-            norm = face.normal()
-            random.seed(rand_prefix + norm.join('_'))
+                continue  # It's nodraw, or something we shouldn't change
 
             if isinstance(tex_type, str):
                 # It's something like squarebeams or backpanels, just look
@@ -2617,7 +2638,7 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
             # plus 128 so we don't start in point A
-            loc = point_a + (2 * stair_pos + 128) * direction
+            loc = point_a + (2 * stair_pos + 128) * direction  # type: Vec
             # Do the vertical offset
             loc.z += stair_pos
             VMF.create_ent(
@@ -2637,7 +2658,7 @@ def place_catwalk_connections(instances, point_a, point_b):
         for stair_pos in range(0, -int(diff.z), 128):
             LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
-            loc = point_a + (2 * stair_pos + 256) * direction
+            loc = point_a + (2 * stair_pos + 256) * direction  # type: Vec
             # Do the vertical offset plus additional 128 units
             # to account for the moved instance
             loc.z -= (stair_pos + 128)
@@ -2722,21 +2743,21 @@ def res_make_catwalk(_, res):
     if not markers:
         return RES_EXHAUSTED
 
-    LOGGER.info('Conn:', connections)
-    LOGGER.info('Markers:', markers)
+    LOGGER.info('Connections: {}', connections)
+    LOGGER.info('Markers: {}', markers)
 
     # First loop through all the markers, adding connecting sections
     for inst in markers.values():
         for conn in inst.outputs:
             if conn.output != output_target or conn.input != output_target:
-                # Indicator toggles or similar, delete these
-                print('Removing ', conn.target)
+                # Indicator toggles or similar, delete these entities.
+                # Find the associated overlays too.
                 for del_inst in VMF.by_target[conn.target]:
-                    del_inst.remove()
+                    remove_ant_toggle(del_inst)
                 continue
 
             inst2 = markers[conn.target]
-            print(inst['targetname'], '<->', inst2['targetname'])
+            LOGGER.debug('{} <-> {}', inst['targetname'], inst2['targetname'])
             origin1 = Vec.from_str(inst['origin'])
             origin2 = Vec.from_str(inst2['origin'])
             if origin1.x != origin2.x and origin1.y != origin2.y:
@@ -2750,10 +2771,11 @@ def res_make_catwalk(_, res):
                 dist = abs(origin1.x - origin2.x)
             vert_dist = origin1.z - origin2.z
 
-            LOGGER.debug('Dist =', dist, ', Vert =', vert_dist)
+            LOGGER.debug('Dist = {}, Vert = {}', dist, vert_dist)
 
-            if dist//2 < vert_dist:
-                # The stairs are 2 long, 1 high.
+            if (dist - 128) // 2 < abs(vert_dist):
+                # The stairs are 2 long, 1 high. Check there's enough room
+                # Subtract the last block though, since that's a corner.
                 LOGGER.warning('Not enough room for stairs!')
                 continue
 
@@ -2782,12 +2804,10 @@ def res_make_catwalk(_, res):
 
     for inst, dir_mask in connections.items():
         # Set the marker instances based on the attached walkways.
-        print(inst['targetname'], dir_mask)
+        normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+
         new_type, inst['angles'] = utils.CONN_LOOKUP[tuple(dir_mask)]
         inst['file'] = instances[CATWALK_TYPES[new_type]]
-
-        normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
-        ':type normal: Vec'
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
@@ -3441,14 +3461,13 @@ def res_import_template_setup(res):
     else:
         force_grid = None
 
-    replace_tex = {
-        prop.name: prop.value
-        for prop in
-        res.find_key('replace', [])
-    }
+    replace_tex = defaultdict(list)
+    for prop in res.find_key('replace', []):
+        replace_tex[prop.name].append(prop.value)
+
     return (
         temp_id,
-        replace_tex,
+        dict(replace_tex),
         force_colour,
         force_grid,
         force_type,
@@ -3632,14 +3651,9 @@ def res_unst_scaffold(_, res):
             else:
                 # If it's not a scaffold, it's probably an indicator_toggle.
                 # We want to remove any them as well as the assoicated
-                # antlines! Assume anything with '$indicator_name' is a
-                # toggle instance
+                # antlines!
                 for toggle in VMF.by_target[ent_targ]:
-                    overlay_name = toggle.fixup['$indicator_name', '']
-                    if overlay_name != '':
-                        toggle.remove()
-                        for ent in VMF.by_target[overlay_name]:
-                            ent.remove()
+                    remove_ant_toggle(toggle)
         if scaff_targs > 1:
             raise Exception('A scaffold item has multiple destinations!')
         elif scaff_targs == 0:
@@ -3997,6 +4011,11 @@ def res_portal_lightstrip(inst, res):
 
 # A mapping of fizzler targetnames to the base instance
 tag_fizzlers = {}
+# Maps fizzler targetnames to a set of values. This is used to orient
+# floor-attached signs.
+tag_fizzler_locs = {}
+# The value is a tuple of either ('z', x, y, z),
+# ('x', x1, x2, y) or ('y', y1, y2, x).
 
 
 @meta_cond(priority=-110, only_once=False)
@@ -4008,9 +4027,54 @@ def res_find_potential_tag_fizzlers(inst):
     if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
-    if inst['file'].casefold() in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
-        # The key list in the dict will be a set of all fizzler items!
-        tag_fizzlers[inst['targetname']] = inst
+    if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+        return
+
+    # The key list in the dict will be a set of all fizzler items!
+    tag_fizzlers[inst['targetname']] = inst
+
+    if tag_fizzler_locs:  # Only loop through fizzlers once.
+        return
+
+    # Determine the origins by first finding the bounding box of the brushes,
+    # then averaging.
+    for fizz in VMF.by_class['trigger_portal_cleanser']:
+        name = fizz['targetname'][:-6]  # Strip off '_brush'
+        bbox_min, bbox_max = fizz.get_bbox()
+        if name in tag_fizzler_locs:
+            orig_min, orig_max = tag_fizzler_locs[name]
+            orig_min.min(bbox_min)
+            orig_max.max(bbox_max)
+        else:
+            tag_fizzler_locs[name] = bbox_min, bbox_max
+
+    for name, (s, l) in tag_fizzler_locs.items():
+        # Figure out how to compare for this brush.
+        # If it's horizontal, signs should point to the center:
+        if abs(s.z - l.z) == 2:
+            tag_fizzler_locs[name] =(
+                'z',
+                s.x + l.x / 2,
+                s.y + l.y / 2,
+                s.z + 1,
+            )
+            continue
+        # For the vertical directions, we want to compare based on the line segment.
+        if abs(s.x - l.x) == 2:  # Y direction
+            tag_fizzler_locs[name] = (
+                'y',
+                s.y,
+                l.y,
+                s.x + 1,
+            )
+        else:  # Extends in X direction
+            tag_fizzler_locs[name] = (
+                'x',
+                s.x,
+                l.x,
+                s.y + 1,
+            )
+
 
 
 @make_result('TagFizzler')
@@ -4026,16 +4090,23 @@ def res_make_tag_fizzler(inst, res):
         inst.remove()
         return
 
+    fizz_base = fizz_name = None
+
     # Look for the fizzler instance we want to replace
-    # Use a set to avoid double-checking for the pairs
-    for out in inst.outputs:
-        if out.target in tag_fizzlers:
-            fizz_name = out.target
-            fizz_base = tag_fizzlers[out.target]
-            del tag_fizzlers[out.target]  # Don't let other signs mod this one!
-            break
-        # else: it's not a fizzler (indicator_toggle), ignore it.
-    else:
+    for targetname in inst.output_targets():
+        if targetname in tag_fizzlers:
+            fizz_name = targetname
+            fizz_base = tag_fizzlers[targetname]
+            del tag_fizzlers[targetname]  # Don't let other signs mod this one!
+            continue
+        else:
+            # It's an indicator toggle, remove it and the antline to clean up.
+            LOGGER.warning('Toggle: {}', targetname)
+            for ent in VMF.by_target[targetname]:
+                remove_ant_toggle(ent)
+    inst.outputs.clear()  # Remove the outptuts now, they're not valid anyway.
+
+    if fizz_base is None:
         # No fizzler - remove this sign
         inst.remove()
         return
@@ -4083,7 +4154,57 @@ def res_make_tag_fizzler(inst, res):
 
     if inst_normal.z != 0:
         # If on floors/ceilings, rotate to point at the fizzler!
-        sign_dir = sign_loc - Vec.from_str(fizz_base['origin'])
+        sign_floor_loc = sign_loc.copy()
+        sign_floor_loc.z = 0  # We don't care about z-positions.
+
+        # Grab the data saved earlier in res_find_potential_tag_fizzlers()
+        axis, side_min, side_max, normal = tag_fizzler_locs[fizz_name]
+
+        # The Z-axis fizzler (horizontal) must be treated differently.
+        if axis == 'z':
+            # For z-axis, just compare to the center point.
+            # The values are really x, y, z, not what they're named.
+            sign_dir = sign_floor_loc - (side_min, side_max, normal)
+        else:
+            # For the other two, we compare to the line,
+            # or compare to the closest side (in line with the fizz)
+            other_axis = 'x' if axis == 'y' else 'y'
+            if abs(sign_floor_loc[other_axis] - normal) < 32:
+                # Compare to the closest side. Use ** to swap x/y arguments
+                # appropriately. The closest side is the one with the
+                # smallest magnitude.
+                VMF.create_ent(
+                    classname='info_null',
+                    targetname=inst['targetname'] + '_min',
+                    origin=sign_floor_loc - Vec(**{
+                        axis: side_min,
+                        other_axis: normal,
+                    }),
+                )
+                VMF.create_ent(
+                    classname='info_null',
+                    targetname=inst['targetname'] + '_max',
+                    origin=sign_floor_loc - Vec(**{
+                        axis: side_max,
+                        other_axis: normal,
+                    }),
+                )
+                sign_dir = min(
+                    sign_floor_loc - Vec(**{
+                        axis: side_min,
+                        other_axis: normal,
+                    }),
+                    sign_floor_loc - Vec(**{
+                        axis: side_max,
+                        other_axis: normal,
+                    }),
+                    key=Vec.mag,
+                )
+            else:
+                # Align just based on whether we're in front or behind.
+                sign_dir = Vec()
+                sign_dir[other_axis] = sign_floor_loc[other_axis] - normal
+
         sign_angle = math.degrees(
             math.atan2(sign_dir.y, sign_dir.x)
         )
@@ -4096,7 +4217,7 @@ def res_make_tag_fizzler(inst, res):
         if inst_normal.z > 0:
             sign_angle = '0 {} 0'.format(sign_angle)
         elif inst_normal.z < 0:
-            # Flip upside-down
+            # Flip upside-down for ceilings
             sign_angle = '0 {} 180'.format(sign_angle)
     else:
         # On a wall, face upright
@@ -4162,10 +4283,6 @@ def res_make_tag_fizzler(inst, res):
     pos_oran = False
     neg_blue = False
     neg_oran = False
-    VMF.create_ent(
-        classname='info_null',
-        origin=sign_loc,
-    )
     if sign_loc[fizz_axis] < sign_center:
         pos_blue = blue_enabled
         pos_oran = oran_enabled
