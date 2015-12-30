@@ -32,6 +32,11 @@ LINUX = platform.startswith('linux')
 short_log_format = None
 long_log_format = None
 
+# Various logger handlers
+stdout_loghandler = None
+stderr_loghandler = None
+file_loghandler = None
+
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
 STEAM_IDS = {
@@ -627,6 +632,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 def init_logging(filename: str=None) -> logging.Logger:
     """Setup the logger and logging handlers."""
     global short_log_format, long_log_format
+    global stderr_loghandler, stdout_loghandler, file_loghandler
     import logging
     from logging import handlers
     import sys, io, os
@@ -678,10 +684,10 @@ def init_logging(filename: str=None) -> logging.Logger:
             return ''
 
     if sys.stdout:
-        out_handler = logging.StreamHandler(sys.stdout)
-        out_handler.setLevel(logging.INFO)
-        out_handler.setFormatter(short_log_format)
-        logger.addHandler(out_handler)
+        stdout_loghandler = logging.StreamHandler(sys.stdout)
+        stdout_loghandler.setLevel(logging.INFO)
+        stdout_loghandler.setFormatter(short_log_format)
+        logger.addHandler(stdout_loghandler)
 
         if sys.stderr:
             def ignore_warnings(record: logging.LogRecord):
@@ -690,15 +696,15 @@ def init_logging(filename: str=None) -> logging.Logger:
                 Those are handled by stdError, and we don't want duplicates.
                 """
                 return record.levelno < logging.WARNING
-            out_handler.addFilter(ignore_warnings)
+            stdout_loghandler.addFilter(ignore_warnings)
     else:
         sys.stdout = NullStream()
 
     if sys.stderr:
-        err_handler = logging.StreamHandler(sys.stderr)
-        err_handler.setLevel(logging.WARNING)
-        err_handler.setFormatter(short_log_format)
-        logger.addHandler(err_handler)
+        stderr_loghandler = logging.StreamHandler(sys.stderr)
+        stderr_loghandler.setLevel(logging.WARNING)
+        stderr_loghandler.setFormatter(short_log_format)
+        logger.addHandler(stderr_loghandler)
     else:
         sys.stderr = NullStream()
 
