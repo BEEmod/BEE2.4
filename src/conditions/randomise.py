@@ -124,3 +124,60 @@ def res_add_variant(inst, res):
         # fizzlers might not get unique names.
         random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
     conditions.add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
+
+    
+@make_result('RandomNum')
+def res_rand_num(inst, res):
+    """Generate a random number and save in a fixup value.
+
+    If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
+    inclusive. 'ResultVar' is the variable the result will be saved in.
+    If 'seed' is set, it will be used to keep the value constant across
+    map recompiles. This should be unique.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    max_val = utils.conv_float(res['max', 1.0])
+    min_val = utils.conv_float(res['min', 0.0])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    inst.fixup[var] = str(func(min_val, max_val))
+
+
+@make_result('RandomVec')
+def res_rand_vec(inst, res):
+    """A modification to RandomNum which generates a random vector instead.
+
+    'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
+    are for each section. If the min and max are equal that number will be used
+    instead.
+    """
+    is_float = utils.conv_bool(res['decimal'])
+    var = res['resultvar', '$random']
+    seed = res['seed', 'random']
+
+    random.seed(inst['origin'] + inst['angles'] + 'random_' + seed)
+
+    if is_float:
+        func = random.uniform
+    else:
+        func = random.randint
+
+    value = Vec()
+
+    for axis in 'xyz':
+        max_val = utils.conv_float(res['max_' + axis, 0.0])
+        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        if min_val == max_val:
+            value[axis] = min_val
+        else:
+            value[axis] = func(min_val, max_val)
+
+    inst.fixup[var] = value.join(' ')
