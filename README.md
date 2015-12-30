@@ -87,24 +87,24 @@ The various `cache` folders and `config` folders should not be included.
 	        (_addGlobal_, _addOverlay_, _addCavePortrait_)
 		- `brushes`: Results dealing with instances.  
 			(_GenRotatingEnt_, _AlterFace_, _AddBrush_, _TemplateBrush_)
-		- `fizzler`: Results for custom fizzler items.
+		- `fizzler`: Results for custom fizzler items.  
 			(_CustFizzler_, _fizzlerModelPair_)
 	    - `globals`: Global flags allowing reference to stylevars, voicelines, etc.  
 	        (_styleVar_, _has*_, _Game_, _HasCavePortrait_, _isPreview_)
 	    - `instances`: Flags and Results for instances - filenames, orientation, locations.  
-	        (_instance_, _has\_inst_, _instVar_)  
+	        (_instance_, _has\_inst_, _instVar_)
 			(_clearOutputs_, _changeInstance_, _setInstVar_, _suffix_,  _localTarget_)
 		- `positioning`: Flags/Results for dealing with the positioning of items.  
 			(_rotation_, _posIsSolid_, _posIsGoo_, _forceUpright_, _OffsetInst_)
 	    - `logical`: Flags like AND, OR and NOT. Used to comine with other flags.  
 	        (_AND_, _OR_, _NOT_, _NOR_, _NAND_)
-		- `randomise`: Results for randomising instances.
+		- `randomise`: Results for randomising instances.  
 			(_random_, _variant_, _randomNum_, _randomVec_)
 		- `trackPlat`: Result for modifying track platforms. (_trackPlatform_)
 		
 	    - `cutoutTile`: Logic for the Cutout Tile item. (_CutoutTile_)
 		- `catwalks`: Logic for Catwalk items (_MakeCatwalk_)
-		- `scaffold`: Logic for Unstationary Scaffolds.
+		- `scaffold`: Logic for Unstationary Scaffolds. (_UnstScaffold_)
 	- `instanceLocs`: Translates `<ITEM_ID:0,1>` text into the associated instance paths.
 	- `vbsp`: The BEE2's VBSP hook, which modifies a map VMF before it is compiled by the original VBSP.
 	- `vbsp_launch`: Wrapper around vbsp, to get around the renaming of scripts to `'__main__'`.
