@@ -7,7 +7,7 @@ if __name__ == '__main__':
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
         # again though.
-        #utils.init_logging()
+        utils.init_logging()
 
         # Make multiprocessing work correctly when frozen.
         # This must run immediately - in this case, multiprocessing overrides
