@@ -39,7 +39,7 @@ settings = {
     "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
-    }
+}
 
 
 TEX_VALVE = {
@@ -66,10 +66,8 @@ TEX_VALVE = {
     "metal/metalgrate018": "special.grating",
     "effects/laserplane": "special.laserfield",
     "sky_black": "special.sky",
-    }
+}
 
-# Load and register these conditions
-import cutoutTile  # This uses TEX_VALVE, so ensure that's defined
 
 TEX_DEFAULTS = [
     # Extra default replacements we need to specially handle.
