@@ -11,6 +11,7 @@ import vbsp
 
 LOGGER = utils.getLogger(__name__)
 
+
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
     """Customises the various components of a custom fizzler item.
@@ -213,3 +214,77 @@ def convert_to_laserfield(
             # heightwise it's always the same
             side.vaxis.offset = 256
             side.vaxis.scale = 0.25
+
+# For each direction, the two perpendicular axes and the axis it is pointing in.
+PAIR_AXES = {
+    (1, 0, 0):  'yz' 'x',
+    (-1, 0, 0): 'yz' 'x',
+    (0, 1, 0):  'xz' 'y',
+    (0, -1, 0): 'xz' 'y',
+    (0, 0, 1):  'xy' 'z',
+    (0, 0, -1): 'xy' 'z',
+}
+
+
+@make_result('fizzlerModelPair')
+def res_fizzler_pair(begin_inst, res):
+    """Modify the instance of a fizzler to link with its pair.
+
+    Each pair will be given a name along the lines of "fizz_name-model1334".
+    Values:
+        - StartInst, EndInst: The instances used for each end
+        - MidInst: An instance placed every 128 units between emitters.
+    """
+    orig_target = begin_inst['targetname']
+
+    if 'modelEnd' in orig_target:
+        return  # We only execute starting from the start side.
+
+    orig_target = orig_target[:-11]  # remove "_modelStart"
+    end_name = orig_target + '_modelEnd'  # What we search for
+
+    # The name all these instances get
+    pair_name = orig_target + '-model' + str(begin_inst.id)
+
+    orig_file = begin_inst['file']
+
+    begin_file = res['StartInst', orig_file]
+    end_file = res['EndInst', orig_file]
+    mid_file = res['MidInst', '']
+
+    begin_inst['file'] = begin_file
+    begin_inst['targetname'] = pair_name
+
+    direction = Vec(0, 0, 1).rotate_by_str(begin_inst['angles'])
+
+    begin_pos = Vec.from_str(begin_inst['origin'])
+    axis_1, axis_2, main_axis = PAIR_AXES[direction.as_tuple()]
+    for end_inst in vbsp.VMF.by_class['func_instance']:
+        if end_inst['targetname', ''] != end_name:
+            # Only examine this barrier hazard's instances!
+            continue
+        end_pos = Vec.from_str(end_inst['origin'])
+        if (
+                begin_pos[axis_1] == end_pos[axis_1] and
+                begin_pos[axis_2] == end_pos[axis_2]
+                ):
+            length = int(end_pos[main_axis] - begin_pos[main_axis])
+            break
+    else:
+        LOGGER.warning('No matching pair for {}!!', orig_target)
+        return
+    end_inst['targetname'] = pair_name
+    end_inst['file'] = end_file
+
+    if mid_file != '':
+        # Go 64 from each side, and always have at least 1 section
+        # A 128 gap will have length = 0
+        for dis in range(0, abs(length) + 1, 128):
+            new_pos = begin_pos + direction*dis
+            vbsp.VMF.create_ent(
+                classname='func_instance',
+                targetname=pair_name,
+                angles=begin_inst['angles'],
+                file=mid_file,
+                origin=new_pos.join(' '),
+            )
