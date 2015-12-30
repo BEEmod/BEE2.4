@@ -300,8 +300,17 @@ FIZZ_OPTIONS = [
 
 BEE2_config = None  # ConfigFile
 
-GAME_MODE = 'ERR'
-IS_PREVIEW = 'ERR'
+GAME_MODE = 'ERR'  # SP or COOP?
+# Are we in preview mode? (Spawn in entry door instead of elevator)
+IS_PREVIEW = 'ERR'  # type: bool
+
+# A seed value for randomness, based on the general map layout.
+# This stops patterns from repeating in different maps, but keeps it the same
+# when recompiling.
+MAP_RAND_SEED = ''
+
+# The actual map.
+VMF = None  # type: VLib.VMF
 
 # These are faces & overlays which have been forceably set by conditions,
 # and will not be overwritten later.
