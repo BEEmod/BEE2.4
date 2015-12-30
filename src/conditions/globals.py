@@ -1,7 +1,10 @@
 """Flags related to global properties - stylevars, music, which game, etc."""
 import utils
 
-from conditions import make_flag, STYLE_VARS, VOICE_ATTR, OPTIONS
+from conditions import (
+    make_flag, make_result, RES_EXHAUSTED,
+    STYLE_VARS, VOICE_ATTR, OPTIONS,
+)
 
 
 @make_flag('styleVar')
@@ -107,3 +110,44 @@ def flag_is_preview(_, flag):
     """
     import vbsp
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
+
+
+@make_result('styleVar')
+def res_set_style_var(_, res):
+    """Set Style Vars.
+
+    The value should be set of "SetTrue" and "SetFalse" keyvalues.
+    """
+    for opt in res.value:
+        if opt.name == 'settrue':
+            STYLE_VARS[opt.value.casefold()] = True
+        elif opt.name == 'setfalse':
+            STYLE_VARS[opt.value.casefold()] = False
+    return RES_EXHAUSTED
+
+
+@make_result('has')
+def res_set_voice_attr(_, res):
+    """Sets a number of Voice Attributes.
+
+        Each child property will be set. The value is ignored, but must
+        be present for syntax reasons.
+    """
+    if res.has_children():
+        for opt in res.value:
+            VOICE_ATTR[opt.name] = True
+    else:
+        VOICE_ATTR[res.value.casefold()] = 1
+    return RES_EXHAUSTED
+
+
+@make_result('setOption')
+def res_set_option(_, res):
+    """Set a value in the "options" part of VBSP_config.
+
+    Each child property will be set.
+    """
+    for opt in res.value:
+        if opt.name in OPTIONS:
+            OPTIONS[opt.name] = opt.value
+    return RES_EXHAUSTED

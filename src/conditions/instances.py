@@ -1,12 +1,18 @@
-"""Flags related to instances or instance variables.
+"""Flags and Results relating to instances or instance variables.
 
 """
 import operator
+import math
 
-from conditions import make_flag, ALL_INST, DIRECTIONS, SOLIDS, GOO_LOCS
+from conditions import (
+    make_flag, make_result,
+    ALL_INST, DIRECTIONS, SOLIDS, GOO_LOCS,
+)
 from instanceLocs import resolve as resolve_inst
 from utils import Vec
+import conditions
 import utils
+
 
 @make_flag('instance')
 def flag_file_equal(inst, flag):
@@ -204,3 +210,67 @@ def flag_goo_at_loc(inst, flag):
     pos = pos // 128 * 128 + 64  # type: Vec
     val = pos.as_tuple() in GOO_LOCS
     return val
+
+
+@make_result('rename', 'changeInstance')
+def res_change_instance(inst, res):
+    """Set the file to a value."""
+    inst['file'] = resolve_inst(res.value)[0]
+
+
+@make_result('suffix', 'instSuffix')
+def res_add_suffix(inst, res):
+    """Add the specified suffix to the filename."""
+    conditions.add_suffix(inst, '_' + res.value)
+
+
+@make_result('setKey')
+def res_set_key(inst, res):
+    """Set a keyvalue to the given value.
+
+    The name and value should be separated by a space.
+    """
+    key, value = res.value.split(' ', 1)
+    inst[key] = value
+
+@make_result('forceUpright')
+def res_force_upright(inst, _):
+    """Position an instance to orient upwards while keeping the normal.
+
+    The result angle will have pitch and roll set to 0. Vertical
+    instances are unaffected.
+    """
+    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    if normal.z != 0:
+        return
+    ang = math.degrees(math.atan2(normal.y, normal.z))
+    inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
+
+
+@make_result('instVar', 'instVarSuffix')
+def res_add_inst_var(inst, res):
+    """Append the value of an instance variable to the filename.
+
+    Pass either the variable name, or a set of value->suffix pairs for a
+    lookup.
+    """
+    if res.has_children():
+        val = inst.fixup[res['variable', '']]
+        for rep in res:  # lookup the number to determine the appending value
+            if rep.name == 'variable':
+                continue  # this isn't a lookup command!
+            if rep.name == val:
+                conditions.add_suffix(inst, '_' + rep.value)
+                break
+    else:  # append the value
+        conditions.add_suffix(inst, '_' + inst.fixup[res.value, ''])
+
+
+@make_result('setInstVar')
+def res_set_inst_var(inst, res):
+    """Set an instance variable to the given value.
+
+    Values follow the format "$start_enabled 1", with or without the $.
+    """
+    var_name, val = res.value.split(' ', 1)
+    inst.fixup[var_name] = val
