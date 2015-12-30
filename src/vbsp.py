@@ -39,7 +39,7 @@ settings = {
     "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
-    }
+}
 
 
 TEX_VALVE = {
@@ -66,10 +66,8 @@ TEX_VALVE = {
     "metal/metalgrate018": "special.grating",
     "effects/laserplane": "special.laserfield",
     "sky_black": "special.sky",
-    }
+}
 
-# Load and register these conditions
-import cutoutTile  # This uses TEX_VALVE, so ensure that's defined
 
 TEX_DEFAULTS = [
     # Extra default replacements we need to specially handle.
@@ -302,8 +300,17 @@ FIZZ_OPTIONS = [
 
 BEE2_config = None  # ConfigFile
 
-GAME_MODE = 'ERR'
-IS_PREVIEW = 'ERR'
+GAME_MODE = 'ERR'  # SP or COOP?
+# Are we in preview mode? (Spawn in entry door instead of elevator)
+IS_PREVIEW = 'ERR'  # type: bool
+
+# A seed value for randomness, based on the general map layout.
+# This stops patterns from repeating in different maps, but keeps it the same
+# when recompiling.
+MAP_RAND_SEED = ''
+
+# The actual map.
+VMF = None  # type: VLib.VMF
 
 # These are faces & overlays which have been forceably set by conditions,
 # and will not be overwritten later.
@@ -2942,6 +2949,7 @@ def main():
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
+    folded_args = [arg.casefold() for arg in old_args]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:
@@ -2952,6 +2960,8 @@ def main():
             'arguments, with some extra arguments:\n'
             '-dump_conditions: Print a list of all condition flags,\n'
             '  results, and metaconditions.\n'
+            '-bee2_verbose: Print debug messages to the console.\n'
+            '-verbose: A default VBSP command, has the same effect as above.\n'
             '-force_peti: Force enabling map conversion. \n'
             "-force_hammer: Don't convert the map at all.\n"
             '-entity_limit: A default VBSP command, this is inspected to'
@@ -2959,7 +2969,16 @@ def main():
         )
         sys.exit()
 
-    if old_args[0].casefold() == '-dump_conditions':
+    # The first is just for us, the second is also for VBSP. We'll switch to
+    # verbose mode if VBSP is set to do so as well.
+    if '-bee2_verbose' in folded_args or '-verbose' in folded_args:
+        utils.stdout_loghandler.setLevel('DEBUG')
+        LOGGER.info('Switched to verbose logging.')
+
+    conditions.import_conditions()  # Import all the conditions and
+    # register them.
+
+    if '-dump_conditions' in folded_args:
         # Print all the condition flags, results, and metaconditions
         conditions.dump_conditions()
         sys.exit()
