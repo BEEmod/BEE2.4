@@ -4,7 +4,6 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 import random
 import math
-import operator
 import itertools
 
 from utils import Vec, Vec_tuple
@@ -16,7 +15,7 @@ import utils
 from typing import (
     Optional,
     Dict, List, Tuple, NamedTuple
-    )
+)
 
 LOGGER = utils.getLogger(__name__)
 
@@ -45,6 +44,9 @@ GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 # The first list are world brushes, the second are func_detail brushes.
 TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
+
+# Sub
+SUBMODULES = ['flag_core', 'flag_global', 'flag_inst']
 
 
 class TEMP_TYPES(Enum):
@@ -482,6 +484,24 @@ def check_flag(flag, inst):
     else:
         res = func(inst, flag)
         return res
+
+
+def import_conditions():
+    """Import all the components of the conditions package.
+
+    This ensures everything gets registered.
+    """
+    import importlib
+    import pkgutil
+
+    # Find the modules in the conditions package
+    for loader, module, is_package in pkgutil.iter_modules(['conditions']):
+        # Import the module, then discard it. The module will run add_flag
+        # or add_result() functions, which save the functions into our dicts.
+        # We don't need a reference to the modules themselves.
+        importlib.import_module('conditions.' + module)
+        LOGGER.debug('Imported {} conditions module', module)
+    LOGGER.info('Imported all conditions modules!')
 
 
 def build_solid_dict():
@@ -1093,7 +1113,6 @@ def retexture_template(
             over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
 
 
-
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -1151,355 +1170,6 @@ def fix_catapult_targets(inst):
     """
     for targ in VMF.by_class['info_target']:
         targ['spawnflags'] = '3'  # Transmit to client, ignoring PVS
-
-#########
-# FLAGS #
-#########
-
-
-@make_flag('AND')
-def flag_and(inst, flag):
-    """The AND group evaluates True if all sub-flags are True."""
-    for sub_flag in flag:
-        if not check_flag(sub_flag, inst):
-            return False
-    # If the AND block is empty, return True
-    return len(sub_flag.value) == 0
-
-
-@make_flag('OR')
-def flag_or(inst, flag):
-    """The OR group evaluates True if any sub-flags are True."""
-    for sub_flag in flag:
-        if check_flag(sub_flag, inst):
-            return True
-    return False
-
-@make_flag('NOT')
-def flag_not(inst, flag):
-    """The NOT group inverts the value of it's one sub-flag."""
-    if len(flag.value) == 1:
-        return not check_flag(flag[0], inst)
-    return False
-
-
-@make_flag('NOR')
-def flag_nor(inst, flag):
-    """The NOR group evaluates True if any sub-flags are False."""
-    return not flag_or(inst, flag)
-
-
-@make_flag('NAND')
-def flag_nand(inst, flag):
-    """The NAND group evaluates True if all sub-flags are False."""
-    return not flag_and(inst, flag)
-
-
-@make_flag('instance')
-def flag_file_equal(inst, flag):
-    """Evaluates True if the instance matches the given file."""
-    return inst['file'].casefold() in resolve_inst(flag.value)
-
-
-@make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst, flag):
-    """Evaluates True if the instance contains the given portion."""
-    return flag.value in inst['file'].casefold()
-
-
-@make_flag('hasInst')
-def flag_has_inst(_, flag):
-    """Checks if the given instance is present anywhere in the map."""
-    flags = resolve_inst(flag.value)
-    return any(
-        inst.casefold() in flags
-        for inst in
-        ALL_INST
-    )
-
-INSTVAR_COMP = {
-    '=': operator.eq,
-    '==': operator.eq,
-
-    '!=': operator.ne,
-    '<>': operator.ne,
-    '=/=': operator.ne,
-
-    '<': operator.lt,
-    '>': operator.gt,
-
-    '>=': operator.ge,
-    '=>': operator.ge,
-    '<=': operator.le,
-    '=<': operator.le,
-}
-
-
-@make_flag('instVar')
-def flag_instvar(inst, flag):
-    """Checks if the $replace value matches the given value.
-
-    The flag value follows the form "$start_enabled == 1", with or without
-    the $.
-    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
-    If ommitted, the operation is assumed to be ==.
-    """
-    values = flag.value.split(' ')
-    if len(values) == 3:
-        variable, op, comp_val = values
-        value = inst.fixup[variable]
-        try:
-            # Convert to floats if possible, otherwise handle both as strings
-            comp_val, value = float(comp_val), float(value)
-        except ValueError:
-            pass
-        return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
-    else:
-        variable, value = values
-        return inst.fixup[variable] == value
-
-
-@make_flag('styleVar')
-def flag_stylevar(_, flag):
-    """Checks if the given Style Var is true.
-
-    Use the NOT flag to invert if needed.
-    """
-    return STYLE_VARS[flag.value.casefold()]
-
-
-@make_flag('has')
-def flag_voice_has(_, flag):
-    """Checks if the given Voice Attribute is present.
-
-    Use the NOT flag to invert if needed.
-    """
-    return VOICE_ATTR[flag.value.casefold()]
-
-
-@make_flag('has_music')
-def flag_music(_, flag):
-    """Checks the selected music ID.
-
-    Use "<NONE>" for no music.
-    """
-    return OPTIONS['music_id'] == flag.value
-
-
-@make_flag('Game')
-def flag_game(_, flag):
-    """Checks which game is being modded.
-
-    Accepts the ffollowing aliases instead of a Steam ID:
-     - PORTAL2
-     - APTAG
-     - ALATAG
-     - TAG
-     - Aperture Tag
-     - TWTM,
-     - Thinking With Time Machine
-    """
-    return OPTIONS['game_id'] == utils.STEAM_IDS.get(
-        flag.value.upper(),
-        flag.value,
-    )
-
-
-@make_flag('has_char')
-def flag_voice_char(_, flag):
-    """Checks to see if the given charcter is present in the voice pack.
-
-    "<NONE>" means no voice pack is chosen.
-    This is case-insensitive, and allows partial matches - 'Cave' matches
-    a voice pack with 'Cave Johnson'.
-    """
-    targ_char = flag.value.casefold()
-    if targ_char == '<none>':
-        return OPTIONS['voice_id'] == '<NONE>'
-    for char in OPTIONS['voice_char'].split(','):
-        if targ_char in char.casefold():
-            return True
-    return False
-
-
-@make_flag('HasCavePortrait')
-def res_cave_portrait(inst, res):
-    """Checks to see if the Cave Portrait option is set for the given
-
-    skin pack.
-    """
-    import vbsp
-    return vbsp.get_opt('cave_port_skin') != ''
-
-
-@make_flag('ifOption')
-def flag_option(_, flag):
-    bits = flag.value.split(' ', 1)
-    key = bits[0].casefold()
-    if key in OPTIONS:
-        return OPTIONS[key] == bits[1]
-    else:
-        return False
-
-
-@make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(_, flag):
-    """Checks if the game mode is "SP" or "COOP".
-    """
-    import vbsp
-    return vbsp.GAME_MODE.casefold() == flag.value.casefold()
-
-
-@make_flag('ifPreview', 'preview')
-def flag_is_preview(_, flag):
-    """Checks if the preview mode status equals the given value.
-
-    If preview mode is enabled, the player will start before the entry
-    door, and restart the map after reaching the exit door. If false,
-    they start in the elevator.
-
-    Preview mode is always False when publishing.
-    """
-    import vbsp
-    return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
-
-
-@make_flag(
-    'rotation',
-    'angle',
-    'angles',
-    'orient',
-    'orientation',
-    'dir',
-    'direction',
-)
-def flag_angles(inst, flag):
-    """Check that a instance is pointed in a direction.
-
-    The value should be either just the angle to check, or a block of
-    options:
-    - Angle: A unit vector (XYZ value) pointing in a direction, or some
-        keywords: +z, -y, N/S/E/W, up/down, floor/ceiling, or walls
-    - From_dir: The direction the unrotated instance is pointed in.
-        This lets the flag check multiple directions
-    - Allow_inverse: If true, this also returns True if the instance is
-        pointed the opposite direction .
-    """
-    angle = inst['angles', '0 0 0']
-
-    if flag.has_children():
-        targ_angle = flag['direction', '0 0 0']
-        from_dir = flag['from_dir', '0 0 1']
-        if from_dir.casefold() in DIRECTIONS:
-            from_dir = Vec(DIRECTIONS[from_dir.casefold()])
-        else:
-            from_dir = Vec.from_str(from_dir, 0, 0, 1)
-        allow_inverse = utils.conv_bool(flag['allow_inverse', '0'])
-    else:
-        targ_angle = flag.value
-        from_dir = Vec(0, 0, 1)
-        allow_inverse = False
-
-    if angle == targ_angle:
-        return True  # Check for exact match
-
-    normal = DIRECTIONS.get(targ_angle.casefold(), None)
-    if normal is None:
-        return False  # If it's not a special angle,
-        # so it failed the exact match
-
-    inst_normal = from_dir.rotate_by_str(angle)
-
-    if normal == 'WALL':
-        # Special case - it's not on the floor or ceiling
-        return not (inst_normal == (0, 0, 1) or inst_normal == (0, 0, -1))
-    else:
-        return inst_normal == normal or (
-            allow_inverse and -inst_normal == normal
-        )
-
-
-@make_flag('posIsSolid')
-def flag_brush_at_loc(inst, flag):
-    """Checks to see if a wall is present at the given location.
-
-    - Pos is the position of the brush, where `0 0 0` is the floor-position
-       of the brush.
-    - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
-    - Type defines the type the brush must be:
-      - "Any" requires either a black or white brush.
-      - "None" means that no brush must be present.
-      - "White" requires a portalable surface.
-      - "Black" requires a non-portalable surface.
-    - SetVar defines an instvar which will be given a value of "black",
-      "white" or "none" to allow the result to be reused.
-    - If gridPos is true, the position will be snapped so it aligns with
-      the 128 brushes (Useful with fizzler/light strip items).
-    - RemoveBrush: If set to 1, the brush will be removed if found.
-      Only do this to EmbedFace brushes, since it will remove the other
-      sides as well.
-    """
-    pos = Vec.from_str(flag['pos', '0 0 0'])
-    pos.z -= 64  # Subtract so origin is the floor-position
-    pos = pos.rotate_by_str(inst['angles', '0 0 0'])
-
-    # Relative to the instance origin
-    pos += Vec.from_str(inst['origin', '0 0 0'])
-
-    norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
-        inst['angles', '0 0 0']
-    )
-
-    if utils.conv_bool(flag['gridpos', '0']):
-        for axis in 'xyz':
-            # Don't realign things in the normal's axis -
-            # those are already fine.
-            if norm[axis] == 0:
-                pos[axis] = pos[axis] // 128 * 128 + 64
-
-    result_var = flag['setVar', '']
-    should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
-    des_type = flag['type', 'any'].casefold()
-
-    brush = SOLIDS.get(pos.as_tuple(), None)
-
-    if brush is None or brush.normal != norm:
-        br_type = 'none'
-    else:
-        br_type = str(brush.color)
-        if should_remove:
-            VMF.remove_brush(
-                brush.solid,
-            )
-
-    if result_var:
-        inst.fixup[result_var] = br_type
-
-    if des_type == 'any' and br_type != 'none':
-        return True
-
-    return des_type == br_type
-
-
-@make_flag('PosIsGoo')
-def flag_goo_at_loc(inst, flag):
-    """Check to see if a given location is submerged in goo.
-
-    0 0 0 is the origin of the instance, values are in 128 increments.
-    """
-    pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
-    pos *= 128
-    pos += Vec.from_str(inst['origin'])
-
-    # Round to 128 units, then offset to the center
-    pos = pos // 128 * 128 + 64  # type: Vec
-    val = pos.as_tuple() in GOO_LOCS
-    return val
-
-
-###########
-# RESULTS #
-###########
 
 
 @make_result('rename', 'changeInstance')

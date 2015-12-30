@@ -2959,6 +2959,9 @@ def main():
         )
         sys.exit()
 
+    conditions.import_conditions()  # Import all the conditions and
+    # register them.
+
     if old_args[0].casefold() == '-dump_conditions':
         # Print all the condition flags, results, and metaconditions
         conditions.dump_conditions()
