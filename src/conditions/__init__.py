@@ -41,12 +41,12 @@ GOO_LOCS = set()  # A set of all blocks containing goo
 GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
-# The first list are world brushes, the second are func_detail brushes.
+# The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
 TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
-# Sub
-SUBMODULES = ['flag_core', 'flag_global', 'flag_inst']
+# A template shaped like embeddedVoxel blocks
+TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
 
 class TEMP_TYPES(Enum):
@@ -92,13 +92,13 @@ CONNECTIONS = {}
 TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
 
-
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
 yp = utils.Vec_tuple(0, 1, 0)
 yn = utils.Vec_tuple(0, -1, 0)
 zp = utils.Vec_tuple(0, 0, 1)
 zn = utils.Vec_tuple(0, 0, -1)
+
 DIRECTIONS = {
     # Translate these words into a normal vector
     '+x': xp,
@@ -192,6 +192,16 @@ TEMPLATE_RETEXTURE = {
 }
 
 del B, W
+
+# Normals pointing in each direction
+ALL_NORMALS = [
+    Vec(x=-1),
+    Vec(y=-1),
+    Vec(z=-1),
+    Vec(x=1),
+    Vec(y=1),
+    Vec(z=1),
+]
 
 
 class NextInstance(Exception):
@@ -1131,6 +1141,71 @@ def retexture_template(
             over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
 
 
+def hollow_block(pos: Vec):
+    """Convert a solid into a embeddedVoxel-style block.
+
+    The original brushes must be in the SOLIDS dict. They will be replaced.
+    This returns a dict mapping normals to the new solidGroups.
+    If a side is nodrawed or otherwise missing, it will be ignored.
+    """
+    block_pos = pos // 128 * 128 + (64, 64, 64)
+
+    for norm in ALL_NORMALS:
+        brush_pos = (block_pos + norm * 64).as_tuple()
+
+        solid_group = SOLIDS.get(brush_pos)
+        if solid_group is None or -solid_group.normal != norm:
+            continue  # This isn't the correct face.
+
+        bbox_min, bbox_max = solid_group.solid.get_bbox()
+        if 4 in (bbox_max - bbox_min):
+            # If it's 4 units thick, skip - embedFace brush which happens
+            # to be centered. We don't want to overlap those.
+            continue
+        else:
+            del bbox_min, bbox_max
+
+        # Remove the original face from the solids list.
+        del SOLIDS[brush_pos]
+        try:
+            VMF.remove_brush(solid_group.solid)
+        except ValueError:
+            pass  # We might try to remove it multiple times, if not hollow.
+
+        orig_face = solid_group.face  # type: VLib.Side
+
+        # Generate our new brush.
+        brushes = import_template(
+            TEMP_EMBEDDED_VOXEL,
+            block_pos,
+            # The normal Z is swapped...
+            Vec(norm.x, norm.y, -norm.z).to_angle(),
+            force_type=TEMP_TYPES.world,
+        ).world
+
+        for brush in brushes:  # type: VLib.Solid
+            for side in brush.sides:
+                # The SKIP brush is the surface, all the others are nodraw.
+                if side.mat.casefold() != 'tools/toolsskip':
+                    continue
+
+                # Overwrite all the properties, to make the new brush
+                # the same as the original.
+                side.mat = orig_face.mat
+                side.uaxis = orig_face.uaxis
+                side.vaxis = orig_face.vaxis
+                side.planes = orig_face.planes
+                side.ham_rot = 0
+
+                # Make a new SolidGroup to match the face.
+                SOLIDS[brush_pos] = solidGroup(
+                    side,
+                    brush,
+                    solid_group.normal,
+                    solid_group.color,
+                )
+
+
 @make_flag('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
@@ -1188,9 +1263,6 @@ def fix_catapult_targets(inst):
     """
     for targ in VMF.by_class['info_target']:
         targ['spawnflags'] = '3'  # Transmit to client, ignoring PVS
-
-
-
 
 
 @make_result_setup('timedRelay')

@@ -447,3 +447,24 @@ def res_import_template(inst, res):
         replace_tex,
         force_colour,
         force_grid,
+    )
+
+
+@make_result('HollowBrush')
+def res_hollow_brush(inst, res):
+    """Hollow out the attached brush, as if EmbeddedVoxel was set.
+
+    This just removes the surface if it's already an embeddedVoxel. This allows
+    multiple items to embed thinly in the same block without affecting each
+    other.
+    """
+    loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
+    loc += Vec.from_str(inst['origin'])
+
+    conditions.hollow_block(loc)
+
+    if utils.conv_bool(res['RemoveFace', False]):
+        solid_grp = SOLIDS.get(loc.as_tuple())
+        if solid_grp:
+            del SOLIDS[loc.as_tuple()]
+            vbsp.VMF.remove_brush(solid_grp.solid)
