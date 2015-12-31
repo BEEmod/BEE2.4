@@ -892,7 +892,6 @@ def import_template(
         # Don't let the overlays get retextured too!
         vbsp.IGNORED_OVERLAYS.add(new_overlay)
 
-
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
     for brush in new_world + new_detail:
@@ -943,6 +942,7 @@ def retexture_template(
     - replace_tex is a replacement table. This overrides everything else.
       The values should either be a list (random), or a single value.
     - If force_colour is set, all tile textures will be switched accordingly.
+      If set to 'INVERT', white and black textures will be swapped.
     - If force_grid is set, all tile textures will be that size:
       ('wall', '2x2', '4x4', 'special')
     - If use_bullseye is true, the bullseye textures will be used for all panel
@@ -1014,8 +1014,16 @@ def retexture_template(
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
 
-            if force_colour is not None:
+            if force_colour == 'INVERT':
+                # Invert the texture
+                tex_colour = (
+                    MAT_TYPES.white
+                    if tex_colour is MAT_TYPES.black else
+                    MAT_TYPES.black
+                )
+            elif force_colour is not None:
                 tex_colour = force_colour
+
             if force_grid is not None:
                 grid_size = force_grid
 

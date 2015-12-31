@@ -288,7 +288,7 @@ def res_add_brush(inst, res):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
-    point1.z -= 64 # Offset to the location of the floor
+    point1.z -= 64  # Offset to the location of the floor
     point2.z -= 64
 
     # Rotate to match the instance
@@ -369,6 +369,8 @@ def res_import_template_setup(res):
         force_colour = MAT_TYPES.white
     elif 'black' in force:
         force_colour = MAT_TYPES.black
+    elif 'invert' in force:
+        force_colour = 'INVERT'
     else:
         force_colour = None
 
@@ -445,4 +447,3 @@ def res_import_template(inst, res):
         replace_tex,
         force_colour,
         force_grid,
-    )
