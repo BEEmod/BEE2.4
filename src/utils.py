@@ -587,21 +587,36 @@ def restart_app():
 
 
 class LogMessage:
+    """Allow using str.format() in logging messages.
+
+    The __str__() method performs the joining.
+    """
     def __init__(self, fmt, args, kwargs):
         self.fmt = fmt
         self.args = args
         self.kwargs = kwargs
         self.has_args = kwargs or args
 
-    def __str__(self):
+    def format_msg(self):
         # Only format if we have arguments!
         # That way { or } can be used in regular messages.
         if self.has_args:
-            msg = str(self.fmt).format(*self.args, **self.kwargs)
+            f = self.fmt = str(self.fmt).format(*self.args, **self.kwargs)
+
+            # Don't repeat the formatting
+            del self.args, self.kwargs
+            self.has_args = False
+            return f
         else:
-            msg = str(self.fmt)
+            return str(self.fmt)
+
+    def __str__(self):
+        """Format the string, and add an ASCII indent."""
+        msg = self.format_msg()
+
         if '\n' not in msg:
             return msg
+
         # For multi-line messages, add an indent so they're associated
         # with the logging tag.
         lines = msg.split('\n')
