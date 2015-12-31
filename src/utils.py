@@ -657,7 +657,7 @@ class NewLogRecord(logging.getLogRecordFactory()):
         if self.alias is not None:
             self.module = self.alias
         return str(self.msg)
-@logging.setLogRecordFactory(NewLogRecord)
+logging.setLogRecordFactory(NewLogRecord)
 
 
 def init_logging(filename: str=None) -> logging.Logger:
