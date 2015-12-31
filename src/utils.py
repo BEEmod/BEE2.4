@@ -632,7 +632,9 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger, alias=None):
+        # Alias is a replacement module name for log messages.
+        self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
 
     def log(self, level, msg, *args, **kwargs):
@@ -641,7 +643,21 @@ class LoggerAdapter(logging.LoggerAdapter):
                 level,
                 LogMessage(msg, args, kwargs),
                 (),
+                extra={'alias': self.alias},
             )
+
+class NewLogRecord(logging.getLogRecordFactory()):
+    """Allow passing an alias for log modules."""
+
+    def getMessage(self):
+        """We have to hook here to change the value of .module.
+
+        It's called just before the formatting call is made.
+        """
+        if self.alias is not None:
+            self.module = self.alias
+        return str(self.msg)
+@logging.setLogRecordFactory(NewLogRecord)
 
 
 def init_logging(filename: str=None) -> logging.Logger:
@@ -747,16 +763,17 @@ def init_logging(filename: str=None) -> logging.Logger:
     return LoggerAdapter(logger)
 
 
-def getLogger(name: str='') -> logging.Logger:
+def getLogger(name: str='', alias: str=None) -> logging.Logger:
     """Get the named logger object.
 
     This puts the logger into the BEE2 namespace, and wraps it to
     use str.format() instead of % formatting.
+    If set, alias is the name to show for the module.
     """
     if name:
-        return LoggerAdapter(logging.getLogger('BEE2.' + name))
+        return LoggerAdapter(logging.getLogger('BEE2.' + name), alias)
     else:  # Allow retrieving the main logger.
-        return LoggerAdapter(logging.getLogger('BEE2'))
+        return LoggerAdapter(logging.getLogger('BEE2'), alias)
 
 
 class EmptyMapping(abc.MutableMapping):
