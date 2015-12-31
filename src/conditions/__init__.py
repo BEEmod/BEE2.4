@@ -56,6 +56,8 @@ class TEMP_TYPES(Enum):
     world = 1
     detail = 2
 
+Template = namedtuple('Template', ['world', 'detail', 'overlay'])
+
 
 class MAT_TYPES(Enum):
     """The values saved in the solidGroup.color attribute."""
@@ -72,8 +74,8 @@ class MAT_TYPES(Enum):
 solidGroup = NamedTuple('solidGroup', [
     ('face', VLib.Side),
     ('solid', VLib.Solid),
-    ('normal', Vec),
-    ('color', MAT_TYPES)
+    ('normal', Vec), # The normal of the face.
+    ('color', MAT_TYPES),
 ])
 SOLIDS = {}  # type: Dict[utils.Vec_tuple, solidGroup]
 
@@ -822,11 +824,7 @@ def import_template(
         angles=None,
         targetname='',
         force_type=TEMP_TYPES.default,
-    ) -> Tuple[
-        List[VLib.Solid],
-        Optional[VLib.Entity],
-        List[VLib.Entity],
-        ]:
+    ) -> Template:
     """Import the given template at a location.
 
     If force_type is set to 'detail' or 'world', all brushes will be converted
@@ -924,13 +922,11 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return new_world, detail_ent, new_over
+    return Template(new_world, detail_ent, new_over)
 
 
 def retexture_template(
-        world: List[VLib.Solid],
-        detail: VLib.Entity,
-        overlays: List[VLib.Entity],
+        template_data: Template,
         origin: Vec,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
@@ -953,9 +949,11 @@ def retexture_template(
       sides instead of the normal textures. (This overrides force_grid.)
     """
     import vbsp
-    all_brushes = list(world)
-    if detail is not None:
-        all_brushes.extend(detail.solids)
+
+    all_brushes = list(template_data.world)
+    if template_data.detail is not None:
+        all_brushes.extend(template_data.detail.solids)
+
     rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*origin)
 
     # Even if not axis-aligned, make mostly-flat surfaces
@@ -1117,7 +1115,7 @@ def retexture_template(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
 
-    for over in overlays:
+    for over in template_data.overlay:
         mat = over['material'].casefold()
         if mat in replace_tex:
             over['material'] = random.choice(replace_tex[mat])

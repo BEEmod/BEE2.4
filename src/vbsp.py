@@ -2660,24 +2660,22 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos = Vec(64, 0, 0)
         faith_targ_pos.localise(temp_origin, temp_angles)
 
-        world, detail, overlays = conditions.import_template(
+        temp_data = conditions.import_template(
             get_opt('static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
             force_type=conditions.TEMP_TYPES.detail,
         )
-    conditions.retexture_template(
-        world,
-        detail,
-        overlays,
-        origin=Vec.from_str(ent['origin']),
-        force_colour=(
-            conditions.MAT_TYPES.white
-            if pan_type == 'white' else
-            conditions.MAT_TYPES.black
-        ),
-        use_bullseye=is_bullseye,
-    )
+        conditions.retexture_template(
+            temp_data,
+            origin=Vec.from_str(ent['origin']),
+            force_colour=(
+                conditions.MAT_TYPES.white
+                if pan_type == 'white' else
+                conditions.MAT_TYPES.black
+            ),
+            use_bullseye=is_bullseye,
+        )
 
     # Search for the info_targets of catapults aimed at the panel,
     # and adjust them so they're placed precicely on the surface.

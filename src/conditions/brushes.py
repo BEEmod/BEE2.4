@@ -296,7 +296,7 @@ def res_add_brush(inst, res):
     point2.rotate_by_str(inst['angles'])
 
     origin = Vec.from_str(inst['origin'])
-    point1 += origin # Then offset to the location of the instance
+    point1 += origin  # Then offset to the location of the instance
     point2 += origin
 
     tex_type = res['type', None]
@@ -432,7 +432,7 @@ def res_import_template(inst, res):
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    world, detail, over = conditions.import_template(
+    temp_data = conditions.import_template(
         temp_id,
         origin,
         angles,
@@ -440,9 +440,7 @@ def res_import_template(inst, res):
         force_type=force_type,
     )
     conditions.retexture_template(
-        world,
-        detail,
-        over,
+        temp_data,
         origin,
         replace_tex,
         force_colour,
