@@ -380,11 +380,4 @@ def main(argv):
     LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
-    try:
-        main(sys.argv)
-    except Exception as e:
-        import logging
-        # Log the error, finalise the logs, and then crash.
-        LOGGER.exception('Exception Occurred:')
-        logging.shutdown()
-        raise
+    main(sys.argv)

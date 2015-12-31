@@ -21,12 +21,12 @@ if __name__ == '__main__':
 from tkinter import messagebox
 
 import traceback
-import logging
 
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
 from tk_tools import TK_ROOT
+
 import UI
 import loadScreen
 import paletteLoader
@@ -156,16 +156,13 @@ if __name__ == '__main__':
                 icon=messagebox.ERROR,
             )
 
-        # Log the error.
-        LOGGER.exception('Exception Occurred:\n' + err)
-        logging.shutdown()
-
         try:
             # Try to turn on the logging window for next time..
             GEN_OPTS['Debug']['show_log_win'] = '1'
             GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
             GEN_OPTS.save()
         except Exception:
+            # Ignore failures...
             pass
 
         # We still want to crash!

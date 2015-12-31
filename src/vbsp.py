@@ -3079,11 +3079,4 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        import logging
-        # Log the error, finalise the logs, and then crash.
-        LOGGER.exception('Exception Occurred:')
-        logging.shutdown()
-        raise
+    main()
