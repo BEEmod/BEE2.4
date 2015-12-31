@@ -3,8 +3,12 @@ import utils
 
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
-    STYLE_VARS, VOICE_ATTR, OPTIONS,
 )
+import vbsp
+
+STYLE_VARS = vbsp.settings['style_vars']
+OPTIONS = vbsp.settings['options']
+VOICE_ATTR = vbsp.settings['has_attr']
 
 
 @make_flag('styleVar')
