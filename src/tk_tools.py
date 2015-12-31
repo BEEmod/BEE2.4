@@ -22,6 +22,38 @@ if utils.WIN:
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
 
+def hook_tk_errors():
+    """TKinter catches and swallows callback errors.
+
+     we need to hook into that to log those seperately.
+    """
+    import traceback
+    main_logger = utils.getLogger()
+
+    def tk_error(exc_type, exc_value, exc_tb):
+        """Log TK errors."""
+        # The exception is caught inside the TK code.
+        # We don't care about that, so try and move the traceback up
+        # one level.
+        if exc_tb.tb_next:
+            exc_tb = exc_tb.tb_next
+        main_logger.error(
+            'TKinter callback exception occurred:\n{}',
+            ''.join(
+                traceback.format_exception(
+                    exc_type,
+                    exc_value,
+                    exc_tb,
+                )
+            ),
+        )
+        # Don't shutdown - most of the time, the TK errors won't
+        # shutdown the application.
+
+    TK_ROOT.report_callback_exception = tk_error
+hook_tk_errors()  # Always do this.
+
+
 def event_cancel(*args, **kwargs):
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
