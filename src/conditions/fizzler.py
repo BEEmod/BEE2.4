@@ -9,7 +9,7 @@ import utils
 import vmfLib as VLib
 import vbsp
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
 
 @make_result('custFizzler')

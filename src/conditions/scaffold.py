@@ -10,7 +10,7 @@ import conditions
 import utils
 import vbsp
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
 
 
 def scaff_scan(inst_list, start_ent):

@@ -17,7 +17,7 @@ from typing import (
     Dict, List, Tuple, NamedTuple
 )
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()

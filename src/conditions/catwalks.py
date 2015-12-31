@@ -9,7 +9,7 @@ import conditions
 import utils
 import vbsp
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.catwalks')
 
 CATWALK_TYPES = {
     utils.CONN_TYPES.straight: 'straight_128',

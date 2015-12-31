@@ -11,7 +11,7 @@ import vmfLib as VLib
 import conditions
 import vbsp
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
 TEX_DEFAULT = [
     ('squarebeams', 'anim_wp/framework/squarebeams'),

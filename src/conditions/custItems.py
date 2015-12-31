@@ -21,7 +21,7 @@ IND_PANEL_TYPES = {
     'none': '',
 }
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.custItems')
 
 
 @make_result_setup('custOutput')
