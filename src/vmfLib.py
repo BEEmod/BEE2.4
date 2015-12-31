@@ -280,7 +280,7 @@ class VMF:
     def remove_ent(self, item):
         """Remove an entity from the map.
 
-        After this is called, the entity will no longer by exported.
+        After this is called, the entity will no longer be exported.
         The object still exists, so it can be reused.
         """
         self.entities.remove(item)
