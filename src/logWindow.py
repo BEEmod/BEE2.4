@@ -53,26 +53,54 @@ class TextHandler(logging.Handler):
         for level, colour in LVL_COLOURS.items():
             widget.tag_config(
                 logging.getLevelName(level),
-                foreground=colour
+                foreground=colour,
+                # For multi-line messages, indent this much.
+                lmargin2=30,
             )
         widget.tag_config(
             logging.getLevelName(logging.CRITICAL),
             background='red',
         )
+        # If multi-line messages contain carriage returns, lmargin2 doesn't
+        # work. Add an additional tag for that.
+        widget.tag_config(
+            'INDENT',
+            lmargin1=30,
+            lmargin2=30,
+        )
+
         widget['state'] = "disabled"
 
     def emit(self, record: logging.LogRecord):
         """Add a logging message."""
 
+        msg = record.msg
+        if isinstance(record.msg, utils.LogMessage):
+            # Ensure we don't use the extra ASCII indents here.
+            record.msg = record.msg.format_msg()
+
         self.widget['state'] = "normal"
+        # We don't want to indent the first line.
+        firstline, *lines = self.format(record).split('\n')
+
         self.widget.insert(
             END,
             # Start with a newline so it doesn't end with one.
-            '\n' + self.format(record),
+            '\n' + firstline,
             (record.levelname,),
         )
+        for line in lines:
+            self.widget.insert(
+                END,
+                '\n' + line,
+                # Indent following lines.
+                (record.levelname, 'INDENT'),
+            )
         self.widget.see(END)  # Scroll to the end
         self.widget['state'] = "disabled"
+
+        # Undo the record overwrite, so other handlers get the correct object.
+        record.msg = msg
 
 
 def set_visible(is_visible: bool):
