@@ -732,13 +732,16 @@ def init_logging(filename: str=None) -> logging.Logger:
     return LoggerAdapter(logger)
 
 
-def getLogger(name: str) -> logging.Logger:
+def getLogger(name: str='') -> logging.Logger:
     """Get the named logger object.
 
     This puts the logger into the BEE2 namespace, and wraps it to
     use str.format() instead of % formatting.
     """
-    return LoggerAdapter(logging.getLogger('BEE2.' + name))
+    if name:
+        return LoggerAdapter(logging.getLogger('BEE2.' + name))
+    else:  # Allow retrieving the main logger.
+        return LoggerAdapter(logging.getLogger('BEE2'))
 
 
 class EmptyMapping(abc.MutableMapping):
