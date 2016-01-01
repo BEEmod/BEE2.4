@@ -190,6 +190,20 @@ TEMPLATE_RETEXTURE = {
 
     'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
+TEMP_TILE_PIX_SIZE = {
+    # The width in texture pixels of each tile size.
+    # We decrease offset to this much +- at maximum (so adjacient template
+    # brushes merge with each other). This still allows creating brushes
+    # with half-grid offsets.
+    '4x4': 128,
+    'floor': 128,  # == 4x4
+    'ceiling': 128,
+
+    '2x2': 256,
+
+    'wall': 512,
+    'special': 512,
+}
 
 del B, W
 
@@ -1037,10 +1051,10 @@ def retexture_template(
             if force_grid is not None:
                 grid_size = force_grid
 
-            if 1 in norm or -1 in norm:
-                # If axis-aligned, make the orientation aligned to world
-                # That way multiple items merge well, and walls are upright
-                face.offset = 0
+            if 1 in norm or -1 in norm:  # Facing NSEW or up/down
+                # Save the originals
+                u_off = face.uaxis.offset
+                v_off = face.vaxis.offset
 
                 # Floor / ceiling is always 1 size - 4x4
                 if norm.z == (0, 0, 1):
@@ -1060,6 +1074,12 @@ def retexture_template(
                 elif norm == (0, -1, 0) or norm == (0, 1, 0):
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
+
+                # If axis-aligned, make the orientation aligned to world
+                # That way multiple items merge well, and walls are upright.
+                # We allow offsets < 1 grid tile, so items can be offset.
+                face.uaxis.offset = u_off % TEMP_TILE_PIX_SIZE[grid_size]
+                face.vaxis.offset = v_off % TEMP_TILE_PIX_SIZE[grid_size]
 
             if use_bullseye:
                 # We want to use the bullseye textures, instead of normal
