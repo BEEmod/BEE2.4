@@ -75,8 +75,6 @@ def flag_instvar(inst, flag):
         return inst.fixup[variable] == value
 
 
-
-
 @make_result('rename', 'changeInstance')
 def res_change_instance(inst, res):
     """Set the file to a value."""

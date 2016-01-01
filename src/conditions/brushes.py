@@ -461,10 +461,13 @@ def res_hollow_brush(inst, res):
     loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
     loc += Vec.from_str(inst['origin'])
 
-    conditions.hollow_block(loc)
+    try:
+        group = SOLIDS[loc.as_tuple()]
+    except KeyError:
+        LOGGER.warning('No brush for hollowing at ({})', loc)
+        return  # No brush here?
 
-    if utils.conv_bool(res['RemoveFace', False]):
-        solid_grp = SOLIDS.get(loc.as_tuple())
-        if solid_grp:
-            del SOLIDS[loc.as_tuple()]
-            vbsp.VMF.remove_brush(solid_grp.solid)
+    conditions.hollow_block(
+        group,
+        remove_orig_face=utils.conv_bool(res['RemoveFace', False])
+    )

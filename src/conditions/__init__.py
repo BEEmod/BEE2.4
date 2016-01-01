@@ -190,6 +190,7 @@ TEMPLATE_RETEXTURE = {
 
     'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
+del B, W
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
     # We decrease offset to this much +- at maximum (so adjacient template
@@ -204,18 +205,6 @@ TEMP_TILE_PIX_SIZE = {
     'wall': 512,
     'special': 512,
 }
-
-del B, W
-
-# Normals pointing in each direction
-ALL_NORMALS = [
-    Vec(x=-1),
-    Vec(y=-1),
-    Vec(z=-1),
-    Vec(x=1),
-    Vec(y=1),
-    Vec(z=1),
-]
 
 
 class NextInstance(Exception):
@@ -978,7 +967,10 @@ def retexture_template(
     if template_data.detail is not None:
         all_brushes.extend(template_data.detail.solids)
 
-    rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*origin)
+    # Template faces are randomised per block and side. This means
+    # multiple templates in the same block get the same texture, so they
+    # can clip into each other without looking bad.
+    rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*(origin // 128))
 
     # Even if not axis-aligned, make mostly-flat surfaces
     # floor/ceiling (+-40 degrees)
@@ -1057,21 +1049,21 @@ def retexture_template(
                 v_off = face.vaxis.offset
 
                 # Floor / ceiling is always 1 size - 4x4
-                if norm.z == (0, 0, 1):
+                if norm.z == 1:
                     if grid_size != 'special':
                         grid_size = 'ceiling'
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, -1, 0)
-                elif norm == (0, 0, -1):
+                elif norm.z == -1:
                     if grid_size != 'special':
                         grid_size = 'floor'
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, -1, 0)
                 # Walls:
-                elif norm == (-1, 0, 0) or norm == (1, 0, 0):
+                elif norm.x != 0:
                     face.uaxis = VLib.UVAxis(0, 1, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
-                elif norm == (0, -1, 0) or norm == (0, 1, 0):
+                elif norm.y != 0:
                     face.uaxis = VLib.UVAxis(1, 0, 0)
                     face.vaxis = VLib.UVAxis(0, 0, -1)
 
@@ -1161,69 +1153,87 @@ def retexture_template(
             over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
 
 
-def hollow_block(pos: Vec):
+def hollow_block(solid_group: solidGroup, remove_orig_face=False):
     """Convert a solid into a embeddedVoxel-style block.
 
     The original brushes must be in the SOLIDS dict. They will be replaced.
     This returns a dict mapping normals to the new solidGroups.
-    If a side is nodrawed or otherwise missing, it will be ignored.
+    If remove_orig_face is true, the starting face will not be kept.
     """
-    block_pos = pos // 128 * 128 + (64, 64, 64)
+    import vbsp
+    orig_solid = solid_group.solid  # type: VLib.Solid
 
-    for norm in ALL_NORMALS:
-        brush_pos = (block_pos + norm * 64).as_tuple()
+    bbox_min, bbox_max = orig_solid.get_bbox()
+    if 4 in (bbox_max - bbox_min):
+        # If it's 4 units thick, skip hollowing - PeTI did it already.
+        if remove_orig_face:
+            VMF.remove_brush(orig_solid)
+            del SOLIDS[solid_group.face.get_origin().as_tuple()]
+        return
 
-        solid_group = SOLIDS.get(brush_pos)
-        if solid_group is None or -solid_group.normal != norm:
-            continue  # This isn't the correct face.
+    VMF.remove_brush(orig_solid)
 
-        bbox_min, bbox_max = solid_group.solid.get_bbox()
-        if 4 in (bbox_max - bbox_min):
-            # If it's 4 units thick, skip - embedFace brush which happens
-            # to be centered. We don't want to overlap those.
+    for face in orig_solid.sides:
+        if remove_orig_face and face is solid_group.face:
+            # Skip readding the original face, which removes it.
             continue
-        else:
-            del bbox_min, bbox_max
 
-        # Remove the original face from the solids list.
-        del SOLIDS[brush_pos]
-        try:
-            VMF.remove_brush(solid_group.solid)
-        except ValueError:
-            pass  # We might try to remove it multiple times, if not hollow.
+        solid_key = face.get_origin().as_tuple()
 
-        orig_face = solid_group.face  # type: VLib.Side
+        if face.mat.casefold() == 'tools/toolsnodraw' and face not in vbsp.IGNORED_FACES:
+            # If it's nodraw, we can skip it. If it's also in IGNORED_FACES
+            # though a condition has set it, so recreate it (it might be sealing
+            # the void behind a func_detail or model).
+            continue
+
+        # Remove this face from the solids list, and get the group.
+        face_group = SOLIDS.pop(solid_key)
 
         # Generate our new brush.
-        brushes = import_template(
+        new_brushes = import_template(
             TEMP_EMBEDDED_VOXEL,
-            block_pos,
+            face.get_origin(),
             # The normal Z is swapped...
-            Vec(norm.x, norm.y, -norm.z).to_angle(),
+            Vec(
+                face_group.normal.x,
+                face_group.normal.y,
+                -face_group.normal.z,
+            ).to_angle(),
             force_type=TEMP_TYPES.world,
         ).world
 
-        for brush in brushes:  # type: VLib.Solid
-            for side in brush.sides:
+        # Texture the new brush..
+        for brush in new_brushes:  # type: VLib.Solid
+            for new_face in brush.sides:
                 # The SKIP brush is the surface, all the others are nodraw.
-                if side.mat.casefold() != 'tools/toolsskip':
+                if new_face.mat.casefold() != 'tools/toolsskip':
                     continue
 
                 # Overwrite all the properties, to make the new brush
                 # the same as the original.
-                side.mat = orig_face.mat
-                side.uaxis = orig_face.uaxis
-                side.vaxis = orig_face.vaxis
-                side.planes = orig_face.planes
-                side.ham_rot = 0
+                new_face.mat = face.mat
+                new_face.uaxis = face.uaxis
+                new_face.vaxis = face.vaxis
+                new_face.planes = face.planes
+                new_face.ham_rot = 0
+
+                # Swap the two IDs - that way when the original face gets
+                # deleted the auto-set ID will vanish, leaving the original
+                # ID.
+                new_face.id, face.id = face.id, new_face.id
+
+                # Remove the new face, if the original wasn't in IGNORED_FACES.
+                if face not in vbsp.IGNORED_FACES:
+                    vbsp.IGNORED_FACES.remove(new_face)
 
                 # Make a new SolidGroup to match the face.
-                SOLIDS[brush_pos] = solidGroup(
-                    side,
+                SOLIDS[solid_key] = solidGroup(
+                    new_face,
                     brush,
-                    solid_group.normal,
-                    solid_group.color,
+                    face_group.normal,
+                    face_group.color,
                 )
+
 
 
 @make_flag('debug')
