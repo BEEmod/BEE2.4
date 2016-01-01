@@ -98,6 +98,9 @@ def load_palettes(pal_dir):
                 # Open from the subfolder
                 pos_file = open(os.path.join(path, 'positions.txt'))
                 prop_file = open(os.path.join(path, 'properties.txt'))
+            else: # A non-palette file, skip it.
+                LOGGER.debug('Skipping "{}"', name)
+                continue
         except (KeyError, FileNotFoundError):
             #  KeyError is returned by zipFile.open() if file is not present
             LOGGER.warning('Bad palette file "{}"!', name)
