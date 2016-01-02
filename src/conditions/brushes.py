@@ -392,12 +392,20 @@ def res_import_template_setup(res):
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
+    replace_brush = res['replaceBrush', None]
+    if replace_brush:
+        replace_brush_pos = Vec.from_str(replace_brush)
+        replace_brush_pos.z -= 64  # 0 0 0 defaults to the floor.
+    else:
+        replace_brush_pos = None
+
     return (
         temp_id,
         dict(replace_tex),
         force_colour,
         force_grid,
         force_type,
+        replace_brush_pos,
     )
 
 
@@ -416,6 +424,9 @@ def res_import_template(inst, res):
     - replace: A block of template material -> replacement textures.
             This is case insensitive - any texture here will not be altered
             otherwise.
+    - replaceBrush: The position of a brush to replace (0 0 0=the surface).
+            This brush will be removed, and overlays will be fixed to use
+            all faces with the same normal.
     """
     (
         temp_id,
@@ -423,6 +434,7 @@ def res_import_template(inst, res):
         force_colour,
         force_grid,
         force_type,
+        replace_brush_pos,
     ) = res.value
 
     if temp_id not in TEMPLATES:
@@ -448,6 +460,42 @@ def res_import_template(inst, res):
         force_colour,
         force_grid,
     )
+
+    # This is the original brush the template is replacing. We fix overlay
+    # face IDs, so this brush is replaced by the faces in the template pointing
+    # the same way.
+    if replace_brush_pos is None:
+        return
+
+    pos = Vec(replace_brush_pos).rotate(angles.x, angles.y, angles.z)
+    pos += origin
+
+    try:
+        brush_group = SOLIDS[pos.as_tuple()]
+    except KeyError:
+        return
+
+    vbsp.VMF.remove_brush(brush_group.solid)
+    new_ids = []
+
+    all_brushes = temp_data.world
+    if temp_data.detail is not None:
+        for ent in temp_data.detail:
+            all_brushes.extend(ent.solids)
+
+    for brush in all_brushes:  # type: VLib.Solid
+        for face in brush.sides:
+            # Only faces pointing the same way!
+            if face.normal() == brush_group.normal:
+                # Skip tool brushes (nodraw, player clips..)
+                if face.mat.casefold().startswith('tools/'):
+                    continue
+                new_ids.append(str(face.id))
+
+    if new_ids:
+        conditions.reallocate_overlays({
+            str(brush_group.face.id): new_ids,
+        })
 
 
 @make_result('HollowBrush')
