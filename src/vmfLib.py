@@ -1529,7 +1529,7 @@ class Entity:
         st += "}\n"
         return st
 
-    def __getitem__(self, key, default=''):
+    def __getitem__(self, key, default='') -> str:
         """Allow using [] syntax to search for keyvalues.
 
         - This will return '' if the value is not present.

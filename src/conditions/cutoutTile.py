@@ -286,7 +286,7 @@ def res_cutout_tile(inst, res):
 
     add_floor_sides(floor_edges)
 
-    reallocate_overlays(overlay_ids)
+    conditions.reallocate_overlays(overlay_ids)
 
     return True
 
@@ -645,25 +645,6 @@ def make_displacement(
         )
         for y in range(grid_size)
     ]
-
-
-
-def reallocate_overlays(mapping):
-    """Fix any overlay faces which were removed.
-    This makes antlines continue to appear on the small tiles.
-    """
-    for overlay in conditions.VMF.by_class['info_overlay']:
-        sides = overlay['sides', ''].split(' ')
-        for side in sides[:]:
-            if side not in mapping:
-                continue
-            sides.remove(side)
-            sides.extend(mapping[side])
-        if not sides:
-            # The overlay doesn't have any sides at all!
-            conditions.VMF.remove_ent(overlay)
-        else:
-            overlay['sides'] = ' '.join(sides)
 
 
 def add_floor_sides(locs):

@@ -779,6 +779,25 @@ def remove_ant_toggle(toggle_ent):
             ent.remove()
 
 
+def reallocate_overlays(mapping: Dict[str, List[str]]):
+    """Replace one side ID with others in all overlays.
+
+    The IDs should be strings.
+    """
+    for overlay in VMF.by_class['info_overlay']:  # type: VLib.Entity
+        sides = overlay['sides', ''].split(' ')
+        for side in sides[:]:
+            if side not in mapping:
+                continue
+            sides.remove(side)
+            sides.extend(mapping[side])
+        if not sides:
+            # The overlay doesn't have any sides at all!
+            VMF.remove_ent(overlay)
+        else:
+            overlay['sides'] = ' '.join(sides)
+
+
 def set_ent_keys(ent, inst, prop_block, suffix=''):
     """Copy the given key prop block to an entity.
 
@@ -1233,7 +1252,6 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
                     face_group.normal,
                     face_group.color,
                 )
-
 
 
 @make_flag('debug')
