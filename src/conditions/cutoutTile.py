@@ -171,9 +171,9 @@ def res_cutout_tile(inst, res):
         inst.remove()  # Remove the instance itself from the map.
     for start_floor, end_floor in FLOOR_IO:
         if end_floor not in INST_LOCS:
-            # Not a marker!
-            for inst in conditions.VMF.by_target[end_floor]:
-                inst.remove()
+            # Not a marker - remove this and the antline.
+            for toggle in conditions.VMF.by_target[end_floor]:
+                conditions.remove_ant_toggle(toggle)
             continue
 
         detail_ent = conditions.VMF.create_ent(
