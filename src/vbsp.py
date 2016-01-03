@@ -319,6 +319,7 @@ IGNORED_OVERLAYS = set()
 
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
+PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
 
 ##################
 # UTIL functions #
@@ -2782,6 +2783,12 @@ def packlist_cond(_, res):
 
     return conditions.RES_EXHAUSTED
 
+@conditions.make_result('PackRename')
+def packlist_cond_rename(_, res):
+    """Add a file to the packlist, saved under a new name."""
+    PACK_RENAME[res['dest']] = res['file']
+    return conditions.RES_EXHAUSTED
+
 
 def make_packlist(map_path):
     """Write the list of files that VRAD should pack."""
@@ -2837,7 +2844,11 @@ def make_packlist(map_path):
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
         for file in sorted(PACK_FILES):
             f.write(file + '\n')
-            LOGGER.info(file)
+            LOGGER.info('"{}"', file)
+        for dest, file in sorted(PACK_RENAME.items()):
+            f.write('{}\t{}\n'.format(file, dest))
+            LOGGER.info('"{}" as "{}"', file, dest)
+
 
     LOGGER.info('Packlist written!')
 
