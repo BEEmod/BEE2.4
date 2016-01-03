@@ -768,7 +768,10 @@ def widen_fizz_brush(brush, thickness, bounds=None):
 
 
 def remove_ant_toggle(toggle_ent):
-    """Remove a texture_toggle, plus the associated antline."""
+    """Remove a texture_toggle instance , plus the associated antline.
+
+    For non-toggle instances, they will just be removed.
+    """
     toggle_ent.remove()
 
     # Assume anything with '$indicator_name' is a toggle instance
