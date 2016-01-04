@@ -1170,6 +1170,10 @@ class Vec:
             self.y += other.y
             self.z += other.z
             return self
+        elif isinstance(other, tuple):
+            self.x += other[0]
+            self.y += other[1]
+            self.z += other[2]
         else:
             orig = self.x, self.y, self.z
             try:
@@ -1193,6 +1197,10 @@ class Vec:
             self.y -= other.y
             self.z -= other.z
             return self
+        elif isinstance(other, tuple):
+            self.x -= other[0]
+            self.y -= other[1]
+            self.z -= other[2]
         else:
             orig = self.x, self.y, self.z
             try:
