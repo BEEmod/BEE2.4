@@ -142,6 +142,11 @@ def res_make_catwalk(_, res):
         connections[inst] = [False, False, False, False]
         markers[inst['targetname']] = inst
 
+        # Snap the markers to the grid. If on glass it can become offset...
+        origin = Vec.from_str(inst['origin'])
+        origin = origin // 128 * 128  # type: Vec
+        origin += 64
+
         while origin.as_tuple() in conditions.GOO_LOCS:
             # The instance is in goo! Switch to floor orientation, and move
             # up until it's in air.
