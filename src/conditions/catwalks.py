@@ -108,6 +108,7 @@ def res_make_catwalk(_, res):
         Support_Wall: A support extending from the East wall.
         Support_Ceil: A support extending from the ceiling.
         Support_Floor: A support extending from the floor.
+        Support_Goo: A floor support, designed for goo pits.
         Single_Wall: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
@@ -120,7 +121,8 @@ def res_make_catwalk(_, res):
         (
             'straight_128', 'straight_256', 'straight_512',
             'corner', 'tjunction', 'crossjunction', 'end', 'stair', 'end_wall',
-            'support_wall', 'support_ceil', 'support_floor', 'single_wall',
+            'support_wall', 'support_ceil', 'support_floor', 'support_goo',
+            'single_wall',
             'markerInst',
         )
     }
@@ -132,12 +134,21 @@ def res_make_catwalk(_, res):
     connections = {}  # The directions this instance is connected by (NSEW)
     markers = {}
 
+    # Find all our markers, so we can look them up by targetname.
     for inst in vbsp.VMF.by_class['func_instance']:
         if inst['file'].casefold() not in marker:
             continue
         #                   [North, South, East,  West ]
         connections[inst] = [False, False, False, False]
         markers[inst['targetname']] = inst
+
+        while origin.as_tuple() in conditions.GOO_LOCS:
+            # The instance is in goo! Switch to floor orientation, and move
+            # up until it's in air.
+            inst['angles'] = '0 0 0'
+            origin.z += 128
+
+        inst['origin'] = str(origin)
 
     if not markers:
         return RES_EXHAUSTED
@@ -233,7 +244,13 @@ def res_make_catwalk(_, res):
 
         # Add regular supports
         if normal == (0, 0, 1):
-            supp = instances['support_floor']
+            # If in goo, use different supports!
+            origin = Vec.from_str(inst['origin'])
+            origin.z -= 128
+            if origin.as_tuple() in conditions.GOO_LOCS:
+                supp = instances['support_goo']
+            else:
+                supp = instances['support_floor']
         elif normal == (0, 0, -1):
             supp = instances['support_ceil']
         else:
