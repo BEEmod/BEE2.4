@@ -1183,7 +1183,7 @@ class Vec:
             except TypeError as e:
                 self.x, self.y, self.z = orig
                 raise TypeError(
-                    'Cannot add ' + type(other) + ' to Vector!'
+                    'Cannot add {} to Vector!'.format(type(other))
                 ) from e
             return self
 
@@ -1210,7 +1210,7 @@ class Vec:
             except TypeError as e:
                 self.x, self.y, self.z = orig
                 raise TypeError(
-                    'Cannot subtract ' + type(other) + ' from Vector!'
+                    'Cannot subtract {} from Vector!'.format(type(other))
                 ) from e
             return self
 
