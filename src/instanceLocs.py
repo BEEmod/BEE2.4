@@ -110,13 +110,17 @@ SUBITEMS = {
     'ball_black': 5,
     'edgeless_white': 4,
     'edgeless_black': 5,
-    # Without the texture default to the white one.
-    'btn_weighted': 0,
-    'btn_floor': 0,
-    'btn_cube': 2,
-    'btn_sphere': 4,
-    'btn_ball': 4,
-    'btn_edgeless': 4,
+
+    # Combined buttom parts
+    'btn_weighted': (0, 1),
+    'btn_floor': (0, 1),
+    'btn_cube': (2, 3),
+    'btn_sphere': (4, 5),
+    'btn_ball': (4, 5),
+    'btn_edgeless': (4, 5),
+
+    'btn_white': (0, 2, 4),
+    'btn_black': (1, 3, 5),
 
     # Track platform
     'track_bottom_grate': 0,
@@ -129,10 +133,13 @@ SUBITEMS = {
     'track_plat_oscil': 5,
     'track_single': 6,
 
+    'track_rail': (1, 2, 3, 6),
+
     # Funnels
     'fun_emitter': 0,
     'fun_white': 1,
     'fun_black': 2,
+    'fun_frame': (1, 2),
 
     # Fizzler
     'fizz_base': 0,
@@ -246,10 +253,22 @@ def resolve(path) -> list:
                             '"' + val + '" is not a valid instance'
                             ' subtype or index!'
                         )
-                # Only add if it's actually in range, and skip "" values
-                if 0 <= ind < len(item_values) and item_values[ind] != '':
-                    out.append(item_values[ind])
-            return out
+                # SUBITEMS has tuple values, which represent multiple subitems.
+                if isinstance(ind, tuple):
+                    out.extend(ind)
+                else:
+                    out.append(ind)
+
+            # Convert to instance lists
+            return [
+                item_values[ind]
+                for ind in out
+
+                # Only use if it's actually in range
+                if 0 <= ind < len(item_values)
+                # Skip "" instance blocks
+                if item_values[ind] != ''
+            ]
         else:
             try:
                 # Skip "" instances
