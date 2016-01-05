@@ -321,6 +321,9 @@ TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
 PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
 
+
+PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
+
 ##################
 # UTIL functions #
 ##################
@@ -1917,7 +1920,18 @@ def random_walls():
             if face.mat.casefold() == 'anim_wp/framework/squarebeams':
                 fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
 
-            alter_mat(face, face_seed(face), texture_lock)
+            # Conditions can define special clumps for items, we want to
+            # do those if needed.
+            origin = face.get_origin()
+            for clump in PRESET_CLUMPS:
+                if clump.min_pos <= origin <= clump.max_pos:
+                    face.mat = clump.tex[get_tile_type(
+                        face.mat.casefold(),
+                        get_face_orient(face),
+                    )]
+                    break
+            else:  # No clump..
+                alter_mat(face, face_seed(face), texture_lock)
 
 
 Clump = namedtuple('Clump', [
@@ -1925,6 +1939,63 @@ Clump = namedtuple('Clump', [
     'max_pos',
     'tex',
 ])
+
+
+@conditions.make_result_setup('ForceClump')
+def cond_force_clump_setup(res):
+    point1 = Vec.from_str(res['point1'])
+    point2 = Vec.from_str(res['point2'])
+
+    # Except for white/black walls, all the textures fallback to each other.
+
+    white_tex = res['white']
+    white_floor = res['whiteFloor', white_tex]
+    white_4x4 = res['white4x4', white_tex]
+
+    black_tex = res['black']
+    black_floor = res['blackFloor', white_tex]
+    black_4x4 = res['black4x4', white_tex]
+
+    tex_data = {
+        'white.wall': white_tex,
+        'white.floor': white_floor,
+        'white.4x4': white_4x4,
+        'white.ceiling': res['whiteCeiling', white_floor],
+        'white.2x2': res['white2x2', white_4x4],
+
+        'black.wall': black_tex,
+        'black.floor': black_floor,
+        'black.4x4': black_4x4,
+        'black.ceiling': res['blackCeiling', black_floor],
+        'black.2x2': res['black2x2', black_floor],
+    }
+
+    return point1, point2, tex_data
+
+
+@conditions.make_result('SetAreaTex')
+def cond_force_clump(inst, res):
+    """Force an area to use certain textures.
+
+    This only works in styles using the clumping texture algorithm.
+    """
+    point1, point2, tex_data = res.value
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    point1 = point1.copy().rotate(*angles)
+    point1 += origin
+
+    point2 = point2.copy().rotate(*angles)
+    point2 += origin
+
+    min_pos, max_pos = Vec.bbox((point1, point2))
+
+    PRESET_CLUMPS.append(Clump(
+        min_pos,
+        max_pos,
+        tex_data
+    ))
 
 
 def clump_walls():
@@ -1965,7 +2036,11 @@ def clump_walls():
     clump_ceil = get_bool_opt('clump_ceil')
     clump_floor = get_bool_opt('clump_floor')
 
-    LOGGER.info('Clumping: {} clumps', clump_numb)
+    LOGGER.info(
+        'Clumping: {} clumps (+ {} special)',
+        clump_numb,
+        len(PRESET_CLUMPS),
+    )
 
     random.seed(MAP_SEED)
 
@@ -2022,6 +2097,20 @@ def clump_walls():
 
         orient = get_face_orient(face)
 
+        origin = face.get_origin()
+        # Conditions can define special clumps for items, do those first
+        # so they override the normal surfaces.
+        # We want to do that regardless of the clump_floor and clump_ceil
+        # settings
+        clump_changed = False
+        for clump in PRESET_CLUMPS:
+            if clump.min_pos <= origin <= clump.max_pos:
+                face.mat = clump.tex[get_tile_type(mat, orient)]
+                clump_changed = True
+                break
+        if clump_changed:
+            continue
+
         if (
                 (orient is ORIENT.floor and not clump_floor) or
                 (orient is ORIENT.ceiling and not clump_ceil)):
@@ -2030,7 +2119,6 @@ def clump_walls():
             continue
 
         # Clump the texture!
-        origin = face.get_origin()
         for clump in clumps:
             if clump.min_pos <= origin <= clump.max_pos:
                 face.mat = clump.tex[get_tile_type(mat, orient)]
