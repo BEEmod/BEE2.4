@@ -1503,7 +1503,10 @@ class Vec:
             # by zero errors - we want this to be a valid normal!
             return self.copy()
         else:
-            return self / self.mag()
+            # Adding 0 clears -0 values - we don't want those.
+            val = self / self.mag()
+            val += 0
+            return val
 
     def dot(self, other):
         """Return the dot product of both Vectors."""
