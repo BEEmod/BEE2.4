@@ -37,6 +37,7 @@ TEMPLATE_FILE = VLib.VMF()
 
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
+# The values stored for OBJ_TYPES
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 
 # This package contains necessary components, and must be available.

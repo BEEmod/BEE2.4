@@ -286,40 +286,20 @@ class Game:
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
-    def export(
-            self,
-            style,
-            all_items,
-            music,
-            skybox,
-            voice,
-            style_vars,
-            elevator,
-            pack_list,
-            editor_sounds,
-            should_refresh=False,
-            ):
+    def export(self, style, selected_objects: dict, should_refresh=False):
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
-        - We unlock the mandatory items if specified.
-        -
+        - For each object type, run its .export() function with the given
+        - item.
         """
+        selected_objects['Style'] = style.id
+
         LOGGER.info('-' * 20)
         LOGGER.info('Exporting Items and Style for "{}"!', self.name)
-        LOGGER.info('Style = {}', style)
-        LOGGER.info('Music = {}', music)
-        LOGGER.info('Voice = {}', voice)
-        LOGGER.info('Skybox = {}', skybox)
-        LOGGER.info('Elevator = {}', elevator)
-        LOGGER.info('Style Vars:')
-        LOGGER.info('  {')
-        for key, val in style_vars.items():
-            LOGGER.info('  {} = {!s}', key, val)
-        LOGGER.info('  }')
-        LOGGER.info('{} Pack Lists!', len(pack_list))
-        LOGGER.info('{} Editor Sounds!', len(editor_sounds))
-        LOGGER.info('-' * 20)
+
+        for obj, selected in selected_objects.items():
+            LOGGER.info('{} = {}', obj, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
@@ -342,11 +322,21 @@ class Game:
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
 
-        vbsp_config = style.config.copy()
+        vbsp_config = Property(None, [])
 
         # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
         # "Renderables" sections.
-        editoritems = Property("ItemData", list(style.editor.find_all('Item')))
+        editoritems = Property("ItemData", [])
+
+        # Export each object type.
+        for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
+            obj_data.cls.export(packageLoader.ExportData(
+                game=self,
+                selected=selected_objects.get(obj_name, None),
+                editoritems=editoritems,
+                vbsp_conf=vbsp_config,
+                selected_style=style,
+            ))
 
         for item in sorted(all_items):
             item_block, editor_parts, config_part = all_items[item].export()

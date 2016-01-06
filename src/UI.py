@@ -758,16 +758,21 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
+    # The chosen items on the palette
+    pal_data = [(it.id, it.subKey) for it in pal_picked]
+
     success = gameMan.selected_game.export(
-        chosen_style,
-        item_list,
-        music=musics.get(music_win.chosen_id, None),
-        skybox=skyboxes.get(skybox_win.chosen_id, None),
-        voice=voices.get(voice_win.chosen_id, None),
-        elevator=elevators.get(elev_win.chosen_id, None),
-        style_vars=style_vars,
-        pack_list=pack_lists,
-        editor_sounds=editor_sounds,
+        selected_objects={
+            # Specfify the 'chosen item' for each object type
+            'Music': music_win.chosen_id,
+            'Skybox': skybox_win.chosen_id,
+            'QuotePack': voice_win.chosen_id,
+            'Elevator': elev_win.chosen_id,
+            'Style': selected_style,
+            'Item': pal_data,  # A list of items on the palette..
+
+            # The others don't have one, so it defaults to None.
+        },
         should_refresh=not GEN_OPTS.get_bool(
             'General',
             'preserve_BEE2_resource_dir',
@@ -789,7 +794,7 @@ def export_editoritems(_=None):
             palettes.remove(pal)
     new_pal = paletteLoader.Palette(
         '<Last Export>',
-        [(it.id, it.subKey) for it in pal_picked],
+        pal_data,
         options={},
         filename='LAST_EXPORT.zip',
         )
