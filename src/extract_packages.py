@@ -49,7 +49,7 @@ def do_copy(zip_list, done_files):
                     # Don't re-extract images
                     if not loc.startswith(img_loc):
                         zip_file.extract(path, path=cache_path)
-                    with currently_done.get_lock():
+                    with done_files.get_lock():
                         done_files.value += 1
 
 

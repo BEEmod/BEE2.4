@@ -39,7 +39,7 @@ settings = {
     "packtrigger":     defaultdict(list),
 
     "voice_data":   Property("Quotes", []),
-    }
+}
 
 
 TEX_VALVE = {
@@ -66,10 +66,8 @@ TEX_VALVE = {
     "metal/metalgrate018": "special.grating",
     "effects/laserplane": "special.laserfield",
     "sky_black": "special.sky",
-    }
+}
 
-# Load and register these conditions
-import cutoutTile  # This uses TEX_VALVE, so ensure that's defined
 
 TEX_DEFAULTS = [
     # Extra default replacements we need to specially handle.
@@ -302,8 +300,17 @@ FIZZ_OPTIONS = [
 
 BEE2_config = None  # ConfigFile
 
-GAME_MODE = 'ERR'
-IS_PREVIEW = 'ERR'
+GAME_MODE = 'ERR'  # SP or COOP?
+# Are we in preview mode? (Spawn in entry door instead of elevator)
+IS_PREVIEW = 'ERR'  # type: bool
+
+# A seed value for randomness, based on the general map layout.
+# This stops patterns from repeating in different maps, but keeps it the same
+# when recompiling.
+MAP_RAND_SEED = ''
+
+# The actual map.
+VMF = None  # type: VLib.VMF
 
 # These are faces & overlays which have been forceably set by conditions,
 # and will not be overwritten later.
@@ -312,6 +319,10 @@ IGNORED_OVERLAYS = set()
 
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
+PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
+
+
+PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 ##################
 # UTIL functions #
@@ -1190,7 +1201,7 @@ def get_map_info():
     file_coop_corr = instanceLocs.resolve('[coopCorr]')
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
-    file_sp_door_frame = instanceLocs.resolve('[door_frame]')
+    file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1692,6 +1703,7 @@ def remove_static_ind_toggles():
             continue
 
         overlay = inst.fixup['$indicator_name', '']
+        # Remove if there isn't an overlay, or no associated ents.
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
     LOGGER.info('Done!')
@@ -1908,7 +1920,18 @@ def random_walls():
             if face.mat.casefold() == 'anim_wp/framework/squarebeams':
                 fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
 
-            alter_mat(face, face_seed(face), texture_lock)
+            # Conditions can define special clumps for items, we want to
+            # do those if needed.
+            origin = face.get_origin()
+            for clump in PRESET_CLUMPS:
+                if clump.min_pos <= origin <= clump.max_pos:
+                    face.mat = clump.tex[get_tile_type(
+                        face.mat.casefold(),
+                        get_face_orient(face),
+                    )]
+                    break
+            else:  # No clump..
+                alter_mat(face, face_seed(face), texture_lock)
 
 
 Clump = namedtuple('Clump', [
@@ -1916,6 +1939,63 @@ Clump = namedtuple('Clump', [
     'max_pos',
     'tex',
 ])
+
+
+@conditions.make_result_setup('ForceClump')
+def cond_force_clump_setup(res):
+    point1 = Vec.from_str(res['point1'])
+    point2 = Vec.from_str(res['point2'])
+
+    # Except for white/black walls, all the textures fallback to each other.
+
+    white_tex = res['white']
+    white_floor = res['whiteFloor', white_tex]
+    white_4x4 = res['white4x4', white_tex]
+
+    black_tex = res['black']
+    black_floor = res['blackFloor', white_tex]
+    black_4x4 = res['black4x4', white_tex]
+
+    tex_data = {
+        'white.wall': white_tex,
+        'white.floor': white_floor,
+        'white.4x4': white_4x4,
+        'white.ceiling': res['whiteCeiling', white_floor],
+        'white.2x2': res['white2x2', white_4x4],
+
+        'black.wall': black_tex,
+        'black.floor': black_floor,
+        'black.4x4': black_4x4,
+        'black.ceiling': res['blackCeiling', black_floor],
+        'black.2x2': res['black2x2', black_floor],
+    }
+
+    return point1, point2, tex_data
+
+
+@conditions.make_result('SetAreaTex')
+def cond_force_clump(inst, res):
+    """Force an area to use certain textures.
+
+    This only works in styles using the clumping texture algorithm.
+    """
+    point1, point2, tex_data = res.value
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+
+    point1 = point1.copy().rotate(*angles)
+    point1 += origin
+
+    point2 = point2.copy().rotate(*angles)
+    point2 += origin
+
+    min_pos, max_pos = Vec.bbox((point1, point2))
+
+    PRESET_CLUMPS.append(Clump(
+        min_pos,
+        max_pos,
+        tex_data
+    ))
 
 
 def clump_walls():
@@ -1956,7 +2036,11 @@ def clump_walls():
     clump_ceil = get_bool_opt('clump_ceil')
     clump_floor = get_bool_opt('clump_floor')
 
-    LOGGER.info('Clumping: {} clumps', clump_numb)
+    LOGGER.info(
+        'Clumping: {} clumps (+ {} special)',
+        clump_numb,
+        len(PRESET_CLUMPS),
+    )
 
     random.seed(MAP_SEED)
 
@@ -2013,6 +2097,20 @@ def clump_walls():
 
         orient = get_face_orient(face)
 
+        origin = face.get_origin()
+        # Conditions can define special clumps for items, do those first
+        # so they override the normal surfaces.
+        # We want to do that regardless of the clump_floor and clump_ceil
+        # settings
+        clump_changed = False
+        for clump in PRESET_CLUMPS:
+            if clump.min_pos <= origin <= clump.max_pos:
+                face.mat = clump.tex[get_tile_type(mat, orient)]
+                clump_changed = True
+                break
+        if clump_changed:
+            continue
+
         if (
                 (orient is ORIENT.floor and not clump_floor) or
                 (orient is ORIENT.ceiling and not clump_ceil)):
@@ -2021,7 +2119,6 @@ def clump_walls():
             continue
 
         # Clump the texture!
-        origin = face.get_origin()
         for clump in clumps:
             if clump.min_pos <= origin <= clump.max_pos:
                 face.mat = clump.tex[get_tile_type(mat, orient)]
@@ -2232,6 +2329,8 @@ def change_overlays():
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
+            # Overlays added by us, or conditions. These are styled aleady,
+            # don't touch them.
             continue
 
         if (over['targetname'] == 'exitdoor_stickman' or
@@ -2650,24 +2749,22 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos = Vec(64, 0, 0)
         faith_targ_pos.localise(temp_origin, temp_angles)
 
-        world, detail, overlays = conditions.import_template(
+        temp_data = conditions.import_template(
             get_opt('static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
             force_type=conditions.TEMP_TYPES.detail,
         )
-    conditions.retexture_template(
-        world,
-        detail,
-        overlays,
-        origin=Vec.from_str(ent['origin']),
-        force_colour=(
-            conditions.MAT_TYPES.white
-            if pan_type == 'white' else
-            conditions.MAT_TYPES.black
-        ),
-        use_bullseye=is_bullseye,
-    )
+        conditions.retexture_template(
+            temp_data,
+            origin=Vec.from_str(ent['origin']),
+            force_colour=(
+                conditions.MAT_TYPES.white
+                if pan_type == 'white' else
+                conditions.MAT_TYPES.black
+            ),
+            use_bullseye=is_bullseye,
+        )
 
     # Search for the info_targets of catapults aimed at the panel,
     # and adjust them so they're placed precicely on the surface.
@@ -2774,6 +2871,12 @@ def packlist_cond(_, res):
 
     return conditions.RES_EXHAUSTED
 
+@conditions.make_result('PackRename')
+def packlist_cond_rename(_, res):
+    """Add a file to the packlist, saved under a new name."""
+    PACK_RENAME[res['dest']] = res['file']
+    return conditions.RES_EXHAUSTED
+
 
 def make_packlist(map_path):
     """Write the list of files that VRAD should pack."""
@@ -2829,7 +2932,11 @@ def make_packlist(map_path):
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
         for file in sorted(PACK_FILES):
             f.write(file + '\n')
-            LOGGER.info(file)
+            LOGGER.info('"{}"', file)
+        for dest, file in sorted(PACK_RENAME.items()):
+            f.write('{}\t{}\n'.format(file, dest))
+            LOGGER.info('"{}" as "{}"', file, dest)
+
 
     LOGGER.info('Packlist written!')
 
@@ -2939,6 +3046,7 @@ def main():
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
+    folded_args = [arg.casefold() for arg in old_args]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:
@@ -2949,6 +3057,8 @@ def main():
             'arguments, with some extra arguments:\n'
             '-dump_conditions: Print a list of all condition flags,\n'
             '  results, and metaconditions.\n'
+            '-bee2_verbose: Print debug messages to the console.\n'
+            '-verbose: A default VBSP command, has the same effect as above.\n'
             '-force_peti: Force enabling map conversion. \n'
             "-force_hammer: Don't convert the map at all.\n"
             '-entity_limit: A default VBSP command, this is inspected to'
@@ -2956,7 +3066,16 @@ def main():
         )
         sys.exit()
 
-    if old_args[0].casefold() == '-dump_conditions':
+    # The first is just for us, the second is also for VBSP. We'll switch to
+    # verbose mode if VBSP is set to do so as well.
+    if '-bee2_verbose' in folded_args or '-verbose' in folded_args:
+        utils.stdout_loghandler.setLevel('DEBUG')
+        LOGGER.info('Switched to verbose logging.')
+
+    conditions.import_conditions()  # Import all the conditions and
+    # register them.
+
+    if '-dump_conditions' in folded_args:
         # Print all the condition flags, results, and metaconditions
         conditions.dump_conditions()
         sys.exit()
@@ -3057,11 +3176,4 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        import logging
-        # Log the error, finalise the logs, and then crash.
-        LOGGER.exception('Exception Occurred:')
-        logging.shutdown()
-        raise
+    main()

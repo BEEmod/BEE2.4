@@ -85,6 +85,12 @@ def load_config():
 def pack_file(zipfile, filename):
     """Check multiple locations for a resource file.
     """
+    if '\t' in filename:
+        # We want to rename the file!
+        filename, arcname = filename.split('\t')
+    else:
+        arcname = filename
+
     for poss_path in RES_ROOT:
         full_path = os.path.normpath(
             os.path.join(poss_path, filename)
@@ -92,7 +98,7 @@ def pack_file(zipfile, filename):
         if os.path.isfile(full_path):
             zipfile.write(
                 filename=full_path,
-                arcname=filename,
+                arcname=arcname,
             )
             break
     else:
@@ -380,11 +386,4 @@ def main(argv):
     LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
-    try:
-        main(sys.argv)
-    except Exception as e:
-        import logging
-        # Log the error, finalise the logs, and then crash.
-        LOGGER.exception('Exception Occurred:')
-        logging.shutdown()
-        raise
+    main(sys.argv)

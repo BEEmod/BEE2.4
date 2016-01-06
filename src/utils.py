@@ -32,6 +32,11 @@ LINUX = platform.startswith('linux')
 short_log_format = None
 long_log_format = None
 
+# Various logger handlers
+stdout_loghandler = None
+stderr_loghandler = None
+file_loghandler = None
+
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
 STEAM_IDS = {
@@ -582,41 +587,86 @@ def restart_app():
 
 
 class LogMessage:
+    """Allow using str.format() in logging messages.
+
+    The __str__() method performs the joining.
+    """
     def __init__(self, fmt, args, kwargs):
         self.fmt = fmt
         self.args = args
         self.kwargs = kwargs
+        self.has_args = kwargs or args
+
+    def format_msg(self):
+        # Only format if we have arguments!
+        # That way { or } can be used in regular messages.
+        if self.has_args:
+            f = self.fmt = str(self.fmt).format(*self.args, **self.kwargs)
+
+            # Don't repeat the formatting
+            del self.args, self.kwargs
+            self.has_args = False
+            return f
+        else:
+            return str(self.fmt)
 
     def __str__(self):
-        # Only format if we have arguments!
-        return str(self.fmt).format(*self.args, **self.kwargs)
+        """Format the string, and add an ASCII indent."""
+        msg = self.format_msg()
 
+        if '\n' not in msg:
+            return msg
+
+        # For multi-line messages, add an indent so they're associated
+        # with the logging tag.
+        lines = msg.split('\n')
+        if lines[-1].isspace():
+            # Strip last line if it's blank
+            del lines[-1]
+        # '|' beside all the lines, '|_ beside the last. Add an empty
+        # line at the end.
+        return '\n | '.join(lines[:-1]) + '\n |_' + lines[-1] + '\n'
 
 
 class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger, alias=None):
+        # Alias is a replacement module name for log messages.
+        self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
 
     def log(self, level, msg, *args, **kwargs):
         if self.isEnabledFor(level):
             self.logger._log(
                 level,
-                # Only use the format adapter if arguments exist
-                (
-                    LogMessage(msg, args, kwargs)
-                    if kwargs or args else
-                    msg
-                ),
+                LogMessage(msg, args, kwargs),
                 (),
+                extra={'alias': self.alias},
             )
+
+class NewLogRecord(logging.getLogRecordFactory()):
+    """Allow passing an alias for log modules."""
+
+    def getMessage(self):
+        """We have to hook here to change the value of .module.
+
+        It's called just before the formatting call is made.
+        """
+        if self.alias is not None:
+            self.module = self.alias
+        return str(self.msg)
+logging.setLogRecordFactory(NewLogRecord)
 
 
 def init_logging(filename: str=None) -> logging.Logger:
-    """Setup the logger and logging handlers."""
+    """Setup the logger and logging handlers.
+
+    If filename is set, all logs will be written to this file.
+    """
     global short_log_format, long_log_format
+    global stderr_loghandler, stdout_loghandler, file_loghandler
     import logging
     from logging import handlers
     import sys, io, os
@@ -640,14 +690,14 @@ def init_logging(filename: str=None) -> logging.Logger:
         # Make the directories the logs are in, if needed.
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-        # The log contains INFO and above logs.
+        # The log contains DEBUG and above logs.
         # We rotate through logs of 500kb each, so it doesn't increase too much.
         log_handler = handlers.RotatingFileHandler(
             filename,
             maxBytes=500 * 1024,
             backupCount=10,
         )
-        log_handler.setLevel(logging.INFO)
+        log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
 
         logger.addHandler(log_handler)
@@ -668,10 +718,10 @@ def init_logging(filename: str=None) -> logging.Logger:
             return ''
 
     if sys.stdout:
-        out_handler = logging.StreamHandler(sys.stdout)
-        out_handler.setLevel(logging.INFO)
-        out_handler.setFormatter(short_log_format)
-        logger.addHandler(out_handler)
+        stdout_loghandler = logging.StreamHandler(sys.stdout)
+        stdout_loghandler.setLevel(logging.INFO)
+        stdout_loghandler.setFormatter(short_log_format)
+        logger.addHandler(stdout_loghandler)
 
         if sys.stderr:
             def ignore_warnings(record: logging.LogRecord):
@@ -680,34 +730,58 @@ def init_logging(filename: str=None) -> logging.Logger:
                 Those are handled by stdError, and we don't want duplicates.
                 """
                 return record.levelno < logging.WARNING
-            out_handler.addFilter(ignore_warnings)
+            stdout_loghandler.addFilter(ignore_warnings)
     else:
         sys.stdout = NullStream()
 
     if sys.stderr:
-        err_handler = logging.StreamHandler(sys.stderr)
-        err_handler.setLevel(logging.WARNING)
-        err_handler.setFormatter(short_log_format)
-        logger.addHandler(err_handler)
+        stderr_loghandler = logging.StreamHandler(sys.stderr)
+        stderr_loghandler.setLevel(logging.WARNING)
+        stderr_loghandler.setFormatter(short_log_format)
+        logger.addHandler(stderr_loghandler)
     else:
         sys.stderr = NullStream()
+
+    # Use the exception hook to report uncaught exceptions, and finalise the
+    # logging system.
+    old_except_handler = sys.__excepthook__
+
+    def except_handler(*exc_info):
+        """Log uncaught exceptions."""
+        logger._log(
+            level=logging.ERROR,
+            msg='Uncaught Exception:',
+            args=(),
+            exc_info=exc_info,
+        )
+        logging.shutdown()
+        # Call the original handler - that prints to the normal console.
+        old_except_handler()
+
+    sys.__excepthook__ = except_handler
 
     return LoggerAdapter(logger)
 
 
-def getLogger(name: str) -> logging.Logger:
+def getLogger(name: str='', alias: str=None) -> logging.Logger:
     """Get the named logger object.
 
     This puts the logger into the BEE2 namespace, and wraps it to
     use str.format() instead of % formatting.
+    If set, alias is the name to show for the module.
     """
-    return LoggerAdapter(logging.getLogger('BEE2.' + name))
+    if name:
+        return LoggerAdapter(logging.getLogger('BEE2.' + name), alias)
+    else:  # Allow retrieving the main logger.
+        return LoggerAdapter(logging.getLogger('BEE2'), alias)
 
 
 class EmptyMapping(abc.MutableMapping):
     """A Mapping class which is always empty.
 
     Any modifications will be ignored.
+    This is used for default arguments, since it then ensures any changes
+    won't be kept, as well as allowing default.items() calls and similar.
     """
     __slots__ = []
 
@@ -749,7 +823,9 @@ class EmptyMapping(abc.MutableMapping):
     __marker = object()
 
     def pop(self, key, default=__marker):
-        raise KeyError
+        if default is self.__marker:
+            raise KeyError
+        return default
 
     def popitem(self):
         raise KeyError
@@ -929,7 +1005,6 @@ class Vec:
             abs(self.z),
         )
 
-
     def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
         """+ operation.
 
@@ -1095,6 +1170,10 @@ class Vec:
             self.y += other.y
             self.z += other.z
             return self
+        elif isinstance(other, tuple):
+            self.x += other[0]
+            self.y += other[1]
+            self.z += other[2]
         else:
             orig = self.x, self.y, self.z
             try:
@@ -1104,7 +1183,7 @@ class Vec:
             except TypeError as e:
                 self.x, self.y, self.z = orig
                 raise TypeError(
-                    'Cannot add ' + type(other) + ' to Vector!'
+                    'Cannot add {} to Vector!'.format(type(other))
                 ) from e
             return self
 
@@ -1118,6 +1197,10 @@ class Vec:
             self.y -= other.y
             self.z -= other.z
             return self
+        elif isinstance(other, tuple):
+            self.x -= other[0]
+            self.y -= other[1]
+            self.z -= other[2]
         else:
             orig = self.x, self.y, self.z
             try:
@@ -1127,7 +1210,7 @@ class Vec:
             except TypeError as e:
                 self.x, self.y, self.z = orig
                 raise TypeError(
-                    'Cannot subtract ' + type(other) + ' from Vector!'
+                    'Cannot subtract {} from Vector!'.format(type(other))
                 ) from e
             return self
 
@@ -1322,38 +1405,27 @@ class Vec:
 
     def mag(self):
         """Compute the distance from the vector and the origin."""
-        if self.z == 0:
-            return math.sqrt(self.x**2+self.y**2)
-        else:
-            return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def join(self, delim=', '):
         """Return a string with all numbers joined by the passed delimiter.
 
         This strips off the .0 if no decimal portion exists.
         """
-        x = int(self.x)
-        if x != self.x:
-            x = self.x
-
-        y = int(self.y)
-        if y != self.y:
-            y = self.y
-
-        z = int(self.z)
-        if z != self.z:
-            z = self.z
-        # convert to int to strip off .0 at end if whole number
-        return '{x!s}{delim}{y!s}{delim}{z!s}'.format(
-            x=x,
-            y=y,
-            z=z,
+        # :g strips the .0 off of floats if it's an integer.
+        return '{x:g}{delim}{y:g}{delim}{z:g}'.format(
+            x=self.x,
+            y=self.y,
+            z=self.z,
             delim=delim,
         )
 
     def __str__(self):
-        """Return a user-friendly representation of this vector."""
-        return "(" + self.join() + ")"
+        """Return the values, separated by spaces.
+
+        This is the main format in Valve's file formats.
+        """
+        return "{:g} {:g} {:g}".format(self.x, self.y, self.z)
 
     def __repr__(self):
         """Code required to reproduce this vector."""
@@ -1377,8 +1449,7 @@ class Vec:
             return self.y
         elif ind == 2 or ind == "z":
             return self.z
-        else:
-            return NotImplemented
+        raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def __setitem__(self, ind: Union[str, int], val: float):
         """Allow editing values by index instead of name if desired.
@@ -1393,7 +1464,7 @@ class Vec:
         elif ind == 2 or ind == "z":
             self.z = float(val)
         else:
-            return NotImplemented
+            raise KeyError('Invalid axis: {!r}'.format(ind))
 
     def as_tuple(self):
         """Return the Vector as a tuple."""
@@ -1401,10 +1472,7 @@ class Vec:
 
     def len_sq(self):
         """Return the magnitude squared, which is slightly faster."""
-        if self.z == 0:
-            return self.x**2 + self.y**2
-        else:
-            return self.x**2 + self.y**2 + self.z**2
+        return self.x**2 + self.y**2 + self.z**2
 
     def __len__(self):
         """The len() of a vector is the number of non-zero axes."""
@@ -1435,7 +1503,10 @@ class Vec:
             # by zero errors - we want this to be a valid normal!
             return self.copy()
         else:
-            return self / self.mag()
+            # Adding 0 clears -0 values - we don't want those.
+            val = self / self.mag()
+            val += 0
+            return val
 
     def dot(self, other):
         """Return the dot product of both Vectors."""

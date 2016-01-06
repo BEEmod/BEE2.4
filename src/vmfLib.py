@@ -3,6 +3,7 @@ Wraps property_parser tree in a set of classes which smartly handle
 specifics of VMF files.
 """
 import io
+import operator
 from collections import defaultdict, namedtuple
 from contextlib import suppress
 import itertools
@@ -208,6 +209,7 @@ class VMF:
         self.solid_id = IDMan()  # All occupied solid ids
         self.face_id = IDMan()  # Ditto for faces
         self.ent_id = IDMan()  # Same for entities
+        self.group_id = IDMan()  # Group IDs (not visgroups)
 
         # Allow quick searching for particular groups, without checking
         # the whole map
@@ -223,7 +225,7 @@ class VMF:
 
         # mapspawn entity, which is the entity world brushes are saved
         # to.
-        self.spawn = spawn or Entity(self, [])
+        self.spawn = spawn or Entity(self)
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
 
@@ -278,7 +280,7 @@ class VMF:
     def remove_ent(self, item):
         """Remove an entity from the map.
 
-        After this is called, the entity will no longer by exported.
+        After this is called, the entity will no longer be exported.
         The object still exists, so it can be reused.
         """
         self.entities.remove(item)
@@ -787,11 +789,7 @@ class Solid:
     @staticmethod
     def parse(vmf_file, tree, hidden=False):
         """Parse a Property tree into a Solid object."""
-        solid_id = utils.conv_int(tree["id", '-1'])
-        try:
-            solid_id = int(solid_id)
-        except TypeError:
-            solid_id = -1
+        solid_id = utils.conv_int(tree["id", '-1'], -1)
         sides = []
         for side in tree.find_all("side"):
             sides.append(Side.parse(vmf_file, side))
@@ -935,13 +933,14 @@ class UVAxis:
         )
 
     def __str__(self):
-        return '[{x} {y} {z} {off}] {scale}'.format(
+        """Generate the text form for this UV data."""
+        return '[{x:g} {y:g} {z:g} {off:g}] {scale:g}'.format(
             x=self.x,
             y=self.y,
             z=self.z,
             off=self.offset,
             scale=self.scale,
-        ).replace('.0', '')
+        )
 
 
 class Side:
@@ -1274,21 +1273,29 @@ class Entity:
     def __init__(
             self,
             vmf_file: VMF,
-            keys=None,
+            keys=utils.EmptyMapping,
             fixup=(),
             ent_id=-1,
             outputs=None,
             solids=None,
             editor=None,
-            hidden=False):
+            hidden=False,
+            groups=()):
         self.map = vmf_file
-        self.keys = keys or {}
+        self.keys = {
+            # Ensure all values are strings. This allows passing ints and Vecs
+            # normally.
+            k: str(v)
+            for k, v in
+            keys.items()
+        }
         self.fixup = EntityFixup(fixup)
         self.outputs = outputs or []  # type: List[Output]
         self.solids = solids or []  # type: List[Solid]
         self.id = vmf_file.ent_id.get_id(ent_id)
         self.hidden = hidden
         self.editor = editor or {'visgroup': []}
+        self.groups = list(groups)
 
         if 'logicalpos' not in self.editor:
             self.editor['logicalpos'] = '[0 ' + str(self.id) + ']'
@@ -1319,6 +1326,8 @@ class Entity:
         ]
         outs = [o.copy() for o in self.outputs]
 
+        new_groups = [group.copy() for group in self.groups]
+
         return Entity(
             vmf_file=map or self.map,
             keys=new_keys,
@@ -1328,6 +1337,7 @@ class Entity:
             solids=new_solids,
             editor=new_editor,
             hidden=self.hidden,
+            groups=new_groups,
         )
 
     @staticmethod
@@ -1339,6 +1349,7 @@ class Entity:
         outputs = []
         editor = {'visgroup': []}
         fixup = []
+        groups = []
         for item in tree_list:
             name = item.name
             if name == "id" and item.value.isnumeric():
@@ -1366,7 +1377,8 @@ class Entity:
                         for br in
                         item
                     )
-            # TODO: handle "group" blocks.
+            elif name == "group" and item.has_children():
+                groups.append(EntityGroup.parse(vmf_file, item))
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
@@ -1394,13 +1406,15 @@ class Entity:
 
         return Entity(
             vmf_file,
-            keys=keys,
-            ent_id=ent_id,
-            solids=solids,
-            outputs=outputs,
-            editor=editor,
-            hidden=hidden,
-            fixup=fixup)
+            keys,
+            fixup,
+            ent_id,
+            outputs,
+            solids,
+            editor,
+            hidden,
+            groups,
+        )
 
     def is_brush(self):
         """Is this Entity a brush entity?"""
@@ -1420,10 +1434,10 @@ class Entity:
         buffer.write(ind + ent_name + '\n')
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
-        for key in sorted(self.keys.keys()):
+        for key, value in sorted(self.keys.items(), key=operator.itemgetter(0)):
             buffer.write(
                 ind +
-                '\t"{}" "{!s}"\n'.format(key, self.keys[key])
+                '\t"{}" "{!s}"\n'.format(key, value)
             )
 
         self.fixup.export(buffer, ind)
@@ -1486,6 +1500,14 @@ class Entity:
         """Add the output to our list."""
         self.outputs.append(output)
 
+    def output_targets(self):
+        """Return a set of the targetnames this entity triggers."""
+        return {
+            out.target
+            for out in
+            self.outputs
+        }
+
     def remove(self):
         """Remove this entity from the map."""
         self.map.remove_ent(self)
@@ -1507,7 +1529,7 @@ class Entity:
         st += "}\n"
         return st
 
-    def __getitem__(self, key, default=''):
+    def __getitem__(self, key, default='') -> str:
         """Allow using [] syntax to search for keyvalues.
 
         - This will return '' if the value is not present.
@@ -1518,8 +1540,7 @@ class Entity:
           [] syntax.
         """
         if isinstance(key, tuple):
-            default = key[1]
-            key = key[0]
+            key, default = key
         key = key.casefold()
         for k in self.keys:
             if k.casefold() == key:
@@ -1533,21 +1554,16 @@ class Entity:
         - It is case-insensitive, so it will overwrite a key which only
           differs by case.
         """
-        if isinstance(key, tuple):
-            # Allow using += syntax with default
-            key, default = key
-        else:
-            default = None
         key_fold = key.casefold()
         for k in self.keys:
             if k.casefold() == key_fold:
                 # Check case-insensitively for this key first
-                orig_val = self.keys.get(k, default)
-                self.keys[k] = val
+                orig_val = self.keys.get(k)
+                self.keys[k] = str(val)
                 break
         else:
-            orig_val = self.keys.get(key, default)
-            self.keys[key] = val
+            orig_val = self.keys.get(key)
+            self.keys[key] = str(val)
 
         # Update the by_class/target dicts with our new value
         if key_fold == 'classname':
@@ -1735,6 +1751,64 @@ class EntityFixup:
                 # When exporting, pad with zeros if needed
                 buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
+
+
+class EntityGroup:
+    """Represents the 'group' blocks in entities.
+
+    This allows the grouping of brushes.
+    """
+    def __init__(
+            self,
+            map: VMF,
+            grp_id,
+            vis_shown=False,
+            vis_auto_shown=False,
+            ):
+        self.map = map
+        self.id = map.group_id.get_id(grp_id)
+        self.shown = vis_shown
+        self.auto_shown = vis_auto_shown
+
+    @classmethod
+    def parse(cls, vmf_file, props):
+        editor_block = props.find_key('editor', [])
+        return cls(
+            vmf_file,
+            props['id'],
+            vis_shown=utils.conv_bool(
+                editor_block['visgroupshown', None], True
+            ),
+            vis_auto_shown=utils.conv_bool(
+                editor_block['visgroupsautoshown', None], True
+            ),
+        )
+
+    def copy(self, map=None):
+        if map is None:
+            map = self.map
+        return EntityGroup(
+            map,
+            self.id,
+            self.shown,
+            self.auto_shown,
+        )
+
+    def export(self, buffer, ind):
+        buffer.write(ind + 'group\n')
+        buffer.write(ind + '\t{\n')
+        buffer.write(ind + '\t"id" "' + str(self.id) + '"\n')
+        buffer.write(ind + '\teditor\n')
+        buffer.write(ind + '\t\t{\n')
+        buffer.write(ind + '\t\t"visgroupshown" "{}"'.format(
+            utils.bool_as_int(self.shown)
+        ))
+        buffer.write(ind + '\t\t"visgroupautoshown" "{}"'.format(
+            utils.bool_as_int(self.auto_shown)
+        ))
+        buffer.write(ind + '\t\t}\n')
+        buffer.write(ind + '\t}')
+
 
 
 class Output:

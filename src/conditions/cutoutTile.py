@@ -11,7 +11,7 @@ import vmfLib as VLib
 import conditions
 import vbsp
 
-LOGGER = utils.getLogger(__name__)
+LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
 TEX_DEFAULT = [
     ('squarebeams', 'anim_wp/framework/squarebeams'),
@@ -146,7 +146,7 @@ def res_cutout_tile(inst, res):
             MATS[key] = [default]
 
     # Find our marker ents
-    for inst in conditions.VMF.by_class['func_instance']:
+    for inst in conditions.VMF.by_class['func_instance']: # type: VLib.Entity
         if inst['file'].casefold() not in item:
             continue
         targ = inst['targetname']
@@ -161,19 +161,19 @@ def res_cutout_tile(inst, res):
         loc = (orient * -64) + Vec.from_str(inst['origin'])
         INST_LOCS[targ] = loc
 
-        outputs = {out.target for out in inst.outputs}
-        for out in outputs:
+        for out in inst.output_targets():
             io_list.append((targ, out))
-        if not outputs and inst.fixup['$connectioncount'] == '0':
+
+        if not inst.outputs and inst.fixup['$connectioncount'] == '0':
             # If the item doesn't have any connections, 'connect'
             # it to itself so we'll generate a 128x128 tile segment.
             io_list.append((targ, targ))
         inst.remove()  # Remove the instance itself from the map.
     for start_floor, end_floor in FLOOR_IO:
         if end_floor not in INST_LOCS:
-            # Not a marker!
-            for inst in conditions.VMF.by_target[end_floor]:
-                inst.remove()
+            # Not a marker - remove this and the antline.
+            for toggle in conditions.VMF.by_target[end_floor]:
+                conditions.remove_ant_toggle(toggle)
             continue
 
         detail_ent = conditions.VMF.create_ent(
@@ -286,7 +286,7 @@ def res_cutout_tile(inst, res):
 
     add_floor_sides(floor_edges)
 
-    reallocate_overlays(overlay_ids)
+    conditions.reallocate_overlays(overlay_ids)
 
     return True
 
@@ -310,14 +310,12 @@ def convert_floor(
         # We need to generate a squarebeams brush to fill this gap.
 
         brush.face.mat = 'tools/toolsnodraw'  # It won't be visible
-        world, detail, over = conditions.import_template(
+        temp_data = conditions.import_template(
             temp_name=FLOOR_TEMP_PILLAR,
             origin=loc,
         )
         conditions.retexture_template(
-            world,
-            detail,
-            over,
+            temp_data,
             loc,
             # Switch to use the configured squarebeams texture
             replace_tex={
@@ -649,25 +647,6 @@ def make_displacement(
     ]
 
 
-
-def reallocate_overlays(mapping):
-    """Fix any overlay faces which were removed.
-    This makes antlines continue to appear on the small tiles.
-    """
-    for overlay in conditions.VMF.by_class['info_overlay']:
-        sides = overlay['sides', ''].split(' ')
-        for side in sides[:]:
-            if side not in mapping:
-                continue
-            sides.remove(side)
-            sides.extend(mapping[side])
-        if not sides:
-            # The overlay doesn't have any sides at all!
-            conditions.VMF.remove_ent(overlay)
-        else:
-            overlay['sides'] = ' '.join(sides)
-
-
 def add_floor_sides(locs):
     """We need to replace nodraw textures around the outside of the holes.
 
@@ -703,7 +682,7 @@ def add_floor_sides(locs):
 
         diag_loc = (wall_loc.x, wall_loc.y, wall_loc.z + 128)
 
-        world, detail, over = conditions.import_template(
+        temp_data = conditions.import_template(
             # If there's a wall surface directly above this point
             # or a ceiling brush in the next block over
             # we want to use a world brush to seal the leak.
@@ -718,9 +697,7 @@ def add_floor_sides(locs):
             angles=Vec(0, rot, 0),
         )
         conditions.retexture_template(
-            world,
-            detail,
-            over,
+            temp_data,
             wall_loc,
             # Switch to use the configured squarebeams texture
             replace_tex={

@@ -1,22 +1,32 @@
-from multiprocessing import freeze_support
-if __name__ == '__main__':
-    # Make multiprocessing work correctly when frozen.
-    # This must run immediately - in this case, multiprocessing overrides
-    # the whole application.
-    freeze_support()
-
 import utils
-LOGGER = utils.init_logging('../logs/BEE2-error.log')
+from multiprocessing import freeze_support
+from multiprocessing.spawn import is_forking
+import sys
+if __name__ == '__main__':
+    if is_forking(sys.argv):
+        # Initialise the logger, which ensures sys.stdout & stderr are availible
+        # This fixes a bug in multiprocessing. We don't want to reopen the logfile
+        # again though.
+        utils.init_logging()
+
+        # Make multiprocessing work correctly when frozen.
+        # This must run immediately - in this case, multiprocessing overrides
+        # the whole application.
+        freeze_support()
+    else:
+        # We need to initiallise logging as early as possible - that way
+        # it can record any errors in the initialisation of modules.
+        LOGGER = utils.init_logging('../logs/BEE2-error.log')
 
 from tkinter import messagebox
 
 import traceback
-import logging
 
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
 
 from tk_tools import TK_ROOT
+
 import UI
 import loadScreen
 import paletteLoader
@@ -146,16 +156,13 @@ if __name__ == '__main__':
                 icon=messagebox.ERROR,
             )
 
-        # Log the error.
-        LOGGER.exception('Exception Occurred:\n' + err)
-        logging.shutdown()
-
         try:
             # Try to turn on the logging window for next time..
             GEN_OPTS['Debug']['show_log_win'] = '1'
             GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
             GEN_OPTS.save()
         except Exception:
+            # Ignore failures...
             pass
 
         # We still want to crash!
