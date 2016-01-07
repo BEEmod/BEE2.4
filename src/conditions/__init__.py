@@ -1478,6 +1478,13 @@ def res_goo_debris(_, res):
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.
     """
+    import vbsp
+
+    if vbsp.settings['pit'] is not None:
+        # We have bottomless pits - don't place goo debris.
+        # TODO: Make this only apply to the ones chosen to be bottomless.
+        return RES_EXHAUSTED
+    
     space = utils.conv_int(res['spacing', '1'], 1)
     rand_count = utils.conv_int(res['number', ''], None)
     if rand_count:
@@ -1500,14 +1507,17 @@ def res_goo_debris(_, res):
     else:
         possible_locs = []
         for x, y, z in set(GOO_FACE_LOC):
+            # Check to ensure the neighbouring blocks are also
+            # goo brushes (depending on spacing).
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
-                    max_x=space+1,
+                    max_x=space + 1,
                     min_y=-space,
-                    max_y=space+1,
+                    max_y=space + 1,
+                    stride=128,
                     ):
                 if x_off == y_off == 0:
-                    continue
+                    continue # We already know this is a goo location
                 if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
                     break  # This doesn't qualify
             else:
@@ -1526,7 +1536,7 @@ def res_goo_debris(_, res):
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list))
+            suff = '_' + str(random.choice(rand_list) + 1)
 
         if offset > 0:
             loc.x += random.randint(-offset, offset)

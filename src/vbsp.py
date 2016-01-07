@@ -1942,7 +1942,7 @@ Clump = namedtuple('Clump', [
 ])
 
 
-@conditions.make_result_setup('ForceClump')
+@conditions.make_result_setup('SetAreaTex')
 def cond_force_clump_setup(res):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
