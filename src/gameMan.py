@@ -72,7 +72,7 @@ CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
     (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
-    ('EXP', 'Export Confuration'),
+    ('EXP', 'Export Configuration'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
     title_text='Exporting',
