@@ -1502,9 +1502,9 @@ def res_goo_debris(_, res):
         for x, y, z in set(GOO_FACE_LOC):
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
-                    max_x=space+1,
+                    max_x=space + 1,
                     min_y=-space,
-                    max_y=space+1,
+                    max_y=space + 1,
                     ):
                 if x_off == y_off == 0:
                     continue
@@ -1526,7 +1526,7 @@ def res_goo_debris(_, res):
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list))
+            suff = '_' + str(random.choice(rand_list) + 1)
 
         if offset > 0:
             loc.x += random.randint(-offset, offset)
