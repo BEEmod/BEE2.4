@@ -201,7 +201,7 @@ def show(quote_pack):
     for tab in TABS.values():
         try:
             notebook.forget(tab)
-        except TclError as e:
+        except TclError:
             pass
         tab.destroy()
 

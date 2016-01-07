@@ -247,7 +247,7 @@ if __name__ == '__main__':
 
         try:
             raise ValueError('An error')
-        except ValueError as e:
+        except ValueError:
             yield LOGGER.exception('Error message')
 
         yield LOGGER.warning('Post-Exception warning')
