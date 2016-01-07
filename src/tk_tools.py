@@ -4,6 +4,7 @@ General code used for tkinter portions.
 """
 from tkinter import ttk
 from tkinter import filedialog
+from tkinter import messagebox
 import tkinter as tk
 
 import os.path
@@ -35,6 +36,7 @@ def hook_tk_errors():
         # The exception is caught inside the TK code.
         # We don't care about that, so try and move the traceback up
         # one level.
+        import sys
         if exc_tb.tb_next:
             exc_tb = exc_tb.tb_next
         main_logger.error(
@@ -47,8 +49,18 @@ def hook_tk_errors():
                 )
             ),
         )
-        # Don't shutdown - most of the time, the TK errors won't
-        # shutdown the application.
+        # Release the grab, if it exists. Otherwise you can't see the error dialog.
+        if TK_ROOT.grab_status() is not None:
+            TK_ROOT.grab_current().grab_release()
+
+        messagebox.showerror(
+            title='BEE2 Error:',
+            message='{}: {!r}'.format(exc_type.__name__, exc_value)
+        )
+        # Since this isn't caught normally, it won't quit the application.
+        # Quit ourselves manually. to prevent TK just freezing.
+        TK_ROOT.quit()
+        sys.exit()
 
     TK_ROOT.report_callback_exception = tk_error
 hook_tk_errors()  # Always do this.

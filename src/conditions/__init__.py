@@ -21,10 +21,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
-OPTIONS = {}
 ALL_INST = set()
-STYLE_VARS = {}
-VOICE_ATTR = {}
 VMF = None  # type: VLib.VMF
 
 conditions = []
@@ -440,14 +437,10 @@ def add(prop_block):
 
 def init(seed, inst_list, vmf_file):
     # Get a bunch of values from VBSP
-    import vbsp
-    global MAP_RAND_SEED, ALL_INST, VMF, STYLE_VARS, VOICE_ATTR, OPTIONS
+    global MAP_RAND_SEED, ALL_INST, VMF
     VMF = vmf_file
     MAP_RAND_SEED = seed
-    ALL_INST = set(inst_list)
-    OPTIONS = vbsp.settings['options']
-    STYLE_VARS = vbsp.settings['style_vars']
-    VOICE_ATTR = vbsp.settings['has_attr']
+    ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
     conditions.sort()
@@ -475,13 +468,15 @@ def check_all():
                 LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
+    import vbsp
+
     LOGGER.info('Map has attributes: ', [
         key
         for key, value in
-        VOICE_ATTR.items()
+        vbsp.settings['has_attr'].items()
         if value
     ])
-    LOGGER.info('Style Vars:', dict(STYLE_VARS.items()))
+    LOGGER.info('Style Vars:', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
 
 
@@ -561,7 +556,7 @@ def build_solid_dict():
                 GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
 
                 # Indicate that this map contains goo...
-                VOICE_ATTR['goo'] = True
+                vbsp.settings['has_attr']['goo'] = True
                 continue
 
             try:
@@ -1638,7 +1633,8 @@ def res_find_potential_tag_fizzlers(inst):
 
     This is used for Aperture Tag paint fizzlers.
     """
-    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+    import vbsp
+    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
     if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
@@ -1699,7 +1695,7 @@ def res_make_tag_fizzler(inst, res):
     MUST be priority -100 so it runs before fizzlers!
     """
     import vbsp
-    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         inst.remove()
         return
@@ -1979,6 +1975,8 @@ def res_make_tag_fizzler(inst, res):
         ),
     ]
 
+    voice_attr = vbsp.settings['has_attr']
+
     if blue_enabled:
         # If this is blue/oran only, don't affect the other color
         neg_trig.outputs.append(VLib.Output(
@@ -1994,10 +1992,10 @@ def res_make_tag_fizzler(inst, res):
             param=utils.bool_as_int(pos_blue),
         ))
         # Add voice attributes - we have the gun and gel!
-        VOICE_ATTR['bluegelgun'] = True
-        VOICE_ATTR['bluegel'] = True
-        VOICE_ATTR['bouncegun'] = True
-        VOICE_ATTR['bouncegel'] = True
+        voice_attr['bluegelgun'] = True
+        voice_attr['bluegel'] = True
+        voice_attr['bouncegun'] = True
+        voice_attr['bouncegel'] = True
 
     if oran_enabled:
         neg_trig.outputs.append(VLib.Output(
@@ -2012,10 +2010,10 @@ def res_make_tag_fizzler(inst, res):
             'SetValue',
             param=utils.bool_as_int(pos_oran),
         ))
-        VOICE_ATTR['orangegelgun'] = True
-        VOICE_ATTR['orangegel'] = True
-        VOICE_ATTR['speedgelgun'] = True
-        VOICE_ATTR['speedgel'] = True
+        voice_attr['orangegelgun'] = True
+        voice_attr['orangegel'] = True
+        voice_attr['speedgelgun'] = True
+        voice_attr['speedgel'] = True
 
     if not oran_enabled and not blue_enabled:
         # If both are disabled, we must shutdown the gun when touching
