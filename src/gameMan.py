@@ -300,7 +300,9 @@ class Game:
 
         LOGGER.info('Style = {}', style.id)
         for obj, selected in selected_objects.items():
-            LOGGER.info('{} = {}', obj, selected)
+            # Skip lists and dicts etc - too long
+            if selected is None or isinstance(selected, str):
+                LOGGER.info('{} = {}', obj, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
