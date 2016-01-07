@@ -1065,6 +1065,7 @@ def add_screenshot_logic(inst):
 
 @conditions.meta_cond(priority=50, only_once=True)
 def set_elev_videos(_):
+    """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
     LOGGER.info('Elevator type: {}', vid_type.upper())
@@ -1087,7 +1088,7 @@ def set_elev_videos(_):
         vert_vid = None
         horiz_vid = None
     else:
-        LOGGER.warning('Invalid elevator type!')
+        LOGGER.warning('Invalid elevator video type!')
         return
 
     transition_ents = instanceLocs.resolve('[transitionents]')
