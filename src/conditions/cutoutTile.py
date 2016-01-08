@@ -138,6 +138,8 @@ def res_cutout_tile(inst, res):
     random.seed(vbsp.MAP_RAND_SEED + '_CUTOUT_TILE_NOISE')
     noise = SimplexNoise(period=4 * 50)  # 4 tiles/block, 50 blocks max
 
+
+
     for mat_prop in res['Materials', []]:
         MATS[mat_prop.name].append(mat_prop.value)
 
@@ -145,6 +147,12 @@ def res_cutout_tile(inst, res):
         # We want the normal brushes to become nodraw.
         MATS['floorbase_disp'] = MATS['floorbase']
         MATS['floorbase'] = ['tools/toolsnodraw']
+
+        # Since this uses random data for initialisation, the alpha and
+        # regular will use slightly different patterns.
+        alpha_noise = SimplexNoise(period=4 * 50)
+    else:
+        alpha_noise = None
 
     for key, default in TEX_DEFAULT:
         if key not in MATS:
@@ -238,6 +246,7 @@ def res_cutout_tile(inst, res):
             make_alpha_base(
                 box_min + (-64, -64, 0),
                 box_max + (64, 64, 0),
+                noise=alpha_noise,
             )
 
         for x, y in utils.iter_grid(
@@ -584,7 +593,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             )
 
 
-def make_alpha_base(bbox_min, bbox_max):
+def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
     """Add the base to a CutoutTile, using displacements."""
     # We want to limit the size of brushes to 512, so the vertexes don't
     # get too far apart.
@@ -620,12 +629,14 @@ def make_alpha_base(bbox_min, bbox_max):
                 alpha_min=0,
                 alpha_max=128,
                 offset=-1,
+                noise=noise,
             )
             conditions.VMF.add_brush(brush.solid)
 
 
 def make_displacement(
         face: VLib.Side,
+        noise: SimplexNoise,
         alpha_min=0,
         alpha_max=255,
         power=3,
@@ -643,10 +654,15 @@ def make_displacement(
         '10': '-1 -1 -1 -1 -1 -1 -1 -1 -1 -1',
     }
 
-    LOGGER.info('Making displacement in: {} {}', bbox_min, bbox_max)
+    LOGGER.debug('Making displacement from {} to {}', bbox_min, bbox_max)
 
     # Number of rows/columns needed
     grid_size = 2 ** power + 1
+
+    # The width/height of the vertextes - this ensures neighbouring
+    # noise matches up correctly.
+    x_vert = (bbox_max.x - bbox_min.x) / grid_size
+    y_vert = (bbox_max.y - bbox_min.y) / grid_size
 
     face.disp_data = {
         # We just want these values repeated the right number of times!
@@ -662,7 +678,15 @@ def make_displacement(
 
     face.disp_data['alphas'] = [
         ' '.join(
-            str(random.randint(alpha_min, alpha_max))
+            str(255 * get_noise(
+                Vec(
+                    bbox_min.x + x * x_vert,
+                    bbox_min.y + y * y_vert,
+                    bbox_min.z,
+                ) // max(x_vert, y_vert),
+                noise,
+                # Make slightly more dust, since simplex rarely hits max/min.
+            ) + 80)
             for x in
             range(grid_size)
         )
