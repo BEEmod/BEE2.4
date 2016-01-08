@@ -18,6 +18,7 @@ Download the BEE2.4 on the releases pages:
 ## Dependencies: ##
 - [pyGame](http://www.pygame.org/) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
+- [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
 - TKinter/TTK (Standard Library)
 
 ## Compilation: ##
@@ -101,7 +102,6 @@ The various `cache` folders and `config` folders should not be included.
 		- `randomise`: Results for randomising instances.  
 			(_random_, _variant_, _randomNum_, _randomVec_)
 		- `trackPlat`: Result for modifying track platforms. (_trackPlatform_)
-		
 	    - `cutoutTile`: Logic for the Cutout Tile item. (_CutoutTile_)
 		- `catwalks`: Logic for Catwalk items (_MakeCatwalk_)
 		- `scaffold`: Logic for Unstationary Scaffolds. (_UnstScaffold_)
