@@ -241,7 +241,7 @@ def resolve(path) -> list:
                 if ind is None:
                     try:
                         ind = int(val.strip())
-                    except ValueError as e:
+                    except ValueError:
                         LOGGER.info('--------\nValid subitems:')
                         LOGGER.info('\n'.join(
                             ('> ' + k + ' = ' + str(v))
