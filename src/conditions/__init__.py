@@ -954,6 +954,15 @@ def import_template(
     return Template(new_world, detail_ent, new_over)
 
 
+# 'Opposite' values for retexture_template(force_colour)
+TEMP_COLOUR_INVERT = {
+    MAT_TYPES.white: MAT_TYPES.black,
+    MAT_TYPES.black: MAT_TYPES.white,
+    None: 'INVERT',
+    'INVERT': None,
+}
+
+
 def retexture_template(
         template_data: Template,
         origin: Vec,
@@ -1484,7 +1493,7 @@ def res_goo_debris(_, res):
         # We have bottomless pits - don't place goo debris.
         # TODO: Make this only apply to the ones chosen to be bottomless.
         return RES_EXHAUSTED
-    
+
     space = utils.conv_int(res['spacing', '1'], 1)
     rand_count = utils.conv_int(res['number', ''], None)
     if rand_count:

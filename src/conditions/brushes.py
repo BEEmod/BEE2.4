@@ -389,6 +389,8 @@ def res_import_template_setup(res):
     else:
         force_grid = None
 
+    invert_var = res['invertVar', '']
+
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
@@ -423,6 +425,7 @@ def res_import_template_setup(res):
         force_grid,
         force_type,
         replace_brush_pos,
+        invert_var,
         keys,
     )
 
@@ -435,7 +438,8 @@ def res_import_template(inst, res):
     Options:
     - ID: The ID of the template to be inserted.
     - force: a space-seperated list of overrides. If 'white' or 'black' is
-             present, the colour of tiles will be overriden. If a tile size
+             present, the colour of tiles will be overriden. If 'invert' is
+            added, white/black tiles will be swapped. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or
             'detail' is present, the brush will be forced to that type.
@@ -448,6 +452,8 @@ def res_import_template(inst, res):
     - keys/localkeys: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail. The origin is
             set automatically.
+    - invertVar: If this fixup value is true, tile colour will be swapped to
+            the opposite of the current force option.
     """
     (
         temp_id,
@@ -456,6 +462,7 @@ def res_import_template(inst, res):
         force_grid,
         force_type,
         replace_brush_pos,
+        invert_var,
         key_block,
     ) = res.value
 
@@ -465,6 +472,9 @@ def res_import_template(inst, res):
         # We don't want an error, just quit
         LOGGER.warning('"{}" not a valid template!', temp_id)
         return
+
+    if invert_var != '' and utils.conv_bool(inst.fixup[invert_var]):
+        force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
