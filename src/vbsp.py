@@ -312,10 +312,11 @@ MAP_RAND_SEED = ''
 # The actual map.
 VMF = None  # type: VLib.VMF
 
-# These are faces & overlays which have been forceably set by conditions,
-# and will not be overwritten later.
+# These are faces, overlays and brush entitites which have been modified by
+# conditions, and shouldn't be restyled or modified later.
 IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
+IGNORED_BRUSH_ENTS = set()
 
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
@@ -2530,6 +2531,10 @@ def change_func_brush():
             VMF.by_class['func_brush'] |
             VMF.by_class['func_door_rotating']
             ):
+
+        if brush in IGNORED_BRUSH_ENTS:
+            continue
+
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
         # Used when creating static panels

@@ -485,9 +485,12 @@ def res_import_template(inst, res):
 
     if key_block is not None:
         conditions.set_ent_keys(temp_data.detail, inst, key_block)
-        br_origin = Vec.from_str(key_block['origin'])
+        br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
         br_origin.localise(origin, angles)
         temp_data.detail['origin'] = br_origin
+        # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
+        # modify it.
+        vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
 
     # This is the original brush the template is replacing. We fix overlay
     # face IDs, so this brush is replaced by the faces in the template pointing
@@ -507,7 +510,8 @@ def res_import_template(inst, res):
     new_ids = []
 
     all_brushes = temp_data.world
-    if temp_data.detail is not None:
+    # Overlays can't be applied to entities (other than func_detail).
+    if temp_data.detail is not None and key_block is None:
         for ent in temp_data.detail:
             all_brushes.extend(ent.solids)
 
