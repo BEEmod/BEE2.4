@@ -410,7 +410,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
         for vers in all_ver:
             for sty_id, style in all_styles.items():
                 if sty_id in vers['styles']:
-                    continue  # We already have a definition
+                    continue  # We already have a definition, or a reference
                 for base_style in style.bases:
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
@@ -441,9 +441,35 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
+            # Evaluate style references.
+            for sty_id, value in vers['styles'].items():
+                if not isinstance(value, str):
+                    continue  # Normal value
+                # It's a reference to another style.
+                try:
+                    vers['styles'][sty_id] = vers['styles'][value[1:-1]]
+                except KeyError:
+                    raise Exception(
+                        'Invalid style reference '
+                        '("{}") for "{}", in "{}" style.'.format(
+                            value, item.id, sty_id,
+                        )
+                    )
+
+            if isinstance(vers['def_style'], str):
+                # The default style is a value reference, fix it up.
+                # If it's an invalid value the above loop will catch it.
+                vers['def_style'] = vers['styles'][vers['def_style'][1:-1]]
+
 
 def parse_item_folder(folders, zip_file, pak_id):
     for fold in folders:
+        if fold.startswith('<') and fold.endswith('>'):
+            # A reference for another style - skip it now, we'll copy the
+            # real value in setup_style_tree()
+            folders[fold] = fold
+            continue
+
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -461,7 +487,7 @@ def parse_item_folder(folders, zip_file, pak_id):
             raise IOError(
                 '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
-                ) from err
+            ) from err
 
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
@@ -718,6 +744,8 @@ class Item:
                 }
             for sty_list in ver.find_all('styles'):
                 for sty in sty_list:
+                    # The first style is considered the 'default', and is used
+                    # if not otherwise present.
                     if vals['def_style'] is None:
                         vals['def_style'] = sty.value
                     vals['styles'][sty.real_name] = sty.value
