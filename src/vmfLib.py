@@ -1500,7 +1500,7 @@ class Entity:
         """Add the output to our list."""
         self.outputs.append(output)
 
-    def output_targets(self):
+    def output_targets(self) -> Set[str]:
         """Return a set of the targetnames this entity triggers."""
         return {
             out.target
@@ -1842,14 +1842,14 @@ class Output:
     ]
 
     def __init__(self,
-                 out,
-                 targ,
-                 inp,
+                 out: str,
+                 targ: str,
+                 inp: str,
                  param='',
                  delay=0.0,
                  times=-1,
-                 inst_out=None,
-                 inst_in=None,
+                 inst_out: str=None,
+                 inst_in: str=None,
                  comma_sep=False):
         self.output = out
         self.inst_out = inst_out
@@ -1862,7 +1862,7 @@ class Output:
         self.comma_sep = comma_sep
 
     @staticmethod
-    def parse(prop):
+    def parse(prop: Property):
         """Convert the VMF Property into an Output object."""
         if OUTPUT_SEP in prop.value:
             sep = False
@@ -1892,7 +1892,7 @@ class Output:
         )
 
     @staticmethod
-    def parse_name(name):
+    def parse_name(name: str) -> Tuple[Optional[str], str]:
         """Extranct the instance name from values of the form:
 
         'instance:local_name;Command'
