@@ -6,6 +6,7 @@ from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
+from property_parser import Property
 from utils import Vec
 import utils
 import conditions
@@ -399,6 +400,22 @@ def res_import_template_setup(res):
     else:
         replace_brush_pos = None
 
+    key_values = res.find_key("Keys", [])
+    if key_values:
+        keys = Property("", [
+            key_values,
+            res.find_key("LocalKeys", []),
+        ])
+        # Ensure we have a 'origin' keyvalue - we automatically offset that.
+        if 'origin' not in key_values:
+            key_values['origin'] = '0 0 0'
+
+        # Spawn everything as detail, so they get put into a brush
+        # entity.
+        force_type = TEMP_TYPES.detail
+    else:
+        keys = None
+
     return (
         temp_id,
         dict(replace_tex),
@@ -406,6 +423,7 @@ def res_import_template_setup(res):
         force_grid,
         force_type,
         replace_brush_pos,
+        keys,
     )
 
 
@@ -427,6 +445,9 @@ def res_import_template(inst, res):
     - replaceBrush: The position of a brush to replace (0 0 0=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal.
+    - keys/localkeys: If set, a brush entity will instead be generated with
+            these values. This overrides force world/detail. The origin is
+            set automatically.
     """
     (
         temp_id,
@@ -435,6 +456,7 @@ def res_import_template(inst, res):
         force_grid,
         force_type,
         replace_brush_pos,
+        key_block,
     ) = res.value
 
     if temp_id not in TEMPLATES:
@@ -460,6 +482,12 @@ def res_import_template(inst, res):
         force_colour,
         force_grid,
     )
+
+    if key_block is not None:
+        conditions.set_ent_keys(temp_data.detail, inst, key_block)
+        br_origin = Vec.from_str(key_block['origin'])
+        br_origin.localise(origin, angles)
+        temp_data.detail['origin'] = br_origin
 
     # This is the original brush the template is replacing. We fix overlay
     # face IDs, so this brush is replaced by the faces in the template pointing
