@@ -1410,10 +1410,14 @@ def make_bottomless_pit(solids, max_height):
         (-128, 0)   # West
     ]
     if teleport:
-        # transform the skybox physics triggers into teleports to move cubes
-            # into the skybox zone
+        # Transform the skybox physics triggers into teleports to move cubes
+        # into the skybox zone
+
+        # Only use 1 entity for the teleport triggers. If multiple are used,
+        # cubes can contact two at once and get teleported odd places.
+        tele_trig = None
         for trig in VMF.by_class['trigger_multiple']:
-            if trig['wait'] != '0.1':
+            if trig['wait'] != '0.1' or trig in IGNORED_BRUSH_ENTS:
                 continue
 
             bbox_min, bbox_max = trig.get_bbox()
@@ -1422,11 +1426,17 @@ def make_bottomless_pit(solids, max_height):
             if origin.z >= pit_height:
                 continue
 
-            trig['classname'] = 'trigger_teleport'
-            trig['spawnflags'] = '4106'  # Physics and npcs
-            trig['landmark'] = tele_ref
-            trig['target'] = tele_dest
-            trig.outputs.clear()
+            if tele_trig is None:
+                tele_trig = trig
+                trig['classname'] = 'trigger_teleport'
+                trig['spawnflags'] = '4106'  # Physics and npcs
+                trig['landmark'] = tele_ref
+                trig['target'] = tele_dest
+                trig.outputs.clear()
+            else:
+                tele_trig.solids.extend(trig.solids)
+                trig.remove()
+
             for x, y in utils.iter_grid(
                 min_x=int(bbox_min.x),
                 max_x=int(bbox_max.x),
@@ -1473,6 +1483,8 @@ def make_bottomless_pit(solids, max_height):
                 for plane in side.planes:
                     if plane.z > origin.z:
                         plane.z -= 16
+        if tele_trig is not None:
+            IGNORED_BRUSH_ENTS.add(tele_trig)
 
     instances = settings['pit']['inst']
 
