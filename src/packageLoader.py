@@ -1012,16 +1012,18 @@ class Skybox:
             self,
             sky_id,
             selitem_data: 'SelitemData',
-            config,
+            config: Property,
+            fog_opts: dict,
             mat,
             ):
         self.id = sky_id
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
+        self.fog_opts = fog_opts
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a skybox definition."""
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
@@ -1031,17 +1033,26 @@ class Skybox:
             'skybox',
             pak_id=data.pak_id,
         )
+
+        fog_opts = {
+            prop.real_name: prop.value
+            for prop in
+            data.info.find_key("Fog", [])
+        }
+
         return cls(
             data.id,
             selitem_data,
             config,
+            fog_opts,
             mat,
         )
 
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data.auth.extend(override.selitem_data.auth)
-        self.config.extend(override.config)
+        self.config += override.config
+        self.fog_opts.update(override.fog_opts)
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
@@ -1052,7 +1063,7 @@ class Skybox:
         if exp_data.selected is None:
             return  # No skybox..
 
-        for skybox in data['Skybox']:
+        for skybox in data['Skybox']:  # type: Skybox
             if skybox.id == exp_data.selected:
                 break
         else:
@@ -1064,8 +1075,19 @@ class Skybox:
             ('Textures', 'Special', 'Sky'),
             skybox.material,
         )
+
         exp_data.vbsp_conf.append(skybox.config)
 
+        # Styles or other items shouldn't be able to set fog settings..
+        if 'fog' in exp_data.vbsp_conf:
+            del exp_data.vbsp_conf['fog']
+
+        fog_opts = Property('Fog', [
+            Property(key, value)
+            for key, value in
+            skybox.fog_opts.items()
+        ])
+        exp_data.vbsp_conf.append(fog_opts)
 
 
 @pak_object('Music')

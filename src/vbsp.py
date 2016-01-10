@@ -32,6 +32,7 @@ settings = {
     "fizzler":        {},
     "options":        {},
     "pit":            None,
+    "fog":            {},
     "elev_opt":       {},
 
     "style_vars":      defaultdict(bool),
@@ -533,6 +534,28 @@ def load_settings():
             pit_inst[inst_type] = vals
     else:
         settings['pit'] = None
+
+    # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
+    fog_config = conf.find_key("fog", [])
+    # Update inplace so imports get the settings
+    settings['fog'].update({
+        # These defaults are from Clean Style.
+        'start': fog_config['start', '128'],
+        'end': fog_config['end', '5000'],
+        'density': fog_config['density', '0.95'],
+        'primary': fog_config['primaryColor', '40 53 64'],
+        'secondary': fog_config['secondaryColor', ''],
+        'direction': fog_config['direction', '0 0 0'],
+        # These appear to be always the same..
+        'height_start': fog_config['height_start', '0'],
+        'height_density': fog_config['height_density', '0'],
+        'height_max_density': fog_config['height_max_density', '1'],
+
+        'tonemap_rate': fog_config['tonemap_rate', '0.25'],
+        'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
+        'tonemap_exp_min': fog_config['tonemap_exposure_min', '.5'],
+        'tonemap_exp_max': fog_config['tonemap_exposure_max', '3'],
+    })
 
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
@@ -1062,6 +1085,110 @@ def add_screenshot_logic(inst):
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
+
+
+@conditions.meta_cond(priority=100, only_once=True)
+def add_fog_ents(_):
+    """Add the tonemap and fog controllers, based on the skybox."""
+    VMF.create_ent(
+        classname='env_tonemap_controller',
+        targetname='@tonemapper',
+        origin=get_opt('global_pti_ents_loc'),
+    )
+
+    fog_opt = settings['fog']
+
+    fog_controller = VMF.create_ent(
+        classname='env_fog_controller',
+        targetname='@fog_controller',
+        origin=get_opt('global_pti_ents_loc'),
+        angles=fog_opt['direction'],
+
+        fogcolor=fog_opt['primary'],
+        fogstart=fog_opt['start'],
+        fogend=fog_opt['end'],
+
+        fogenable='1',
+        use_angles='1',
+        foglerptime='2',
+
+        heightFogStart=fog_opt['height_start'],
+        heightFogDensity=fog_opt['height_density'],
+        heightFogMaxDensity=fog_opt['height_max_density'],
+    )
+
+    if fog_opt['secondary']:
+        # Only enable fog blending if a secondary color is enabled
+        fog_controller['fogblend'] = '1'
+        fog_controller['fogcolor2'] = fog_opt['secondary']
+        fog_controller['use_angles'] = '1'
+
+    fog_auto = VMF.create_ent(
+        classname='logic_auto',
+        spawnflags='0',
+    )
+    fog_auto.outputs = [
+        VLib.Output(
+            'OnMapSpawn',
+            '@clientcommand',
+            'Command',
+            'r_flashlightbrightness 1',
+        ),
+
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetTonemapPercentBrightPixels',
+            fog_opt['tonemap_brightpixels'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetTonemapRate',
+            fog_opt['tonemap_rate'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetAutoExposureMin',
+            fog_opt['tonemap_exp_min'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetAutoExposureMax',
+            fog_opt['tonemap_exp_max'],
+        ),
+    ]
+
+    if fog_opt['tonemap_bloom_scale']:
+        fog_auto.outputs.append(VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetBloomScale',
+            fog_opt['tonemap_bloom_scale'],
+        ))
+
+    if GAME_MODE == 'SP':
+        fog_auto.outputs.append(VLib.Output(
+            'OnMapSpawn',
+            '!player',
+            'SetFogController',
+            '@fog_controller',
+        ))
+    else:
+        fog_auto.outputs.append(VLib.Output(
+            'OnMapSpawn',
+            '!player_blue',
+            'SetFogController',
+            '@fog_controller',
+        ))
+        fog_auto.outputs.append(VLib.Output(
+            'OnMapSpawn',
+            '!player_orange',
+            'SetFogController',
+            '@fog_controller',
+        ))
 
 
 @conditions.meta_cond(priority=50, only_once=True)
