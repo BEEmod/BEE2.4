@@ -225,6 +225,7 @@ class selWin:
             none_desc=(('line', 'Do not add anything.'),),
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
+            desc='',
             callback=_NO_OP,
             callback_params=(),
             attributes=(),
@@ -255,6 +256,8 @@ class selWin:
           Each tuple should contain an ID, display text, and default value.
           If the values are True or False a check/cross will be displayed,
           otherwise they're a string.
+        - desc is descriptive text to display on the window, and in the widget
+          tooltip.
         """
         self.noneItem = Item(
             'NONE',
@@ -271,6 +274,7 @@ class selWin:
         self.callback_params = callback_params
         self.suggested = None
         self.has_def = has_def
+        self.description = desc
 
         if has_none:
             self.item_list = [self.noneItem] + lst
@@ -290,8 +294,16 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
 
-        self.win.columnconfigure(0, weight=1)
-        self.win.rowconfigure(0, weight=1)
+        if desc:
+            self.desc_label = ttk.Label(
+                self.win,
+                text=desc,
+                justify=LEFT,
+                anchor=W,
+                width=5,  # Keep a small width, so this doesn't affect the
+                # initial window size.
+            )
+            self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
@@ -301,9 +313,9 @@ class selWin:
             sashwidth=3,  # Width of border
             sashrelief=RAISED,  # Raise the border between panes
         )
-        self.pane_win.grid(row=0, column=0, sticky="NSEW")
+        self.pane_win.grid(row=1, column=0, sticky="NSEW")
         self.win.columnconfigure(0, weight=1)
-        self.win.rowconfigure(0, weight=1)
+        self.win.rowconfigure(1, weight=1)
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
@@ -592,6 +604,9 @@ class selWin:
         )
         self.disp_btn.pack(side=RIGHT)
 
+        if self.description:
+            add_tooltip(self.display, self.description)
+
         self.save()
 
         return self.display
@@ -762,6 +777,9 @@ class selWin:
         self.pal_frame.update_idletasks()
         self.pal_frame['width'] = self.wid_canvas.winfo_width()
         self.prop_name['wraplength'] = self.prop_desc.winfo_width()
+        if self.desc_label is not None:
+            self.desc_label['wraplength'] = self.win.winfo_width()
+
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero

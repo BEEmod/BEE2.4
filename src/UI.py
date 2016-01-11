@@ -518,6 +518,10 @@ def load_packages(data):
         TK_ROOT,
         sky_list,
         title='Select Skyboxes',
+        desc='The skybox decides what the area outside the chamber is like.'
+             ' It chooses the colour of sky (seen in some items), the style'
+             ' of bottomless pit (if present), as well as color of "fog" (seen'
+             ' in larger chambers.',
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
@@ -531,6 +535,10 @@ def load_packages(data):
         TK_ROOT,
         voice_list,
         title='Select Additional Voice Lines',
+        desc='Voice lines choose which extra voices play as the player enters '
+             'or exits a chamber. They are chosen based on which items are '
+             'present in the map. The additional "Multiverse" Cave lines are'
+             ' controlled seperately in Style Properties.',
         has_none=True,
         none_desc='Add no extra voice lines.',
         none_attrs={
@@ -546,6 +554,9 @@ def load_packages(data):
         TK_ROOT,
         music_list,
         title='Select Background Music',
+        desc='This controls the background music used for a map. Some '
+             'tracks have variations which are played when interacting '
+             'with certain testing elements.',
         has_none=True,
         none_desc='Add no music to the map at all.',
         callback=win_callback,
@@ -563,6 +574,10 @@ def load_packages(data):
         TK_ROOT,
         style_list,
         title='Select Style',
+        desc='The Style controls many aspects of the map. It decides the '
+             'materials used for walls, the appearance of entrances and '
+             'exits, the design for most items as well as other settings.\n\n'
+             'The style broadly defines the time period a chamber is set in.',
         has_none=False,
         has_def=False,
         attributes=[
@@ -574,9 +589,13 @@ def load_packages(data):
         TK_ROOT,
         elev_list,
         title='Select Elevator Video',
+        desc='Set the video played on the video screens in modern Aperture '
+             'elevator rooms. Not all styles feature these. If set to "None", '
+             'a random video will be selected each time the map is played, '
+             'like in the default PeTI.',
         has_none=True,
         has_def=True,
-        none_desc='Chose a random video.',
+        none_desc='Choose a random video.',
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
