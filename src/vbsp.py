@@ -1485,7 +1485,7 @@ def make_bottomless_pit(solids, max_height):
     pit_height = settings['pit']['height']
 
     if settings['pit']['skybox'] != '':
-        # Add in the actual skybox edges and triggers
+        # Add in the actual skybox edges and triggers.
         VMF.create_ent(
             classname='func_instance',
             file=settings['pit']['skybox'],
@@ -1496,6 +1496,41 @@ def make_bottomless_pit(solids, max_height):
                 tele_off_y - 64,
             ),
         )
+
+        fog_opt = settings['fog']
+
+        # Now generate the sky_camera, with appropriate values.
+        sky_camera = VMF.create_ent(
+            classname='sky_camera',
+            scale='1.0',
+
+            origin='{!s} {!s} 0'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+            ),
+
+            angles=fog_opt['direction'],
+            fogdir=fog_opt['direction'],
+            fogcolor=fog_opt['primary'],
+            fogstart=fog_opt['start'],
+            fogend=fog_opt['end'],
+
+            fogenable='1',
+
+            heightFogStart=fog_opt['height_start'],
+            heightFogDensity=fog_opt['height_density'],
+            heightFogMaxDensity=fog_opt['height_max_density'],
+        )
+
+        if fog_opt['secondary']:
+            # Only enable fog blending if a secondary color is enabled
+            sky_camera['fogblend'] = '1'
+            sky_camera['fogcolor2'] = fog_opt['secondary']
+            sky_camera['use_angles'] = '1'
+        else:
+            sky_camera['fogblend'] = '0'
+            sky_camera['use_angles'] = '0'
+
 
     if settings['pit']['skybox_ceil'] != '':
         # We dynamically add the ceiling so it resizes to match the map,
@@ -1513,7 +1548,7 @@ def make_bottomless_pit(solids, max_height):
         )
 
     if settings['pit']['targ'] != '':
-        # Add in the actual skybox edges and triggers
+        # Add in the teleport reference target.
         VMF.create_ent(
             classname='func_instance',
             file=settings['pit']['targ'],
