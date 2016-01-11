@@ -17,7 +17,7 @@ import img
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr, AttrTypes as SelAttrType
 import extract_packages
 import voiceEditor
 import contextWin
@@ -424,6 +424,7 @@ def load_packages(data):
 
     StyleVarPane.add_vars(data['StyleVar'])
 
+    # THese item types don't appear anywhere in the UI, so we just save them.
     for packlist in data['PackList']:
         pack_lists[packlist.id] = packlist
 
@@ -437,6 +438,8 @@ def load_packages(data):
     elev_list = []
 
     # These don't need special-casing, and act the same.
+    # The attrs are a map from selectorWin attributes, to the attribute on
+    # the object.
     obj_types = [
         (sky_list, skyboxes, 'Skybox', {
             '3D': 'config.value',  # Check if it has a config
@@ -518,7 +521,7 @@ def load_packages(data):
         callback=win_callback,
         callback_params=['Skybox'],
         attributes=[
-            SelAttr('3D', '3D Skybox: ', False),
+            SelAttr.bool('3D', '3D Skybox', False),
         ],
     )
 
@@ -529,11 +532,11 @@ def load_packages(data):
         has_none=True,
         none_desc='Add no extra voice lines.',
         none_attrs={
-            'CHAR': '<Multiverse Cave only>',
+            'CHAR': ['<Multiverse Cave only>'],
         },
         callback=voice_callback,
         attributes=[
-            SelAttr('CHAR', 'Characters: ', '??'),
+            SelAttr.list('CHAR', 'Characters', ['??']),
         ],
     )
 
@@ -546,11 +549,11 @@ def load_packages(data):
         callback=win_callback,
         callback_params=['Music'],
         attributes=[
-            SelAttr('GEL_SPEED', 'Propulsion Gel SFX: ', False),
-            SelAttr('GEL_BOUNCE', 'Repulsion Gel SFX: ', False),
-            SelAttr('TBEAM', 'Excursion Funnel SFX: ', False),
-            SelAttr('BRIDGE', 'Hard Light SFX: ', False),
-            SelAttr('FLING', 'Fling SFX: ', False),
+            SelAttr.bool('GEL_SPEED', 'Propulsion Gel SFX'),
+            SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX'),
+            SelAttr.bool('TBEAM', 'Excursion Funnel SFX'),
+            SelAttr.bool('BRIDGE', 'Hard Light SFX'),
+            SelAttr.bool('FLING', 'Fling SFX'),
         ],
     )
 
@@ -561,7 +564,7 @@ def load_packages(data):
         has_none=False,
         has_def=False,
         attributes=[
-            SelAttr('VID', 'Elevator Videos: ', True),
+            SelAttr.bool('VID', 'Elevator Videos', default=True),
         ]
     )
 
@@ -575,7 +578,7 @@ def load_packages(data):
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
-            SelAttr('ORIENT', 'Multiple Orientations: ', False),
+            SelAttr.bool('ORIENT', 'Multiple Orientations'),
         ]
     )
 
