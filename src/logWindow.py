@@ -109,6 +109,7 @@ def set_visible(is_visible: bool):
         window.deiconify()
     else:
         window.withdraw()
+    GEN_OPTS['Debug']['show_log_win'] = utils.bool_as_int(is_visible)
 
 
 def btn_copy():
@@ -139,10 +140,11 @@ def init(start_open, log_level='info'):
     global window, log_handler, text_box, level_selector
 
     window = tk.Toplevel(TK_ROOT, name='console_win')
+    window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     window.title('Logs ' + utils.BEE_VERSION)
-    window.protocol('WM_DELETE_WINDOW', window.withdraw)
+    window.protocol('WM_DELETE_WINDOW', lambda: set_visible(False))
 
     text_box = tk.Text(
         window,
