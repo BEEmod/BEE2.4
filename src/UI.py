@@ -17,7 +17,7 @@ import img
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr, AttrTypes as SelAttrType
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
 import voiceEditor
 import contextWin
@@ -1468,7 +1468,7 @@ def init_menu_bar(win):
         )
     file_menu.add_command(
         label="Backup/Restore Puzzles...",
-        command=backupWin.show_window,
+        command=backup_win.show_window,
     )
     file_menu.add_command(
         label="Manage Packages...",
@@ -1690,7 +1690,7 @@ def init_windows():
     utils.bind_leftclick(windows['opt'], contextWin.hide_context)
     utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
-    backupWin.init_toplevel()
+    backup_win.init_toplevel()
     loader.step('UI')
     voiceEditor.init_widgets()
     loader.step('UI')
