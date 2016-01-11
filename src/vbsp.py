@@ -555,6 +555,7 @@ def load_settings():
 
         'tonemap_rate': fog_config['tonemap_rate', '0.25'],
         'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
+        'tonemap_bloom_scale': fog_config['tonemap_bloom_scale', ''],
         'tonemap_exp_min': fog_config['tonemap_exposure_min', '.5'],
         'tonemap_exp_max': fog_config['tonemap_exposure_max', '3'],
     })
