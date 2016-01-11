@@ -27,7 +27,7 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
-import backup as backupWin
+import backup as backup_win
 import tooltip
 
 LOGGER = utils.getLogger(__name__)
@@ -378,6 +378,7 @@ class PalItem(Label):
 
 def quit_application():
     """Do a last-minute save of our config files, and quit the app."""
+    import sys
     GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
     GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
