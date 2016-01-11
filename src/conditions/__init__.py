@@ -1213,18 +1213,16 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             continue
 
         # Remove this face from the solids list, and get the group.
-        face_group = SOLIDS.pop(solid_key)
+        face_group = SOLIDS.pop(solid_key, None)
+
+        normal = face.normal()
 
         # Generate our new brush.
         new_brushes = import_template(
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...
-            Vec(
-                face_group.normal.x,
-                face_group.normal.y,
-                -face_group.normal.z,
-            ).to_angle(),
+            Vec(normal.x, normal.y, -normal.z).to_angle(),
             force_type=TEMP_TYPES.world,
         ).world
 
@@ -1253,12 +1251,13 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
                     vbsp.IGNORED_FACES.remove(new_face)
 
                 # Make a new SolidGroup to match the face.
-                SOLIDS[solid_key] = solidGroup(
-                    new_face,
-                    brush,
-                    face_group.normal,
-                    face_group.color,
-                )
+                if face_group is not None:
+                    SOLIDS[solid_key] = solidGroup(
+                        new_face,
+                        brush,
+                        face_group.normal,
+                        face_group.color,
+                    )
 
 
 @make_flag('debug')
