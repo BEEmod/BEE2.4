@@ -640,6 +640,53 @@ class VMF:
             west=f_west,
         )
 
+    def make_hollow(
+            self,
+            p1, p2,
+            thick=16,
+            mat='tools/toolsnodraw',
+            ) -> List['Solid']:
+        """Create 6 brushes to surround the given region."""
+        b_min, b_max = Vec.bbox(p1, p2)
+
+        top = self.make_prism(
+            Vec(b_min.x, b_min.y, b_max.z),
+            Vec(b_max.x, b_max.y, b_max.z + thick),
+            mat,
+        ).solid
+
+        bottom = self.make_prism(
+            Vec(b_min.x, b_min.y, b_min.z),
+            Vec(b_max.x, b_max.y, b_min.z - thick),
+            mat,
+        ).solid
+
+        west = self.make_prism(
+            Vec(b_min.x - thick, b_min.y, b_min.z),
+            Vec(b_min.x, b_max.y, b_max.z),
+            mat,
+        ).solid
+
+        east = self.make_prism(
+            Vec(b_max.x, b_min.y, b_min.z),
+            Vec(b_max.x + thick, b_max.y, b_max.z),
+            mat
+        ).solid
+
+        north = self.make_prism(
+            Vec(b_min.x, b_max.y, b_min.z),
+            Vec(b_max.x, b_max.y + thick, b_max.z),
+            mat,
+        ).solid
+
+        south = self.make_prism(
+            Vec(b_min.x, b_min.y - thick, b_min.z),
+            Vec(b_max.x, b_min.y, b_max.z),
+            mat,
+        ).solid
+
+        return [north, south, east, west, top, bottom]
+
 
 class Camera:
     def __init__(self, vmf_file, pos, targ):
