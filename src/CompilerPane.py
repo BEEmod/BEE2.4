@@ -256,7 +256,7 @@ def make_pane(tool_frame):
     window = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Compile Opt',
+        title='Compile Options',
         name='compiler',
         resize_x=True,
         resize_y=False,
