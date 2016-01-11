@@ -4,6 +4,7 @@ import itertools
 import random
 
 from BEE2_config import ConfigFile
+from utils import Vec
 import conditions
 import utils
 import vmfLib
@@ -258,10 +259,6 @@ def add_voice(
     global ALLOW_MID_VOICES, VMF, map_attr, style_vars
     LOGGER.info('Adding Voice Lines!')
 
-    if len(voice_data.value) == 0:
-        LOGGER.info('Error - No Voice Line Data!')
-        return
-
     VMF = vmf_file
     map_attr = has_items
     style_vars = style_vars_
@@ -270,7 +267,7 @@ def add_voice(
     mid_config = ConfigFile('mid_voice.cfg', root='bee2')
 
     quote_base = voice_data['base', False]
-    quote_loc = voice_data['quote_loc', '-10000 0 0']
+    quote_loc = Vec.from_str(voice_data['quote_loc', '-10000 0 0'], x=-10000)
     if quote_base:
         LOGGER.info('Adding Base instance!')
         VMF.create_ent(
@@ -281,6 +278,13 @@ def add_voice(
             origin=quote_loc,
             fixup_style='0',
         )
+
+    # Always add a box around the lines - it may be needed for quoteEvents.
+    VMF.add_brushes(VMF.make_hollow(
+        quote_loc - 64,
+        quote_loc + 64,
+        thick=32,
+    ))
 
     ALLOW_MID_VOICES = not style_vars.get('NoMidVoices', False)
 
