@@ -8,12 +8,15 @@ from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
+
 from collections import namedtuple
+from enum import Enum
 import functools
 import math
 
 import img  # png library for TKinter
 from richTextBox import tkRichText
+from tooltip import add_tooltip
 import utils
 import tk_tools
 
@@ -35,7 +38,53 @@ def _NO_OP(*args):
     """The default callback, triggered whenever the chosen item is changed."""
     pass
 
-AttrDef = namedtuple('AttrDef', 'id desc default')
+
+class AttrTypes(Enum):
+    """The type of labels used for selectoritem attributes."""
+    STR = STRING = 'string'  # Normal text
+    LIST = 'list'  # A sequence, joined by commas
+    BOOL = 'bool'  # A yes/no checkmark
+    COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+
+
+class AttrDef(namedtuple('AttrDef', 'id type desc default')):
+    """The definition for attributes."""
+    def __new__(
+            cls,
+            id: str,
+            desc='',
+            default=None,
+            type=AttrTypes.STRING,
+            ):
+        # Set some reasonable defaults for the different types
+        if default is None:
+            if type is AttrTypes.STRING:
+                default = ''
+            elif type is AttrTypes.BOOL:
+                default = False
+            elif type is AttrTypes.LIST:
+                default = []
+            elif type is AttrTypes.COLOR:
+                default = utils.Vec(255, 255, 255)
+
+        # The description should either be blank, or end in a colon.
+        if desc != '' and not desc.endswith(': '):
+            desc += ': '
+
+        return super().__new__(cls, id, type, desc, default)
+
+    for name in AttrTypes.__members__.keys():
+        # Create a constructor for each AttrType, which presets the type
+        # parameter.
+        exec("""\
+@classmethod
+def {l_name}(cls, id: str, desc='', default=None):
+    \"""An alternative constructor to create {l_name}-type attrs.\"""
+    return AttrDef(id, desc, default, AttrTypes.{name})""".format(
+            name=name,
+            l_name=name.lower()
+        ), globals(), locals())
+
 
 SelitemData = namedtuple(
     'SelitemData',
@@ -474,22 +523,31 @@ class selWin:
 
             self.attr = {}
             # Add in all the attribute labels
-            for index, (at_id, desc, value) in enumerate(attributes):
+            for index, attr in enumerate(attributes):
                 desc_label = ttk.Label(
                     attr_frame,
-                    text=desc,
+                    text=attr.desc,
                 )
-                self.attr[at_id] = val_label = ttk.Label(
+                self.attr[attr.id] = val_label = ttk.Label(
                     attr_frame,
                 )
-                val_label.default = value
-                if isinstance(value, bool):
+                val_label.default = attr.default
+                val_label.type = attr.type
+                if attr.type is AttrTypes.BOOL:
                     # It's a tick/cross label
                     val_label['image'] = (
                         ICON_CHECK
-                        if value else
+                        if attr.default else
                         ICON_CROSS,
                     )
+                elif attr.type is AttrTypes.COLOR:
+                    # A small colour swatch.
+                    val_label.configure(
+                        relief=RAISED,
+                    )
+                    # Show the color value when hovered.
+                    add_tooltip(val_label)
+
                 # Position in a 2-wide grid
                 desc_label.grid(
                     row=index // 2,
@@ -669,22 +727,32 @@ class selWin:
                 self.prop_reset.state(('!disabled',))
 
         if self.attr:
+            # Set the attribute items.
             for attr_id, label in self.attr.items():
-                val = item.attrs.get(attr_id, None)
-                if val is None:
-                    val = label.default
-                if isinstance(label.default, bool):
+                val = item.attrs.get(attr_id, label.default)
+
+                if label.type is AttrTypes.BOOL:
                     label['image'] = (
                         ICON_CHECK
                         if val else
                         ICON_CROSS
                     )
+                elif label.type is AttrTypes.COLOR:
+                    label['image'] = img.color_square(val, size=16)
+                    # Display the full color when hovering..
+                    label.tooltip_text = 'Color: R={r}, G={g}, B={b}'.format(
+                        r=int(val.x), g=int(val.y), b=int(val.z),
+                    )
+                elif label.type is AttrTypes.LIST:
+                    # Join the values (in alphabetical order)
+                    label['text'] = ', '.join(sorted(val))
+                elif label.type is AttrTypes.STRING:
+                    # Just a string.
+                    label['text'] = str(val)
                 else:
-                    # Display as text. If it's a container, sort alphabetically.
-                    if isinstance(val, (list, tuple, set)):
-                        val = ', '.join(sorted(val))
-                    label['text'] = val
-
+                    raise ValueError(
+                        'Invalid attribute type: "{}"'.format(label.type)
+                    )
 
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
