@@ -319,6 +319,8 @@ IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
 IGNORED_BRUSH_ENTS = set()
 
+GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
+
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
 PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
@@ -1096,7 +1098,7 @@ def add_fog_ents(_):
     fog_controller = VMF.create_ent(
         classname='env_fog_controller',
         targetname='@fog_controller',
-        origin=get_opt('global_pti_ents_loc'),
+        origin=pos + (16, 0, 0),
         angles=fog_opt['direction'],
 
         fogcolor=fog_opt['primary'],
@@ -2659,6 +2661,14 @@ def add_extra_ents(mode):
             file='instances/BEE2/logic/model_changer/' + chosen_model + '.vmf',
             fixup_style='0',
         )
+
+    # Add a logic_auto with the set of global outputs.
+    logic_auto = VMF.create_ent(
+        classname='logic_auto',
+        spawnflags='0', # Don't remove on fire
+        origin=pti_loc + (0, 0, 16),
+    )
+    logic_auto.outputs = GLOBAL_OUTPUTS
 
 
 def change_func_brush():
