@@ -1013,7 +1013,7 @@ class Skybox:
             sky_id,
             selitem_data: 'SelitemData',
             config: Property,
-            fog_opts: dict,
+            fog_opts: Property,
             mat,
             ):
         self.id = sky_id
@@ -1021,6 +1021,12 @@ class Skybox:
         self.material = mat
         self.config = config
         self.fog_opts = fog_opts
+
+        # Extract this for selector windows to easily display
+        self.fog_color = utils.Vec.from_str(
+            fog_opts['primarycolor' ''],
+            255, 255, 255
+        )
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1034,11 +1040,7 @@ class Skybox:
             pak_id=data.pak_id,
         )
 
-        fog_opts = {
-            prop.real_name: prop.value
-            for prop in
-            data.info.find_key("Fog", [])
-        }
+        fog_opts = data.info.find_key("Fog", [])
 
         return cls(
             data.id,
@@ -1052,7 +1054,7 @@ class Skybox:
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data.auth.extend(override.selitem_data.auth)
         self.config += override.config
-        self.fog_opts.update(override.fog_opts)
+        self.fog_opts += override.fog_opts
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
@@ -1082,11 +1084,9 @@ class Skybox:
         if 'fog' in exp_data.vbsp_conf:
             del exp_data.vbsp_conf['fog']
 
-        fog_opts = Property('Fog', [
-            Property(key, value)
-            for key, value in
-            skybox.fog_opts.items()
-        ])
+        fog_opts = skybox.fog_opts.copy()
+        fog_opts.name = 'Fog'
+
         exp_data.vbsp_conf.append(fog_opts)
 
 
