@@ -1048,26 +1048,20 @@ def set_player_portalgun(inst):
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
 
-    if blue_portal or oran_portal:
-        auto = VMF.create_ent(
-            classname='logic_auto',
-            origin=get_opt('global_pti_ents_loc'),
-            spawnflags='1',  # Remove on Fire
-        )
-        if blue_portal:
-            auto.add_out(VLib.Output(
-                'OnMapSpawn',
-                '@player_has_blue',
-                'Trigger',
-                times=1,
-            ))
-        if oran_portal:
-            auto.add_out(VLib.Output(
-                'OnMapSpawn',
-                '@player_has_oran',
-                'Trigger',
-                times=1,
-            ))
+    if blue_portal:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@player_has_blue',
+            'Trigger',
+            times=1,
+        ))
+    if oran_portal:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@player_has_oran',
+            'Trigger',
+            times=1,
+        ))
 
     LOGGER.info('Done!')
 
@@ -1090,10 +1084,11 @@ def add_screenshot_logic(inst):
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents(_):
     """Add the tonemap and fog controllers, based on the skybox."""
+    pos = Vec.from_str(get_opt('global_pti_ents_loc'))
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
-        origin=get_opt('global_pti_ents_loc'),
+        origin=pos + (-16, 0, 0),
     )
 
     fog_opt = settings['fog']
@@ -1123,11 +1118,7 @@ def add_fog_ents(_):
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    fog_auto = VMF.create_ent(
-        classname='logic_auto',
-        spawnflags='0',
-    )
-    fog_auto.outputs = [
+    GLOBAL_OUTPUTS.extend([
         VLib.Output(
             'OnMapSpawn',
             '@clientcommand',
@@ -1159,10 +1150,10 @@ def add_fog_ents(_):
             'SetAutoExposureMax',
             fog_opt['tonemap_exp_max'],
         ),
-    ]
+    ])
 
     if fog_opt['tonemap_bloom_scale']:
-        fog_auto.outputs.append(VLib.Output(
+        GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '@tonemapper',
             'SetBloomScale',
@@ -1170,20 +1161,20 @@ def add_fog_ents(_):
         ))
 
     if GAME_MODE == 'SP':
-        fog_auto.outputs.append(VLib.Output(
+        GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '!player',
             'SetFogController',
             '@fog_controller',
         ))
     else:
-        fog_auto.outputs.append(VLib.Output(
+        GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '!player_blue',
             'SetFogController',
             '@fog_controller',
         ))
-        fog_auto.outputs.append(VLib.Output(
+        GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '!player_orange',
             'SetFogController',
@@ -2634,7 +2625,8 @@ def add_extra_ents(mode):
     # set.
 
     pti_file = get_opt("global_pti_ents")
-    pti_loc = get_opt("global_pti_ents_loc")
+    pti_loc = Vec.from_str(get_opt('global_pti_ents_loc'))
+
     if pti_file != '':
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = VMF.create_ent(
