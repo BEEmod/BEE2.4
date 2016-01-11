@@ -44,9 +44,6 @@ def flag_angles(inst, flag):
         from_dir = Vec(0, 0, 1)
         allow_inverse = False
 
-    if angle == targ_angle:
-        return True  # Check for exact match
-
     normal = DIRECTIONS.get(targ_angle.casefold(), None)
     if normal is None:
         return False  # If it's not a special angle,
