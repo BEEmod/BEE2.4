@@ -443,6 +443,7 @@ def load_packages(data):
     obj_types = [
         (sky_list, skyboxes, 'Skybox', {
             '3D': 'config.value',  # Check if it has a config
+            'COLOR': 'fog_color',
         }),
         (voice_list, voices, 'QuotePack', {
             'CHAR': 'chars',
@@ -522,6 +523,7 @@ def load_packages(data):
         callback_params=['Skybox'],
         attributes=[
             SelAttr.bool('3D', '3D Skybox', False),
+            SelAttr.color('COLOR', 'Fog Color'),
         ],
     )
 
