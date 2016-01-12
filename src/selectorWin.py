@@ -9,7 +9,8 @@ from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
 
-from collections import namedtuple
+from collections import namedtuple, defaultdict
+from operator import itemgetter, attrgetter
 from enum import Enum
 import functools
 import math
@@ -32,6 +33,10 @@ err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 # The two icons used for boolean item attributes
 ICON_CHECK = img.png('icons/check')
 ICON_CROSS = img.png('icons/cross')
+
+# Up/down pointing triangles
+UP_ARROW = '\u25B3'
+DN_ARROW = '\u25BD'
 
 
 def _NO_OP(*args):
@@ -90,6 +95,68 @@ SelitemData = namedtuple(
     'SelitemData',
     'name, short_name, auth, icon, desc, group',
 )
+
+
+class GroupHeader(ttk.Frame):
+    """The widget used for group headers."""
+    def __init__(self, win: 'selWin', title):
+        self.parent = win
+        super().__init__(
+            win.pal_frame,
+        )
+
+        self.sep_left = ttk.Separator(self)
+        self.sep_left.grid(row=0, column=0, sticky=EW)
+        self.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            self,
+            text=title,
+            width=len(title) + 2,
+            anchor=CENTER,
+        )
+        self.title.grid(row=0, column=1)
+
+        self.sep_right = ttk.Separator(self)
+        self.sep_right.grid(row=0, column=2, sticky=EW)
+        self.columnconfigure(2, weight=1)
+
+        self.arrow = ttk.Label(
+            self,
+            text=DN_ARROW,
+            width=2,
+        )
+        self.arrow.grid(row=0, column=3)
+
+        self._visible = True
+
+        utils.bind_leftclick(self, self.toggle)
+        utils.bind_leftclick(self.sep_left, self.toggle)
+        utils.bind_leftclick(self.sep_right, self.toggle)
+        utils.bind_leftclick(self.title, self.toggle)
+        utils.bind_leftclick(self.arrow, self.toggle)
+
+    @property
+    def visible(self):
+        return self._visible
+
+    @visible.setter
+    def visible(self, value):
+        value = bool(value)
+        if value == self._visible:
+            return  # Don't do anything..
+
+        self._visible = value
+        if value:
+            self.arrow['text'] = DN_ARROW
+        else:
+            self.arrow['text'] = UP_ARROW
+        self.parent.flow_items()
+
+    def toggle(self, _=None):
+        """Toggle the header on or off."""
+        self.visible = not self._visible
+
 
 
 class Item:
@@ -163,8 +230,8 @@ class Item:
         self.desc = desc
         self.authors = authors or []
         self.attrs = attributes or {}
-        self.button = None
-        self.win = None
+        self.button = None  # type: ttk.Button
+        self.win = None  # type: Toplevel
 
     def __repr__(self):
         return (
@@ -293,6 +360,14 @@ class selWin:
         self.win.iconbitmap('../BEE2.ico')
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
+
+        # A map from group name -> header widget
+        self.group_widgets = {}
+        # A map from folded name -> display name
+        self.group_names = {
+            '': 'Other'  # The label for items without a group
+        }
+        self.grouped_items = defaultdict(list)
 
         if desc:
             self.desc_label = ttk.Label(
@@ -464,22 +539,13 @@ class selWin:
         self.mouseover_font['slant'] = font.ITALIC
         self.context_var = IntVar()
 
-        # Re-order items appropriately.
-        #
-        self.item_list.sort(
-            # Alphabetical order
-            key=lambda it: it.longName
-        )
-        self.item_list.sort(
-            # Sort by group name
-            key=lambda it: it.group.casefold() if it.group else ''
-        )
-        self.item_list.sort(
-            # Make non-grouped items go first
-            key=lambda it: 2 if it.group else 1
-        )
+        # The headers for the context menu
+        self.context_menus = {}
 
-        for ind, item in enumerate(self.item_list):
+        # Sort alphabetically!
+        self.item_list.sort(key=attrgetter('longName'))
+
+        for ind, item in enumerate(self.item_list):  # type: int, Item
             if item == self.noneItem:
                 item.button = ttk.Button(
                     self.pal_frame,
@@ -493,12 +559,30 @@ class selWin:
                     image=item.icon,
                     compound='top',
                     )
-            self.context_menu.add_radiobutton(
+
+            group_key = item.group.casefold() if item.group else ''
+            self.grouped_items[group_key].append(item)
+
+            if group_key not in self.group_names:
+                self.group_names[item.group.casefold()] = item.group
+
+            if not item.group:
+                # Ungrouped items appear directly in the menu.
+                menu = self.context_menu
+            else:
+                try:
+                    menu = self.context_menus[group_key]
+                except KeyError:
+                    self.context_menus[group_key] = menu = Menu(
+                        self.context_menu,
+                    )
+
+            menu.add_radiobutton(
                 label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
                 var=self.context_var,
                 value=ind,
-                )
+            )
 
             item.win = self.win
             utils.bind_leftclick(
@@ -509,6 +593,26 @@ class selWin:
                 item.button,
                 self.save,
             )
+
+        for index, (key, menu) in enumerate(
+                sorted(self.context_menus.items(), key=itemgetter(0)),
+                # We start with the ungrouped items, so increase the index
+                # appropriately.
+                start=len(self.grouped_items[''])):
+            self.context_menu.add_cascade(
+                menu=menu,
+                label=self.group_names[key],
+            )
+            # Set a custom attribute to keep track of the menu's index.
+            menu.index = index
+
+        for group_key, text in self.group_names.items():
+            self.group_widgets[group_key] = GroupHeader(
+                self,
+                text,
+            )
+            self.group_widgets[group_key].should_show = True
+
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -684,8 +788,8 @@ class selWin:
 
         utils.center_win(self.win, parent=self.parent)
 
-        self.flow_items()
         self.sel_item(self.selected)
+        self.win.after(2, self.flow_items)
 
     def open_context(self, _):
         """Dislay the context window at the text widget."""
@@ -783,27 +887,52 @@ class selWin:
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero
-        num_items = len(self.item_list)
+
+        # The offset for the current group
+        y_off = 0
+
+        # Note - empty string should sort to the beginning!
+        ordered_groups = sorted(self.grouped_items.keys())
+
+        for group_key in ordered_groups:
+            items = self.grouped_items[group_key]
+            group_wid = self.group_widgets[group_key]  # type: GroupHeader
+            group_wid.place(
+                x=0,
+                y=y_off,
+                width=width * ITEM_WIDTH,
+            )
+            group_wid.update_idletasks()
+            y_off += group_wid.winfo_reqheight() + 5
+
+            if not group_wid.visible:
+                # Hide everything!
+                for item in items:  # type: Item
+                    item.button.place_forget()
+                continue
+
+
+            for i, item in enumerate(items):  # type: int, Item
+                if item == self.suggested:
+                    self.sugg_lbl.place(
+                        x=(i % width) * ITEM_WIDTH + 1,
+                        y=(i // width) * ITEM_HEIGHT + y_off,
+                    )
+                    self.sugg_lbl['width'] = item.button.winfo_width()
+                item.button.place(
+                    x=(i % width) * ITEM_WIDTH + 1,
+                    y=(i // width) * ITEM_HEIGHT + y_off + 20,
+                )
+                item.button.lift()
+
+            y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
+
         self.wid_canvas['scrollregion'] = (
             0, 0,
-            width*ITEM_WIDTH,
-            math.ceil(num_items/width) * ITEM_HEIGHT+20
+            width * ITEM_WIDTH,
+            y_off,
         )
-        self.pal_frame['height'] = (
-            math.ceil(num_items/width) * ITEM_HEIGHT+20
-        )
-        for i, item in enumerate(self.item_list):
-            if item == self.suggested:
-                self.sugg_lbl.place(
-                    x=((i % width) * ITEM_WIDTH + 1),
-                    y=((i // width) * ITEM_HEIGHT)
-                )
-                self.sugg_lbl['width'] = item.button.winfo_width()
-            item.button.place(
-                x=((i % width) * ITEM_WIDTH + 1),
-                y=((i // width) * ITEM_HEIGHT + 20)
-            )
-            item.button.lift()
+        self.pal_frame['height'] = y_off
 
     def __contains__(self, obj):
         """Determine if the given SelWinItem or item ID is in this item list."""
@@ -821,6 +950,26 @@ class selWin:
         """Return whether the current item is the suggested one."""
         return self.suggested == self.selected
 
+    def set_context_font(self, item: Item, font):
+        """Set the font of an item, and its parent group."""
+        if item.group:
+            group_key = item.group.casefold()
+            menu = self.context_menus[group_key]  # type: Menu
+            index = self.grouped_items[group_key].index(item)
+
+            # Also highlight the menu
+            self.context_menu.entryconfig(
+                menu.index,  # Use a custom attr to keep track of this...
+                font=font,
+            )
+        else:
+            menu = self.context_menu
+            index = self.grouped_items[''].index(item)
+        menu.entryconfig(
+            index,
+            font=font,
+        )
+
     def set_suggested(self, suggested=None):
         """Set the suggested item to the given ID.
 
@@ -828,9 +977,10 @@ class selWin:
         If the ID is "<NONE>", it will be set to the None item.
         """
         if self.suggested is not None:
-            self.context_menu.entryconfig(
-                self.item_list.index(self.suggested),
-                font=self.norm_font)
+            self.set_context_font(
+                self.suggested,
+                self.norm_font,
+            )
             # Remove the font from the last suggested item
 
         if suggested is None:
@@ -846,9 +996,10 @@ class selWin:
                 self.suggested = None
 
         if self.suggested is not None:
-            self.context_menu.entryconfig(
-                self.item_list.index(self.suggested),
-                font=self.sugg_font)
+            self.set_context_font(
+                self.suggested,
+                font=self.sugg_font,
+            )
         self.set_disp()  # Update the textbox if needed
         self.flow_items()  # Refresh
 
