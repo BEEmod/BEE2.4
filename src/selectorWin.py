@@ -34,9 +34,10 @@ err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 ICON_CHECK = img.png('icons/check')
 ICON_CROSS = img.png('icons/cross')
 
-# Up/down pointing triangles
-UP_ARROW = '\u25B3'
-DN_ARROW = '\u25BD'
+UP_ARROW = '△'
+DN_ARROW = '▽'
+UP_ARROW_FILLED = '▲'
+DN_ARROW_FILLED = '▼'
 
 
 def _NO_OP(*args):
@@ -131,11 +132,14 @@ class GroupHeader(ttk.Frame):
 
         self._visible = True
 
-        utils.bind_leftclick(self, self.toggle)
-        utils.bind_leftclick(self.sep_left, self.toggle)
-        utils.bind_leftclick(self.sep_right, self.toggle)
-        utils.bind_leftclick(self.title, self.toggle)
-        utils.bind_leftclick(self.arrow, self.toggle)
+        # For the mouse events to work, we need to bind on all the children too.
+        widgets = self.winfo_children()
+        widgets.append(self)
+        for wid in widgets:  # type: Widget
+            utils.bind_leftclick(wid, self.toggle)
+            wid['cursor'] = utils.CURSORS['link']
+        self.bind('<Enter>', self.hover_start)
+        self.bind('<Leave>', self.hover_end)
 
     @property
     def visible(self):
@@ -148,15 +152,27 @@ class GroupHeader(ttk.Frame):
             return  # Don't do anything..
 
         self._visible = value
-        if value:
-            self.arrow['text'] = DN_ARROW
-        else:
-            self.arrow['text'] = UP_ARROW
+        self.hover_start() # Update arrow icon
         self.parent.flow_items()
 
     def toggle(self, _=None):
         """Toggle the header on or off."""
         self.visible = not self._visible
+
+    def hover_start(self, _=None):
+        """When hovered over, fill in the triangle."""
+        if self._visible:
+            self.arrow['text'] = DN_ARROW_FILLED
+        else:
+            self.arrow['text'] = UP_ARROW_FILLED
+
+    def hover_end(self, _=None):
+        """When leaving, hollow the triangle."""
+        if self._visible:
+            self.arrow['text'] = DN_ARROW
+        else:
+            self.arrow['text'] = UP_ARROW
+
 
 
 class Item:
