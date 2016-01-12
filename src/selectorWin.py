@@ -903,14 +903,13 @@ class selWin:
                 width=width * ITEM_WIDTH,
             )
             group_wid.update_idletasks()
-            y_off += group_wid.winfo_reqheight() + 5
+            y_off += group_wid.winfo_reqheight()
 
             if not group_wid.visible:
                 # Hide everything!
                 for item in items:  # type: Item
                     item.button.place_forget()
                 continue
-
 
             # Place each item
             for i, item in enumerate(items):  # type: int, Item
