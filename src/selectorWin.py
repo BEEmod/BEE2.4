@@ -34,10 +34,11 @@ err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 ICON_CHECK = img.png('icons/check')
 ICON_CROSS = img.png('icons/cross')
 
-UP_ARROW = '△'
-DN_ARROW = '▽'
-UP_ARROW_FILLED = '▲'
-DN_ARROW_FILLED = '▼'
+# Arrows used to indicate the state of the group - collapsed or expanded
+GRP_COLL = '◁'
+GRP_COLL_HOVER = '◀'
+GRP_EXP = '▽'
+GRP_EXP_HOVER = '▼'
 
 
 def _NO_OP(*args):
@@ -125,7 +126,7 @@ class GroupHeader(ttk.Frame):
 
         self.arrow = ttk.Label(
             self,
-            text=DN_ARROW,
+            text=GRP_EXP,
             width=2,
         )
         self.arrow.grid(row=0, column=3)
@@ -161,17 +162,19 @@ class GroupHeader(ttk.Frame):
 
     def hover_start(self, _=None):
         """When hovered over, fill in the triangle."""
-        if self._visible:
-            self.arrow['text'] = DN_ARROW_FILLED
-        else:
-            self.arrow['text'] = UP_ARROW_FILLED
+        self.arrow['text'] = (
+            GRP_EXP_HOVER
+            if self._visible else
+            GRP_COLL_HOVER
+        )
 
     def hover_end(self, _=None):
         """When leaving, hollow the triangle."""
-        if self._visible:
-            self.arrow['text'] = DN_ARROW
-        else:
-            self.arrow['text'] = UP_ARROW
+        self.arrow['text'] = (
+            GRP_EXP
+            if self._visible else
+            GRP_COLL
+        )
 
 
 
