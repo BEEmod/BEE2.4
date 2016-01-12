@@ -112,6 +112,7 @@ class GroupHeader(ttk.Frame):
         self.title = ttk.Label(
             self,
             text=title,
+            font=win.norm_font,
             width=len(title) + 2,
             anchor=CENTER,
         )
@@ -156,7 +157,6 @@ class GroupHeader(ttk.Frame):
     def toggle(self, _=None):
         """Toggle the header on or off."""
         self.visible = not self._visible
-
 
 
 class Item:
@@ -912,6 +912,7 @@ class selWin:
                 continue
 
 
+            # Place each item
             for i, item in enumerate(items):  # type: int, Item
                 if item == self.suggested:
                     self.sugg_lbl.place(
@@ -925,8 +926,10 @@ class selWin:
                 )
                 item.button.lift()
 
+            # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
 
+        # Set the size of the canvas and frame to the amount we've used
         self.wid_canvas['scrollregion'] = (
             0, 0,
             width * ITEM_WIDTH,
@@ -956,6 +959,9 @@ class selWin:
             group_key = item.group.casefold()
             menu = self.context_menus[group_key]  # type: Menu
             index = self.grouped_items[group_key].index(item)
+
+            # Apply the font to the group header as well.
+            self.group_widgets[group_key].title['font'] = font
 
             # Also highlight the menu
             self.context_menu.entryconfig(
