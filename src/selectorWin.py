@@ -383,9 +383,7 @@ class selWin:
         # A map from group name -> header widget
         self.group_widgets = {}
         # A map from folded name -> display name
-        self.group_names = {
-            '': 'Other'  # The label for items without a group
-        }
+        self.group_names = {}
         self.grouped_items = defaultdict(list)
 
         if desc:
@@ -583,7 +581,8 @@ class selWin:
             self.grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
-                self.group_names[item.group.casefold()] = item.group
+                # If the item is groupless, use 'Other' for the header.
+                self.group_names[group_key] = item.group or 'Other'
 
             if not item.group:
                 # Ungrouped items appear directly in the menu.
@@ -613,11 +612,14 @@ class selWin:
                 self.save,
             )
 
+        # Convert to a normal dictionary, after adding all items.
+        self.grouped_items = dict(self.grouped_items)
+
         for index, (key, menu) in enumerate(
                 sorted(self.context_menus.items(), key=itemgetter(0)),
                 # We start with the ungrouped items, so increase the index
                 # appropriately.
-                start=len(self.grouped_items[''])):
+                start=len(self.grouped_items.get('', ()))):
             self.context_menu.add_cascade(
                 menu=menu,
                 label=self.group_names[key],
