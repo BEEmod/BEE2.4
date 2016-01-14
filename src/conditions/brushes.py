@@ -453,7 +453,8 @@ def res_import_template(inst, res):
             these values. This overrides force world/detail. The origin is
             set automatically.
     - invertVar: If this fixup value is true, tile colour will be swapped to
-            the opposite of the current force option.
+            the opposite of the current force option. If it is set to
+            'white' or 'black', that colour will be forced instead.
     """
     (
         temp_id,
@@ -473,8 +474,15 @@ def res_import_template(inst, res):
         LOGGER.warning('"{}" not a valid template!', temp_id)
         return
 
-    if invert_var != '' and utils.conv_bool(inst.fixup[invert_var]):
-        force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
+    if invert_var != '':
+        invert_val = inst.fixup[invert_var].casefold()
+
+        if invert_val == 'white':
+            force_colour = conditions.MAT_TYPES.white
+        elif invert_val == 'black':
+            force_colour = conditions.MAT_TYPES.black
+        elif utils.conv_bool(invert_val):
+            force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
