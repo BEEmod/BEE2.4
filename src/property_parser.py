@@ -239,7 +239,15 @@ class Property:
             elif freshline.startswith('}'):
                 # Move back a block
                 open_properties.pop()
-                cur_block = open_properties[-1].value
+                try:
+                    cur_block = open_properties[-1].value
+                except IndexError:
+                    # No open blocks!
+                    raise KeyValError(
+                        'Too many closing brackets.',
+                        filename,
+                        line_num,
+                    )
 
             # handle name bare on one line, will need a brace on
             # the next line
@@ -254,12 +262,6 @@ class Property:
                     line_num,
                 )
 
-            if not open_properties:
-                raise KeyValError(
-                    'Too many closing brackets.',
-                    filename,
-                    line_num,
-                )
         if len(open_properties) > 1:
             raise KeyValError(
                 'End of text reached with remaining open sections.',
