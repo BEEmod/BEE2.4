@@ -522,8 +522,7 @@ def res_import_template(inst, res):
     all_brushes = temp_data.world
     # Overlays can't be applied to entities (other than func_detail).
     if temp_data.detail is not None and key_block is None:
-        for ent in temp_data.detail:
-            all_brushes.extend(ent.solids)
+        all_brushes.extend(temp_data.detail.solids)
 
     for brush in all_brushes:  # type: VLib.Solid
         for face in brush.sides:
