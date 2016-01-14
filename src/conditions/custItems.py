@@ -325,16 +325,30 @@ def res_faith_mods(inst, res):
 
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
-                    out.inst_in = res['angled_targ', 'animate_angled_relay']
+                    # Instead of an instance: output, use local names.
+                    # This allows us to strip the proxy, as well as use
+                    # overlay instances.
+                    out.inst_in = None
+                    out.target = conditions.local_name(
+                        inst,
+                        res['angled_targ', 'animate_angled_relay']
+                    )
                     out.input = res['angled_in', 'Trigger']
                     if fixup_var:
                         inst.fixup[fixup_var] = 'angled'
-                    break # There's only one output we want to look for...
+                    break  # There's only one output we want to look for...
+
                 elif out.inst_in == 'animate_straightup_relay':
-                    out.inst_in = res[
-                        'straight_targ', 'animate_straightup_relay'
-                    ]
+                    out.inst_in = None
+                    out.target = conditions.local_name(
+                        inst,
+                        res[
+                            'straight_targ',
+                            'animate_straightup_relay'
+                        ],
+                    )
                     out.input = res['straight_in', 'Trigger']
+
                     if fixup_var:
                         inst.fixup[fixup_var] = 'straight'
                     break
