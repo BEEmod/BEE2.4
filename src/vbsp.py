@@ -592,7 +592,7 @@ def add_voice(_):
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        map_seed=MAP_SEED,
+        map_seed=MAP_RAND_SEED,
         )
 
 
@@ -2212,7 +2212,7 @@ def clump_walls():
         len(PRESET_CLUMPS),
     )
 
-    random.seed(MAP_SEED)
+    random.seed(MAP_RAND_SEED)
 
     clumps = []
 
@@ -3223,7 +3223,7 @@ def main():
     """Main program code.
 
     """
-    global MAP_SEED, IS_PREVIEW, GAME_MODE
+    global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
     args = " ".join(sys.argv)
@@ -3318,12 +3318,12 @@ def main():
 
         load_map(path)
 
-        MAP_SEED = calc_rand_seed()
+        MAP_RAND_SEED = calc_rand_seed()
 
         all_inst = get_map_info()
 
         conditions.init(
-            seed=MAP_SEED,
+            seed=MAP_RAND_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
             )
