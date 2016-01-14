@@ -1171,12 +1171,19 @@ def retexture_template(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
 
-    for over in template_data.overlay:
+    for over in template_data.overlay[:]:
         mat = over['material'].casefold()
         if mat in replace_tex:
-            over['material'] = random.choice(replace_tex[mat])
+            over['material'] = mat = random.choice(replace_tex[mat])
         elif mat in vbsp.TEX_VALVE:
-            over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+            over['material'] = mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+        else:
+            continue
+        if mat == '':
+            # If blank, remove the overlay from the map and the list.
+            # (Since it's inplace, this can affect the tuple.)
+            template_data.overlay.remove(over)
+            over.remove()
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
