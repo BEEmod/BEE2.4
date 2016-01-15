@@ -4,6 +4,7 @@ import itertools
 import random
 
 from BEE2_config import ConfigFile
+from property_parser import Property
 from utils import Vec
 import conditions
 import utils
@@ -19,7 +20,10 @@ ADDED_BULLSEYES = set()
 
 # Special quote instances assoicated with an item/style.
 # These are only added if the condition executes.
-QUOTE_EVENTS = {} # id -> instance mapping
+QUOTE_EVENTS = {}  # id -> instance mapping
+
+# The block of SP and coop voice data
+QUOTE_DATA = Property('Quotes', [])
 
 ALLOW_MID_VOICES = False
 VMF = None
@@ -249,7 +253,6 @@ def sort_func(quote):
 
 
 def add_voice(
-        voice_data,
         has_items,
         style_vars_,
         vmf_file,
@@ -266,8 +269,8 @@ def add_voice(
     norm_config = ConfigFile('voice.cfg', root='bee2')
     mid_config = ConfigFile('mid_voice.cfg', root='bee2')
 
-    quote_base = voice_data['base', False]
-    quote_loc = Vec.from_str(voice_data['quote_loc', '-10000 0 0'], x=-10000)
+    quote_base = QUOTE_DATA['base', False]
+    quote_loc = Vec.from_str(QUOTE_DATA['quote_loc', '-10000 0 0'], x=-10000)
     if quote_base:
         LOGGER.info('Adding Base instance!')
         VMF.create_ent(
@@ -293,7 +296,7 @@ def add_voice(
     # QuoteEvents allows specifiying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
     # in certain styles, but uses the default if not set.
-    for event in voice_data.find_all('QuoteEvents', 'Event'):
+    for event in QUOTE_DATA.find_all('QuoteEvents', 'Event'):
         event_id = event['id', ''].casefold()
         # We ignore the config if no result was executed.
         if event_id and event_id in QUOTE_EVENTS:
@@ -315,8 +318,8 @@ def add_voice(
 
     # For each group, locate the voice lines.
     for group in itertools.chain(
-            voice_data.find_all('group'),
-            voice_data.find_all('midinst'),
+            QUOTE_DATA.find_all('group'),
+            QUOTE_DATA.find_all('midinst'),
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']

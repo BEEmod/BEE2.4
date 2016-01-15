@@ -38,8 +38,6 @@ settings = {
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
     "packtrigger":     defaultdict(list),
-
-    "voice_data":   Property("Quotes", []),
 }
 
 
@@ -458,7 +456,7 @@ def load_settings():
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        settings['voice_data'] += quote_block.value
+        voiceLine.QUOTE_DATA += quote_block.value
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -593,7 +591,7 @@ def add_voice(_):
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
         map_seed=MAP_RAND_SEED,
-        )
+    )
 
 
 @conditions.meta_cond(priority=-250)
