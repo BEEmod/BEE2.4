@@ -2,6 +2,7 @@
 from decimal import Decimal
 import itertools
 import random
+import os
 
 from BEE2_config import ConfigFile
 from property_parser import Property
@@ -31,6 +32,10 @@ VMF = None
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
 
+# The location of the responses script.
+RESP_LOC = 'bee2/inject/response_data.nut'
+
+
 # Create a fake instance to pass to condition flags. This way we can
 # reuse all that logic, without breaking flags that check the instance.
 fake_inst = vmfLib.VMF().create_ent(
@@ -39,6 +44,32 @@ fake_inst = vmfLib.VMF().create_ent(
     angles='0 0 0',
     origin='0 0 0',
 )
+
+
+def has_responses():
+    """Check if we have any valid 'response' data for Coop."""
+    LOGGER.info([prop.name for prop in QUOTE_DATA])
+    return 'CoopResponses' in QUOTE_DATA
+
+
+def generate_resp_script(file):
+    """Write the responses section into a file."""
+    config = ConfigFile('voice_responses.cfg', root='bee2')
+    file.write("BEE2_RESPONSES <- {\n")
+    for section in QUOTE_DATA.find_key('CoopResponses', []):
+        section_data = ['\t{} = [\n'.format(section.name)]
+        for index, line in enumerate(section):
+            if not config.getboolean(section.name, "line_" + str(index), True):
+                # It's disabled!
+                continue
+            section_data.append(
+                '\t\tCreateSceneEntity("{}"),'.format(line['choreo'])
+            )
+        if len(section_data) != 1:
+            for line in section_data:
+                file.write(line)
+            file.write('\t],')
+    file.write('}\n')
 
 
 def mode_quotes(prop_block):
@@ -305,6 +336,17 @@ def add_voice(
             QUOTE_EVENTS[event_id] = INST_PREFIX + event['file']
 
     LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
+
+    if has_responses():
+        LOGGER.info('Generating responses data..')
+        with open(RESP_LOC, 'w') as f:
+            generate_resp_script(f)
+    else:
+        LOGGER.info('No responses data..')
+        try:
+            os.remove(RESP_LOC)
+        except FileNotFoundError:
+            pass
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         VMF.create_ent(

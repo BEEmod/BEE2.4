@@ -39,6 +39,8 @@ GAME_FOLDER = {
 # Files that VBSP may generate, that we want to insert into the packfile.
 # They are all placed in bee2/inject/.
 INJECT_FILES = {
+    'response_data.nut': 'scripts/vscripts/BEE2/coop_response_data.nut'
+}
 
 
 def quote(txt):
