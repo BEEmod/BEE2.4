@@ -3311,6 +3311,13 @@ def main():
     else:
         LOGGER.info("PeTI map detected!")
 
+        # Clear the list of files we want to inject into the packfile.
+        try:
+            os.removedirs('bee2/inject/')
+        except (FileNotFoundError, OSError):
+            pass
+        os.makedirs('bee2/inject/', exist_ok=True)
+
         LOGGER.info("Loading settings...")
         load_settings()
 

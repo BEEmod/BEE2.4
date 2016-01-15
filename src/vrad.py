@@ -36,6 +36,10 @@ GAME_FOLDER = {
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }
 
+# Files that VBSP may generate, that we want to insert into the packfile.
+# They are all placed in bee2/inject/.
+INJECT_FILES = {
+
 
 def quote(txt):
     return '"' + txt + '"'
@@ -82,7 +86,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile, filename):
+def pack_file(zipfile: ZipFile, filename):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -103,6 +107,15 @@ def pack_file(zipfile, filename):
             break
     else:
         LOGGER.warning('"bee2/' + filename + '" not found!')
+
+
+def inject_files(zipfile: ZipFile):
+    """Inject certain files into the packlist,  if they exist."""
+    for filename, arcname in INJECT_FILES.items():
+        filename = os.path.join('bee2', 'inject', filename)
+        if os.path.exists(filename):
+            LOGGER.info('Injecting "{}" into packfile.', arcname)
+            zipfile.write(filename, arcname)
 
 
 def pack_content(path):
@@ -142,6 +155,8 @@ def pack_content(path):
 
     for file in files:
         pack_file(zipfile, file)
+
+    inject_files(zipfile)
 
     LOGGER.debug(' - Added files')
 
