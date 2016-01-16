@@ -191,39 +191,6 @@ def add_quote(quote, targetname, quote_loc):
                 vmfLib.Output('OnUser1', targetname, 'PlaySound')
             )
             added_ents.append(snd)
-        elif name == 'ambientchoreo':
-            # For some lines, they don't play globally. Workaround this
-            # by placing an ambient_generic and choreo ent, and play the
-            # sound when the choreo starts.
-            added_ents.append(VMF.create_ent(
-                classname='ambient_generic',
-                spawnflags='49',  # Infinite Range, Starts Silent
-                targetname=targetname + '_snd',
-                origin=quote_loc,
-                message=prop['File'],
-                health='10',  # Volume
-            ))
-
-            c_line = prop['choreo']
-            # Add this to the beginning, since all scenes need it...
-            if not c_line.startswith('scenes/'):
-                c_line = 'scenes/' + c_line
-
-            choreo = VMF.create_ent(
-                classname='logic_choreographed_scene',
-                targetname=targetname,
-                origin=quote_loc,
-                scenefile=c_line,
-                busyactor="1",  # Wait for actor to stop talking
-                onplayerdeath='0',
-            )
-            choreo.outputs.append(
-                vmfLib.Output('OnStart', targetname + '_snd', 'PlaySound')
-            )
-            choreo.outputs.append(
-                vmfLib.Output('OnUser1', targetname, 'Start')
-            )
-            added_ents.append(choreo)
         elif name == 'bullseye':
             # Cave's voice lines require a special named bullseye to
             # work correctly.
@@ -393,6 +360,34 @@ def add_voice(
             ))
             # Add one of the associated quotes
             add_quote(random.choice(chosen), quote_targetname, choreo_loc)
+
+    if ADDED_BULLSEYES or utils.conv_bool(QUOTE_DATA['UseMicrophones', '']):
+        # Add microphones that broadcast audio directly at players.
+        # This ensures it is heard regardless of location.
+        # This is used for Cave and core Wheatley.
+        if vbsp.GAME_MODE == 'SP':
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_sp',
+                speakername='!player',
+                maxRange='96',
+                origin=quote_loc,
+            )
+        else:
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_blue',
+                speakername='!player_blue',
+                maxRange='96',
+                origin=quote_loc,
+            )
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_orange',
+                speakername='!player_orange',
+                maxRange='96',
+                origin=quote_loc,
+            )
 
     LOGGER.info('Mid quotes: {}', mid_quotes)
     for mid_item in mid_quotes:
