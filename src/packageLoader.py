@@ -985,7 +985,8 @@ class QuotePack:
         # Copy the config files for this voiceline..
         for prefix, pretty in [
                 ('', 'normal'),
-                ('mid_', 'MidChamber')]:
+                ('mid_', 'MidChamber'),
+                ('resp_', 'Responses')]:
             path = os.path.join(
                 os.getcwd(),
                 '..',
