@@ -54,7 +54,7 @@ def has_responses():
 
 def generate_resp_script(file):
     """Write the responses section into a file."""
-    config = ConfigFile('voice_responses.cfg', root='bee2')
+    config = ConfigFile('resp_voice.cfg', root='bee2')
     file.write("BEE2_RESPONSES <- {\n")
     for section in QUOTE_DATA.find_key('CoopResponses', []):
         section_data = ['\t{} = [\n'.format(section.name)]
