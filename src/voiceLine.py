@@ -2,8 +2,10 @@
 from decimal import Decimal
 import itertools
 import random
+import os
 
 from BEE2_config import ConfigFile
+from property_parser import Property
 from utils import Vec
 import conditions
 import utils
@@ -19,13 +21,20 @@ ADDED_BULLSEYES = set()
 
 # Special quote instances assoicated with an item/style.
 # These are only added if the condition executes.
-QUOTE_EVENTS = {} # id -> instance mapping
+QUOTE_EVENTS = {}  # id -> instance mapping
+
+# The block of SP and coop voice data
+QUOTE_DATA = Property('Quotes', [])
 
 ALLOW_MID_VOICES = False
 VMF = None
 
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
+
+# The location of the responses script.
+RESP_LOC = 'bee2/inject/response_data.nut'
+
 
 # Create a fake instance to pass to condition flags. This way we can
 # reuse all that logic, without breaking flags that check the instance.
@@ -35,6 +44,32 @@ fake_inst = vmfLib.VMF().create_ent(
     angles='0 0 0',
     origin='0 0 0',
 )
+
+
+def has_responses():
+    """Check if we have any valid 'response' data for Coop."""
+    LOGGER.info([prop.name for prop in QUOTE_DATA])
+    return 'CoopResponses' in QUOTE_DATA
+
+
+def generate_resp_script(file):
+    """Write the responses section into a file."""
+    config = ConfigFile('resp_voice.cfg', root='bee2')
+    file.write("BEE2_RESPONSES <- {\n")
+    for section in QUOTE_DATA.find_key('CoopResponses', []):
+        section_data = ['\t{} = [\n'.format(section.name)]
+        for index, line in enumerate(section):
+            if not config.getboolean(section.name, "line_" + str(index), True):
+                # It's disabled!
+                continue
+            section_data.append(
+                '\t\tCreateSceneEntity("{}"),'.format(line['choreo'])
+            )
+        if len(section_data) != 1:
+            for line in section_data:
+                file.write(line)
+            file.write('\t],')
+    file.write('}\n')
 
 
 def mode_quotes(prop_block):
@@ -156,39 +191,6 @@ def add_quote(quote, targetname, quote_loc):
                 vmfLib.Output('OnUser1', targetname, 'PlaySound')
             )
             added_ents.append(snd)
-        elif name == 'ambientchoreo':
-            # For some lines, they don't play globally. Workaround this
-            # by placing an ambient_generic and choreo ent, and play the
-            # sound when the choreo starts.
-            added_ents.append(VMF.create_ent(
-                classname='ambient_generic',
-                spawnflags='49',  # Infinite Range, Starts Silent
-                targetname=targetname + '_snd',
-                origin=quote_loc,
-                message=prop['File'],
-                health='10',  # Volume
-            ))
-
-            c_line = prop['choreo']
-            # Add this to the beginning, since all scenes need it...
-            if not c_line.startswith('scenes/'):
-                c_line = 'scenes/' + c_line
-
-            choreo = VMF.create_ent(
-                classname='logic_choreographed_scene',
-                targetname=targetname,
-                origin=quote_loc,
-                scenefile=c_line,
-                busyactor="1",  # Wait for actor to stop talking
-                onplayerdeath='0',
-            )
-            choreo.outputs.append(
-                vmfLib.Output('OnStart', targetname + '_snd', 'PlaySound')
-            )
-            choreo.outputs.append(
-                vmfLib.Output('OnUser1', targetname, 'Start')
-            )
-            added_ents.append(choreo)
         elif name == 'bullseye':
             # Cave's voice lines require a special named bullseye to
             # work correctly.
@@ -249,7 +251,6 @@ def sort_func(quote):
 
 
 def add_voice(
-        voice_data,
         has_items,
         style_vars_,
         vmf_file,
@@ -266,8 +267,8 @@ def add_voice(
     norm_config = ConfigFile('voice.cfg', root='bee2')
     mid_config = ConfigFile('mid_voice.cfg', root='bee2')
 
-    quote_base = voice_data['base', False]
-    quote_loc = Vec.from_str(voice_data['quote_loc', '-10000 0 0'], x=-10000)
+    quote_base = QUOTE_DATA['base', False]
+    quote_loc = Vec.from_str(QUOTE_DATA['quote_loc', '-10000 0 0'], x=-10000)
     if quote_base:
         LOGGER.info('Adding Base instance!')
         VMF.create_ent(
@@ -293,7 +294,7 @@ def add_voice(
     # QuoteEvents allows specifiying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
     # in certain styles, but uses the default if not set.
-    for event in voice_data.find_all('QuoteEvents', 'Event'):
+    for event in QUOTE_DATA.find_all('QuoteEvents', 'Event'):
         event_id = event['id', ''].casefold()
         # We ignore the config if no result was executed.
         if event_id and event_id in QUOTE_EVENTS:
@@ -302,6 +303,17 @@ def add_voice(
             QUOTE_EVENTS[event_id] = INST_PREFIX + event['file']
 
     LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
+
+    if has_responses():
+        LOGGER.info('Generating responses data..')
+        with open(RESP_LOC, 'w') as f:
+            generate_resp_script(f)
+    else:
+        LOGGER.info('No responses data..')
+        try:
+            os.remove(RESP_LOC)
+        except FileNotFoundError:
+            pass
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
         VMF.create_ent(
@@ -315,8 +327,8 @@ def add_voice(
 
     # For each group, locate the voice lines.
     for group in itertools.chain(
-            voice_data.find_all('group'),
-            voice_data.find_all('midinst'),
+            QUOTE_DATA.find_all('group'),
+            QUOTE_DATA.find_all('midinst'),
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
@@ -348,6 +360,34 @@ def add_voice(
             ))
             # Add one of the associated quotes
             add_quote(random.choice(chosen), quote_targetname, choreo_loc)
+
+    if ADDED_BULLSEYES or utils.conv_bool(QUOTE_DATA['UseMicrophones', '']):
+        # Add microphones that broadcast audio directly at players.
+        # This ensures it is heard regardless of location.
+        # This is used for Cave and core Wheatley.
+        if vbsp.GAME_MODE == 'SP':
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_sp',
+                speakername='!player',
+                maxRange='96',
+                origin=quote_loc,
+            )
+        else:
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_blue',
+                speakername='!player_blue',
+                maxRange='96',
+                origin=quote_loc,
+            )
+            VMF.create_ent(
+                classname='env_microphone',
+                targetname='player_speaker_orange',
+                speakername='!player_orange',
+                maxRange='96',
+                origin=quote_loc,
+            )
 
     LOGGER.info('Mid quotes: {}', mid_quotes)
     for mid_item in mid_quotes:

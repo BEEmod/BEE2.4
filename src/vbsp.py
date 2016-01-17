@@ -38,8 +38,6 @@ settings = {
     "style_vars":      defaultdict(bool),
     "has_attr":        defaultdict(bool),
     "packtrigger":     defaultdict(list),
-
-    "voice_data":   Property("Quotes", []),
 }
 
 
@@ -458,7 +456,7 @@ def load_settings():
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        settings['voice_data'] += quote_block.value
+        voiceLine.QUOTE_DATA += quote_block.value
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -588,12 +586,11 @@ def load_map(map_path):
 def add_voice(_):
     """Add voice lines to the map."""
     voiceLine.add_voice(
-        voice_data=settings['voice_data'],
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
         map_seed=MAP_RAND_SEED,
-        )
+    )
 
 
 @conditions.meta_cond(priority=-250)
@@ -2648,6 +2645,18 @@ def add_extra_ents(mode):
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
 
+        # The scripts we want to run on the @glados entity.
+        # This gets special functions called (especially in coop) for various
+        # events we might want to track - death, pings, camera taunts, etc.
+        glados_scripts = [
+            'choreo/glados.nut',  # Implements Multiverse Cave..
+        ]
+        if GAME_MODE == 'COOP' and voiceLine.has_responses():
+            glados_scripts.append('BEE2/coop_responses.nut')
+            PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
+
+        global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
+
     # Add the model changer instance.
     # We don't change the player model in Coop, or if Bendy is selected.
 
@@ -2666,7 +2675,7 @@ def add_extra_ents(mode):
     # Add a logic_auto with the set of global outputs.
     logic_auto = VMF.create_ent(
         classname='logic_auto',
-        spawnflags='0', # Don't remove on fire
+        spawnflags='0',  # Don't remove on fire
         origin=pti_loc + (0, 0, 16),
     )
     logic_auto.outputs = GLOBAL_OUTPUTS
@@ -3312,6 +3321,13 @@ def main():
         )
     else:
         LOGGER.info("PeTI map detected!")
+
+        # Clear the list of files we want to inject into the packfile.
+        try:
+            os.removedirs('bee2/inject/')
+        except (FileNotFoundError, OSError):
+            pass
+        os.makedirs('bee2/inject/', exist_ok=True)
 
         LOGGER.info("Loading settings...")
         load_settings()
