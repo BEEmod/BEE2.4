@@ -397,6 +397,12 @@ class Game:
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
+        LOGGER.info('Writing instance list!')
+        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
+            for line in self.build_instance_data(editoritems):
+                inst_file.write(line)
+        export_screen.step('EXP')
+
         LOGGER.info('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
         with open(self.abs_path(
@@ -410,12 +416,6 @@ class Game:
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
-        export_screen.step('EXP')
-
-        LOGGER.info('Writing instance list!')
-        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
-            for line in self.build_instance_data(editoritems):
-                inst_file.write(line)
         export_screen.step('EXP')
 
         LOGGER.info('Copying Custom Compiler!')
@@ -456,10 +456,14 @@ class Game:
         """Build a property tree listing all of the instances for each item.
         as well as another listing the input and output commands.
         VBSP uses this to reduce duplication in VBSP_config files.
+
+        This additionally strips custom instance definitions from the original
+        list.
         """
         instance_locs = Property("AllInstances", [])
+        cust_inst = Property("CustInstances", [])
         commands = Property("Connections", [])
-        root_block = Property(None, [instance_locs, commands])
+        root_block = Property(None, [instance_locs, cust_inst, commands])
 
         for item in editoritems.find_all("Item"):
             instance_block = Property(item['Type'], [])
@@ -468,10 +472,19 @@ class Game:
             comm_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block:
-                    instance_block.append(
-                        Property('Instance', inst['Name'])
-                    )
+                for inst in inst_block.value[:]:
+                    if inst.name.isdigit():
+                        # Direct Portal 2 value
+                        instance_block.append(
+                            Property('Instance', inst['Name'])
+                        )
+                    else:
+                        # It's a custom definition, remove from editoritems
+                        inst_block.value.remove(inst)
+                        cust_inst.set_key(
+                            (item['type'], inst.name),
+                            inst['Name'],
+                        )
 
             # Look in the Inputs and Outputs blocks to find the io definitions.
             # Copy them to property names like 'Input_Activate'.
