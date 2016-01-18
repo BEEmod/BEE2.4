@@ -44,8 +44,8 @@ SPECIAL_INST = {
 
     'coopExit':         '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':        '<ITEM_COOP_ENTRY_DOOR:0>',
-    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up',
-    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down',
+    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up>',
+    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down>',
     'spExit':           '<ITEM_ENTRY_DOOR:10>',
     'spEntry':          '<ITEM_ENTRY_DOOR:9>',
 
@@ -57,8 +57,8 @@ SPECIAL_INST = {
     'spExitCorr2':      '<ITEM_EXIT_DOOR:1>',
     'spExitCorr3':      '<ITEM_EXIT_DOOR:2>',
     'spExitCorr4':      '<ITEM_EXIT_DOOR:3>',
-    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up',
-    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down',
+    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up>',
+    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down>',
 
     'spEntryCorr':      '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'spEntryCorr1':     '<ITEM_ENTRY_DOOR:0>',
@@ -68,16 +68,16 @@ SPECIAL_INST = {
     'spEntryCorr5':     '<ITEM_ENTRY_DOOR:4>',
     'spEntryCorr6':     '<ITEM_ENTRY_DOOR:5>',
     'spEntryCorr7':     '<ITEM_ENTRY_DOOR:6>',
-    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up',
-    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down',
+    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up>',
+    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down>',
 
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
     'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
     'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
     'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
     'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
-    'coopCorrUp':   '<ITEM_ENTRY_DOOR:bee2_vert_up',
-    'coopCorrDown': '<ITEM_ENTRY_DOOR:bee2_vert_down',
+    'coopCorrUp':   '<ITEM_COOP_EXIT_DOOR:bee2_vert_up>',
+    'coopCorrDown': '<ITEM_COOP_EXIT_DOOR:bee2_vert_down>',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
@@ -184,11 +184,6 @@ def load_conf(prop_block: Property):
             for inst in
             prop
         ]
-    INST_SPECIAL = {
-        key.casefold(): resolve(val_string)
-        for key, val_string in
-        SPECIAL_INST.items()
-    }
 
     for prop in prop_block.find_key('CustInstances', []):
         CUST_INST_FILES[prop.real_name] = {
@@ -196,6 +191,12 @@ def load_conf(prop_block: Property):
             for inst in
             prop
         }
+
+    INST_SPECIAL = {
+        key.casefold(): resolve(val_string)
+        for key, val_string in
+        SPECIAL_INST.items()
+    }
 
     # Several special items which use multiple item types!
 
@@ -285,12 +286,8 @@ def resolve(path) -> List[str]:
                         out.append(cust_item_vals[folded_value[5:]])
                         continue
                     except KeyError:
-                        LOGGER.warning(
-                            '"{}" is not a valid custom subtype'
-                            ' for "{}" items!',
-                            val,
-                            item,
-                        )
+                        # Ignore the error - these values are used in the code
+                        # for certain features as well.
                         return []
 
                 ind = SUBITEMS.get(folded_value, None)
@@ -361,3 +358,23 @@ def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
     This returns None if the given value is not present.
     """
     return CUST_INST_FILES[item_id].get(inst.casefold(), None)
+
+
+def get_special_inst(name: str):
+    """Get the instance associated with a "[special]" instance path."""
+    try:
+        inst = INST_SPECIAL[name.casefold()]
+    except KeyError:
+        raise KeyError("Invalid special instance name! ({})".format(name))
+
+    LOGGER.info('Key: {!r}, Value: {}', name, inst)
+
+    # The number you'll get is fixed, so it's fine if we return different
+    # types - unpack single instances, since that's what you want most of the
+    # time.
+    if len(inst) == 1:
+        return inst[0]
+    elif len(inst) == 0:
+        return None  # No value
+    else:
+        return inst
