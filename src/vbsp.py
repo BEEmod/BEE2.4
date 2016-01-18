@@ -1315,6 +1315,7 @@ def get_map_info():
     global GAME_MODE, IS_PREVIEW
 
     inst_files = set()  # Get a set of every instance in the map.
+    file_coop_entry = instanceLocs.resolve('[coopEntry]')
     file_coop_exit = instanceLocs.resolve('[coopExit]')
     file_sp_exit = instanceLocs.resolve('[spExit]')
     file_sp_entry = instanceLocs.resolve('[spEntry]')
@@ -1330,14 +1331,6 @@ def get_map_info():
         # Make conditions set appropriately
         LOGGER.info('Forcing elevator spawn!')
         IS_PREVIEW = False
-
-    no_player_start_inst = (
-        # All the instances that have the no_player start value
-        file_sp_entry +
-        file_coop_corr +
-        file_sp_entry_corr +
-        file_sp_exit_corr
-    )
 
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to disinguish between them. Add an instvar to help.
@@ -1363,49 +1356,54 @@ def get_map_info():
 
         file = item['file'].casefold()
         LOGGER.debug('File:', file)
-        if file in no_player_start_inst:
-            if elev_override:
-                item.fixup['no_player_start'] = '1'
-            else:
-                IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
-            if override_sp_exit == 0:
-                LOGGER.info(
-                    'Using random exit ({})',
-                    str(file_sp_exit_corr.index(file) + 1)
-                )
-            else:
-                LOGGER.info('Setting exit to {}', override_sp_exit)
-                item['file'] = file_sp_exit_corr[override_sp_exit-1]
+            mod_entryexit(
+                item,
+                'spExitCorr',
+                'SP Exit',
+                elev_override,
+                override_sp_exit,
+            )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
-            if override_sp_entry == 0:
-                LOGGER.info(
-                    'Using random entry ({})',
-                    str(file_sp_entry_corr.index(file) + 1),
-                )
-            else:
-                LOGGER.info('Setting entry to {}', override_sp_entry)
-                item['file'] = file_sp_entry_corr[override_sp_entry-1]
+            mod_entryexit(
+                item,
+                'spEntryCorr',
+                'SP Entry',
+                elev_override,
+                override_sp_entry,
+            )
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
-            if override_coop_corr == 0:
-                LOGGER.info(
-                    'Using random exit ({})',
-                    str(file_coop_corr.index(file) + 1),
-                )
-            else:
-                LOGGER.info('Setting coop exit to {}', override_coop_corr)
-                item['file'] = file_coop_corr[override_coop_corr-1]
+            mod_entryexit(
+                item,
+                'coopCorr',
+                'Coop Exit',
+                elev_override,
+                override_coop_corr,
+            )
+        elif file in file_coop_entry:
+            GAME_MODE = 'COOP'
+            mod_entryexit(
+                item,
+                'coopCorr',
+                'Coop Spawn',
+                elev_override,
+            )
         elif file in file_coop_exit:
             GAME_MODE = 'COOP'
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
         elif file in file_sp_exit or file in file_sp_entry:
             GAME_MODE = 'SP'
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
         elif file in file_sp_door_frame:
             door_frames.append(item)
+
         inst_files.add(item['file'])
 
     LOGGER.info("Game Mode: " + GAME_MODE)
@@ -1433,6 +1431,48 @@ def get_map_info():
     # Return the set of all instances in the map.
     return inst_files
 
+
+def mod_entryexit(
+        inst: VLib.Entity,
+        resolve_name,
+        pretty_name,
+        elev_override=False,
+        override_corr=-1,
+    ):
+    """Modify this entrance or exit.
+
+    This sets IS_PREVIEW and chooses a
+    particular corridor number.
+    """
+    global IS_PREVIEW
+
+    files = instanceLocs.INST_SPECIAL[resolve_name]
+
+    # The coop spawn instance doesn't have no_player_start..
+    if 'no_player_start' in inst.fixup:
+        if elev_override:
+            inst.fixup['no_player_start'] = '1'
+        else:
+            IS_PREVIEW = not utils.conv_bool(inst.fixup['no_player_start'])
+
+
+    if override_corr == -1:
+        return  # No extra variants!
+
+    if override_corr == 0:
+        LOGGER.info(
+            'Using random {} ({})',
+            pretty_name,
+            str(files.index(inst['file'].casefold()) + 1
+            )
+        )
+    else:
+        LOGGER.info(
+            'Setting {} to {}',
+            pretty_name,
+            override_corr,
+        )
+        inst['file'] = files[override_corr-1]
 
 def calc_rand_seed():
     """Use the ambient light entities to create a map seed.
