@@ -472,7 +472,7 @@ class Game:
             comm_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block.value[:]:
+                for inst in inst_block.value[:]:  # type: Property
                     if inst.name.isdigit():
                         # Direct Portal 2 value
                         instance_block.append(
@@ -483,7 +483,10 @@ class Game:
                         inst_block.value.remove(inst)
                         cust_inst.set_key(
                             (item['type'], inst.name),
-                            inst['Name'],
+                            # Allow using either the normal block format,
+                            # or just providing the file - we don't use the
+                            # other values.
+                            inst['name'] if inst.has_children() else inst.value,
                         )
 
             # Look in the Inputs and Outputs blocks to find the io definitions.
