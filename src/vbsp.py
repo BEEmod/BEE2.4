@@ -1346,6 +1346,7 @@ def get_map_info():
     # The type of corridor - used to replace doorframes, if needed.
     # 0-7 = normal, 'up'/'down' = vert up/down
     entry_corr_type = exit_corr_type = 0
+    entr_coor_name = exit_corr_name = ""
 
     # The door frame instances
     entry_door_frame = exit_door_frame = None
@@ -1367,6 +1368,7 @@ def get_map_info():
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
+            exit_coor_name = item['targetname']
             exit_corr_type = mod_entryexit(
                 item,
                 'spExitCorr',
@@ -1377,6 +1379,7 @@ def get_map_info():
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
+            entry_coor_name = item['targetname']
             entry_corr_type = mod_entryexit(
                 item,
                 'spEntryCorr',
@@ -1386,6 +1389,7 @@ def get_map_info():
             )
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
+            exit_coor_name = item['targetname']
             exit_corr_type = mod_entryexit(
                 item,
                 'coopCorr',
@@ -1395,6 +1399,7 @@ def get_map_info():
             )
         elif file in file_coop_entry:
             GAME_MODE = 'COOP'
+            entry_coor_name = item['targetname']
             mod_entryexit(
                 item,
                 'coopCorr',
@@ -1443,10 +1448,25 @@ def get_map_info():
             exit_door_frame = door_frame
 
     if GAME_MODE == 'COOP':
-        mod_doorframe(exit_door_frame, 'ITEM_COOP_EXIT_DOOR', exit_corr_type)
+        mod_doorframe(
+            exit_door_frame,
+            'ITEM_COOP_EXIT_DOOR',
+            exit_corr_type,
+            exit_coor_name,
+        )
     else:
-        mod_doorframe(entry_door_frame, 'ITEM_ENTRY_DOOR', entry_corr_type)
-        mod_doorframe(exit_door_frame, 'ITEM_EXIT_DOOR', exit_corr_type)
+        mod_doorframe(
+            entry_door_frame,
+            'ITEM_ENTRY_DOOR',
+            entry_corr_type,
+            entry_coor_name,
+        )
+        mod_doorframe(
+            exit_door_frame,
+            'ITEM_EXIT_DOOR',
+            exit_corr_type,
+            exit_coor_name,
+        )
 
     # Return the set of all instances in the map.
     return inst_files
@@ -1516,15 +1536,17 @@ def mod_entryexit(
         return override_corr - 1
 
 
-def mod_doorframe(inst: VLib.Entity, corr_id, corr_type):
+def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
     """Change the instance used by door frames, if desired.
 
     corr_id is the item ID of the dooor, and corr_type is the
-    return value of mod_entryexit().
+    return value of mod_entryexit(). corr_name is the name of the corridor.
     """
     is_white = inst['file'].casefold() in instanceLocs.get_special_inst(
         'white_frame',
     )
+
+    inst['targetname'] = corr_name
 
     LOGGER.info('Doorframe: <{}:bee2_frame_{}_{}>',
         corr_id,
