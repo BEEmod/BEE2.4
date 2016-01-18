@@ -44,6 +44,8 @@ SPECIAL_INST = {
 
     'coopExit':         '<ITEM_COOP_ENTRY_DOOR:3>',
     'coopEntry':        '<ITEM_COOP_ENTRY_DOOR:0>',
+    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up',
+    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down',
     'spExit':           '<ITEM_ENTRY_DOOR:10>',
     'spEntry':          '<ITEM_ENTRY_DOOR:9>',
 
@@ -55,6 +57,8 @@ SPECIAL_INST = {
     'spExitCorr2':      '<ITEM_EXIT_DOOR:1>',
     'spExitCorr3':      '<ITEM_EXIT_DOOR:2>',
     'spExitCorr4':      '<ITEM_EXIT_DOOR:3>',
+    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up',
+    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down',
 
     'spEntryCorr':      '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
     'spEntryCorr1':     '<ITEM_ENTRY_DOOR:0>',
@@ -64,12 +68,16 @@ SPECIAL_INST = {
     'spEntryCorr5':     '<ITEM_ENTRY_DOOR:4>',
     'spEntryCorr6':     '<ITEM_ENTRY_DOOR:5>',
     'spEntryCorr7':     '<ITEM_ENTRY_DOOR:6>',
+    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up',
+    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down',
 
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
     'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
     'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
     'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
     'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
+    'coopCorrUp':   '<ITEM_ENTRY_DOOR:bee2_vert_up',
+    'coopCorrDown': '<ITEM_ENTRY_DOOR:bee2_vert_down',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
