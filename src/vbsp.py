@@ -1441,12 +1441,16 @@ def mod_entryexit(
     ):
     """Modify this entrance or exit.
 
-    This sets IS_PREVIEW and chooses a
+    This sets IS_PREVIEW, switches to vertical variants, and chooses a
     particular corridor number.
+    This returns the corridor used - 1-7, 'up', or 'down'
     """
     global IS_PREVIEW
+    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
 
-    files = instanceLocs.INST_SPECIAL[resolve_name]
+    vert_up = instanceLocs.get_special_inst(resolve_name + 'Up')
+    vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
+    files = instanceLocs.get_special_inst(resolve_name)
 
     # The coop spawn instance doesn't have no_player_start..
     if 'no_player_start' in inst.fixup:
@@ -1455,24 +1459,41 @@ def mod_entryexit(
         else:
             IS_PREVIEW = not utils.conv_bool(inst.fixup['no_player_start'])
 
+    if normal == (0, 0, 1) and vert_up is not None:
+        LOGGER.info(
+            'Using upward variant for {}',
+            pretty_name,
+        )
+        inst['file'] = vert_up
+        return 'vert_up'
+
+    if normal == (0, 0, -1) and vert_down is not None:
+        LOGGER.info(
+            'Using downward variant for {}',
+            pretty_name,
+        )
+        inst['file'] = vert_down
+        return 'vert_down'
 
     if override_corr == -1:
-        return  # No extra variants!
+        return None  # No extra variants!
 
     if override_corr == 0:
+        index = files.index(inst['file'].casefold())
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
-            str(files.index(inst['file'].casefold()) + 1
-            )
+            str(index + 1),
         )
+        return index
     else:
         LOGGER.info(
             'Setting {} to {}',
             pretty_name,
             override_corr,
         )
-        inst['file'] = files[override_corr-1]
+        inst['file'] = files[override_corr - 1]
+        return override_corr - 1
 
 def calc_rand_seed():
     """Use the ambient light entities to create a map seed.
