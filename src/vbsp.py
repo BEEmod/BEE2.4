@@ -1323,6 +1323,7 @@ def get_map_info():
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
     file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
+    file_coop_door_frame = instanceLocs.resolve('[door_frame_coop]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1342,6 +1343,13 @@ def get_map_info():
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
 
+    # The type of corridor - used to replace doorframes, if needed.
+    # 0-7 = normal, 'up'/'down' = vert up/down
+    entry_corr_type = exit_corr_type = 0
+
+    # The door frame instances
+    entry_door_frame = exit_door_frame = None
+
     for item in VMF.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
         # doors.
@@ -1359,7 +1367,7 @@ def get_map_info():
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
             exit_origin = Vec.from_str(item['origin'])
-            mod_entryexit(
+            exit_corr_type = mod_entryexit(
                 item,
                 'spExitCorr',
                 'SP Exit',
@@ -1369,7 +1377,7 @@ def get_map_info():
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
             entry_origin = Vec.from_str(item['origin'])
-            mod_entryexit(
+            entry_corr_type = mod_entryexit(
                 item,
                 'spEntryCorr',
                 'SP Entry',
@@ -1378,7 +1386,7 @@ def get_map_info():
             )
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
-            mod_entryexit(
+            exit_corr_type = mod_entryexit(
                 item,
                 'coopCorr',
                 'Coop Exit',
@@ -1402,7 +1410,11 @@ def get_map_info():
             if elev_override:
                 item.fixup['no_player_start'] = '1'
         elif file in file_sp_door_frame:
+            # We need to inspect origins to determine the entry door type.
             door_frames.append(item)
+        elif file in file_coop_door_frame:
+            # The coop frame must be the exit door...
+            exit_door_frame = item
 
         inst_files.add(item['file'])
 
@@ -1425,8 +1437,16 @@ def get_map_info():
         origin = Vec.from_str(door_frame['origin'])
         if origin.x == entry_origin.x and origin.y == entry_origin.y:
             door_frame.fixup['door_type'] = 'entry'
+            entry_door_frame = door_frame
         elif origin.x == exit_origin.x and origin.y == exit_origin.y:
             door_frame.fixup['door_type'] = 'exit'
+            exit_door_frame = door_frame
+
+    if GAME_MODE == 'COOP':
+        mod_doorframe(exit_door_frame, 'ITEM_COOP_EXIT_DOOR', exit_corr_type)
+    else:
+        mod_doorframe(entry_door_frame, 'ITEM_ENTRY_DOOR', entry_corr_type)
+        mod_doorframe(exit_door_frame, 'ITEM_EXIT_DOOR', exit_corr_type)
 
     # Return the set of all instances in the map.
     return inst_files
@@ -1494,6 +1514,36 @@ def mod_entryexit(
         )
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
+
+
+def mod_doorframe(inst: VLib.Entity, corr_id, corr_type):
+    """Change the instance used by door frames, if desired.
+
+    corr_id is the item ID of the dooor, and corr_type is the
+    return value of mod_entryexit().
+    """
+    is_white = inst['file'].casefold() in instanceLocs.get_special_inst(
+        'white_frame',
+    )
+
+    LOGGER.info('Doorframe: <{}:bee2_frame_{}_{}>',
+        corr_id,
+        corr_type,
+        'white' if is_white else 'black',
+    )
+
+    replace = instanceLocs.resolve(
+        # Allow using a custom instance path to replace corridor types:
+        # "frame_1_white", "frame_vert_down_white"
+        '<{id}:bee2_frame_{type}_{color}>'.format(
+            id=corr_id,
+            type=corr_type,
+            color='white' if is_white else 'black',
+        )
+    )
+    if replace:
+        inst['file'] = replace[0]
+
 
 def calc_rand_seed():
     """Use the ambient light entities to create a map seed.
@@ -1582,7 +1632,6 @@ def make_bottomless_pit(solids, max_height):
         else:
             sky_camera['fogblend'] = '0'
             sky_camera['use_angles'] = '0'
-
 
     if settings['pit']['skybox_ceil'] != '':
         # We dynamically add the ceiling so it resizes to match the map,
