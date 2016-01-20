@@ -1367,7 +1367,11 @@ def get_map_info():
         LOGGER.debug('File:', file)
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
-            exit_origin = Vec.from_str(item['origin'])
+            # In SP mode the same instance is used for entry and exit door
+            # frames. Use the position of the item to distinguish the two.
+            # We need .rotate() since they could be in the same block.
+            exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            exit_origin += Vec.from_str(item['origin'])
             exit_corr_name = item['targetname']
             exit_corr_type = mod_entryexit(
                 item,
@@ -1379,7 +1383,8 @@ def get_map_info():
             )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
-            entry_origin = Vec.from_str(item['origin'])
+            entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
             entry_corr_type = mod_entryexit(
                 item,
@@ -1441,11 +1446,16 @@ def get_map_info():
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
     for door_frame in door_frames:
-        origin = Vec.from_str(door_frame['origin'])
-        if origin.x == entry_origin.x and origin.y == entry_origin.y:
+        origin = Vec(0, 0, -64).rotate_by_str(door_frame['angles'])
+        if origin.z == 0:
+            # When the corridors are horizontal, the corridors are placed
+            # 64 units downward - reverse that.
+            origin.z = -64
+        origin += Vec.from_str(door_frame['origin'])
+        if origin == entry_origin:
             door_frame.fixup['door_type'] = 'entry'
             entry_door_frame = door_frame
-        elif origin.x == exit_origin.x and origin.y == exit_origin.y:
+        elif origin == exit_origin:
             door_frame.fixup['door_type'] = 'exit'
             exit_door_frame = door_frame
 
@@ -1550,6 +1560,9 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
     corr_id is the item ID of the dooor, and corr_type is the
     return value of mod_entryexit(). corr_name is the name of the corridor.
     """
+    if inst is None:
+        return  # This doorframe doesn't exist...
+
     is_white = inst['file'].casefold() in instanceLocs.get_special_inst(
         'white_frame',
     )
