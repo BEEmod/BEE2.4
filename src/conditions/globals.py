@@ -116,6 +116,15 @@ def flag_is_preview(_, flag):
     return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
 
 
+@make_flag('hasExitSignage')
+def flag_has_exit_signage(inst, flag):
+    """Check to see if either exit sign is present."""
+    for over in vbsp.VMF.by_class['info_overlay']:
+        if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
+            return True
+    return False
+
+
 @make_result('styleVar')
 def res_set_style_var(_, res):
     """Set Style Vars.
