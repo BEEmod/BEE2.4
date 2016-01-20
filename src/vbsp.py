@@ -1447,10 +1447,8 @@ def get_map_info():
     # the entry and exit frames.
     for door_frame in door_frames:
         origin = Vec(0, 0, -64).rotate_by_str(door_frame['angles'])
-        if origin.z == 0:
-            # When the corridors are horizontal, the corridors are placed
-            # 64 units downward - reverse that.
-            origin.z = -64
+        # Corridors are placed 64 units below doorframes - reverse that.
+        origin.z -= 64
         origin += Vec.from_str(door_frame['origin'])
         if origin == entry_origin:
             door_frame.fixup['door_type'] = 'entry'
