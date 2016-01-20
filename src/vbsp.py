@@ -1375,6 +1375,7 @@ def get_map_info():
                 'SP Exit',
                 elev_override,
                 override_sp_exit,
+                is_exit=True,
             )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
@@ -1396,6 +1397,7 @@ def get_map_info():
                 'Coop Exit',
                 elev_override,
                 override_coop_corr,
+                is_exit=True,
             )
         elif file in file_coop_entry:
             GAME_MODE = 'COOP'
@@ -1478,6 +1480,7 @@ def mod_entryexit(
         pretty_name,
         elev_override=False,
         override_corr=-1,
+        is_exit=False,
     ):
     """Modify this entrance or exit.
 
@@ -1487,6 +1490,11 @@ def mod_entryexit(
     """
     global IS_PREVIEW
     normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+
+    if is_exit:
+        # Swap the normal direction, so the up/down names match the direction
+        # of travel.
+        normal = -normal
 
     vert_up = instanceLocs.get_special_inst(resolve_name + 'Up')
     vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
