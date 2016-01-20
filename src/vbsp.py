@@ -1548,12 +1548,6 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
 
     inst['targetname'] = corr_name
 
-    LOGGER.info('Doorframe: <{}:bee2_frame_{}_{}>',
-        corr_id,
-        corr_type,
-        'white' if is_white else 'black',
-    )
-
     replace = instanceLocs.resolve(
         # Allow using a custom instance path to replace corridor types:
         # "frame_1_white", "frame_vert_down_white"
