@@ -63,12 +63,12 @@ def generate_resp_script(file):
                 # It's disabled!
                 continue
             section_data.append(
-                '\t\tCreateSceneEntity("{}"),'.format(line['choreo'])
+                '\t\tCreateSceneEntity("{}"),\n'.format(line['choreo'])
             )
         if len(section_data) != 1:
             for line in section_data:
                 file.write(line)
-            file.write('\t],')
+            file.write('\t],\n')
     file.write('}\n')
 
 
