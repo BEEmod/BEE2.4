@@ -2180,7 +2180,6 @@ def make_barrier_solid(origin, material):
     )
 
 
-
 def face_seed(face):
     """Create a seed unique to this brush face.
 
@@ -2193,28 +2192,6 @@ def face_seed(face):
         else:
             origin[axis] = (origin[axis] // 128) * 128 + 64
     return origin.join(' ')
-
-
-def get_grid_sizes(face: VLib.Side):
-    """Determine the grid sizes that fits on this brush."""
-    bbox_min, bbox_max = face.get_bbox()
-    dim = bbox_max - bbox_min
-
-    if dim.x == 0:
-        u, v = dim.y, dim.z
-    elif dim.y == 0:
-        u, v = dim.x, dim.z
-    elif dim.z == 0:
-        u, v = dim.x, dim.y
-    else:
-        raise Exception(str(dim) + ' not on grid!')
-
-    if u % 128 == 0 and v % 128 == 0:  # regular square
-        return "0.25", "0.5", "0.5", "1", "1",
-    if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
-        return "0.5",
-    if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
-        return "0.25",
 
 
 def random_walls():
