@@ -7,6 +7,7 @@ from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
+from property_parser import Property
 from utils import Vec
 from instanceLocs import resolve as resolve_inst
 import utils
@@ -289,6 +290,67 @@ def res_change_outputs(inst: VLib.Entity, res):
                     inst.outputs.remove(output)
                 else:
                     output.inst_out, output.output = rep
+
+
+@make_result_setup('changeInputs')
+def res_change_inputs_setup(res: Property):
+    vals = {}
+    for prop in res:
+        out_key = VLib.Output.parse_name(prop.real_name)
+        if prop.has_children():
+            vals[out_key] = (
+                prop['inst_in', None],
+                prop['input'],
+                prop['params', ''],
+                utils.conv_float(prop['delay', 0.0]),
+                1 if utils.conv_bool(prop['only_once', '0']) else -1,
+            )
+        else:
+            vals[out_key] = None
+    return vals
+
+
+@make_result('changeInputs')
+def res_change_inputs(inst: VLib.Entity, res):
+    """Switch the inputs for an instance.
+
+    Each child is an input to replace. The name is the original input, matching
+    the values in editoritems.txt. If 'inst_in' is set, this is the local entity
+    to trigger via proxy (otherwise it controls the instance). 'input',
+    'params', 'delay', and 'only_once' match the values in Hammer.
+
+    Use empty quotes instead of a block to indicate it should be deleted.
+    This replaces all outputs which target this instance name.
+    """
+    name = inst['targetname'].casefold()
+    if not name:
+        LOGGER.warning('Empty targetname for changeInputs...')
+        return  # No name, it can't be triggered...
+
+    for inst in vbsp.VMF.by_class['func_instance']:
+        for out in inst.outputs[:]:  # type: VLib.Output
+            if out.target.casefold() != name:
+                continue
+
+            try:
+                new_vals = res.value[out.inst_in, out.input]
+            except KeyError:
+                LOGGER.warning(
+                    'Unknown output for changeInputs({}):\n {}',
+                    name,
+                    out
+                )
+                continue
+            if new_vals is None:
+                inst.outputs.remove(out)
+                continue
+            (
+                out.inst_in,
+                out.input,
+                out.params,
+                out.delay,
+                out.times,
+            ) = new_vals
 
 
 @make_result('faithMods')
