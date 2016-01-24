@@ -291,7 +291,7 @@ class Property:
                 else:
                     yield prop
 
-    def find_key(self, key, def_=_NO_KEY_FOUND):
+    def find_key(self, key, def_: _Prop_Value=_NO_KEY_FOUND):
         """Obtain the value of the child Property with a given name.
 
         - If no child is found with the given name, this will return the
