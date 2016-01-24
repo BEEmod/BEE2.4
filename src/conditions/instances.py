@@ -7,8 +7,10 @@ from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
+from utils import Vec
 from instanceLocs import resolve as resolve_inst
 import conditions
+import vmfLib as VLib
 
 
 @make_flag('instance')
