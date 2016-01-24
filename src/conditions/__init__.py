@@ -808,6 +808,14 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
         if prop.value.startswith('$'):
             if prop.value in inst.fixup:
                 ent[prop.real_name] = inst.fixup[prop.value]
+            else:
+                LOGGER.warning(
+                    'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
+                    prop.value,
+                    inst['targetname'],
+                    inst,
+                    inst.fixup._fixup
+                )
         else:
             ent[prop.real_name] = prop.value
     name = inst['targetname', ''] + '-'
