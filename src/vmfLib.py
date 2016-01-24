@@ -1651,6 +1651,8 @@ class Entity:
         del self['targetname']
         del self['classname']
         self.keys.clear()
+        # Clear $fixup as well.
+        self.fixup.clear()
 
     def __contains__(self, key: str):
         """Determine if a value exists for the given key."""
@@ -1735,11 +1737,22 @@ class EntityFixup:
         """Generate a list that can be passed to the constructor."""
         return list(self._fixup.values())
 
+    def clear(self):
+        """Wipe all the $fixup values."""
+        self._fixup.clear()
+
     def __getitem__(self, key):
         if isinstance(key, tuple):
             return self.get(key[0], default=key[1])
         else:
             return self.get(key)
+
+    def __contains__(self, var):
+        """Check if a variable is present in the fixup list."""
+        if var[0] == '$':
+            var = var[1:]
+        return var.casefold() in self._fixup
+
 
     def __setitem__(self, var, val):
         """Set the value of an instance $replace variable.
