@@ -1701,6 +1701,7 @@ class EntityFixup:
     This also treats variable names case-insensitively, and strips $
     signs off the front of them.
     """
+    __slots__ = ['_fixup']
 
     def __init__(self, fixup=()):
         self._fixup = {}
