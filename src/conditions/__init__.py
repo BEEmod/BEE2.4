@@ -856,6 +856,24 @@ def load_templates():
         )
 
 
+def get_template(temp_name):
+    """Get the data associated with a given template."""
+    try:
+        return TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        # Replace the KeyError with a more useful error message, and
+        # list all the templates that are available.
+        LOGGER.info('Templates:')
+        LOGGER.info('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
+
+
 def import_template(
         temp_name,
         origin,
@@ -873,20 +891,8 @@ def import_template(
     If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
-    try:
-        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        # Replace the KeyError with a more useful error message, and
-        # list all the templates that are available.
-        LOGGER.info('Templates:')
-        LOGGER.info('\n'.join(
-            ('* "' + temp + '"')
-            for temp in
-            TEMPLATES.keys()
-        ))
-        # Overwrite the error's value
-        err.args = ('Template not found: "{}"'.format(temp_name),)
-        raise err
+    orig_world, orig_detail, orig_over = get_template(temp_name)
+
     new_world = []
     new_detail = []
     new_over = []
