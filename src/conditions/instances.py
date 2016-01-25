@@ -3,6 +3,7 @@
 """
 import operator
 
+import utils
 from conditions import (
     make_flag, make_result,
     ALL_INST,
@@ -163,13 +164,18 @@ def res_replace_instance(inst: VLib.Entity, res):
     'keys' and 'localkeys' defines the new keyvalues used.
     'targetname' and 'angles' are preset, and 'origin' will be used to offset
     the given amount from the current location.
+    If 'keep_instance' is true, the instance entity will be kept instead of
+    removed.
     """
     import vbsp
 
     origin = Vec.from_str(inst['origin'])
     angles = inst['angles']
 
-    inst.remove()  # free the ent ID..
+    if not utils.conv_bool(res['keep_instance', '0'], False):
+        inst.remove()  # Do this first to free the ent ID, so the new ent has
+        # the same one.
+
     # We copy to allow us to still acess the $fixups and other values.
     new_ent = inst.copy(des_id=inst.id)
     new_ent.clear_keys()
