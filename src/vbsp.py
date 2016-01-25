@@ -35,9 +35,9 @@ settings = {
     "fog":            {},
     "elev_opt":       {},
 
-    "style_vars":      defaultdict(bool),
-    "has_attr":        defaultdict(bool),
-    "packtrigger":     defaultdict(list),
+    "style_vars":     defaultdict(bool),
+    "has_attr":       defaultdict(bool),
+    "packtrigger":    defaultdict(list),
 }
 
 
