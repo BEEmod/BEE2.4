@@ -39,7 +39,7 @@ GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], VLib.Entity, List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
