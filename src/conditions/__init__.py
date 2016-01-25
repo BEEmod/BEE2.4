@@ -968,6 +968,32 @@ def import_template(
     return Template(new_world, detail_ent, new_over)
 
 
+def get_scaling_template(
+        temp_id,
+    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis]]:
+    """Get the scaling data from a template.
+
+    This is a dictionary mapping normals to UV axis info.
+    """
+    world, detail, over = get_template(temp_id)
+
+    if detail:
+        world = world + detail.solids # Don't mutate the lists
+    else:
+        world = list(world)
+
+    uvs = {}
+
+    for brush in world:
+        for side in brush.sides:
+            uvs[side.normal().as_tuple()] = (
+                side.uaxis.copy(),
+                side.vaxis.copy(),
+            )
+
+    return uvs
+
+
 # 'Opposite' values for retexture_template(force_colour)
 TEMP_COLOUR_INVERT = {
     MAT_TYPES.white: MAT_TYPES.black,
