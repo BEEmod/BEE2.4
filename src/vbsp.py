@@ -215,9 +215,6 @@ DEFAULTS = {
     "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
     # The maximum distance of a single broken section
     "broken_antline_distance":  "3",
-
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
     "goo_scale":                "1",  # Scale of goo material
 
     # Add lights to disguise the bottomless pit transition
@@ -231,6 +228,14 @@ DEFAULTS = {
     "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
     # Filter used on grating vphysics_clips
     "grating_filter":           "@not_paint_bomb",
+    # A template holding a brush used to decide the
+    # rotation and scaling of glass. This overrided glass_scale
+    # and grating_scale, if set.
+    "glass_template":     "",
+    "grating_template":   "",
+
+    "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
