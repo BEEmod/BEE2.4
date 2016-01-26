@@ -3288,6 +3288,15 @@ def main():
         # If we don't get the special -force args, check for the entity
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
+
+    # Clear the list of files we want to inject into the packfile.
+    # If we're in a Hammer map, we want to ensure no files are injected.
+    try:
+        os.removedirs('bee2/inject/')
+    except (FileNotFoundError, OSError):
+        pass
+    os.makedirs('bee2/inject/', exist_ok=True)
+
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
@@ -3298,13 +3307,6 @@ def main():
         )
     else:
         LOGGER.info("PeTI map detected!")
-
-        # Clear the list of files we want to inject into the packfile.
-        try:
-            os.removedirs('bee2/inject/')
-        except (FileNotFoundError, OSError):
-            pass
-        os.makedirs('bee2/inject/', exist_ok=True)
 
         LOGGER.info("Loading settings...")
         load_settings()
