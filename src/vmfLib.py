@@ -989,6 +989,19 @@ class UVAxis:
             scale=self.scale,
         )
 
+    def __repr__(self):
+        rep = '{cls}({x:g}, {y:g}, {z:g}'.format(
+            cls=self.__class__.__name__,
+            x=self.x,
+            y=self.y,
+            z=self.z,
+        )
+        if self.offset != 0:
+            rep += ', offset={:g}'.format(self.offset)
+        if self.scale != 0.25:
+            rep += ', scale={:g}'.format(self.scale)
+        return rep + ')'
+
 
 class Side:
     """A brush face."""
