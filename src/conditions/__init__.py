@@ -970,10 +970,10 @@ def import_template(
 
 def get_scaling_template(
         temp_id,
-    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis]]:
+    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis, float]]:
     """Get the scaling data from a template.
 
-    This is a dictionary mapping normals to UV axis info.
+    This is a dictionary mapping normals to the U,V and rotation data.
     """
     world, detail, over = get_template(temp_id)
 
@@ -989,6 +989,7 @@ def get_scaling_template(
             uvs[side.normal().as_tuple()] = (
                 side.uaxis.copy(),
                 side.vaxis.copy(),
+                side.ham_rot,
             )
 
     return uvs
