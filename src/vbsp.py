@@ -35,9 +35,9 @@ settings = {
     "fog":            {},
     "elev_opt":       {},
 
-    "style_vars":      defaultdict(bool),
-    "has_attr":        defaultdict(bool),
-    "packtrigger":     defaultdict(list),
+    "style_vars":     defaultdict(bool),
+    "has_attr":       defaultdict(bool),
+    "packtrigger":    defaultdict(list),
 }
 
 
@@ -215,9 +215,6 @@ DEFAULTS = {
     "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
     # The maximum distance of a single broken section
     "broken_antline_distance":  "3",
-
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
     "goo_scale":                "1",  # Scale of goo material
 
     # Add lights to disguise the bottomless pit transition
@@ -231,6 +228,14 @@ DEFAULTS = {
     "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
     # Filter used on grating vphysics_clips
     "grating_filter":           "@not_paint_bomb",
+    # A template holding a brush used to decide the
+    # rotation and scaling of glass. This overrides glass_scale
+    # and grating_scale, if set.
+    "glass_template":     "",
+    "grating_template":   "",
+
+    "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
@@ -1919,6 +1924,12 @@ def change_brush():
     glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
     goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
 
+    glass_temp = get_opt("glass_template")
+    if glass_temp:
+        glass_temp = conditions.get_scaling_template(glass_temp)
+    else:
+        glass_temp = None
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1939,6 +1950,10 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
+    else:
+        pit_height = 0
+        pit_solids = None
+        pit_goo_tex = ''
 
     highest_brush = 0
 
@@ -1972,8 +1987,17 @@ def change_brush():
                 # Apply goo scaling
                 face.scale = goo_scale
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                # Apply the glass scaling option
-                face.scale = glass_scale
+                if glass_temp is not None:
+                    try:
+                        u, v, face.ham_rot = glass_temp[face.normal().as_tuple()]
+                    except KeyError:
+                        pass
+                    else:
+                        face.uaxis = u.copy()
+                        face.vaxis = v.copy()
+                else:
+                    # Apply the glass scaling option
+                    face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_clip_mat:
@@ -2664,6 +2688,12 @@ def change_func_brush():
     grating_clip_mat = get_opt("grating_clip")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
 
+    grate_temp = get_opt("grating_template")
+    if grate_temp:
+        grate_temp = conditions.get_scaling_template(grate_temp)
+    else:
+        grate_temp = None
+
     # All the textures used for faith plate bullseyes
     bullseye_white = set(itertools.chain.from_iterable(
         settings['textures']['special.bullseye_white_' + orient]
@@ -2690,11 +2720,7 @@ def change_func_brush():
     # Merge nearby grating brushes
     grating_brush = {}
 
-    for brush in (
-            VMF.by_class['func_brush'] |
-            VMF.by_class['func_door_rotating']
-            ):
-
+    for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
         if brush in IGNORED_BRUSH_ENTS:
             continue
 
@@ -2748,7 +2774,17 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    side.scale = grating_scale
+                    if grate_temp is not None:
+                        try:
+                            u, v, side.ham_rot = grate_temp[side.normal().as_tuple()]
+                        except KeyError:
+                            pass
+                        else:
+                            side.uaxis = u.copy()
+                            side.vaxis = v.copy()
+                    else:
+                        side.scale = grating_scale
+
                 alter_mat(side)  # for gratings, laserfields and some others
 
             # The style blanked the material, so delete the brush

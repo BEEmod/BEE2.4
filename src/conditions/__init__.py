@@ -39,7 +39,7 @@ GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], VLib.Entity, List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
@@ -856,6 +856,24 @@ def load_templates():
         )
 
 
+def get_template(temp_name):
+    """Get the data associated with a given template."""
+    try:
+        return TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        # Replace the KeyError with a more useful error message, and
+        # list all the templates that are available.
+        LOGGER.info('Templates:')
+        LOGGER.info('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
+
+
 def import_template(
         temp_name,
         origin,
@@ -873,20 +891,8 @@ def import_template(
     If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
-    try:
-        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        # Replace the KeyError with a more useful error message, and
-        # list all the templates that are available.
-        LOGGER.info('Templates:')
-        LOGGER.info('\n'.join(
-            ('* "' + temp + '"')
-            for temp in
-            TEMPLATES.keys()
-        ))
-        # Overwrite the error's value
-        err.args = ('Template not found: "{}"'.format(temp_name),)
-        raise err
+    orig_world, orig_detail, orig_over = get_template(temp_name)
+
     new_world = []
     new_detail = []
     new_over = []
@@ -960,6 +966,33 @@ def import_template(
         vbsp.IGNORED_FACES.update(solid.sides)
 
     return Template(new_world, detail_ent, new_over)
+
+
+def get_scaling_template(
+        temp_id,
+    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis, float]]:
+    """Get the scaling data from a template.
+
+    This is a dictionary mapping normals to the U,V and rotation data.
+    """
+    world, detail, over = get_template(temp_id)
+
+    if detail:
+        world = world + detail.solids # Don't mutate the lists
+    else:
+        world = list(world)
+
+    uvs = {}
+
+    for brush in world:
+        for side in brush.sides:
+            uvs[side.normal().as_tuple()] = (
+                side.uaxis.copy(),
+                side.vaxis.copy(),
+                side.ham_rot,
+            )
+
+    return uvs
 
 
 # 'Opposite' values for retexture_template(force_colour)
