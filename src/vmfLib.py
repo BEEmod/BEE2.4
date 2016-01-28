@@ -989,6 +989,19 @@ class UVAxis:
             scale=self.scale,
         )
 
+    def __repr__(self):
+        rep = '{cls}({x:g}, {y:g}, {z:g}'.format(
+            cls=self.__class__.__name__,
+            x=self.x,
+            y=self.y,
+            z=self.z,
+        )
+        if self.offset != 0:
+            rep += ', offset={:g}'.format(self.offset)
+        if self.scale != 0.25:
+            rep += ', scale={:g}'.format(self.scale)
+        return rep + ')'
+
 
 class Side:
     """A brush face."""
@@ -1651,6 +1664,8 @@ class Entity:
         del self['targetname']
         del self['classname']
         self.keys.clear()
+        # Clear $fixup as well.
+        self.fixup.clear()
 
     def __contains__(self, key: str):
         """Determine if a value exists for the given key."""
@@ -1699,6 +1714,7 @@ class EntityFixup:
     This also treats variable names case-insensitively, and strips $
     signs off the front of them.
     """
+    __slots__ = ['_fixup']
 
     def __init__(self, fixup=()):
         self._fixup = {}
@@ -1735,11 +1751,22 @@ class EntityFixup:
         """Generate a list that can be passed to the constructor."""
         return list(self._fixup.values())
 
+    def clear(self):
+        """Wipe all the $fixup values."""
+        self._fixup.clear()
+
     def __getitem__(self, key):
         if isinstance(key, tuple):
             return self.get(key[0], default=key[1])
         else:
             return self.get(key)
+
+    def __contains__(self, var):
+        """Check if a variable is present in the fixup list."""
+        if var[0] == '$':
+            var = var[1:]
+        return var.casefold() in self._fixup
+
 
     def __setitem__(self, var, val):
         """Set the value of an instance $replace variable.

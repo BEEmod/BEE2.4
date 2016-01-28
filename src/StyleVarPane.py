@@ -28,14 +28,6 @@ styleOptions = [
     ),
 
     stylevar(
-        id='FixPortalBump',
-        name='Prevent Portal Bump  (glass)',
-        enabled=0,
-        desc='Add portal bumpers to make it more difficult to portal through '
-             'glass panes.'
-    ),
-
-    stylevar(
         id='FixFizzlerBump',
         name='Prevent Portal Bump  (fizzler)',
         enabled=0,

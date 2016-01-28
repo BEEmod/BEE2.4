@@ -15,6 +15,8 @@ from tooltip import add_tooltip
 import utils
 import tk_tools
 
+from typing import List
+
 
 UP_ARROW = '\u25B3'
 DN_ARROW = '\u25BD'
@@ -242,9 +244,9 @@ class CheckDetails(ttk.Frame):
             showhandle=False,
         )
         self.wid_header.grid(row=0, column=1, sticky='EW')
-        self.wid_head_frames = [0] * len(self.headers)
-        self.wid_head_label = [0] * len(self.headers)
-        self.wid_head_sort = [0] * len(self.headers)
+        self.wid_head_frames = [0] * len(self.headers)  # type: List[ttk.Frame]
+        self.wid_head_label = [0] * len(self.headers)  # type: List[ttk.Label]
+        self.wid_head_sort = [0] * len(self.headers)  # type: List[ttk.Label]
         self.make_headers()
 
         self.wid_canvas = tk.Canvas(
