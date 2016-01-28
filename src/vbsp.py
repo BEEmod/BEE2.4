@@ -231,8 +231,8 @@ DEFAULTS = {
     # A template holding a brush used to decide the
     # rotation and scaling of glass. This overrides glass_scale
     # and grating_scale, if set.
-    "glass_template":     "",
-    "grating_template":   "",
+    "glass_template":           "",
+    "grating_template":         "",
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
