@@ -738,8 +738,6 @@ def export_editoritems(_=None):
     # The chosen items on the palette
     pal_data = [(it.id, it.subKey) for it in pal_picked]
 
-    LOGGER.info(item_list)
-
     item_versions = {
         it_id: item.selected_ver
         for it_id, item in
