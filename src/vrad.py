@@ -130,11 +130,11 @@ def pack_content(path):
     else:
         with pack_list:
             for line in pack_list:
-                files.add(line.strip().lower())
+                line = line.strip()
+                if not line or line.startswith('//'):
+                    continue  # Skip blanks or comments
 
-    if '' in files:
-        # Allow blank lines in original files
-        files.remove('')
+                files.add(line.lower())
 
     if not files:
         LOGGER.info('No files to pack!')
