@@ -1015,10 +1015,10 @@ def set_player_model(_):
     model_path, pgun_skin = PLAYER_MODELS[chosen_model]
 
     # Plug leaks
-    VMF.make_hollow(
+    VMF.add_brushes(VMF.make_hollow(
         loc - (32, 32, 64),
         loc + (32, 32, 64),
-    )
+    ))
 
     # Precache the model, so we can switch to it.
     VMF.create_ent(
