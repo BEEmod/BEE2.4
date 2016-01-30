@@ -1149,6 +1149,9 @@ class Music:
     @staticmethod
     def export(exp_data: ExportData):
         """Export the selected music."""
+        if exp_data.selected is None:
+            return  # No music..
+
         for music in data['Music']:
             if music.id == exp_data.selected:
                 break
@@ -1156,9 +1159,6 @@ class Music:
             raise Exception(
                 "Selected music ({}) doesn't exist?".format(exp_data.selected)
             )
-
-        if music is None:
-            return
 
         vbsp_config = exp_data.vbsp_conf
 
@@ -1341,6 +1341,7 @@ class ElevatorVid:
         """Export the chosen video into the configs."""
         style = exp_data.selected_style  # type: Style
         vbsp_config = exp_data.vbsp_conf  # type: Property
+
         if exp_data.selected is None:
             elevator = None
         else:
