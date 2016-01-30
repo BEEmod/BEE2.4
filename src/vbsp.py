@@ -987,6 +987,100 @@ def anti_fizz_bump(inst):
 
     LOGGER.info('Done!')
 
+# The paths for player models and the portalgun skin
+PLAYER_MODELS = {
+    'sp': ('player/chell/player', 0),
+    'atlas': ('player/ballbot/ballbot', 1),
+    'pbody': ('player/eggbot/eggbot', 2),
+}
+
+
+@conditions.meta_cond(priority=400, only_once=True)
+def set_player_model(_):
+    """Set the player model in SinglePlayer."""
+
+    # Add the model changer instance.
+    # We don't change the player model in Coop, or if Bendy is selected.
+
+    if GAME_MODE == 'COOP':  # Not in coop..
+        return
+
+    loc = Vec.from_str(get_opt('model_changer_loc'))
+    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
+
+    if chosen_model == 'peti':
+        # The default model..
+        return
+
+    model_path, pgun_skin = PLAYER_MODELS[chosen_model]
+
+    # Plug leaks
+    VMF.make_hollow(
+        loc - (32, 32, 64),
+        loc + (32, 32, 64),
+    )
+
+    # Precache the model, so we can switch to it.
+    VMF.create_ent(
+        classname='prop_dynamic_override',
+        origin=loc + (0, 0, -60),
+        model='models/' + model_path + '.mdl',
+
+        rendermode=10,
+        startDisabled=1,
+        holdAnimation=1,
+        disableshadows=1,
+        disableshadowdepth=1,
+        disableflashlight=1,
+        disablereceiveshadows=1,
+    )
+
+    auto = VMF.create_ent(
+        classname='logic_auto',
+        spawnflags=0,  # Don't remove on fire.
+        origin=loc + (0, 0, 32),
+    )
+
+    # The delay is required to ensure the portalgun parents properly
+    # to the player's hand.
+    auto.add_out(VLib.Output(
+        'OnMapSpawn',
+        '@command',
+        'Command',
+        'setmodel ' + model_path,
+        delay=0.1,
+    ))
+
+    # We need to redo this whenever a saved game is loaded..
+    auto.add_out(VLib.Output(
+        'OnLoadGame',
+        '@command',
+        'Command',
+        'setmodel ' + model_path,
+        delay=0.1,
+    ))
+
+    if pgun_skin and get_opt('game_id') == utils.STEAM_IDS['PORTAL2']:
+        # Only change portalgun skins in Portal 2 - this is the vanilla
+        # portalgun weapon/viewmodel.
+        auto.add_out(VLib.Output(
+            'OnMapSpawn',
+            'viewmodel',  # Classname of the viewmodel.
+            'Skin',
+            str(pgun_skin),
+            delay=0.1,
+        ))
+        auto.add_out(VLib.Output(
+            'OnMapSpawn',
+            # Classname of the portalgun.
+            # This will also change pedestals and the like,
+            # but that's fine.
+            'weapon_portalgun',
+            'Skin',
+            str(pgun_skin),
+            delay=0,
+        ))
+
 
 @conditions.meta_cond(priority=500, only_once=True)
 def set_player_portalgun(inst):
@@ -2657,21 +2751,6 @@ def add_extra_ents(mode):
             PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
         global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
-
-    # Add the model changer instance.
-    # We don't change the player model in Coop, or if Bendy is selected.
-
-    model_changer_loc = get_opt('model_changer_loc')
-    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI')
-    if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
-        VMF.create_ent(
-            classname='func_instance',
-            targetname='model_changer',
-            angles='0 0 0',
-            origin=model_changer_loc,
-            file='instances/BEE2/logic/model_changer/' + chosen_model + '.vmf',
-            fixup_style='0',
-        )
 
     # Add a logic_auto with the set of global outputs.
     logic_auto = VMF.create_ent(
