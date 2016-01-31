@@ -1,6 +1,7 @@
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
+import os
 import sys
 if __name__ == '__main__':
     if is_forking(sys.argv):
@@ -17,6 +18,12 @@ if __name__ == '__main__':
         # We need to initiallise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
         LOGGER = utils.init_logging('../logs/BEE2-error.log')
+
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        os.chdir(os.path.dirname(sys.argv[0]))
 
 from tkinter import messagebox
 
@@ -66,14 +73,6 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        import os
-        import sys
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
-
     loadScreen.main_loader.set_length('UI', 14)
     loadScreen.main_loader.show()
 
