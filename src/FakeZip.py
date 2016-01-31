@@ -5,7 +5,8 @@ This is useful to allow using the same code for reading folders or zips of data.
 import shutil
 import os
 
-from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+from zipfile import ZIP_STORED
+
 
 class FakeZipInfo:
     """Analog to zipfile.ZipInfo, but for directories.
@@ -17,7 +18,8 @@ class FakeZipInfo:
     def __init__(self, filename):
         self.filename = filename
         self.comment = ''
-    compress_type = ZIP_DEFLATED
+
+    compress_type = ZIP_STORED  # Files on disk are uncompressed..
     reserved = 0
 
     def __str__(self):
@@ -33,7 +35,7 @@ class FakeZip:
     It offers all the same functions, but instead reads grabs
     files from subfolders.
     """
-    def __init__(self, folder, mode='w', compress_type=None):
+    def __init__(self, folder, mode='w'):
         self.folder = folder
         self.wr_mode = 'a' if 'a' in mode else 'w'
 
@@ -58,12 +60,16 @@ class FakeZip:
 
     def names(self):
         base = self.folder
+        rel_path = os.path.relpath
         for dirpath, dirnames, filenames in os.walk(base):
             for name in filenames:
-                yield os.path.relpath(os.path.join(dirpath, name), base)
+                yield rel_path(dirpath + '/' + name, base)
 
     def namelist(self):
-        return list(self.names())
+        """We actually return a set, since this is mainly used for 'in'
+        testing.
+        """
+        return set(self.names())
 
     def infolist(self):
         return map(FakeZipInfo, self.names())
