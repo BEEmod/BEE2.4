@@ -163,7 +163,7 @@ elif MAC:
         scroll_func = getattr(target, orient + 'view_scroll')
 
         def mousewheel_handler(event):
-            scroll_func(event.delta, "units")
+            scroll_func(-event.delta, "units")
         for frame in frames:
             frame.bind('<MouseWheel>', mousewheel_handler, add='+')
 elif LINUX:
