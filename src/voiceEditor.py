@@ -263,7 +263,6 @@ def show(quote_pack):
             quote_data.find_all('quotes', 'CoopResponses')
         )),
     )
-    LOGGER.info('Pack: {}, resp={!r}', quote_pack.id, responses)
 
     if len(responses):
         make_tab(
@@ -384,7 +383,6 @@ def make_tab(group, config: ConfigFile, tab_type):
 
     for quote in sorted_quotes:
         if tab_type is TabTypes.RESPONSE:
-            LOGGER.info('{!r}', quote)
             try:
                 name = RESPONSE_NAMES[quote.name]
             except KeyError:
@@ -460,7 +458,6 @@ def find_lines(quote_block):
 def find_resp_lines(quote_block):
     """Find the line blocks in response items."""
     for index, prop in enumerate(quote_block):
-        LOGGER.info(prop.name, index)
         yield None, prop, 'line_{}'.format(index)
 
 
