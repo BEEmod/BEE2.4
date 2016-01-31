@@ -68,6 +68,10 @@ EMPTY_VPK = bytes([
     0, 0, 1, 0, 0, 0, 0,
 ])
 
+# The last DLC released by Valve - this is the one that we overwrite with a
+# VPK file.
+OVERRIDE_DLC = 'portal2_dlc3'
+
 
 def pak_object(name, allow_mult=False, has_img=True):
     """Decorator to add a class to the list of objects.
@@ -1317,7 +1321,7 @@ class StyleVPK:
     @classmethod
     def parse(cls, data: ParseData):
         vpk_name = data.info['filename']
-        dest_folder = os.path.join('../vpk_cache', vpk_name)
+        dest_folder = os.path.join('../vpk_cache', data.id.casefold())
 
         os.makedirs(dest_folder, exist_ok=True)
 
@@ -1342,6 +1346,45 @@ class StyleVPK:
             )
 
         return cls(data.id, file_count)
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        sel_vpk = exp_data.selected_style.vpk_name  # type: Style
+
+        if sel_vpk:
+            for vpk in data['StyleVPK']:  # type: StyleVPK
+                if vpk.id.casefold() == sel_vpk:
+                    sel_vpk = vpk
+                    break
+            else:
+                sel_vpk = None
+        else:
+            sel_vpk = None
+
+        dest_folder = exp_data.game.abs_path(OVERRIDE_DLC)
+        # Remove existing VPKs. We want to leave other files - otherwise
+        # users will end up regenerating the sound cache every time they
+        # export.
+
+        os.makedirs(dest_folder, exist_ok=True)
+        for file in os.listdir(dest_folder):
+            if file[:6] == 'pak01_':
+                os.remove(os.path.join(dest_folder, file))
+
+        if sel_vpk is None:
+            # Write a blank VPK file.
+            with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
+                f.write(EMPTY_VPK)
+        else:
+            src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
+            for index, suffix in zip(
+                    range(sel_vpk.file_count),  # Limit to the number of files
+                    sel_vpk.iter_vpk_names()):
+                shutil.copy(
+                    os.path.join(src_folder, 'pak01' + suffix),
+                    os.path.join(dest_folder, 'pak01' + suffix),
+                )
+
 
     @staticmethod
     def iter_vpk_names():
