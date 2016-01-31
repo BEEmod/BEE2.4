@@ -21,6 +21,7 @@ EXCLUDES = [
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
     'dis',  # From inspect, not needed
+    'pprint',  # From pickle, not needed
 ]
 
 # Additional modules to include:
