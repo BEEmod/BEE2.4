@@ -262,22 +262,27 @@ def init(cback):
             ''
         )
 
-    labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')
-    widgets['saveButton'] = ttk.Button(win, text='Close', command=exit_win)
-    widgets['titleLabel'] = ttk.Label(win, text='')
+    frame = ttk.Frame(win, padding=10)
+    frame.grid(row=0, column=0, sticky='NSEW')
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
+
+    labels['noOptions'] = ttk.Label(frame, text='No Properties avalible!')
+    widgets['saveButton'] = ttk.Button(frame, text='Close', command=exit_win)
+    widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
-    widgets['div_1'] = ttk.Separator(win, orient="vertical")
-    widgets['div_2'] = ttk.Separator(win, orient="vertical")
-    widgets['div_h'] = ttk.Separator(win, orient="horizontal")
+    widgets['div_1'] = ttk.Separator(frame, orient="vertical")
+    widgets['div_2'] = ttk.Separator(frame, orient="vertical")
+    widgets['div_h'] = ttk.Separator(frame, orient="horizontal")
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
-        labels[key] = ttk.Label(win, text=prop_name+':')
+        labels[key] = ttk.Label(frame, text=prop_name+':')
         if prop_type == 'checkbox':
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = utils.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
-                win,
+                frame,
                 variable=values[key],
                 command=func_partial(set_check, key),
                 )
@@ -294,13 +299,13 @@ def init(cback):
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = utils.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
-                win,
+                frame,
                 variable=values[key],
                 command=func_partial(save_rail, key),
                 )
 
         elif prop_type == 'panAngle':
-            frm = ttk.Frame(win)
+            frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = StringVar(value=DEFAULTS[key])
             for pos, angle in enumerate(['30', '45', '60', '90']):
@@ -314,7 +319,7 @@ def init(cback):
                 frm.columnconfigure(pos, weight=1)
 
         elif prop_type == 'gelType':
-            frm = ttk.Frame(win)
+            frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = IntVar(value=DEFAULTS[key])
             for pos, text in enumerate(PAINT_OPTS):
@@ -330,7 +335,7 @@ def init(cback):
 
         elif prop_type == 'pistPlat':
             widgets[key] = Scale(
-                win,
+                frame,
                 from_=0,
                 to=4,
                 orient="horizontal",
@@ -353,7 +358,7 @@ def init(cback):
 
         elif prop_type == 'timerDel':
             widgets[key] = ttk.Scale(
-                win,
+                frame,
                 from_=0,
                 to=30,
                 orient="horizontal",
@@ -362,7 +367,7 @@ def init(cback):
             values[key] = DEFAULTS[key]
 
         elif prop_type == 'railPlat':
-            widgets[key] = ttk.Checkbutton(win)
+            widgets[key] = ttk.Checkbutton(frame)
     values['startup'] = DEFAULTS['startup']
 
 
