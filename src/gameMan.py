@@ -78,6 +78,12 @@ export_screen = loadScreen.LoadScreen(
     title_text='Exporting',
 )
 
+EXE_SUFFIX = (
+    '.exe' if utils.WIN else
+    '_osx' if utils.MAC else
+    '_linux' if utils.LINUX else
+    ''
+)
 
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
@@ -590,7 +596,7 @@ def add_game(_=None, refresh_menu=True):
 
     messagebox.showinfo(
         message='Select the folder where the game executable is located '
-                '(portal2.exe)...',
+                '(portal2' + EXE_SUFFIX + ')...',
         parent=TK_ROOT,
         title='BEE2 - Add Game',
         )
