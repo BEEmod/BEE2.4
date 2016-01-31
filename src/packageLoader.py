@@ -9,7 +9,7 @@ import os.path
 import shutil
 
 from property_parser import Property, NoKeyError
-from FakeZip import FakeZip, zip_names
+from FakeZip import FakeZip, zip_names, zip_open_bin
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
@@ -59,6 +59,14 @@ CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
+
+# The binary data comprising a blank VPK file.
+EMPTY_VPK = bytes([
+    52, 18, 170, 85,  # VPK identifier
+    1,  # Version 1
+    0,  # 0 bytes of directory info
+    0, 0, 1, 0, 0, 0, 0,
+])
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -211,6 +219,8 @@ def load_packages(
                     # Add slash to the end to indicate it's a folder.
         )
         sys.exit('No Packages Directory!')
+
+    shutil.rmtree('../vpk_cache/', ignore_errors=True)
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -587,6 +597,7 @@ class Style:
             base_style=None,
             suggested=None,
             has_video=True,
+            vpk_name='',
             corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
@@ -596,6 +607,7 @@ class Style:
         self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
+        self.vpk_name = vpk_name
         self.corridor_names = {
             'sp_entry': corridor_names.get('sp_entry', Property('', [])),
             'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
@@ -613,6 +625,7 @@ class Style:
         selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = utils.conv_bool(info['has_video', '1'])
+        vpk_name = info['vpk_name', ''].casefold()
 
         sugg = info.find_key('suggested', [])
         sugg = (
@@ -657,6 +670,7 @@ class Style:
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
+            vpk_name=vpk_name
             )
 
     def add_over(self, override: 'Style'):
@@ -1283,6 +1297,48 @@ class StyleVar:
             for key, val in
             exp_data.selected.items()
         ]))
+
+
+@pak_object('StyleVPK')
+class StyleVPK:
+    """A set of VPK files used for styles.
+
+    These are copied into _dlc3, allowing changing the in-editor wall
+    textures.
+    """
+    def __init__(self, vpk_id):
+        self.id = vpk_id
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        vpk_name = data.info['filename']
+        dest_folder = os.path.join('../vpk_cache', vpk_name)
+
+        os.makedirs(dest_folder, exist_ok=True)
+
+        zip_file = data.zip_file  # type: ZipFile
+        zip_filenames = zip_file.namelist()
+
+        for name in cls.iter_vpk_names():
+            src = os.path.join('vpk', vpk_name + name)
+            if src not in zip_filenames:
+                break
+            dest = os.path.join(dest_folder, 'pak01' + name)
+            with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
+                shutil.copyfileobj(src_file, dest_file)
+
+        return cls(data.id)
+
+    @staticmethod
+    def iter_vpk_names():
+        """Iterate over VPK filename suffixes.
+
+        The first is '_dir.vpk', then '_000.vpk' with increasing
+        numbers.
+        """
+        yield '_dir.vpk'
+        for i in range(999):
+            yield '_{:03}.vpk'.format(i)
 
 
 @pak_object('Elevator')
