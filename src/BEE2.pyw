@@ -4,6 +4,12 @@ from multiprocessing.spawn import is_forking
 import os
 import sys
 if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        os.chdir(os.path.dirname(sys.argv[0]))
+    
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
@@ -18,12 +24,6 @@ if __name__ == '__main__':
         # We need to initiallise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
         LOGGER = utils.init_logging('../logs/BEE2-error.log')
-
-    if utils.MAC or utils.LINUX:
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
 
 from tkinter import messagebox
 
