@@ -8,6 +8,7 @@ import random
 
 import sound as snd
 import utils
+import contextWin
 
 # all editable properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
@@ -212,7 +213,7 @@ def paint_fx(e=None):
     sfx('config')
 
 
-def exit_win():
+def exit_win(_=None):
     "Quit and return the new settings."
     global is_open
     win.grab_release()
@@ -225,6 +226,10 @@ def exit_win():
             # or use values by default.
             out[key] = out_values.get(key, values[key])
     callback(out)
+
+    if contextWin.is_open:
+        # Restore the context window if we hid it earlier.
+        contextWin.prop_window.deiconify()
 
 
 def can_edit(prop_list):
@@ -244,7 +249,19 @@ def init(cback):
     win.resizable(False, False)
     win.iconbitmap('../BEE2.ico')
     win.protocol("WM_DELETE_WINDOW", exit_win)
+    win.transient(TK_ROOT)
     win.withdraw()
+
+    if utils.MAC:
+        # Switch to use the 'modal' window style on Mac.
+        TK_ROOT.call(
+            '::tk::unsupported::MacWindowStyle',
+            'style',
+            win,
+            'moveableModal',
+            ''
+        )
+
     labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')
     widgets['saveButton'] = ttk.Button(win, text='Close', command=exit_win)
     widgets['titleLabel'] = ttk.Label(win, text='')
@@ -503,10 +520,16 @@ def show_window(used_props, parent, item_name):
     win.deiconify()
     win.lift(parent)
     win.grab_set()
+    win.attributes("-topmost", True)
     win.geometry(
         '+' + str(parent.winfo_rootx() - 30) +
         '+' + str(parent.winfo_rooty() - win.winfo_reqheight() - 30)
         )
+
+    if contextWin.is_open:
+        # Temporarily hide the context window while we're open.
+        contextWin.prop_window.withdraw()
+
 
 # load the window if directly executing this file
 if __name__ == '__main__':
