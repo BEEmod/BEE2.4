@@ -7,6 +7,7 @@ from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
+from property_parser import Property
 from utils import Vec
 from instanceLocs import resolve as resolve_inst
 import utils
@@ -291,6 +292,67 @@ def res_change_outputs(inst: VLib.Entity, res):
                     output.inst_out, output.output = rep
 
 
+@make_result_setup('changeInputs')
+def res_change_inputs_setup(res: Property):
+    vals = {}
+    for prop in res:
+        out_key = VLib.Output.parse_name(prop.real_name)
+        if prop.has_children():
+            vals[out_key] = (
+                prop['inst_in', None],
+                prop['input'],
+                prop['params', ''],
+                utils.conv_float(prop['delay', 0.0]),
+                1 if utils.conv_bool(prop['only_once', '0']) else -1,
+            )
+        else:
+            vals[out_key] = None
+    return vals
+
+
+@make_result('changeInputs')
+def res_change_inputs(inst: VLib.Entity, res):
+    """Switch the inputs for an instance.
+
+    Each child is an input to replace. The name is the original input, matching
+    the values in editoritems.txt. If 'inst_in' is set, this is the local entity
+    to trigger via proxy (otherwise it controls the instance). 'input',
+    'params', 'delay', and 'only_once' match the values in Hammer.
+
+    Use empty quotes instead of a block to indicate it should be deleted.
+    This replaces all outputs which target this instance name.
+    """
+    name = inst['targetname'].casefold()
+    if not name:
+        LOGGER.warning('Empty targetname for changeInputs...')
+        return  # No name, it can't be triggered...
+
+    for inst in vbsp.VMF.by_class['func_instance']:
+        for out in inst.outputs[:]:  # type: VLib.Output
+            if out.target.casefold() != name:
+                continue
+
+            try:
+                new_vals = res.value[out.inst_in, out.input]
+            except KeyError:
+                LOGGER.warning(
+                    'Unknown output for changeInputs({}):\n {}',
+                    name,
+                    out
+                )
+                continue
+            if new_vals is None:
+                inst.outputs.remove(out)
+                continue
+            (
+                out.inst_in,
+                out.input,
+                out.params,
+                out.delay,
+                out.times,
+            ) = new_vals
+
+
 @make_result('faithMods')
 def res_faith_mods(inst, res):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
@@ -325,16 +387,30 @@ def res_faith_mods(inst, res):
 
             for out in trig.outputs:
                 if out.inst_in == 'animate_angled_relay':
-                    out.inst_in = res['angled_targ', 'animate_angled_relay']
+                    # Instead of an instance: output, use local names.
+                    # This allows us to strip the proxy, as well as use
+                    # overlay instances.
+                    out.inst_in = None
+                    out.target = conditions.local_name(
+                        inst,
+                        res['angled_targ', 'animate_angled_relay']
+                    )
                     out.input = res['angled_in', 'Trigger']
                     if fixup_var:
                         inst.fixup[fixup_var] = 'angled'
-                    break # There's only one output we want to look for...
+                    break  # There's only one output we want to look for...
+
                 elif out.inst_in == 'animate_straightup_relay':
-                    out.inst_in = res[
-                        'straight_targ', 'animate_straightup_relay'
-                    ]
+                    out.inst_in = None
+                    out.target = conditions.local_name(
+                        inst,
+                        res[
+                            'straight_targ',
+                            'animate_straightup_relay'
+                        ],
+                    )
                     out.input = res['straight_in', 'Trigger']
+
                     if fixup_var:
                         inst.fixup[fixup_var] = 'straight'
                     break

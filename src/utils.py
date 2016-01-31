@@ -163,7 +163,7 @@ elif MAC:
         scroll_func = getattr(target, orient + 'view_scroll')
 
         def mousewheel_handler(event):
-            scroll_func(event.delta, "units")
+            scroll_func(-event.delta, "units")
         for frame in frames:
             frame.bind('<MouseWheel>', mousewheel_handler, add='+')
 elif LINUX:
@@ -966,9 +966,15 @@ class Vec:
         )
 
     @staticmethod
-    def bbox(points):
-        """Compute the bounding box for a set of points."""
-        first, *points = points
+    def bbox(*points: 'Vec'):
+        """Compute the bounding box for a set of points.
+
+        Pass either several Vecs, or an iterable of Vecs.
+        """
+        if len(points) == 1:  # Allow passing a single iterable
+            (first, *points), = points
+        else:
+            first, *points = points
         bbox_min = first.copy()
         bbox_max = first.copy()
         for point in points:

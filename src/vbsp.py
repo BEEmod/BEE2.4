@@ -32,13 +32,12 @@ settings = {
     "fizzler":        {},
     "options":        {},
     "pit":            None,
+    "fog":            {},
     "elev_opt":       {},
 
-    "style_vars":      defaultdict(bool),
-    "has_attr":        defaultdict(bool),
-    "packtrigger":     defaultdict(list),
-
-    "voice_data":   Property("Quotes", []),
+    "style_vars":     defaultdict(bool),
+    "has_attr":       defaultdict(bool),
+    "packtrigger":    defaultdict(list),
 }
 
 
@@ -216,9 +215,6 @@ DEFAULTS = {
     "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
     # The maximum distance of a single broken section
     "broken_antline_distance":  "3",
-
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
     "goo_scale":                "1",  # Scale of goo material
 
     # Add lights to disguise the bottomless pit transition
@@ -232,6 +228,14 @@ DEFAULTS = {
     "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
     # Filter used on grating vphysics_clips
     "grating_filter":           "@not_paint_bomb",
+    # A template holding a brush used to decide the
+    # rotation and scaling of glass. This overrides glass_scale
+    # and grating_scale, if set.
+    "glass_template":           "",
+    "grating_template":         "",
+
+    "glass_scale":              "0.15",  # Scale of glass texture
+    "grating_scale":            "0.15",  # Scale of grating texture
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
@@ -312,10 +316,13 @@ MAP_RAND_SEED = ''
 # The actual map.
 VMF = None  # type: VLib.VMF
 
-# These are faces & overlays which have been forceably set by conditions,
-# and will not be overwritten later.
+# These are faces, overlays and brush entitites which have been modified by
+# conditions, and shouldn't be restyled or modified later.
 IGNORED_FACES = set()
 IGNORED_OVERLAYS = set()
+IGNORED_BRUSH_ENTS = set()
+
+GLOBAL_OUTPUTS = []  # A list of outputs which will be put into a logic_auto.
 
 TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
@@ -454,7 +461,7 @@ def load_settings():
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        settings['voice_data'] += quote_block.value
+        voiceLine.QUOTE_DATA += quote_block.value
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
@@ -533,6 +540,29 @@ def load_settings():
     else:
         settings['pit'] = None
 
+    # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
+    fog_config = conf.find_key("fog", [])
+    # Update inplace so imports get the settings
+    settings['fog'].update({
+        # These defaults are from Clean Style.
+        'start': fog_config['start', '128'],
+        'end': fog_config['end', '5000'],
+        'density': fog_config['density', '0.95'],
+        'primary': fog_config['primaryColor', '40 53 64'],
+        'secondary': fog_config['secondaryColor', ''],
+        'direction': fog_config['direction', '0 0 0'],
+        # These appear to be always the same..
+        'height_start': fog_config['height_start', '0'],
+        'height_density': fog_config['height_density', '0'],
+        'height_max_density': fog_config['height_max_density', '1'],
+
+        'tonemap_rate': fog_config['tonemap_rate', '0.25'],
+        'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
+        'tonemap_bloom_scale': fog_config['tonemap_bloom_scale', ''],
+        'tonemap_exp_min': fog_config['tonemap_exposure_min', '.5'],
+        'tonemap_exp_max': fog_config['tonemap_exposure_max', '3'],
+    })
+
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
     if get_opt('BEE2_loc') != '':
@@ -561,12 +591,11 @@ def load_map(map_path):
 def add_voice(_):
     """Add voice lines to the map."""
     voiceLine.add_voice(
-        voice_data=settings['voice_data'],
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
-        map_seed=MAP_SEED,
-        )
+        map_seed=MAP_RAND_SEED,
+    )
 
 
 @conditions.meta_cond(priority=-250)
@@ -958,6 +987,100 @@ def anti_fizz_bump(inst):
 
     LOGGER.info('Done!')
 
+# The paths for player models and the portalgun skin
+PLAYER_MODELS = {
+    'sp': ('player/chell/player', 0),
+    'atlas': ('player/ballbot/ballbot', 1),
+    'pbody': ('player/eggbot/eggbot', 2),
+}
+
+
+@conditions.meta_cond(priority=400, only_once=True)
+def set_player_model(_):
+    """Set the player model in SinglePlayer."""
+
+    # Add the model changer instance.
+    # We don't change the player model in Coop, or if Bendy is selected.
+
+    if GAME_MODE == 'COOP':  # Not in coop..
+        return
+
+    loc = Vec.from_str(get_opt('model_changer_loc'))
+    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
+
+    if chosen_model == 'peti':
+        # The default model..
+        return
+
+    model_path, pgun_skin = PLAYER_MODELS[chosen_model]
+
+    # Plug leaks
+    VMF.add_brushes(VMF.make_hollow(
+        loc - (32, 32, 64),
+        loc + (32, 32, 64),
+    ))
+
+    # Precache the model, so we can switch to it.
+    VMF.create_ent(
+        classname='prop_dynamic_override',
+        origin=loc + (0, 0, -60),
+        model='models/' + model_path + '.mdl',
+
+        rendermode=10,
+        startDisabled=1,
+        holdAnimation=1,
+        disableshadows=1,
+        disableshadowdepth=1,
+        disableflashlight=1,
+        disablereceiveshadows=1,
+    )
+
+    auto = VMF.create_ent(
+        classname='logic_auto',
+        spawnflags=0,  # Don't remove on fire.
+        origin=loc + (0, 0, 32),
+    )
+
+    # The delay is required to ensure the portalgun parents properly
+    # to the player's hand.
+    auto.add_out(VLib.Output(
+        'OnMapSpawn',
+        '@command',
+        'Command',
+        'setmodel ' + model_path,
+        delay=0.1,
+    ))
+
+    # We need to redo this whenever a saved game is loaded..
+    auto.add_out(VLib.Output(
+        'OnLoadGame',
+        '@command',
+        'Command',
+        'setmodel ' + model_path,
+        delay=0.1,
+    ))
+
+    if pgun_skin and get_opt('game_id') == utils.STEAM_IDS['PORTAL2']:
+        # Only change portalgun skins in Portal 2 - this is the vanilla
+        # portalgun weapon/viewmodel.
+        auto.add_out(VLib.Output(
+            'OnMapSpawn',
+            'viewmodel',  # Classname of the viewmodel.
+            'Skin',
+            str(pgun_skin),
+            delay=0.1,
+        ))
+        auto.add_out(VLib.Output(
+            'OnMapSpawn',
+            # Classname of the portalgun.
+            # This will also change pedestals and the like,
+            # but that's fine.
+            'weapon_portalgun',
+            'Skin',
+            str(pgun_skin),
+            delay=0,
+        ))
+
 
 @conditions.meta_cond(priority=500, only_once=True)
 def set_player_portalgun(inst):
@@ -1024,26 +1147,20 @@ def set_player_portalgun(inst):
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
 
-    if blue_portal or oran_portal:
-        auto = VMF.create_ent(
-            classname='logic_auto',
-            origin=get_opt('global_pti_ents_loc'),
-            spawnflags='1',  # Remove on Fire
-        )
-        if blue_portal:
-            auto.add_out(VLib.Output(
-                'OnMapSpawn',
-                '@player_has_blue',
-                'Trigger',
-                times=1,
-            ))
-        if oran_portal:
-            auto.add_out(VLib.Output(
-                'OnMapSpawn',
-                '@player_has_oran',
-                'Trigger',
-                times=1,
-            ))
+    if blue_portal:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@player_has_blue',
+            'Trigger',
+            times=1,
+        ))
+    if oran_portal:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@player_has_oran',
+            'Trigger',
+            times=1,
+        ))
 
     LOGGER.info('Done!')
 
@@ -1063,8 +1180,110 @@ def add_screenshot_logic(inst):
         LOGGER.info('Added Screenshot Logic')
 
 
+@conditions.meta_cond(priority=100, only_once=True)
+def add_fog_ents(_):
+    """Add the tonemap and fog controllers, based on the skybox."""
+    pos = Vec.from_str(get_opt('global_pti_ents_loc'))
+    VMF.create_ent(
+        classname='env_tonemap_controller',
+        targetname='@tonemapper',
+        origin=pos + (-16, 0, 0),
+    )
+
+    fog_opt = settings['fog']
+
+    fog_controller = VMF.create_ent(
+        classname='env_fog_controller',
+        targetname='@fog_controller',
+        origin=pos + (16, 0, 0),
+        angles=fog_opt['direction'],
+
+        fogcolor=fog_opt['primary'],
+        fogstart=fog_opt['start'],
+        fogend=fog_opt['end'],
+
+        fogenable='1',
+        use_angles='1',
+        foglerptime='2',
+
+        heightFogStart=fog_opt['height_start'],
+        heightFogDensity=fog_opt['height_density'],
+        heightFogMaxDensity=fog_opt['height_max_density'],
+    )
+
+    if fog_opt['secondary']:
+        # Only enable fog blending if a secondary color is enabled
+        fog_controller['fogblend'] = '1'
+        fog_controller['fogcolor2'] = fog_opt['secondary']
+        fog_controller['use_angles'] = '1'
+
+    GLOBAL_OUTPUTS.extend([
+        VLib.Output(
+            'OnMapSpawn',
+            '@clientcommand',
+            'Command',
+            'r_flashlightbrightness 1',
+        ),
+
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetTonemapPercentBrightPixels',
+            fog_opt['tonemap_brightpixels'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetTonemapRate',
+            fog_opt['tonemap_rate'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetAutoExposureMin',
+            fog_opt['tonemap_exp_min'],
+        ),
+        VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetAutoExposureMax',
+            fog_opt['tonemap_exp_max'],
+        ),
+    ])
+
+    if fog_opt['tonemap_bloom_scale']:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@tonemapper',
+            'SetBloomScale',
+            fog_opt['tonemap_bloom_scale'],
+        ))
+
+    if GAME_MODE == 'SP':
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '!player',
+            'SetFogController',
+            '@fog_controller',
+        ))
+    else:
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '!player_blue',
+            'SetFogController',
+            '@fog_controller',
+        ))
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '!player_orange',
+            'SetFogController',
+            '@fog_controller',
+        ))
+
+
 @conditions.meta_cond(priority=50, only_once=True)
 def set_elev_videos(_):
+    """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
     LOGGER.info('Elevator type: {}', vid_type.upper())
@@ -1087,7 +1306,7 @@ def set_elev_videos(_):
         vert_vid = None
         horiz_vid = None
     else:
-        LOGGER.warning('Invalid elevator type!')
+        LOGGER.warning('Invalid elevator video type!')
         return
 
     transition_ents = instanceLocs.resolve('[transitionents]')
@@ -1356,7 +1575,7 @@ def make_bottomless_pit(solids, max_height):
     pit_height = settings['pit']['height']
 
     if settings['pit']['skybox'] != '':
-        # Add in the actual skybox edges and triggers
+        # Add in the actual skybox edges and triggers.
         VMF.create_ent(
             classname='func_instance',
             file=settings['pit']['skybox'],
@@ -1367,6 +1586,41 @@ def make_bottomless_pit(solids, max_height):
                 tele_off_y - 64,
             ),
         )
+
+        fog_opt = settings['fog']
+
+        # Now generate the sky_camera, with appropriate values.
+        sky_camera = VMF.create_ent(
+            classname='sky_camera',
+            scale='1.0',
+
+            origin='{!s} {!s} 0'.format(
+                tele_off_x - 64,
+                tele_off_y - 64,
+            ),
+
+            angles=fog_opt['direction'],
+            fogdir=fog_opt['direction'],
+            fogcolor=fog_opt['primary'],
+            fogstart=fog_opt['start'],
+            fogend=fog_opt['end'],
+
+            fogenable='1',
+
+            heightFogStart=fog_opt['height_start'],
+            heightFogDensity=fog_opt['height_density'],
+            heightFogMaxDensity=fog_opt['height_max_density'],
+        )
+
+        if fog_opt['secondary']:
+            # Only enable fog blending if a secondary color is enabled
+            sky_camera['fogblend'] = '1'
+            sky_camera['fogcolor2'] = fog_opt['secondary']
+            sky_camera['use_angles'] = '1'
+        else:
+            sky_camera['fogblend'] = '0'
+            sky_camera['use_angles'] = '0'
+
 
     if settings['pit']['skybox_ceil'] != '':
         # We dynamically add the ceiling so it resizes to match the map,
@@ -1384,7 +1638,7 @@ def make_bottomless_pit(solids, max_height):
         )
 
     if settings['pit']['targ'] != '':
-        # Add in the actual skybox edges and triggers
+        # Add in the teleport reference target.
         VMF.create_ent(
             classname='func_instance',
             file=settings['pit']['targ'],
@@ -1408,10 +1662,14 @@ def make_bottomless_pit(solids, max_height):
         (-128, 0)   # West
     ]
     if teleport:
-        # transform the skybox physics triggers into teleports to move cubes
-            # into the skybox zone
+        # Transform the skybox physics triggers into teleports to move cubes
+        # into the skybox zone
+
+        # Only use 1 entity for the teleport triggers. If multiple are used,
+        # cubes can contact two at once and get teleported odd places.
+        tele_trig = None
         for trig in VMF.by_class['trigger_multiple']:
-            if trig['wait'] != '0.1':
+            if trig['wait'] != '0.1' or trig in IGNORED_BRUSH_ENTS:
                 continue
 
             bbox_min, bbox_max = trig.get_bbox()
@@ -1420,11 +1678,17 @@ def make_bottomless_pit(solids, max_height):
             if origin.z >= pit_height:
                 continue
 
-            trig['classname'] = 'trigger_teleport'
-            trig['spawnflags'] = '4106'  # Physics and npcs
-            trig['landmark'] = tele_ref
-            trig['target'] = tele_dest
-            trig.outputs.clear()
+            if tele_trig is None:
+                tele_trig = trig
+                trig['classname'] = 'trigger_teleport'
+                trig['spawnflags'] = '4106'  # Physics and npcs
+                trig['landmark'] = tele_ref
+                trig['target'] = tele_dest
+                trig.outputs.clear()
+            else:
+                tele_trig.solids.extend(trig.solids)
+                trig.remove()
+
             for x, y in utils.iter_grid(
                 min_x=int(bbox_min.x),
                 max_x=int(bbox_max.x),
@@ -1471,6 +1735,8 @@ def make_bottomless_pit(solids, max_height):
                 for plane in side.planes:
                     if plane.z > origin.z:
                         plane.z -= 16
+        if tele_trig is not None:
+            IGNORED_BRUSH_ENTS.add(tele_trig)
 
     instances = settings['pit']['inst']
 
@@ -1752,6 +2018,12 @@ def change_brush():
     glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
     goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
 
+    glass_temp = get_opt("glass_template")
+    if glass_temp:
+        glass_temp = conditions.get_scaling_template(glass_temp)
+    else:
+        glass_temp = None
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -1772,6 +2044,10 @@ def change_brush():
         pit_solids = []
         pit_height = settings['pit']['height']
         pit_goo_tex = settings['pit']['tex_goo']
+    else:
+        pit_height = 0
+        pit_solids = None
+        pit_goo_tex = ''
 
     highest_brush = 0
 
@@ -1805,8 +2081,17 @@ def change_brush():
                 # Apply goo scaling
                 face.scale = goo_scale
             if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
-                # Apply the glass scaling option
-                face.scale = glass_scale
+                if glass_temp is not None:
+                    try:
+                        u, v, face.ham_rot = glass_temp[face.normal().as_tuple()]
+                    except KeyError:
+                        pass
+                    else:
+                        face.uaxis = u.copy()
+                        face.vaxis = v.copy()
+                else:
+                    # Apply the glass scaling option
+                    face.scale = glass_scale
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_clip_mat:
@@ -1868,7 +2153,6 @@ def make_barrier_solid(origin, material):
     )
 
 
-
 def face_seed(face):
     """Create a seed unique to this brush face.
 
@@ -1881,28 +2165,6 @@ def face_seed(face):
         else:
             origin[axis] = (origin[axis] // 128) * 128 + 64
     return origin.join(' ')
-
-
-def get_grid_sizes(face: VLib.Side):
-    """Determine the grid sizes that fits on this brush."""
-    bbox_min, bbox_max = face.get_bbox()
-    dim = bbox_max - bbox_min
-
-    if dim.x == 0:
-        u, v = dim.y, dim.z
-    elif dim.y == 0:
-        u, v = dim.x, dim.z
-    elif dim.z == 0:
-        u, v = dim.x, dim.y
-    else:
-        raise Exception(str(dim) + ' not on grid!')
-
-    if u % 128 == 0 and v % 128 == 0:  # regular square
-        return "0.25", "0.5", "0.5", "1", "1",
-    if u % 64 == 0 and v % 64 == 0:  # 2x2 grid
-        return "0.5",
-    if u % 32 == 0 and v % 32 == 0:  # 4x4 grid
-        return "0.25",
 
 
 def random_walls():
@@ -1941,7 +2203,7 @@ Clump = namedtuple('Clump', [
 ])
 
 
-@conditions.make_result_setup('ForceClump')
+@conditions.make_result_setup('SetAreaTex')
 def cond_force_clump_setup(res):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
@@ -2042,7 +2304,7 @@ def clump_walls():
         len(PRESET_CLUMPS),
     )
 
-    random.seed(MAP_SEED)
+    random.seed(MAP_RAND_SEED)
 
     clumps = []
 
@@ -2458,7 +2720,8 @@ def add_extra_ents(mode):
     # set.
 
     pti_file = get_opt("global_pti_ents")
-    pti_loc = get_opt("global_pti_ents_loc")
+    pti_loc = Vec.from_str(get_opt('global_pti_ents_loc'))
+
     if pti_file != '':
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = VMF.create_ent(
@@ -2477,20 +2740,25 @@ def add_extra_ents(mode):
             'disable_pti_audio'
             ] = utils.bool_as_int(not has_cave)
 
-    # Add the model changer instance.
-    # We don't change the player model in Coop, or if Bendy is selected.
+        # The scripts we want to run on the @glados entity.
+        # This gets special functions called (especially in coop) for various
+        # events we might want to track - death, pings, camera taunts, etc.
+        glados_scripts = [
+            'choreo/glados.nut',  # Implements Multiverse Cave..
+        ]
+        if GAME_MODE == 'COOP' and voiceLine.has_responses():
+            glados_scripts.append('BEE2/coop_responses.nut')
+            PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
-    model_changer_loc = get_opt('model_changer_loc')
-    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI')
-    if mode == 'SP' and chosen_model != 'PETI' and model_changer_loc != '':
-        VMF.create_ent(
-            classname='func_instance',
-            targetname='model_changer',
-            angles='0 0 0',
-            origin=model_changer_loc,
-            file='instances/BEE2/logic/model_changer/' + chosen_model + '.vmf',
-            fixup_style='0',
-        )
+        global_pti_ents.fixup['glados_script'] = ' '.join(glados_scripts)
+
+    # Add a logic_auto with the set of global outputs.
+    logic_auto = VMF.create_ent(
+        classname='logic_auto',
+        spawnflags='0',  # Don't remove on fire
+        origin=pti_loc + (0, 0, 16),
+    )
+    logic_auto.outputs = GLOBAL_OUTPUTS
 
 
 def change_func_brush():
@@ -2498,6 +2766,12 @@ def change_func_brush():
     LOGGER.info("Editing Brush Entities...")
     grating_clip_mat = get_opt("grating_clip")
     grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
+
+    grate_temp = get_opt("grating_template")
+    if grate_temp:
+        grate_temp = conditions.get_scaling_template(grate_temp)
+    else:
+        grate_temp = None
 
     # All the textures used for faith plate bullseyes
     bullseye_white = set(itertools.chain.from_iterable(
@@ -2525,10 +2799,10 @@ def change_func_brush():
     # Merge nearby grating brushes
     grating_brush = {}
 
-    for brush in (
-            VMF.by_class['func_brush'] |
-            VMF.by_class['func_door_rotating']
-            ):
+    for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
+        if brush in IGNORED_BRUSH_ENTS:
+            continue
+
         brush['drawInFastReflection'] = get_opt("force_brush_reflect")
         parent = brush['parentname', '']
         # Used when creating static panels
@@ -2579,7 +2853,17 @@ def change_func_brush():
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
-                    side.scale = grating_scale
+                    if grate_temp is not None:
+                        try:
+                            u, v, side.ham_rot = grate_temp[side.normal().as_tuple()]
+                        except KeyError:
+                            pass
+                        else:
+                            side.uaxis = u.copy()
+                            side.vaxis = v.copy()
+                    else:
+                        side.scale = grating_scale
+
                 alter_mat(side)  # for gratings, laserfields and some others
 
             # The style blanked the material, so delete the brush
@@ -3040,7 +3324,7 @@ def main():
     """Main program code.
 
     """
-    global MAP_SEED, IS_PREVIEW, GAME_MODE
+    global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
     args = " ".join(sys.argv)
@@ -3119,6 +3403,15 @@ def main():
         # If we don't get the special -force args, check for the entity
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
+
+    # Clear the list of files we want to inject into the packfile.
+    # If we're in a Hammer map, we want to ensure no files are injected.
+    try:
+        os.removedirs('bee2/inject/')
+    except (FileNotFoundError, OSError):
+        pass
+    os.makedirs('bee2/inject/', exist_ok=True)
+
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
@@ -3135,12 +3428,12 @@ def main():
 
         load_map(path)
 
-        MAP_SEED = calc_rand_seed()
+        MAP_RAND_SEED = calc_rand_seed()
 
         all_inst = get_map_info()
 
         conditions.init(
-            seed=MAP_SEED,
+            seed=MAP_RAND_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
             )

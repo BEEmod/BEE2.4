@@ -44,11 +44,6 @@ FILES_TO_BACKUP = [
     ('VRAD',        'bin/vrad_linux', ''),
 ]
 
-VOICE_PATHS = [
-    ('', '', 'normal'),
-    ('MID_', 'mid_', 'MidChamber'),
-]
-
 _UNLOCK_ITEMS = [
     'ITEM_EXIT_DOOR',
     'ITEM_COOP_EXIT_DOOR',
@@ -77,12 +72,18 @@ CONN_FUNNEL = 'CONNECTION_TBEAM_POLARITY'
 export_screen = loadScreen.LoadScreen(
     ('BACK', 'Backup Original Files'),
     (backup.AUTO_BACKUP_STAGE, 'Backup Puzzles'),
-    ('CONF', 'Generate Config Files'),
+    ('EXP', 'Export Configuration'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
     title_text='Exporting',
 )
 
+EXE_SUFFIX = (
+    '.exe' if utils.WIN else
+    '_osx' if utils.MAC else
+    '_linux' if utils.LINUX else
+    ''
+)
 
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
@@ -288,49 +289,29 @@ class Game:
 
     def export(
             self,
-            style,
-            all_items,
-            music,
-            skybox,
-            voice,
-            style_vars,
-            elevator,
-            pack_list,
-            editor_sounds,
+            style: packageLoader.Style,
+            selected_objects: dict,
             should_refresh=False,
             ):
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
-        - We unlock the mandatory items if specified.
-        -
+        - For each object type, run its .export() function with the given
+        - item.
+        - Styles are a special case.
         """
+
         LOGGER.info('-' * 20)
         LOGGER.info('Exporting Items and Style for "{}"!', self.name)
-        LOGGER.info('Style = {}', style)
-        LOGGER.info('Music = {}', music)
-        LOGGER.info('Voice = {}', voice)
-        LOGGER.info('Skybox = {}', skybox)
-        LOGGER.info('Elevator = {}', elevator)
-        LOGGER.info('Style Vars:')
-        LOGGER.info('  {')
-        for key, val in style_vars.items():
-            LOGGER.info('  {} = {!s}', key, val)
-        LOGGER.info('  }')
-        LOGGER.info('{} Pack Lists!', len(pack_list))
-        LOGGER.info('{} Editor Sounds!', len(editor_sounds))
-        LOGGER.info('-' * 20)
+
+        LOGGER.info('Style = {}', style.id)
+        for obj, selected in selected_objects.items():
+            # Skip lists and dicts etc - too long
+            if selected is None or isinstance(selected, str):
+                LOGGER.info('{} = {}', obj, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
-        export_screen.set_length(
-            'CONF',
-            # VBSP_conf, Editoritems, instances, gameinfo, pack_lists,
-            # editor_sounds, template VMF
-            7 +
-            # Don't add the voicelines to the progress bar if not selected
-            (0 if voice is None else len(VOICE_PATHS)),
-        )
         # files in compiler/
         export_screen.set_length('COMP', len(os.listdir('../compiler')))
 
@@ -339,102 +320,34 @@ class Game:
         else:
             export_screen.skip_stage('RES')
 
+        # The items, plus editoritems, vbsp_config and the instance list.
+        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
+
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
 
-        vbsp_config = style.config.copy()
+        # Start off with the style's data.
+        editoritems, vbsp_config = style.export()
+        export_screen.step('EXP')
 
-        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
-        # "Renderables" sections.
-        editoritems = Property("ItemData", list(style.editor.find_all('Item')))
+        # Export each object type.
+        for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
+            if obj_name == 'Style':
+                continue  # Done above already
 
-        for item in sorted(all_items):
-            item_block, editor_parts, config_part = all_items[item].export()
-            editoritems += item_block
-            editoritems += editor_parts
-            vbsp_config += config_part
+            LOGGER.info('Exporting "{}"', obj_name)
+            selected = selected_objects.get(obj_name, None)
 
-        if voice is not None:
-            vbsp_config += voice.config
+            LOGGER.debug('Name: {}, selected: {}', obj_name, selected)
 
-        if skybox is not None:
-            vbsp_config.set_key(
-                ('Textures', 'Special', 'Sky'),
-                skybox.material,
-            )
-            vbsp_config += skybox.config
-
-        if style.has_video:
-            if elevator is None:
-                # Use a randomised video
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'RAND',
-                )
-            elif elevator.id == 'VALVE_BLUESCREEN':
-                # This video gets a special script and handling
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'BSOD',
-                )
-            else:
-                # Use the particular selected video
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'FORCE',
-                )
-                vbsp_config.set_key(
-                    ('Elevator', 'horiz'),
-                    elevator.horiz_video,
-                )
-                vbsp_config.set_key(
-                    ('Elevator', 'vert'),
-                    elevator.vert_video,
-                )
-        else:  # No elevator video for this style
-            vbsp_config.set_key(
-                ('Elevator', 'type'),
-                'NONE',
-            )
-
-        if music is not None:
-            if music.sound is not None:
-                vbsp_config.set_key(
-                    ('Options', 'music_SoundScript'),
-                    music.sound,
-                )
-            if music.inst is not None:
-                vbsp_config.set_key(
-                    ('Options', 'music_instance'),
-                    music.inst,
-                )
-            if music.packfiles:
-                vbsp_config.set_key(
-                    ('PackTriggers', 'Forced'),
-                    [
-                        Property('File', file)
-                        for file in
-                        music.packfiles
-                    ],
-                )
-
-            vbsp_config.set_key(('Options', 'music_ID'), music.id)
-            vbsp_config += music.config
-
-        if voice is not None:
-            vbsp_config.set_key(
-                ('Options', 'voice_pack'),
-                voice.id,
-            )
-            vbsp_config.set_key(
-                ('Options', 'voice_char'),
-                ','.join(voice.chars)
-            )
-            if voice.cave_skin is not None:
-                vbsp_config.set_key(
-                    ('Options', 'cave_port_skin'),
-                    voice.cave_skin,
-                )
+            obj_data.cls.export(packageLoader.ExportData(
+                game=self,
+                selected=selected,
+                editoritems=editoritems,
+                vbsp_conf=vbsp_config,
+                selected_style=style,
+            ))
+            export_screen.step('EXP')
 
         vbsp_config.set_key(
             ('Options', 'BEE2_loc'),
@@ -445,37 +358,7 @@ class Game:
             self.steamID,
         )
 
-        vbsp_config.ensure_exists('StyleVars')
-        vbsp_config['StyleVars'] += [
-            Property(key, utils.bool_as_int(val))
-            for key, val in
-            style_vars.items()
-        ]
-
-        pack_block = Property('PackList', [])
-        # A list of materials which will casue a specific packlist to be used.
-        pack_triggers = Property('PackTriggers', [])
-
-        for key, pack in pack_list.items():
-            pack_block.append(Property(
-                key,
-                [
-                    Property('File', file)
-                    for file in
-                    pack.files
-                ]
-            ))
-            for trigger_mat in pack.trigger_mats:
-                pack_triggers.append(
-                    Property('Material', [
-                        Property('Texture', trigger_mat),
-                        Property('PackList', pack.id),
-                    ])
-                )
-        if pack_triggers.value:
-            vbsp_config.append(pack_triggers)
-
-        # If there are multiple of these blocks, merge them together
+        # If there are multiple of these blocks, merge them together.
         # They will end up in this order.
         vbsp_config.merge_children(
             'Textures',
@@ -498,11 +381,13 @@ class Game:
         # Backup puzzles, if desired
         backup.auto_backup(selected_game, export_screen)
 
-        # This is the connections "heart" icon and "error" icon
+        # This is the connection "heart" and "error" models.
+        # These have to come last, so we need to special case it.
         editoritems += style.editor.find_key("Renderables", [])
 
-
-        if style_vars.get('UnlockDefault', False):
+        # Special-case: implement the UnlockDefault stlylevar here,
+        # so all items are modified.
+        if selected_objects['StyleVar']['UnlockDefault']:
             LOGGER.info('Unlocking Items!')
             for item in editoritems.find_all('Item'):
                 # If the Unlock Default Items stylevar is enabled, we
@@ -518,7 +403,11 @@ class Game:
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
-        export_screen.step('CONF')
+        LOGGER.info('Writing instance list!')
+        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
+            for line in self.build_instance_data(editoritems):
+                inst_file.write(line)
+        export_screen.step('EXP')
 
         LOGGER.info('Writing Editoritems!')
         os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
@@ -526,57 +415,14 @@ class Game:
                 'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
-        export_screen.step('CONF')
+        export_screen.step('EXP')
 
         LOGGER.info('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
         with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
-        export_screen.step('CONF')
-
-        LOGGER.info('Writing instance list!')
-        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
-            for line in self.build_instance_data(editoritems):
-                inst_file.write(line)
-        export_screen.step('CONF')
-
-        LOGGER.info('Writing packing list!')
-        with open(self.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
-            for line in pack_block.export():
-                pack_file.write(line)
-        export_screen.step('CONF')
-
-        LOGGER.info('Editing game_sounds!')
-        self.add_editor_sounds(editor_sounds.values())
-        export_screen.step('CONF')
-
-        LOGGER.info('Exporting {} templates!',
-            len(packageLoader.data['BrushTemplate'])
-        )
-        with open(self.abs_path('bin/bee2/templates.vmf'), 'w') as temp_file:
-            packageLoader.TEMPLATE_FILE.export(temp_file)
-        export_screen.step('CONF')
-
-        if voice is not None:
-            for prefix, dest, pretty in VOICE_PATHS:
-                path = os.path.join(
-                    os.getcwd(),
-                    '..',
-                    'config',
-                    'voice',
-                    prefix + voice.id + '.cfg',
-                )
-                LOGGER.info(path)
-                if os.path.isfile(path):
-                    shutil.copy(
-                        path,
-                        self.abs_path('bin/bee2/{}voice.cfg'.format(dest))
-                    )
-                    LOGGER.info('Written "{}voice.cfg"', dest)
-                else:
-                    LOGGER.info('No {} voice config!', pretty)
-                export_screen.step('CONF')
+        export_screen.step('EXP')
 
         LOGGER.info('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
@@ -616,10 +462,14 @@ class Game:
         """Build a property tree listing all of the instances for each item.
         as well as another listing the input and output commands.
         VBSP uses this to reduce duplication in VBSP_config files.
+
+        This additionally strips custom instance definitions from the original
+        list.
         """
         instance_locs = Property("AllInstances", [])
+        cust_inst = Property("CustInstances", [])
         commands = Property("Connections", [])
-        root_block = Property(None, [instance_locs, commands])
+        root_block = Property(None, [instance_locs, cust_inst, commands])
 
         for item in editoritems.find_all("Item"):
             instance_block = Property(item['Type'], [])
@@ -628,10 +478,19 @@ class Game:
             comm_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block:
-                    instance_block.append(
-                        Property('Instance', inst['Name'])
-                    )
+                for inst in inst_block.value[:]:
+                    if inst.name.isdigit():
+                        # Direct Portal 2 value
+                        instance_block.append(
+                            Property('Instance', inst['Name'])
+                        )
+                    else:
+                        # It's a custom definition, remove from editoritems
+                        inst_block.value.remove(inst)
+                        cust_inst.set_key(
+                            (item['type'], inst.name),
+                            inst['Name'],
+                        )
 
             # Look in the Inputs and Outputs blocks to find the io definitions.
             # Copy them to property names like 'Input_Activate'.
@@ -737,7 +596,7 @@ def add_game(_=None, refresh_menu=True):
 
     messagebox.showinfo(
         message='Select the folder where the game executable is located '
-                '(portal2.exe)...',
+                '(portal2' + EXE_SUFFIX + ')...',
         parent=TK_ROOT,
         title='BEE2 - Add Game',
         )

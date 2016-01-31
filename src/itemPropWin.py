@@ -8,6 +8,7 @@ import random
 
 import sound as snd
 import utils
+import contextWin
 
 # all editable properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
@@ -212,7 +213,7 @@ def paint_fx(e=None):
     sfx('config')
 
 
-def exit_win():
+def exit_win(_=None):
     "Quit and return the new settings."
     global is_open
     win.grab_release()
@@ -225,6 +226,10 @@ def exit_win():
             # or use values by default.
             out[key] = out_values.get(key, values[key])
     callback(out)
+
+    if contextWin.is_open:
+        # Restore the context window if we hid it earlier.
+        contextWin.prop_window.deiconify()
 
 
 def can_edit(prop_list):
@@ -244,23 +249,40 @@ def init(cback):
     win.resizable(False, False)
     win.iconbitmap('../BEE2.ico')
     win.protocol("WM_DELETE_WINDOW", exit_win)
+    win.transient(TK_ROOT)
     win.withdraw()
-    labels['noOptions'] = ttk.Label(win, text='No Properties avalible!')
-    widgets['saveButton'] = ttk.Button(win, text='Close', command=exit_win)
-    widgets['titleLabel'] = ttk.Label(win, text='')
+
+    if utils.MAC:
+        # Switch to use the 'modal' window style on Mac.
+        TK_ROOT.call(
+            '::tk::unsupported::MacWindowStyle',
+            'style',
+            win,
+            'moveableModal',
+            ''
+        )
+
+    frame = ttk.Frame(win, padding=10)
+    frame.grid(row=0, column=0, sticky='NSEW')
+    frame.rowconfigure(0, weight=1)
+    frame.columnconfigure(0, weight=1)
+
+    labels['noOptions'] = ttk.Label(frame, text='No Properties avalible!')
+    widgets['saveButton'] = ttk.Button(frame, text='Close', command=exit_win)
+    widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
-    widgets['div_1'] = ttk.Separator(win, orient="vertical")
-    widgets['div_2'] = ttk.Separator(win, orient="vertical")
-    widgets['div_h'] = ttk.Separator(win, orient="horizontal")
+    widgets['div_1'] = ttk.Separator(frame, orient="vertical")
+    widgets['div_2'] = ttk.Separator(frame, orient="vertical")
+    widgets['div_h'] = ttk.Separator(frame, orient="horizontal")
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
-        labels[key] = ttk.Label(win, text=prop_name+':')
+        labels[key] = ttk.Label(frame, text=prop_name+':')
         if prop_type == 'checkbox':
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = utils.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
-                win,
+                frame,
                 variable=values[key],
                 command=func_partial(set_check, key),
                 )
@@ -277,13 +299,13 @@ def init(cback):
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = utils.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
-                win,
+                frame,
                 variable=values[key],
                 command=func_partial(save_rail, key),
                 )
 
         elif prop_type == 'panAngle':
-            frm = ttk.Frame(win)
+            frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = StringVar(value=DEFAULTS[key])
             for pos, angle in enumerate(['30', '45', '60', '90']):
@@ -297,7 +319,7 @@ def init(cback):
                 frm.columnconfigure(pos, weight=1)
 
         elif prop_type == 'gelType':
-            frm = ttk.Frame(win)
+            frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = IntVar(value=DEFAULTS[key])
             for pos, text in enumerate(PAINT_OPTS):
@@ -313,7 +335,7 @@ def init(cback):
 
         elif prop_type == 'pistPlat':
             widgets[key] = Scale(
-                win,
+                frame,
                 from_=0,
                 to=4,
                 orient="horizontal",
@@ -336,7 +358,7 @@ def init(cback):
 
         elif prop_type == 'timerDel':
             widgets[key] = ttk.Scale(
-                win,
+                frame,
                 from_=0,
                 to=30,
                 orient="horizontal",
@@ -345,7 +367,7 @@ def init(cback):
             values[key] = DEFAULTS[key]
 
         elif prop_type == 'railPlat':
-            widgets[key] = ttk.Checkbutton(win)
+            widgets[key] = ttk.Checkbutton(frame)
     values['startup'] = DEFAULTS['startup']
 
 
@@ -503,10 +525,16 @@ def show_window(used_props, parent, item_name):
     win.deiconify()
     win.lift(parent)
     win.grab_set()
+    win.attributes("-topmost", True)
     win.geometry(
         '+' + str(parent.winfo_rootx() - 30) +
         '+' + str(parent.winfo_rooty() - win.winfo_reqheight() - 30)
         )
+
+    if contextWin.is_open:
+        # Temporarily hide the context window while we're open.
+        contextWin.prop_window.withdraw()
+
 
 # load the window if directly executing this file
 if __name__ == '__main__':

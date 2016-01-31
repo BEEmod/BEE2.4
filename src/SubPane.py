@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import ttk
 
+import tooltip
 import utils
 import sound as snd
 
@@ -69,6 +70,9 @@ class SubPane(Toplevel):
             # Contract the spacing to allow the icons to fit.
             padx=(2 if utils.MAC else (5, 2)),
         )
+        tooltip.add_tooltip(
+            self.tool_button,
+            text='Hide/Show the "{}" window.'.format(title))
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)

@@ -12,6 +12,8 @@ import utils
 LOGGER = utils.getLogger('img')
 
 cached_img = {}
+cached_squares = {}
+
 
 def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     """Loads in an image for use in TKinter.
@@ -77,6 +79,24 @@ def spr(name, error=None):
 def icon(name, error=None):
     """Load in a palette icon, using the correct directory and size."""
     return png(os.path.join("items", name), error=error, resize_to=64)
+
+
+def color_square(color: utils.Vec, size=16):
+    """Create a square image of the given size, with the given color."""
+    key = color.x, color.y, color.z, size
+
+    try:
+        return cached_squares[key]
+    except KeyError:
+        img = Image.new(
+            mode='RGB',
+            size=(size, size),
+            color=(int(color.x), int(color.y), int(color.z)),
+        )
+        tk_img = ImageTk.PhotoImage(image=img)
+        cached_squares[color.as_tuple(), size] = tk_img
+
+        return tk_img
 
 
 # If image is not readable, use this instead

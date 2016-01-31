@@ -4,10 +4,13 @@ from tkinter import ttk
 from tkinter import font
 
 from decimal import Decimal
+from enum import Enum
 import os
 import functools
+import itertools
 
 from BEE2_config import ConfigFile
+from property_parser import Property
 import img
 import utils
 import tk_tools
@@ -25,6 +28,22 @@ QUOTE_FONT['weight'] = 'bold'
 
 SP_IMG = img.png('icons/quote_sp')
 COOP_IMG = img.png('icons/quote_coop')
+
+# Friendly names given to certain response channels.
+RESPONSE_NAMES = {
+    'death_goo': 'Death - Toxic Goo',
+    'death_turret': 'Death - Turrets',
+    'death_crush': 'Death - Crusher',
+    'death_laserfield': 'Death - LaserField',
+}
+
+config = config_mid = config_resp = None # type: ConfigFile
+
+
+class TabTypes(Enum):
+    NORM = 0
+    MIDCHAMBER = MID = 1
+    RESPONSE = RESP = 2
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
 win.columnconfigure(0, weight=1)
@@ -135,7 +154,7 @@ def configure_canv(e):
     canvas = e.widget
     frame = canvas.frame
     canvas['scrollregion'] = (
-        0,
+        4,
         0,
         canvas.winfo_reqwidth(),
         frame.winfo_reqheight(),
@@ -147,6 +166,7 @@ def save():
     LOGGER.info('Saving Configs!')
     config.save_check()
     config_mid.save_check()
+    config_resp.save_check()
     win.withdraw()
 
 
@@ -162,13 +182,20 @@ def add_tabs():
     # Add or remove tabs so only the correct mode is visible.
     for name, tab in sorted(TABS.items()):
         notebook.add(tab)
-        if tab.nb_is_mid:
-            # For the midpoint tabs, we use a special image to make
-            # sure they are well-distinguished from the other groups.
+        # For the special tabs, we use a special image to make
+        # sure they are well-distinguished from the other groups
+        if tab.nb_type is TabTypes.MID:
             notebook.tab(
                 tab,
                 compound='image',
                 image=img.png('icons/mid_quote'),
+                )
+        if tab.nb_type is TabTypes.RESPONSE:
+            notebook.tab(
+                tab,
+                compound=RIGHT,
+                image=img.png('icons/resp_quote'),
+                text='Resp'
                 )
         else:
             notebook.tab(tab, text=tab.nb_text)
@@ -179,7 +206,7 @@ def add_tabs():
 
 def show(quote_pack):
     """Display the editing window."""
-    global voice_item, config, config_mid
+    global voice_item, config, config_mid, config_resp
     voice_item = quote_pack
 
     win.title('BEE2 - Configure "' + voice_item.selitem_data.name + '"')
@@ -190,6 +217,7 @@ def show(quote_pack):
     os.makedirs('config/voice', exist_ok=True)
     config = ConfigFile('voice/' + quote_pack.id + '.cfg')
     config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
+    config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')
 
     # Clear the transcript textbox
     text = UI['trans']
@@ -201,7 +229,7 @@ def show(quote_pack):
     for tab in TABS.values():
         try:
             notebook.forget(tab)
-        except TclError as e:
+        except TclError:
             pass
         tab.destroy()
 
@@ -211,20 +239,41 @@ def show(quote_pack):
         make_tab(
             group,
             config,
-            is_mid=False,
-            )
+            TabTypes.NORM
+        )
 
-    mid_quotes = list(quote_data.find_all('quotes', 'midchamber'))
-    if len(mid_quotes) > 0:
-        frame = make_tab(
-            mid_quotes[0],
+    # Merge all blocks into one
+    mid_quotes = Property(
+        'midChamber',
+        list(itertools.chain.from_iterable(
+            quote_data.find_all('quotes', 'midChamber')
+        ))
+    )
+
+    if len(mid_quotes):
+        make_tab(
+            mid_quotes,
             config_mid,
-            is_mid=True,
-            )
-        frame.nb_text = ''
+            TabTypes.MIDCHAMBER,
+        )
+
+    responses = Property(
+        'CoopResponses',
+        list(itertools.chain.from_iterable(
+            quote_data.find_all('quotes', 'CoopResponses')
+        )),
+    )
+
+    if len(responses):
+        make_tab(
+            responses,
+            config_resp,
+            TabTypes.RESPONSE,
+        )
 
     config.save()
     config_mid.save()
+    config_resp.save()
 
     add_tabs()
 
@@ -233,9 +282,9 @@ def show(quote_pack):
     utils.center_win(win)  # Center inside the parent
 
 
-def make_tab(group, config, is_mid=False):
+def make_tab(group, config: ConfigFile, tab_type):
     """Create all the widgets for a tab."""
-    if is_mid:
+    if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
         group_name = 'Mid - Chamber'
         group_id = 'MIDCHAMBER'
@@ -243,10 +292,18 @@ def make_tab(group, config, is_mid=False):
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
-    else:
+    elif tab_type is TabTypes.RESPONSE:
+        group_name = 'Responses'
+        group_id = None
+        group_desc = (
+            'Lines played in response to certain events in Coop.'
+        )
+    elif tab_type is TabTypes.NORM:
         group_name = group['name', 'No Name!']
         group_id = group_name.upper()
-        group_desc = group['desc', '']
+        group_desc = group['desc', ''] + ':'
+    else:
+        raise ValueError('Invalid tab type!')
 
     # This is just to hold the canvas and scrollbar
     outer_frame = ttk.Frame(UI['tabs'])
@@ -257,7 +314,7 @@ def make_tab(group, config, is_mid=False):
     # We add this attribute so the refresh() method knows all the
     # tab names
     outer_frame.nb_text = group_name
-    outer_frame.nb_is_mid = is_mid
+    outer_frame.nb_type = tab_type
 
     # We need a canvas to make the list scrollable.
     canv = Canvas(
@@ -299,7 +356,7 @@ def make_tab(group, config, is_mid=False):
 
     ttk.Label(
         frame,
-        text=group_desc + ':',
+        text=group_desc,
         ).grid(
             row=1,
             column=0,
@@ -310,50 +367,77 @@ def make_tab(group, config, is_mid=False):
         row=2,
         column=0,
         sticky='EW',
-        )
+    )
 
-    sorted_quotes = sorted(
-        group.find_all('Quote'),
-        key=quote_sort_func,
-        reverse=True,
+    if tab_type is TabTypes.RESPONSE:
+        sorted_quotes = sorted(
+            group,
+            key=lambda prop: prop.real_name
+        )
+    else:
+        sorted_quotes = sorted(
+            group.find_all('Quote'),
+            key=quote_sort_func,
+            reverse=True,
         )
 
     for quote in sorted_quotes:
+        if tab_type is TabTypes.RESPONSE:
+            try:
+                name = RESPONSE_NAMES[quote.name]
+            except KeyError:
+                # Convert channels of the form 'death_goo' into 'Death - Goo'.
+                channel, ch_arg = quote.name.split('_', 1)
+                name = channel.title() + ' - ' + ch_arg.title()
+                del channel, ch_arg
+
+            group_id = quote.name
+        else:
+            name = quote['name', 'No Name!']
+
         ttk.Label(
             frame,
-            text=quote['name', 'No Name!'],
+            text=name,
             font=QUOTE_FONT,
-            ).grid(
-                column=0,
-                sticky=W,
-                )
+        ).grid(
+            column=0,
+            sticky=W,
+        )
 
-        for badge, line in find_lines(quote):
-            line_id = line['id', line['name']]
+        if tab_type is TabTypes.RESPONSE:
+            line_iter = find_resp_lines(quote)
+        else:
+            line_iter = find_lines(quote)
+
+        for badge, line, line_id in line_iter:
+            if line_id is None:
+                line_id = line['id', line['name']]
             check = ttk.Checkbutton(
                 frame,
-                text=line['name'],
+                text=line['name', 'No Name?'],
                 compound=LEFT,
                 image=badge,
-                )
+            )
+
             check.quote_var = IntVar(
                 value=config.get_bool(group_id, line_id, True),
-                )
+            )
+
             check['variable'] = check.quote_var
 
             check['command'] = functools.partial(
                 check_toggled,
-                check.quote_var,
-                config[group_id],
-                line_id,
-                )
+                var=check.quote_var,
+                config_section=config[group_id],
+                quote_id=line_id,
+            )
 
             check.transcript = list(get_trans_lines(line))
             check.grid(
                 column=0,
                 padx=(10, 0),
                 sticky=W,
-                )
+            )
             check.bind("<Enter>", show_trans)
     canv.bind('<Configure>', configure_canv)
 
@@ -364,11 +448,17 @@ def find_lines(quote_block):
     """Find the line property blocks in a quote."""
     for prop in quote_block:
         if prop.name == 'line':
-            yield None, prop
+            yield None, prop, None
         elif prop.name == 'line_sp':
-            yield SP_IMG, prop
+            yield SP_IMG, prop, None
         elif prop.name == 'line_coop':
-            yield COOP_IMG, prop
+            yield COOP_IMG, prop, None
+
+
+def find_resp_lines(quote_block):
+    """Find the line blocks in response items."""
+    for index, prop in enumerate(quote_block):
+        yield None, prop, 'line_{}'.format(index)
 
 
 def get_trans_lines(trans_block):

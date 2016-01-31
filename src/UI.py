@@ -27,7 +27,7 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
-import backup as backupWin
+import backup as backup_win
 import tooltip
 
 LOGGER = utils.getLogger(__name__)
@@ -255,55 +255,6 @@ class Item:
             vers.append(name)
         return self.ver_list, vers
 
-    def export(self):
-        """Generate the editoritems and vbsp_config data for this item.
-
-        """
-        self.load_data()
-
-        # Build a dictionary of this item's palette positions,
-        # if any exist.
-        palette_items = {
-            item.subKey: item
-            for item in pal_picked
-            if item.id == self.id
-        }
-
-        new_editor = self.data['editor'].copy()
-
-        new_editor['type'] = self.id # Set the item ID to match our item
-        # This allows the folders to be reused for different items if needed.
-
-        for index, editor_section in enumerate(
-                new_editor.find_all("Editor", "Subtype")):
-            # For each subtype, see if it's on the palette
-            for editor_sec_index, pal_section in enumerate(
-                    editor_section):
-                # We need to manually loop so we get the index of the palette
-                # property block in the section
-                if pal_section.name == "palette":
-                    if index in palette_items:
-                        if len(palette_items) == 1:
-                            # Switch to the 'Grouped' icon
-                            if self.data['all_name'] is not None:
-                                pal_section['Tooltip'] = self.data['all_name']
-                            if self.data['all_icon'] is not None:
-                                pal_section['Image'] = self.data['all_icon']
-                        pal_section['Position'] = (
-                            str(palette_items[index].pre_x) + " " +
-                            str(palette_items[index].pre_y) + " 0"
-                            )
-                    else:
-                        del editor_section[editor_sec_index]
-                        break
-
-        return (
-            new_editor,
-            self.data['editor_extra'],
-            # Add all_conf first so it's conditions run first by default
-            self.item.all_conf + self.data['vbsp'],
-        )
-
 
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
@@ -427,6 +378,7 @@ class PalItem(Label):
 
 def quit_application():
     """Do a last-minute save of our config files, and quit the app."""
+    import sys
     GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
     GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
@@ -435,7 +387,8 @@ def quit_application():
     CompilerPane.COMPILE_CFG.save_check()
     # Destroy the TK windows
     TK_ROOT.destroy()
-    exit(0)
+    sys.exit(0)
+
 gameMan.quit_application = quit_application
 
 
@@ -473,6 +426,7 @@ def load_packages(data):
 
     StyleVarPane.add_vars(data['StyleVar'])
 
+    # THese item types don't appear anywhere in the UI, so we just save them.
     for packlist in data['PackList']:
         pack_lists[packlist.id] = packlist
 
@@ -486,9 +440,12 @@ def load_packages(data):
     elev_list = []
 
     # These don't need special-casing, and act the same.
+    # The attrs are a map from selectorWin attributes, to the attribute on
+    # the object.
     obj_types = [
         (sky_list, skyboxes, 'Skybox', {
             '3D': 'config.value',  # Check if it has a config
+            'COLOR': 'fog_color',
         }),
         (voice_list, voices, 'QuotePack', {
             'CHAR': 'chars',
@@ -563,11 +520,16 @@ def load_packages(data):
         TK_ROOT,
         sky_list,
         title='Select Skyboxes',
+        desc='The skybox decides what the area outside the chamber is like.'
+             ' It chooses the colour of sky (seen in some items), the style'
+             ' of bottomless pit (if present), as well as color of "fog" (seen'
+             ' in larger chambers.',
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
         attributes=[
-            SelAttr('3D', '3D Skybox: ', False),
+            SelAttr.bool('3D', '3D Skybox', False),
+            SelAttr.color('COLOR', 'Fog Color'),
         ],
     )
 
@@ -575,14 +537,18 @@ def load_packages(data):
         TK_ROOT,
         voice_list,
         title='Select Additional Voice Lines',
+        desc='Voice lines choose which extra voices play as the player enters '
+             'or exits a chamber. They are chosen based on which items are '
+             'present in the map. The additional "Multiverse" Cave lines are'
+             ' controlled seperately in Style Properties.',
         has_none=True,
         none_desc='Add no extra voice lines.',
         none_attrs={
-            'CHAR': '<Multiverse Cave only>',
+            'CHAR': ['<Multiverse Cave only>'],
         },
         callback=voice_callback,
         attributes=[
-            SelAttr('CHAR', 'Characters: ', '??'),
+            SelAttr.list('CHAR', 'Characters', ['??']),
         ],
     )
 
@@ -590,16 +556,19 @@ def load_packages(data):
         TK_ROOT,
         music_list,
         title='Select Background Music',
+        desc='This controls the background music used for a map. Some '
+             'tracks have variations which are played when interacting '
+             'with certain testing elements.',
         has_none=True,
         none_desc='Add no music to the map at all.',
         callback=win_callback,
         callback_params=['Music'],
         attributes=[
-            SelAttr('GEL_SPEED', 'Propulsion Gel SFX: ', False),
-            SelAttr('GEL_BOUNCE', 'Repulsion Gel SFX: ', False),
-            SelAttr('TBEAM', 'Excursion Funnel SFX: ', False),
-            SelAttr('BRIDGE', 'Hard Light SFX: ', False),
-            SelAttr('FLING', 'Fling SFX: ', False),
+            SelAttr.bool('GEL_SPEED', 'Propulsion Gel SFX'),
+            SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX'),
+            SelAttr.bool('TBEAM', 'Excursion Funnel SFX'),
+            SelAttr.bool('BRIDGE', 'Hard Light SFX'),
+            SelAttr.bool('FLING', 'Fling SFX'),
         ],
     )
 
@@ -607,10 +576,14 @@ def load_packages(data):
         TK_ROOT,
         style_list,
         title='Select Style',
+        desc='The Style controls many aspects of the map. It decides the '
+             'materials used for walls, the appearance of entrances and '
+             'exits, the design for most items as well as other settings.\n\n'
+             'The style broadly defines the time period a chamber is set in.',
         has_none=False,
         has_def=False,
         attributes=[
-            SelAttr('VID', 'Elevator Videos: ', True),
+            SelAttr.bool('VID', 'Elevator Videos', default=True),
         ]
     )
 
@@ -618,13 +591,17 @@ def load_packages(data):
         TK_ROOT,
         elev_list,
         title='Select Elevator Video',
+        desc='Set the video played on the video screens in modern Aperture '
+             'elevator rooms. Not all styles feature these. If set to "None", '
+             'a random video will be selected each time the map is played, '
+             'like in the default PeTI.',
         has_none=True,
         has_def=True,
-        none_desc='Chose a random video.',
+        none_desc='Choose a random video.',
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
-            SelAttr('ORIENT', 'Multiple Orientations: ', False),
+            SelAttr.bool('ORIENT', 'Multiple Orientations'),
         ]
     )
 
@@ -758,16 +735,29 @@ def export_editoritems(_=None):
     for var in StyleVarPane.styleOptions:
         style_vars[var.id] = style_vals[var.id].get() == 1
 
+    # The chosen items on the palette
+    pal_data = [(it.id, it.subKey) for it in pal_picked]
+
+    item_versions = {
+        it_id: item.selected_ver
+        for it_id, item in
+        item_list.items()
+    }
+
     success = gameMan.selected_game.export(
-        chosen_style,
-        item_list,
-        music=musics.get(music_win.chosen_id, None),
-        skybox=skyboxes.get(skybox_win.chosen_id, None),
-        voice=voices.get(voice_win.chosen_id, None),
-        elevator=elevators.get(elev_win.chosen_id, None),
-        style_vars=style_vars,
-        pack_list=pack_lists,
-        editor_sounds=editor_sounds,
+        style=chosen_style,
+        selected_objects={
+            # Specfify the 'chosen item' for each object type
+            'Music': music_win.chosen_id,
+            'Skybox': skybox_win.chosen_id,
+            'QuotePack': voice_win.chosen_id,
+            'Elevator': elev_win.chosen_id,
+
+            'Item': (pal_data, item_versions),
+            'StyleVar': style_vars,
+
+            # The others don't have one, so it defaults to None.
+        },
         should_refresh=not GEN_OPTS.get_bool(
             'General',
             'preserve_BEE2_resource_dir',
@@ -789,7 +779,7 @@ def export_editoritems(_=None):
             palettes.remove(pal)
     new_pal = paletteLoader.Palette(
         '<Last Export>',
-        [(it.id, it.subKey) for it in pal_picked],
+        pal_data,
         options={},
         filename='LAST_EXPORT.zip',
         )
@@ -1478,7 +1468,7 @@ def init_menu_bar(win):
         )
     file_menu.add_command(
         label="Backup/Restore Puzzles...",
-        command=backupWin.show_window,
+        command=backup_win.show_window,
     )
     file_menu.add_command(
         label="Manage Packages...",
@@ -1700,7 +1690,7 @@ def init_windows():
     utils.bind_leftclick(windows['opt'], contextWin.hide_context)
     utils.bind_leftclick(windows['pal'], contextWin.hide_context)
 
-    backupWin.init_toplevel()
+    backup_win.init_toplevel()
     loader.step('UI')
     voiceEditor.init_widgets()
     loader.step('UI')

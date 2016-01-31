@@ -21,10 +21,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
-OPTIONS = {}
 ALL_INST = set()
-STYLE_VARS = {}
-VOICE_ATTR = {}
 VMF = None  # type: VLib.VMF
 
 conditions = []
@@ -42,7 +39,7 @@ GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], List[VLib.Solid], List[VLib.Entity]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], VLib.Entity, List[VLib.Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
@@ -440,14 +437,10 @@ def add(prop_block):
 
 def init(seed, inst_list, vmf_file):
     # Get a bunch of values from VBSP
-    import vbsp
-    global MAP_RAND_SEED, ALL_INST, VMF, STYLE_VARS, VOICE_ATTR, OPTIONS
+    global MAP_RAND_SEED, ALL_INST, VMF
     VMF = vmf_file
     MAP_RAND_SEED = seed
-    ALL_INST = set(inst_list)
-    OPTIONS = vbsp.settings['options']
-    STYLE_VARS = vbsp.settings['style_vars']
-    VOICE_ATTR = vbsp.settings['has_attr']
+    ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
     conditions.sort()
@@ -475,13 +468,15 @@ def check_all():
                 LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
+    import vbsp
+
     LOGGER.info('Map has attributes: ', [
         key
         for key, value in
-        VOICE_ATTR.items()
+        vbsp.settings['has_attr'].items()
         if value
     ])
-    LOGGER.info('Style Vars:', dict(STYLE_VARS.items()))
+    LOGGER.info('Style Vars:', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
 
 
@@ -561,7 +556,7 @@ def build_solid_dict():
                 GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
 
                 # Indicate that this map contains goo...
-                VOICE_ATTR['goo'] = True
+                vbsp.settings['has_attr']['goo'] = True
                 continue
 
             try:
@@ -813,6 +808,14 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
         if prop.value.startswith('$'):
             if prop.value in inst.fixup:
                 ent[prop.real_name] = inst.fixup[prop.value]
+            else:
+                LOGGER.warning(
+                    'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
+                    prop.value,
+                    inst['targetname'],
+                    inst,
+                    inst.fixup._fixup
+                )
         else:
             ent[prop.real_name] = prop.value
     name = inst['targetname', ''] + '-'
@@ -853,6 +856,24 @@ def load_templates():
         )
 
 
+def get_template(temp_name):
+    """Get the data associated with a given template."""
+    try:
+        return TEMPLATES[temp_name.casefold()]
+    except KeyError as err:
+        # Replace the KeyError with a more useful error message, and
+        # list all the templates that are available.
+        LOGGER.info('Templates:')
+        LOGGER.info('\n'.join(
+            ('* "' + temp + '"')
+            for temp in
+            TEMPLATES.keys()
+        ))
+        # Overwrite the error's value
+        err.args = ('Template not found: "{}"'.format(temp_name),)
+        raise err
+
+
 def import_template(
         temp_name,
         origin,
@@ -870,20 +891,8 @@ def import_template(
     If targetname is set, it will be used to localise overlay names.
     """
     import vbsp
-    try:
-        orig_world, orig_detail, orig_over = TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        # Replace the KeyError with a more useful error message, and
-        # list all the templates that are available.
-        LOGGER.info('Templates:')
-        LOGGER.info('\n'.join(
-            ('* "' + temp + '"')
-            for temp in
-            TEMPLATES.keys()
-        ))
-        # Overwrite the error's value
-        err.args = ('Template not found: "{}"'.format(temp_name),)
-        raise err
+    orig_world, orig_detail, orig_over = get_template(temp_name)
+
     new_world = []
     new_detail = []
     new_over = []
@@ -957,6 +966,42 @@ def import_template(
         vbsp.IGNORED_FACES.update(solid.sides)
 
     return Template(new_world, detail_ent, new_over)
+
+
+def get_scaling_template(
+        temp_id,
+    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis, float]]:
+    """Get the scaling data from a template.
+
+    This is a dictionary mapping normals to the U,V and rotation data.
+    """
+    world, detail, over = get_template(temp_id)
+
+    if detail:
+        world = world + detail.solids # Don't mutate the lists
+    else:
+        world = list(world)
+
+    uvs = {}
+
+    for brush in world:
+        for side in brush.sides:
+            uvs[side.normal().as_tuple()] = (
+                side.uaxis.copy(),
+                side.vaxis.copy(),
+                side.ham_rot,
+            )
+
+    return uvs
+
+
+# 'Opposite' values for retexture_template(force_colour)
+TEMP_COLOUR_INVERT = {
+    MAT_TYPES.white: MAT_TYPES.black,
+    MAT_TYPES.black: MAT_TYPES.white,
+    None: 'INVERT',
+    'INVERT': None,
+}
 
 
 def retexture_template(
@@ -1167,12 +1212,19 @@ def retexture_template(
                     '{!s}.{!s}'.format(tex_colour, grid_size)
                 )
 
-    for over in template_data.overlay:
+    for over in template_data.overlay[:]:
         mat = over['material'].casefold()
         if mat in replace_tex:
-            over['material'] = random.choice(replace_tex[mat])
+            over['material'] = mat = random.choice(replace_tex[mat])
         elif mat in vbsp.TEX_VALVE:
-            over['material'] = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+            over['material'] = mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+        else:
+            continue
+        if mat == '':
+            # If blank, remove the overlay from the map and the list.
+            # (Since it's inplace, this can affect the tuple.)
+            template_data.overlay.remove(over)
+            over.remove()
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
@@ -1209,18 +1261,16 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             continue
 
         # Remove this face from the solids list, and get the group.
-        face_group = SOLIDS.pop(solid_key)
+        face_group = SOLIDS.pop(solid_key, None)
+
+        normal = face.normal()
 
         # Generate our new brush.
         new_brushes = import_template(
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...
-            Vec(
-                face_group.normal.x,
-                face_group.normal.y,
-                -face_group.normal.z,
-            ).to_angle(),
+            Vec(normal.x, normal.y, -normal.z).to_angle(),
             force_type=TEMP_TYPES.world,
         ).world
 
@@ -1249,12 +1299,13 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
                     vbsp.IGNORED_FACES.remove(new_face)
 
                 # Make a new SolidGroup to match the face.
-                SOLIDS[solid_key] = solidGroup(
-                    new_face,
-                    brush,
-                    face_group.normal,
-                    face_group.color,
-                )
+                if face_group is not None:
+                    SOLIDS[solid_key] = solidGroup(
+                        new_face,
+                        brush,
+                        face_group.normal,
+                        face_group.color,
+                    )
 
 
 @make_flag('debug')
@@ -1483,6 +1534,13 @@ def res_goo_debris(_, res):
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.
     """
+    import vbsp
+
+    if vbsp.settings['pit'] is not None:
+        # We have bottomless pits - don't place goo debris.
+        # TODO: Make this only apply to the ones chosen to be bottomless.
+        return RES_EXHAUSTED
+
     space = utils.conv_int(res['spacing', '1'], 1)
     rand_count = utils.conv_int(res['number', ''], None)
     if rand_count:
@@ -1505,14 +1563,17 @@ def res_goo_debris(_, res):
     else:
         possible_locs = []
         for x, y, z in set(GOO_FACE_LOC):
+            # Check to ensure the neighbouring blocks are also
+            # goo brushes (depending on spacing).
             for x_off, y_off in utils.iter_grid(
                     min_x=-space,
-                    max_x=space+1,
+                    max_x=space + 1,
                     min_y=-space,
-                    max_y=space+1,
+                    max_y=space + 1,
+                    stride=128,
                     ):
                 if x_off == y_off == 0:
-                    continue
+                    continue # We already know this is a goo location
                 if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
                     break  # This doesn't qualify
             else:
@@ -1531,7 +1592,7 @@ def res_goo_debris(_, res):
             continue
 
         if rand_list is not None:
-            suff = '_' + str(random.choice(rand_list))
+            suff = '_' + str(random.choice(rand_list) + 1)
 
         if offset > 0:
             loc.x += random.randint(-offset, offset)
@@ -1638,7 +1699,8 @@ def res_find_potential_tag_fizzlers(inst):
 
     This is used for Aperture Tag paint fizzlers.
     """
-    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+    import vbsp
+    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
     if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
@@ -1699,7 +1761,7 @@ def res_make_tag_fizzler(inst, res):
     MUST be priority -100 so it runs before fizzlers!
     """
     import vbsp
-    if OPTIONS['game_id'] != utils.STEAM_IDS['TAG']:
+    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         inst.remove()
         return
@@ -1979,6 +2041,8 @@ def res_make_tag_fizzler(inst, res):
         ),
     ]
 
+    voice_attr = vbsp.settings['has_attr']
+
     if blue_enabled:
         # If this is blue/oran only, don't affect the other color
         neg_trig.outputs.append(VLib.Output(
@@ -1994,10 +2058,10 @@ def res_make_tag_fizzler(inst, res):
             param=utils.bool_as_int(pos_blue),
         ))
         # Add voice attributes - we have the gun and gel!
-        VOICE_ATTR['bluegelgun'] = True
-        VOICE_ATTR['bluegel'] = True
-        VOICE_ATTR['bouncegun'] = True
-        VOICE_ATTR['bouncegel'] = True
+        voice_attr['bluegelgun'] = True
+        voice_attr['bluegel'] = True
+        voice_attr['bouncegun'] = True
+        voice_attr['bouncegel'] = True
 
     if oran_enabled:
         neg_trig.outputs.append(VLib.Output(
@@ -2012,10 +2076,10 @@ def res_make_tag_fizzler(inst, res):
             'SetValue',
             param=utils.bool_as_int(pos_oran),
         ))
-        VOICE_ATTR['orangegelgun'] = True
-        VOICE_ATTR['orangegel'] = True
-        VOICE_ATTR['speedgelgun'] = True
-        VOICE_ATTR['speedgel'] = True
+        voice_attr['orangegelgun'] = True
+        voice_attr['orangegel'] = True
+        voice_attr['speedgelgun'] = True
+        voice_attr['speedgel'] = True
 
     if not oran_enabled and not blue_enabled:
         # If both are disabled, we must shutdown the gun when touching

@@ -3,12 +3,15 @@
 """
 import operator
 
+import utils
 from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
+from utils import Vec
 from instanceLocs import resolve as resolve_inst
 import conditions
+import vmfLib as VLib
 
 
 @make_flag('instance')
@@ -97,7 +100,6 @@ def res_set_key(inst, res):
     inst[key] = value
 
 
-
 @make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst, res):
     """Append the value of an instance variable to the filename.
@@ -153,3 +155,38 @@ def res_local_targetname(inst, res):
     else:
         name = inst['targetname', '']
     inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
+
+
+@make_result('replaceInstance')
+def res_replace_instance(inst: VLib.Entity, res):
+    """Replace an instance with another entity.
+
+    'keys' and 'localkeys' defines the new keyvalues used.
+    'targetname' and 'angles' are preset, and 'origin' will be used to offset
+    the given amount from the current location.
+    If 'keep_instance' is true, the instance entity will be kept instead of
+    removed.
+    """
+    import vbsp
+
+    origin = Vec.from_str(inst['origin'])
+    angles = inst['angles']
+
+    if not utils.conv_bool(res['keep_instance', '0'], False):
+        inst.remove()  # Do this first to free the ent ID, so the new ent has
+        # the same one.
+
+    # We copy to allow us to still acess the $fixups and other values.
+    new_ent = inst.copy(des_id=inst.id)
+    new_ent.clear_keys()
+    # Ensure there's a classname, just in case.
+    new_ent['classname'] = 'info_null'
+
+    vbsp.VMF.add_ent(new_ent)
+
+    conditions.set_ent_keys(new_ent, inst, res)
+
+    origin += Vec.from_str(new_ent['origin']).rotate_by_str(angles)
+    new_ent['origin'] = origin
+    new_ent['angles'] = angles
+    new_ent['targetname'] = inst['targetname']

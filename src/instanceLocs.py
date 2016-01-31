@@ -1,13 +1,28 @@
+"""This module maintains a copy of all the instances defined in editoritems.
+
+This way VBSP_config files can generically refer to items, and work in
+multiple styles.
+"""
+from collections import defaultdict
 from functools import lru_cache
 
 from property_parser import Property
 import utils
 
+from typing import Optional, List
+
 LOGGER = utils.getLogger(__name__)
 
+# The list of instance each item uses.
 INSTANCE_FILES = {}
 
-# Special names for these specific instances
+# A dict holding dicts of additional custom instance names - used to define
+# names in conditions or BEE2-added features.
+CUST_INST_FILES = defaultdict(dict)
+
+# Special names for some specific instances - those which have special
+# functionality which can't be used in custom items like entry/exit doors,
+# or indicator panels.
 SPECIAL_INST = {
     # Glass only generates borders for genuine ITEM_BARRIER items,
     # so it's possible to define special names.
@@ -73,6 +88,9 @@ SPECIAL_INST = {
     'white_frame_coop': '<ITEM_COOP_EXIT_DOOR:4>',
     'black_frame_coop': '<ITEM_COOP_EXIT_DOOR:5>',
 }
+
+# The resolved versions of SPECIAL_INST
+INST_SPECIAL = None  # type: dict
 
 # Gives names to reusable instance fields, so you don't need to remember
 # indexes
@@ -152,7 +170,7 @@ def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
-    for prop in prop_block.find_key('Allinstances'):
+    for prop in prop_block.find_key('Allinstances', []):
         INSTANCE_FILES[prop.real_name] = [
             inst.value.casefold()
             for inst in
@@ -163,6 +181,13 @@ def load_conf(prop_block: Property):
         for key, val_string in
         SPECIAL_INST.items()
     }
+
+    for prop in prop_block.find_key('CustInstances', []):
+        CUST_INST_FILES[prop.real_name] = {
+            inst.name: inst.value.casefold()
+            for inst in
+            prop
+        }
 
     # Several special items which use multiple item types!
 
@@ -210,17 +235,24 @@ def load_conf(prop_block: Property):
         resolve('<ITEM_LASER_RELAY_OFFSET>')
     )
 
+
+# Cache the return values, since they're constant.
 @lru_cache()
-def resolve(path) -> list:
-    """Replace an instance path with the values it refers to.
+def resolve(path) -> List[str]:
+    """Resolve an instance path into the values it refers to.
 
     Valid paths:
     - "<ITEM_ID:1,2,5>": matches the given indexes for that item.
     - "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
+    - "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
+    - "<ITEM_ID:bee2_value, 3, 2, cube_black>": Any combination of the above
     - "[spExitCorridor]": Hardcoded shortcuts for specific items
+    - "path/to_instance": A single direct instance path
 
-    This returns a list of instances which match the selector.
-    When using <> values, the '' path will never be returned.
+    This returns a list of instances which match the selector, or an empty list
+    if it's invalid. Incorrect [] will raise an exception (since these are
+    hardcoded).
+    When using <> values, "" filenames will be skipped.
     """
 
     if path.startswith('<') and path.endswith('>'):
@@ -235,13 +267,30 @@ def resolve(path) -> list:
                     item,
                 )
                 return []
+            cust_item_vals = CUST_INST_FILES[item]
             out = []
             for val in subitem.split(','):
-                ind = SUBITEMS.get(val.strip().casefold(), None)
+                folded_value = val.strip().casefold()
+                if folded_value.startswith('bee2_'):
+                    # A custom value...
+                    try:
+                        out.append(cust_item_vals[folded_value[5:]])
+                        continue
+                    except KeyError:
+                        LOGGER.warning(
+                            '"{}" is not a valid custom subtype'
+                            ' for "{}" items!',
+                            val,
+                            item,
+                        )
+                        return []
+
+                ind = SUBITEMS.get(folded_value, None)
+
                 if ind is None:
                     try:
-                        ind = int(val.strip())
-                    except ValueError as e:
+                        ind = int(folded_value)
+                    except ValueError:
                         LOGGER.info('--------\nValid subitems:')
                         LOGGER.info('\n'.join(
                             ('> ' + k + ' = ' + str(v))
@@ -260,16 +309,20 @@ def resolve(path) -> list:
                     out.append(ind)
 
             # Convert to instance lists
-            return [
-                item_values[ind]
-                for ind in out
+            inst_out = []
+            for ind in out:
+                if isinstance(ind, str):
+                    inst_out.append(ind)
+                    continue
 
                 # Only use if it's actually in range
-                if 0 <= ind < len(item_values)
-                # Skip "" instance blocks
-                if item_values[ind] != ''
-            ]
+                if 0 <= ind < len(item_values):
+                    # Skip "" instance blocks
+                    if item_values[ind] != '':
+                        inst_out.append(item_values[ind])
+            return inst_out
         else:
+            # It's just the <item_id>, return all the values
             try:
                 # Skip "" instances
                 return [
@@ -292,3 +345,11 @@ def resolve(path) -> list:
             return []
     else:  # Just a normal path
         return [path.casefold()]
+
+
+def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
+    """Get the filename used for a custom instance defined in editoritems.
+
+    This returns None if the given value is not present.
+    """
+    return CUST_INST_FILES[item_id].get(inst.casefold(), None)

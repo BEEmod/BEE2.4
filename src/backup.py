@@ -1,6 +1,16 @@
 """Backup and restore P2C maps.
 
 """
+import utils
+if __name__ == '__main__' and (utils.MAC or utils.LINUX):
+    # Change directory to the location of the executable
+    # Otherwise we can't find our files!
+    # The Windows executable does this automatically.
+    import os
+    import sys
+    os.chdir(os.path.dirname(sys.argv[0]))
+
+
 import string
 import tkinter as tk
 from tkinter import ttk
@@ -23,7 +33,6 @@ from property_parser import Property
 from CheckDetails import CheckDetails, Item as CheckItem
 from loadScreen import LoadScreen
 import img
-import utils
 import tk_tools
 import gameMan
 
@@ -879,6 +888,7 @@ def init_toplevel():
 
 if __name__ == '__main__':
     # Run this standalone.
+
     init_application()
 
     TK_ROOT.deiconify()

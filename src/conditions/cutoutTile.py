@@ -3,6 +3,8 @@ from collections import defaultdict, namedtuple
 
 import random
 
+from perlin import SimplexNoise
+
 from utils import Vec, Vec_tuple
 from instanceLocs import resolve as resolve_inst
 
@@ -133,6 +135,11 @@ def res_cutout_tile(inst, res):
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
     }
 
+    random.seed(vbsp.MAP_RAND_SEED + '_CUTOUT_TILE_NOISE')
+    noise = SimplexNoise(period=4 * 50)  # 4 tiles/block, 50 blocks max
+
+
+
     for mat_prop in res['Materials', []]:
         MATS[mat_prop.name].append(mat_prop.value)
 
@@ -140,6 +147,12 @@ def res_cutout_tile(inst, res):
         # We want the normal brushes to become nodraw.
         MATS['floorbase_disp'] = MATS['floorbase']
         MATS['floorbase'] = ['tools/toolsnodraw']
+
+        # Since this uses random data for initialisation, the alpha and
+        # regular will use slightly different patterns.
+        alpha_noise = SimplexNoise(period=4 * 50)
+    else:
+        alpha_noise = None
 
     for key, default in TEX_DEFAULT:
         if key not in MATS:
@@ -233,6 +246,7 @@ def res_cutout_tile(inst, res):
             make_alpha_base(
                 box_min + (-64, -64, 0),
                 box_max + (64, 64, 0),
+                noise=alpha_noise,
             )
 
         for x, y in utils.iter_grid(
@@ -249,6 +263,7 @@ def res_cutout_tile(inst, res):
                 SETTINGS,
                 sign_loc,
                 detail_ent,
+                noise
             )
 
         # Mark borders we need to fill in, and the angle (for func_instance)
@@ -291,13 +306,27 @@ def res_cutout_tile(inst, res):
     return True
 
 
+def get_noise(loc: Vec, noise_func: SimplexNoise):
+    """Generate a number between 0 and 1.
+
+    This is used to determine where tiles are placed.
+    """
+    # Average between the neighbouring locations, to smooth out changes.
+    return sum(
+        noise_func.noise3(loc.x + x, loc.y + y, loc.z)
+        for x in (-1, 0, 1)
+        for y in (-1, 0, 1)
+    ) / 9
+
+
 def convert_floor(
-        loc,
+        loc: Vec,
         overlay_ids,
         mats,
         settings,
         signage_loc,
         detail,
+        noise_func: SimplexNoise,
 ):
     """Cut out tiles at the specified location."""
     try:
@@ -338,20 +367,22 @@ def convert_floor(
     loc.x -= 64
     loc.y -= 64
 
-    random.seed('cutout_tile' + loc.join(' '))
-    tile_map = [
-        (random.randint(0, 100) < settings['floor_chance'])
-        for _ in range(16)
-    ]
-
     for x, y in utils.iter_grid(max_x=4, max_y=4):
         tile_loc = loc + (x*32 + 16, y*32 + 16, 0)
         if tile_loc.as_tuple() in signage_loc:
+            # Force the tile to be present under signage..
             should_make_tile = True
+            rand = 100
             # We don't need to check this again in future!
             signage_loc.remove(tile_loc.as_tuple())
         else:
-            should_make_tile = tile_map[x*4 + y]
+            # A number between 0-100
+            rand = 50 * get_noise(tile_loc // 32, noise_func) + 50
+
+            should_make_tile = rand < settings['floor_chance']
+            if random.randint(0, 10) == 0:
+                # Sometimes there'll be random holes/extra tiles
+                should_make_tile = not should_make_tile
         if should_make_tile:
             # Full tile
             tile = make_tile(
@@ -363,8 +394,9 @@ def convert_floor(
             )
             detail.solids.append(tile.solid)
             ant_locs.append(str(tile.top.id))
-        elif random.randint(0, 100) < settings['floor_glue_chance']:
-            # 'Glue' tile
+        elif rand < settings['floor_glue_chance']:
+            # 'Glue' tile - this chance should be higher, making these appear
+            # bordering the full tiles.
             tile = make_tile(
                 p1=tile_loc - (16, 16, 1),
                 p2=tile_loc + (16, 16, -2),
@@ -561,7 +593,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             )
 
 
-def make_alpha_base(bbox_min, bbox_max):
+def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
     """Add the base to a CutoutTile, using displacements."""
     # We want to limit the size of brushes to 512, so the vertexes don't
     # get too far apart.
@@ -597,12 +629,14 @@ def make_alpha_base(bbox_min, bbox_max):
                 alpha_min=0,
                 alpha_max=128,
                 offset=-1,
+                noise=noise,
             )
             conditions.VMF.add_brush(brush.solid)
 
 
 def make_displacement(
         face: VLib.Side,
+        noise: SimplexNoise,
         alpha_min=0,
         alpha_max=255,
         power=3,
@@ -620,10 +654,15 @@ def make_displacement(
         '10': '-1 -1 -1 -1 -1 -1 -1 -1 -1 -1',
     }
 
-    LOGGER.info('Making displacement in: {} {}', bbox_min, bbox_max)
+    LOGGER.debug('Making displacement from {} to {}', bbox_min, bbox_max)
 
     # Number of rows/columns needed
     grid_size = 2 ** power + 1
+
+    # The width/height of the vertextes - this ensures neighbouring
+    # noise matches up correctly.
+    x_vert = (bbox_max.x - bbox_min.x) / grid_size
+    y_vert = (bbox_max.y - bbox_min.y) / grid_size
 
     face.disp_data = {
         # We just want these values repeated the right number of times!
@@ -639,7 +678,15 @@ def make_displacement(
 
     face.disp_data['alphas'] = [
         ' '.join(
-            str(random.randint(alpha_min, alpha_max))
+            str(255 * get_noise(
+                Vec(
+                    bbox_min.x + x * x_vert,
+                    bbox_min.y + y * y_vert,
+                    bbox_min.z,
+                ) // max(x_vert, y_vert),
+                noise,
+                # Make slightly more dust, since simplex rarely hits max/min.
+            ) + 80)
             for x in
             range(grid_size)
         )

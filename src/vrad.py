@@ -36,6 +36,12 @@ GAME_FOLDER = {
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }
 
+# Files that VBSP may generate, that we want to insert into the packfile.
+# They are all placed in bee2/inject/.
+INJECT_FILES = {
+    'response_data.nut': 'scripts/vscripts/BEE2/coop_response_data.nut'
+}
+
 
 def quote(txt):
     return '"' + txt + '"'
@@ -82,7 +88,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile, filename):
+def pack_file(zipfile: ZipFile, filename):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -105,6 +111,15 @@ def pack_file(zipfile, filename):
         LOGGER.warning('"bee2/' + filename + '" not found!')
 
 
+def inject_files(zipfile: ZipFile):
+    """Inject certain files into the packlist,  if they exist."""
+    for filename, arcname in INJECT_FILES.items():
+        filename = os.path.join('bee2', 'inject', filename)
+        if os.path.exists(filename):
+            LOGGER.info('Injecting "{}" into packfile.', arcname)
+            zipfile.write(filename, arcname)
+
+
 def pack_content(path):
     """Pack any custom content into the map."""
     files = set()
@@ -115,11 +130,11 @@ def pack_content(path):
     else:
         with pack_list:
             for line in pack_list:
-                files.add(line.strip().lower())
+                line = line.strip()
+                if not line or line.startswith('//'):
+                    continue  # Skip blanks or comments
 
-    if '' in files:
-        # Allow blank lines in original files
-        files.remove('')
+                files.add(line.lower())
 
     if not files:
         LOGGER.info('No files to pack!')
@@ -142,6 +157,8 @@ def pack_content(path):
 
     for file in files:
         pack_file(zipfile, file)
+
+    inject_files(zipfile)
 
     LOGGER.debug(' - Added files')
 

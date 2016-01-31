@@ -23,6 +23,8 @@ import tooltip
 import tk_tools
 import utils
 
+import UI
+
 LOGGER = utils.getLogger(__name__)
 
 OPEN_IN_TAB = 2
@@ -34,8 +36,8 @@ wid['subitem'] = [0, 0, 0, 0, 0]
 wid['sprite'] = [0, 0, 0, 0, 0]
 
 
-selected_item = None
-selected_sub_item = None
+selected_item = None # type: UI.Item
+selected_sub_item = None  # type: UI.PalItem
 is_open = False
 
 version_lookup = []

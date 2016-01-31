@@ -82,6 +82,9 @@ def res_cust_fizzler(base_inst, res):
         for config in new_brush_config:
             new_brush = orig_brush.copy()
             vbsp.VMF.add_ent(new_brush)
+            # Don't allow restyling it
+            vbsp.IGNORED_BRUSH_ENTS.add(new_brush)
+
             new_brush.clear_keys()  # Wipe the original keyvalues
             new_brush['origin'] = orig_brush['origin']
             new_brush['targetname'] = (

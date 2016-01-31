@@ -640,6 +640,53 @@ class VMF:
             west=f_west,
         )
 
+    def make_hollow(
+            self,
+            p1, p2,
+            thick=16,
+            mat='tools/toolsnodraw',
+            ) -> List['Solid']:
+        """Create 6 brushes to surround the given region."""
+        b_min, b_max = Vec.bbox(p1, p2)
+
+        top = self.make_prism(
+            Vec(b_min.x, b_min.y, b_max.z),
+            Vec(b_max.x, b_max.y, b_max.z + thick),
+            mat,
+        ).solid
+
+        bottom = self.make_prism(
+            Vec(b_min.x, b_min.y, b_min.z),
+            Vec(b_max.x, b_max.y, b_min.z - thick),
+            mat,
+        ).solid
+
+        west = self.make_prism(
+            Vec(b_min.x - thick, b_min.y, b_min.z),
+            Vec(b_min.x, b_max.y, b_max.z),
+            mat,
+        ).solid
+
+        east = self.make_prism(
+            Vec(b_max.x, b_min.y, b_min.z),
+            Vec(b_max.x + thick, b_max.y, b_max.z),
+            mat
+        ).solid
+
+        north = self.make_prism(
+            Vec(b_min.x, b_max.y, b_min.z),
+            Vec(b_max.x, b_max.y + thick, b_max.z),
+            mat,
+        ).solid
+
+        south = self.make_prism(
+            Vec(b_min.x, b_min.y - thick, b_min.z),
+            Vec(b_max.x, b_min.y, b_max.z),
+            mat,
+        ).solid
+
+        return [north, south, east, west, top, bottom]
+
 
 class Camera:
     def __init__(self, vmf_file, pos, targ):
@@ -941,6 +988,19 @@ class UVAxis:
             off=self.offset,
             scale=self.scale,
         )
+
+    def __repr__(self):
+        rep = '{cls}({x:g}, {y:g}, {z:g}'.format(
+            cls=self.__class__.__name__,
+            x=self.x,
+            y=self.y,
+            z=self.z,
+        )
+        if self.offset != 0:
+            rep += ', offset={:g}'.format(self.offset)
+        if self.scale != 0.25:
+            rep += ', scale={:g}'.format(self.scale)
+        return rep + ')'
 
 
 class Side:
@@ -1500,7 +1560,7 @@ class Entity:
         """Add the output to our list."""
         self.outputs.append(output)
 
-    def output_targets(self):
+    def output_targets(self) -> Set[str]:
         """Return a set of the targetnames this entity triggers."""
         return {
             out.target
@@ -1604,6 +1664,8 @@ class Entity:
         del self['targetname']
         del self['classname']
         self.keys.clear()
+        # Clear $fixup as well.
+        self.fixup.clear()
 
     def __contains__(self, key: str):
         """Determine if a value exists for the given key."""
@@ -1652,6 +1714,7 @@ class EntityFixup:
     This also treats variable names case-insensitively, and strips $
     signs off the front of them.
     """
+    __slots__ = ['_fixup']
 
     def __init__(self, fixup=()):
         self._fixup = {}
@@ -1688,11 +1751,22 @@ class EntityFixup:
         """Generate a list that can be passed to the constructor."""
         return list(self._fixup.values())
 
+    def clear(self):
+        """Wipe all the $fixup values."""
+        self._fixup.clear()
+
     def __getitem__(self, key):
         if isinstance(key, tuple):
             return self.get(key[0], default=key[1])
         else:
             return self.get(key)
+
+    def __contains__(self, var):
+        """Check if a variable is present in the fixup list."""
+        if var[0] == '$':
+            var = var[1:]
+        return var.casefold() in self._fixup
+
 
     def __setitem__(self, var, val):
         """Set the value of an instance $replace variable.
@@ -1842,14 +1916,14 @@ class Output:
     ]
 
     def __init__(self,
-                 out,
-                 targ,
-                 inp,
+                 out: str,
+                 targ: str,
+                 inp: str,
                  param='',
                  delay=0.0,
                  times=-1,
-                 inst_out=None,
-                 inst_in=None,
+                 inst_out: str=None,
+                 inst_in: str=None,
                  comma_sep=False):
         self.output = out
         self.inst_out = inst_out
@@ -1862,7 +1936,7 @@ class Output:
         self.comma_sep = comma_sep
 
     @staticmethod
-    def parse(prop):
+    def parse(prop: Property):
         """Convert the VMF Property into an Output object."""
         if OUTPUT_SEP in prop.value:
             sep = False
@@ -1892,7 +1966,7 @@ class Output:
         )
 
     @staticmethod
-    def parse_name(name):
+    def parse_name(name: str) -> Tuple[Optional[str], str]:
         """Extranct the instance name from values of the form:
 
         'instance:local_name;Command'

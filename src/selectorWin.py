@@ -8,12 +8,16 @@ from tkinter import *  # ui library
 from tkinter import font
 from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
-from collections import namedtuple
+
+from collections import namedtuple, defaultdict
+from operator import itemgetter, attrgetter
+from enum import Enum
 import functools
 import math
 
 import img  # png library for TKinter
 from richTextBox import tkRichText
+from tooltip import add_tooltip
 import utils
 import tk_tools
 
@@ -30,17 +34,148 @@ err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
 ICON_CHECK = img.png('icons/check')
 ICON_CROSS = img.png('icons/cross')
 
+# Arrows used to indicate the state of the group - collapsed or expanded
+GRP_COLL = '◁'
+GRP_COLL_HOVER = '◀'
+GRP_EXP = '▽'
+GRP_EXP_HOVER = '▼'
+
 
 def _NO_OP(*args):
     """The default callback, triggered whenever the chosen item is changed."""
     pass
 
-AttrDef = namedtuple('AttrDef', 'id desc default')
+
+class AttrTypes(Enum):
+    """The type of labels used for selectoritem attributes."""
+    STR = STRING = 'string'  # Normal text
+    LIST = 'list'  # A sequence, joined by commas
+    BOOL = 'bool'  # A yes/no checkmark
+    COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+
+
+class AttrDef(namedtuple('AttrDef', 'id type desc default')):
+    """The definition for attributes."""
+    def __new__(
+            cls,
+            id: str,
+            desc='',
+            default=None,
+            type=AttrTypes.STRING,
+            ):
+        # Set some reasonable defaults for the different types
+        if default is None:
+            if type is AttrTypes.STRING:
+                default = ''
+            elif type is AttrTypes.BOOL:
+                default = False
+            elif type is AttrTypes.LIST:
+                default = []
+            elif type is AttrTypes.COLOR:
+                default = utils.Vec(255, 255, 255)
+
+        # The description should either be blank, or end in a colon.
+        if desc != '' and not desc.endswith(': '):
+            desc += ': '
+
+        return super().__new__(cls, id, type, desc, default)
+
+    for name in AttrTypes.__members__.keys():
+        # Create a constructor for each AttrType, which presets the type
+        # parameter.
+        exec("""\
+@classmethod
+def {l_name}(cls, id: str, desc='', default=None):
+    \"""An alternative constructor to create {l_name}-type attrs.\"""
+    return AttrDef(id, desc, default, AttrTypes.{name})""".format(
+            name=name,
+            l_name=name.lower()
+        ), globals(), locals())
+
 
 SelitemData = namedtuple(
     'SelitemData',
     'name, short_name, auth, icon, desc, group',
 )
+
+
+class GroupHeader(ttk.Frame):
+    """The widget used for group headers."""
+    def __init__(self, win: 'selWin', title):
+        self.parent = win
+        super().__init__(
+            win.pal_frame,
+        )
+
+        self.sep_left = ttk.Separator(self)
+        self.sep_left.grid(row=0, column=0, sticky=EW)
+        self.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            self,
+            text=title,
+            font=win.norm_font,
+            width=len(title) + 2,
+            anchor=CENTER,
+        )
+        self.title.grid(row=0, column=1)
+
+        self.sep_right = ttk.Separator(self)
+        self.sep_right.grid(row=0, column=2, sticky=EW)
+        self.columnconfigure(2, weight=1)
+
+        self.arrow = ttk.Label(
+            self,
+            text=GRP_EXP,
+            width=2,
+        )
+        self.arrow.grid(row=0, column=3)
+
+        self._visible = True
+
+        # For the mouse events to work, we need to bind on all the children too.
+        widgets = self.winfo_children()
+        widgets.append(self)
+        for wid in widgets:  # type: Widget
+            utils.bind_leftclick(wid, self.toggle)
+            wid['cursor'] = utils.CURSORS['link']
+        self.bind('<Enter>', self.hover_start)
+        self.bind('<Leave>', self.hover_end)
+
+    @property
+    def visible(self):
+        return self._visible
+
+    @visible.setter
+    def visible(self, value):
+        value = bool(value)
+        if value == self._visible:
+            return  # Don't do anything..
+
+        self._visible = value
+        self.hover_start() # Update arrow icon
+        self.parent.flow_items()
+
+    def toggle(self, _=None):
+        """Toggle the header on or off."""
+        self.visible = not self._visible
+
+    def hover_start(self, _=None):
+        """When hovered over, fill in the triangle."""
+        self.arrow['text'] = (
+            GRP_EXP_HOVER
+            if self._visible else
+            GRP_COLL_HOVER
+        )
+
+    def hover_end(self, _=None):
+        """When leaving, hollow the triangle."""
+        self.arrow['text'] = (
+            GRP_EXP
+            if self._visible else
+            GRP_COLL
+        )
+
 
 
 class Item:
@@ -114,8 +249,8 @@ class Item:
         self.desc = desc
         self.authors = authors or []
         self.attrs = attributes or {}
-        self.button = None
-        self.win = None
+        self.button = None  # type: ttk.Button
+        self.win = None  # type: Toplevel
 
     def __repr__(self):
         return (
@@ -176,6 +311,7 @@ class selWin:
             none_desc=(('line', 'Do not add anything.'),),
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
+            desc='',
             callback=_NO_OP,
             callback_params=(),
             attributes=(),
@@ -206,6 +342,8 @@ class selWin:
           Each tuple should contain an ID, display text, and default value.
           If the values are True or False a check/cross will be displayed,
           otherwise they're a string.
+        - desc is descriptive text to display on the window, and in the widget
+          tooltip.
         """
         self.noneItem = Item(
             'NONE',
@@ -222,6 +360,7 @@ class selWin:
         self.callback_params = callback_params
         self.suggested = None
         self.has_def = has_def
+        self.description = desc
 
         if has_none:
             self.item_list = [self.noneItem] + lst
@@ -241,8 +380,22 @@ class selWin:
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
 
-        self.win.columnconfigure(0, weight=1)
-        self.win.rowconfigure(0, weight=1)
+        # A map from group name -> header widget
+        self.group_widgets = {}
+        # A map from folded name -> display name
+        self.group_names = {}
+        self.grouped_items = defaultdict(list)
+
+        if desc:
+            self.desc_label = ttk.Label(
+                self.win,
+                text=desc,
+                justify=LEFT,
+                anchor=W,
+                width=5,  # Keep a small width, so this doesn't affect the
+                # initial window size.
+            )
+            self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
         self.pane_win = PanedWindow(
@@ -252,9 +405,9 @@ class selWin:
             sashwidth=3,  # Width of border
             sashrelief=RAISED,  # Raise the border between panes
         )
-        self.pane_win.grid(row=0, column=0, sticky="NSEW")
+        self.pane_win.grid(row=1, column=0, sticky="NSEW")
         self.win.columnconfigure(0, weight=1)
-        self.win.rowconfigure(0, weight=1)
+        self.win.rowconfigure(1, weight=1)
 
         self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
@@ -403,22 +556,13 @@ class selWin:
         self.mouseover_font['slant'] = font.ITALIC
         self.context_var = IntVar()
 
-        # Re-order items appropriately.
-        #
-        self.item_list.sort(
-            # Alphabetical order
-            key=lambda it: it.longName
-        )
-        self.item_list.sort(
-            # Sort by group name
-            key=lambda it: it.group.casefold() if it.group else ''
-        )
-        self.item_list.sort(
-            # Make non-grouped items go first
-            key=lambda it: 2 if it.group else 1
-        )
+        # The headers for the context menu
+        self.context_menus = {}
 
-        for ind, item in enumerate(self.item_list):
+        # Sort alphabetically!
+        self.item_list.sort(key=attrgetter('longName'))
+
+        for ind, item in enumerate(self.item_list):  # type: int, Item
             if item == self.noneItem:
                 item.button = ttk.Button(
                     self.pal_frame,
@@ -432,12 +576,31 @@ class selWin:
                     image=item.icon,
                     compound='top',
                     )
-            self.context_menu.add_radiobutton(
+
+            group_key = item.group.casefold() if item.group else ''
+            self.grouped_items[group_key].append(item)
+
+            if group_key not in self.group_names:
+                # If the item is groupless, use 'Other' for the header.
+                self.group_names[group_key] = item.group or 'Other'
+
+            if not item.group:
+                # Ungrouped items appear directly in the menu.
+                menu = self.context_menu
+            else:
+                try:
+                    menu = self.context_menus[group_key]
+                except KeyError:
+                    self.context_menus[group_key] = menu = Menu(
+                        self.context_menu,
+                    )
+
+            menu.add_radiobutton(
                 label=item.context_lbl,
                 command=functools.partial(self.sel_item_id, item.name),
                 var=self.context_var,
                 value=ind,
-                )
+            )
 
             item.win = self.win
             utils.bind_leftclick(
@@ -448,6 +611,29 @@ class selWin:
                 item.button,
                 self.save,
             )
+
+        # Convert to a normal dictionary, after adding all items.
+        self.grouped_items = dict(self.grouped_items)
+
+        for index, (key, menu) in enumerate(
+                sorted(self.context_menus.items(), key=itemgetter(0)),
+                # We start with the ungrouped items, so increase the index
+                # appropriately.
+                start=len(self.grouped_items.get('', ()))):
+            self.context_menu.add_cascade(
+                menu=menu,
+                label=self.group_names[key],
+            )
+            # Set a custom attribute to keep track of the menu's index.
+            menu.index = index
+
+        for group_key, text in self.group_names.items():
+            self.group_widgets[group_key] = GroupHeader(
+                self,
+                text,
+            )
+            self.group_widgets[group_key].should_show = True
+
         self.flow_items(None)
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
@@ -474,22 +660,31 @@ class selWin:
 
             self.attr = {}
             # Add in all the attribute labels
-            for index, (at_id, desc, value) in enumerate(attributes):
+            for index, attr in enumerate(attributes):
                 desc_label = ttk.Label(
                     attr_frame,
-                    text=desc,
+                    text=attr.desc,
                 )
-                self.attr[at_id] = val_label = ttk.Label(
+                self.attr[attr.id] = val_label = ttk.Label(
                     attr_frame,
                 )
-                val_label.default = value
-                if isinstance(value, bool):
+                val_label.default = attr.default
+                val_label.type = attr.type
+                if attr.type is AttrTypes.BOOL:
                     # It's a tick/cross label
                     val_label['image'] = (
                         ICON_CHECK
-                        if value else
+                        if attr.default else
                         ICON_CROSS,
                     )
+                elif attr.type is AttrTypes.COLOR:
+                    # A small colour swatch.
+                    val_label.configure(
+                        relief=RAISED,
+                    )
+                    # Show the color value when hovered.
+                    add_tooltip(val_label)
+
                 # Position in a 2-wide grid
                 desc_label.grid(
                     row=index // 2,
@@ -533,6 +728,9 @@ class selWin:
             command=self.open_win,
         )
         self.disp_btn.pack(side=RIGHT)
+
+        if self.description:
+            add_tooltip(self.display, self.description)
 
         self.save()
 
@@ -611,8 +809,8 @@ class selWin:
 
         utils.center_win(self.win, parent=self.parent)
 
-        self.flow_items()
         self.sel_item(self.selected)
+        self.win.after(2, self.flow_items)
 
     def open_context(self, _):
         """Dislay the context window at the text widget."""
@@ -669,22 +867,32 @@ class selWin:
                 self.prop_reset.state(('!disabled',))
 
         if self.attr:
+            # Set the attribute items.
             for attr_id, label in self.attr.items():
-                val = item.attrs.get(attr_id, None)
-                if val is None:
-                    val = label.default
-                if isinstance(label.default, bool):
+                val = item.attrs.get(attr_id, label.default)
+
+                if label.type is AttrTypes.BOOL:
                     label['image'] = (
                         ICON_CHECK
                         if val else
                         ICON_CROSS
                     )
+                elif label.type is AttrTypes.COLOR:
+                    label['image'] = img.color_square(val, size=16)
+                    # Display the full color when hovering..
+                    label.tooltip_text = 'Color: R={r}, G={g}, B={b}'.format(
+                        r=int(val.x), g=int(val.y), b=int(val.z),
+                    )
+                elif label.type is AttrTypes.LIST:
+                    # Join the values (in alphabetical order)
+                    label['text'] = ', '.join(sorted(val))
+                elif label.type is AttrTypes.STRING:
+                    # Just a string.
+                    label['text'] = str(val)
                 else:
-                    # Display as text. If it's a container, sort alphabetically.
-                    if isinstance(val, (list, tuple, set)):
-                        val = ', '.join(sorted(val))
-                    label['text'] = val
-
+                    raise ValueError(
+                        'Invalid attribute type: "{}"'.format(label.type)
+                    )
 
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
@@ -694,30 +902,63 @@ class selWin:
         self.pal_frame.update_idletasks()
         self.pal_frame['width'] = self.wid_canvas.winfo_width()
         self.prop_name['wraplength'] = self.prop_desc.winfo_width()
+        if self.desc_label is not None:
+            self.desc_label['wraplength'] = self.win.winfo_width()
+
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero
-        num_items = len(self.item_list)
+
+        # The offset for the current group
+        y_off = 0
+
+        # Note - empty string should sort to the beginning!
+        ordered_groups = sorted(self.grouped_items.keys())
+
+        # Hide suggestion indicator if the item's not visible.
+        self.sugg_lbl.place_forget()
+
+        for group_key in ordered_groups:
+            items = self.grouped_items[group_key]
+            group_wid = self.group_widgets[group_key]  # type: GroupHeader
+            group_wid.place(
+                x=0,
+                y=y_off,
+                width=width * ITEM_WIDTH,
+            )
+            group_wid.update_idletasks()
+            y_off += group_wid.winfo_reqheight()
+
+            if not group_wid.visible:
+                # Hide everything!
+                for item in items:  # type: Item
+                    item.button.place_forget()
+                continue
+
+            # Place each item
+            for i, item in enumerate(items):  # type: int, Item
+                if item == self.suggested:
+                    self.sugg_lbl.place(
+                        x=(i % width) * ITEM_WIDTH + 1,
+                        y=(i // width) * ITEM_HEIGHT + y_off,
+                    )
+                    self.sugg_lbl['width'] = item.button.winfo_width()
+                item.button.place(
+                    x=(i % width) * ITEM_WIDTH + 1,
+                    y=(i // width) * ITEM_HEIGHT + y_off + 20,
+                )
+                item.button.lift()
+
+            # Increase the offset by the total height of this item section
+            y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
+
+        # Set the size of the canvas and frame to the amount we've used
         self.wid_canvas['scrollregion'] = (
             0, 0,
-            width*ITEM_WIDTH,
-            math.ceil(num_items/width) * ITEM_HEIGHT+20
+            width * ITEM_WIDTH,
+            y_off,
         )
-        self.pal_frame['height'] = (
-            math.ceil(num_items/width) * ITEM_HEIGHT+20
-        )
-        for i, item in enumerate(self.item_list):
-            if item == self.suggested:
-                self.sugg_lbl.place(
-                    x=((i % width) * ITEM_WIDTH + 1),
-                    y=((i // width) * ITEM_HEIGHT)
-                )
-                self.sugg_lbl['width'] = item.button.winfo_width()
-            item.button.place(
-                x=((i % width) * ITEM_WIDTH + 1),
-                y=((i // width) * ITEM_HEIGHT + 20)
-            )
-            item.button.lift()
+        self.pal_frame['height'] = y_off
 
     def __contains__(self, obj):
         """Determine if the given SelWinItem or item ID is in this item list."""
@@ -735,6 +976,29 @@ class selWin:
         """Return whether the current item is the suggested one."""
         return self.suggested == self.selected
 
+    def set_context_font(self, item: Item, font):
+        """Set the font of an item, and its parent group."""
+        if item.group:
+            group_key = item.group.casefold()
+            menu = self.context_menus[group_key]  # type: Menu
+            index = self.grouped_items[group_key].index(item)
+
+            # Apply the font to the group header as well.
+            self.group_widgets[group_key].title['font'] = font
+
+            # Also highlight the menu
+            self.context_menu.entryconfig(
+                menu.index,  # Use a custom attr to keep track of this...
+                font=font,
+            )
+        else:
+            menu = self.context_menu
+            index = self.grouped_items[''].index(item)
+        menu.entryconfig(
+            index,
+            font=font,
+        )
+
     def set_suggested(self, suggested=None):
         """Set the suggested item to the given ID.
 
@@ -742,9 +1006,10 @@ class selWin:
         If the ID is "<NONE>", it will be set to the None item.
         """
         if self.suggested is not None:
-            self.context_menu.entryconfig(
-                self.item_list.index(self.suggested),
-                font=self.norm_font)
+            self.set_context_font(
+                self.suggested,
+                self.norm_font,
+            )
             # Remove the font from the last suggested item
 
         if suggested is None:
@@ -760,9 +1025,10 @@ class selWin:
                 self.suggested = None
 
         if self.suggested is not None:
-            self.context_menu.entryconfig(
-                self.item_list.index(self.suggested),
-                font=self.sugg_font)
+            self.set_context_font(
+                self.suggested,
+                font=self.sugg_font,
+            )
         self.set_disp()  # Update the textbox if needed
         self.flow_items()  # Refresh
 

@@ -1,9 +1,9 @@
 """
 Handles scanning through the zip packages to find all items, styles, etc.
 """
+import operator
 from zipfile import ZipFile
 from collections import defaultdict, namedtuple
-import logging
 import os
 import os.path
 import shutil
@@ -35,9 +35,24 @@ res_count = -1
 
 TEMPLATE_FILE = VLib.VMF()
 
+# Various namedtuples to allow passing blocks of data around
+# (especially to functions that only use parts.)
+
+# Tempory data stored when parsing info.txt, but before .parse() is called.
+# This allows us to parse all packages before loading objects.
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
+# The arguments for pak_object.parse().
 ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
+# The values stored for OBJ_TYPES
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+# The arguments to pak_object.export().
+ExportData = namedtuple('ExportData', [
+    'selected',
+    'selected_style',  # Some items need to know which style is selected
+    'editoritems',
+    'vbsp_conf',
+    'game',
+])
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
@@ -58,6 +73,8 @@ def pak_object(name, allow_mult=False, has_img=True):
 
     If allow_mult is true, duplicate items will be treated as overrides,
     with one randomly chosen to be the 'parent'.
+
+    export(ExportData) is called to export the object into the configs.
     """
     def x(cls):
         OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
@@ -393,7 +410,7 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
         for vers in all_ver:
             for sty_id, style in all_styles.items():
                 if sty_id in vers['styles']:
-                    continue  # We already have a definition
+                    continue  # We already have a definition, or a reference
                 for base_style in style.bases:
                     if base_style.id in vers['styles']:
                         # Copy the values for the parent to the child style
@@ -424,9 +441,35 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
+            # Evaluate style references.
+            for sty_id, value in vers['styles'].items():
+                if not isinstance(value, str):
+                    continue  # Normal value
+                # It's a reference to another style.
+                try:
+                    vers['styles'][sty_id] = vers['styles'][value[1:-1]]
+                except KeyError:
+                    raise Exception(
+                        'Invalid style reference '
+                        '("{}") for "{}", in "{}" style.'.format(
+                            value, item.id, sty_id,
+                        )
+                    )
+
+            if isinstance(vers['def_style'], str):
+                # The default style is a value reference, fix it up.
+                # If it's an invalid value the above loop will catch it.
+                vers['def_style'] = vers['styles'][vers['def_style'][1:-1]]
+
 
 def parse_item_folder(folders, zip_file, pak_id):
     for fold in folders:
+        if fold.startswith('<') and fold.endswith('>'):
+            # A reference for another style - skip it now, we'll copy the
+            # real value in setup_style_tree()
+            folders[fold] = fold
+            continue
+
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -444,7 +487,7 @@ def parse_item_folder(folders, zip_file, pak_id):
             raise IOError(
                 '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
-                ) from err
+            ) from err
 
         editor_iter = Property.find_all(editor, 'Item')
         folders[fold] = {
@@ -625,6 +668,26 @@ class Style:
     def __repr__(self):
         return '<Style:' + self.id + '>'
 
+    def export(self):
+        """Export this style, returning the vbsp_config and editoritems.
+
+        This is a special case, since styles should go first in the lists.
+        """
+        vbsp_config = Property(None, [])
+
+        # Editoritems.txt is composed of a "ItemData" block, holding "Item" and
+        # "Renderables" sections.
+
+        editoritems = Property("ItemData", [])
+
+        # Only add the actual Item blocks,
+        # Renderables is added in gameMan specially.
+        # It must come last.
+        editoritems += self.editor.find_all("Item")
+        vbsp_config += self.config
+
+        return editoritems, vbsp_config
+
 
 @pak_object('Item')
 class Item:
@@ -637,7 +700,7 @@ class Item:
             all_conf=None,
             unstyled=False,
             glob_desc=(),
-            desc_last=False
+            desc_last=False,
             ):
         self.id = item_id
         self.versions = versions
@@ -681,6 +744,8 @@ class Item:
                 }
             for sty_list in ver.find_all('styles'):
                 for sty in sty_list:
+                    # The first style is considered the 'default', and is used
+                    # if not otherwise present.
                     if vals['def_style'] is None:
                         vals['def_style'] = sty.value
                     vals['styles'][sty.real_name] = sty.value
@@ -735,6 +800,91 @@ class Item:
 
     def __repr__(self):
         return '<Item:' + self.id + '>'
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export all items into the configs.
+
+        For the selected attribute, this takes a tuple of values:
+        (pal_list, versions)
+        Pal_list is a list of (item, subitem) tuples representing the palette.
+        Versions is a {item:version_id} dictionary.
+
+        """
+        editoritems = exp_data.editoritems
+        vbsp_config = exp_data.vbsp_conf
+        pal_list, versions = exp_data.selected
+
+        for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+            (
+                item_block,
+                editor_parts,
+                config_part
+            ) = item._get_export_data(
+                pal_list, versions, exp_data.selected_style.id,
+            )
+            editoritems += item_block
+            editoritems += editor_parts
+            vbsp_config += config_part
+
+    def _get_export_data(self, pal_list, versions, style_id):
+        """Get the data for an exported item."""
+
+        # Build a dictionary of this item's palette positions,
+        # if any exist.
+        palette_items = {
+            subitem: index
+            for index, (item, subitem) in
+            enumerate(pal_list)
+            if item == self.id
+        }
+
+        item_data = self.versions[
+            versions.get(self.id, 'VER_DEFAULT')
+        ]['styles'][style_id]
+
+        new_editor = item_data['editor'].copy()
+
+        new_editor['type'] = self.id  # Set the item ID to match our item
+        # This allows the folders to be reused for different items if needed.
+
+        for index, editor_section in enumerate(
+                new_editor.find_all("Editor", "Subtype")):
+
+            # For each subtype, see if it's on the palette
+            for editor_sec_index, pal_section in enumerate(
+                    editor_section):
+                # We need to manually loop so we get the index of the palette
+                # property block in the section
+                if pal_section.name != "palette":
+                    # Skip non-palette blocks in "SubType"
+                    # (animations, sounds, model)
+                    continue
+
+                if index in palette_items:
+                    if len(palette_items) == 1:
+                        # Switch to the 'Grouped' icon and name
+                        if item_data['all_name'] is not None:
+                            pal_section['Tooltip'] = item_data['all_name']
+                        if item_data['all_icon'] is not None:
+                            pal_section['Image'] = item_data['all_icon']
+
+                    pal_section['Position'] = "{x} {y} 0".format(
+                        x=palette_items[index] % 4,
+                        y=palette_items[index] // 4,
+                    )
+                else:
+                    # This subtype isn't on the palette, delete the entire
+                    # "Palette" block.
+                    del editor_section[editor_sec_index]
+                    break
+
+        return (
+            new_editor,
+            item_data['editor_extra'],
+            # Add all_conf first so it's conditions run first by default
+            self.all_conf + item_data['vbsp'],
+        )
 
 
 @pak_object('QuotePack')
@@ -798,6 +948,64 @@ class QuotePack:
     def __repr__(self):
         return '<Voice:' + self.id + '>'
 
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the quotepack."""
+        if exp_data.selected is None:
+            return  # No quote pack!
+
+        for voice in data['QuotePack']:
+            if voice.id == exp_data.selected:
+                break
+        else:
+            raise Exception(
+                "Selected voice ({}) doesn't exist?".format(exp_data.selected)
+            )
+
+        vbsp_config = exp_data.vbsp_conf
+        vbsp_config += voice.config
+
+        # Set values in vbsp_config, so flags can determine which voiceline
+        # is selected.
+        vbsp_config.set_key(
+            ('Options', 'voice_pack'),
+            voice.id,
+        )
+        vbsp_config.set_key(
+            ('Options', 'voice_char'),
+            ','.join(voice.chars)
+        )
+
+        if voice.cave_skin is not None:
+            vbsp_config.set_key(
+                ('Options', 'cave_port_skin'),
+                voice.cave_skin,
+            )
+
+        # Copy the config files for this voiceline..
+        for prefix, pretty in [
+                ('', 'normal'),
+                ('mid_', 'MidChamber'),
+                ('resp_', 'Responses')]:
+            path = os.path.join(
+                os.getcwd(),
+                '..',
+                'config',
+                'voice',
+                prefix.upper() + voice.id + '.cfg',
+            )
+            LOGGER.info(path)
+            if os.path.isfile(path):
+                shutil.copy(
+                    path,
+                    exp_data.game.abs_path(
+                        'bin/bee2/{}voice.cfg'.format(prefix)
+                    )
+                )
+                LOGGER.info('Written "{}voice.cfg"', prefix)
+            else:
+                LOGGER.info('No {} voice config!', pretty)
+
 
 @pak_object('Skybox')
 class Skybox:
@@ -805,16 +1013,24 @@ class Skybox:
             self,
             sky_id,
             selitem_data: 'SelitemData',
-            config,
+            config: Property,
+            fog_opts: Property,
             mat,
             ):
         self.id = sky_id
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
+        self.fog_opts = fog_opts
+
+        # Extract this for selector windows to easily display
+        self.fog_color = utils.Vec.from_str(
+            fog_opts['primarycolor' ''],
+            255, 255, 255
+        )
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a skybox definition."""
         selitem_data = get_selitem_data(data.info)
         mat = data.info['material', 'sky_black']
@@ -824,20 +1040,55 @@ class Skybox:
             'skybox',
             pak_id=data.pak_id,
         )
+
+        fog_opts = data.info.find_key("Fog", [])
+
         return cls(
             data.id,
             selitem_data,
             config,
+            fog_opts,
             mat,
         )
 
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data.auth.extend(override.selitem_data.auth)
-        self.config.extend(override.config)
+        self.config += override.config
+        self.fog_opts += override.fog_opts
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the selected skybox."""
+        if exp_data.selected is None:
+            return  # No skybox..
+
+        for skybox in data['Skybox']:  # type: Skybox
+            if skybox.id == exp_data.selected:
+                break
+        else:
+            raise Exception(
+                "Selected skybox ({}) doesn't exist?".format(exp_data.selected)
+            )
+
+        exp_data.vbsp_conf.set_key(
+            ('Textures', 'Special', 'Sky'),
+            skybox.material,
+        )
+
+        exp_data.vbsp_conf.append(skybox.config)
+
+        # Styles or other items shouldn't be able to set fog settings..
+        if 'fog' in exp_data.vbsp_conf:
+            del exp_data.vbsp_conf['fog']
+
+        fog_opts = skybox.fog_opts.copy()
+        fog_opts.name = 'Fog'
+
+        exp_data.vbsp_conf.append(fog_opts)
 
 
 @pak_object('Music')
@@ -894,6 +1145,49 @@ class Music:
 
     def __repr__(self):
         return '<Music ' + self.id + '>'
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the selected music."""
+        if exp_data.selected is None:
+            return  # No music..
+
+        for music in data['Music']:
+            if music.id == exp_data.selected:
+                break
+        else:
+            raise Exception(
+                "Selected music ({}) doesn't exist?".format(exp_data.selected)
+            )
+
+        vbsp_config = exp_data.vbsp_conf
+
+        # Set the instance/ambient_generic file that should be used.
+        if music.sound is not None:
+            vbsp_config.set_key(
+                ('Options', 'music_SoundScript'),
+                music.sound,
+            )
+        if music.inst is not None:
+            vbsp_config.set_key(
+                ('Options', 'music_instance'),
+                music.inst,
+            )
+
+        # If we need to pack, add the files to be unconditionally packed.
+        if music.packfiles:
+            vbsp_config.set_key(
+                ('PackTriggers', 'Forced'),
+                [
+                    Property('File', file)
+                    for file in
+                    music.packfiles
+                ],
+            )
+
+        # Allow flags to detect the music that's used
+        vbsp_config.set_key(('Options', 'music_ID'), music.id)
+        vbsp_config += music.config
 
 
 @pak_object('StyleVar', allow_mult=True, has_img=False)
@@ -976,6 +1270,20 @@ class StyleVar:
             style.bases
         )
 
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export style var selections into the config.
+
+        The .selected attribute is a dict mapping ids to the boolean value.
+        """
+        # Add the StyleVars block, containing each style_var.
+
+        exp_data.vbsp_conf.append(Property('StyleVars', [
+            Property(key, utils.bool_as_int(val))
+            for key, val in
+            exp_data.selected.items()
+        ]))
+
 
 @pak_object('Elevator')
 class ElevatorVid:
@@ -1027,6 +1335,57 @@ class ElevatorVid:
 
     def __repr__(self):
         return '<ElevatorVid ' + self.id + '>'
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the chosen video into the configs."""
+        style = exp_data.selected_style  # type: Style
+        vbsp_config = exp_data.vbsp_conf  # type: Property
+
+        if exp_data.selected is None:
+            elevator = None
+        else:
+            for elevator in data['Elevator']:
+                if elevator.id == exp_data.selected:
+                    break
+            else:
+                raise Exception(
+                    "Selected elevator ({}) "
+                    "doesn't exist?".format(exp_data.selected)
+                )
+
+        if style.has_video:
+            if elevator is None:
+                # Use a randomised video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'RAND',
+                )
+            elif elevator.id == 'VALVE_BLUESCREEN':
+                # This video gets a special script and handling
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'BSOD',
+                )
+            else:
+                # Use the particular selected video
+                vbsp_config.set_key(
+                    ('Elevator', 'type'),
+                    'FORCE',
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'horiz'),
+                    elevator.horiz_video,
+                )
+                vbsp_config.set_key(
+                    ('Elevator', 'vert'),
+                    elevator.vert_video,
+                )
+        else:  # No elevator video for this style
+            vbsp_config.set_key(
+                ('Elevator', 'type'),
+                'NONE',
+            )
 
 
 @pak_object('PackList', allow_mult=True, has_img=False)
@@ -1103,6 +1462,49 @@ class PackList:
             if item not in self.trigger_mats:
                 self.trigger_mats.append(item)
 
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export all the packlists."""
+
+        pack_block = Property('PackList', [])
+
+        # A list of materials which will casue a specific packlist to be used.
+        pack_triggers = Property('PackTriggers', [])
+
+        for pack in data['PackList']:  # type: PackList
+            # Build a
+            # "Pack_id"
+            # {
+            # "File" "filename"
+            # "File" "filename"
+            # }
+            # block for each packlist
+            pack_block.append(Property(
+                pack.id,
+                [
+                    Property('File', file)
+                    for file in  # type: str
+                    pack.files
+                ]
+            ))
+
+            for trigger_mat in pack.trigger_mats:
+                pack_triggers.append(
+                    Property('Material', [
+                        Property('Texture', trigger_mat),
+                        Property('PackList', pack.id),
+                    ])
+                )
+
+        # Only add packtriggers if there's actually a value
+        if pack_triggers.value:
+            exp_data.vbsp_conf.append(pack_triggers)
+
+        LOGGER.info('Writing packing list!')
+        with open(exp_data.game.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
+            for line in pack_block.export():
+                pack_file.write(line)
+
 
 @pak_object('EditorSound', has_img=False)
 class EditorSound:
@@ -1123,6 +1525,14 @@ class EditorSound:
         return cls(
             snd_name=data.id,
             data=data.info.find_key('keys', [])
+        )
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export EditorSound objects."""
+        # Just command the game to do the writing.
+        exp_data.game.add_editor_sounds(
+            data['EditorSound']
         )
 
 
@@ -1204,6 +1614,13 @@ class BrushTemplate:
             data.id,
             file,
         )
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Write the template VMF file."""
+        path = exp_data.game.abs_path('bin/bee2/templates.vmf')
+        with open(path, 'w') as temp_file:
+            TEMPLATE_FILE.export(temp_file)
 
 
 def desc_parse(info):

@@ -6,6 +6,7 @@ from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
+from property_parser import Property
 from utils import Vec
 import utils
 import conditions
@@ -388,6 +389,8 @@ def res_import_template_setup(res):
     else:
         force_grid = None
 
+    invert_var = res['invertVar', '']
+
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
@@ -399,6 +402,22 @@ def res_import_template_setup(res):
     else:
         replace_brush_pos = None
 
+    key_values = res.find_key("Keys", [])
+    if key_values:
+        keys = Property("", [
+            key_values,
+            res.find_key("LocalKeys", []),
+        ])
+        # Ensure we have a 'origin' keyvalue - we automatically offset that.
+        if 'origin' not in key_values:
+            key_values['origin'] = '0 0 0'
+
+        # Spawn everything as detail, so they get put into a brush
+        # entity.
+        force_type = TEMP_TYPES.detail
+    else:
+        keys = None
+
     return (
         temp_id,
         dict(replace_tex),
@@ -406,6 +425,8 @@ def res_import_template_setup(res):
         force_grid,
         force_type,
         replace_brush_pos,
+        invert_var,
+        keys,
     )
 
 
@@ -417,7 +438,8 @@ def res_import_template(inst, res):
     Options:
     - ID: The ID of the template to be inserted.
     - force: a space-seperated list of overrides. If 'white' or 'black' is
-             present, the colour of tiles will be overriden. If a tile size
+             present, the colour of tiles will be overriden. If 'invert' is
+            added, white/black tiles will be swapped. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or
             'detail' is present, the brush will be forced to that type.
@@ -427,6 +449,12 @@ def res_import_template(inst, res):
     - replaceBrush: The position of a brush to replace (0 0 0=the surface).
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal.
+    - keys/localkeys: If set, a brush entity will instead be generated with
+            these values. This overrides force world/detail. The origin is
+            set automatically.
+    - invertVar: If this fixup value is true, tile colour will be swapped to
+            the opposite of the current force option. If it is set to
+            'white' or 'black', that colour will be forced instead.
     """
     (
         temp_id,
@@ -435,6 +463,8 @@ def res_import_template(inst, res):
         force_grid,
         force_type,
         replace_brush_pos,
+        invert_var,
+        key_block,
     ) = res.value
 
     if temp_id not in TEMPLATES:
@@ -443,6 +473,16 @@ def res_import_template(inst, res):
         # We don't want an error, just quit
         LOGGER.warning('"{}" not a valid template!', temp_id)
         return
+
+    if invert_var != '':
+        invert_val = inst.fixup[invert_var].casefold()
+
+        if invert_val == 'white':
+            force_colour = conditions.MAT_TYPES.white
+        elif invert_val == 'black':
+            force_colour = conditions.MAT_TYPES.black
+        elif utils.conv_bool(invert_val):
+            force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
@@ -460,6 +500,15 @@ def res_import_template(inst, res):
         force_colour,
         force_grid,
     )
+
+    if key_block is not None:
+        conditions.set_ent_keys(temp_data.detail, inst, key_block)
+        br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
+        br_origin.localise(origin, angles)
+        temp_data.detail['origin'] = br_origin
+        # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
+        # modify it.
+        vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
 
     # This is the original brush the template is replacing. We fix overlay
     # face IDs, so this brush is replaced by the faces in the template pointing
@@ -479,9 +528,9 @@ def res_import_template(inst, res):
     new_ids = []
 
     all_brushes = temp_data.world
-    if temp_data.detail is not None:
-        for ent in temp_data.detail:
-            all_brushes.extend(ent.solids)
+    # Overlays can't be applied to entities (other than func_detail).
+    if temp_data.detail is not None and key_block is None:
+        all_brushes.extend(temp_data.detail.solids)
 
     for brush in all_brushes:  # type: VLib.Solid
         for face in brush.sides:

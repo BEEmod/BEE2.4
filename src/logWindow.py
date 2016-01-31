@@ -109,6 +109,7 @@ def set_visible(is_visible: bool):
         window.deiconify()
     else:
         window.withdraw()
+    GEN_OPTS['Debug']['show_log_win'] = utils.bool_as_int(is_visible)
 
 
 def btn_copy():
@@ -139,10 +140,11 @@ def init(start_open, log_level='info'):
     global window, log_handler, text_box, level_selector
 
     window = tk.Toplevel(TK_ROOT, name='console_win')
+    window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     window.title('Logs ' + utils.BEE_VERSION)
-    window.protocol('WM_DELETE_WINDOW', window.withdraw)
+    window.protocol('WM_DELETE_WINDOW', lambda: set_visible(False))
 
     text_box = tk.Text(
         window,
@@ -213,7 +215,7 @@ def init(start_open, log_level='info'):
         ],
         exportselection=0,
         # On Mac this defaults to being way too wide!
-        width=7 if utils.MAC else None,
+        width=15 if utils.MAC else None,
     )
     level_selector.state(['readonly'])  # Prevent directly typing in values
     level_selector.bind('<<ComboboxSelected>>', set_level)
@@ -247,7 +249,7 @@ if __name__ == '__main__':
 
         try:
             raise ValueError('An error')
-        except ValueError as e:
+        except ValueError:
             yield LOGGER.exception('Error message')
 
         yield LOGGER.warning('Post-Exception warning')
