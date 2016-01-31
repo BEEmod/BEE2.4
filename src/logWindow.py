@@ -215,7 +215,7 @@ def init(start_open, log_level='info'):
         ],
         exportselection=0,
         # On Mac this defaults to being way too wide!
-        width=7 if utils.MAC else None,
+        width=15 if utils.MAC else None,
     )
     level_selector.state(['readonly'])  # Prevent directly typing in values
     level_selector.bind('<<ComboboxSelected>>', set_level)
