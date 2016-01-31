@@ -915,6 +915,9 @@ class selWin:
         # Note - empty string should sort to the beginning!
         ordered_groups = sorted(self.grouped_items.keys())
 
+        # Hide suggestion indicator if the item's not visible.
+        self.sugg_lbl.place_forget()
+
         for group_key in ordered_groups:
             items = self.grouped_items[group_key]
             group_wid = self.group_widgets[group_key]  # type: GroupHeader
