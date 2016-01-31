@@ -1306,8 +1306,13 @@ class StyleVPK:
     These are copied into _dlc3, allowing changing the in-editor wall
     textures.
     """
-    def __init__(self, vpk_id):
+    def __init__(self, vpk_id, file_count=0):
+        """Initialise a StyleVPK object.
+
+        The file_count is the number of VPK files - 0 = just pak01_dir.
+        """
         self.id = vpk_id
+        self.file_count = file_count
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1319,15 +1324,24 @@ class StyleVPK:
         zip_file = data.zip_file  # type: ZipFile
         zip_filenames = zip_file.namelist()
 
-        for name in cls.iter_vpk_names():
+        has_files = False
+        file_count = 0
+
+        for file_count, name in enumerate(cls.iter_vpk_names()):
             src = os.path.join('vpk', vpk_name + name)
             if src not in zip_filenames:
                 break
             dest = os.path.join(dest_folder, 'pak01' + name)
             with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
                 shutil.copyfileobj(src_file, dest_file)
+            has_files = True
 
-        return cls(data.id)
+        if not has_files:
+            raise Exception(
+                'VPK object "{}" has no associated VPK files!'.format(data.id)
+            )
+
+        return cls(data.id, file_count)
 
     @staticmethod
     def iter_vpk_names():
