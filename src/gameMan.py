@@ -528,8 +528,8 @@ def find_steam_info(game_dir):
 
     This only works on Source games!
     """
-    game_id = -1
-    name = "ERR"
+    game_id = None
+    name = None
     found_name = False
     found_id = False
     for folder in os.listdir(game_dir):
@@ -541,10 +541,8 @@ def find_steam_info(game_dir):
                     if not found_id and 'steamappid' in clean_line.casefold():
                         raw_id = clean_line.casefold().replace(
                             'steamappid', '').strip()
-                        try:
-                            game_id = int(raw_id)
-                        except ValueError:
-                            pass
+                        if raw_id.isdigit():
+                            game_id = raw_id
                     elif not found_name and 'game ' in clean_line.casefold():
                         found_name = True
                         ind = clean_line.casefold().rfind('game') + 4
@@ -560,7 +558,7 @@ def save():
     for gm in all_games:
         if gm.name not in config:
             config[gm.name] = {}
-        config[gm.name]['SteamID'] = str(gm.steamID)
+        config[gm.name]['SteamID'] = gm.steamID
         config[gm.name]['Dir'] = gm.root
     config.save()
 
@@ -573,7 +571,7 @@ def load():
             try:
                 new_game = Game(
                     gm,
-                    int(config[gm]['SteamID']),
+                    config[gm]['SteamID'],
                     config[gm]['Dir'],
                 )
             except ValueError:
@@ -610,7 +608,7 @@ def add_game(_=None, refresh_menu=True):
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
-        if name == "ERR" or gm_id == -1:
+        if name is None or gm_id is None:
             messagebox.showinfo(
                 message='This does not appear to be a valid game folder!',
                 parent=TK_ROOT,
