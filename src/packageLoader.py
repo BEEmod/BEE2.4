@@ -68,9 +68,15 @@ EMPTY_VPK = bytes([
     0, 0, 1, 0, 0, 0, 0,
 ])
 
-# The last DLC released by Valve - this is the one that we overwrite with a
-# VPK file.
-OVERRIDE_DLC = 'portal2_dlc3'
+# The folder we want to copy our VPKs to.
+VPK_FOLDER = {
+    # The last DLC released by Valve - this is the one that we
+    # overwrite with a VPK file.
+    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
+
+    # This doesn't have VPK files, and is higher priority.
+    utils.STEAM_IDS['APERTURE TAG']: 'portal2',
+}
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -1361,7 +1367,10 @@ class StyleVPK:
         else:
             sel_vpk = None
 
-        dest_folder = exp_data.game.abs_path(OVERRIDE_DLC)
+        dest_folder = exp_data.game.abs_path(VPK_FOLDER.get(
+            exp_data.game.steamID,
+            'portal2_dlc3',
+        ))
         os.makedirs(dest_folder, exist_ok=True)
         # Remove existing VPKs. We want to leave other files - otherwise
         # users will end up regenerating the sound cache every time they
