@@ -1367,22 +1367,7 @@ class StyleVPK:
         else:
             sel_vpk = None
 
-        dest_folder = exp_data.game.abs_path(VPK_FOLDER.get(
-            exp_data.game.steamID,
-            'portal2_dlc3',
-        ))
-        os.makedirs(dest_folder, exist_ok=True)
-        # Remove existing VPKs. We want to leave other files - otherwise
-        # users will end up regenerating the sound cache every time they
-        # export.
-        try:
-            for file in os.listdir(dest_folder):
-                if file[:6] == 'pak01_':
-                    os.remove(os.path.join(dest_folder, file))
-        except PermissionError:
-            # The player might have Portal 2 open. Abort changing the VPK.
-            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 open?")
-            return
+        dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
 
         if sel_vpk is None:
             # Write a blank VPK file.
@@ -1398,7 +1383,6 @@ class StyleVPK:
                     os.path.join(dest_folder, 'pak01' + suffix),
                 )
 
-
     @staticmethod
     def iter_vpk_names():
         """Iterate over VPK filename suffixes.
@@ -1409,6 +1393,32 @@ class StyleVPK:
         yield '_dir.vpk'
         for i in range(999):
             yield '_{:03}.vpk'.format(i)
+
+    @staticmethod
+    def clear_vpk_files(game):
+        """Remove existing VPKs files from a game.
+
+         We want to leave other files - otherwise users will end up
+         regenerating the sound cache every time they export.
+
+        This returns the path to the game folder.
+        """
+        dest_folder = game.abs_path(VPK_FOLDER.get(
+            game.steamID,
+            'portal2_dlc3',
+        ))
+
+        os.makedirs(dest_folder, exist_ok=True)
+        try:
+            for file in os.listdir(dest_folder):
+                if file[:6] == 'pak01_':
+                    os.remove(os.path.join(dest_folder, file))
+        except PermissionError:
+            # The player might have Portal 2 open. Abort changing the VPK.
+            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 open?")
+            return
+
+        return dest_folder
 
 
 @pak_object('Elevator')
