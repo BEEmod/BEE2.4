@@ -1362,14 +1362,18 @@ class StyleVPK:
             sel_vpk = None
 
         dest_folder = exp_data.game.abs_path(OVERRIDE_DLC)
+        os.makedirs(dest_folder, exist_ok=True)
         # Remove existing VPKs. We want to leave other files - otherwise
         # users will end up regenerating the sound cache every time they
         # export.
-
-        os.makedirs(dest_folder, exist_ok=True)
-        for file in os.listdir(dest_folder):
-            if file[:6] == 'pak01_':
-                os.remove(os.path.join(dest_folder, file))
+        try:
+            for file in os.listdir(dest_folder):
+                if file[:6] == 'pak01_':
+                    os.remove(os.path.join(dest_folder, file))
+        except PermissionError:
+            # The player might have Portal 2 open. Abort changing the VPK.
+            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 open?")
+            return
 
         if sel_vpk is None:
             # Write a blank VPK file.
