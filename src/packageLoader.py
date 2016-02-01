@@ -1369,10 +1369,28 @@ class StyleVPK:
 
         dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
 
+        if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
+            # In Portal 2, we make a dlc3 folder - this changes priorities,
+            # so the soundcache will be regenerated. Just copy the old one over.
+            sound_cache = os.path.join(
+                dest_folder, 'maps', 'soundcache', '_master.cache'
+            )
+            LOGGER.info('Sound cache: {}', sound_cache)
+            if not os.path.isfile(sound_cache):
+                LOGGER.info('Copying over soundcache file for DLC3..')
+                os.makedirs(os.path.dirname(sound_cache), exist_ok=True)
+                shutil.copy(
+                    exp_data.game.abs_path(
+                        'portal2_dlc2/maps/soundcache/_master.cache',
+                    ),
+                    sound_cache,
+                )
+
         if sel_vpk is None:
             # Write a blank VPK file.
             with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
                 f.write(EMPTY_VPK)
+            LOGGER.info('Written empty VPK to "{}"', dest_folder)
         else:
             src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
             for index, suffix in zip(
@@ -1382,6 +1400,12 @@ class StyleVPK:
                     os.path.join(src_folder, 'pak01' + suffix),
                     os.path.join(dest_folder, 'pak01' + suffix),
                 )
+            LOGGER.info(
+                'Written {} VPK{} to "{}"',
+                sel_vpk.file_count,
+                '' if sel_vpk.file_count == 1 else 's',
+                dest_folder,
+            )
 
     @staticmethod
     def iter_vpk_names():
