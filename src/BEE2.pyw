@@ -1,8 +1,15 @@
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
+import os
 import sys
 if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        os.chdir(os.path.dirname(sys.argv[0]))
+    
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
@@ -66,14 +73,6 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        import os
-        import sys
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
-
     loadScreen.main_loader.set_length('UI', 14)
     loadScreen.main_loader.show()
 

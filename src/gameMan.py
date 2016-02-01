@@ -328,6 +328,9 @@ class Game:
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
 
+        # Make the folders we need to copy files to, if desired.
+        os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
+
         # Start off with the style's data.
         editoritems, vbsp_config = style.export()
         export_screen.step('EXP')
