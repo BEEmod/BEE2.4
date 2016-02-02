@@ -1419,7 +1419,7 @@ class StyleVPK:
             yield '_{:03}.vpk'.format(i)
 
     @staticmethod
-    def clear_vpk_files(game):
+    def clear_vpk_files(game) -> str:
         """Remove existing VPKs files from a game.
 
          We want to leave other files - otherwise users will end up
@@ -1440,7 +1440,6 @@ class StyleVPK:
         except PermissionError:
             # The player might have Portal 2 open. Abort changing the VPK.
             LOGGER.warning("Couldn't replace VPK files. Is Portal 2 open?")
-            return
 
         return dest_folder
 
