@@ -3062,6 +3062,10 @@ def change_func_brush():
                     VMF.by_class['func_instance'] &
                     VMF.by_target[targ]
                     ):
+
+                if 'connectioncount' not in ins.fixup:
+                    continue  # It's a static-style overlay instance, ignore.
+
                 if make_static_pan(ins, brush_type, is_bullseye):
                     # delete the brush, we don't want it if we made a
                     # static one
@@ -3076,6 +3080,9 @@ def change_func_brush():
                     # Add the attachment name to the parent, so it
                     # automatically sets the attachment point for us.
                     brush['parentname'] += ',panel_attach'
+
+                break # Don't run twice - there might be a second matching
+                # overlay instance!
 
     if get_opt('grating_pack') and settings['has_attr']['grating']:
         TO_PACK.add(get_opt('grating_pack').casefold())
