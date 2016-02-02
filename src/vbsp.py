@@ -1414,6 +1414,7 @@ def get_map_info():
     global GAME_MODE, IS_PREVIEW
 
     inst_files = set()  # Get a set of every instance in the map.
+    file_coop_entry = instanceLocs.resolve('[coopEntry]')
     file_coop_exit = instanceLocs.resolve('[coopExit]')
     file_sp_exit = instanceLocs.resolve('[spExit]')
     file_sp_entry = instanceLocs.resolve('[spEntry]')
@@ -1421,6 +1422,7 @@ def get_map_info():
     file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
     file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
     file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
+    file_coop_door_frame = instanceLocs.resolve('[door_frame_coop]')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1429,14 +1431,6 @@ def get_map_info():
         # Make conditions set appropriately
         LOGGER.info('Forcing elevator spawn!')
         IS_PREVIEW = False
-
-    no_player_start_inst = (
-        # All the instances that have the no_player start value
-        file_sp_entry +
-        file_coop_corr +
-        file_sp_entry_corr +
-        file_sp_exit_corr
-    )
 
     # Door frames use the same instance for both the entry and exit doors,
     # and it'd be useful to disinguish between them. Add an instvar to help.
@@ -1447,6 +1441,14 @@ def get_map_info():
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
+
+    # The type of corridor - used to replace doorframes, if needed.
+    # 0-7 = normal, 'up'/'down' = vert up/down
+    entry_corr_type = exit_corr_type = 0
+    entry_corr_name = exit_corr_name = ""
+
+    # The door frame instances
+    entry_door_frame = exit_door_frame = None
 
     for item in VMF.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
@@ -1462,49 +1464,69 @@ def get_map_info():
 
         file = item['file'].casefold()
         LOGGER.debug('File:', file)
-        if file in no_player_start_inst:
-            if elev_override:
-                item.fixup['no_player_start'] = '1'
-            else:
-                IS_PREVIEW = not utils.conv_bool(item.fixup['no_player_start'])
         if file in file_sp_exit_corr:
             GAME_MODE = 'SP'
-            exit_origin = Vec.from_str(item['origin'])
-            if override_sp_exit == 0:
-                LOGGER.info(
-                    'Using random exit ({})',
-                    str(file_sp_exit_corr.index(file) + 1)
-                )
-            else:
-                LOGGER.info('Setting exit to {}', override_sp_exit)
-                item['file'] = file_sp_exit_corr[override_sp_exit-1]
+            # In SP mode the same instance is used for entry and exit door
+            # frames. Use the position of the item to distinguish the two.
+            # We need .rotate() since they could be in the same block.
+            exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            exit_origin += Vec.from_str(item['origin'])
+            exit_corr_name = item['targetname']
+            exit_corr_type = mod_entryexit(
+                item,
+                'spExitCorr',
+                'SP Exit',
+                elev_override,
+                override_sp_exit,
+                is_exit=True,
+            )
         elif file in file_sp_entry_corr:
             GAME_MODE = 'SP'
-            entry_origin = Vec.from_str(item['origin'])
-            if override_sp_entry == 0:
-                LOGGER.info(
-                    'Using random entry ({})',
-                    str(file_sp_entry_corr.index(file) + 1),
-                )
-            else:
-                LOGGER.info('Setting entry to {}', override_sp_entry)
-                item['file'] = file_sp_entry_corr[override_sp_entry-1]
+            entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
+            entry_origin += Vec.from_str(item['origin'])
+            entry_corr_name = item['targetname']
+            entry_corr_type = mod_entryexit(
+                item,
+                'spEntryCorr',
+                'SP Entry',
+                elev_override,
+                override_sp_entry,
+            )
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
-            if override_coop_corr == 0:
-                LOGGER.info(
-                    'Using random exit ({})',
-                    str(file_coop_corr.index(file) + 1),
-                )
-            else:
-                LOGGER.info('Setting coop exit to {}', override_coop_corr)
-                item['file'] = file_coop_corr[override_coop_corr-1]
+            exit_corr_name = item['targetname']
+            exit_corr_type = mod_entryexit(
+                item,
+                'coopCorr',
+                'Coop Exit',
+                elev_override,
+                override_coop_corr,
+                is_exit=True,
+            )
+        elif file in file_coop_entry:
+            GAME_MODE = 'COOP'
+            entry_corr_name = item['targetname']
+            mod_entryexit(
+                item,
+                'coopCorr',
+                'Coop Spawn',
+                elev_override,
+            )
         elif file in file_coop_exit:
             GAME_MODE = 'COOP'
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
         elif file in file_sp_exit or file in file_sp_entry:
             GAME_MODE = 'SP'
+            if elev_override:
+                item.fixup['no_player_start'] = '1'
         elif file in file_sp_door_frame:
+            # We need to inspect origins to determine the entry door type.
             door_frames.append(item)
+        elif file in file_coop_door_frame:
+            # The coop frame must be the exit door...
+            exit_door_frame = item
+
         inst_files.add(item['file'])
 
     LOGGER.info("Game Mode: " + GAME_MODE)
@@ -1523,14 +1545,138 @@ def get_map_info():
     # Now check the door frames, to allow distinguishing between
     # the entry and exit frames.
     for door_frame in door_frames:
-        origin = Vec.from_str(door_frame['origin'])
-        if origin.x == entry_origin.x and origin.y == entry_origin.y:
+        origin = Vec(0, 0, -64).rotate_by_str(door_frame['angles'])
+        # Corridors are placed 64 units below doorframes - reverse that.
+        origin.z -= 64
+        origin += Vec.from_str(door_frame['origin'])
+        if origin == entry_origin:
             door_frame.fixup['door_type'] = 'entry'
-        elif origin.x == exit_origin.x and origin.y == exit_origin.y:
+            entry_door_frame = door_frame
+        elif origin == exit_origin:
             door_frame.fixup['door_type'] = 'exit'
+            exit_door_frame = door_frame
+
+    if GAME_MODE == 'COOP':
+        mod_doorframe(
+            exit_door_frame,
+            'ITEM_COOP_EXIT_DOOR',
+            exit_corr_type,
+            exit_corr_name,
+        )
+    else:
+        mod_doorframe(
+            entry_door_frame,
+            'ITEM_ENTRY_DOOR',
+            entry_corr_type,
+            entry_corr_name,
+        )
+        mod_doorframe(
+            exit_door_frame,
+            'ITEM_EXIT_DOOR',
+            exit_corr_type,
+            exit_corr_name,
+        )
 
     # Return the set of all instances in the map.
     return inst_files
+
+
+def mod_entryexit(
+        inst: VLib.Entity,
+        resolve_name,
+        pretty_name,
+        elev_override=False,
+        override_corr=-1,
+        is_exit=False,
+    ):
+    """Modify this entrance or exit.
+
+    This sets IS_PREVIEW, switches to vertical variants, and chooses a
+    particular corridor number.
+    This returns the corridor used - 1-7, 'up', or 'down'
+    """
+    global IS_PREVIEW
+    normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+
+    if is_exit:
+        # Swap the normal direction, so the up/down names match the direction
+        # of travel.
+        normal = -normal
+
+    vert_up = instanceLocs.get_special_inst(resolve_name + 'Up')
+    vert_down = instanceLocs.get_special_inst(resolve_name + 'Down')
+    files = instanceLocs.get_special_inst(resolve_name)
+
+    # The coop spawn instance doesn't have no_player_start..
+    if 'no_player_start' in inst.fixup:
+        if elev_override:
+            inst.fixup['no_player_start'] = '1'
+        else:
+            IS_PREVIEW = not utils.conv_bool(inst.fixup['no_player_start'])
+
+    if normal == (0, 0, 1) and vert_up is not None:
+        LOGGER.info(
+            'Using upward variant for {}',
+            pretty_name,
+        )
+        inst['file'] = vert_up
+        return 'vert_up'
+
+    if normal == (0, 0, -1) and vert_down is not None:
+        LOGGER.info(
+            'Using downward variant for {}',
+            pretty_name,
+        )
+        inst['file'] = vert_down
+        return 'vert_down'
+
+    if override_corr == -1:
+        return None  # No extra variants!
+
+    if override_corr == 0:
+        index = files.index(inst['file'].casefold())
+        LOGGER.info(
+            'Using random {} ({})',
+            pretty_name,
+            str(index + 1),
+        )
+        return index
+    else:
+        LOGGER.info(
+            'Setting {} to {}',
+            pretty_name,
+            override_corr,
+        )
+        inst['file'] = files[override_corr - 1]
+        return override_corr - 1
+
+
+def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
+    """Change the instance used by door frames, if desired.
+
+    corr_id is the item ID of the dooor, and corr_type is the
+    return value of mod_entryexit(). corr_name is the name of the corridor.
+    """
+    if inst is None:
+        return  # This doorframe doesn't exist...
+
+    is_white = inst['file'].casefold() in instanceLocs.get_special_inst(
+        'white_frame',
+    )
+
+    inst['targetname'] = corr_name
+
+    replace = instanceLocs.resolve(
+        # Allow using a custom instance path to replace corridor types:
+        # "frame_1_white", "frame_vert_down_white"
+        '<{id}:bee2_frame_{type}_{color}>'.format(
+            id=corr_id,
+            type=corr_type,
+            color='white' if is_white else 'black',
+        )
+    )
+    if replace:
+        inst['file'] = replace[0]
 
 
 def calc_rand_seed():
@@ -1620,7 +1766,6 @@ def make_bottomless_pit(solids, max_height):
         else:
             sky_camera['fogblend'] = '0'
             sky_camera['use_angles'] = '0'
-
 
     if settings['pit']['skybox_ceil'] != '':
         # We dynamically add the ceiling so it resizes to match the map,
