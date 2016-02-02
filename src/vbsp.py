@@ -3146,13 +3146,24 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     # We use a template for the surface, so it can use correct textures.
     if angle == '00':
         # Special case: flat panels use different templates
-        world, detail, overlays = conditions.import_template(
+        temp_data = conditions.import_template(
             get_opt('static_pan_temp_flat'),
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
             force_type=conditions.TEMP_TYPES.detail,
         )
+        conditions.retexture_template(
+            temp_data,
+            origin=Vec.from_str(ent['origin']),
+            force_colour=(
+                conditions.MAT_TYPES.white
+                if pan_type == 'white' else
+                conditions.MAT_TYPES.black
+            ),
+            use_bullseye=is_bullseye,
+        )
+
         # Some styles have 8-unit thick flat panels, others use 4-units.
         # Put the target halfway.
         faith_targ_pos = Vec(0, 0, -64 + 6).rotate_by_str(ent['angles'])
