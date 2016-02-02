@@ -1367,7 +1367,10 @@ class StyleVPK:
         else:
             sel_vpk = None
 
-        dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
+        try:
+            dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
+        except PermissionError:
+            return  # We can't edit the VPK files - P2 is open..
 
         if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
             # In Portal 2, we make a dlc3 folder - this changes priorities,
@@ -1439,7 +1442,9 @@ class StyleVPK:
                     os.remove(os.path.join(dest_folder, file))
         except PermissionError:
             # The player might have Portal 2 open. Abort changing the VPK.
-            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 open?")
+            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 "
+                           "or Hammer open?")
+            raise
 
         return dest_folder
 

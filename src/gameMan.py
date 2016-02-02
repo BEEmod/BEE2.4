@@ -287,7 +287,10 @@ class Game:
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
-        packageLoader.StyleVPK.clear_vpk_files(self)
+        try:
+            packageLoader.StyleVPK.clear_vpk_files(self)
+        except PermissionError:
+            pass
 
     def export(
             self,
