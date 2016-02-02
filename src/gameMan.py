@@ -28,7 +28,7 @@ LOGGER = utils.getLogger(__name__)
 all_games = []
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
-game_menu = None
+game_menu = None  # type: Menu
 
 trans_data = {}
 
@@ -123,7 +123,7 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id, folder):
+    def __init__(self, name, steam_id: str, folder):
         self.name = name
         self.steamID = steam_id
         self.root = folder
@@ -684,7 +684,7 @@ def remove_game(_=None):
         add_menu_opts(game_menu)
 
 
-def add_menu_opts(menu, callback=None):
+def add_menu_opts(menu: Menu, callback=None):
     """Add the various games to the menu."""
     global selectedGame_radio, setgame_callback
     if callback is not None:
