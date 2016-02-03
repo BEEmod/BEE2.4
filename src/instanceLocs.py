@@ -5,6 +5,7 @@ multiple styles.
 """
 from collections import defaultdict
 from functools import lru_cache
+import logging
 
 from property_parser import Property
 import utils
@@ -193,7 +194,7 @@ def load_conf(prop_block: Property):
         }
 
     INST_SPECIAL = {
-        key.casefold(): resolve(val_string)
+        key.casefold(): resolve(val_string, silent=True)
         for key, val_string in
         SPECIAL_INST.items()
     }
@@ -230,24 +231,24 @@ def load_conf(prop_block: Property):
 
     # Laser items have the offset and centered item versions.
     INST_SPECIAL['lasercatcher'] = (
-        resolve('<ITEM_LASER_CATCHER_CENTER>') +
-        resolve('<ITEM_LASER_CATCHER_OFFSET>')
+        resolve('<ITEM_LASER_CATCHER_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_CATCHER_OFFSET>', silent=True)
     )
 
     INST_SPECIAL['laseremitter'] = (
-        resolve('<ITEM_LASER_EMITTER_CENTER>') +
-        resolve('<ITEM_LASER_EMITTER_OFFSET>')
+        resolve('<ITEM_LASER_EMITTER_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_EMITTER_OFFSET>', silent=True)
     )
 
     INST_SPECIAL['laserrelay'] = (
-        resolve('<ITEM_LASER_RELAY_CENTER>') +
-        resolve('<ITEM_LASER_RELAY_OFFSET>')
+        resolve('<ITEM_LASER_RELAY_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
     )
 
+    LOGGER.warning('None in vals: {}', None in INST_SPECIAL.values())
 
-# Cache the return values, since they're constant.
-@lru_cache()
-def resolve(path) -> List[str]:
+
+def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
@@ -262,6 +263,25 @@ def resolve(path) -> List[str]:
     if it's invalid. Incorrect [] will raise an exception (since these are
     hardcoded).
     When using <> values, "" filenames will be skipped.
+
+    If silent is True, no error messages will be output (for use with hardcoded
+    names).
+    """
+    if silent:
+        # Ignore messages < ERROR (warning and info)
+        LOGGER.setLevel(logging.ERROR)
+        val = _resolve(path)
+        LOGGER.setLevel(logging.NOTSET)
+        return val
+    else:
+        return _resolve(path)
+
+
+# Cache the return values, since they're constant.
+@lru_cache()
+def _resolve(path):
+    """Use a secondary function to allow caching values, while ignoring the
+    'silent' parameter.
     """
 
     if path.startswith('<') and path.endswith('>'):
@@ -286,8 +306,13 @@ def resolve(path) -> List[str]:
                         out.append(cust_item_vals[folded_value[5:]])
                         continue
                     except KeyError:
-                        # Ignore the error - these values are used in the code
-                        # for certain features as well.
+                        LOGGER.warning(
+                            'Invalid custom instance name - "{}" for '
+                            '<{}> (Valid: {!r})',
+                            folded_value[5:],
+                            item,
+                            cust_item_vals,
+                        )
                         return []
 
                 ind = SUBITEMS.get(folded_value, None)
@@ -366,8 +391,6 @@ def get_special_inst(name: str):
         inst = INST_SPECIAL[name.casefold()]
     except KeyError:
         raise KeyError("Invalid special instance name! ({})".format(name))
-
-    LOGGER.info('Key: {!r}, Value: {}', name, inst)
 
     # The number you'll get is fixed, so it's fine if we return different
     # types - unpack single instances, since that's what you want most of the

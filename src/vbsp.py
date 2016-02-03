@@ -1377,7 +1377,7 @@ def ap_tag_modifications(_):
             angles='0 0 0'
         )
 
-    transition_ents = instanceLocs.resolve('[transitionents]')
+    transition_ents = instanceLocs.get_special_inst('transitionents')
     for inst in VMF.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue
@@ -1414,15 +1414,18 @@ def get_map_info():
     global GAME_MODE, IS_PREVIEW
 
     inst_files = set()  # Get a set of every instance in the map.
-    file_coop_entry = instanceLocs.resolve('[coopEntry]')
-    file_coop_exit = instanceLocs.resolve('[coopExit]')
-    file_sp_exit = instanceLocs.resolve('[spExit]')
-    file_sp_entry = instanceLocs.resolve('[spEntry]')
-    file_coop_corr = instanceLocs.resolve('[coopCorr]')
-    file_sp_entry_corr = instanceLocs.resolve('[spEntryCorr]')
-    file_sp_exit_corr = instanceLocs.resolve('[spExitCorr]')
-    file_sp_door_frame = instanceLocs.resolve('[door_frame_sp]')
-    file_coop_door_frame = instanceLocs.resolve('[door_frame_coop]')
+
+    # If the values are None / not present, use an empty tuple to disable
+    # that IF.
+    file_coop_entry = instanceLocs.get_special_inst('coopEntry') or ()
+    file_coop_exit = instanceLocs.get_special_inst('coopExit') or ()
+    file_sp_exit = instanceLocs.get_special_inst('spExit') or ()
+    file_sp_entry = instanceLocs.get_special_inst('spEntry') or ()
+    file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
+    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
+    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
+    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp') or ()
+    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop') or ()
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1666,11 +1669,11 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
 
     inst['targetname'] = corr_name
 
-    replace = instanceLocs.resolve(
+    replace = instanceLocs.get_cust_inst(
         # Allow using a custom instance path to replace corridor types:
         # "frame_1_white", "frame_vert_down_white"
-        '<{id}:bee2_frame_{type}_{color}>'.format(
-            id=corr_id,
+        corr_id,
+        'frame_{type}_{color}'.format(
             type=corr_type,
             color='white' if is_white else 'black',
         )
