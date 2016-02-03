@@ -62,15 +62,10 @@ images/cache/
 inst_cache/
 source_cache/
 cache/
+vpk_cache/
 
 # The config files automatically regenerate with the defaults.
-config/item_configs.cfg
-config/config.cfg
-config/games.cfg
-config/compile.cfg
-config/packages.cfg
-config/voice/
-config/screenshot.jpg
+config/
 
 # Logs
 BEE2-error.log*

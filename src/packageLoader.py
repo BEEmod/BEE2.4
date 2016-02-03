@@ -9,7 +9,7 @@ import os.path
 import shutil
 
 from property_parser import Property, NoKeyError
-from FakeZip import FakeZip, zip_names
+from FakeZip import FakeZip, zip_names, zip_open_bin
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
@@ -59,6 +59,24 @@ CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
+
+# The binary data comprising a blank VPK file.
+EMPTY_VPK = bytes([
+    52, 18, 170, 85,  # VPK identifier
+    1,  # Version 1
+    0,  # 0 bytes of directory info
+    0, 0, 1, 0, 0, 0, 0,
+])
+
+# The folder we want to copy our VPKs to.
+VPK_FOLDER = {
+    # The last DLC released by Valve - this is the one that we
+    # overwrite with a VPK file.
+    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
+
+    # This doesn't have VPK files, and is higher priority.
+    utils.STEAM_IDS['APERTURE TAG']: 'portal2',
+}
 
 
 def pak_object(name, allow_mult=False, has_img=True):
@@ -211,6 +229,8 @@ def load_packages(
                     # Add slash to the end to indicate it's a folder.
         )
         sys.exit('No Packages Directory!')
+
+    shutil.rmtree('../vpk_cache/', ignore_errors=True)
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -587,6 +607,7 @@ class Style:
             base_style=None,
             suggested=None,
             has_video=True,
+            vpk_name='',
             corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
@@ -596,6 +617,7 @@ class Style:
         self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
+        self.vpk_name = vpk_name
         self.corridor_names = {
             'sp_entry': corridor_names.get('sp_entry', Property('', [])),
             'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
@@ -613,6 +635,7 @@ class Style:
         selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = utils.conv_bool(info['has_video', '1'])
+        vpk_name = info['vpk_name', ''].casefold()
 
         sugg = info.find_key('suggested', [])
         sugg = (
@@ -657,6 +680,7 @@ class Style:
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
+            vpk_name=vpk_name
             )
 
     def add_over(self, override: 'Style'):
@@ -1283,6 +1307,146 @@ class StyleVar:
             for key, val in
             exp_data.selected.items()
         ]))
+
+
+@pak_object('StyleVPK')
+class StyleVPK:
+    """A set of VPK files used for styles.
+
+    These are copied into _dlc3, allowing changing the in-editor wall
+    textures.
+    """
+    def __init__(self, vpk_id, file_count=0):
+        """Initialise a StyleVPK object.
+
+        The file_count is the number of VPK files - 0 = just pak01_dir.
+        """
+        self.id = vpk_id
+        self.file_count = file_count
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        vpk_name = data.info['filename']
+        dest_folder = os.path.join('../vpk_cache', data.id.casefold())
+
+        os.makedirs(dest_folder, exist_ok=True)
+
+        zip_file = data.zip_file  # type: ZipFile
+        zip_filenames = zip_file.namelist()
+
+        has_files = False
+        file_count = 0
+
+        for file_count, name in enumerate(cls.iter_vpk_names()):
+            src = os.path.join('vpk', vpk_name + name)
+            if src not in zip_filenames:
+                break
+            dest = os.path.join(dest_folder, 'pak01' + name)
+            with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
+                shutil.copyfileobj(src_file, dest_file)
+            has_files = True
+
+        if not has_files:
+            raise Exception(
+                'VPK object "{}" has no associated VPK files!'.format(data.id)
+            )
+
+        return cls(data.id, file_count)
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        sel_vpk = exp_data.selected_style.vpk_name  # type: Style
+
+        if sel_vpk:
+            for vpk in data['StyleVPK']:  # type: StyleVPK
+                if vpk.id.casefold() == sel_vpk:
+                    sel_vpk = vpk
+                    break
+            else:
+                sel_vpk = None
+        else:
+            sel_vpk = None
+
+        try:
+            dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
+        except PermissionError:
+            return  # We can't edit the VPK files - P2 is open..
+
+        if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
+            # In Portal 2, we make a dlc3 folder - this changes priorities,
+            # so the soundcache will be regenerated. Just copy the old one over.
+            sound_cache = os.path.join(
+                dest_folder, 'maps', 'soundcache', '_master.cache'
+            )
+            LOGGER.info('Sound cache: {}', sound_cache)
+            if not os.path.isfile(sound_cache):
+                LOGGER.info('Copying over soundcache file for DLC3..')
+                os.makedirs(os.path.dirname(sound_cache), exist_ok=True)
+                shutil.copy(
+                    exp_data.game.abs_path(
+                        'portal2_dlc2/maps/soundcache/_master.cache',
+                    ),
+                    sound_cache,
+                )
+
+        if sel_vpk is None:
+            # Write a blank VPK file.
+            with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
+                f.write(EMPTY_VPK)
+            LOGGER.info('Written empty VPK to "{}"', dest_folder)
+        else:
+            src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
+            for index, suffix in zip(
+                    range(sel_vpk.file_count),  # Limit to the number of files
+                    sel_vpk.iter_vpk_names()):
+                shutil.copy(
+                    os.path.join(src_folder, 'pak01' + suffix),
+                    os.path.join(dest_folder, 'pak01' + suffix),
+                )
+            LOGGER.info(
+                'Written {} VPK{} to "{}"',
+                sel_vpk.file_count,
+                '' if sel_vpk.file_count == 1 else 's',
+                dest_folder,
+            )
+
+    @staticmethod
+    def iter_vpk_names():
+        """Iterate over VPK filename suffixes.
+
+        The first is '_dir.vpk', then '_000.vpk' with increasing
+        numbers.
+        """
+        yield '_dir.vpk'
+        for i in range(999):
+            yield '_{:03}.vpk'.format(i)
+
+    @staticmethod
+    def clear_vpk_files(game) -> str:
+        """Remove existing VPKs files from a game.
+
+         We want to leave other files - otherwise users will end up
+         regenerating the sound cache every time they export.
+
+        This returns the path to the game folder.
+        """
+        dest_folder = game.abs_path(VPK_FOLDER.get(
+            game.steamID,
+            'portal2_dlc3',
+        ))
+
+        os.makedirs(dest_folder, exist_ok=True)
+        try:
+            for file in os.listdir(dest_folder):
+                if file[:6] == 'pak01_':
+                    os.remove(os.path.join(dest_folder, file))
+        except PermissionError:
+            # The player might have Portal 2 open. Abort changing the VPK.
+            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 "
+                           "or Hammer open?")
+            raise
+
+        return dest_folder
 
 
 @pak_object('Elevator')
