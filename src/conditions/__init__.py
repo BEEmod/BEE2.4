@@ -13,8 +13,8 @@ import vmfLib as VLib
 import utils
 
 from typing import (
-    Optional,
-    Dict, List, Tuple, NamedTuple
+    Optional, Callable, Any,
+    Dict, List, Tuple, NamedTuple,
 )
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
@@ -395,7 +395,7 @@ def meta_cond(priority=0, only_once=True):
 
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
-    def x(func):
+    def x(func: Callable[[VLib.Entity, Property], bool]):
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
@@ -408,7 +408,7 @@ def make_flag(orig_name, *aliases):
 
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
-    def x(func):
+    def x(func: Callable[[VLib.Entity, Property], Any]):
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
@@ -421,7 +421,7 @@ def make_result(orig_name, *aliases):
 
 def make_result_setup(*names):
     """Decorator to do setup for this result."""
-    def x(func):
+    def x(func: Callable[[Property], Any]):
         for name in names:
             RESULT_SETUP[name.casefold()] = func
         return func
@@ -957,6 +957,7 @@ def import_template(
         detail_ent.solids = new_detail
     else:
         detail_ent = None
+        new_detail = []
 
     # Don't let these get retextured normally - that should be
     # done by retexture_template(), if at all!
@@ -1524,13 +1525,13 @@ def make_static_pist(ent, res):
 def res_goo_debris(_, res):
     """Add random instances to goo squares.
 
-    Parameters:
+    Options:
         - file: The filename for the instance. The variant files should be
             suffixed with '_1.vmf', '_2.vmf', etc.
         - space: the number of border squares which must be filled with goo
                  for a square to be eligable - defaults to 1.
         - weight, number: see the 'Variant' result, a set of weights for the
-                 options
+                options
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.
     """
@@ -1550,7 +1551,7 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = utils.conv_int(res['chance', '30'], 30)/100
+    chance = utils.conv_int(res['chance', '30'], 30) / 100
     file = res['file']
     offset = utils.conv_int(res['offset', '0'], 0)
 

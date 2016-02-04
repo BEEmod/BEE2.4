@@ -924,7 +924,7 @@ class Solid:
             bbox_min.min(side_min)
         return bbox_min, bbox_max
 
-    def get_origin(self, bbox_min=None, bbox_max=None) -> Vec:
+    def get_origin(self, bbox_min: Vec=None, bbox_max: Vec=None) -> Vec:
         """Calculates a vector representing the exact center of this brush."""
         if bbox_min is None or bbox_max is None:
             bbox_min, bbox_max = self.get_bbox()

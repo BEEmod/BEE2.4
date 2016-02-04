@@ -453,7 +453,7 @@ class Property:
                 slice,
                 Tuple[Union[str, int, slice], Union[_Prop_Value, Any]],
             ],
-            ):
+            ) -> str:
         """Allow indexing the children directly.
 
         - If given an index or slice, it will search by position.
