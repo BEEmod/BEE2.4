@@ -434,10 +434,14 @@ class Game:
 
         LOGGER.info('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
+            src_path = os.path.join('../compiler', file)
+            if not os.path.isfile(src_path):
+                continue
+
             LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
             try:
                 shutil.copy(
-                    os.path.join('../compiler', file),
+                    src_path,
                     self.abs_path('bin/')
                 )
             except PermissionError:
