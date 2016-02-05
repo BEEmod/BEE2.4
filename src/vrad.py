@@ -30,16 +30,23 @@ RES_ROOT = [
 ]
 
 GAME_FOLDER = {
-    # The game's root folder, where screenshots are saved/
+    # The game's root folder, where screenshots are saved
     utils.STEAM_IDS['PORTAL2']: 'portal2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }
 
 # Files that VBSP may generate, that we want to insert into the packfile.
-# They are all placed in bee2/inject/.
+# They are all found in bee2/inject/.
 INJECT_FILES = {
-    'response_data.nut': 'scripts/vscripts/BEE2/coop_response_data.nut'
+    # Defines choreo lines used on coop death, taunts, etc.
+    'response_data.nut': 'scripts/vscripts/BEE2/coop_response_data.nut',
+
+    # The list of soundscripts that the game loads.
+    'soundscript_manifest.txt': 'scripts/game_sounds_manifest.txt',
+
+    # A generated soundscript for the current music.
+    'music_script.txt': 'scripts/BEE2_generated_music.txt'
 }
 
 
@@ -111,6 +118,48 @@ def pack_file(zipfile: ZipFile, filename):
         LOGGER.warning('"bee2/' + filename + '" not found!')
 
 
+def gen_sound_manifest(additional):
+    """Generate a new game_sounds_manifest.txt file.
+
+    This includes all the current scripts defined, plus any custom ones.
+    """
+    orig_manifest = os.path.join(
+        '..',
+        GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
+        'scripts',
+        'game_sounds_manifest.txt',
+    )
+    try:
+        with open(orig_manifest) as f:
+            props = Property.parse(f, orig_manifest).find_key(
+                'game_sounds_manifest', [],
+            )
+    except FileNotFoundError: # Assume no sounds
+        props = Property('game_sounds_manifest', [])
+
+    scripts = [prop.value for prop in props.find_all('precache_file')]
+
+    for script in additional:
+        scripts.append(script)
+
+    # Special case - the injected generated music script
+    if os.path.exists('bee2/inject/music_script.txt'):
+        scripts.append('scripts/BEE2_generated_music.txt')
+
+    # Build and unbuild it to strip other things out - Valve includes a bogus
+    # 'new_sound_scripts_must_go_below_here' entry..
+    new_props = Property('game_sounds_manifest', [
+        Property('precache_file', file)
+        for file in scripts
+    ])
+
+    inject_loc = os.path.join('bee2', 'inject', 'soundscript_manifest.txt')
+    with open(inject_loc, 'w') as f:
+        for line in new_props.export():
+            f.write(line)
+    LOGGER.info('Written new soundscripts_manifest..')
+
+
 def inject_files(zipfile: ZipFile):
     """Inject certain files into the packlist,  if they exist."""
     for filename, arcname in INJECT_FILES.items():
@@ -121,8 +170,15 @@ def inject_files(zipfile: ZipFile):
 
 
 def pack_content(path):
-    """Pack any custom content into the map."""
-    files = set()
+    """Pack any custom content into the map.
+
+    Filelist format: "[control char]filename[\t packname]"
+    Filename is the name of the actual file. If given packname is the
+    name to save it into the packfile as. If the first character of the
+    filename is '#', the file will be added to the soundscript manifest too.
+    """
+    files = set()  # Files to pack.
+    soundscripts = set()  # Soundscripts need to be added to the manifest too..
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
     except (IOError, FileNotFoundError):
@@ -130,11 +186,14 @@ def pack_content(path):
     else:
         with pack_list:
             for line in pack_list:
-                line = line.strip()
+                line = line.strip().lower()
                 if not line or line.startswith('//'):
                     continue  # Skip blanks or comments
+                if line[:1] == '#':
+                    line = line[1:]
+                    soundscripts.add(line)
 
-                files.add(line.lower())
+                files.add(line)
 
     if not files:
         LOGGER.info('No files to pack!')
@@ -157,6 +216,8 @@ def pack_content(path):
 
     for file in files:
         pack_file(zipfile, file)
+
+    gen_sound_manifest(soundscripts)
 
     inject_files(zipfile)
 
