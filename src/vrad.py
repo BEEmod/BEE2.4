@@ -36,6 +36,13 @@ GAME_FOLDER = {
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }
 
+SOUND_MAN_FOLDER = {
+    # The folder where game_sounds_manifest is found
+    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc2',
+    utils.STEAM_IDS['TWTM']: 'twtm',
+    utils.STEAM_IDS['APTAG']: 'aperturetag',
+}
+
 # Files that VBSP may generate, that we want to insert into the packfile.
 # They are all found in bee2/inject/.
 INJECT_FILES = {
@@ -125,7 +132,7 @@ def gen_sound_manifest(additional):
     """
     orig_manifest = os.path.join(
         '..',
-        GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
+        SOUND_MAN_FOLDER.get(CONF['game_id', ''], 'portal2'),
         'scripts',
         'game_sounds_manifest.txt',
     )
@@ -134,7 +141,7 @@ def gen_sound_manifest(additional):
             props = Property.parse(f, orig_manifest).find_key(
                 'game_sounds_manifest', [],
             )
-    except FileNotFoundError: # Assume no sounds
+    except FileNotFoundError:  # Assume no sounds
         props = Property('game_sounds_manifest', [])
 
     scripts = [prop.value for prop in props.find_all('precache_file')]
