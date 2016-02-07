@@ -21,6 +21,19 @@ _NO_KEY_FOUND = object()
 _Prop_Value = Union[List['Property'], str]
 _as_dict_return = Dict[str, Union[str, 'as_dict_return']]
 
+# Various [flags] used after property names in some Valve files.
+# See https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/tier1/KeyValues.cpp#L2055
+PROP_FLAGS = {
+    # We know we're not on a console...
+    'x360': False,
+    'ps3': False,
+    'gameconsole': False,
+
+    'win32': True,  # Not actually windows, it actually means 'PC'
+    'osx': utils.MAC,
+    'linux': utils.LINUX,
+}
+
 
 class KeyValError(Exception):
     """An error that occured when parsing a Valve KeyValues file.
@@ -101,6 +114,41 @@ def read_multiline_value(file, line_num, filename):
             line_num,
         )
 
+
+def read_flag(line_end, filename, line_num):
+    """Read a potential [] flag."""
+    flag = line_end.lstrip()
+    if flag[:1] == '[':
+        if ']' not in flag:
+            raise KeyValError(
+                'Unterminated [flag] on '
+                'line: "{}"'.format(line_end),
+                filename,
+                line_num,
+            )
+        flag, comment = flag.split(']', 1)
+        # Parse the flag
+        if flag[:1] == '!':
+            inv = True
+            flag = flag[1:]
+        else:
+            inv = False
+    else:
+        comment = flag
+
+    # Check for unexpected text at the end of a line..
+    comment = comment.lstrip()
+    if comment and not comment.startswith('//'):
+        raise KeyValError(
+            'Extra text after '
+            'line: "{}"'.format(line_end),
+            filename,
+            line_num,
+        )
+
+    if flag:
+        return PROP_FLAGS.get(flag.casefold(), True)
+    return True
 
 class Property:
     """Represents Property found in property files, like those used by Valve.
@@ -209,20 +257,14 @@ class Property:
                         if value and '\\' in value:
                             for orig, new in REPLACE_CHARS.items():
                                 value = value.replace(orig, new)
-                # Line_contents[4] is the start of the comment, ensure that it's
-                # blank or starts with a comment.
+                # Line_contents[4] is the start of the comment, check for [] flags.
                 if len(line_contents) >= 5:
-                    comment = line_contents[4].lstrip()
-                    # same as: not (comment or comment.startswith('//'))
-                    if comment and not comment.startswith('//'):
-                        raise KeyValError(
-                            'Extra text after '
-                            'line: "{}"'.format(line_contents[4]),
-                            filename,
-                            line_num,
-                        )
+                    if read_flag(line_contents[4], filename, line_num):
+                        cur_block.append(Property(name, value))
+                else:
+                    # No flag, add unconditionally
+                    cur_block.append(Property(name, value))
 
-                cur_block.append(Property(name, value))
             elif freshline.startswith('{'):
                 # Open a new block.
                 # If we're expecting a block, the value will be None.
