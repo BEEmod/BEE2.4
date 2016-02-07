@@ -1117,6 +1117,7 @@ class Skybox:
 
 @pak_object('Music')
 class Music:
+
     def __init__(
             self,
             music_id,
@@ -1139,7 +1140,10 @@ class Music:
         """Parse a music definition."""
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
-        sound = data.info['soundscript', None]
+        sound = data.info.find_key('soundscript', '')  # type: Property
+
+        if not sound.has_children():
+            sound = sound.value
 
         packfiles = [
             prop.value
@@ -1160,7 +1164,7 @@ class Music:
             sound=sound,
             config=config,
             pack=packfiles,
-            )
+        )
 
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
@@ -1176,7 +1180,7 @@ class Music:
         if exp_data.selected is None:
             return  # No music..
 
-        for music in data['Music']:
+        for music in data['Music']:  # type: Music
             if music.id == exp_data.selected:
                 break
         else:
@@ -1186,11 +1190,18 @@ class Music:
 
         vbsp_config = exp_data.vbsp_conf
 
+        if isinstance(music.sound, Property):
+            # We want to generate the soundscript - copy over the configs.
+            vbsp_config.append(Property('MusicScript', music.sound.value))
+            script = 'music.BEE2'
+        else:
+            script = music.sound
+
         # Set the instance/ambient_generic file that should be used.
-        if music.sound is not None:
+        if script is not None:
             vbsp_config.set_key(
                 ('Options', 'music_SoundScript'),
-                music.sound,
+                script,
             )
         if music.inst is not None:
             vbsp_config.set_key(

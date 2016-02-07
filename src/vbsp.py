@@ -34,6 +34,7 @@ settings = {
     "pit":            None,
     "fog":            {},
     "elev_opt":       {},
+    'music_conf':     None,
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
@@ -506,6 +507,8 @@ def load_settings():
             'scr_rand', 'scr_force', 'scr_bsod',
         )
     }
+
+    settings['music_conf'] = conf['MusicScript', []]
 
     # Bottomless pit configuration
     pit = conf.find_key("bottomless_pit", [])
@@ -3415,6 +3418,12 @@ def make_vrad_config():
         IS_PREVIEW
     )
     conf['game_id'] = get_opt('game_id')
+
+    # Copy over music soundscript data so VRAD can generate it..
+    if settings['music_conf']:
+        # It's a list of prop objects, so it'll become a proper
+        # block when written.
+        conf['MusicScript'] = settings['music_conf']
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():
