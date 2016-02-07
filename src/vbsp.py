@@ -3572,11 +3572,10 @@ def main():
 
     # Clear the list of files we want to inject into the packfile.
     # If we're in a Hammer map, we want to ensure no files are injected.
-    try:
-        os.removedirs('bee2/inject/')
-    except (FileNotFoundError, OSError):
-        pass
+    LOGGER.info('Clearing inject/ directory..')
     os.makedirs('bee2/inject/', exist_ok=True)
+    for file in os.listdir('bee2/inject'):
+        os.remove(os.path.join('bee2', 'inject', file))
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
