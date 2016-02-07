@@ -10,10 +10,14 @@ bugfixes and improvments.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/TeamSpen210/BEE2-items) repository.
 
-## Download
+## Download and Use
 Download the BEE2.4 on the releases pages:
 - [Application](https://github.com/BenVlodgi/BEE2.4/releases)
 - [Packages](https://github.com/TeamSpen210/BEE2-items/releases)
+Extract the contents of the Application release anywhere you like. 
+Place extracted package folder in the root BEE2 folder.
+To run, locate the BEE2.exe in the bin folder and exicute it.
+
 
 ## Dependencies: ##
 - [pyGame](http://www.pygame.org/) (for sounds, not required)
