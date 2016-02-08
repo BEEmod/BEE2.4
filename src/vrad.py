@@ -16,6 +16,7 @@ import utils
 LOGGER = utils.init_logging('bee2/VRAD.log')
 
 CONF = Property('Config', [])
+
 SCREENSHOT_DIR = os.path.join(
     '..',
     'portal2',  # This is hardcoded into P2, it won't change for mods.
@@ -63,7 +64,7 @@ INJECT_FILES = {
 # SNDLVL_NONE means it's infinite range.
 MUSIC_START = """\
 "music.BEE2{name}"
- {
+ {{
  "channel" "CHAN_STATIC"
  "soundlevel" "SNDLVL_NONE"
  "volume" "{vol}"
@@ -82,24 +83,24 @@ MUSIC_BASE = """\
 # Operator stacks which enable the given gel types.
 MUSIC_GEL_BOUNCE_MAIN = """\
 
-  "import_stack" "p2_update_music_play_gel"
-  "gel_play_entry"
-   {
-   "entry_name" "music.BEE2_gel_bounce"
-   }
-  "gel_stop_entry"
-   {
-   "match_entry" "music.BEE2_gel_bounce"
-   }
+   "import_stack" "p2_update_music_play_gel"
+   "gel_play_entry"
+    {
+    "entry_name" "music.BEE2_gel_bounce"
+    }
+   "gel_stop_entry"
+    {
+    "match_entry" "music.BEE2_gel_bounce"
+    }
 """
 
 MUSIC_GEL_SPEED_MAIN = """\
 
-  "import_stack" "p2_update_music_play_speed_gel"
-  "speed_velocity_trigger"
-   {
-   "input2" "250"
-   }
+   "import_stack" "p2_update_music_play_speed_gel"
+   "speed_velocity_trigger"
+    {
+    "input2" "250"
+    }
    "speed_play_entry"
     {
     "entry_name" "music.BEE2_gel_speed"
@@ -312,7 +313,6 @@ def gen_sound_manifest(additional, has_music=False):
     for script in additional:
         scripts.append(script)
 
-
     # Build and unbuild it to strip other things out - Valve includes a bogus
     # 'new_sound_scripts_must_go_below_here' entry..
     new_props = Property('game_sounds_manifest', [
@@ -327,23 +327,40 @@ def gen_sound_manifest(additional, has_music=False):
     LOGGER.info('Written new soundscripts_manifest..')
 
 
-def generate_music_script(data: Property):
+def generate_music_script(data: Property, pack_list):
     """Generate a soundscript file for music."""
+    # We also pack the filenames used for the tracks - that way funnel etc
+    # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
+    # we don't check there.
+    # The voice attrs used in the map - we can skip tracks
+    voice_attr = CONF['VoiceAttr', ''].casefold().split(';')
+
     funnel = data.find_key('tbeam', '')
     bounce = data.find_key('bouncegel', '')
     speed = data.find_key('speedgel', '')
 
+    # The sounds must be present, and the items should be in the map.
+    has_funnel = funnel.value and (
+        'funnel' in voice_attr or
+        'excursionfunnel' in voice_attr
+    )
+    has_bounce = bounce.value and (
+        'bouncegel' in voice_attr or
+        'bluegel' in voice_attr
+    )
+    # Speed-gel sounds also play when flinging, so keep it always.
+
     with open(os.path.join('bee2', 'inject', 'music_script.txt'), 'w') as file:
         # Write the base music track
         file.write(MUSIC_START.format(name='', vol='1'))
-        write_sound(file, data.find_key('base'), snd_prefix='#*')
+        write_sound(file, data.find_key('base'), pack_list, snd_prefix='#*')
         file.write(MUSIC_BASE)
         # The 'soundoperators' section is still open now.
 
         # Add the operators to play the auxilluary sounds..
-        if funnel.value:
+        if has_funnel:
             file.write(MUSIC_FUNNEL_MAIN)
-        if bounce.value:
+        if has_bounce:
             file.write(MUSIC_GEL_BOUNCE_MAIN)
         if speed.value:
             file.write(MUSIC_GEL_SPEED_MAIN)
@@ -351,24 +368,24 @@ def generate_music_script(data: Property):
         # End the main sound block
         file.write("  }\n }\n}\n")
 
-        if funnel.value:
+        if has_funnel:
             # Write the 'music.BEE2_funnel' sound entry
             file.write(MUSIC_START.format(name='_funnel', vol='1'))
-            write_sound(file, funnel, snd_prefix='*')
+            write_sound(file, funnel, pack_list, snd_prefix='*')
             file.write(MUSIC_FUNNEL_STACK)
 
-        if bounce.value:
+        if has_bounce:
             file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
-            write_sound(file, bounce, snd_prefix='*')
+            write_sound(file, bounce, pack_list, snd_prefix='*')
             file.write(MUSIC_GEL_STACK)
 
         if speed.value:
             file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
-            write_sound(file, speed, snd_prefix='*')
+            write_sound(file, speed, pack_list, snd_prefix='*')
             file.write(MUSIC_GEL_STACK)
 
 
-def write_sound(file, snds: Property, snd_prefix='*'):
+def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
     """Write either a single sound, or multiple rndsound.
 
     snd_prefix is the prefix for each filename - *, #, @, etc.
@@ -376,11 +393,13 @@ def write_sound(file, snds: Property, snd_prefix='*'):
     if snds.has_children():
         file.write(' "rndwave"\n  {\n')
         for snd in snds:
-            file.write('  "wave" "{sndchar}{file}"\n'.format(
-                file=snd.value,
-                sndchar=snd_prefix,
+            file.write(
+                '  "wave" "{sndchar}{file}"\n'.format(
+                    file=snd.value,
+                    sndchar=snd_prefix,
+                )
             )
-        )
+            pack_list.add('sound/' + snd.value.casefold())
         file.write('  }\n')
     else:
         file.write(
@@ -389,6 +408,7 @@ def write_sound(file, snds: Property, snd_prefix='*'):
                 sndchar=snd_prefix,
             )
         )
+        pack_list.add('sound/' + snds.value.casefold())
 
 
 def inject_files(zipfile: ZipFile):
@@ -445,17 +465,16 @@ def pack_content(path, is_peti):
     zipfile = ZipFile(zip_data, mode='a')
     LOGGER.debug(' - Existing zip read')
 
-    for file in files:
-        pack_file(zipfile, file)
-
     # Only generate a soundscript for PeTI maps..
-    has_music = False
     if is_peti:
         music_data = CONF.find_key('MusicScript', [])
         if music_data.value:
-            generate_music_script(music_data)
+            generate_music_script(music_data, files)
             # Add the new script to the manifest file..
             soundscripts.add('scripts/BEE2_generated_music.txt')
+
+    for file in files:
+        pack_file(zipfile, file)
 
     gen_sound_manifest(soundscripts)
 

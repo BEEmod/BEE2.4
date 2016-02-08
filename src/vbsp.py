@@ -3393,7 +3393,6 @@ def make_packlist(map_path):
 
     LOGGER.info('Packlist written!')
 
-
 def make_vrad_config():
     """Generate a config file for VRAD from our configs.
 
@@ -3418,6 +3417,14 @@ def make_vrad_config():
         IS_PREVIEW
     )
     conf['game_id'] = get_opt('game_id')
+
+    # Copy over the voice attributes
+    conf['VoiceAttr'] = ';'.join(
+        key
+        for key, value in
+        settings['has_attr'].items()
+        if value
+    )
 
     # Copy over music soundscript data so VRAD can generate it..
     if settings['music_conf']:
