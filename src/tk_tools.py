@@ -28,6 +28,7 @@ def hook_tk_errors():
 
      we need to hook into that to log those seperately.
     """
+    import loadScreen
     import traceback
     main_logger = utils.getLogger()
 
@@ -49,13 +50,17 @@ def hook_tk_errors():
                 )
             ),
         )
+        # Close loading screens if they're visible..
+        loadScreen.LoadScreen.close_all()
+
         # Release the grab, if it exists. Otherwise you can't see the error dialog.
-        if TK_ROOT.grab_status() is not None:
-            TK_ROOT.grab_current().grab_release()
+        TK_ROOT.grab_set_global()
+        TK_ROOT.grab_release()
 
         messagebox.showerror(
             title='BEE2 Error:',
-            message='{}: {!r}'.format(exc_type.__name__, exc_value)
+            message='{}: {!r}'.format(exc_type.__name__, exc_value),
+            parent=TK_ROOT,
         )
         # Since this isn't caught normally, it won't quit the application.
         # Quit ourselves manually. to prevent TK just freezing.

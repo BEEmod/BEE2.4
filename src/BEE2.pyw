@@ -9,7 +9,7 @@ if __name__ == '__main__':
         # Otherwise we can't find our files!
         # The Windows executable does this automatically.
         os.chdir(os.path.dirname(sys.argv[0]))
-    
+
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
@@ -140,8 +140,12 @@ if __name__ == '__main__':
         TK_ROOT.mainloop()
 
     except Exception as e:
-        # If the loading screen is visible, destroy it so the error can be seen.
-        loadScreen.main_loader.destroy()
+        # Close loading screens if they're visible..
+        loadScreen.LoadScreen.close_all()
+
+        # Grab and release the grab so nothing else can block the error message.
+        TK_ROOT.grab_set_global()
+        TK_ROOT.grab_release()
 
         err = traceback.format_exc()
         if show_errors:

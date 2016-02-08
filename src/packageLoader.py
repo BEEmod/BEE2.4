@@ -1231,8 +1231,7 @@ class Music(PakObject):
         for music in data['Music']:  # type: Music
             if music.id == exp_data.selected:
                 break
-        else:
-            raise Exception(
+        raise Exception(
                 "Selected music ({}) doesn't exist?".format(exp_data.selected)
             )
 
