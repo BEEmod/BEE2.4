@@ -604,7 +604,6 @@ class Property:
             return NotImplemented
 
     append = __iadd__
-    append.__doc__ = """Append another property to this one."""
 
     def merge_children(self, *names: str):
         """Merge together any children of ours with the given names.

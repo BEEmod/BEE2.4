@@ -1216,7 +1216,7 @@ class Music(PakObject):
 
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.config.extend(override.config)
+        self.config.append(override.config)
         self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
