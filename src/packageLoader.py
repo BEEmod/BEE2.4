@@ -1160,7 +1160,7 @@ class Music(PakObject):
             self,
             music_id,
             selitem_data: 'SelitemData',
-            config=None,
+            config: Property=None,
             inst=None,
             sound=None,
             pack=(),
@@ -1172,6 +1172,16 @@ class Music(PakObject):
         self.packfiles = list(pack)
 
         self.selitem_data = selitem_data
+
+        # Set attributes on this so UI.load_packages() can easily check for
+        # which are present...
+        sound_channels = ('base', 'speedgel', 'bouncegel', 'tbeam',)
+        if isinstance(sound, Property):
+            for chan in sound_channels:
+                setattr(self, 'has_' + chan, bool(sound[chan, '']))
+        else:
+            for chan in sound_channels:
+                setattr(self, 'has_' + chan, False)
 
     @classmethod
     def parse(cls, data):

@@ -454,7 +454,9 @@ def load_packages(data):
             'VID': 'has_video',
         }),
         (music_list, musics, 'Music', {
-            # TODO: Allow indicating the presence of extra track parts
+            'TBEAM': 'has_tbeam',
+            'GEL_BOUNCE': 'has_bouncegel',
+            'GEL_SPEED': 'has_speedgel',
         }),
         (elev_list, elevators, 'Elevator', {
             'ORIENT': 'has_orient',
@@ -567,8 +569,6 @@ def load_packages(data):
             SelAttr.bool('GEL_SPEED', 'Propulsion Gel SFX'),
             SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX'),
             SelAttr.bool('TBEAM', 'Excursion Funnel SFX'),
-            SelAttr.bool('BRIDGE', 'Hard Light SFX'),
-            SelAttr.bool('FLING', 'Fling SFX'),
         ],
     )
 
