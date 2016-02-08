@@ -18,8 +18,7 @@ import extract_packages
 import utils
 
 from typing import (
-    Union, Optional,
-    List, Dict, Tuple,
+    Dict,
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -79,25 +78,69 @@ VPK_FOLDER = {
 }
 
 
-def pak_object(name, allow_mult=False, has_img=True):
-    """Decorator to add a class to the list of objects.
+class _PakObjectMeta(type):
+    def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
+        """Adds a PakObject to the list of objects.
 
-    Each object class needs two methods:
-    parse() gets called with a ParseData object, to read from info.txt.
-    The return value gets saved.
+        Making a metaclass allows us to hook into the creation of all subclasses.
+        """
+        # Defer to type to create the class..
+        cls = type.__new__(mcs, name, bases, namespace)
 
-    For override items, they are parsed normally. The original item then
-    gets the add_over(override) method called for each override to add values.
+        if name != 'PakObject':  # Don't register the base class itself!
+            OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
 
-    If allow_mult is true, duplicate items will be treated as overrides,
-    with one randomly chosen to be the 'parent'.
-
-    export(ExportData) is called to export the object into the configs.
-    """
-    def x(cls):
-        OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
         return cls
-    return x
+
+    def __init__(cls, name, bases, namespace, **kwargs):
+        # We have to strip kwargs from the type() calls to prevent errors.
+        type.__init__(cls, name, bases, namespace)
+
+
+class PakObject(metaclass=_PakObjectMeta):
+    """The base class for package objects.
+
+    In the class base list, set 'allow_mult' to True if duplicates are allowed.
+    If duplicates occur, they will be treated as overrides.
+    Set 'has_img' to control wether the object will count towards the images
+    loading bar - this should be stepped in the UI.load_packages() method.
+    """
+    @classmethod
+    def parse(cls, data: ParseData) -> 'PakObject':
+        """Parse the package object from the info.txt block.
+
+        ParseData is a namedtuple containing relevant info:
+        - zip_file, the package's ZipFile or FakeZip
+        - id, the ID of the item
+        - info, the Property block in info.txt
+        - pak_id, the ID of the package
+        """
+        raise NotImplementedError
+
+    def add_over(self, override: 'PakObject'):
+        """Called to override values.
+        self is the originally defined item, and override is the override item
+        to copy values from.
+        """
+        pass
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the appropriate data into the game.
+
+        ExportData is a namedtuple containing various data:
+        - selected: The ID of the selected item (or None)
+        - selected_style: The selected style object
+        - editoritems: The Property block for editoritems.txt
+        - vbsp_conf: The Property block for vbsp_config
+        - game: The game we're exporting to.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def get_objects(cls):
+        """Get the list of objects parsed."""
+        return OBJ_TYPES[cls.__name__]
 
 
 def reraise_keyerror(err, obj_id):
@@ -596,8 +639,7 @@ class Package:
     enabled = enabled.setter(set_enabled)
 
 
-@pak_object('Style')
-class Style:
+class Style(PakObject):
     def __init__(
             self,
             style_id,
@@ -713,8 +755,7 @@ class Style:
         return editoritems, vbsp_config
 
 
-@pak_object('Item')
-class Item:
+class Item(PakObject):
     def __init__(
             self,
             item_id,
@@ -911,8 +952,7 @@ class Item:
         )
 
 
-@pak_object('QuotePack')
-class QuotePack:
+class QuotePack(PakObject):
     def __init__(
             self,
             quote_id,
@@ -1031,8 +1071,7 @@ class QuotePack:
                 LOGGER.info('No {} voice config!', pretty)
 
 
-@pak_object('Skybox')
-class Skybox:
+class Skybox(PakObject):
     def __init__(
             self,
             sky_id,
@@ -1115,8 +1154,7 @@ class Skybox:
         exp_data.vbsp_conf.append(fog_opts)
 
 
-@pak_object('Music')
-class Music:
+class Music(PakObject):
 
     def __init__(
             self,
@@ -1225,8 +1263,7 @@ class Music:
         vbsp_config += music.config
 
 
-@pak_object('StyleVar', allow_mult=True, has_img=False)
-class StyleVar:
+class StyleVar(PakObject, allow_mult=True, has_img=False):
     def __init__(
             self,
             var_id,
@@ -1320,8 +1357,7 @@ class StyleVar:
         ]))
 
 
-@pak_object('StyleVPK')
-class StyleVPK:
+class StyleVPK(PakObject):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall
@@ -1460,8 +1496,7 @@ class StyleVPK:
         return dest_folder
 
 
-@pak_object('Elevator')
-class ElevatorVid:
+class Elevator(PakObject):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.
@@ -1505,11 +1540,8 @@ class ElevatorVid:
             vert_video,
         )
 
-    def add_over(self, override):
-        pass
-
     def __repr__(self):
-        return '<ElevatorVid ' + self.id + '>'
+        return '<Elevator ' + self.id + '>'
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1563,8 +1595,7 @@ class ElevatorVid:
             )
 
 
-@pak_object('PackList', allow_mult=True, has_img=False)
-class PackList:
+class PackList(PakObject, allow_mult=True, has_img=False):
     def __init__(self, pak_id, files, mats):
         self.id = pak_id
         self.files = files
@@ -1631,7 +1662,7 @@ class PackList:
         # Dont copy over if it's already present
         for item in override.files:
             if item not in self.files:
-                self.file.append(item)
+                self.files.append(item)
 
         for item in override.trigger_mats:
             if item not in self.trigger_mats:
@@ -1654,13 +1685,14 @@ class PackList:
             # "File" "filename"
             # }
             # block for each packlist
+            files = [
+                Property('File', file)
+                for file in
+                pack.files
+            ]
             pack_block.append(Property(
                 pack.id,
-                [
-                    Property('File', file)
-                    for file in  # type: str
-                    pack.files
-                ]
+                files,
             ))
 
             for trigger_mat in pack.trigger_mats:
@@ -1681,8 +1713,7 @@ class PackList:
                 pack_file.write(line)
 
 
-@pak_object('EditorSound', has_img=False)
-class EditorSound:
+class EditorSound(PakObject, has_img=False):
     """Add sounds that are usable in the editor.
 
     The editor only reads in game_sounds_editor, so custom sounds must be
@@ -1711,8 +1742,7 @@ class EditorSound:
         )
 
 
-@pak_object('BrushTemplate', has_img=False)
-class BrushTemplate:
+class BrushTemplate(PakObject, has_img=False):
     """A template brush which will be copied into the map, then retextured.
 
     This allows the sides of the brush to swap between wall/floor textures
