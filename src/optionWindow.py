@@ -81,11 +81,12 @@ def make_checkbox(
     if var is None:
         var = BooleanVar(
             value=default,
-            name='opt_'+section.casefold()+'_'+item,
+            name='opt_' + section.casefold() + '_' + item,
         )
-        VARS[section, item] = var
     else:
         default = var.get()
+
+    VARS[section, item] = var
 
     def save_opt():
         """Save the checkbox's values."""

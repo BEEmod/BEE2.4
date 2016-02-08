@@ -1703,6 +1703,10 @@ def init_windows():
 
     optionWindow.reset_all_win = reset_panes
 
+    # Save and load to properly apply config settings.
+    optionWindow.load()
+    optionWindow.save()
+
     TK_ROOT.deiconify()  # show it once we've loaded everything
     windows['pal'].deiconify()
     windows['opt'].deiconify()

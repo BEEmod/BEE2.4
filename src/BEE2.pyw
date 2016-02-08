@@ -14,7 +14,7 @@ if __name__ == '__main__':
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
         # again though.
-        utils.init_logging()
+        LOGGER = utils.init_logging()
 
         # Make multiprocessing work correctly when frozen.
         # This must run immediately - in this case, multiprocessing overrides
@@ -50,7 +50,7 @@ DEFAULT_SETTINGS = {
     'General': {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
-        'mute_sounds': '0',
+        'play_sounds': '1',
         'show_wip_items': '0',
     },
     'Debug': {
