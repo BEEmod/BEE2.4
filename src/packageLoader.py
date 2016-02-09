@@ -1389,19 +1389,22 @@ class StyleVPK(PakObject):
         os.makedirs(dest_folder, exist_ok=True)
 
         zip_file = data.zip_file  # type: ZipFile
-        zip_filenames = set(zip_file.namelist())
 
         has_files = False
         file_count = 0
 
         for file_count, name in enumerate(cls.iter_vpk_names()):
             src = 'vpk/' + vpk_name + name
-            if src not in zip_filenames:
-                break
             dest = os.path.join(dest_folder, 'pak01' + name)
-            with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
-                shutil.copyfileobj(src_file, dest_file)
-            has_files = True
+            try:
+                src_file = zip_open_bin(zip_file, src)
+            except KeyError:
+                # This VPK filename isn't present, we've found them all..
+                break
+            else:
+                with src_file, open(dest, 'wb') as dest_file:
+                    shutil.copyfileobj(src_file, dest_file)
+                has_files = True
 
         if not has_files:
             raise Exception(
