@@ -1389,13 +1389,13 @@ class StyleVPK(PakObject):
         os.makedirs(dest_folder, exist_ok=True)
 
         zip_file = data.zip_file  # type: ZipFile
-        zip_filenames = zip_file.namelist()
+        zip_filenames = set(zip_file.namelist())
 
         has_files = False
         file_count = 0
 
         for file_count, name in enumerate(cls.iter_vpk_names()):
-            src = os.path.join('vpk', vpk_name + name)
+            src = 'vpk/' + vpk_name + name
             if src not in zip_filenames:
                 break
             dest = os.path.join(dest_folder, 'pak01' + name)
