@@ -3,9 +3,16 @@ from tkinter import *  # ui library
 from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 
+from weakref import WeakSet
+
 import utils
 
+
 class LoadScreen(Toplevel):
+
+    # Keep a reference to all loading screens, so we can close them globally.
+    _all_screens = WeakSet()
+
     def __init__(self, *stages, title_text='Loading'):
         self.stages = list(stages)
         self.widgets = {}
@@ -25,6 +32,8 @@ class LoadScreen(Toplevel):
             cursor=utils.CURSORS['wait'],
         )
         self.withdraw()
+
+        self._all_screens.add(self)
 
         # this prevents stuff like the title bar, normal borders etc from
         # appearing in this window.
@@ -135,6 +144,7 @@ class LoadScreen(Toplevel):
             del self.bar_var
             del self.bar_val
             self.active = False
+            self._all_screens.discard(self)
 
     def __enter__(self):
         """LoadScreen can be used as a context manager.
@@ -148,6 +158,12 @@ class LoadScreen(Toplevel):
         """Hide the loading screen, and passthrough execptions.
         """
         self.reset()
+
+    @classmethod
+    def close_all(cls):
+        """Hide all loadscreen windows."""
+        for screen in cls._all_screens:
+            screen.reset()
 
 main_loader = LoadScreen(
     ('PAK', 'Packages'),

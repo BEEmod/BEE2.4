@@ -1,13 +1,20 @@
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
+import os
 import sys
 if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        os.chdir(os.path.dirname(sys.argv[0]))
+
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are availible
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
         # again though.
-        utils.init_logging()
+        LOGGER = utils.init_logging()
 
         # Make multiprocessing work correctly when frozen.
         # This must run immediately - in this case, multiprocessing overrides
@@ -43,7 +50,7 @@ DEFAULT_SETTINGS = {
     'General': {
         'preserve_BEE2_resource_dir': '0',
         'allow_any_folder_as_game': '0',
-        'mute_sounds': '0',
+        'play_sounds': '1',
         'show_wip_items': '0',
     },
     'Debug': {
@@ -66,14 +73,6 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        import os
-        import sys
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
-
     loadScreen.main_loader.set_length('UI', 14)
     loadScreen.main_loader.show()
 
@@ -141,8 +140,12 @@ if __name__ == '__main__':
         TK_ROOT.mainloop()
 
     except Exception as e:
-        # If the loading screen is visible, destroy it so the error can be seen.
-        loadScreen.main_loader.destroy()
+        # Close loading screens if they're visible..
+        loadScreen.LoadScreen.close_all()
+
+        # Grab and release the grab so nothing else can block the error message.
+        TK_ROOT.grab_set_global()
+        TK_ROOT.grab_release()
 
         err = traceback.format_exc()
         if show_errors:

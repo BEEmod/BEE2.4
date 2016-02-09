@@ -354,7 +354,7 @@ def res_change_inputs(inst: VLib.Entity, res):
 
 
 @make_result('faithMods')
-def res_faith_mods(inst, res):
+def res_faith_mods(inst: VLib.Entity, res: Property):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
     Values:
@@ -364,53 +364,81 @@ def res_faith_mods(inst, res):
             straight plates
         - instvar: A $replace value to set to either 'angled' or '
             'straight'.
+        - enabledVar: A $replace value which will be copied to the main
+            trigger's Start Disabled value (and inverted).
+        - trig_temp: An ID for a template brush to add. This will be offset by
+            the trigger's position (in the case of the 'helper' trigger).
     """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']
+    trig_enabled = res['enabledVar', None]
+    trig_temp = res['trig_temp', '']
     offset = utils.conv_int(res['raise_trig', '0'])
     if offset:
         offset = Vec(0, 0, offset).rotate_by_str(inst['angles', '0 0 0'])
-        ':type offset Vec'
+    else:
+        offset = Vec()
+
+    if trig_enabled is not None:
+        trig_enabled = utils.conv_bool(inst.fixup[trig_enabled])
+    else:
+        trig_enabled = None
+
     for trig in vbsp.VMF.by_class['trigger_catapult']:
-        if inst['targetname'] in trig['targetname']:
-            if offset:  # Edit both the normal and the helper trigger
-                trig['origin'] = (
-                    Vec.from_str(trig['origin']) +
-                    offset
-                ).join(' ')
-                for solid in trig.solids:
-                    solid.translate(offset)
+        if inst['targetname'] not in trig['targetname']:
+            continue
 
-            # Inspect the outputs to determine the type.
-            # We also change them if desired, since that's not possible
-            # otherwise.
+        # Edit both the normal and the helper trigger..
+        trig_origin = trig['origin'] = Vec.from_str(trig['origin']) + offset
 
-            for out in trig.outputs:
-                if out.inst_in == 'animate_angled_relay':
-                    # Instead of an instance: output, use local names.
-                    # This allows us to strip the proxy, as well as use
-                    # overlay instances.
-                    out.inst_in = None
-                    out.target = conditions.local_name(
-                        inst,
-                        res['angled_targ', 'animate_angled_relay']
-                    )
-                    out.input = res['angled_in', 'Trigger']
-                    if fixup_var:
-                        inst.fixup[fixup_var] = 'angled'
-                    break  # There's only one output we want to look for...
+        if offset and not trig_temp:
+            # No template, shift the current brushes.
+            for solid in trig.solids:
+                solid.translate(offset)
+        elif trig_temp:
+            trig.solids = conditions.import_template(
+                temp_name=trig_temp,
+                origin=trig_origin,
+                angles=Vec.from_str(inst['angles']),
+                force_type=conditions.TEMP_TYPES.world,
+            ).world
+            # Remove the trigger solids from worldspawn..
+            for solid in trig.solids:
+                vbsp.VMF.remove_brush(solid)
 
-                elif out.inst_in == 'animate_straightup_relay':
-                    out.inst_in = None
-                    out.target = conditions.local_name(
-                        inst,
-                        res[
-                            'straight_targ',
-                            'animate_straightup_relay'
-                        ],
-                    )
-                    out.input = res['straight_in', 'Trigger']
+        if trig_enabled is not None and 'helper' not in trig['targetname']:
+            trig['startdisabled'] = utils.bool_as_int(not trig_enabled)
 
-                    if fixup_var:
-                        inst.fixup[fixup_var] = 'straight'
-                    break
+        # Inspect the outputs to determine the type.
+        # We also change them if desired, since that's not possible
+        # otherwise.
+
+        for out in trig.outputs:
+            if out.inst_in == 'animate_angled_relay':
+                # Instead of an instance: output, use local names.
+                # This allows us to strip the proxy, as well as use
+                # overlay instances.
+                out.inst_in = None
+                out.target = conditions.local_name(
+                    inst,
+                    res['angled_targ', 'animate_angled_relay']
+                )
+                out.input = res['angled_in', 'Trigger']
+                if fixup_var:
+                    inst.fixup[fixup_var] = 'angled'
+                break  # There's only one output we want to look for...
+
+            elif out.inst_in == 'animate_straightup_relay':
+                out.inst_in = None
+                out.target = conditions.local_name(
+                    inst,
+                    res[
+                        'straight_targ',
+                        'animate_straightup_relay'
+                    ],
+                )
+                out.input = res['straight_in', 'Trigger']
+
+                if fixup_var:
+                    inst.fixup[fixup_var] = 'straight'
+                break

@@ -88,11 +88,13 @@ def flag_brush_at_loc(inst, flag):
     # Relative to the instance origin
     pos += Vec.from_str(inst['origin', '0 0 0'])
 
-    norm = Vec.from_str(flag['dir', '0 0 -1']).rotate_by_str(
-        inst['angles', '0 0 0']
-    )
+    norm = flag['dir', None]
+    if norm is not None:
+        norm = Vec.from_str(norm).rotate_by_str(
+            inst['angles', '0 0 0'],
+        )
 
-    if utils.conv_bool(flag['gridpos', '0']):
+    if utils.conv_bool(flag['gridpos', '0']) and norm is not None:
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
@@ -105,7 +107,7 @@ def flag_brush_at_loc(inst, flag):
 
     brush = SOLIDS.get(pos.as_tuple(), None)
 
-    if brush is None or brush.normal != norm:
+    if brush is None or (norm is not None and brush.normal != norm):
         br_type = 'none'
     else:
         br_type = str(brush.color)

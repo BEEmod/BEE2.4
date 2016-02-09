@@ -9,7 +9,7 @@ import os.path
 import shutil
 
 from property_parser import Property, NoKeyError
-from FakeZip import FakeZip, zip_names
+from FakeZip import FakeZip, zip_names, zip_open_bin
 from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
@@ -18,8 +18,7 @@ import extract_packages
 import utils
 
 from typing import (
-    Union, Optional,
-    List, Dict, Tuple,
+    Dict,
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -60,26 +59,88 @@ CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
 
+# The binary data comprising a blank VPK file.
+EMPTY_VPK = bytes([
+    52, 18, 170, 85,  # VPK identifier
+    1,  # Version 1
+    0,  # 0 bytes of directory info
+    0, 0, 1, 0, 0, 0, 0,
+])
 
-def pak_object(name, allow_mult=False, has_img=True):
-    """Decorator to add a class to the list of objects.
+# The folder we want to copy our VPKs to.
+VPK_FOLDER = {
+    # The last DLC released by Valve - this is the one that we
+    # overwrite with a VPK file.
+    utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
 
-    Each object class needs two methods:
-    parse() gets called with a ParseData object, to read from info.txt.
-    The return value gets saved.
+    # This doesn't have VPK files, and is higher priority.
+    utils.STEAM_IDS['APERTURE TAG']: 'portal2',
+}
 
-    For override items, they are parsed normally. The original item then
-    gets the add_over(override) method called for each override to add values.
 
-    If allow_mult is true, duplicate items will be treated as overrides,
-    with one randomly chosen to be the 'parent'.
+class _PakObjectMeta(type):
+    def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
+        """Adds a PakObject to the list of objects.
 
-    export(ExportData) is called to export the object into the configs.
-    """
-    def x(cls):
-        OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+        Making a metaclass allows us to hook into the creation of all subclasses.
+        """
+        # Defer to type to create the class..
+        cls = type.__new__(mcs, name, bases, namespace)
+
+        if name != 'PakObject':  # Don't register the base class itself!
+            OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+
         return cls
-    return x
+
+    def __init__(cls, name, bases, namespace, **kwargs):
+        # We have to strip kwargs from the type() calls to prevent errors.
+        type.__init__(cls, name, bases, namespace)
+
+
+class PakObject(metaclass=_PakObjectMeta):
+    """The base class for package objects.
+
+    In the class base list, set 'allow_mult' to True if duplicates are allowed.
+    If duplicates occur, they will be treated as overrides.
+    Set 'has_img' to control wether the object will count towards the images
+    loading bar - this should be stepped in the UI.load_packages() method.
+    """
+    @classmethod
+    def parse(cls, data: ParseData) -> 'PakObject':
+        """Parse the package object from the info.txt block.
+
+        ParseData is a namedtuple containing relevant info:
+        - zip_file, the package's ZipFile or FakeZip
+        - id, the ID of the item
+        - info, the Property block in info.txt
+        - pak_id, the ID of the package
+        """
+        raise NotImplementedError
+
+    def add_over(self, override: 'PakObject'):
+        """Called to override values.
+        self is the originally defined item, and override is the override item
+        to copy values from.
+        """
+        pass
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """Export the appropriate data into the game.
+
+        ExportData is a namedtuple containing various data:
+        - selected: The ID of the selected item (or None)
+        - selected_style: The selected style object
+        - editoritems: The Property block for editoritems.txt
+        - vbsp_conf: The Property block for vbsp_config
+        - game: The game we're exporting to.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def get_objects(cls):
+        """Get the list of objects parsed."""
+        return OBJ_TYPES[cls.__name__]
 
 
 def reraise_keyerror(err, obj_id):
@@ -211,6 +272,8 @@ def load_packages(
                     # Add slash to the end to indicate it's a folder.
         )
         sys.exit('No Packages Directory!')
+
+    shutil.rmtree('../vpk_cache/', ignore_errors=True)
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -576,8 +639,7 @@ class Package:
     enabled = enabled.setter(set_enabled)
 
 
-@pak_object('Style')
-class Style:
+class Style(PakObject):
     def __init__(
             self,
             style_id,
@@ -587,6 +649,7 @@ class Style:
             base_style=None,
             suggested=None,
             has_video=True,
+            vpk_name='',
             corridor_names=utils.EmptyMapping,
             ):
         self.id = style_id
@@ -596,6 +659,7 @@ class Style:
         self.bases = []  # Set by setup_style_tree()
         self.suggested = suggested or {}
         self.has_video = has_video
+        self.vpk_name = vpk_name
         self.corridor_names = {
             'sp_entry': corridor_names.get('sp_entry', Property('', [])),
             'sp_exit':  corridor_names.get('sp_exit', Property('', [])),
@@ -613,6 +677,7 @@ class Style:
         selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = utils.conv_bool(info['has_video', '1'])
+        vpk_name = info['vpk_name', ''].casefold()
 
         sugg = info.find_key('suggested', [])
         sugg = (
@@ -657,6 +722,7 @@ class Style:
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
+            vpk_name=vpk_name
             )
 
     def add_over(self, override: 'Style'):
@@ -689,8 +755,7 @@ class Style:
         return editoritems, vbsp_config
 
 
-@pak_object('Item')
-class Item:
+class Item(PakObject):
     def __init__(
             self,
             item_id,
@@ -887,8 +952,7 @@ class Item:
         )
 
 
-@pak_object('QuotePack')
-class QuotePack:
+class QuotePack(PakObject):
     def __init__(
             self,
             quote_id,
@@ -1007,8 +1071,7 @@ class QuotePack:
                 LOGGER.info('No {} voice config!', pretty)
 
 
-@pak_object('Skybox')
-class Skybox:
+class Skybox(PakObject):
     def __init__(
             self,
             sky_id,
@@ -1091,13 +1154,13 @@ class Skybox:
         exp_data.vbsp_conf.append(fog_opts)
 
 
-@pak_object('Music')
-class Music:
+class Music(PakObject):
+
     def __init__(
             self,
             music_id,
             selitem_data: 'SelitemData',
-            config=None,
+            config: Property=None,
             inst=None,
             sound=None,
             pack=(),
@@ -1110,12 +1173,25 @@ class Music:
 
         self.selitem_data = selitem_data
 
+        # Set attributes on this so UI.load_packages() can easily check for
+        # which are present...
+        sound_channels = ('base', 'speedgel', 'bouncegel', 'tbeam',)
+        if isinstance(sound, Property):
+            for chan in sound_channels:
+                setattr(self, 'has_' + chan, bool(sound[chan, '']))
+        else:
+            for chan in sound_channels:
+                setattr(self, 'has_' + chan, False)
+
     @classmethod
     def parse(cls, data):
         """Parse a music definition."""
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
-        sound = data.info['soundscript', None]
+        sound = data.info.find_key('soundscript', '')  # type: Property
+
+        if not sound.has_children():
+            sound = sound.value
 
         packfiles = [
             prop.value
@@ -1136,11 +1212,11 @@ class Music:
             sound=sound,
             config=config,
             pack=packfiles,
-            )
+        )
 
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.config.extend(override.config)
+        self.config.append(override.config)
         self.selitem_data.auth.extend(override.selitem_data.auth)
 
     def __repr__(self):
@@ -1152,7 +1228,7 @@ class Music:
         if exp_data.selected is None:
             return  # No music..
 
-        for music in data['Music']:
+        for music in data['Music']:  # type: Music
             if music.id == exp_data.selected:
                 break
         else:
@@ -1162,11 +1238,18 @@ class Music:
 
         vbsp_config = exp_data.vbsp_conf
 
+        if isinstance(music.sound, Property):
+            # We want to generate the soundscript - copy over the configs.
+            vbsp_config.append(Property('MusicScript', music.sound.value))
+            script = 'music.BEE2'
+        else:
+            script = music.sound
+
         # Set the instance/ambient_generic file that should be used.
-        if music.sound is not None:
+        if script is not None:
             vbsp_config.set_key(
                 ('Options', 'music_SoundScript'),
-                music.sound,
+                script,
             )
         if music.inst is not None:
             vbsp_config.set_key(
@@ -1190,8 +1273,7 @@ class Music:
         vbsp_config += music.config
 
 
-@pak_object('StyleVar', allow_mult=True, has_img=False)
-class StyleVar:
+class StyleVar(PakObject, allow_mult=True, has_img=False):
     def __init__(
             self,
             var_id,
@@ -1285,8 +1367,146 @@ class StyleVar:
         ]))
 
 
-@pak_object('Elevator')
-class ElevatorVid:
+class StyleVPK(PakObject):
+    """A set of VPK files used for styles.
+
+    These are copied into _dlc3, allowing changing the in-editor wall
+    textures.
+    """
+    def __init__(self, vpk_id, file_count=0):
+        """Initialise a StyleVPK object.
+
+        The file_count is the number of VPK files - 0 = just pak01_dir.
+        """
+        self.id = vpk_id
+        self.file_count = file_count
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        vpk_name = data.info['filename']
+        dest_folder = os.path.join('../vpk_cache', data.id.casefold())
+
+        os.makedirs(dest_folder, exist_ok=True)
+
+        zip_file = data.zip_file  # type: ZipFile
+        zip_filenames = zip_file.namelist()
+
+        has_files = False
+        file_count = 0
+
+        for file_count, name in enumerate(cls.iter_vpk_names()):
+            src = os.path.join('vpk', vpk_name + name)
+            if src not in zip_filenames:
+                break
+            dest = os.path.join(dest_folder, 'pak01' + name)
+            with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
+                shutil.copyfileobj(src_file, dest_file)
+            has_files = True
+
+        if not has_files:
+            raise Exception(
+                'VPK object "{}" has no associated VPK files!'.format(data.id)
+            )
+
+        return cls(data.id, file_count)
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        sel_vpk = exp_data.selected_style.vpk_name  # type: Style
+
+        if sel_vpk:
+            for vpk in data['StyleVPK']:  # type: StyleVPK
+                if vpk.id.casefold() == sel_vpk:
+                    sel_vpk = vpk
+                    break
+            else:
+                sel_vpk = None
+        else:
+            sel_vpk = None
+
+        try:
+            dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
+        except PermissionError:
+            return  # We can't edit the VPK files - P2 is open..
+
+        if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
+            # In Portal 2, we make a dlc3 folder - this changes priorities,
+            # so the soundcache will be regenerated. Just copy the old one over.
+            sound_cache = os.path.join(
+                dest_folder, 'maps', 'soundcache', '_master.cache'
+            )
+            LOGGER.info('Sound cache: {}', sound_cache)
+            if not os.path.isfile(sound_cache):
+                LOGGER.info('Copying over soundcache file for DLC3..')
+                os.makedirs(os.path.dirname(sound_cache), exist_ok=True)
+                shutil.copy(
+                    exp_data.game.abs_path(
+                        'portal2_dlc2/maps/soundcache/_master.cache',
+                    ),
+                    sound_cache,
+                )
+
+        if sel_vpk is None:
+            # Write a blank VPK file.
+            with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
+                f.write(EMPTY_VPK)
+            LOGGER.info('Written empty VPK to "{}"', dest_folder)
+        else:
+            src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
+            for index, suffix in zip(
+                    range(sel_vpk.file_count),  # Limit to the number of files
+                    sel_vpk.iter_vpk_names()):
+                shutil.copy(
+                    os.path.join(src_folder, 'pak01' + suffix),
+                    os.path.join(dest_folder, 'pak01' + suffix),
+                )
+            LOGGER.info(
+                'Written {} VPK{} to "{}"',
+                sel_vpk.file_count,
+                '' if sel_vpk.file_count == 1 else 's',
+                dest_folder,
+            )
+
+    @staticmethod
+    def iter_vpk_names():
+        """Iterate over VPK filename suffixes.
+
+        The first is '_dir.vpk', then '_000.vpk' with increasing
+        numbers.
+        """
+        yield '_dir.vpk'
+        for i in range(999):
+            yield '_{:03}.vpk'.format(i)
+
+    @staticmethod
+    def clear_vpk_files(game) -> str:
+        """Remove existing VPKs files from a game.
+
+         We want to leave other files - otherwise users will end up
+         regenerating the sound cache every time they export.
+
+        This returns the path to the game folder.
+        """
+        dest_folder = game.abs_path(VPK_FOLDER.get(
+            game.steamID,
+            'portal2_dlc3',
+        ))
+
+        os.makedirs(dest_folder, exist_ok=True)
+        try:
+            for file in os.listdir(dest_folder):
+                if file[:6] == 'pak01_':
+                    os.remove(os.path.join(dest_folder, file))
+        except PermissionError:
+            # The player might have Portal 2 open. Abort changing the VPK.
+            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 "
+                           "or Hammer open?")
+            raise
+
+        return dest_folder
+
+
+class Elevator(PakObject):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.
@@ -1330,11 +1550,8 @@ class ElevatorVid:
             vert_video,
         )
 
-    def add_over(self, override):
-        pass
-
     def __repr__(self):
-        return '<ElevatorVid ' + self.id + '>'
+        return '<Elevator ' + self.id + '>'
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1388,8 +1605,7 @@ class ElevatorVid:
             )
 
 
-@pak_object('PackList', allow_mult=True, has_img=False)
-class PackList:
+class PackList(PakObject, allow_mult=True, has_img=False):
     def __init__(self, pak_id, files, mats):
         self.id = pak_id
         self.files = files
@@ -1456,7 +1672,7 @@ class PackList:
         # Dont copy over if it's already present
         for item in override.files:
             if item not in self.files:
-                self.file.append(item)
+                self.files.append(item)
 
         for item in override.trigger_mats:
             if item not in self.trigger_mats:
@@ -1479,13 +1695,14 @@ class PackList:
             # "File" "filename"
             # }
             # block for each packlist
+            files = [
+                Property('File', file)
+                for file in
+                pack.files
+            ]
             pack_block.append(Property(
                 pack.id,
-                [
-                    Property('File', file)
-                    for file in  # type: str
-                    pack.files
-                ]
+                files,
             ))
 
             for trigger_mat in pack.trigger_mats:
@@ -1506,8 +1723,7 @@ class PackList:
                 pack_file.write(line)
 
 
-@pak_object('EditorSound', has_img=False)
-class EditorSound:
+class EditorSound(PakObject, has_img=False):
     """Add sounds that are usable in the editor.
 
     The editor only reads in game_sounds_editor, so custom sounds must be
@@ -1536,8 +1752,7 @@ class EditorSound:
         )
 
 
-@pak_object('BrushTemplate', has_img=False)
-class BrushTemplate:
+class BrushTemplate(PakObject, has_img=False):
     """A template brush which will be copied into the map, then retextured.
 
     This allows the sides of the brush to swap between wall/floor textures

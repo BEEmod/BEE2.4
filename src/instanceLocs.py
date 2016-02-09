@@ -5,6 +5,7 @@ multiple styles.
 """
 from collections import defaultdict
 from functools import lru_cache
+import logging
 
 from property_parser import Property
 import utils
@@ -42,34 +43,42 @@ SPECIAL_INST = {
     'glass_short':          '<ITEM_BARRIER:3,7>',
     'glass_convex_corner':  '<ITEM_BARRIER:4,8>',
 
-    'coopExit':    '<ITEM_COOP_ENTRY_DOOR:3>',
-    'coopEntry':   '<ITEM_COOP_ENTRY_DOOR:0>',
-    'spExit':      '<ITEM_ENTRY_DOOR:10>',
-    'spEntry':     '<ITEM_ENTRY_DOOR:9>',
+    'coopExit':         '<ITEM_COOP_ENTRY_DOOR:3>',
+    'coopEntry':        '<ITEM_COOP_ENTRY_DOOR:0>',
+    'coopEntryUp':      '<ITEM_COOP_ENTRY_DOOR:bee2_vert_up>',
+    'coopEntryDown':    '<ITEM_COOP_ENTRY_DOOR:bee2_vert_down>',
+    'spExit':           '<ITEM_ENTRY_DOOR:10>',
+    'spEntry':          '<ITEM_ENTRY_DOOR:9>',
 
-    'elevatorEntry':     '<ITEM_ENTRY_DOOR:9>',
-    'elevatorExit':      '<ITEM_ENTRY_DOOR:10>',
+    'elevatorEntry':    '<ITEM_ENTRY_DOOR:9>',
+    'elevatorExit':     '<ITEM_ENTRY_DOOR:10>',
 
-    'spExitCorr':   '<ITEM_EXIT_DOOR:0,1,2,3>',
-    'spExitCorr1':  '<ITEM_EXIT_DOOR:0>',
-    'spExitCorr2':  '<ITEM_EXIT_DOOR:1>',
-    'spExitCorr3':  '<ITEM_EXIT_DOOR:2>',
-    'spExitCorr4':  '<ITEM_EXIT_DOOR:3>',
+    'spExitCorr':       '<ITEM_EXIT_DOOR:0,1,2,3>',
+    'spExitCorr1':      '<ITEM_EXIT_DOOR:0>',
+    'spExitCorr2':      '<ITEM_EXIT_DOOR:1>',
+    'spExitCorr3':      '<ITEM_EXIT_DOOR:2>',
+    'spExitCorr4':      '<ITEM_EXIT_DOOR:3>',
+    'spExitCorrUp':     '<ITEM_EXIT_DOOR:bee2_vert_up>',
+    'spExitCorrDown':   '<ITEM_EXIT_DOOR:bee2_vert_down>',
 
-    'spEntryCorr':  '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
-    'spEntryCorr1': '<ITEM_ENTRY_DOOR:0>',
-    'spEntryCorr2': '<ITEM_ENTRY_DOOR:1>',
-    'spEntryCorr3': '<ITEM_ENTRY_DOOR:2>',
-    'spEntryCorr4': '<ITEM_ENTRY_DOOR:3>',
-    'spEntryCorr5': '<ITEM_ENTRY_DOOR:4>',
-    'spEntryCorr6': '<ITEM_ENTRY_DOOR:5>',
-    'spEntryCorr7': '<ITEM_ENTRY_DOOR:6>',
+    'spEntryCorr':      '<ITEM_ENTRY_DOOR:0,1,2,3,4,5,6>',
+    'spEntryCorr1':     '<ITEM_ENTRY_DOOR:0>',
+    'spEntryCorr2':     '<ITEM_ENTRY_DOOR:1>',
+    'spEntryCorr3':     '<ITEM_ENTRY_DOOR:2>',
+    'spEntryCorr4':     '<ITEM_ENTRY_DOOR:3>',
+    'spEntryCorr5':     '<ITEM_ENTRY_DOOR:4>',
+    'spEntryCorr6':     '<ITEM_ENTRY_DOOR:5>',
+    'spEntryCorr7':     '<ITEM_ENTRY_DOOR:6>',
+    'spEntryCorrUp':    '<ITEM_ENTRY_DOOR:bee2_vert_up>',
+    'spEntryCorrDown':  '<ITEM_ENTRY_DOOR:bee2_vert_down>',
 
     'coopCorr':     '<ITEM_COOP_EXIT_DOOR:0,1,2,3>',
     'coopCorr1':    '<ITEM_COOP_EXIT_DOOR:0>',
     'coopCorr2':    '<ITEM_COOP_EXIT_DOOR:1>',
     'coopCorr3':    '<ITEM_COOP_EXIT_DOOR:2>',
     'coopCorr4':    '<ITEM_COOP_EXIT_DOOR:3>',
+    'coopCorrUp':   '<ITEM_COOP_EXIT_DOOR:bee2_vert_up>',
+    'coopCorrDown': '<ITEM_COOP_EXIT_DOOR:bee2_vert_down>',
 
     'indToggle':    '<ITEM_INDICATOR_TOGGLE>',
     # Although unused by default, editoritems allows having different instances
@@ -176,11 +185,6 @@ def load_conf(prop_block: Property):
             for inst in
             prop
         ]
-    INST_SPECIAL = {
-        key.casefold(): resolve(val_string)
-        for key, val_string in
-        SPECIAL_INST.items()
-    }
 
     for prop in prop_block.find_key('CustInstances', []):
         CUST_INST_FILES[prop.real_name] = {
@@ -188,6 +192,12 @@ def load_conf(prop_block: Property):
             for inst in
             prop
         }
+
+    INST_SPECIAL = {
+        key.casefold(): resolve(val_string, silent=True)
+        for key, val_string in
+        SPECIAL_INST.items()
+    }
 
     # Several special items which use multiple item types!
 
@@ -221,24 +231,24 @@ def load_conf(prop_block: Property):
 
     # Laser items have the offset and centered item versions.
     INST_SPECIAL['lasercatcher'] = (
-        resolve('<ITEM_LASER_CATCHER_CENTER>') +
-        resolve('<ITEM_LASER_CATCHER_OFFSET>')
+        resolve('<ITEM_LASER_CATCHER_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_CATCHER_OFFSET>', silent=True)
     )
 
     INST_SPECIAL['laseremitter'] = (
-        resolve('<ITEM_LASER_EMITTER_CENTER>') +
-        resolve('<ITEM_LASER_EMITTER_OFFSET>')
+        resolve('<ITEM_LASER_EMITTER_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_EMITTER_OFFSET>', silent=True)
     )
 
     INST_SPECIAL['laserrelay'] = (
-        resolve('<ITEM_LASER_RELAY_CENTER>') +
-        resolve('<ITEM_LASER_RELAY_OFFSET>')
+        resolve('<ITEM_LASER_RELAY_CENTER>', silent=True) +
+        resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
     )
 
+    LOGGER.warning('None in vals: {}', None in INST_SPECIAL.values())
 
-# Cache the return values, since they're constant.
-@lru_cache()
-def resolve(path) -> List[str]:
+
+def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
@@ -253,6 +263,25 @@ def resolve(path) -> List[str]:
     if it's invalid. Incorrect [] will raise an exception (since these are
     hardcoded).
     When using <> values, "" filenames will be skipped.
+
+    If silent is True, no error messages will be output (for use with hardcoded
+    names).
+    """
+    if silent:
+        # Ignore messages < ERROR (warning and info)
+        LOGGER.setLevel(logging.ERROR)
+        val = _resolve(path)
+        LOGGER.setLevel(logging.NOTSET)
+        return val
+    else:
+        return _resolve(path)
+
+
+# Cache the return values, since they're constant.
+@lru_cache()
+def _resolve(path):
+    """Use a secondary function to allow caching values, while ignoring the
+    'silent' parameter.
     """
 
     if path.startswith('<') and path.endswith('>'):
@@ -278,10 +307,11 @@ def resolve(path) -> List[str]:
                         continue
                     except KeyError:
                         LOGGER.warning(
-                            '"{}" is not a valid custom subtype'
-                            ' for "{}" items!',
-                            val,
+                            'Invalid custom instance name - "{}" for '
+                            '<{}> (Valid: {!r})',
+                            folded_value[5:],
                             item,
+                            cust_item_vals,
                         )
                         return []
 
@@ -353,3 +383,21 @@ def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
     This returns None if the given value is not present.
     """
     return CUST_INST_FILES[item_id].get(inst.casefold(), None)
+
+
+def get_special_inst(name: str):
+    """Get the instance associated with a "[special]" instance path."""
+    try:
+        inst = INST_SPECIAL[name.casefold()]
+    except KeyError:
+        raise KeyError("Invalid special instance name! ({})".format(name))
+
+    # The number you'll get is fixed, so it's fine if we return different
+    # types - unpack single instances, since that's what you want most of the
+    # time.
+    if len(inst) == 1:
+        return inst[0]
+    elif len(inst) == 0:
+        return None  # No value
+    else:
+        return inst

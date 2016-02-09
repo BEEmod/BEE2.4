@@ -28,7 +28,7 @@ LOGGER = utils.getLogger(__name__)
 all_games = []
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
-game_menu = None
+game_menu = None  # type: Menu
 
 trans_data = {}
 
@@ -123,7 +123,7 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id, folder):
+    def __init__(self, name, steam_id: str, folder):
         self.name = name
         self.steamID = steam_id
         self.root = folder
@@ -287,6 +287,11 @@ class Game:
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
+        try:
+            packageLoader.StyleVPK.clear_vpk_files(self)
+        except PermissionError:
+            pass
+
     def export(
             self,
             style: packageLoader.Style,
@@ -325,6 +330,9 @@ class Game:
 
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
+
+        # Make the folders we need to copy files to, if desired.
+        os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
 
         # Start off with the style's data.
         editoritems, vbsp_config = style.export()
@@ -426,10 +434,14 @@ class Game:
 
         LOGGER.info('Copying Custom Compiler!')
         for file in os.listdir('../compiler'):
+            src_path = os.path.join('../compiler', file)
+            if not os.path.isfile(src_path):
+                continue
+
             LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
             try:
                 shutil.copy(
-                    os.path.join('../compiler', file),
+                    src_path,
                     self.abs_path('bin/')
                 )
             except PermissionError:
@@ -478,7 +490,7 @@ class Game:
             comm_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block.value[:]:
+                for inst in inst_block.value[:]:  # type: Property
                     if inst.name.isdigit():
                         # Direct Portal 2 value
                         instance_block.append(
@@ -489,7 +501,10 @@ class Game:
                         inst_block.value.remove(inst)
                         cust_inst.set_key(
                             (item['type'], inst.name),
-                            inst['Name'],
+                            # Allow using either the normal block format,
+                            # or just providing the file - we don't use the
+                            # other values.
+                            inst['name'] if inst.has_children() else inst.value,
                         )
 
             # Look in the Inputs and Outputs blocks to find the io definitions.
@@ -526,8 +541,8 @@ def find_steam_info(game_dir):
 
     This only works on Source games!
     """
-    game_id = -1
-    name = "ERR"
+    game_id = None
+    name = None
     found_name = False
     found_id = False
     for folder in os.listdir(game_dir):
@@ -539,10 +554,8 @@ def find_steam_info(game_dir):
                     if not found_id and 'steamappid' in clean_line.casefold():
                         raw_id = clean_line.casefold().replace(
                             'steamappid', '').strip()
-                        try:
-                            game_id = int(raw_id)
-                        except ValueError:
-                            pass
+                        if raw_id.isdigit():
+                            game_id = raw_id
                     elif not found_name and 'game ' in clean_line.casefold():
                         found_name = True
                         ind = clean_line.casefold().rfind('game') + 4
@@ -558,7 +571,7 @@ def save():
     for gm in all_games:
         if gm.name not in config:
             config[gm.name] = {}
-        config[gm.name]['SteamID'] = str(gm.steamID)
+        config[gm.name]['SteamID'] = gm.steamID
         config[gm.name]['Dir'] = gm.root
     config.save()
 
@@ -571,7 +584,7 @@ def load():
             try:
                 new_game = Game(
                     gm,
-                    int(config[gm]['SteamID']),
+                    config[gm]['SteamID'],
                     config[gm]['Dir'],
                 )
             except ValueError:
@@ -608,7 +621,7 @@ def add_game(_=None, refresh_menu=True):
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
-        if name == "ERR" or gm_id == -1:
+        if name is None or gm_id is None:
             messagebox.showinfo(
                 message='This does not appear to be a valid game folder!',
                 parent=TK_ROOT,
@@ -681,7 +694,7 @@ def remove_game(_=None):
         add_menu_opts(game_menu)
 
 
-def add_menu_opts(menu, callback=None):
+def add_menu_opts(menu: Menu, callback=None):
     """Add the various games to the menu."""
     global selectedGame_radio, setgame_callback
     if callback is not None:

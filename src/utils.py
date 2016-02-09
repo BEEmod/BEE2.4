@@ -850,7 +850,8 @@ class Vec:
         If no value is given, that axis will be set to 0.
         A sequence can be passed in (as the x argument), which will use
         the three args as x/y/z.
-        :type x: int | float | Vec | list[float]
+
+        :type x: int | float | Vec | list[str | int | float]
         """
         if isinstance(x, (int, float)):
             self.x = float(x)
