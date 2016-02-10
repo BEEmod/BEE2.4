@@ -85,21 +85,18 @@ EXE_SUFFIX = (
     ''
 )
 
+
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
 
     Valve's items use special translation strings which would look ugly
     if we didn't convert them.
     """
-    global trans_data
     try:
         with open('../basemodui.txt') as trans:
             trans_prop = Property.parse(trans, 'basemodui.txt')
-        trans_data = {
-            item.real_name: item.value
-            for item in
-            trans_prop.find_key("lang", []).find_key("tokens", [])
-        }
+        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
+            trans_data[item.real_name] = item.value
     except IOError:
         pass
 
