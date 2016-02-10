@@ -53,6 +53,9 @@ INJECT_FILES = {
     # The list of soundscripts that the game loads.
     'soundscript_manifest.txt': 'scripts/game_sounds_manifest.txt',
 
+    # The list of particles that the game loads.
+    'particles_manifest.txt': 'particles/particles_manifest.txt',
+
     # A generated soundscript for the current music.
     'music_script.txt': 'scripts/BEE2_generated_music.txt'
 }
@@ -289,17 +292,21 @@ def pack_file(zipfile: ZipFile, filename):
         LOGGER.warning('"bee2/' + filename + '" not found!')
 
 
-def gen_sound_manifest(additional, has_music=False):
+def gen_sound_manifest(additional):
     """Generate a new game_sounds_manifest.txt file.
 
     This includes all the current scripts defined, plus any custom ones.
     """
+    if not additional:
+        return  # Don't pack, there aren't any new sounds..
+
     orig_manifest = os.path.join(
         '..',
         SOUND_MAN_FOLDER.get(CONF['game_id', ''], 'portal2'),
         'scripts',
         'game_sounds_manifest.txt',
     )
+
     try:
         with open(orig_manifest) as f:
             props = Property.parse(f, orig_manifest).find_key(
@@ -325,6 +332,48 @@ def gen_sound_manifest(additional, has_music=False):
         for line in new_props.export():
             f.write(line)
     LOGGER.info('Written new soundscripts_manifest..')
+
+
+def gen_part_manifest(additional):
+    """Generate a new particle system manifest file.
+
+    This includes all the current ones defined, plus any custom ones.
+    """
+    if not additional:
+        return  # Don't pack, there aren't any new particles..
+
+    orig_manifest = os.path.join(
+        '..',
+        GAME_FOLDER.get(CONF['game_id', ''], 'portal2'),
+        'particles',
+        'particles_manifest.txt',
+    )
+
+    try:
+        with open(orig_manifest) as f:
+            props = Property.parse(f, orig_manifest).find_key(
+                'particles_manifest', [],
+            )
+    except FileNotFoundError:  # Assume no particles
+        props = Property('particles_manifest', [])
+
+    parts = [prop.value for prop in props.find_all('file')]
+
+    for particle in additional:
+        parts.append(particle)
+
+    # Build and unbuild it to strip comments and similar lines.
+    new_props = Property('particles_manifest', [
+        Property('file', file)
+        for file in parts
+    ])
+
+    inject_loc = os.path.join('bee2', 'inject', 'particles_manifest.txt')
+    with open(inject_loc, 'w') as f:
+        for line in new_props.export():
+            f.write(line)
+
+    LOGGER.info('Written new particles_manifest..')
 
 
 def generate_music_script(data: Property, pack_list):
@@ -430,6 +479,8 @@ def pack_content(path, is_peti):
     """
     files = set()  # Files to pack.
     soundscripts = set()  # Soundscripts need to be added to the manifest too..
+    particles = set()
+
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
     except (IOError, FileNotFoundError):
@@ -443,6 +494,10 @@ def pack_content(path, is_peti):
                 if line[:1] == '#':
                     line = line[1:]
                     soundscripts.add(line)
+
+                # We need to add particle systems to a manifest.
+                if line.startswith('particles/'):
+                    particles.add(line)
 
                 files.add(line)
 
@@ -477,6 +532,7 @@ def pack_content(path, is_peti):
         pack_file(zipfile, file)
 
     gen_sound_manifest(soundscripts)
+    gen_part_manifest(particles)
 
     inject_files(zipfile)
 
