@@ -23,7 +23,7 @@ if __name__ == '__main__':
     else:
         # We need to initiallise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
-        LOGGER = utils.init_logging('../logs/BEE2-error.log')
+        LOGGER = utils.init_logging('../logs/BEE2.log')
 
 from tkinter import messagebox
 

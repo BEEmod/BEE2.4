@@ -68,4 +68,4 @@ vpk_cache/
 config/
 
 # Logs
-BEE2-error.log*
+BEE2.log*
