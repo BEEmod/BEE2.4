@@ -12,6 +12,7 @@ from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
 
+from enum import Enum
 import functools
 import webbrowser
 
@@ -29,12 +30,7 @@ LOGGER = utils.getLogger(__name__)
 
 OPEN_IN_TAB = 2
 
-wid = dict()
-
-# Holds the 5 sprite labels
-wid['subitem'] = [0, 0, 0, 0, 0]
-wid['sprite'] = [0, 0, 0, 0, 0]
-
+wid = {}
 
 selected_item = None # type: UI.Item
 selected_sub_item = None  # type: UI.PalItem
@@ -62,6 +58,20 @@ ROT_TYPES = {
     "handle_36_directions": "rot_36",
     "handle_catapult":      "rot_catapult"
 }
+
+class SPR(Enum):
+    """The slots for property-indicating sprites. The value is the column."""
+    INPUT = 0
+    OUTPUT = 1
+    ROTATION = 2
+    COLLISION = 3
+    FACING = 4
+
+
+def set_sprite(pos, sprite):
+    """Set one of the property sprites to a value."""
+    widget = wid['sprite', pos]
+    widget['image'] = png.spr(sprite)
 
 
 def pos_for_item():
@@ -134,7 +144,7 @@ def show_prop(widget, warp_cursor=False):
     selected_sub_item = widget
     is_open = True
 
-    icon_widget = wid['subitem'][pos_for_item()]
+    icon_widget = wid['subitem', pos_for_item()]
 
     # Calculate the pixel offset between the window and the subitem in
     # the properties dialog, and shift if needed to keep it inside the
@@ -196,12 +206,12 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem'][ind]['image'] = png.png('BEE2/alpha_64')
+            wid['subitem', ind]['image'] = png.png('BEE2/alpha_64')
         else:
-            wid['subitem'][ind]['image'] = selected_item.get_icon(pos)
-        wid['subitem'][ind]['relief'] = 'flat'
+            wid['subitem', ind]['image'] = selected_item.get_icon(pos)
+        wid['subitem', ind]['relief'] = 'flat'
 
-    wid['subitem'][pos_for_item()]['relief'] = 'raised'
+    wid['subitem', pos_for_item()]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data['auth'])
     wid['name']['text'] = selected_sub_item.name
@@ -283,21 +293,22 @@ def load_item_data():
 
     if has_inputs:
         if has_polarity:
-            wid['sprite'][0]['image'] = png.spr('in_polarity')
+            set_sprite(SPR.INPUT, 'in_polarity')
         else:
-            wid['sprite'][0]['image'] = png.spr('in_norm')
+            set_sprite(SPR.INPUT, 'in_norm')
     else:
-        wid['sprite'][0]['image'] = png.spr('in_none')
+        set_sprite(SPR.INPUT, 'in_none')
 
     if has_outputs:
         if has_timer:
-            wid['sprite'][1]['image'] = png.spr('out_tim')
+            set_sprite(SPR.OUTPUT, 'out_tim')
         else:
-            wid['sprite'][1]['image'] = png.spr('out_norm')
+            set_sprite(SPR.OUTPUT, 'out_norm')
     else:
-        wid['sprite'][1]['image'] = png.spr('out_none')
+        set_sprite(SPR.OUTPUT, 'out_none')
 
-    wid['sprite'][2]['image'] = png.spr(
+    set_sprite(
+        SPR.ROTATION,
         ROT_TYPES.get(
             rot_type.casefold(),
             'rot_none',
@@ -305,9 +316,9 @@ def load_item_data():
     )
 
     if is_embed:
-        wid['sprite'][3]['image'] = png.spr('space_embed')
+        set_sprite(SPR.COLLISION, 'space_embed')
     else:
-        wid['sprite'][3]['image'] = png.spr('space_none')
+        set_sprite(SPR.COLLISION, 'space_none')
 
     face_spr = "surf"
     if not surf_wall:
@@ -318,15 +329,18 @@ def load_item_data():
         face_spr += "_ceil"
     if face_spr == "surf":
         face_spr += "_none"
-    wid['sprite'][4]['image'] = png.spr(face_spr)
+
+    set_sprite(SPR.FACING, face_spr)
 
 
 def follow_main(_=None):
     """Move the properties window to keep a relative offset to the main window.
 
     """
-    prop_window.geometry('+'+str(prop_window.relX+TK_ROOT.winfo_x()) +
-                         '+'+str(prop_window.relY+TK_ROOT.winfo_y()))
+    prop_window.geometry('+{x}+{y}'.format(
+        x=prop_window.relX + TK_ROOT.winfo_x(),
+        y=prop_window.relY + TK_ROOT.winfo_y(),
+    ))
 
 
 def hide_context(_=None):
@@ -340,7 +354,7 @@ def hide_context(_=None):
 
 def init_widgets():
     """Initiallise all the window components."""
-    global prop_window, moreinfo_win
+    global prop_window
     prop_window = Toplevel(TK_ROOT)
     prop_window.overrideredirect(1)
     prop_window.resizable(False, False)
@@ -362,7 +376,7 @@ def init_widgets():
             column=0,
             columnspan=3,
             sticky="EW",
-            )
+        )
 
     wid['name'] = ttk.Label(f, text="", anchor="center")
     wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
@@ -381,18 +395,18 @@ def init_widgets():
 
     sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
-    for i, _ in enumerate(wid['subitem']):
-        wid['subitem'][i] = ttk.Label(
+    for i in range(5):
+        wid['subitem', i] = ttk.Label(
             sub_frame,
             image=png.png('BEE2/alpha_64'),
         )
-        wid['subitem'][i].grid(row=0, column=i)
+        wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
-            wid['subitem'][i],
+            wid['subitem', i],
             functools.partial(sub_sel, i),
         )
         utils.bind_rightclick(
-            wid['subitem'][i],
+            wid['subitem', i],
             functools.partial(sub_open, i),
         )
 
@@ -403,16 +417,19 @@ def init_widgets():
         row=4,
         column=0,
         sticky="SW",
-        )
+    )
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
-    for i in range(5):
-        spr = png.spr('ap_grey')
-        wid['sprite'][i] = ttk.Label(spr_frame, image=spr, relief="raised")
-        wid['sprite'][i].grid(row=0, column=i)
+    for spr_id in SPR:
+        wid['sprite', spr_id] = sprite = ttk.Label(
+            spr_frame,
+            image=png.spr('ap_grey'),
+            relief="raised",
+        )
+        sprite.grid(row=0, column=spr_id.value)
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
