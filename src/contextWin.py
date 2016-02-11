@@ -67,11 +67,43 @@ class SPR(Enum):
     COLLISION = 3
     FACING = 4
 
+SPRITE_TOOL = {
+    # The tooltips associated with each sprite.
+    'rot_0': 'This item may not be rotated.',
+    'rot_4': 'This item can be pointed in 4 directions.',
+    'rot_5': 'This item can be positioned on the sides and center.',
+    'rot_6': 'This item can be centered in two directions, plus on the sides.',
+    'rot_8': 'This item can be placed like light strips.',
+    'rot_36': 'This item can be rotated on the floor to face 360 degrees.',
+    'rot_catapult': 'This item is positioned using a catapult trajectory.',
+
+    'in_none': 'This item does not accept any inputs.',
+    'in_norm': 'This item accepts inputs.',
+    'in_polarity': 'Excursion Funnels accept a on/off input and a directional input.',
+
+    'out_none': 'This item does not output.',
+    'out_norm': 'This item has an output.',
+    'out_tim': 'This item has a timed output.',
+
+    'space_none': 'This item does not take up any space inside walls.',
+    'space_embed': 'This item takes space inside the wall.',
+
+    'surf_none': 'This item cannot be placed anywhere...',
+    'surf_ceil': 'This item can only be attached to ceilings.',
+    'surf_floor': 'This item can only be placed on the floor.',
+    'surf_floor_ceil': 'This item can be placed on floors and ceilings.',
+    'surf_wall': 'This item can be placed on walls only.',
+    'surf_wall_ceil': 'This item can be attached to walls and ceilings.',
+    'surf_wall_floor': 'This item can be placed on floors and walls.',
+    'surf_wall_floor_ceil': 'This item can be placed in any orientation.',
+}
+
 
 def set_sprite(pos, sprite):
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
     widget['image'] = png.spr(sprite)
+    widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
 
 
 def pos_for_item():
@@ -376,12 +408,12 @@ def init_widgets():
         f,
         text="Properties:",
         anchor="center",
-        ).grid(
-            row=0,
-            column=0,
-            columnspan=3,
-            sticky="EW",
-        )
+    ).grid(
+        row=0,
+        column=0,
+        columnspan=3,
+        sticky="EW",
+    )
 
     wid['name'] = ttk.Label(f, text="", anchor="center")
     wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
@@ -392,7 +424,7 @@ def init_widgets():
         anchor="e",
         compound="left",
         image=png.spr('gear_ent'),
-        )
+    )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
@@ -435,6 +467,7 @@ def init_widgets():
             relief="raised",
         )
         sprite.grid(row=0, column=spr_id.value)
+        tooltip.add_tooltip(sprite)
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
