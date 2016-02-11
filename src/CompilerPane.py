@@ -105,7 +105,7 @@ def set_corr_values(group_name, props):
     group = CORRIDOR[group_name] = ['Random'] + [
         str(i) + ': Corridor'
         for i in
-        range(1, count+1)
+        range(1, count + 1)
     ]
     for prop in props[group_name]:
         try:
@@ -201,6 +201,7 @@ def set_screenshot(img=None):
         except IOError:  # Image doesn't exist!
             # In that case, use a black image
             img = Image.new('RGB', (1, 1), color=(0, 0, 0))
+    # Make a smaller image for showing in the UI..
     tk_img = img.resize(
         (
             int(PETI_WIDTH // 3.5),
@@ -321,7 +322,7 @@ def make_pane(tool_frame):
     UI['thumb_cleanup'].grid(row=3, columnspan=2, sticky='W')
     add_tooltip(
         UI['thumb_auto'],
-        "Override the map image to use a screenshot automatically taken"
+        "Override the map image to use a screenshot automatically taken "
         "from the beginning of a chamber. Press F5 to take a new "
         "screenshot. If the map has not been previewed recently "
         "(within the last few hours), the default PeTI screenshot "
@@ -343,7 +344,7 @@ def make_pane(tool_frame):
 
     add_tooltip(
         UI['thumb_label'],
-        custom_tooltip
+        custom_tooltip,
     )
 
     add_tooltip(

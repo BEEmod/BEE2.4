@@ -1213,6 +1213,11 @@ def init_option(f):
         width=8,
         )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
+    tooltip.add_tooltip(
+        UI['conf_voice'],
+        'Enable or disable particular voice lines, to prevent them from '
+        'being added.',
+    )
 
     # Make all the selector window textboxes
     style_win.widget(props).grid(row=0, column=1, sticky='EW')

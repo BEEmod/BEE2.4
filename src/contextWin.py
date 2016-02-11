@@ -420,12 +420,18 @@ def init_widgets():
 
     wid['ent_count'] = ttk.Label(
         f,
-        text="2",
+        text="",
         anchor="e",
         compound="left",
         image=png.spr('gear_ent'),
     )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
+    tooltip.add_tooltip(
+        wid['ent_count'],
+        'The number of entities used for this item. The Source engine limits '
+        'this to 2048 in total. This provides a guide to how many of these '
+        'items can be placed in a map at once.'
+    )
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
     wid['author'].grid(row=2, column=0, columnspan=3, sticky="EW")
