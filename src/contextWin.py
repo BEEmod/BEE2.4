@@ -328,6 +328,11 @@ def load_item_data():
     if not surf_ceil:
         face_spr += "_ceil"
     if face_spr == "surf":
+        # This doesn't seem right - this item won't be placeable at all...
+        LOGGER.warning(
+            "Item <{}> disallows all orientations. Is this right?",
+            selected_item.id,
+        )
         face_spr += "_none"
 
     set_sprite(SPR.FACING, face_spr)
