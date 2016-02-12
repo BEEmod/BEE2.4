@@ -3,10 +3,33 @@ import random
 
 from property_parser import Property
 from conditions import (
-    Condition, make_result, make_result_setup, RES_EXHAUSTED,
+    Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
 import conditions
 import utils
+
+
+@make_flag('random')
+def flag_random(inst, res: Property):
+    """Randomly is either true or false."""
+    if res.has_children():
+        chance = res['chance', '100']
+        seed = res['seed', '']
+    else:
+        chance = res.value
+        seed = ''
+
+    # Allow ending with '%' sign
+    chance = utils.conv_int(chance.rstrip('%'), 100)
+
+    random.seed('random_chance_{}:{}_{}_{}'.format(
+        seed,
+        inst['targetname', ''],
+        inst['origin'],
+        inst['angles'],
+    ))
+    return random.randrange(100) < chance
+
 
 @make_result_setup('random')
 def res_random_setup(res):
@@ -125,7 +148,7 @@ def res_add_variant(inst, res):
         random.seed(inst['targetname'] + inst['origin'] + inst['angles'])
     conditions.add_suffix(inst, "_var" + str(random.choice(res.value) + 1))
 
-    
+
 @make_result('RandomNum')
 def res_rand_num(inst, res):
     """Generate a random number and save in a fixup value.
