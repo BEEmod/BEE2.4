@@ -51,7 +51,7 @@ def hook_tk_errors():
             ),
         )
         # Close loading screens if they're visible..
-        loadScreen.LoadScreen.close_all()
+        loadScreen.close_all()
 
         # Release the grab, if it exists. Otherwise you can't see the error dialog.
         TK_ROOT.grab_set_global()

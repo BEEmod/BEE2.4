@@ -141,7 +141,7 @@ if __name__ == '__main__':
 
     except Exception as e:
         # Close loading screens if they're visible..
-        loadScreen.LoadScreen.close_all()
+        loadScreen.close_all()
 
         # Grab and release the grab so nothing else can block the error message.
         TK_ROOT.grab_set_global()
