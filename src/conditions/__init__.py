@@ -46,6 +46,15 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
 
+class SWITCH_TYPE(Enum):
+    """The methods useable for switch options."""
+    FIRST = 'first'  # choose the first match
+    LAST = 'last'  # choose the last match
+    RANDOM = 'random'  # Randomly choose
+    ALL = 'all'  # Run all matching commands
+
+
+
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
     """
@@ -258,11 +267,15 @@ class Condition:
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
-            elif prop.name == 'condition':
+
+            elif prop.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
                 results.append(prop)
             elif prop.name == 'elsecondition':
                 prop.name = 'condition'
+                else_results.append(prop)
+            elif prop.name == 'elseswitch':
+                prop.name = 'switch'
                 else_results.append(prop)
             elif prop.name == 'priority':
                 try:
@@ -1461,6 +1474,61 @@ def res_end_condition(base_inst, res):
     """
     raise EndCondition
 
+
+@make_result_setup('switch')
+def res_switch_setup(res):
+    flag = None
+    method = SWITCH_TYPE.FIRST
+    cases = []
+    for prop in res:
+        if prop.has_children():
+            cases.append(prop)
+        else:
+            if prop.name == 'flag':
+                flag = prop.value
+                continue
+            if prop.name == 'method':
+                try:
+                    method = SWITCH_TYPE(prop.value.casefold())
+                except ValueError:
+                    pass
+
+    for prop in cases:
+        for result in prop.value:
+            Condition.setup_result(prop.value, result)
+
+    if method is SWITCH_TYPE.LAST:
+        cases[:] = cases[::-1]
+
+    return (
+        flag,
+        cases,
+        method,
+    )
+
+
+@make_result('switch')
+def res_switch(inst, res):
+    """Run the same flag multiple times with different arguments.
+
+    'method' is the way the search is done - first, last, random, or all.
+    'flag' is the name of the flag.
+    """
+    flag_name, cases, method = res.value
+
+    if method is SWITCH_TYPE.RANDOM:
+        cases = cases[:]
+        random.shuffle(cases)
+
+    for case in cases:
+        flag = Property(flag_name, case.real_name)
+        if not check_flag(flag, inst):
+            continue
+        for res in case:
+            Condition.test_result(inst, res)
+        if method is not SWITCH_TYPE.ALL:
+            # All does them all, otherwise we quit now.
+            break
 
 
 @make_result_setup('staticPiston')
