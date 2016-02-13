@@ -67,178 +67,178 @@ INJECT_FILES = {
 # SNDLVL_NONE means it's infinite range.
 MUSIC_START = """\
 "music.BEE2{name}"
- {{
- "channel" "CHAN_STATIC"
- "soundlevel" "SNDLVL_NONE"
- "volume" "{vol}"
+{{
+"channel" "CHAN_STATIC"
+"soundlevel" "SNDLVL_NONE"
+"volume" "{vol}"
 """
 
 # The basic operator stack for music without any additional tracks.
 MUSIC_BASE = """\
- "soundentry_version" "2"
- "operator_stacks"
-  {
-  "update_stack"
-   {
-   "import_stack" "update_music_stereo"
+"soundentry_version" "2"
+"operator_stacks"
+\t{
+\t"update_stack"
+\t\t{
+\t\t"import_stack" "update_music_stereo"
 """
 
 # We need to stop the sub-tracks after the main track stops...
 MUSIC_END = """\
-   }
-  "stop_stack"
-   {
-   "stop_entry"
-    {
-    "operator" "sys_stop_entries"
-    "input_max_entries" "0"
-    "match_entity" "false"
-    "match_substring" "true"
-    "match_entry" "music.BEE2"
-    }
-   }
-  }
- }
+\t\t}
+\t"stop_stack"
+\t\t{
+\t\t"stop_entry"
+\t\t\t{
+\t\t\t"operator" "sys_stop_entries"
+\t\t\t"input_max_entries" "0"
+\t\t\t"match_entity" "false"
+\t\t\t"match_substring" "true"
+\t\t\t"match_entry" "music.BEE2"
+\t\t\t}
+\t\t}
+\t}
+}
 """
 
 # Operator stacks which enable the given gel types.
 MUSIC_GEL_BOUNCE_MAIN = """\
 
-   "import_stack" "p2_update_music_play_gel"
-   "gel_play_entry"
-    {
-    "entry_name" "music.BEE2_gel_bounce"
-    }
-   "gel_stop_entry"
-    {
-    "match_entry" "music.BEE2_gel_bounce"
-    }
+\t\t"import_stack" "p2_update_music_play_gel"
+\t\t"gel_play_entry"
+\t\t\t{
+\t\t\t"entry_name" "music.BEE2_gel_bounce"
+\t\t\t}
+\t\t"gel_stop_entry"
+\t\t\t{
+\t\t\t"match_entry" "music.BEE2_gel_bounce"
+\t\t\t}
 """
 
 MUSIC_GEL_SPEED_MAIN = """\
 
-   "import_stack" "p2_update_music_play_speed_gel"
-   "speed_velocity_trigger"
-    {
-    "input2" "250"
-    }
-   "speed_play_entry"
-    {
-    "entry_name" "music.BEE2_gel_speed"
-    }
-   "speed_stop_entry"
-    {
-    "match_entry" "music.BEE2_gel_speed"
-    }
+\t\t"import_stack" "p2_update_music_play_speed_gel"
+\t\t"speed_velocity_trigger"
+\t\t\t{
+\t\t\t"input2" "250"
+\t\t\t}
+\t\t"speed_play_entry"
+\t\t\t{
+\t\t\t"entry_name" "music.BEE2_gel_speed"
+\t\t\t}
+\t\t"speed_stop_entry"
+\t\t\t{
+\t\t\t"match_entry" "music.BEE2_gel_speed"
+\t\t\t}
 """
 
 MUSIC_FUNNEL_MAIN = """\
 
-  "import_stack" "p2_update_music_play_tbeam"
-  "play_entry"
-   {
-   "entry_name" "music.BEE2_funnel"
-   }
-  "stop_entry"
-   {
-   "match_entry" "music.BEE2_funnel"
-   }
+\t"import_stack" "p2_update_music_play_tbeam"
+\t"play_entry"
+\t\t{
+\t\t"entry_name" "music.BEE2_funnel"
+\t\t}
+\t"stop_entry"
+\t\t{
+\t\t"match_entry" "music.BEE2_funnel"
+\t\t}
 """
 
 # The gel operator stack syncronises the music with the base track.
 MUSIC_GEL_STACK = """\
 
- "soundentry_version" "2"
- "operator_stacks"
-  {
-  "start_stack"
-   {
-   "import_stack" "start_sync_to_entry"
-   "elapsed_time"
-    {
-    "entry" "music.BEE2"
-    }
-   "duration_div"
-    {
-    "input2" "1"
-    }
-   "div_mult"
-    {
-    "input1" "1.0"
-    }
-   }
-  "update_stack"
-   {
-   "import_stack" "update_music_stereo"
-   "volume_fade_in"
-    {
-     "input_max" "0.25"
-    }
-   "volume_fade_out"
-    {
-    "input_max" "1.0"
-    }
-   }
-  }
- }
+"soundentry_version" "2"
+"operator_stacks"
+\t{
+\t"start_stack"
+\t\t{
+\t\t"import_stack" "start_sync_to_entry"
+\t\t"elapsed_time"
+\t\t\t{
+\t\t\t"entry" "music.BEE2"
+\t\t\t}
+\t\t"duration_div"
+\t\t\t{
+\t\t\t"input2" "1"
+\t\t\t}
+\t\t"div_mult"
+\t\t\t{
+\t\t\t"input1" "1.0"
+\t\t\t}
+\t\t}
+\t"update_stack"
+\t\t{
+\t\t"import_stack" "update_music_stereo"
+\t\t"volume_fade_in"
+\t\t\t{
+\t\t\t"input_max" "0.25"
+\t\t\t}
+\t\t"volume_fade_out"
+\t\t\t{
+\t\t\t"input_max" "1.0"
+\t\t\t}
+\t\t}
+\t}
+}
 """
 
 # The funnel operator statck makes it start randomly offset into the music..
 MUSIC_FUNNEL_STACK = """\
 
- "soundentry_version" "2"
- "operator_stacks"
-  {
-  "start_stack"
-   {
-   "random_offset"
-    {
-    "operator" "math_random"
-    "input_min" "0.0"
-    "input_max" "126"
-    }
-   "negative_delay"
-    {
-    "operator" "math_float"
-    "apply" "mult"
-    "input1" "@random_offset.output"
-    "input2" "-1.0"
-    }
-   "delay_output"
-    {
-    "operator" "sys_output"
-    "input_float" "@negative_delay.output"
-    "output" "delay"
-    }
-   }
-  "update_stack"
-   {
-   "import_stack" "update_music_stereo"
-   "mixer"
-    {
-    "mixgroup" "unduckedMusic"
-    }
-   "volume_fade_in"
-    {
-    "input_max" "3.0"
-    "input_map_min" "0.05"
-    }
-   "volume_fade_out"
-    {
-    "input_max" "0.75"
-    "input_map_min" "0.05"
-    }
-   "volume_lfo_time_scale"
-    {
-    "input2" "0.3"
-    }
-   "volume_lfo_scale"
-    {
-    "input2" "0.4"
-    }
-   }
-  }
- }
+"soundentry_version" "2"
+"operator_stacks"
+\t{
+\t"start_stack"
+\t\t{
+\t\t"random_offset"
+\t\t\t{
+\t\t\t"operator" "math_random"
+\t\t\t"input_min" "0.0"
+\t\t\t"input_max" "126"
+\t\t\t}
+\t\t"negative_delay"
+\t\t\t{
+\t\t\t"operator" "math_float"
+\t\t\t"apply" "mult"
+\t\t\t"input1" "@random_offset.output"
+\t\t\t"input2" "-1.0"
+\t\t\t}
+\t\t"delay_output"
+\t\t\t{
+\t\t\t"operator" "sys_output"
+\t\t\t"input_float" "@negative_delay.output"
+\t\t\t"output" "delay"
+\t\t\t}
+\t\t}
+\t\t"update_stack"
+\t\t\t{
+\t\t\t"import_stack" "update_music_stereo"
+\t\t\t"mixer"
+\t\t\t\t{
+\t\t\t\t"mixgroup" "unduckedMusic"
+\t\t\t\t}
+\t\t\t"volume_fade_in"
+\t\t\t\t{
+\t\t\t\t"input_max" "3.0"
+\t\t\t\t"input_map_min" "0.05"
+\t\t\t\t}
+\t\t\t"volume_fade_out"
+\t\t\t\t{
+\t\t\t\t"input_max" "0.75"
+\t\t\t\t"input_map_min" "0.05"
+\t\t\t\t}
+\t\t\t"volume_lfo_time_scale"
+\t\t\t\t{
+\t\t\t\t"input2" "0.3"
+\t\t\t\t}
+\t\t\t"volume_lfo_scale"
+\t\t\t\t{
+\t\t\t\t"input2" "0.4"
+\t\t\t\t}
+\t\t\t}
+\t\t}
+\t}
 """
 
 
@@ -437,16 +437,19 @@ def generate_music_script(data: Property, pack_list):
 
         if has_funnel:
             # Write the 'music.BEE2_funnel' sound entry
+            file.write('\n')
             file.write(MUSIC_START.format(name='_funnel', vol='1'))
             write_sound(file, funnel, pack_list, snd_prefix='*')
             file.write(MUSIC_FUNNEL_STACK)
 
         if has_bounce:
+            file.write('\n')
             file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
             write_sound(file, bounce, pack_list, snd_prefix='*')
             file.write(MUSIC_GEL_STACK)
 
         if speed.value:
+            file.write('\n')
             file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
             write_sound(file, speed, pack_list, snd_prefix='*')
             file.write(MUSIC_GEL_STACK)
@@ -458,19 +461,19 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
     snd_prefix is the prefix for each filename - *, #, @, etc.
     """
     if snds.has_children():
-        file.write(' "rndwave"\n  {\n')
+        file.write('"rndwave"\n\t{\n')
         for snd in snds:
             file.write(
-                '  "wave" "{sndchar}{file}"\n'.format(
+                '\t"wave" "{sndchar}{file}"\n'.format(
                     file=snd.value,
                     sndchar=snd_prefix,
                 )
             )
             pack_list.add('sound/' + snd.value.casefold())
-        file.write('  }\n')
+        file.write('\t}\n')
     else:
         file.write(
-            ' "wave" "{sndchar}{file}"\n'.format(
+            '"wave" "{sndchar}{file}"\n'.format(
                 file=snds.value,
                 sndchar=snd_prefix,
             )
