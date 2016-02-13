@@ -1227,6 +1227,7 @@ def retexture_template(
                 )
 
     for over in template_data.overlay[:]:
+        random.seed('TEMP_OVERLAY_' + over['basisorigin'])
         mat = over['material'].casefold()
         if mat in replace_tex:
             over['material'] = mat = random.choice(replace_tex[mat])
