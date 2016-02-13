@@ -83,6 +83,24 @@ MUSIC_BASE = """\
    "import_stack" "update_music_stereo"
 """
 
+# We need to stop the sub-tracks after the main track stops...
+MUSIC_END = """\
+   }
+  "stop_stack"
+   {
+   "stop_entry"
+    {
+    "operator" "sys_stop_entries"
+    "input_max_entries" "0"
+    "match_entity" "false"
+    "match_substring" "true"
+    "match_entry" "music.BEE2"
+    }
+   }
+  }
+ }
+"""
+
 # Operator stacks which enable the given gel types.
 MUSIC_GEL_BOUNCE_MAIN = """\
 
@@ -415,7 +433,7 @@ def generate_music_script(data: Property, pack_list):
             file.write(MUSIC_GEL_SPEED_MAIN)
 
         # End the main sound block
-        file.write("  }\n }\n}\n")
+        file.write(MUSIC_END)
 
         if has_funnel:
             # Write the 'music.BEE2_funnel' sound entry
