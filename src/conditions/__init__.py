@@ -878,9 +878,9 @@ def get_template(temp_name):
         # list all the templates that are available.
         LOGGER.info('Templates:')
         LOGGER.info('\n'.join(
-            ('* "' + temp + '"')
+            ('* "' + temp.upper() + '"')
             for temp in
-            TEMPLATES.keys()
+            sorted(TEMPLATES.keys())
         ))
         # Overwrite the error's value
         err.args = ('Template not found: "{}"'.format(temp_name),)
