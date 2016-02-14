@@ -223,6 +223,10 @@ class Property:
 
         # A queue of the properties we are currently in (outside to inside).
         open_properties = [cur_block]
+
+        # Do we require a block to be opened next? ("name"\n must have { next.)
+        requires_block = False
+
         for line_num, line in file_iter:
             if isinstance(line, bytes):
                 # Decode bytes using utf-8
@@ -238,25 +242,29 @@ class Property:
                 name = line_contents[1]
                 try:
                     value = line_contents[3]
-                except IndexError:  # It doesn't have a value, likely a block
-                    value = None
+                except IndexError:  # It doesn't have a value - it's a block.
+                    cur_block.append(Property(name, ''))
+                    requires_block = True  # Ensure the next token must be a '{'.
+                    continue  # Ensure we skip the check for the above value
+
+                # Special case - comment between name/value sections -
+                # it's a name block then.
+                if line_contents[2].lstrip().startswith('//'):
+                    cur_block.append(Property(name, ''))
+                    requires_block = True
+                    continue
                 else:
-                    # Special case - comment between name/value sections -
-                    # it's a name block then.
-                    if line_contents[2].lstrip().startswith('//'):
-                        value = None
-                        del line_contents[3:]
-                    else:
-                        if len(line_contents) < 5:
-                            # It's a multiline value - no ending quote!
-                            value += read_multiline_value(
-                                file_iter,
-                                line_num,
-                                filename,
-                            )
-                        if value and '\\' in value:
-                            for orig, new in REPLACE_CHARS.items():
-                                value = value.replace(orig, new)
+                    if len(line_contents) < 5:
+                        # It's a multiline value - no ending quote!
+                        value += read_multiline_value(
+                            file_iter,
+                            line_num,
+                            filename,
+                        )
+                    if value and '\\' in value:
+                        for orig, new in REPLACE_CHARS.items():
+                            value = value.replace(orig, new)
+
                 # Line_contents[4] is the start of the comment, check for [] flags.
                 if len(line_contents) >= 5:
                     if read_flag(line_contents[4], filename, line_num):
@@ -266,15 +274,15 @@ class Property:
                     cur_block.append(Property(name, value))
 
             elif freshline.startswith('{'):
-                # Open a new block.
-                # If we're expecting a block, the value will be None.
-                if cur_block[-1].value is not None:
+                # Open a new block - make sure the last token was a name..
+                if not requires_block:
                     raise KeyValError(
-                        'Property cannot have sub-section if it already'
+                        'Property cannot have sub-section if it already '
                         'has an in-line value.',
                         filename,
                         line_num,
                     )
+                requires_block = False
                 cur_block = cur_block[-1]
                 cur_block.value = []
                 open_properties.append(cur_block)
@@ -291,15 +299,25 @@ class Property:
                         line_num,
                     )
 
-            # handle name bare on one line, will need a brace on
-            # the next line
+            # Handle name bare on one line - it's a name block. This is used
+            # in VMF files...
             elif is_identifier(freshline):
-                cur_block.append(Property(freshline, None))
+                cur_block.append(Property(freshline, ''))
+                requires_block = True
+                continue
             else:
                 raise KeyValError(
                     "Unexpected beginning character '"
                     + freshline[0]
                     + '"!',
+                    filename,
+                    line_num,
+                )
+
+            # A "name" line was found, but it wasn't followed by '{'!
+            if requires_block:
+                raise KeyValError(
+                    "Block opening ('{') required!",
                     filename,
                     line_num,
                 )
