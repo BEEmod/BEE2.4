@@ -44,6 +44,7 @@ class ConfigFile(ConfigParser):
 
     def save(self):
         """Write our values out to disk."""
+        LOGGER.info('Saving changes in config "{}"!', self.filename)
         if self.filename is None:
             return
         self.has_changed = False
@@ -58,7 +59,6 @@ class ConfigFile(ConfigParser):
     def save_check(self):
         """Check to see if we have different values, and save if needed."""
         if self.has_changed:
-            LOGGER.info('Saving changes in config "{}"!', self.filename)
             self.save()
 
     def set_defaults(self, def_settings):
