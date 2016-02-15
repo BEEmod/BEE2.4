@@ -45,12 +45,14 @@ def do_copy(zip_list, done_files):
         with zip_file:
             for path in zip_names(zip_file):
                 loc = os.path.normcase(path)
-                if loc.startswith("resources"):
-                    # Don't re-extract images
-                    if not loc.startswith(img_loc):
-                        zip_file.extract(path, path=cache_path)
-                    with done_files.get_lock():
-                        done_files.value += 1
+                if not loc.startswith("resources"):
+                    continue
+                # Don't re-extract images
+                if loc.startswith(img_loc):
+                    continue
+                zip_file.extract(path, path=cache_path)
+                with done_files.get_lock():
+                    done_files.value += 1
 
 
 def start_copying(zip_list):
@@ -63,6 +65,7 @@ def start_copying(zip_list):
     LOGGER.info('Starting background process!')
     copy_process.start()
     TK_ROOT.after(UPDATE_INTERVAL, update)
+
 
 def update():
     """Check the progress of the copying until it's done.
