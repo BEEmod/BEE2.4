@@ -1,6 +1,7 @@
 # coding=utf-8
 from tkinter import *
 from tkinter import ttk
+from tkinter import messagebox
 from tk_tools import TK_ROOT
 
 from BEE2_config import GEN_OPTS
@@ -59,6 +60,40 @@ def save():
 
     for func in refresh_callbacks:
         func()
+
+
+def clear_caches():
+    """Wipe the cache times in configs.
+
+     This will force package resources to be extracted again.
+     """
+    import gameMan
+    import packageLoader
+
+    restart_ok = messagebox.askokcancel(
+        title='Allow Restart?',
+        message='Restart the BEE2 to re-extract packages?',
+    )
+
+    if not restart_ok:
+        return
+
+    for game in gameMan.all_games:
+        game.mod_time = 0
+        game.save()
+    GEN_OPTS['General']['cache_time'] = '0'
+
+    for pack_id in packageLoader.packages:
+        packageLoader.PACK_CONFIG[pack_id]['ModTime'] = '0'
+
+    save()  # Save any option changes..
+
+    gameMan.CONFIG.save_check()
+    GEN_OPTS.save_check()
+    packageLoader.PACK_CONFIG.save_check()
+
+    utils.restart_app()
+
 
 
 def make_checkbox(
@@ -220,6 +255,17 @@ def init_gen_tab(f):
                 'These may be buggy or incomplete.',
         var=SHOW_WIP,
     ).grid(row=1, column=0, sticky=W)
+
+    UI['reset_cache'] = reset_cache = ttk.Button(
+        f,
+        text='Reset Package Caches',
+        command=clear_caches,
+    )
+    reset_cache.grid(row=2, column=0, columnspan=2, sticky='SEW')
+    add_tooltip(
+        reset_cache,
+        'Force re-extracting all package resources. This requires a restart.'
+    )
 
 
 def init_win_tab(f):
