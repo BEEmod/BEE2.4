@@ -21,6 +21,7 @@ from tk_tools import TK_ROOT
 
 from datetime import datetime
 from io import BytesIO
+from codecs import EncodedFile
 import time
 import os
 import shutil
@@ -122,8 +123,21 @@ class P2C:
         path is the file path for the map inside the zip, without extension.
         zip_file is either a ZipFile or FakeZip object.
         """
-        with zip_file.open(path + '.p2c') as file:
-            props = Property.parse(file, path)
+        # Some P2Cs may have non-ASCII characters in descriptions, so we
+        # need to read it as bytes and convert to utf-8 ourselves - zips
+        # don't convert encodings automatically for us.
+        with zip_open_bin(zip_file, path + '.p2c') as file:
+            props = Property.parse(
+                # Decode the P2C as UTF-8, and skip unknown characters.
+                # We're only using it for display purposes, so that should
+                # be sufficent.
+                EncodedFile(
+                    file,
+                    data_encoding='utf-8',
+                    errors='replace',
+                ),
+                path,
+            )
         props = props.find_key('portal2_puzzle', [])
 
         title = props['title', None]
@@ -132,7 +146,7 @@ class P2C:
 
         return cls(
             path=path,
-            zip_file = zip_file,
+            zip_file=zip_file,
             title=title,
             desc=props['description', '...'],
             is_coop=utils.conv_bool(props['coop', '0']),
@@ -418,7 +432,9 @@ def save_backup():
                 with zip_open_bin(old_zip, scr_path) as f:
                     new_zip.writestr(scr_path, f.read())
 
-            with old_zip.open(map_path, 'r') as f:
+            # Copy the map as bytes, so encoded characters are transfered
+            # unaltered.
+            with zip_open_bin(old_zip, map_path) as f:
                 new_zip.writestr(map_path, f.read())
             copy_loader.step('COPY')
 
