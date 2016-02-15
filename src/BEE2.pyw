@@ -124,18 +124,17 @@ if __name__ == '__main__':
 
         LOGGER.info('Loading Item Translations...')
         gameMan.init_trans()
-        LOGGER.info('Done')
 
         LOGGER.info('Initialising UI...')
         UI.init_windows()  # create all windows
-        LOGGER.info('Done!')
+        LOGGER.info('UI initialised!')
 
         loadScreen.main_loader.destroy()
 
         if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
             extract_packages.done_callback()
         else:
-            extract_packages.start_copying(pack_data['zips'])
+            extract_packages.check_cache(pack_data['zips'])
 
         TK_ROOT.mainloop()
 

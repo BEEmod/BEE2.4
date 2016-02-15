@@ -646,6 +646,31 @@ class Package:
         PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
+    def is_stale(self):
+        """Check to see if this package has been modified since the last run."""
+        if isinstance(self.zip, FakeZip):
+            # unzipped packages are for development, so always extract.
+            LOGGER.info('Extracting resources - {} is unzipped!', self.id)
+            return True
+        last_modtime = PACK_CONFIG.get_int(self.id, 'ModTime', 0)
+        zip_modtime = int(os.stat(self.name).st_mtime)
+
+        if zip_modtime != last_modtime:
+            LOGGER.info('Package {} is stale! Extracting resources...', self.id)
+            return True
+        return False
+
+    def set_modtime(self):
+        """After the cache has been extracted, set the modification dates
+         in the config."""
+        if isinstance(self.zip, FakeZip):
+            # No modification time
+            PACK_CONFIG[self.id]['ModTime'] = '0'
+        else:
+            PACK_CONFIG[self.id]['ModTime'] = str(int(
+                os.stat(self.name).st_mtime
+            ))
+
 
 class Style(PakObject):
     def __init__(

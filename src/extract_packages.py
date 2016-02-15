@@ -13,6 +13,7 @@ from zipfile import ZipFile
 
 from FakeZip import zip_names, FakeZip
 from tk_tools import TK_ROOT
+import packageLoader
 import utils
 
 LOGGER = utils.getLogger(__name__)
@@ -54,15 +55,40 @@ def do_copy(zip_list, done_files):
                 with done_files.get_lock():
                     done_files.value += 1
 
+def update_modtimes():
+    """Update the cache modification times, so next time we don't extract.
 
-def start_copying(zip_list):
+    This should only be done if we've copied all the files.
+    """
+    LOGGER.info('Setting modtimes..')
+    for pack in packageLoader.packages.values():
+        pack.set_modtime()
+    packageLoader.PACK_CONFIG.save()
+
+
+def check_cache(zip_list):
+    """Check to see if any zipfiles are invalid, and if so extract the cache."""
     global copy_process
+    LOGGER.info('Checking cache...')
+
+    cache_stale = any(
+        pack.is_stale()
+        for pack in
+        packageLoader.packages.values()
+    )
+
+    if not cache_stale:
+        # We've already done the copying..
+        LOGGER.info('Cache is still fresh, skipping extraction')
+        done_callback()
+        return
+
     copy_process = multiprocessing.Process(
         target=do_copy,
         args=(zip_list, currently_done),
     )
     copy_process.daemon = True
-    LOGGER.info('Starting background process!')
+    LOGGER.info('Starting background extraction process!')
     copy_process.start()
     TK_ROOT.after(UPDATE_INTERVAL, update)
 
@@ -84,6 +110,7 @@ def update():
         export_btn_text.set(
             'Export...'
         )
+        update_modtimes()
         done_callback()
     else:
         # Coninuously tell TK to re-run this, so we update

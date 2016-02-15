@@ -318,6 +318,8 @@ class Game:
         except PermissionError:
             pass
 
+        self.mod_time = 0
+
     def export(
             self,
             style: packageLoader.Style,
