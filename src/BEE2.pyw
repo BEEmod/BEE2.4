@@ -52,6 +52,10 @@ DEFAULT_SETTINGS = {
         'allow_any_folder_as_game': '0',
         'play_sounds': '1',
         'show_wip_items': '0',
+
+        # A token used to indicate the time the current cache/ was extracted.
+        # This tells us whether to copy it to the game folder.
+        'cache_time': '0'
     },
     'Debug': {
         # Show exceptions in dialog box when crash occurs

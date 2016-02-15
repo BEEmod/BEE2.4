@@ -15,7 +15,7 @@ from tkinter import filedialog  # open/save as dialog creator
 from tk_tools import TK_ROOT
 
 from query_dialogs import ask_string
-from BEE2_config import ConfigFile
+from BEE2_config import ConfigFile, GEN_OPTS
 from property_parser import Property
 import utils
 import loadScreen
@@ -281,6 +281,16 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
+    def cache_valid(self):
+        """Check to see if the cache is valid."""
+        cache_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+
+        if cache_time == self.mod_time:
+            LOGGER.info("Skipped copying cache!")
+            return True
+        LOGGER.info("Cache invalid - copying..")
+        return False
+
     def refresh_cache(self):
         """Copy over the resource files into this game."""
 
@@ -306,6 +316,11 @@ class Game:
                 pass
 
             shutil.copytree(source, dest, copy_function=copy_func)
+        LOGGER.info('Cache copied.')
+        # Save the new cache modification date.
+        self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        self.save()
+        CONFIG.save_check()
 
     def clear_cache(self):
         """Remove all resources from the game."""
@@ -347,6 +362,11 @@ class Game:
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         export_screen.set_length('COMP', len(os.listdir('../compiler')))
+
+        LOGGER.info('Should refresh: {}', should_refresh)
+        if should_refresh:
+            # Check to ensure the cache needs to be copied over..
+            should_refresh = not self.cache_valid()
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)

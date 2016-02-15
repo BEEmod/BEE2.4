@@ -55,15 +55,25 @@ def do_copy(zip_list, done_files):
                 with done_files.get_lock():
                     done_files.value += 1
 
+
 def update_modtimes():
     """Update the cache modification times, so next time we don't extract.
 
     This should only be done if we've copied all the files.
     """
+    import time
+    from BEE2_config import GEN_OPTS
     LOGGER.info('Setting modtimes..')
     for pack in packageLoader.packages.values():
+        # Set modification times for each package.
         pack.set_modtime()
+
+    # Set the overall cache time to now.
+    GEN_OPTS['General']['cache_time'] = str(int(time.time()))
+
     packageLoader.PACK_CONFIG.save()
+    GEN_OPTS.save()
+
 
 
 def check_cache(zip_list):
