@@ -351,21 +351,29 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        cache_folder = os.path.abspath('../cache/')
+        # Extract all resources/BEE2/ images.
 
-        shutil.rmtree(cache_folder, ignore_errors=True)
+        img_dest = '../images/cache'
+
+        shutil.rmtree(img_dest, ignore_errors=True)
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
                 loc = os.path.normcase(path).casefold()
-                if loc.startswith(img_loc):
-                    loader.step("IMG_EX")
-                    zip_file.extract(path, path=cache_folder)
-
-        shutil.rmtree('../images/cache', ignore_errors=True)
-        if os.path.isdir("../cache/resources/bee2"):
-            shutil.move("../cache/resources/bee2", "../images/cache")
-        shutil.rmtree('../cache/', ignore_errors=True)
+                if not loc.startswith(img_loc):
+                    continue
+                # Strip resources/BEE2/ from the path and move to the
+                # cache folder.
+                dest_loc = os.path.join(
+                    img_dest,
+                    os.path.relpath(loc, img_loc)
+                )
+                # Make the destination directory and copy over the image
+                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
+                with zip_open_bin(zip_file, path) as src:
+                    with open(dest_loc, mode='wb') as dest:
+                        shutil.copyfileobj(src, dest)
+                loader.step("IMG_EX")
 
     finally:
         # close them all, we've already read the contents.
