@@ -781,15 +781,6 @@ class Style(PakObject):
 
     def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
-        LOGGER.warning('Overriding {}!', self.id)
-        for key in self.__dict__.keys():
-            if key in ('editor', 'config'): continue
-            LOGGER.info(
-                '{}: {!r} -> {!r}',
-                key,
-                self.__dict__.get(key),
-                override.__dict__.get(key),
-            )
         self.editor.append(override.editor)
         self.config.append(override.config)
         self.selitem_data.auth.extend(override.selitem_data.auth)
