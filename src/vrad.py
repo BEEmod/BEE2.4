@@ -94,7 +94,7 @@ MUSIC_END = """\
 \t\t\t"input_max_entries" "0"
 \t\t\t"match_entity" "false"
 \t\t\t"match_substring" "true"
-\t\t\t"match_entry" "music.BEE2"
+\t\t\t"match_entry" "music.BEE2_"
 \t\t\t}
 \t\t}
 \t}

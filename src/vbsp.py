@@ -267,6 +267,7 @@ DEFAULTS = {
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
+    "music_looplen":            "0",  # If set, re-trigger music after this time.
     "elev_type":                "RAND",  # What type of script to use:
     # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
@@ -2846,16 +2847,27 @@ def add_extra_ents(mode):
     # options on the music item.
     sound = get_opt('music_soundscript')
     inst = get_opt('music_instance')
+    snd_length = utils.conv_int(get_opt('music_looplen'))
 
     if sound != '':
-        VMF.create_ent(
+        music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
             targetname='@music',
             origin=loc,
             message=sound,
             health='10',  # Volume
+        )
+        music.add_out(VLib.Output('OnUser1', '@music', 'PlaySound'))
+
+        if snd_length > 0:
+            # Allow us to use non-looping mp3s, by continually re-triggering
+            # the music entity.
+            music.add_out(
+                VLib.Output('OnUser1', '@music', 'FireUser1', delay=snd_length)
             )
+            # Set to non-looping, so re-playing will restart it correctly.
+            music['spawnflags'] = '49'
 
     if inst != '':
         VMF.create_ent(
@@ -2865,7 +2877,7 @@ def add_extra_ents(mode):
             origin=loc,
             file=inst,
             fixup_style='0',
-            )
+        )
 
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.

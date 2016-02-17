@@ -1197,12 +1197,14 @@ class Music(PakObject):
             inst=None,
             sound=None,
             pack=(),
+            loop_len=0,
             ):
         self.id = music_id
         self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
+        self.len = loop_len
 
         self.selitem_data = selitem_data
 
@@ -1222,6 +1224,14 @@ class Music(PakObject):
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', '')  # type: Property
+
+        snd_length = data.info['loop_len', '0']
+        if ':' in snd_length:
+            # Allow specifying lengths as min:sec.
+            minute, second = snd_length.split(':')
+            snd_length = 60 * utils.conv_int(minute) + utils.conv_int(second)
+        else:
+            snd_length = utils.conv_int(snd_length)
 
         if not sound.has_children():
             sound = sound.value
@@ -1245,6 +1255,7 @@ class Music(PakObject):
             sound=sound,
             config=config,
             pack=packfiles,
+            loop_len=snd_length,
         )
 
     def add_over(self, override: 'Music'):
@@ -1289,6 +1300,10 @@ class Music(PakObject):
                 ('Options', 'music_instance'),
                 music.inst,
             )
+        vbsp_config.set_key(
+            ('Options', 'music_looplen'),
+            str(music.len),
+        )
 
         # If we need to pack, add the files to be unconditionally packed.
         if music.packfiles:
