@@ -14,6 +14,7 @@ FORMAT_TYPES = {
     'list': ('{i}. {}\n', 'indent'),
     'break': ('\n', None),
     'rule': (' \n', 'hrule'),
+    'invert': ('{}\n', 'invert')
     # Horizontal rules are created by applying a tag to a
     # space + newline (which affects the whole line)
     # It decreases the text size (to shrink it vertically),
