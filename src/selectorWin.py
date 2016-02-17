@@ -1012,7 +1012,7 @@ class selWin:
             )
             # Remove the font from the last suggested item
 
-        if suggested is None:
+        if suggested is None or suggested == '':
             self.suggested = None
         elif suggested == "<NONE>":
             self.suggested = self.noneItem

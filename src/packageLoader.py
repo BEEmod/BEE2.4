@@ -41,7 +41,7 @@ TEMPLATE_FILE = VLib.VMF()
 # This allows us to parse all packages before loading objects.
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 # The arguments for pak_object.parse().
-ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
+ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id, is_override')
 # The values stored for OBJ_TYPES
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 # The arguments to pak_object.export().
@@ -336,6 +336,7 @@ def load_packages(
                             obj_id,
                             obj_data.info_block,
                             obj_data.pak_id,
+                            False,
                         )
                     )
                 except (NoKeyError, IndexError) as e:
@@ -409,7 +410,7 @@ def parse_package(pack: 'Package'):
         for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(pack.zip, obj_id, obj, pack.id)
+                ParseData(pack.zip, obj_id, obj, pack.id, True)
             )
 
         for obj in pack.info.find_all(comp_type):
@@ -418,7 +419,7 @@ def parse_package(pack: 'Package'):
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(pack.zip, obj_id, obj, pack.id)
+                        ParseData(pack.zip, obj_id, obj, pack.id, True)
                     )
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
@@ -709,16 +710,27 @@ class Style(PakObject):
         info = data.info
         selitem_data = get_selitem_data(info)
         base = info['base', '']
-        has_video = utils.conv_bool(info['has_video', '1'])
+        has_video = utils.conv_bool(
+            info['has_video', ''],
+            not data.is_override,  # Assume no video for override
+        )
         vpk_name = info['vpk_name', ''].casefold()
 
         sugg = info.find_key('suggested', [])
-        sugg = (
-            sugg['quote', '<NONE>'],
-            sugg['music', '<NONE>'],
-            sugg['skybox', 'SKY_BLACK'],
-            sugg['goo', 'GOO_NORM'],
-            sugg['elev', '<NONE>'],
+        if data.is_override:
+            # For overrides, we default to no suggestion..
+            sugg = (
+                sugg['quote', ''],
+                sugg['music', ''],
+                sugg['skybox', ''],
+                sugg['elev', ''],
+            )
+        else:
+            sugg = (
+                sugg['quote', '<NONE>'],
+                sugg['music', '<NONE>'],
+                sugg['skybox', 'SKY_BLACK'],
+                sugg['elev', '<NONE>'],
             )
 
         corridors = info.find_key('corridors', [])
@@ -730,22 +742,31 @@ class Style(PakObject):
 
         if base == '':
             base = None
-        folder = 'styles/' + info['folder']
-        config = folder + '/vbsp_config.cfg'
-        with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
-            items = Property.parse(
-                item_data,
-                data.pak_id+':'+folder+'/items.txt'
-            )
-
         try:
-            with data.zip_file.open(config, 'r') as vbsp_config:
-                vbsp = Property.parse(
-                    vbsp_config,
-                    data.pak_id+':'+config,
+            folder = 'styles/' + info['folder']
+        except IndexError:
+            if data.is_override:
+                items = Property(None, [])
+                vbsp = None
+            else:
+                raise ValueError('Style missing configuration!')
+        else:
+            with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
+                items = Property.parse(
+                    item_data,
+                    data.pak_id + ':' + folder + '/items.txt'
                 )
-        except KeyError:
-            vbsp = None
+
+            config = folder + '/vbsp_config.cfg'
+            try:
+                with data.zip_file.open(config, 'r') as vbsp_config:
+                    vbsp = Property.parse(
+                        vbsp_config,
+                        data.pak_id + ':' + config,
+                    )
+            except KeyError:
+                vbsp = None
+
         return cls(
             style_id=data.id,
             selitem_data=selitem_data,
@@ -756,13 +777,31 @@ class Style(PakObject):
             has_video=has_video,
             corridor_names=corridors,
             vpk_name=vpk_name
-            )
+        )
 
     def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
-        self.editor.extend(override.editor)
-        self.config.extend(override.config)
+        LOGGER.warning('Overriding {}!', self.id)
+        for key in self.__dict__.keys():
+            if key in ('editor', 'config'): continue
+            LOGGER.info(
+                '{}: {!r} -> {!r}',
+                key,
+                self.__dict__.get(key),
+                override.__dict__.get(key),
+            )
+        self.editor.append(override.editor)
+        self.config.append(override.config)
         self.selitem_data.auth.extend(override.selitem_data.auth)
+
+        self.has_video = self.has_video or override.has_video
+        # If overrides have suggested IDs, use those. Unset values = ''.
+        self.suggested = tuple(
+            over_sugg or self_sugg
+            for self_sugg, over_sugg in
+            zip(self.suggested, override.suggested)
+        )
+
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
