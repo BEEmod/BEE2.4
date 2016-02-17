@@ -30,6 +30,10 @@ export_btn_text = tk.StringVar()
 
 
 def done_callback():
+    """Called once the cache copying is done (or not needed).
+
+    This is overwritten by UI, and enables the various export buttons.
+    """
     pass
 
 
@@ -68,20 +72,31 @@ def update_modtimes():
         # Set modification times for each package.
         pack.set_modtime()
 
+    # Reset package cache times for removed packages. This ensures they'll be
+    # detected if re-added.
+    for pak_id in packageLoader.PACK_CONFIG:
+        if pak_id not in packageLoader.packages:
+            packageLoader.PACK_CONFIG[pak_id]['ModTime'] = '0'
+
     # Set the overall cache time to now.
     GEN_OPTS['General']['cache_time'] = str(int(time.time()))
+    GEN_OPTS['General']['cache_pack_count'] = str(len(packageLoader.packages))
 
     packageLoader.PACK_CONFIG.save()
     GEN_OPTS.save()
 
 
-
 def check_cache(zip_list):
     """Check to see if any zipfiles are invalid, and if so extract the cache."""
     global copy_process
+    from BEE2_config import GEN_OPTS
+
     LOGGER.info('Checking cache...')
 
-    cache_stale = any(
+    cache_packs = GEN_OPTS.get_int('General', 'cache_pack_count')
+
+    # We need to match the number of packages too, to account for removed ones.
+    cache_stale = (len(packageLoader.packages) == cache_packs) and any(
         pack.is_stale()
         for pack in
         packageLoader.packages.values()

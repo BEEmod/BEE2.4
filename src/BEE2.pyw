@@ -55,7 +55,9 @@ DEFAULT_SETTINGS = {
 
         # A token used to indicate the time the current cache/ was extracted.
         # This tells us whether to copy it to the game folder.
-        'cache_time': '0'
+        'cache_time': '0',
+        # We need this value to detect just removing a package.
+        'cache_pack_count': '0',
     },
     'Debug': {
         # Show exceptions in dialog box when crash occurs
