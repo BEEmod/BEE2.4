@@ -183,7 +183,7 @@ MUSIC_GEL_STACK = """\
 }
 """
 
-# The funnel operator statck makes it start randomly offset into the music..
+# The funnel operator stack makes it start randomly offset into the music..
 MUSIC_FUNNEL_STACK = """\
 
 "soundentry_version" "2"
@@ -211,34 +211,34 @@ MUSIC_FUNNEL_STACK = """\
 \t\t\t"output" "delay"
 \t\t\t}
 \t\t}
-\t\t"update_stack"
+\t"update_stack"
+\t\t{
+\t\t"import_stack" "update_music_stereo"
+\t\t"mixer"
 \t\t\t{
-\t\t\t"import_stack" "update_music_stereo"
-\t\t\t"mixer"
-\t\t\t\t{
-\t\t\t\t"mixgroup" "unduckedMusic"
-\t\t\t\t}
-\t\t\t"volume_fade_in"
-\t\t\t\t{
-\t\t\t\t"input_max" "3.0"
-\t\t\t\t"input_map_min" "0.05"
-\t\t\t\t}
-\t\t\t"volume_fade_out"
-\t\t\t\t{
-\t\t\t\t"input_max" "0.75"
-\t\t\t\t"input_map_min" "0.05"
-\t\t\t\t}
-\t\t\t"volume_lfo_time_scale"
-\t\t\t\t{
-\t\t\t\t"input2" "0.3"
-\t\t\t\t}
-\t\t\t"volume_lfo_scale"
-\t\t\t\t{
-\t\t\t\t"input2" "0.4"
-\t\t\t\t}
+\t\t\t"mixgroup" "unduckedMusic"
+\t\t\t}
+\t\t"volume_fade_in"
+\t\t\t{
+\t\t\t"input_max" "3.0"
+\t\t\t"input_map_min" "0.05"
+\t\t\t}
+\t\t"volume_fade_out"
+\t\t\t{
+\t\t\t"input_max" "0.75"
+\t\t\t"input_map_min" "0.05"
+\t\t\t}
+\t\t"volume_lfo_time_scale"
+\t\t\t{
+\t\t\t"input2" "0.3"
+\t\t\t}
+\t\t"volume_lfo_scale"
+\t\t\t{
+\t\t\t"input2" "0.4"
 \t\t\t}
 \t\t}
 \t}
+}
 """
 
 
