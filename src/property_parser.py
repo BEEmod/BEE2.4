@@ -1,11 +1,12 @@
 import utils
+import re
 
 from typing import (
     Optional, Union, Any,
     Dict, List, Tuple, Iterator,
 )
 
-__all__ = ['KeyValError', 'NoKeyError', 'Property', 'INVALID']
+__all__ = ['KeyValError', 'NoKeyError', 'Property']
 
 # various escape sequences that we allow
 REPLACE_CHARS = {
@@ -18,8 +19,10 @@ REPLACE_CHARS = {
 # Sentinel value to indicate that no default was given to find_key()
 _NO_KEY_FOUND = object()
 
+# We allow bare identifiers on lines, but they can't contain quotes or brackets.
+_RE_IDENTIFIER = re.compile('[^"{}]+')
+
 _Prop_Value = Union[List['Property'], str]
-_as_dict_return = Dict[str, Union[str, 'as_dict_return']]
 
 # Various [flags] used after property names in some Valve files.
 # See https://github.com/ValveSoftware/source-sdk-2013/blob/master/sp/src/tier1/KeyValues.cpp#L2055
@@ -150,6 +153,7 @@ def read_flag(line_end, filename, line_num):
         return PROP_FLAGS.get(flag.casefold(), True)
     return True
 
+
 class Property:
     """Represents Property found in property files, like those used by Valve.
 
@@ -209,7 +213,6 @@ class Property:
         filename, if set should be the source of the text for debug purposes.
         file_contents should be an iterable of strings
         """
-        from utils import is_identifier
 
         file_iter = enumerate(file_contents, start=1)
 
@@ -226,6 +229,8 @@ class Property:
 
         # Do we require a block to be opened next? ("name"\n must have { next.)
         requires_block = False
+
+        is_identifier = _RE_IDENTIFIER.match
 
         for line_num, line in file_iter:
             if isinstance(line, bytes):

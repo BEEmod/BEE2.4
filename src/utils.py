@@ -4,6 +4,7 @@ import math
 import string
 from collections import abc
 import collections
+import re
 
 from sys import platform
 from enum import Enum
@@ -342,15 +343,6 @@ def clean_line(line: str):
         line = line.split('//', 1)[0]
     return line.strip()
 
-
-def is_identifier(name, forbidden='{}"'):
-    """Check to see if any forbidden characters are part of a candidate name.
-
-    """
-    for char in forbidden:
-        if char in name:
-            return False
-    return True
 
 FILE_CHARS = set(string.ascii_letters + string.digits + '-_ .|')
 
