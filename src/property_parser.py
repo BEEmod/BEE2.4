@@ -138,6 +138,7 @@ def read_flag(line_end, filename, line_num):
             inv = False
     else:
         comment = flag
+        flag = inv = None
 
     # Check for unexpected text at the end of a line..
     comment = comment.lstrip()
@@ -150,7 +151,9 @@ def read_flag(line_end, filename, line_num):
         )
 
     if flag:
-        return PROP_FLAGS.get(flag.casefold(), True)
+        # If inv is False, we need True flags.
+        # If inv is True, we need False flags.
+        return inv is not PROP_FLAGS.get(flag.casefold(), True)
     return True
 
 
@@ -242,7 +245,7 @@ class Property:
                 # Skip blank lines and comments!
                 continue
 
-            if freshline.startswith('"'):   # data string
+            if freshline[0] == '"':   # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
                 try:
@@ -278,7 +281,7 @@ class Property:
                     # No flag, add unconditionally
                     cur_block.append(Property(name, value))
 
-            elif freshline.startswith('{'):
+            elif freshline[0] == '{':
                 # Open a new block - make sure the last token was a name..
                 if not requires_block:
                     raise KeyValError(
@@ -291,7 +294,7 @@ class Property:
                 cur_block = cur_block[-1]
                 cur_block.value = []
                 open_properties.append(cur_block)
-            elif freshline.startswith('}'):
+            elif freshline[0] == '}':
                 # Move back a block
                 open_properties.pop()
                 try:
