@@ -1419,17 +1419,17 @@ def get_map_info():
 
     inst_files = set()  # Get a set of every instance in the map.
 
-    # If the values are None / not present, use an empty tuple to disable
-    # that IF.
-    file_coop_entry = instanceLocs.get_special_inst('coopEntry') or ()
-    file_coop_exit = instanceLocs.get_special_inst('coopExit') or ()
-    file_sp_exit = instanceLocs.get_special_inst('spExit') or ()
-    file_sp_entry = instanceLocs.get_special_inst('spEntry') or ()
-    file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
-    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
-    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
-    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp') or ()
-    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop') or ()
+    file_coop_entry = instanceLocs.get_special_inst('coopEntry')
+    file_coop_exit = instanceLocs.get_special_inst('coopExit')
+    file_sp_exit = instanceLocs.get_special_inst('spExit')
+    file_sp_entry = instanceLocs.get_special_inst('spEntry')
+
+    # These have multiple instances, so in must be used.
+    file_coop_corr = instanceLocs.get_special_inst('coopCorr')
+    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr')
+    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
+    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
+    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1510,7 +1510,7 @@ def get_map_info():
                 override_coop_corr,
                 is_exit=True,
             )
-        elif file in file_coop_entry:
+        elif file_coop_entry == file:
             GAME_MODE = 'COOP'
             entry_corr_name = item['targetname']
             mod_entryexit(
@@ -1519,11 +1519,11 @@ def get_map_info():
                 'Coop Spawn',
                 elev_override,
             )
-        elif file in file_coop_exit:
+        elif file_coop_exit == file:
             GAME_MODE = 'COOP'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
-        elif file in file_sp_exit or file in file_sp_entry:
+        elif file_sp_exit == file or file_sp_entry == file:
             GAME_MODE = 'SP'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
