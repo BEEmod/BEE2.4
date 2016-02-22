@@ -1445,7 +1445,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         ]))
 
 
-class StyleVPK(PakObject):
+class StyleVPK(PakObject, has_img=False):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall
