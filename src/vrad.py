@@ -795,6 +795,10 @@ def main(argv):
             utils.conv_bool(CONF['force_full'], False)
         )
 
+    if '-no_pack' not in args:
+        pack_content(path, is_peti)
+    else:
+        LOGGER.warning("Packing files is disabled!")
 
     if is_peti:
         mod_screenshots()
@@ -805,10 +809,6 @@ def main(argv):
         LOGGER.info("Hammer map detected! Not forcing cheap lighting..")
         run_vrad(full_args)
 
-    if '-no_pack' not in args:
-        pack_content(path, is_peti)
-    else:
-        LOGGER.warning("No items to pack!")
     LOGGER.info("BEE2 VRAD hook finished!")
 
 if __name__ == '__main__':
