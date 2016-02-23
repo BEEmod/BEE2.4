@@ -795,9 +795,10 @@ def main(argv):
             utils.conv_bool(CONF['force_full'], False)
         )
 
-    mod_screenshots()
 
     if is_peti:
+        mod_screenshots()
+
         LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
     else:
