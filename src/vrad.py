@@ -307,7 +307,7 @@ def pack_file(zipfile: ZipFile, filename):
             )
             break
     else:
-        LOGGER.warning('"bee2/' + filename + '" not found!')
+        LOGGER.warning('"bee2/' + filename + '" not found! (May be OK if not custom)')
 
 
 def gen_sound_manifest(additional):
@@ -481,13 +481,12 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
         pack_list.add('sound/' + snds.value.casefold())
 
 
-def inject_files(zipfile: ZipFile):
-    """Inject certain files into the packlist,  if they exist."""
+def inject_files():
+    """Generate the names of files to inject, if they exist.."""
     for filename, arcname in INJECT_FILES.items():
         filename = os.path.join('bee2', 'inject', filename)
         if os.path.exists(filename):
-            LOGGER.info('Injecting "{}" into packfile.', arcname)
-            zipfile.write(filename, arcname)
+            yield filename, arcname
 
 
 def pack_content(path, is_peti):
@@ -522,12 +521,33 @@ def pack_content(path, is_peti):
 
                 files.add(line)
 
-    if not files:
+    # Only generate a soundscript for PeTI maps..
+    if is_peti:
+        music_data = CONF.find_key('MusicScript', [])
+        if music_data.value:
+            generate_music_script(music_data, files)
+            # Add the new script to the manifest file..
+            soundscripts.add('scripts/BEE2_generated_music.txt')
+
+    # We still generate these in hammer-mode - it's still useful there.
+    # If no files are packed, no manifest will be added either.
+    gen_sound_manifest(soundscripts)
+    gen_part_manifest(particles)
+
+    inject_names = list(inject_files())
+
+    # Abort packing if no packfiles exist, and no injected files exist either.
+    if not files and not inject_names:
         LOGGER.info('No files to pack!')
         return
 
     LOGGER.info('Files to pack:')
     for file in sorted(files):
+        # \t seperates the original and in-pack name if used.
+        LOGGER.info(' # "' + file.replace('\t', '" as "') + '"')
+
+    LOGGER.info('Injected files:')
+    for _, file in inject_names:
         LOGGER.info(' # "' + file + '"')
 
     LOGGER.info("Packing Files!")
@@ -541,21 +561,12 @@ def pack_content(path, is_peti):
     zipfile = ZipFile(zip_data, mode='a')
     LOGGER.debug(' - Existing zip read')
 
-    # Only generate a soundscript for PeTI maps..
-    if is_peti:
-        music_data = CONF.find_key('MusicScript', [])
-        if music_data.value:
-            generate_music_script(music_data, files)
-            # Add the new script to the manifest file..
-            soundscripts.add('scripts/BEE2_generated_music.txt')
-
     for file in files:
         pack_file(zipfile, file)
 
-    gen_sound_manifest(soundscripts)
-    gen_part_manifest(particles)
-
-    inject_files(zipfile)
+    for filename, arcname in inject_names:
+        LOGGER.info('Injecting "{}" into packfile.', arcname)
+        zipfile.write(filename, arcname)
 
     LOGGER.debug(' - Added files')
 
