@@ -1,6 +1,6 @@
 import tkinter
 from tkinter.constants import *
-from tkinter.font import Font as tkFont
+from tkinter.font import Font as tkFont, nametofont
 
 import utils
 
@@ -10,6 +10,8 @@ FORMAT_TYPES = {
     # format string, tag
     'line': ('{}\n', None),
     'under': ('{}\n', 'underline'),
+    'bold': ('{}\n', 'bold'),
+    'italic': ('{}\n', 'italic'),
     'bullet': ('\u2022 {}\n', 'indent'),
     'list': ('{i}. {}\n', 'indent'),
     'break': ('\n', None),
@@ -36,16 +38,31 @@ class tkRichText(tkinter.Text):
      - "invert": White-on-black text.
     """
     def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
+        self.font = nametofont(font)
+        self.bold_font = self.font.copy()
+        self.italic_font = self.font.copy()
+
+        self.bold_font['weight'] = 'bold'
+        self.italic_font['slant'] = 'italic'
+
         super().__init__(
             parent,
             width=width,
             height=height,
             wrap="word",
-            font=font,
+            font=self.font,
         )
         self.tag_config(
             "underline",
             underline=1,
+        )
+        self.tag_config(
+            "bold",
+            font=self.bold_font,
+        )
+        self.tag_config(
+            "italic",
+            font=self.italic_font,
         )
         self.tag_config(
             "invert",
@@ -63,6 +80,7 @@ class tkRichText(tkinter.Text):
             "hrule",
             relief="sunken",
             borderwidth=1,
+            # This makes the line-height very short.
             font=tkFont(size=1),
         )
         self['state'] = "disabled"
