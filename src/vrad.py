@@ -310,10 +310,12 @@ def pack_file(zipfile: ZipFile, filename):
         LOGGER.warning('"bee2/' + filename + '" not found! (May be OK if not custom)')
 
 
-def gen_sound_manifest(additional):
+def gen_sound_manifest(additional, excludes):
     """Generate a new game_sounds_manifest.txt file.
 
     This includes all the current scripts defined, plus any custom ones.
+    Excludes is a list of scripts to remove from the listing - this allows
+    overriding the sounds without VPK overrides.
     """
     if not additional:
         return  # Don't pack, there aren't any new sounds..
@@ -336,7 +338,19 @@ def gen_sound_manifest(additional):
     scripts = [prop.value for prop in props.find_all('precache_file')]
 
     for script in additional:
-        scripts.append(script)
+        # For our packed scripts, force the game to load them
+        # (we know they're used).
+        scripts.append('!' + script)
+
+    for script in excludes:
+        try:
+            scripts.remove(script)
+        except IndexError:
+            LOGGER.warning(
+                '"{}" should be excluded, but it\'s'
+                ' not in the manifest already!',
+                script,
+            )
 
     # Build and unbuild it to strip other things out - Valve includes a bogus
     # 'new_sound_scripts_must_go_below_here' entry..
@@ -499,6 +513,7 @@ def pack_content(path, is_peti):
     """
     files = set()  # Files to pack.
     soundscripts = set()  # Soundscripts need to be added to the manifest too..
+    rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
     particles = set()
 
     try:
@@ -511,6 +526,11 @@ def pack_content(path, is_peti):
                 line = line.strip().lower()
                 if not line or line.startswith('//'):
                     continue  # Skip blanks or comments
+
+                if line[:2] == '-#':
+                    rem_soundscripts.add(line[2:])
+                    continue
+
                 if line[:1] == '#':
                     line = line[1:]
                     soundscripts.add(line)
@@ -531,7 +551,7 @@ def pack_content(path, is_peti):
 
     # We still generate these in hammer-mode - it's still useful there.
     # If no files are packed, no manifest will be added either.
-    gen_sound_manifest(soundscripts)
+    gen_sound_manifest(soundscripts, rem_soundscripts)
     gen_part_manifest(particles)
 
     inject_names = list(inject_files())
