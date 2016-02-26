@@ -11,7 +11,7 @@ import os.path
 
 from zipfile import ZipFile
 
-from FakeZip import zip_names, FakeZip
+from FakeZip import zip_names, FakeZip, zip_open_bin
 from tk_tools import TK_ROOT
 import packageLoader
 import utils
@@ -39,9 +39,12 @@ def done_callback():
 
 def do_copy(zip_list, done_files):
     cache_path = os.path.abspath('../cache/')
+    music_samp = os.path.abspath('../sounds/music_samp/')
     shutil.rmtree(cache_path, ignore_errors=True)
+    shutil.rmtree(music_samp, ignore_errors=True)
 
     img_loc = os.path.join('resources', 'bee2')
+    music_loc = os.path.join('resources', 'music_samp')
     for zip_path in zip_list:
         if os.path.isfile(zip_path):
             zip_file = ZipFile(zip_path)
@@ -55,7 +58,17 @@ def do_copy(zip_list, done_files):
                 # Don't re-extract images
                 if loc.startswith(img_loc):
                     continue
-                zip_file.extract(path, path=cache_path)
+                if loc.startswith(music_loc):
+                    dest_path = os.path.join(
+                        music_samp,
+                        os.path.relpath(path, music_loc)
+                    )
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    with zip_open_bin(zip_file, path) as src:
+                        with open(dest_path, 'wb') as dest:
+                            shutil.copyfileobj(src, dest)
+                else:
+                    zip_file.extract(path, path=cache_path)
                 with done_files.get_lock():
                     done_files.value += 1
 
@@ -96,7 +109,7 @@ def check_cache(zip_list):
     cache_packs = GEN_OPTS.get_int('General', 'cache_pack_count')
 
     # We need to match the number of packages too, to account for removed ones.
-    cache_stale = (len(packageLoader.packages) == cache_packs) and any(
+    cache_stale = (len(packageLoader.packages) == cache_packs) or any(
         pack.is_stale()
         for pack in
         packageLoader.packages.values()
