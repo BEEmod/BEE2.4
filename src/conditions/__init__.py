@@ -1021,6 +1021,7 @@ TEMP_COLOUR_INVERT = {
 def retexture_template(
         template_data: Template,
         origin: Vec,
+        fixup: VLib.EntityFixup=None,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
@@ -1041,6 +1042,7 @@ def retexture_template(
       ('wall', '2x2', '4x4', 'special')
     - If use_bullseye is true, the bullseye textures will be used for all panel
       sides instead of the normal textures. (This overrides force_grid.)
+    - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
     """
     import vbsp
 
@@ -1062,7 +1064,7 @@ def retexture_template(
 
     # Ensure all values are lists.
     replace_tex = {
-        key: ([value] if isinstance(value, str) else value)
+        key.casefold(): ([value] if isinstance(value, str) else value)
         for key, value in
         replace_tex.items()
     }
@@ -1075,8 +1077,12 @@ def retexture_template(
             random.seed(rand_prefix + norm.join('_'))
 
             if folded_mat in replace_tex:
-                # replace_tex overrides everything
-                face.mat = random.choice(replace_tex[folded_mat])
+                # Replace_tex overrides everything.
+                mat = random.choice(replace_tex[folded_mat])
+                LOGGER.info('Mat: {}, replacement: {}', folded_mat, mat)
+                if mat[:1] == '$' and fixup is not None:
+                    mat = fixup[mat]
+                face.mat = mat
                 continue
 
             tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
@@ -1230,9 +1236,11 @@ def retexture_template(
         random.seed('TEMP_OVERLAY_' + over['basisorigin'])
         mat = over['material'].casefold()
         if mat in replace_tex:
-            over['material'] = mat = random.choice(replace_tex[mat])
+            mat = random.choice(replace_tex[mat])
+            if mat[:1] == '$':
+                mat = fixup[mat]
         elif mat in vbsp.TEX_VALVE:
-            over['material'] = mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+            mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
         else:
             continue
         if mat == '':
@@ -1240,6 +1248,8 @@ def retexture_template(
             # (Since it's inplace, this can affect the tuple.)
             template_data.overlay.remove(over)
             over.remove()
+        else:
+            over['material'] = mat
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):

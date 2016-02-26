@@ -95,4 +95,9 @@ def res_insert_overlay(inst: VLib.Entity, res: Property):
         over['sides'] = str(face_id)
 
     # Wipe the brushes from the map.
-    temp.detail.remove()
+    if temp.detail is not None:
+        temp.detail.remove()
+        LOGGER.info(
+            'Overlay template "{}" could set keep_brushes=0.',
+            temp_id,
+        )

@@ -431,7 +431,7 @@ def res_import_template_setup(res):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst, res):
+def res_import_template(inst: VLib.Entity, res):
     """Import a template VMF file, retexturing it to match orientatation.
 
     It will be placed overlapping the given instance.
@@ -496,6 +496,7 @@ def res_import_template(inst, res):
     conditions.retexture_template(
         temp_data,
         origin,
+        inst.fixup,
         replace_tex,
         force_colour,
         force_grid,

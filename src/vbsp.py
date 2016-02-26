@@ -3179,6 +3179,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
                 if pan_type == 'white' else
                 conditions.MAT_TYPES.black
             ),
+            fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
 
@@ -3228,6 +3229,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
                 if pan_type == 'white' else
                 conditions.MAT_TYPES.black
             ),
+            fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
 
