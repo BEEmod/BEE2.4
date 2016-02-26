@@ -338,6 +338,8 @@ def gen_sound_manifest(additional, excludes):
     scripts = [prop.value for prop in props.find_all('precache_file')]
 
     for script in additional:
+        scripts.append(script)
+        
         # For our packed scripts, force the game to load them
         # (we know they're used).
         scripts.append('!' + script)
