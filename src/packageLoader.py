@@ -1840,41 +1840,69 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VLib.VMF):
+    def __init__(self, temp_id, vmf_file: VLib.VMF, force=None, keep_brushes=True):
+        """Import in a BrushTemplate object.
+
+        This copies the solids out of vmf_file and into TEMPLATE_FILE.
+        If force is set to 'world' or 'detail', the other type will be converted.
+        If keep_brushes is false brushes will be skipped (for TemplateOverlay).
+        """
         self.id = temp_id
         # We don't actually store the solids here - put them in
-        # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+        # the TEMPLATE_FILE VMF. That way the original VMF object can vanish.
 
         # If we have overlays, we need to ensure the IDs crossover correctly
         id_mapping = {}
 
-        if vmf_file.brushes:
-            self.temp_world = TEMPLATE_FILE.create_ent(
-                classname='bee2_template_world',
-                template_id=self.id,
-            )
+        self.temp_world = TEMPLATE_FILE.create_ent(
+            classname='bee2_template_world',
+            template_id=self.id,
+        )
+        self.temp_detail = TEMPLATE_FILE.create_ent(
+            classname='bee2_template_detail',
+            template_id=self.id,
+        )
+
+        # Check to see if any func_details have associated solids..
+        has_detail = any(
+            e.is_brush()
+            for e in
+            vmf_file.by_class['func_detail']
+        )
+
+        # Copy world brushes
+        if keep_brushes and vmf_file.brushes:
             self.temp_world.solids = [
                 solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                 for solid in
                 vmf_file.brushes
             ]
-        else:
-            self.temp_world = None
 
-        # Add detail brushes
-        if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
-            self.temp_detail = TEMPLATE_FILE.create_ent(
-                classname='bee2_template_detail',
-                template_id=self.id,
-            )
+        # Copy detail brushes
+        if keep_brushes and has_detail:
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
                     solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                     for solid in
                     ent.solids
                 )
-        else:
+
+        # Allow switching world brushes to detail or vice-versa.
+        if force.casefold == 'world':
+            self.temp_world.solids.extend(self.temp_detail.solids)
+            del self.temp_detail.solids[:]
+
+        if force.casefold == 'detail':
+            self.temp_detail.solids.extend(self.temp_world.solids)
+            del self.temp_world.solids[:]
+
+        # Destroy the entity object if it's unused.
+        if not self.temp_detail.solids:
+            self.temp_detail.remove()
             self.temp_detail = None
+        if not self.temp_world.solids:
+            self.temp_world.remove()
+            self.temp_world = None
 
         self.temp_overlays = []
 
@@ -1909,6 +1937,8 @@ class BrushTemplate(PakObject, has_img=False):
         return cls(
             data.id,
             file,
+            force=data.info['force', ''],
+            keep_brushes=utils.conv_bool(data.info['keep_brushes', '1'], True),
         )
 
     @staticmethod
