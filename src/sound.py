@@ -71,7 +71,11 @@ else:
             self.stop_callback = stop_callback
             self.cur_file = None
 
-        def play_sample(self):
+        @property
+        def is_playing(self):
+            return bool(self.sample)
+
+        def play_sample(self, e=None):
             pass
             """Play a sample of music.
 

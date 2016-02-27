@@ -908,12 +908,16 @@ class selWin:
         item.button.state(('alternate',))
 
         if self.sampler:
-            # Cancel currently-playing sounds
+            is_playing = self.sampler.is_playing
             self.sampler.stop()
 
             self.sampler.cur_file = item.snd_sample
             if self.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
+
+                if is_playing:
+                    # Start the sampler again, so it plays the current item!
+                    self.sampler.play_sample()
             else:
                 self.samp_button.state(('disabled',))
 
