@@ -512,6 +512,7 @@ class selWin:
                 start_callback=set_samp_stop,
             )
             samp_button['command'] = self.sampler.play_sample
+            utils.bind_leftclick(self.prop_icon, self.sampler.play_sample)
             samp_button.state(('disabled',))
         else:
             self.sampler = None
