@@ -805,6 +805,10 @@ class selWin:
 
     def save(self, _=None):
         """Save the selected item into the textbox."""
+        # Stop sample sounds if they're playing
+        if self.sampler:
+            self.sampler.stop()
+
         self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
@@ -904,6 +908,9 @@ class selWin:
         item.button.state(('alternate',))
 
         if self.sampler:
+            # Cancel currently-playing sounds
+            self.sampler.stop()
+
             self.sampler.cur_file = item.snd_sample
             if self.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
