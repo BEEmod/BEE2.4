@@ -25,11 +25,14 @@ def res_import_template_setup(res):
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
+    offset = Vec.from_str(res['offset', '0 0 0'])
+
     return (
         temp_id,
         dict(replace_tex),
         face,
-        norm
+        norm,
+        offset,
     )
 
 
@@ -42,12 +45,14 @@ def res_insert_overlay(inst: VLib.Entity, res: Property):
         - Replace: old -> new material replacements
         - Face_pos: The offset of the brush face.
         - Normal: The direction of the brush face.
+        - Offset: An offset to move the overlays by.
     """
     (
         temp_id,
         replace,
         face,
         norm,
+        offset,
     ) = res.value
 
     if temp_id[:1] == '$':
@@ -59,6 +64,11 @@ def res_insert_overlay(inst: VLib.Entity, res: Property):
     face_pos = Vec(face).rotate(*angles)
     face_pos += origin
     normal = Vec(norm).rotate(*angles)
+
+    # Don't make offset change the face_pos value..
+    origin += offset.copy().rotate_by_str(
+        inst['angles', '0 0 0']
+    )
 
     for axis, norm in enumerate(normal):
         # Align to the center of the block grid. The normal direction is
