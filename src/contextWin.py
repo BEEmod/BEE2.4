@@ -217,18 +217,18 @@ def get_description(global_last, glob_desc, style_desc):
         # We have both, we need to join them together.
         if global_last:
             yield from style_desc
-            yield (('line', ''))
+            yield (('rule', ''))
             yield from glob_desc
         else:
             yield from glob_desc
-            yield (('line', ''))
+            yield (('rule', ''))
             yield from style_desc
     elif glob_desc:
         yield from glob_desc
     elif style_desc:
         yield from style_desc
     else:
-        return # No description
+        return  # No description
 
 
 def load_item_data():
