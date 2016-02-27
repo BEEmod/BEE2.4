@@ -567,6 +567,7 @@ def load_packages(data):
              'tracks have variations which are played when interacting '
              'with certain testing elements.',
         has_none=True,
+        has_snd_sample=True,
         none_desc='Add no music to the map at all.',
         callback=win_callback,
         callback_params=['Music'],
