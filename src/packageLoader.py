@@ -1251,16 +1251,26 @@ class Music(PakObject):
                 setattr(self, 'has_' + chan, False)
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a music definition."""
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', '')  # type: Property
 
         # The sample music file to play, if found.
-        sample = data.info['sample', '']
-        if sample:
-            sample = os.path.abspath('../sounds/music_samp/' + sample)
+        rel_sample = data.info['sample', '']
+        if rel_sample:
+            sample = os.path.abspath('../sounds/music_samp/' + rel_sample)
+            zip_sample = 'resources/music_samp/' + rel_sample
+            try:
+                with zip_open_bin(data.zip_file, zip_sample):
+                    pass
+            except KeyError:
+                LOGGER.warning(
+                    'Music sample for <{}> does not exist in zip: "{}"',
+                    data.id,
+                    zip_sample,
+                )
         else:
             sample = None
 
