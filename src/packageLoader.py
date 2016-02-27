@@ -1226,6 +1226,7 @@ class Music(PakObject):
             config: Property=None,
             inst=None,
             sound=None,
+            sample=None,
             pack=(),
             loop_len=0,
             ):
@@ -1235,6 +1236,7 @@ class Music(PakObject):
         self.sound = sound
         self.packfiles = list(pack)
         self.len = loop_len
+        self.sample = sample
 
         self.selitem_data = selitem_data
 
@@ -1254,6 +1256,13 @@ class Music(PakObject):
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', '')  # type: Property
+
+        # The sample music file to play, if found.
+        sample = data.info['sample', '']
+        if sample:
+            sample = os.path.abspath('../sounds/music_samp/' + sample)
+        else:
+            sample = None
 
         snd_length = data.info['loop_len', '0']
         if ':' in snd_length:
@@ -1283,6 +1292,7 @@ class Music(PakObject):
             selitem_data,
             inst=inst,
             sound=sound,
+            sample=sample,
             config=config,
             pack=packfiles,
             loop_len=snd_length,

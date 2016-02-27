@@ -490,6 +490,10 @@ def load_packages(data):
             # Every item has an image
             loader.step("IMG")
 
+    # Set the 'sample' value for music items
+    for sel_item in music_list: # type: selWinItem
+        sel_item.snd_sample = musics[sel_item.name].sample
+
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
 
