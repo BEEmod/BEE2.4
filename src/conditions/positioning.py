@@ -151,7 +151,7 @@ def res_force_upright(inst, _):
     normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
     if normal.z != 0:
         return
-    ang = math.degrees(math.atan2(normal.y, normal.z))
+    ang = math.degrees(math.atan2(normal.y, normal.x))
     inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
 
 
