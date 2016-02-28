@@ -1350,9 +1350,17 @@ def init_picker(f):
     # add another frame inside to place labels on
     frmScroll = ttk.Frame(pal_canvas)
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
-    for item in item_list.values():
+
+    # Create the items in the palette.
+    # Sort by item ID, and then group by package ID.
+    # Reverse sort packages so 'Valve' appears at the top..
+    items = sorted(item_list.values(), key=operator.attrgetter('id'))
+    items.sort(key=operator.attrgetter('pak_id'), reverse=True)
+
+    for item in items:
         for i in range(0, item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+
     f.bind("<Configure>", flow_picker)
 
 
