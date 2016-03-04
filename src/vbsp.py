@@ -1446,6 +1446,8 @@ def get_map_info():
     entry_origin = Vec(-999, -999, -999)
     exit_origin = Vec(-999, -999, -999)
 
+    exit_fixup = entry_fixup = None  # Copy the exit/entry fixup to the frame.
+
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
     override_coop_corr = BEE2_config.get_int('Corridor', 'coop', 0)
@@ -1480,6 +1482,7 @@ def get_map_info():
             exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
             exit_origin += Vec.from_str(item['origin'])
             exit_corr_name = item['targetname']
+            exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
                 item,
                 'spExitCorr',
@@ -1493,6 +1496,7 @@ def get_map_info():
             entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
+            entry_fixup = item.fixup
             entry_corr_type = mod_entryexit(
                 item,
                 'spEntryCorr',
@@ -1503,6 +1507,7 @@ def get_map_info():
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
             exit_corr_name = item['targetname']
+            exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
                 item,
                 'coopCorr',
@@ -1514,6 +1519,7 @@ def get_map_info():
         elif file_coop_entry == file:
             GAME_MODE = 'COOP'
             entry_corr_name = item['targetname']
+            entry_fixup = item.fixup
             mod_entryexit(
                 item,
                 'coopCorr',
@@ -1560,9 +1566,14 @@ def get_map_info():
         if origin == entry_origin:
             door_frame.fixup['door_type'] = 'entry'
             entry_door_frame = door_frame
+            if entry_fixup is not None:
+                # Copy the entry-door's fixup values to the frame itself..
+                door_frame.fixup.update(entry_fixup)
         elif origin == exit_origin:
             door_frame.fixup['door_type'] = 'exit'
             exit_door_frame = door_frame
+            if exit_fixup is not None:
+                door_frame.fixup.update(exit_fixup)
 
     if GAME_MODE == 'COOP':
         mod_doorframe(
