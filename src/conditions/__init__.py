@@ -1334,6 +1334,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
 
 
 @make_flag('debug')
+@make_result('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
 
@@ -1353,14 +1354,6 @@ def debug_flag(inst, props):
     else:
         LOGGER.warning('Debug: ' + props.value)
     return True  # The flag is always true
-
-
-@make_result('debug')
-def debug_result(inst, props):
-    # Swallow the return value, so the flag isn't deleted
-    debug_flag(inst, props)
-
-debug_result.__doc__ = debug_flag.__doc__
 
 
 @make_result('dummy', 'nop', 'do_nothing')
