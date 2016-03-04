@@ -1612,7 +1612,8 @@ def mod_entryexit(
 
     This sets IS_PREVIEW, switches to vertical variants, and chooses a
     particular corridor number.
-    This returns the corridor used - 1-7, 'up', or 'down'
+    This returns the corridor used - 1-7, 'up', or 'down'.
+    The corridor used is also copied to '$corr_index'.
     """
     global IS_PREVIEW
     normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
@@ -1650,14 +1651,15 @@ def mod_entryexit(
         return 'vert_down'
 
     if override_corr == -1:
-        return None  # No extra variants!
+        return None  # There aren't any variants (coop spawn room)
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
+        inst.fixup['$corr_index'] = index + 1
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
-            str(index + 1),
+            index + 1,
         )
         return index
     else:
@@ -1666,6 +1668,7 @@ def mod_entryexit(
             pretty_name,
             override_corr,
         )
+        inst.fixup['$corr_index'] = override_corr
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
 
