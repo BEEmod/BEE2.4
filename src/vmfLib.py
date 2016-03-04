@@ -1711,12 +1711,12 @@ FixupTuple = namedtuple('FixupTuple', 'var value id')
 class EntityFixup:
     """A speciallised mapping which keeps track of the variable indexes.
 
-    This also treats variable names case-insensitively, and strips $
-    signs off the front of them.
+    This treats variable names case-insensitively, and optionally allows
+    writing variables with $ signs in front.
     """
     __slots__ = ['_fixup']
 
-    def __init__(self, fixup=()):
+    def __init__(self, fixup: Iterable[FixupTuple]=()):
         self._fixup = {}
         # In _fixup each variable is stored as a tuple of (var_name,
         # value, index) with keys equal to the casefolded var name.
@@ -1755,18 +1755,30 @@ class EntityFixup:
         """Wipe all the $fixup values."""
         self._fixup.clear()
 
-    def __getitem__(self, key):
+    def update(self, other):
+        """Copy the keys of the other item to this one.
+
+        Variable IDs are not preserved.
+        """
+        # Convert to dict - this handles EntityFixup + other mappings
+        for key, value in dict(other).items():
+            self[key] = value
+
+    def __getitem__(self, key: Union[str, Tuple[str, str]]):
+        """Retieve keys via fixup[key] or fixup[key, default].
+
+        See EntityFixup.get().
+        """
         if isinstance(key, tuple):
             return self.get(key[0], default=key[1])
         else:
             return self.get(key)
 
-    def __contains__(self, var):
+    def __contains__(self, var: str):
         """Check if a variable is present in the fixup list."""
         if var[0] == '$':
             var = var[1:]
         return var.casefold() in self._fixup
-
 
     def __setitem__(self, var, val):
         """Set the value of an instance $replace variable.
@@ -1819,9 +1831,9 @@ class EntityFixup:
 
     def export(self, buffer, ind):
         """Export all the replace values into the VMF."""
-        if len(self._fixup) > 0:
+        if len(self._fixup):
             for (key, value, index) in sorted(
-                    self._fixup.values(), key=lambda x: x.id):
+                    self._fixup.values(), key=operator.attrgetter('id')):
                 # When exporting, pad with zeros if needed
                 buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
