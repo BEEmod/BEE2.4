@@ -1838,6 +1838,22 @@ class EntityFixup:
                 buffer.write(ind + '\t"replace{:02}" "${} {}"\n'.format(
                     index, key, value))
 
+    def __str__(self):
+        items = '\n'.join(
+            '\t${0.var} = {0.value!r}'.format(tup)
+            for tup in
+            sorted(self._fixup.values(), key=operator.attrgetter('id'))
+        )
+        return self.__class__.__name__ + '{\n' + items + '\n}'
+
+    def __repr__(self):
+        items = ', '.join(
+            repr(tup)
+            for tup in
+            sorted(self._fixup.values(), key=operator.attrgetter('id'))
+        )
+        return self.__class__.__name__ + '([' + items + '])'
+
 
 class EntityGroup:
     """Represents the 'group' blocks in entities.
