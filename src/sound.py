@@ -11,6 +11,27 @@ LOGGER = utils.getLogger(__name__)
 
 play_sound = True
 
+SOUNDS = {
+    'select': 'rollover',
+    'add': 'increment',
+    'config': 'reconfig',
+    'subtract': 'decrement',
+    'connect': 'connection_made',
+    'disconnect': 'connection_destroyed',
+    'expand': 'extrude',
+    'delete': 'collapse',
+    'error': 'error',
+    'contract': 'carve',
+    'raise_1': 'panel_raise_01',
+    'raise_2': 'panel_raise_02',
+    'raise_3': 'panel_raise_03',
+    'lower_1': 'panel_lower_01',
+    'lower_2': 'panel_lower_02',
+    'lower_3': 'panel_lower_03',
+    'move': 'reconfig',
+    'swap': 'extrude',
+}
+
 try:
     import pygame
     # buffer must be power of 2, higher means less choppy audio but
@@ -24,41 +45,27 @@ except ImportError:
 
         No sounds will be played.
         """
+
+    def load_snd():
+        pass
+
     initiallised = False
     pygame = None
     SamplePlayer = None
 else:
     # Succeeded
     initiallised = True
-    sounds = {
-        'select': 'rollover',
-        'add': 'increment',
-        'config': 'reconfig',
-        'subtract': 'decrement',
-        'connect': 'connection_made',
-        'disconnect': 'connection_destroyed',
-        'expand': 'extrude',
-        'delete': 'collapse',
-        'error': 'error',
-        'contract': 'carve',
-        'raise_1': 'panel_raise_01',
-        'raise_2': 'panel_raise_02',
-        'raise_3': 'panel_raise_03',
-        'lower_1': 'panel_lower_01',
-        'lower_2': 'panel_lower_02',
-        'lower_3': 'panel_lower_03',
-        'move': 'reconfig',
-        'swap': 'extrude',
-        }
 
-    for key, filename in sounds.items():
-        LOGGER.debug('Loading {}', filename)
-        sounds[key] = pygame.mixer.Sound('../sounds/' + filename + '.wav')
+    def load_snd():
+        """Load in sound FX."""
+        for key, filename in SOUNDS.items():
+            LOGGER.debug('Loading {}', filename)
+            SOUNDS[key] = pygame.mixer.Sound('../sounds/' + filename + '.wav')
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
-        if play_sound and name in sounds:
-            sounds[name].play()
+        if play_sound and name in SOUNDS:
+            SOUNDS[name].play()
 
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""

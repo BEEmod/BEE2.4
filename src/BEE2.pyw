@@ -41,6 +41,7 @@ import packageLoader
 import gameMan
 import extract_packages
 import logWindow
+import sound
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -79,7 +80,7 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    loadScreen.main_loader.set_length('UI', 14)
+    loadScreen.main_loader.set_length('UI', 15)
     loadScreen.main_loader.show()
 
     # OS X starts behind other windows, fix that.
@@ -130,6 +131,10 @@ if __name__ == '__main__':
 
         LOGGER.info('Loading Item Translations...')
         gameMan.init_trans()
+
+        LOGGER.info('Loading sound FX...')
+        sound.load_snd()
+        loadScreen.main_loader.step('UI')
 
         LOGGER.info('Initialising UI...')
         UI.init_windows()  # create all windows
