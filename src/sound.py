@@ -60,7 +60,7 @@ else:
         """Load in sound FX."""
         for key, filename in SOUNDS.items():
             LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pygame.mixer.Sound('../sounds/' + filename + '.wav')
+            SOUNDS[key] = pygame.mixer.Sound('../sounds/' + filename + '.ogg')
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
