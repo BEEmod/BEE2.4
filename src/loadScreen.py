@@ -143,8 +143,7 @@ class LoadScreen(Toplevel):
     def set_length(self, stage, num):
         """Set the number of items in a stage."""
         self.maxes[stage] = num
-        if self.active:
-            self.set_nums(stage)
+        self.set_nums(stage)
 
     def step(self, stage):
         """Increment a step by one."""
