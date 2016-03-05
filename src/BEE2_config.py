@@ -85,6 +85,14 @@ class ConfigFile(ConfigParser):
             self[section][value] = default
             return default
 
+    def __getitem__(self, section):
+        try:
+            return super().__getitem__(section)
+        except KeyError:
+            self[section] = {}
+            return super().__getitem__(section)
+
+
     def getboolean(self, section, value, default=False) -> bool:
         """Get the value in the specified section, coercing to a Boolean.
 
