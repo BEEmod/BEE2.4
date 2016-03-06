@@ -20,7 +20,7 @@ Download the latest releases of the BEE2.4 and items from the following pages:
 
 
 ## Dependencies: ##
-- [pyGame](http://www.pygame.org/) (for sounds, not required)
+- [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
 - [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
 - TKinter/TTK (Standard Library)

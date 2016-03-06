@@ -1,5 +1,5 @@
 """
-This module provides a wrapper around PyGame, in order to play sounds easily.
+This module provides a wrapper around Pyglet, in order to play sounds easily.
 To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
@@ -33,10 +33,7 @@ SOUNDS = {
 }
 
 try:
-    import pygame
-    # buffer must be power of 2, higher means less choppy audio but
-    # higher latency between play() and the sound actually playing.
-    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
+    import pyglet
 except ImportError:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
 
@@ -50,17 +47,17 @@ except ImportError:
         pass
 
     initiallised = False
-    pygame = None
+    pyglet = None
     SamplePlayer = None
 else:
-    # Succeeded
+    # Succeeded in loading PyGame
     initiallised = True
 
     def load_snd():
         """Load in sound FX."""
         for key, filename in SOUNDS.items():
             LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pygame.mixer.Sound('../sounds/' + filename + '.wav')
+            SOUNDS[key] = pyglet.media.load('../sounds/' + filename + '.wav', streaming=False)
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
@@ -96,15 +93,15 @@ else:
                 return
 
             try:
-                self.sample = pygame.mixer.Sound(self.cur_file)
-            except pygame.error:
+                sound = pyglet.media.load(self.cur_file, streaming=False)
+            except pyglet.media.MediaFormatException:
                 self.stop_callback()
                 LOGGER.exception('Sound sample not found: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
 
-            self.sample.play()
+            self.sample = sound.play()
             self.after = TK_ROOT.after(
-                int(self.sample.get_length() * 1000),
+                int(sound.duration * 1000),
                 self._finished,
             )
             self.start_callback()
@@ -114,7 +111,7 @@ else:
             if self.sample is None:
                 return
 
-            self.sample.stop()
+            self.sample.pause()
             self.sample = None
             self.stop_callback()
 
