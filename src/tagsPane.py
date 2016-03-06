@@ -144,15 +144,11 @@ def add_tag(section: Section, tag, pretty=None):
     PRETTY_TAG[key] = pretty
 
 
-def init(master):
+def init(frm):
     """Initialise the UI objects."""
 
-    master.bind('<Enter>', expand)
-    master.bind('<Leave>', contract)
-
-    frm = ttk.Frame(master)
-    frm.grid(row=0, column=0, sticky='NSEW', pady=(0, 4))
-    frm.columnconfigure(0, weight=1)
+    frm.bind('<Enter>', expand)
+    frm.bind('<Leave>', contract)
 
 
     wid['tag_mode_any'] = widget = ttk.Radiobutton(
