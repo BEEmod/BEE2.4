@@ -95,9 +95,10 @@ else:
 
             try:
                 sound = pyglet.media.load(self.cur_file, streaming=False)
-            except pyglet.media.MediaFormatException:
+            # AVbin raises it's own error if the file isn't found..
+            except (FileNotFoundError, pyglet.media.MediaFormatException):
                 self.stop_callback()
-                LOGGER.exception('Sound sample not found: "{}"', self.cur_file)
+                LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
 
             self.sample = sound.play()
