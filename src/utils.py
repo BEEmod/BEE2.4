@@ -629,12 +629,21 @@ class LoggerAdapter(logging.LoggerAdapter):
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
 
-    def log(self, level, msg, *args, **kwargs):
+    def log(self, level, msg, *args, exc_info=None, stack_info=False, **kwargs):
+        """This version of .log() is for str.format() compatibility.
+
+        The message is wrapped in a LogMessage object, which is given the
+        args and kwargs
+        """
         if self.isEnabledFor(level):
             self.logger._log(
                 level,
                 LogMessage(msg, args, kwargs),
-                (),
+                (), # No positional arguments, we do the formatting through
+                # LogMessage..
+                # Pull these two arguments out of kwargs, so they can be set..
+                exc_info=exc_info,
+                stack_info=stack_info,
                 extra={'alias': self.alias},
             )
 
