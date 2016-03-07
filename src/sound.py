@@ -34,6 +34,7 @@ SOUNDS = {
 
 try:
     import pyglet
+    from pyglet.media import avbin # We need this extension, so error early..
 except ImportError:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
 
@@ -47,7 +48,7 @@ except ImportError:
         pass
 
     initiallised = False
-    pyglet = None
+    pyglet = avbin = None
     SamplePlayer = None
 else:
     # Succeeded in loading PyGame
