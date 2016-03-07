@@ -58,7 +58,7 @@ else:
         """Load in sound FX."""
         for key, filename in SOUNDS.items():
             LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pyglet.media.load('../sounds/' + filename + '.wav', streaming=False)
+            SOUNDS[key] = pyglet.media.load('../sounds/' + filename + '.ogg', streaming=False)
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
