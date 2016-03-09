@@ -6,19 +6,9 @@ import utils
 
 LOGGER = utils.getLogger(__name__)
 
-class tkRichText(tkinter.Text):
-    """A version of the TK Text widget which allows using special formatting.
 
-    The format for the text is a list of tuples, where each tuple is (type, text).
-    Types:
-     - "line" : standard line, with carriage return after.
-     - "bold" : bolded text, with carriage return
-     - "bullet" : indented with a bullet at the beginning
-     - "list" : indented with "1. " at the beginning, the number increasing
-     - "break" : A carriage return. This ignores the text part.
-     - "rule" : A horizontal line. This ignores the text part.
-     - "invert": White-on-black text.
-    """
+class tkRichText(tkinter.Text):
+    """A version of the TK Text widget which allows using special formatting."""
     def __init__(self, parent, width=10, height=4, font="TkDefaultFont"):
         self.font = nametofont(font)
         self.bold_font = self.font.copy()
