@@ -17,6 +17,7 @@ import functools
 import webbrowser
 
 from richTextBox import tkRichText
+from tkMarkdown import HRULE_TEXT
 import img as png
 import sound as snd
 import itemPropWin
@@ -217,11 +218,11 @@ def get_description(global_last, glob_desc, style_desc):
         # We have both, we need to join them together.
         if global_last:
             yield from style_desc
-            yield (('rule', ''))
+            yield HRULE_TEXT
             yield from glob_desc
         else:
             yield from glob_desc
-            yield (('rule', ''))
+            yield HRULE_TEXT
             yield from style_desc
     elif glob_desc:
         yield from glob_desc
