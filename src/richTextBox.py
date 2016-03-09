@@ -68,9 +68,7 @@ class tkRichText(tkinter.Text):
         if isinstance(desc, str):
             super().insert("end", desc)
         else:
-            desc = list(desc)
-            LOGGER.info('Text data: {}', desc)
             for text, tag in desc:
                 super().insert("end", text, tag)
 
-            self['state'] = "disabled"
+        self['state'] = "disabled"
