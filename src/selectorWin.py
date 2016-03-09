@@ -359,7 +359,7 @@ class selWin:
         self.noneItem = Item(
             'NONE',
             '',
-            desc=none_desc,
+            desc=tkMarkdown.convert(none_desc),
             attributes=dict(none_attrs),
         )
         self.noneItem.icon = img.png('BEE2/none_96')
