@@ -1,6 +1,7 @@
 from enum import Enum
 
 from markdown.util import etree
+from markdown.extensions import smart_strong, sane_lists
 from markdown.preprocessors import Preprocessor
 import markdown
 
@@ -137,10 +138,15 @@ class TKConverter(markdown.Extension, Preprocessor):
 
 # Reuse one instance for the conversions.
 _converter = TKConverter()
-_MD = markdown.Markdown(extensions=[_converter])
+_MD = markdown.Markdown(extensions=[
+    _converter,
+    smart_strong.SmartEmphasisExtension(),
+    sane_lists.SaneListExtension(),
+])
 
 
 def convert(text):
+    """Convert markdown syntax into a list ready to be passed to richTextBox."""
     _MD.reset()
     _MD.convert(text)
     return _converter.result
