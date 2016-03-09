@@ -6,24 +6,6 @@ import utils
 
 LOGGER = utils.getLogger(__name__)
 
-FORMAT_TYPES = {
-    # format string, tag
-    'line': ('{}\n', None),
-    'under': ('{}\n', 'underline'),
-    'bold': ('{}\n', 'bold'),
-    'italic': ('{}\n', 'italic'),
-    'bullet': ('\u2022 {}\n', 'indent'),
-    'list': ('{i}. {}\n', 'indent'),
-    'break': ('\n', None),
-    'rule': (' \n', 'hrule'),
-    'invert': ('{}\n', 'invert')
-    # Horizontal rules are created by applying a tag to a
-    # space + newline (which affects the whole line)
-    # It decreases the text size (to shrink it vertically),
-    # and gives a border.
-}
-
-
 class tkRichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting.
 
@@ -96,20 +78,9 @@ class tkRichText(tkinter.Text):
         if isinstance(desc, str):
             super().insert("end", desc)
         else:
-            list_ind = 1
-            for line_type, value in desc:
-                try:
-                    form, tag = FORMAT_TYPES[line_type.casefold()]
-                except KeyError:
-                    LOGGER.warning('Unknown description type "{}"!', line_type)
-                    continue
+            desc = list(desc)
+            LOGGER.info('Text data: {}', desc)
+            for text, tag in desc:
+                super().insert("end", text, tag)
 
-                super().insert("end", form.format(value, i=list_ind), tag)
-
-                if '{i}' in form:
-                    # Increment the list index if used.
-                    list_ind += 1
-            # delete the trailing newline
-            self.delete(self.index(END) + "-1char", "end")
-
-        self['state'] = "disabled"
+            self['state'] = "disabled"

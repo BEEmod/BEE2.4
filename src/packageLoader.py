@@ -15,6 +15,7 @@ from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 import vmfLib as VLib
 import extract_packages
+import tkMarkdown
 import utils
 
 from typing import (
@@ -565,7 +566,7 @@ def parse_item_folder(folders, zip_file, pak_id):
         folders[fold] = {
             'auth':     sep_values(props['authors', '']),
             'tags':     sep_values(props['tags', '']),
-            'desc':     list(desc_parse(props)),
+            'desc':     desc_parse(props),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
             'icons':    {p.name: p.value for p in props['icon', []]},
@@ -848,7 +849,7 @@ class Item(PakObject):
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
 
-        glob_desc = list(desc_parse(data.info))
+        glob_desc = desc_parse(data.info)
         desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
@@ -1973,12 +1974,16 @@ def desc_parse(info):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
+    lines = []
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
-                yield (line.name, line.value)
+                lines.append(line.value)
         else:
-            yield ("line", prop.value)
+            lines.append(prop.value)
+
+    return tkMarkdown.convert('\n'.join(lines))
+
 
 
 def get_selitem_data(info):
@@ -1986,7 +1991,7 @@ def get_selitem_data(info):
 
     """
     auth = sep_values(info['authors', ''])
-    desc = list(desc_parse(info))
+    desc = desc_parse(info)
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
