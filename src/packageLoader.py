@@ -566,7 +566,7 @@ def parse_item_folder(folders, zip_file, pak_id):
         folders[fold] = {
             'auth':     sep_values(props['authors', '']),
             'tags':     sep_values(props['tags', '']),
-            'desc':     desc_parse(props),
+            'desc':     desc_parse(props, pak_id + ':' + prop_path),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
             'icons':    {p.name: p.value for p in props['icon', []]},
@@ -849,7 +849,7 @@ class Item(PakObject):
         folders = {}
         unstyled = utils.conv_bool(data.info['unstyled', '0'])
 
-        glob_desc = desc_parse(data.info)
+        glob_desc = desc_parse(data.info, 'global:' + data.id)
         desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
@@ -1970,7 +1970,7 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.export(temp_file)
 
 
-def desc_parse(info):
+def desc_parse(info, id=''):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
@@ -1978,6 +1978,8 @@ def desc_parse(info):
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
+                if line.name:
+                    LOGGER.warning('Old desc format: ', id)
                 lines.append(line.value)
         else:
             lines.append(prop.value)
