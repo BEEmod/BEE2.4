@@ -8,33 +8,10 @@ ico_path = os.path.join(os.getcwd(), "../bee2.ico")
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # Just using the core and .mixer
-    'pygame.math',
-    'pygame.cdrom',
-    'pygame.cursors',
-    'pygame.display',
-    'pygame.draw',
-    'pygame.event',
-    'pygame.image',
-    'pygame.joystick',
-    'pygame.key',
-    'pygame.mouse',
-    'pygame.sprite',
-    'pygame.threads',
-    'pygame.pixelcopy',
-    'pygame.mask',
-    'pygame.pixelarray',
-    'pygame.overlay',
-    'pygame.time',
-    'pygame.transform',
-    'pygame.font',
-    'pygame.sysfont',
-    'pygame.movie',
-    'pygame.movieext',
-    'pygame.scrap',
-    'pygame.surfarray',
-    'pygame.sndarray',
-    'pygame.fastevent',
+    # Block the graphics parts of pyglet, which we aren't using..
+    'pyglet.font',
+    'pyglet.image',  # Imported from pyglet.media in functions only.
+    'pyglet.text',
 
     # We just use idlelib.WidgetRedirector
     'idlelib.ClassBrowser',
