@@ -59,6 +59,12 @@ EXCLUDES = [
 
     # Stop us from then including Qt itself
     'PIL.ImageQt',
+
+    'email',  # Imported in a logging handler
+    'smtplib',  # ditto
+
+    'unittest',  # Imported in __name__==__main__..
+    'doctest',  # ditto
 ]
 
 if utils.WIN:
