@@ -8,11 +8,6 @@ ico_path = os.path.join(os.getcwd(), "../bee2.ico")
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # Block the graphics parts of pyglet, which we aren't using..
-    'pyglet.font',
-    'pyglet.image',  # Imported from pyglet.media in functions only.
-    'pyglet.text',
-
     # We just use idlelib.WidgetRedirector
     'idlelib.ClassBrowser',
     'idlelib.ColorDelegator',
@@ -60,11 +55,27 @@ EXCLUDES = [
     # Stop us from then including Qt itself
     'PIL.ImageQt',
 
-    'email',  # Imported in a logging handler
-    'smtplib',  # ditto
+    'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
+
+    # Imported by logging handlers which we don't use..
+    'win32evtlog',
+    'win32evtlogutil',
+    'email',
+    'smtplib',
+
+    'inspect',
+    'pkgutil',
 
     'unittest',  # Imported in __name__==__main__..
-    'doctest',  # ditto
+    'doctest',
+    'optparse',
+    'argparse',
+]
+
+
+if not utils.MAC:
+    EXCLUDES.append('platform')  # Only used in the mac pyglet code..
+
 ]
 
 if utils.WIN:
@@ -73,6 +84,7 @@ else:
     base = None
 
 bee_version = input('BEE2 Version: ')
+
 
 setup(
     name='BEE2',
