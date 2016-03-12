@@ -35,12 +35,18 @@ EXCLUDES = [
     'email',
     'smtplib',
     'http',
-
 ]
 
 if utils.WIN:
     # Subprocess uses these in UNIX-style OSes, but not Windows
     EXCLUDES += ['select', 'selectors']
+
+if utils.MAC or utils.LINUX:
+    EXCLUDES += ['grp', 'pwd']  # Unix authentication modules, optional
+
+    # The only hash algorithm that's used is sha512 - random.seed()
+    EXCLUDES += ['_sha1', '_sha256', '_md5']
+
 
 # Additional modules to include:
 INCLUDES = [
