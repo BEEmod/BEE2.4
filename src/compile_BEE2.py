@@ -76,12 +76,29 @@ EXCLUDES = [
 if not utils.MAC:
     EXCLUDES.append('platform')  # Only used in the mac pyglet code..
 
+# cx_freeze doesn't detect these required modules
+INCLUDES = [
+    'pyglet.clock',
+    'pyglet.resource',
 ]
+
+# AVbin is needed to read OGG files.
+INCLUDE_LIBS = [
+    'C:/Windows/system32/avbin.dll',
+    'C:/Windows/sysWOW64/avbin64.dll',
+]
+
 
 if utils.WIN:
     base = 'Win32GUI'
 else:
     base = None
+
+# Filter out files for other platforms
+INCLUDE_LIBS = [
+    path for path in INCLUDE_LIBS
+    if os.path.exists(path)
+]
 
 bee_version = input('BEE2 Version: ')
 
@@ -94,8 +111,10 @@ setup(
         'build_exe': {
             'build_exe': '../build_BEE2/bin',
             'excludes': EXCLUDES,
+            'includes': INCLUDES,
             # These values are added to the generated BUILD_CONSTANTS module.
             'constants': 'BEE_VERSION=' + repr(bee_version),
+            'include_files': INCLUDE_LIBS,
         },
     },
     executables=[
