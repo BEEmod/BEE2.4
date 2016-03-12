@@ -15,7 +15,7 @@ from tkinter import filedialog  # open/save as dialog creator
 from tk_tools import TK_ROOT
 
 from query_dialogs import ask_string
-from BEE2_config import ConfigFile
+from BEE2_config import ConfigFile, GEN_OPTS
 from property_parser import Property
 import utils
 import loadScreen
@@ -32,7 +32,7 @@ game_menu = None  # type: Menu
 
 trans_data = {}
 
-config = ConfigFile('games.cfg')
+CONFIG = ConfigFile('games.cfg')
 
 FILES_TO_BACKUP = [
     ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
@@ -85,21 +85,18 @@ EXE_SUFFIX = (
     ''
 )
 
+
 def init_trans():
     """Load a copy of basemodui, used to translate item strings.
 
     Valve's items use special translation strings which would look ugly
     if we didn't convert them.
     """
-    global trans_data
     try:
         with open('../basemodui.txt') as trans:
             trans_prop = Property.parse(trans, 'basemodui.txt')
-        trans_data = {
-            item.real_name: item.value
-            for item in
-            trans_prop.find_key("lang", []).find_key("tokens", [])
-        }
+        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
+            trans_data[item.real_name] = item.value
     except IOError:
         pass
 
@@ -123,10 +120,39 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id: str, folder):
+    def __init__(self, name, steam_id: str, folder, mod_time=0):
         self.name = name
         self.steamID = steam_id
         self.root = folder
+        # The modified date of the cache, so we know whether to copy it over.
+        self.mod_time = mod_time
+
+    @classmethod
+    def parse(cls, gm_id, config: ConfigFile):
+        steam_id = config.get_val(gm_id, 'SteamID', '<none>')
+        if not steam_id.isdigit():
+            raise ValueError(
+                'Game {} has invalid Steam ID: {}'.format(gm_id, steam_id)
+            )
+
+        folder = config.get_val(gm_id, 'Dir', '')
+        if not folder:
+            raise ValueError(
+                'Game {} has no folder!'.format(gm_id)
+            )
+
+        mod_time = config.get_int(gm_id, 'ModTime', 0)
+
+        return cls(gm_id, steam_id, folder, mod_time)
+
+    def save(self):
+        """Write a game into the config page."""
+        if self.name not in CONFIG:
+            CONFIG[self.name] = {}  # Make the section if it's not there.
+        CONFIG[self.name]['SteamID'] = self.steamID
+        CONFIG[self.name]['Dir'] = self.root
+        CONFIG[self.name]['ModTime'] = str(self.mod_time)
+
 
     def dlc_priority(self):
         """Iterate through all subfolders, in order of high to low priority.
@@ -255,6 +281,16 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
+    def cache_valid(self):
+        """Check to see if the cache is valid."""
+        cache_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+
+        if cache_time == self.mod_time:
+            LOGGER.info("Skipped copying cache!")
+            return True
+        LOGGER.info("Cache invalid - copying..")
+        return False
+
     def refresh_cache(self):
         """Copy over the resource files into this game."""
 
@@ -280,6 +316,11 @@ class Game:
                 pass
 
             shutil.copytree(source, dest, copy_function=copy_func)
+        LOGGER.info('Cache copied.')
+        # Save the new cache modification date.
+        self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        self.save()
+        CONFIG.save_check()
 
     def clear_cache(self):
         """Remove all resources from the game."""
@@ -291,6 +332,8 @@ class Game:
             packageLoader.StyleVPK.clear_vpk_files(self)
         except PermissionError:
             pass
+
+        self.mod_time = 0
 
     def export(
             self,
@@ -319,6 +362,11 @@ class Game:
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         export_screen.set_length('COMP', len(os.listdir('../compiler')))
+
+        LOGGER.info('Should refresh: {}', should_refresh)
+        if should_refresh:
+            # Check to ensure the cache needs to be copied over..
+            should_refresh = not self.cache_valid()
 
         if should_refresh:
             export_screen.set_length('RES', extract_packages.res_count)
@@ -569,29 +617,24 @@ def find_steam_info(game_dir):
 
 def save():
     for gm in all_games:
-        if gm.name not in config:
-            config[gm.name] = {}
-        config[gm.name]['SteamID'] = gm.steamID
-        config[gm.name]['Dir'] = gm.root
-    config.save()
+        gm.save()
+    CONFIG.save_check()
 
 
 def load():
     global selected_game
     all_games.clear()
-    for gm in config:
+    for gm in CONFIG:
         if gm != 'DEFAULT':
             try:
-                new_game = Game(
+                new_game = Game.parse(
                     gm,
-                    config[gm]['SteamID'],
-                    config[gm]['Dir'],
+                    CONFIG,
                 )
             except ValueError:
-                pass
-            else:
-                all_games.append(new_game)
-                new_game.edit_gameinfo(True)
+                continue
+            all_games.append(new_game)
+            new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.withdraw()
@@ -683,8 +726,8 @@ def remove_game(_=None):
         selected_game.edit_gameinfo(add_line=False)
 
         all_games.remove(selected_game)
-        config.remove_section(selected_game.name)
-        config.save()
+        CONFIG.remove_section(selected_game.name)
+        CONFIG.save()
 
         if not all_games:
             quit_application()  # If we have no games, nothing can be done

@@ -385,6 +385,7 @@ def quit_application():
     GEN_OPTS.save_check()
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
+    gameMan.save()
     # Destroy the TK windows
     TK_ROOT.destroy()
     sys.exit(0)
@@ -489,6 +490,10 @@ def load_packages(data):
             # Every item has an image
             loader.step("IMG")
 
+    # Set the 'sample' value for music items
+    for sel_item in music_list: # type: selWinItem
+        sel_item.snd_sample = musics[sel_item.name].sample
+
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
 
@@ -562,6 +567,7 @@ def load_packages(data):
              'tracks have variations which are played when interacting '
              'with certain testing elements.',
         has_none=True,
+        has_snd_sample=True,
         none_desc='Add no music to the map at all.',
         callback=win_callback,
         callback_params=['Music'],
@@ -1213,6 +1219,11 @@ def init_option(f):
         width=8,
         )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
+    tooltip.add_tooltip(
+        UI['conf_voice'],
+        'Enable or disable particular voice lines, to prevent them from '
+        'being added.',
+    )
 
     # Make all the selector window textboxes
     style_win.widget(props).grid(row=0, column=1, sticky='EW')
@@ -1339,9 +1350,17 @@ def init_picker(f):
     # add another frame inside to place labels on
     frmScroll = ttk.Frame(pal_canvas)
     pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
-    for item in item_list.values():
+
+    # Create the items in the palette.
+    # Sort by item ID, and then group by package ID.
+    # Reverse sort packages so 'Valve' appears at the top..
+    items = sorted(item_list.values(), key=operator.attrgetter('id'))
+    items.sort(key=operator.attrgetter('pak_id'), reverse=True)
+
+    for item in items:
         for i in range(0, item.num_sub):
             pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+
     f.bind("<Configure>", flow_picker)
 
 

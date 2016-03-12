@@ -8,34 +8,6 @@ ico_path = os.path.join(os.getcwd(), "../bee2.ico")
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
-    # Just using the core and .mixer
-    'pygame.math',
-    'pygame.cdrom',
-    'pygame.cursors',
-    'pygame.display',
-    'pygame.draw',
-    'pygame.event',
-    'pygame.image',
-    'pygame.joystick',
-    'pygame.key',
-    'pygame.mouse',
-    'pygame.sprite',
-    'pygame.threads',
-    'pygame.pixelcopy',
-    'pygame.mask',
-    'pygame.pixelarray',
-    'pygame.overlay',
-    'pygame.time',
-    'pygame.transform',
-    'pygame.font',
-    'pygame.sysfont',
-    'pygame.movie',
-    'pygame.movieext',
-    'pygame.scrap',
-    'pygame.surfarray',
-    'pygame.sndarray',
-    'pygame.fastevent',
-
     # We just use idlelib.WidgetRedirector
     'idlelib.ClassBrowser',
     'idlelib.ColorDelegator',
@@ -82,14 +54,55 @@ EXCLUDES = [
 
     # Stop us from then including Qt itself
     'PIL.ImageQt',
+
+    'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
+
+    # Imported by logging handlers which we don't use..
+    'win32evtlog',
+    'win32evtlogutil',
+    'email',
+    'smtplib',
+
+    'pkgutil',
+
+    'unittest',  # Imported in __name__==__main__..
+    'doctest',
+    'optparse',
+    'argparse',
 ]
+
+
+if not utils.MAC:
+    EXCLUDES.append('platform')  # Only used in the mac pyglet code..
+
+# cx_freeze doesn't detect these required modules
+INCLUDES = [
+    'pyglet.clock',
+    'pyglet.resource',
+]
+
+# AVbin is needed to read OGG files.
+INCLUDE_LIBS = [
+    'C:/Windows/system32/avbin.dll',  # Win 32 bit
+    'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
+    '/usr/local/lib/libavbin.dylib',  # OS X
+    '/usr/lib/libavbin.so',  # Linux
+]
+
 
 if utils.WIN:
     base = 'Win32GUI'
 else:
     base = None
 
+# Filter out files for other platforms
+INCLUDE_LIBS = [
+    path for path in INCLUDE_LIBS
+    if os.path.exists(path)
+]
+
 bee_version = input('BEE2 Version: ')
+
 
 setup(
     name='BEE2',
@@ -99,8 +112,10 @@ setup(
         'build_exe': {
             'build_exe': '../build_BEE2/bin',
             'excludes': EXCLUDES,
+            'includes': INCLUDES,
             # These values are added to the generated BUILD_CONSTANTS module.
             'constants': 'BEE_VERSION=' + repr(bee_version),
+            'include_files': INCLUDE_LIBS,
         },
     },
     executables=[

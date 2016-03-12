@@ -101,7 +101,7 @@ def load_palettes(pal_dir):
             else: # A non-palette file, skip it.
                 LOGGER.debug('Skipping "{}"', name)
                 continue
-        except (KeyError, FileNotFoundError):
+        except (KeyError, FileNotFoundError, zipfile.BadZipFile):
             #  KeyError is returned by zipFile.open() if file is not present
             LOGGER.warning('Bad palette file "{}"!', name)
         else:

@@ -41,7 +41,7 @@ TEMPLATE_FILE = VLib.VMF()
 # This allows us to parse all packages before loading objects.
 ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
 # The arguments for pak_object.parse().
-ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id')
+ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id, is_override')
 # The values stored for OBJ_TYPES
 ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
 # The arguments to pak_object.export().
@@ -336,6 +336,7 @@ def load_packages(
                             obj_id,
                             obj_data.info_block,
                             obj_data.pak_id,
+                            False,
                         )
                     )
                 except (NoKeyError, IndexError) as e:
@@ -351,21 +352,29 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        cache_folder = os.path.abspath('../cache/')
+        # Extract all resources/BEE2/ images.
 
-        shutil.rmtree(cache_folder, ignore_errors=True)
+        img_dest = '../images/cache'
+
+        shutil.rmtree(img_dest, ignore_errors=True)
         img_loc = os.path.join('resources', 'bee2')
         for zip_file in zips:
             for path in zip_names(zip_file):
                 loc = os.path.normcase(path).casefold()
-                if loc.startswith(img_loc):
-                    loader.step("IMG_EX")
-                    zip_file.extract(path, path=cache_folder)
-
-        shutil.rmtree('../images/cache', ignore_errors=True)
-        if os.path.isdir("../cache/resources/bee2"):
-            shutil.move("../cache/resources/bee2", "../images/cache")
-        shutil.rmtree('../cache/', ignore_errors=True)
+                if not loc.startswith(img_loc):
+                    continue
+                # Strip resources/BEE2/ from the path and move to the
+                # cache folder.
+                dest_loc = os.path.join(
+                    img_dest,
+                    os.path.relpath(loc, img_loc)
+                )
+                # Make the destination directory and copy over the image
+                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
+                with zip_open_bin(zip_file, path) as src:
+                    with open(dest_loc, mode='wb') as dest:
+                        shutil.copyfileobj(src, dest)
+                loader.step("IMG_EX")
 
     finally:
         # close them all, we've already read the contents.
@@ -401,7 +410,7 @@ def parse_package(pack: 'Package'):
         for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(pack.zip, obj_id, obj, pack.id)
+                ParseData(pack.zip, obj_id, obj, pack.id, True)
             )
 
         for obj in pack.info.find_all(comp_type):
@@ -410,7 +419,7 @@ def parse_package(pack: 'Package'):
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(pack.zip, obj_id, obj, pack.id)
+                        ParseData(pack.zip, obj_id, obj, pack.id, True)
                     )
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
@@ -638,6 +647,31 @@ class Package:
         PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
+    def is_stale(self):
+        """Check to see if this package has been modified since the last run."""
+        if isinstance(self.zip, FakeZip):
+            # unzipped packages are for development, so always extract.
+            LOGGER.info('Extracting resources - {} is unzipped!', self.id)
+            return True
+        last_modtime = PACK_CONFIG.get_int(self.id, 'ModTime', 0)
+        zip_modtime = int(os.stat(self.name).st_mtime)
+
+        if zip_modtime != last_modtime:
+            LOGGER.info('Package {} is stale! Extracting resources...', self.id)
+            return True
+        return False
+
+    def set_modtime(self):
+        """After the cache has been extracted, set the modification dates
+         in the config."""
+        if isinstance(self.zip, FakeZip):
+            # No modification time
+            PACK_CONFIG[self.id]['ModTime'] = '0'
+        else:
+            PACK_CONFIG[self.id]['ModTime'] = str(int(
+                os.stat(self.name).st_mtime
+            ))
+
 
 class Style(PakObject):
     def __init__(
@@ -676,16 +710,27 @@ class Style(PakObject):
         info = data.info
         selitem_data = get_selitem_data(info)
         base = info['base', '']
-        has_video = utils.conv_bool(info['has_video', '1'])
+        has_video = utils.conv_bool(
+            info['has_video', ''],
+            not data.is_override,  # Assume no video for override
+        )
         vpk_name = info['vpk_name', ''].casefold()
 
         sugg = info.find_key('suggested', [])
-        sugg = (
-            sugg['quote', '<NONE>'],
-            sugg['music', '<NONE>'],
-            sugg['skybox', 'SKY_BLACK'],
-            sugg['goo', 'GOO_NORM'],
-            sugg['elev', '<NONE>'],
+        if data.is_override:
+            # For overrides, we default to no suggestion..
+            sugg = (
+                sugg['quote', ''],
+                sugg['music', ''],
+                sugg['skybox', ''],
+                sugg['elev', ''],
+            )
+        else:
+            sugg = (
+                sugg['quote', '<NONE>'],
+                sugg['music', '<NONE>'],
+                sugg['skybox', 'SKY_BLACK'],
+                sugg['elev', '<NONE>'],
             )
 
         corridors = info.find_key('corridors', [])
@@ -697,22 +742,31 @@ class Style(PakObject):
 
         if base == '':
             base = None
-        folder = 'styles/' + info['folder']
-        config = folder + '/vbsp_config.cfg'
-        with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
-            items = Property.parse(
-                item_data,
-                data.pak_id+':'+folder+'/items.txt'
-            )
-
         try:
-            with data.zip_file.open(config, 'r') as vbsp_config:
-                vbsp = Property.parse(
-                    vbsp_config,
-                    data.pak_id+':'+config,
+            folder = 'styles/' + info['folder']
+        except IndexError:
+            if data.is_override:
+                items = Property(None, [])
+                vbsp = None
+            else:
+                raise ValueError('Style missing configuration!')
+        else:
+            with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
+                items = Property.parse(
+                    item_data,
+                    data.pak_id + ':' + folder + '/items.txt'
                 )
-        except KeyError:
-            vbsp = None
+
+            config = folder + '/vbsp_config.cfg'
+            try:
+                with data.zip_file.open(config, 'r') as vbsp_config:
+                    vbsp = Property.parse(
+                        vbsp_config,
+                        data.pak_id + ':' + config,
+                    )
+            except KeyError:
+                vbsp = None
+
         return cls(
             style_id=data.id,
             selitem_data=selitem_data,
@@ -723,13 +777,22 @@ class Style(PakObject):
             has_video=has_video,
             corridor_names=corridors,
             vpk_name=vpk_name
-            )
+        )
 
     def add_over(self, override: 'Style'):
         """Add the additional commands to ourselves."""
-        self.editor.extend(override.editor)
-        self.config.extend(override.config)
+        self.editor.append(override.editor)
+        self.config.append(override.config)
         self.selitem_data.auth.extend(override.selitem_data.auth)
+
+        self.has_video = self.has_video or override.has_video
+        # If overrides have suggested IDs, use those. Unset values = ''.
+        self.suggested = tuple(
+            over_sugg or self_sugg
+            for self_sugg, over_sugg in
+            zip(self.suggested, override.suggested)
+        )
+
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -1163,13 +1226,17 @@ class Music(PakObject):
             config: Property=None,
             inst=None,
             sound=None,
+            sample=None,
             pack=(),
+            loop_len=0,
             ):
         self.id = music_id
         self.config = config or Property(None, [])
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
+        self.len = loop_len
+        self.sample = sample
 
         self.selitem_data = selitem_data
 
@@ -1184,11 +1251,36 @@ class Music(PakObject):
                 setattr(self, 'has_' + chan, False)
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a music definition."""
         selitem_data = get_selitem_data(data.info)
         inst = data.info['instance', None]
         sound = data.info.find_key('soundscript', '')  # type: Property
+
+        # The sample music file to play, if found.
+        rel_sample = data.info['sample', '']
+        if rel_sample:
+            sample = os.path.abspath('../sounds/music_samp/' + rel_sample)
+            zip_sample = 'resources/music_samp/' + rel_sample
+            try:
+                with zip_open_bin(data.zip_file, zip_sample):
+                    pass
+            except KeyError:
+                LOGGER.warning(
+                    'Music sample for <{}> does not exist in zip: "{}"',
+                    data.id,
+                    zip_sample,
+                )
+        else:
+            sample = None
+
+        snd_length = data.info['loop_len', '0']
+        if ':' in snd_length:
+            # Allow specifying lengths as min:sec.
+            minute, second = snd_length.split(':')
+            snd_length = 60 * utils.conv_int(minute) + utils.conv_int(second)
+        else:
+            snd_length = utils.conv_int(snd_length)
 
         if not sound.has_children():
             sound = sound.value
@@ -1210,8 +1302,10 @@ class Music(PakObject):
             selitem_data,
             inst=inst,
             sound=sound,
+            sample=sample,
             config=config,
             pack=packfiles,
+            loop_len=snd_length,
         )
 
     def add_over(self, override: 'Music'):
@@ -1256,6 +1350,10 @@ class Music(PakObject):
                 ('Options', 'music_instance'),
                 music.inst,
             )
+        vbsp_config.set_key(
+            ('Options', 'music_looplen'),
+            str(music.len),
+        )
 
         # If we need to pack, add the files to be unconditionally packed.
         if music.packfiles:
@@ -1367,7 +1465,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         ]))
 
 
-class StyleVPK(PakObject):
+class StyleVPK(PakObject, has_img=False):
     """A set of VPK files used for styles.
 
     These are copied into _dlc3, allowing changing the in-editor wall
@@ -1389,19 +1487,22 @@ class StyleVPK(PakObject):
         os.makedirs(dest_folder, exist_ok=True)
 
         zip_file = data.zip_file  # type: ZipFile
-        zip_filenames = set(zip_file.namelist())
 
         has_files = False
         file_count = 0
 
         for file_count, name in enumerate(cls.iter_vpk_names()):
             src = 'vpk/' + vpk_name + name
-            if src not in zip_filenames:
-                break
             dest = os.path.join(dest_folder, 'pak01' + name)
-            with open(dest, 'wb') as dest_file, zip_open_bin(zip_file, src) as src_file:
-                shutil.copyfileobj(src_file, dest_file)
-            has_files = True
+            try:
+                src_file = zip_open_bin(zip_file, src)
+            except KeyError:
+                # This VPK filename isn't present, we've found them all..
+                break
+            else:
+                with src_file, open(dest, 'wb') as dest_file:
+                    shutil.copyfileobj(src_file, dest_file)
+                has_files = True
 
         if not has_files:
             raise Exception(
@@ -1759,41 +1860,69 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VLib.VMF):
+    def __init__(self, temp_id, vmf_file: VLib.VMF, force=None, keep_brushes=True):
+        """Import in a BrushTemplate object.
+
+        This copies the solids out of vmf_file and into TEMPLATE_FILE.
+        If force is set to 'world' or 'detail', the other type will be converted.
+        If keep_brushes is false brushes will be skipped (for TemplateOverlay).
+        """
         self.id = temp_id
         # We don't actually store the solids here - put them in
-        # the TEMPLATE_FILE VMF. That way the VMF object can vanish.
+        # the TEMPLATE_FILE VMF. That way the original VMF object can vanish.
 
         # If we have overlays, we need to ensure the IDs crossover correctly
         id_mapping = {}
 
-        if vmf_file.brushes:
-            self.temp_world = TEMPLATE_FILE.create_ent(
-                classname='bee2_template_world',
-                template_id=self.id,
-            )
+        self.temp_world = TEMPLATE_FILE.create_ent(
+            classname='bee2_template_world',
+            template_id=self.id,
+        )
+        self.temp_detail = TEMPLATE_FILE.create_ent(
+            classname='bee2_template_detail',
+            template_id=self.id,
+        )
+
+        # Check to see if any func_details have associated solids..
+        has_detail = any(
+            e.is_brush()
+            for e in
+            vmf_file.by_class['func_detail']
+        )
+
+        # Copy world brushes
+        if keep_brushes and vmf_file.brushes:
             self.temp_world.solids = [
                 solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                 for solid in
                 vmf_file.brushes
             ]
-        else:
-            self.temp_world = None
 
-        # Add detail brushes
-        if any(e.is_brush() for e in vmf_file.by_class['func_detail']):
-            self.temp_detail = TEMPLATE_FILE.create_ent(
-                classname='bee2_template_detail',
-                template_id=self.id,
-            )
+        # Copy detail brushes
+        if keep_brushes and has_detail:
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
                     solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
                     for solid in
                     ent.solids
                 )
-        else:
+
+        # Allow switching world brushes to detail or vice-versa.
+        if force.casefold == 'world':
+            self.temp_world.solids.extend(self.temp_detail.solids)
+            del self.temp_detail.solids[:]
+
+        if force.casefold == 'detail':
+            self.temp_detail.solids.extend(self.temp_world.solids)
+            del self.temp_world.solids[:]
+
+        # Destroy the entity object if it's unused.
+        if not self.temp_detail.solids:
+            self.temp_detail.remove()
             self.temp_detail = None
+        if not self.temp_world.solids:
+            self.temp_world.remove()
+            self.temp_world = None
 
         self.temp_overlays = []
 
@@ -1828,6 +1957,8 @@ class BrushTemplate(PakObject, has_img=False):
         return cls(
             data.id,
             file,
+            force=data.info['force', ''],
+            keep_brushes=utils.conv_bool(data.info['keep_brushes', '1'], True),
         )
 
     @staticmethod

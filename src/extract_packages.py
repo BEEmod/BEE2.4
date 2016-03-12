@@ -11,8 +11,9 @@ import os.path
 
 from zipfile import ZipFile
 
-from FakeZip import zip_names, FakeZip
+from FakeZip import zip_names, FakeZip, zip_open_bin
 from tk_tools import TK_ROOT
+import packageLoader
 import utils
 
 LOGGER = utils.getLogger(__name__)
@@ -29,14 +30,21 @@ export_btn_text = tk.StringVar()
 
 
 def done_callback():
+    """Called once the cache copying is done (or not needed).
+
+    This is overwritten by UI, and enables the various export buttons.
+    """
     pass
 
 
 def do_copy(zip_list, done_files):
     cache_path = os.path.abspath('../cache/')
+    music_samp = os.path.abspath('../sounds/music_samp/')
     shutil.rmtree(cache_path, ignore_errors=True)
+    shutil.rmtree(music_samp, ignore_errors=True)
 
     img_loc = os.path.join('resources', 'bee2')
+    music_loc = os.path.join('resources', 'music_samp')
     for zip_path in zip_list:
         if os.path.isfile(zip_path):
             zip_file = ZipFile(zip_path)
@@ -45,24 +53,83 @@ def do_copy(zip_list, done_files):
         with zip_file:
             for path in zip_names(zip_file):
                 loc = os.path.normcase(path)
-                if loc.startswith("resources"):
-                    # Don't re-extract images
-                    if not loc.startswith(img_loc):
-                        zip_file.extract(path, path=cache_path)
-                    with done_files.get_lock():
-                        done_files.value += 1
+                if not loc.startswith("resources"):
+                    continue
+                # Don't re-extract images
+                if loc.startswith(img_loc):
+                    continue
+                if loc.startswith(music_loc):
+                    dest_path = os.path.join(
+                        music_samp,
+                        os.path.relpath(path, music_loc)
+                    )
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    with zip_open_bin(zip_file, path) as src:
+                        with open(dest_path, 'wb') as dest:
+                            shutil.copyfileobj(src, dest)
+                else:
+                    zip_file.extract(path, path=cache_path)
+                with done_files.get_lock():
+                    done_files.value += 1
 
 
-def start_copying(zip_list):
+def update_modtimes():
+    """Update the cache modification times, so next time we don't extract.
+
+    This should only be done if we've copied all the files.
+    """
+    import time
+    from BEE2_config import GEN_OPTS
+    LOGGER.info('Setting modtimes..')
+    for pack in packageLoader.packages.values():
+        # Set modification times for each package.
+        pack.set_modtime()
+
+    # Reset package cache times for removed packages. This ensures they'll be
+    # detected if re-added.
+    for pak_id in packageLoader.PACK_CONFIG:
+        if pak_id not in packageLoader.packages:
+            packageLoader.PACK_CONFIG[pak_id]['ModTime'] = '0'
+
+    # Set the overall cache time to now.
+    GEN_OPTS['General']['cache_time'] = str(int(time.time()))
+    GEN_OPTS['General']['cache_pack_count'] = str(len(packageLoader.packages))
+
+    packageLoader.PACK_CONFIG.save()
+    GEN_OPTS.save()
+
+
+def check_cache(zip_list):
+    """Check to see if any zipfiles are invalid, and if so extract the cache."""
     global copy_process
+    from BEE2_config import GEN_OPTS
+
+    LOGGER.info('Checking cache...')
+
+    cache_packs = GEN_OPTS.get_int('General', 'cache_pack_count')
+
+    # We need to match the number of packages too, to account for removed ones.
+    cache_stale = (len(packageLoader.packages) == cache_packs) or any(
+        pack.is_stale()
+        for pack in
+        packageLoader.packages.values()
+    )
+
+    if not cache_stale:
+        # We've already done the copying..
+        LOGGER.info('Cache is still fresh, skipping extraction')
+        done_callback()
+        return
+
     copy_process = multiprocessing.Process(
         target=do_copy,
         args=(zip_list, currently_done),
     )
     copy_process.daemon = True
-    LOGGER.info('Starting background process!')
+    LOGGER.info('Starting background extraction process!')
     copy_process.start()
     TK_ROOT.after(UPDATE_INTERVAL, update)
+
 
 def update():
     """Check the progress of the copying until it's done.
@@ -81,6 +148,7 @@ def update():
         export_btn_text.set(
             'Export...'
         )
+        update_modtimes()
         done_callback()
     else:
         # Coninuously tell TK to re-run this, so we update

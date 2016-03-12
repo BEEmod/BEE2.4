@@ -150,7 +150,8 @@ def init(frm):
     frm.bind('<Enter>', expand)
     frm.bind('<Leave>', contract)
 
-    wid['tag_mode_any'] = widget = tk.Radiobutton(
+
+    wid['tag_mode_any'] = widget = ttk.Radiobutton(
         frm,
         text='Any',
         variable=TAG_MODE,
@@ -159,7 +160,7 @@ def init(frm):
     )
     widget.grid(row=0, column=0, sticky='W')
 
-    wid['tag_mode_all'] = widget = tk.Radiobutton(
+    wid['tag_mode_all'] = widget = ttk.Radiobutton(
         frm,
         text='All',
         variable=TAG_MODE,

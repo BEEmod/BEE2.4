@@ -46,6 +46,15 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
 
+class SWITCH_TYPE(Enum):
+    """The methods useable for switch options."""
+    FIRST = 'first'  # choose the first match
+    LAST = 'last'  # choose the last match
+    RANDOM = 'random'  # Randomly choose
+    ALL = 'all'  # Run all matching commands
+
+
+
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
     """
@@ -258,11 +267,15 @@ class Condition:
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
-            elif prop.name == 'condition':
+
+            elif prop.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
                 results.append(prop)
             elif prop.name == 'elsecondition':
                 prop.name = 'condition'
+                else_results.append(prop)
+            elif prop.name == 'elseswitch':
+                prop.name = 'switch'
                 else_results.append(prop)
             elif prop.name == 'priority':
                 try:
@@ -865,9 +878,9 @@ def get_template(temp_name):
         # list all the templates that are available.
         LOGGER.info('Templates:')
         LOGGER.info('\n'.join(
-            ('* "' + temp + '"')
+            ('* "' + temp.upper() + '"')
             for temp in
-            TEMPLATES.keys()
+            sorted(TEMPLATES.keys())
         ))
         # Overwrite the error's value
         err.args = ('Template not found: "{}"'.format(temp_name),)
@@ -1008,6 +1021,7 @@ TEMP_COLOUR_INVERT = {
 def retexture_template(
         template_data: Template,
         origin: Vec,
+        fixup: VLib.EntityFixup=None,
         replace_tex: dict=utils.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
@@ -1028,6 +1042,7 @@ def retexture_template(
       ('wall', '2x2', '4x4', 'special')
     - If use_bullseye is true, the bullseye textures will be used for all panel
       sides instead of the normal textures. (This overrides force_grid.)
+    - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
     """
     import vbsp
 
@@ -1049,7 +1064,7 @@ def retexture_template(
 
     # Ensure all values are lists.
     replace_tex = {
-        key: ([value] if isinstance(value, str) else value)
+        key.casefold(): ([value] if isinstance(value, str) else value)
         for key, value in
         replace_tex.items()
     }
@@ -1062,8 +1077,12 @@ def retexture_template(
             random.seed(rand_prefix + norm.join('_'))
 
             if folded_mat in replace_tex:
-                # replace_tex overrides everything
-                face.mat = random.choice(replace_tex[folded_mat])
+                # Replace_tex overrides everything.
+                mat = random.choice(replace_tex[folded_mat])
+                LOGGER.info('Mat: {}, replacement: {}', folded_mat, mat)
+                if mat[:1] == '$' and fixup is not None:
+                    mat = fixup[mat]
+                face.mat = mat
                 continue
 
             tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
@@ -1214,11 +1233,14 @@ def retexture_template(
                 )
 
     for over in template_data.overlay[:]:
+        random.seed('TEMP_OVERLAY_' + over['basisorigin'])
         mat = over['material'].casefold()
         if mat in replace_tex:
-            over['material'] = mat = random.choice(replace_tex[mat])
+            mat = random.choice(replace_tex[mat])
+            if mat[:1] == '$':
+                mat = fixup[mat]
         elif mat in vbsp.TEX_VALVE:
-            over['material'] = mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+            mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
         else:
             continue
         if mat == '':
@@ -1226,6 +1248,8 @@ def retexture_template(
             # (Since it's inplace, this can affect the tuple.)
             template_data.overlay.remove(over)
             over.remove()
+        else:
+            over['material'] = mat
 
 
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
@@ -1310,6 +1334,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
 
 
 @make_flag('debug')
+@make_result('debug')
 def debug_flag(inst, props):
     """Displays text when executed, for debugging conditions.
 
@@ -1329,14 +1354,6 @@ def debug_flag(inst, props):
     else:
         LOGGER.warning('Debug: ' + props.value)
     return True  # The flag is always true
-
-
-@make_result('debug')
-def debug_result(inst, props):
-    # Swallow the return value, so the flag isn't deleted
-    debug_flag(inst, props)
-
-debug_result.__doc__ = debug_flag.__doc__
 
 
 @make_result('dummy', 'nop', 'do_nothing')
@@ -1461,6 +1478,61 @@ def res_end_condition(base_inst, res):
     """
     raise EndCondition
 
+
+@make_result_setup('switch')
+def res_switch_setup(res):
+    flag = None
+    method = SWITCH_TYPE.FIRST
+    cases = []
+    for prop in res:
+        if prop.has_children():
+            cases.append(prop)
+        else:
+            if prop.name == 'flag':
+                flag = prop.value
+                continue
+            if prop.name == 'method':
+                try:
+                    method = SWITCH_TYPE(prop.value.casefold())
+                except ValueError:
+                    pass
+
+    for prop in cases:
+        for result in prop.value:
+            Condition.setup_result(prop.value, result)
+
+    if method is SWITCH_TYPE.LAST:
+        cases[:] = cases[::-1]
+
+    return (
+        flag,
+        cases,
+        method,
+    )
+
+
+@make_result('switch')
+def res_switch(inst, res):
+    """Run the same flag multiple times with different arguments.
+
+    'method' is the way the search is done - first, last, random, or all.
+    'flag' is the name of the flag.
+    """
+    flag_name, cases, method = res.value
+
+    if method is SWITCH_TYPE.RANDOM:
+        cases = cases[:]
+        random.shuffle(cases)
+
+    for case in cases:
+        flag = Property(flag_name, case.real_name)
+        if not check_flag(flag, inst):
+            continue
+        for res in case:
+            Condition.test_result(inst, res)
+        if method is not SWITCH_TYPE.ALL:
+            # All does them all, otherwise we quit now.
+            break
 
 
 @make_result_setup('staticPiston')

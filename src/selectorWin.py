@@ -18,6 +18,7 @@ import math
 import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
+import sound
 import utils
 import tk_tools
 
@@ -39,6 +40,9 @@ GRP_COLL = '◁'
 GRP_COLL_HOVER = '◀'
 GRP_EXP = '▽'
 GRP_EXP_HOVER = '▼'
+
+BTN_PLAY = '▶'
+BTN_STOP = '■'
 
 
 def _NO_OP(*args):
@@ -208,6 +212,7 @@ class Item:
         'group',
         'button',
         'win',
+        'snd_sample',
         'context_lbl',
         'ico_file',
         'attrs',
@@ -223,6 +228,7 @@ class Item:
             desc=(('line', ''),),
             group: str=None,
             attributes: dict=None,
+            snd_sample: str=None,
             ):
         self.name = name
         self.shortName = short_name
@@ -247,6 +253,7 @@ class Item:
             )
             self.ico_file = icon
         self.desc = desc
+        self.snd_sample = snd_sample
         self.authors = authors or []
         self.attrs = attributes or {}
         self.button = None  # type: ttk.Button
@@ -308,6 +315,7 @@ class selWin:
             lst,
             has_none=True,
             has_def=True,
+            has_snd_sample=False,
             none_desc=(('line', 'Do not add anything.'),),
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
@@ -328,6 +336,8 @@ class selWin:
           of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
+        - If has_snd_sample is True, a '>' button will appear next to names
+          to play the associated audio sample for the item.
         - none_desc holds an optional description for the <none> Item,
           which can be used to describe what it results in.
         - title is the title of the selector window.
@@ -466,13 +476,47 @@ class selWin:
         self.prop_icon['image'] = self.prop_icon.img
         self.prop_icon.grid(row=0, column=0)
 
+        name_frame = ttk.Frame(self.prop_frm)
+
         self.prop_name = ttk.Label(
-            self.prop_frm,
+            name_frame,
             text="Item",
             justify=CENTER,
             font=("Helvetica", 12, "bold"),
             )
-        self.prop_name.grid(row=1, column=0, columnspan=4)
+        name_frame.grid(row=1, column=0, columnspan=4)
+        name_frame.columnconfigure(0, weight=1)
+        self.prop_name.grid(row=0, column=0)
+
+        # For music items, add a '>' button to play sound samples
+        if has_snd_sample and sound.initiallised:
+            self.samp_button = samp_button = ttk.Button(
+                name_frame,
+                text=BTN_PLAY,
+                width=1,
+            )
+            samp_button.grid(row=0, column=1)
+            add_tooltip(
+                samp_button,
+                "Play a sample of this item.",
+            )
+
+            def set_samp_play():
+                samp_button['text'] = BTN_PLAY
+
+            def set_samp_stop():
+                samp_button['text'] = BTN_STOP
+
+            self.sampler = sound.SamplePlayer(
+                stop_callback=set_samp_play,
+                start_callback=set_samp_stop,
+            )
+            samp_button['command'] = self.sampler.play_sample
+            utils.bind_leftclick(self.prop_icon, self.sampler.play_sample)
+            samp_button.state(('disabled',))
+        else:
+            self.sampler = None
+
         self.prop_author = ttk.Label(self.prop_frm, text="Author")
         self.prop_author.grid(row=2, column=0, columnspan=4)
 
@@ -762,6 +806,10 @@ class selWin:
 
     def save(self, _=None):
         """Save the selected item into the textbox."""
+        # Stop sample sounds if they're playing
+        if self.sampler:
+            self.sampler.stop()
+
         self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
@@ -859,6 +907,20 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+
+        if self.sampler:
+            is_playing = self.sampler.is_playing
+            self.sampler.stop()
+
+            self.sampler.cur_file = item.snd_sample
+            if self.sampler.cur_file:
+                self.samp_button.state(('!disabled',))
+
+                if is_playing:
+                    # Start the sampler again, so it plays the current item!
+                    self.sampler.play_sample()
+            else:
+                self.samp_button.state(('disabled',))
 
         if self.has_def:
             if self.suggested is None or self.selected == self.suggested:
@@ -1012,7 +1074,7 @@ class selWin:
             )
             # Remove the font from the last suggested item
 
-        if suggested is None:
+        if suggested is None or suggested == '':
             self.suggested = None
         elif suggested == "<NONE>":
             self.suggested = self.noneItem

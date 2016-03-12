@@ -12,6 +12,7 @@ from tk_tools import TK_ROOT
 from tkinter import ttk
 from tkinter import messagebox
 
+from enum import Enum
 import functools
 import webbrowser
 
@@ -29,12 +30,7 @@ LOGGER = utils.getLogger(__name__)
 
 OPEN_IN_TAB = 2
 
-wid = dict()
-
-# Holds the 5 sprite labels
-wid['subitem'] = [0, 0, 0, 0, 0]
-wid['sprite'] = [0, 0, 0, 0, 0]
-
+wid = {}
 
 selected_item = None # type: UI.Item
 selected_sub_item = None  # type: UI.PalItem
@@ -62,6 +58,52 @@ ROT_TYPES = {
     "handle_36_directions": "rot_36",
     "handle_catapult":      "rot_catapult"
 }
+
+class SPR(Enum):
+    """The slots for property-indicating sprites. The value is the column."""
+    INPUT = 0
+    OUTPUT = 1
+    ROTATION = 2
+    COLLISION = 3
+    FACING = 4
+
+SPRITE_TOOL = {
+    # The tooltips associated with each sprite.
+    'rot_0': 'This item may not be rotated.',
+    'rot_4': 'This item can be pointed in 4 directions.',
+    'rot_5': 'This item can be positioned on the sides and center.',
+    'rot_6': 'This item can be centered in two directions, plus on the sides.',
+    'rot_8': 'This item can be placed like light strips.',
+    'rot_36': 'This item can be rotated on the floor to face 360 degrees.',
+    'rot_catapult': 'This item is positioned using a catapult trajectory.',
+
+    'in_none': 'This item does not accept any inputs.',
+    'in_norm': 'This item accepts inputs.',
+    'in_polarity': 'Excursion Funnels accept a on/off input and a directional input.',
+
+    'out_none': 'This item does not output.',
+    'out_norm': 'This item has an output.',
+    'out_tim': 'This item has a timed output.',
+
+    'space_none': 'This item does not take up any space inside walls.',
+    'space_embed': 'This item takes space inside the wall.',
+
+    'surf_none': 'This item cannot be placed anywhere...',
+    'surf_ceil': 'This item can only be attached to ceilings.',
+    'surf_floor': 'This item can only be placed on the floor.',
+    'surf_floor_ceil': 'This item can be placed on floors and ceilings.',
+    'surf_wall': 'This item can be placed on walls only.',
+    'surf_wall_ceil': 'This item can be attached to walls and ceilings.',
+    'surf_wall_floor': 'This item can be placed on floors and walls.',
+    'surf_wall_floor_ceil': 'This item can be placed in any orientation.',
+}
+
+
+def set_sprite(pos, sprite):
+    """Set one of the property sprites to a value."""
+    widget = wid['sprite', pos]
+    widget['image'] = png.spr(sprite)
+    widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
 
 
 def pos_for_item():
@@ -134,7 +176,7 @@ def show_prop(widget, warp_cursor=False):
     selected_sub_item = widget
     is_open = True
 
-    icon_widget = wid['subitem'][pos_for_item()]
+    icon_widget = wid['subitem', pos_for_item()]
 
     # Calculate the pixel offset between the window and the subitem in
     # the properties dialog, and shift if needed to keep it inside the
@@ -175,18 +217,18 @@ def get_description(global_last, glob_desc, style_desc):
         # We have both, we need to join them together.
         if global_last:
             yield from style_desc
-            yield (('line', ''))
+            yield (('rule', ''))
             yield from glob_desc
         else:
             yield from glob_desc
-            yield (('line', ''))
+            yield (('rule', ''))
             yield from style_desc
     elif glob_desc:
         yield from glob_desc
     elif style_desc:
         yield from style_desc
     else:
-        return # No description
+        return  # No description
 
 
 def load_item_data():
@@ -196,12 +238,12 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem'][ind]['image'] = png.png('BEE2/alpha_64')
+            wid['subitem', ind]['image'] = png.png('BEE2/alpha_64')
         else:
-            wid['subitem'][ind]['image'] = selected_item.get_icon(pos)
-        wid['subitem'][ind]['relief'] = 'flat'
+            wid['subitem', ind]['image'] = selected_item.get_icon(pos)
+        wid['subitem', ind]['relief'] = 'flat'
 
-    wid['subitem'][pos_for_item()]['relief'] = 'raised'
+    wid['subitem', pos_for_item()]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data['auth'])
     wid['name']['text'] = selected_sub_item.name
@@ -283,21 +325,22 @@ def load_item_data():
 
     if has_inputs:
         if has_polarity:
-            wid['sprite'][0]['image'] = png.spr('in_polarity')
+            set_sprite(SPR.INPUT, 'in_polarity')
         else:
-            wid['sprite'][0]['image'] = png.spr('in_norm')
+            set_sprite(SPR.INPUT, 'in_norm')
     else:
-        wid['sprite'][0]['image'] = png.spr('in_none')
+        set_sprite(SPR.INPUT, 'in_none')
 
     if has_outputs:
         if has_timer:
-            wid['sprite'][1]['image'] = png.spr('out_tim')
+            set_sprite(SPR.OUTPUT, 'out_tim')
         else:
-            wid['sprite'][1]['image'] = png.spr('out_norm')
+            set_sprite(SPR.OUTPUT, 'out_norm')
     else:
-        wid['sprite'][1]['image'] = png.spr('out_none')
+        set_sprite(SPR.OUTPUT, 'out_none')
 
-    wid['sprite'][2]['image'] = png.spr(
+    set_sprite(
+        SPR.ROTATION,
         ROT_TYPES.get(
             rot_type.casefold(),
             'rot_none',
@@ -305,9 +348,9 @@ def load_item_data():
     )
 
     if is_embed:
-        wid['sprite'][3]['image'] = png.spr('space_embed')
+        set_sprite(SPR.COLLISION, 'space_embed')
     else:
-        wid['sprite'][3]['image'] = png.spr('space_none')
+        set_sprite(SPR.COLLISION, 'space_none')
 
     face_spr = "surf"
     if not surf_wall:
@@ -317,16 +360,24 @@ def load_item_data():
     if not surf_ceil:
         face_spr += "_ceil"
     if face_spr == "surf":
+        # This doesn't seem right - this item won't be placeable at all...
+        LOGGER.warning(
+            "Item <{}> disallows all orientations. Is this right?",
+            selected_item.id,
+        )
         face_spr += "_none"
-    wid['sprite'][4]['image'] = png.spr(face_spr)
+
+    set_sprite(SPR.FACING, face_spr)
 
 
 def follow_main(_=None):
     """Move the properties window to keep a relative offset to the main window.
 
     """
-    prop_window.geometry('+'+str(prop_window.relX+TK_ROOT.winfo_x()) +
-                         '+'+str(prop_window.relY+TK_ROOT.winfo_y()))
+    prop_window.geometry('+{x}+{y}'.format(
+        x=prop_window.relX + TK_ROOT.winfo_x(),
+        y=prop_window.relY + TK_ROOT.winfo_y(),
+    ))
 
 
 def hide_context(_=None):
@@ -340,7 +391,7 @@ def hide_context(_=None):
 
 def init_widgets():
     """Initiallise all the window components."""
-    global prop_window, moreinfo_win
+    global prop_window
     prop_window = Toplevel(TK_ROOT)
     prop_window.overrideredirect(1)
     prop_window.resizable(False, False)
@@ -357,42 +408,48 @@ def init_widgets():
         f,
         text="Properties:",
         anchor="center",
-        ).grid(
-            row=0,
-            column=0,
-            columnspan=3,
-            sticky="EW",
-            )
+    ).grid(
+        row=0,
+        column=0,
+        columnspan=3,
+        sticky="EW",
+    )
 
     wid['name'] = ttk.Label(f, text="", anchor="center")
     wid['name'].grid(row=1, column=0, columnspan=3, sticky="EW")
 
     wid['ent_count'] = ttk.Label(
         f,
-        text="2",
+        text="",
         anchor="e",
         compound="left",
         image=png.spr('gear_ent'),
-        )
+    )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
+    tooltip.add_tooltip(
+        wid['ent_count'],
+        'The number of entities used for this item. The Source engine limits '
+        'this to 2048 in total. This provides a guide to how many of these '
+        'items can be placed in a map at once.'
+    )
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
     wid['author'].grid(row=2, column=0, columnspan=3, sticky="EW")
 
     sub_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     sub_frame.grid(column=0, columnspan=3, row=3)
-    for i, _ in enumerate(wid['subitem']):
-        wid['subitem'][i] = ttk.Label(
+    for i in range(5):
+        wid['subitem', i] = ttk.Label(
             sub_frame,
             image=png.png('BEE2/alpha_64'),
         )
-        wid['subitem'][i].grid(row=0, column=i)
+        wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
-            wid['subitem'][i],
+            wid['subitem', i],
             functools.partial(sub_sel, i),
         )
         utils.bind_rightclick(
-            wid['subitem'][i],
+            wid['subitem', i],
             functools.partial(sub_open, i),
         )
 
@@ -403,22 +460,26 @@ def init_widgets():
         row=4,
         column=0,
         sticky="SW",
-        )
+    )
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     spr_frame.grid(column=1, columnspan=2, row=4, sticky=W)
     # sprites: inputs, outputs, rotation handle, occupied/embed state,
     # desiredFacing
-    for i in range(5):
-        spr = png.spr('ap_grey')
-        wid['sprite'][i] = ttk.Label(spr_frame, image=spr, relief="raised")
-        wid['sprite'][i].grid(row=0, column=i)
+    for spr_id in SPR:
+        wid['sprite', spr_id] = sprite = ttk.Label(
+            spr_frame,
+            image=png.spr('ap_grey'),
+            relief="raised",
+        )
+        sprite.grid(row=0, column=spr_id.value)
+        tooltip.add_tooltip(sprite)
 
     desc_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
     desc_frame.columnconfigure(0, weight=1)
 
-    wid['desc'] = tkRichText(desc_frame, width=40, height=8, font=None)
+    wid['desc'] = tkRichText(desc_frame, width=40, height=8)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
     desc_scroll = tk_tools.HidingScroll(

@@ -521,7 +521,6 @@ def show_window(used_props, parent, item_name):
 
     widgets['titleLabel'].configure(text='Settings for "' + item_name + '"')
     win.title('BEE2 - ' + item_name)
-    win.transient(master=parent)
     win.deiconify()
     win.lift(parent)
     win.grab_set()

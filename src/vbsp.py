@@ -267,6 +267,7 @@ DEFAULTS = {
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
+    "music_looplen":            "0",  # If set, re-trigger music after this time.
     "elev_type":                "RAND",  # What type of script to use:
     # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
@@ -1418,12 +1419,13 @@ def get_map_info():
 
     inst_files = set()  # Get a set of every instance in the map.
 
-    # If the values are None / not present, use an empty tuple to disable
-    # that IF.
-    file_coop_entry = instanceLocs.get_special_inst('coopEntry') or ()
-    file_coop_exit = instanceLocs.get_special_inst('coopExit') or ()
-    file_sp_exit = instanceLocs.get_special_inst('spExit') or ()
-    file_sp_entry = instanceLocs.get_special_inst('spEntry') or ()
+    file_coop_entry = instanceLocs.get_special_inst('coopEntry')
+    file_coop_exit = instanceLocs.get_special_inst('coopExit')
+    file_sp_exit = instanceLocs.get_special_inst('spExit')
+    file_sp_entry = instanceLocs.get_special_inst('spEntry')
+
+    # These have multiple instances, so 'in' must be used.
+    # If both frames are set to "", get_special returns None so fix that.
     file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
     file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
     file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
@@ -1443,6 +1445,8 @@ def get_map_info():
     door_frames = []
     entry_origin = Vec(-999, -999, -999)
     exit_origin = Vec(-999, -999, -999)
+
+    exit_fixup = entry_fixup = None  # Copy the exit/entry fixup to the frame.
 
     override_sp_entry = BEE2_config.get_int('Corridor', 'sp_entry', 0)
     override_sp_exit = BEE2_config.get_int('Corridor', 'sp_exit', 0)
@@ -1478,6 +1482,7 @@ def get_map_info():
             exit_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
             exit_origin += Vec.from_str(item['origin'])
             exit_corr_name = item['targetname']
+            exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
                 item,
                 'spExitCorr',
@@ -1491,6 +1496,7 @@ def get_map_info():
             entry_origin = Vec(0, 0, -64).rotate_by_str(item['angles'])
             entry_origin += Vec.from_str(item['origin'])
             entry_corr_name = item['targetname']
+            entry_fixup = item.fixup
             entry_corr_type = mod_entryexit(
                 item,
                 'spEntryCorr',
@@ -1501,6 +1507,7 @@ def get_map_info():
         elif file in file_coop_corr:
             GAME_MODE = 'COOP'
             exit_corr_name = item['targetname']
+            exit_fixup = item.fixup
             exit_corr_type = mod_entryexit(
                 item,
                 'coopCorr',
@@ -1509,20 +1516,21 @@ def get_map_info():
                 override_coop_corr,
                 is_exit=True,
             )
-        elif file in file_coop_entry:
+        elif file_coop_entry == file:
             GAME_MODE = 'COOP'
             entry_corr_name = item['targetname']
+            entry_fixup = item.fixup
             mod_entryexit(
                 item,
                 'coopCorr',
                 'Coop Spawn',
                 elev_override,
             )
-        elif file in file_coop_exit:
+        elif file_coop_exit == file:
             GAME_MODE = 'COOP'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
-        elif file in file_sp_exit or file in file_sp_entry:
+        elif file_sp_exit == file or file_sp_entry == file:
             GAME_MODE = 'SP'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
@@ -1558,9 +1566,14 @@ def get_map_info():
         if origin == entry_origin:
             door_frame.fixup['door_type'] = 'entry'
             entry_door_frame = door_frame
+            if entry_fixup is not None:
+                # Copy the entry-door's fixup values to the frame itself..
+                door_frame.fixup.update(entry_fixup)
         elif origin == exit_origin:
             door_frame.fixup['door_type'] = 'exit'
             exit_door_frame = door_frame
+            if exit_fixup is not None:
+                door_frame.fixup.update(exit_fixup)
 
     if GAME_MODE == 'COOP':
         mod_doorframe(
@@ -1599,7 +1612,8 @@ def mod_entryexit(
 
     This sets IS_PREVIEW, switches to vertical variants, and chooses a
     particular corridor number.
-    This returns the corridor used - 1-7, 'up', or 'down'
+    This returns the corridor used - 1-7, 'up', or 'down'.
+    The corridor used is also copied to '$corr_index'.
     """
     global IS_PREVIEW
     normal = Vec(0, 0, 1).rotate_by_str(inst['angles'])
@@ -1637,14 +1651,15 @@ def mod_entryexit(
         return 'vert_down'
 
     if override_corr == -1:
-        return None  # No extra variants!
+        return None  # There aren't any variants (coop spawn room)
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
+        inst.fixup['$corr_index'] = index + 1
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
-            str(index + 1),
+            index + 1,
         )
         return index
     else:
@@ -1653,6 +1668,7 @@ def mod_entryexit(
             pretty_name,
             override_corr,
         )
+        inst.fixup['$corr_index'] = override_corr
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
 
@@ -2846,16 +2862,27 @@ def add_extra_ents(mode):
     # options on the music item.
     sound = get_opt('music_soundscript')
     inst = get_opt('music_instance')
+    snd_length = utils.conv_int(get_opt('music_looplen'))
 
     if sound != '':
-        VMF.create_ent(
+        music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
             targetname='@music',
             origin=loc,
             message=sound,
             health='10',  # Volume
+        )
+        music.add_out(VLib.Output('OnUser1', '@music', 'PlaySound'))
+
+        if snd_length > 0:
+            # Allow us to use non-looping mp3s, by continually re-triggering
+            # the music entity.
+            music.add_out(
+                VLib.Output('OnUser1', '@music', 'FireUser1', delay=snd_length)
             )
+            # Set to non-looping, so re-playing will restart it correctly.
+            music['spawnflags'] = '49'
 
     if inst != '':
         VMF.create_ent(
@@ -2865,7 +2892,7 @@ def add_extra_ents(mode):
             origin=loc,
             file=inst,
             fixup_style='0',
-            )
+        )
 
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
@@ -3167,6 +3194,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
                 if pan_type == 'white' else
                 conditions.MAT_TYPES.black
             ),
+            fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
 
@@ -3216,6 +3244,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
                 if pan_type == 'white' else
                 conditions.MAT_TYPES.black
             ),
+            fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
 

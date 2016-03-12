@@ -1,18 +1,61 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
 from tk_tools import TK_ROOT
-from tkinter import ttk  # themed ui components that match the OS
+from tkinter import ttk
 
 from weakref import WeakSet
+import contextlib
 
 import utils
 
+# Keep a reference to all loading screens, so we can close them globally.
+_ALL_SCREENS = WeakSet()
+
+LOGGER = utils.getLogger(__name__)
+
+
+def close_all():
+    """Hide all loadscreen windows."""
+    for screen in _ALL_SCREENS:
+        screen.reset()
+
+
+@contextlib.contextmanager
+def surpress_screens():
+    """A context manager to supress loadscreens while the body is active."""
+    active = []
+    for screen in _ALL_SCREENS:
+        if not screen.active:
+            continue
+        screen.wm_focusmodel()
+        screen.withdraw()
+        screen.active = False
+        active.append(screen)
+
+    yield
+
+    for screen in active:
+        screen.deiconify()
+        screen.active = True
+        screen.lift()
+
+
+def patch_tk_dialogs():
+    """Patch various tk windows to hide loading screens while they're are open.
+
+    """
+    from tkinter import commondialog
+
+    # contextlib managers can also be used as decorators.
+    supressor = surpress_screens()  # type: contextlib.ContextDecorator
+    # Mesageboxes, file dialogs and colorchooser all inherit from Dialog,
+    # so patching .show() will fix them all.
+    commondialog.Dialog.show = supressor(commondialog.Dialog.show)
+
+patch_tk_dialogs()
+
 
 class LoadScreen(Toplevel):
-
-    # Keep a reference to all loading screens, so we can close them globally.
-    _all_screens = WeakSet()
-
     def __init__(self, *stages, title_text='Loading'):
         self.stages = list(stages)
         self.widgets = {}
@@ -22,7 +65,7 @@ class LoadScreen(Toplevel):
         self.maxes = {}
         self.num_images = 0
 
-        self.active = True
+        self.active = False
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything.
 
@@ -33,7 +76,7 @@ class LoadScreen(Toplevel):
         )
         self.withdraw()
 
-        self._all_screens.add(self)
+        _ALL_SCREENS.add(self)
 
         # this prevents stuff like the title bar, normal borders etc from
         # appearing in this window.
@@ -89,6 +132,7 @@ class LoadScreen(Toplevel):
 
     def show(self):
         """Display this loading screen."""
+        self.active = True
         self.deiconify()
         self.update()  # Force an update so the reqwidth is correct
         loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
@@ -98,15 +142,14 @@ class LoadScreen(Toplevel):
 
     def set_length(self, stage, num):
         """Set the number of items in a stage."""
-        if self.active:
-            self.maxes[stage] = num
-            self.set_nums(stage)
+        self.maxes[stage] = num
+        self.set_nums(stage)
 
     def step(self, stage):
         """Increment a step by one."""
+        self.bar_val[stage] += 1
+        self.set_nums(stage)
         if self.active:
-            self.bar_val[stage] += 1
-            self.set_nums(stage)
             self.widgets[stage].update()
 
     def set_nums(self, stage):
@@ -120,14 +163,16 @@ class LoadScreen(Toplevel):
 
     def skip_stage(self, stage):
         """Skip over this stage of the loading process."""
+        self.labels[stage]['text'] = 'Skipped!'
+        self.bar_var[stage].set(1000)  # Make sure it fills to max
+
         if self.active:
-            self.labels[stage]['text'] = 'Skipped!'
-            self.bar_var[stage].set(1000)  # Make sure it fills to max
             self.widgets[stage].update()
 
     def reset(self):
         """Hide the loading screen and reset all the progress bars."""
         self.withdraw()
+        self.active = False
         for stage, _ in self.stages:
             self.maxes[stage] = 10
             self.bar_val[stage] = 0
@@ -144,7 +189,7 @@ class LoadScreen(Toplevel):
             del self.bar_var
             del self.bar_val
             self.active = False
-            self._all_screens.discard(self)
+            _ALL_SCREENS.discard(self)
 
     def __enter__(self):
         """LoadScreen can be used as a context manager.
@@ -159,11 +204,6 @@ class LoadScreen(Toplevel):
         """
         self.reset()
 
-    @classmethod
-    def close_all(cls):
-        """Hide all loadscreen windows."""
-        for screen in cls._all_screens:
-            screen.reset()
 
 main_loader = LoadScreen(
     ('PAK', 'Packages'),

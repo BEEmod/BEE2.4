@@ -23,7 +23,7 @@ if __name__ == '__main__':
     else:
         # We need to initiallise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
-        LOGGER = utils.init_logging('../logs/BEE2-error.log')
+        LOGGER = utils.init_logging('../logs/BEE2.log')
 
 from tkinter import messagebox
 
@@ -41,6 +41,7 @@ import packageLoader
 import gameMan
 import extract_packages
 import logWindow
+import sound
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -52,6 +53,12 @@ DEFAULT_SETTINGS = {
         'allow_any_folder_as_game': '0',
         'play_sounds': '1',
         'show_wip_items': '0',
+
+        # A token used to indicate the time the current cache/ was extracted.
+        # This tells us whether to copy it to the game folder.
+        'cache_time': '0',
+        # We need this value to detect just removing a package.
+        'cache_pack_count': '0',
     },
     'Debug': {
         # Show exceptions in dialog box when crash occurs
@@ -73,12 +80,13 @@ DEFAULT_SETTINGS = {
 }
 
 if __name__ == '__main__':
-    loadScreen.main_loader.set_length('UI', 14)
+    loadScreen.main_loader.set_length('UI', 15)
     loadScreen.main_loader.show()
 
     # OS X starts behind other windows, fix that.
     if utils.MAC:
         TK_ROOT.lift()
+        loadScreen.main_loader.lift()
 
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
@@ -124,24 +132,27 @@ if __name__ == '__main__':
 
         LOGGER.info('Loading Item Translations...')
         gameMan.init_trans()
-        LOGGER.info('Done')
+
+        LOGGER.info('Loading sound FX...')
+        sound.load_snd()
+        loadScreen.main_loader.step('UI')
 
         LOGGER.info('Initialising UI...')
         UI.init_windows()  # create all windows
-        LOGGER.info('Done!')
+        LOGGER.info('UI initialised!')
 
         loadScreen.main_loader.destroy()
 
         if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
             extract_packages.done_callback()
         else:
-            extract_packages.start_copying(pack_data['zips'])
+            extract_packages.check_cache(pack_data['zips'])
 
         TK_ROOT.mainloop()
 
     except Exception as e:
         # Close loading screens if they're visible..
-        loadScreen.LoadScreen.close_all()
+        loadScreen.close_all()
 
         # Grab and release the grab so nothing else can block the error message.
         TK_ROOT.grab_set_global()
