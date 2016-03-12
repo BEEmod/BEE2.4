@@ -83,8 +83,10 @@ INCLUDES = [
 
 # AVbin is needed to read OGG files.
 INCLUDE_LIBS = [
-    'C:/Windows/system32/avbin.dll',
-    'C:/Windows/sysWOW64/avbin64.dll',
+    'C:/Windows/system32/avbin.dll',  # Win 32 bit
+    'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
+    '/usr/local/lib/libavbin.dylib',  # OS X
+    '/usr/lib/libavbin.so',  # Linux
 ]
 
 
