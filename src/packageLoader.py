@@ -220,12 +220,27 @@ def find_packages(pak_dir, zips, zip_name_lst):
             LOGGER.info('Extra file: {}', name)
             continue
 
-        if 'info.txt' in zip_file.namelist():  # Is it valid?
+        LOGGER.debug('Reading package "' + name + '"')
+
+        try:
+            # Valid packages must have an info.txt file!
+            info_file = zip_file.open('info.txt')
+        except KeyError:
+            if is_dir:
+                # This isn't a package, so check the subfolders too...
+                LOGGER.debug('Checking subdir "{}" for packages...', name)
+                find_packages(name, zips, zip_name_lst)
+            else:
+                zip_file.close()
+                LOGGER.warning('ERROR: Bad package "{}"!', name)
+        else:
+            with info_file:
+                info = Property.parse(info_file, name + ':info.txt')
+
+            # Add the zipfile to the list, it's valid
             zips.append(zip_file)
             zip_name_lst.append(os.path.abspath(name))
-            LOGGER.debug('Reading package "' + name + '"')
-            with zip_file.open('info.txt') as info_file:
-                info = Property.parse(info_file, name + ':info.txt')
+
             pak_id = info['ID']
             packages[pak_id] = Package(
                 pak_id,
@@ -234,14 +249,7 @@ def find_packages(pak_dir, zips, zip_name_lst):
                 name,
             )
             found_pak = True
-        else:
-            if is_dir:
-                # This isn't a package, so check the subfolders too...
-                LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name, zips, zip_name_lst)
-            else:
-                zip_file.close()
-                LOGGER.warning('ERROR: Bad package "{}"!', name)
+
     if not found_pak:
         LOGGER.debug('No packages in folder!')
 
