@@ -2,9 +2,10 @@
 import logging
 import math
 import string
+import os.path
+import tempfile
 from collections import abc
 import collections
-import re
 
 from sys import platform
 from enum import Enum
@@ -832,6 +833,64 @@ class EmptyMapping(abc.MutableMapping):
         raise KeyError
 
 EmptyMapping = EmptyMapping()  # We only need the one instance
+
+
+class AtomicWriter:
+    """Atomically overwrite a file.
+
+    Use as a context manager - the returned temporary file
+    should be written to. When cleanly exiting, the file will be transfered.
+    If an exception occurs in the body, the temporary data will be discarded.
+
+    This is not reentrant, but can be repeated - starting the context manager
+    clears the file.
+    """
+    def __init__(self, filename, is_bytes=False):
+        """Create an AtomicWriter.
+        is_bytes sets text or bytes writing mode. The file is always writable.
+        """
+        self.filename = filename
+        self.dir = os.path.dirname(filename)
+        self.is_bytes = is_bytes
+        self.temp = None
+
+    def make_tempfile(self):
+        """Create the temporary file object."""
+        if self.temp is not None:
+            # Already open - close and delete the current file.
+            self.temp.close()
+            os.remove(self.temp.name)
+
+        # Create folders if needed..
+        os.makedirs(self.dir, exist_ok=True)
+
+        self.temp = tempfile.NamedTemporaryFile(
+            mode='wb' if self.is_bytes else 'wt',
+            dir=self.dir,
+            delete=False,
+        )
+
+    def __enter__(self):
+        """Delagate to the underlying temporary file handler."""
+        self.make_tempfile()
+        return self.temp.__enter__()
+
+    def __exit__(self, exc_type, exc_value, tback):
+        # Pass to tempfile, which also closes().
+        temp_path = self.temp.name
+        self.temp.__exit__(exc_type, exc_value, tback)
+        self.temp = None
+        if exc_type is not None:
+            # An exception occured, clean up.
+            try:
+                os.remove(temp_path)
+            except FileNotFoundError:
+                pass
+        else:
+            # No exception, commit changes
+            os.replace(temp_path, self.filename)
+
+        return False # Don't cancel the exception.
 
 
 Vec_tuple = collections.namedtuple('Vec_tuple', ['x', 'y', 'z'])
