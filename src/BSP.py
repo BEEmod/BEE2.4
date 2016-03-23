@@ -1,9 +1,10 @@
 """Read and write lumps in Source BSP files.
 
 """
+from enum import Enum
 import struct
 
-from enum import Enum
+import utils
 
 P2_BSP_VERSION = 21  # The BSP version used in Portal 2.
 BSP_MAGIC = b'VBSP'  # All BSP files start with this
@@ -160,7 +161,7 @@ class BSP:
         # Adjust the length to match the new data block.
         lump.length = len(new_data)
 
-        with open(new_name, 'wb') as file:
+        with utils.AtomicWriter(new_name, is_bytes=True) as file:
             self.write_header(file)
             file.write(before_lump)
             file.write(new_data)

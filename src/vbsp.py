@@ -3471,7 +3471,7 @@ def save(path):
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
+    with utils.AtomicWriter(path) as f:
         VMF.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 

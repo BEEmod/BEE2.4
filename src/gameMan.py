@@ -264,7 +264,7 @@ class Game:
                         )
                     continue
 
-                with open(info_path, 'w') as file:
+                with utils.AtomicWriter(info_path) as file:
                     for line in data:
                         file.write(line)
         if not add_line:
@@ -465,10 +465,11 @@ class Game:
                 inst_file.write(line)
         export_screen.step('EXP')
 
+        # AtomicWriter writes to a temporary file, then renames in one step.
+        # This ensures editoritems won't be half-written.
         LOGGER.info('Writing Editoritems!')
-        os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
-        with open(self.abs_path(
-                'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
+        with utils.AtomicWriter(self.abs_path(
+                'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
         export_screen.step('EXP')

@@ -339,7 +339,7 @@ def gen_sound_manifest(additional, excludes):
 
     for script in additional:
         scripts.append(script)
-        
+
         # For our packed scripts, force the game to load them
         # (we know they're used).
         scripts.append('!' + script)
@@ -521,7 +521,8 @@ def pack_content(path, is_peti):
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
     except (IOError, FileNotFoundError):
-        pass
+        pass  # Assume no files if missing..
+        # There might still be things to inject.
     else:
         with pack_list:
             for line in pack_list:

@@ -22,6 +22,7 @@ class ConfigFile(ConfigParser):
         """
         super().__init__()
         self.filename = os.path.join(root, filename)
+        self.writer = utils.AtomicWriter(self.filename)
         self.has_changed = False
 
         if auto_load:
@@ -40,21 +41,18 @@ class ConfigFile(ConfigParser):
                 self.filename,
             )
             # If we fail, just continue - we just use the default values
+        # We're not different to the file on disk..
         self.has_changed = False
 
     def save(self):
         """Write our values out to disk."""
         LOGGER.info('Saving changes in config "{}"!', self.filename)
         if self.filename is None:
-            return
-        self.has_changed = False
-        # Make sure the directory exists
-        folder = os.path.dirname(self.filename)
-        if folder:
-            os.makedirs(folder, exist_ok=True)
+            raise ValueError('No filename provided!')
 
-        with open(self.filename, 'w') as conf:
+        with self.writer as conf:
             self.write(conf)
+        self.has_changed = False
 
     def save_check(self):
         """Check to see if we have different values, and save if needed."""
