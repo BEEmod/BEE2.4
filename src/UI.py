@@ -401,10 +401,12 @@ def load_palette(data):
 
 def load_settings():
     """Load options from the general config file."""
+    global selectedPalette
     try:
-        selectedPalette_radio.set(int(GEN_OPTS['Last_Selected']['palette']))
+        selectedPalette = GEN_OPTS.get_int('Last_Selected', 'palette')
     except (KeyError, ValueError):
         pass  # It'll be set to the first palette by default, and then saved
+    selectedPalette_radio.set(selectedPalette)
     GEN_OPTS.has_changed = False
 
     optionWindow.load()
