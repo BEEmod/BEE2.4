@@ -87,7 +87,9 @@ class _PakObjectMeta(type):
         # Defer to type to create the class..
         cls = type.__new__(mcs, name, bases, namespace)
 
-        if name != 'PakObject':  # Don't register the base class itself!
+        # Only register subclasses of PakObject - those with a parent class.
+        # PakObject isn't created yet so we can't directly check that.
+        if bases:
             OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
 
         return cls
@@ -102,7 +104,7 @@ class PakObject(metaclass=_PakObjectMeta):
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
     If duplicates occur, they will be treated as overrides.
-    Set 'has_img' to control wether the object will count towards the images
+    Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
     """
     @classmethod
