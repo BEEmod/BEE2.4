@@ -136,9 +136,11 @@ def res_cutout_tile(inst, res):
     }
 
     random.seed(vbsp.MAP_RAND_SEED + '_CUTOUT_TILE_NOISE')
-    noise = SimplexNoise(period=4 * 50)  # 4 tiles/block, 50 blocks max
+    noise = SimplexNoise(period=4 * 40)  # 4 tiles/block, 50 blocks max
 
-
+    # We want to know the number of neighbouring tile cutouts before
+    # placing tiles - blocks away from the sides generate fewer tiles.
+    floor_neighbours = defaultdict(dict)  # all_floors[z][x,y] = count
 
     for mat_prop in res['Materials', []]:
         MATS[mat_prop.name].append(mat_prop.value)
@@ -182,16 +184,13 @@ def res_cutout_tile(inst, res):
             # it to itself so we'll generate a 128x128 tile segment.
             io_list.append((targ, targ))
         inst.remove()  # Remove the instance itself from the map.
+
     for start_floor, end_floor in FLOOR_IO:
         if end_floor not in INST_LOCS:
             # Not a marker - remove this and the antline.
             for toggle in conditions.VMF.by_target[end_floor]:
                 conditions.remove_ant_toggle(toggle)
             continue
-
-        detail_ent = conditions.VMF.create_ent(
-            classname='func_detail'
-        )
 
         box_min = Vec(INST_LOCS[start_floor])
         box_min.min(INST_LOCS[end_floor])
@@ -251,20 +250,13 @@ def res_cutout_tile(inst, res):
 
         for x, y in utils.iter_grid(
                 min_x=int(box_min.x),
-                max_x=int(box_max.x)+1,
+                max_x=int(box_max.x) + 1,
                 min_y=int(box_min.y),
-                max_y=int(box_max.y)+1,
+                max_y=int(box_max.y) + 1,
                 stride=128,
                 ):
-            convert_floor(
-                Vec(x, y, z),
-                overlay_ids,
-                MATS,
-                SETTINGS,
-                sign_loc,
-                detail_ent,
-                noise
-            )
+            # Build the set of all positions..
+            floor_neighbours[z][x, y] = -1
 
         # Mark borders we need to fill in, and the angle (for func_instance)
         # The wall is the face pointing inwards towards the bottom brush,
@@ -299,11 +291,76 @@ def res_cutout_tile(inst, res):
                 rot=0,
             ))
 
+    # Now count boundries near tiles, then generate them.
+
+    # Do it seperately for each z-level:
+    for z, xy_dict in floor_neighbours.items():  # type: float, dict
+        for x, y in xy_dict:  # type: float, float
+            # We want to count where there aren't any tiles
+            xy_dict[x, y] = (
+                ((x - 128, y - 128) not in xy_dict) +
+                ((x - 128, y + 128) not in xy_dict) +
+                ((x + 128, y - 128) not in xy_dict) +
+                ((x + 128, y + 128) not in xy_dict) +
+
+                ((x - 128, y) not in xy_dict) +
+                ((x + 128, y) not in xy_dict) +
+                ((x, y - 128) not in xy_dict) +
+                ((x, y + 128) not in xy_dict)
+            )
+
+        max_x = max_y = 0
+
+        weights = {}
+        # Now the counts are all correct, compute the weight to apply
+        # for tiles.
+        # Adding the neighbouring counts will make a 5x5 area needed to set
+        # the center to 0.
+
+        for (x, y), cur_count in xy_dict.items():
+            max_x = max(x, max_x)
+            max_y = max(y, max_y)
+
+            # Orthrogonal is worth 0.2, diagonal is worth 0.1.
+            # Not-present tiles would be 8 - the maximum
+            tile_count = (
+                0.8 * cur_count +
+                0.1 * xy_dict.get((x - 128, y - 128), 8) +
+                0.1 * xy_dict.get((x - 128, y + 128), 8) +
+                0.1 * xy_dict.get((x + 128, y - 128), 8) +
+                0.1 * xy_dict.get((x + 128, y + 128), 8) +
+
+                0.2 * xy_dict.get((x - 128, y), 8) +
+                0.2 * xy_dict.get((x, y - 128), 8) +
+                0.2 * xy_dict.get((x, y + 128), 8) +
+                0.2 * xy_dict.get((x + 128, y), 8)
+            )
+            # The number ranges from 0 (all tiles) to 12.8 (no tiles).
+            # All tiles should still have a small chance to generate tiles.
+            weights[x, y] = min((tile_count + 0.5) / 8, 1)
+
+        # Share the detail entity among same-height tiles..
+        detail_ent = conditions.VMF.create_ent(
+            classname='func_detail',
+        )
+
+        for x, y in xy_dict:
+            convert_floor(
+                Vec(x, y, z),
+                overlay_ids,
+                MATS,
+                SETTINGS,
+                sign_loc,
+                detail_ent,
+                noise_weight=weights[x, y],
+                noise_func=noise,
+            )
+
     add_floor_sides(floor_edges)
 
     conditions.reallocate_overlays(overlay_ids)
 
-    return True
+    return conditions.RES_EXHAUSTED
 
 
 def get_noise(loc: Vec, noise_func: SimplexNoise):
@@ -313,7 +370,8 @@ def get_noise(loc: Vec, noise_func: SimplexNoise):
     """
     # Average between the neighbouring locations, to smooth out changes.
     return sum(
-        noise_func.noise3(loc.x + x, loc.y + y, loc.z)
+        # + 1 / 2 fixes the value range (originally -1,1 -> 0,1)
+        (noise_func.noise3(loc.x + x, loc.y + y, loc.z) + 1) / 2
         for x in (-1, 0, 1)
         for y in (-1, 0, 1)
     ) / 9
@@ -326,6 +384,7 @@ def convert_floor(
         settings,
         signage_loc,
         detail,
+        noise_weight,
         noise_func: SimplexNoise,
 ):
     """Cut out tiles at the specified location."""
@@ -333,6 +392,7 @@ def convert_floor(
         brush = conditions.SOLIDS[loc.as_tuple()]
     except KeyError:
         return False  # No tile here!
+
 
     if brush.normal == (0, 0, 1):
         # This is a pillar block - there isn't actually tiles here!
@@ -368,7 +428,7 @@ def convert_floor(
     loc.y -= 64
 
     for x, y in utils.iter_grid(max_x=4, max_y=4):
-        tile_loc = loc + (x*32 + 16, y*32 + 16, 0)
+        tile_loc = loc + (x * 32 + 16, y * 32 + 16, 0)
         if tile_loc.as_tuple() in signage_loc:
             # Force the tile to be present under signage..
             should_make_tile = True
@@ -376,13 +436,17 @@ def convert_floor(
             # We don't need to check this again in future!
             signage_loc.remove(tile_loc.as_tuple())
         else:
-            # A number between 0-100
-            rand = 50 * get_noise(tile_loc // 32, noise_func) + 50
+            # Create a number between 0-100
+            rand = 100 * get_noise(tile_loc // 32, noise_func) + 10
+
+            # Adjust based on the noise_weight value, so boundries have more tiles
+            rand *= 0.1 + 0.9 * (1 - noise_weight)
 
             should_make_tile = rand < settings['floor_chance']
-            if random.randint(0, 10) == 0:
+            if random.randint(0, 7) == 0:
                 # Sometimes there'll be random holes/extra tiles
                 should_make_tile = not should_make_tile
+
         if should_make_tile:
             # Full tile
             tile = make_tile(
@@ -626,8 +690,6 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
             brush.top.mat = random.choice(MATS['floorbase_disp'])
             make_displacement(
                 brush.top,
-                alpha_min=0,
-                alpha_max=128,
                 offset=-1,
                 noise=noise,
             )
@@ -637,8 +699,6 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
 def make_displacement(
         face: VLib.Side,
         noise: SimplexNoise,
-        alpha_min=0,
-        alpha_max=255,
         power=3,
         offset=0,
         ):
@@ -678,15 +738,14 @@ def make_displacement(
 
     face.disp_data['alphas'] = [
         ' '.join(
-            str(255 * get_noise(
+            str(512 * get_noise(
                 Vec(
                     bbox_min.x + x * x_vert,
                     bbox_min.y + y * y_vert,
                     bbox_min.z,
                 ) // max(x_vert, y_vert),
                 noise,
-                # Make slightly more dust, since simplex rarely hits max/min.
-            ) + 80)
+            ))
             for x in
             range(grid_size)
         )
