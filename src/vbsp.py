@@ -1,3 +1,5 @@
+import contextlib
+
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -304,7 +306,7 @@ FIZZ_OPTIONS = [
     ('0', 'scanline'),
 ]
 
-BEE2_config = None  # ConfigFile
+BEE2_config = None  # type: ConfigFile
 
 GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
@@ -3353,6 +3355,7 @@ def packlist_cond(_, res):
 
     return conditions.RES_EXHAUSTED
 
+
 @conditions.make_result('PackRename')
 def packlist_cond_rename(_, res):
     """Add a file to the packlist, saved under a new name."""
@@ -3419,8 +3422,8 @@ def make_packlist(map_path):
             f.write('{}\t{}\n'.format(file, dest))
             LOGGER.info('"{}" as "{}"', file, dest)
 
-
     LOGGER.info('Packlist written!')
+
 
 def make_vrad_config():
     """Generate a config file for VRAD from our configs.
@@ -3477,11 +3480,17 @@ def save(path):
 
 
 def run_vbsp(vbsp_args, do_swap, path, new_path):
-    """Execute the original VBSP, copying files around so it works correctly."""
+    """Execute the original VBSP, copying files around so it works correctly.
+
+    vbsp_args are the arguments to pass.
+    path is the original .vmf, new_path is the styled/ name.
+    If do_swap is true VBSP will be run on the map in styled/.
+    """
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
     if do_swap:
+        # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
                 path.replace(".vmf", ".log"),
@@ -3490,6 +3499,7 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     # Put quotes around args which contain spaces, and remove blank args.
     vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
 
+    # VBSP is named _osx or _linux for those platforms.
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
@@ -3509,19 +3519,33 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         " ".join(vbsp_args)
         )
 
-    utils.con_log("Calling original VBSP...")
-    utils.con_log(arg)
-    code = subprocess.call(
-        arg,
-        stdout=None,
-        stderr=subprocess.PIPE,
-        shell=True,
-    )
-    if code == 0:
-        utils.con_log("Done!")
-    else:
-        utils.con_log("VBSP failed! (" + str(code) + ")")
-        sys.exit(code)
+    # Use a special name for VBSP's output..
+    vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')
+
+    LOGGER.info("Calling original VBSP...")
+    LOGGER.info("Arguments: {}", arg)
+    try:
+        output = subprocess.check_output(
+            arg,
+            stderr=subprocess.PIPE,
+            shell=True,
+        )
+    except subprocess.CalledProcessError as err:
+        # VBSP didn't suceed. Print the error log..
+        vbsp_logger.error(err.output.decode('ascii'))
+
+        process_vbsp_fail(err.output)
+
+        LOGGER.error("VBSP failed! ({})", err.returncode)
+        # Propagate the fail code to Portal 2.
+        sys.exit(err.returncode)
+
+    # Print output
+    vbsp_logger.info(output.decode('ascii'))
+    LOGGER.info("VBSP Done!")
+
+    process_vbsp_log(output)
+
     if do_swap:  # copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
             if os.path.isfile(new_path.replace(".vmf", ext)):
@@ -3529,6 +3553,94 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
                     new_path.replace(".vmf", ext),
                     path.replace(".vmf", ext),
                 )
+
+
+def process_vbsp_log(output: bytes):
+    """Read through VBSP's log, extracting entity counts.
+
+    This is then passed back to the main BEE2 application for display.
+    """
+
+    # The output is something like this:
+    # nummapplanes:     (?? / 65536)
+    # nummapbrushes:    (?? / 8192)
+    # nummapbrushsides: (?? / 65536)
+    # num_map_overlays: (?? / 512)
+    # nummodels:        (?? / 1024)
+    # num_entities:     (?? / 16384)
+
+    desired_vals = [
+        # VBSP values -> config names
+        (b'nummapbrushes:', 'brush'),
+        (b'num_map_overlays:', 'overlay'),
+        (b'num_entities:', 'entity'),
+    ]
+    # The other options rarely hit the limits, so we don't track them.
+
+    counts = {
+        'brush': ('0', '8192'),
+        'overlay': ('0', '512'),
+        'entity': ('0', '2048'),
+    }
+
+    for line in output.splitlines():
+        line = line.lstrip()
+        for name, conf in desired_vals:
+            if not line.startswith(name):
+                continue
+            # Grab the value from ( onwards
+            fraction = line.split(b'(', 1)[1]
+            # Grab the two numbers, convert to ascii and strip
+            # whitespace.
+            count_num, count_max = fraction.split(b'/')
+            counts[conf] = (
+                count_num.strip(b' \t\n').decode('ascii'),
+                # Strip the ending ) off the max. We have the value, so
+                # we might as well tell the BEE2 if it changes..
+                count_max.strip(b') \t\n').decode('ascii')
+            )
+
+    LOGGER.info('Retrieved counts: {}', counts)
+    count_section = BEE2_config['Counts']
+    for count_name, (value, limit) in counts.items():
+        count_section[count_name] = value
+        count_section['max_' + count_name] = limit
+    BEE2_config.save()
+
+
+def process_vbsp_fail(output: bytes):
+    """Read through VBSP's logs when failing, to update counts."""
+    # VBSP doesn't output the actual entity counts, so set the errorred
+    # one to max and the others to zero.
+    count_section = BEE2_config['Counts']
+
+    count_section['max_brush'] = '8192'
+    count_section['max_entity'] = '2048'
+    count_section['max_overlay'] = '512'
+
+    for line in reversed(output.splitlines()):  # type: bytes
+        if b'MAX_MAP_OVERLAYS' in line:
+            count_section['entity'] = '0'
+            count_section['brush'] = '0'
+            count_section['overlay'] = '512'
+            # The line is like 'MAX_MAP_OVER = 512', pull out the number from
+            # the end and decode it.
+            count_section['max_overlay'] = line.split(b'=')[1].strip().decode('ascii')
+            break
+        if b'MAX_MAP_BRUSHSIDES' in line or b'MAX_MAP_PLANES' in line:
+            count_section['entity'] = '0'
+            count_section['overlay'] = '0'
+            count_section['brush'] = '8192'
+            break
+        if b'MAX_MAP_ENTITIES' in line:
+            count_section['entity'] = count_section['overlay'] = '0'
+            count_section['brush'] = '8192'
+            break
+    else:
+        count_section['entity'] = '0'
+        count_section['overlay'] = '0'
+        count_section['brush'] = '0'
+    BEE2_config.save_check()
 
 
 def main():

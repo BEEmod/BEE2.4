@@ -890,7 +890,7 @@ class AtomicWriter:
             # No exception, commit changes
             os.replace(temp_path, self.filename)
 
-        return False # Don't cancel the exception.
+        return False  # Don't cancel the exception.
 
 
 Vec_tuple = collections.namedtuple('Vec_tuple', ['x', 'y', 'z'])

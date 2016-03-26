@@ -15,10 +15,6 @@ from tooltip import add_tooltip
 import SubPane
 import utils
 
-MAX_ENTS = 2048
-MAX_OVERLAY = 512
-MAX_BRUSH = 8192
-
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
@@ -41,8 +37,13 @@ COMPILE_DEFAULTS = {
     },
     'Counts': {
         'brush': '0',
-        'ent': '0',
         'overlay': '0',
+
+        'entity': '0',
+
+        'max_brush': '8192',
+        'max_overlay': '512',
+        'max_entity': '2048',
         },
     }
 
@@ -63,7 +64,7 @@ UI = {}
 chosen_thumb = StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
-tk_screenshot = None # The preview image shown
+tk_screenshot = None  # The preview image shown
 
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = os.path.abspath(os.path.join(
@@ -86,8 +87,38 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = StringVar(value='')
 
 count_brush = IntVar(value=0)
-count_ents = IntVar(value=0)
+count_entity = IntVar(value=0)
 count_overlay = IntVar(value=0)
+
+# Controls flash_count()
+count_brush.should_flash = False
+count_entity.should_flash = False
+count_overlay.should_flash = False
+
+# The data for the 3 progress bars -
+# (variable, config_name, default_max, description)
+COUNT_CATEGORIES = [
+    (
+        count_brush, 'brush', 8192,
+        "Brushes form the walls or other parts of the test chamber. If this "
+        "is high, it may help to reduce the size of the map or remove intricate"
+        " shapes."
+    ),
+    (
+        count_entity, 'entity', 2048,
+        "Entities are the things in the map that have functionality. Removing "
+        "complex moving items will help reduce this. Items have their entity "
+        "count listed in the item description window.\n\n"
+        "This isn't totally accurate, some entity types are counted here "
+        "but don't affect the ingame limit. ",
+    ),
+    (
+        count_overlay, 'overlay', 512,
+        "Overlays are smaller images affixed to surfaces, like signs or "
+        "indicator lights. Hiding long antlines or setting them to signage "
+        "will reduce this."
+    ),
+]
 
 vrad_light_type = IntVar(
     value=COMPILE_CFG.get_bool('General', 'vrad_force_full')
@@ -135,12 +166,64 @@ def make_corr_combo(frm, corr_name, width):
     return widget
 
 
+def flash_count():
+    """Flash the counter between 0 and 100 when on."""
+    should_cont = False
+
+    for var in (count_brush, count_entity, count_overlay):
+        if not var.should_flash:
+            continue  # Abort when it shouldn't be flashing
+
+        if var.get() == 0:
+            var.set(100)
+        else:
+            var.set(0)
+
+        should_cont = True
+
+    if should_cont:
+        TK_ROOT.after(750, flash_count)
+
+
 def refresh_counts(reload=True):
     if reload:
         COMPILE_CFG.load()
-    count_brush.set(COMPILE_CFG.get_int('Counts', 'brush'))
-    count_ents.set(COMPILE_CFG.get_int('Counts', 'ent'))
-    count_overlay.set(COMPILE_CFG.get_int('Counts', 'overlay'))
+
+    # Don't re-run the flash function if it's already on.
+    run_flash = not (
+        count_entity.should_flash or
+        count_overlay.should_flash or
+        count_brush.should_flash
+    )
+
+    for bar_var, name, default, tip_blurb in COUNT_CATEGORIES:
+        value = COMPILE_CFG.get_int('Counts', name)
+
+        if name == 'entity':
+            # The in-engine entity limit is different to VBSP's limit
+            # (that one might include prop_static, lights etc).
+            max_value = default
+        else:
+            # Use or to ensure no divide-by-zero occurs..
+            max_value = COMPILE_CFG.get_int('Counts', 'max_' + name) or default
+
+        # If it's hit the limit, make it continously scroll to draw
+        # attention to the bar.
+        if value >= max_value:
+            bar_var.should_flash = True
+        else:
+            bar_var.should_flash = False
+            bar_var.set(100 * value / max_value)
+
+        UI['count_' + name].tooltip_text = '{}/{} ({:.2%}):\n{}'.format(
+            value,
+            max_value,
+            value / max_value,
+            tip_blurb,
+        )
+
+    if run_flash:
+        flash_count()
 
 
 def find_screenshot(_=None):
@@ -392,7 +475,7 @@ def make_pane(tool_frame):
     add_tooltip(
         UI['light_full'],
         "Compile with high-quality lighting. This looks correct, "
-        "but takes longer to compute. Use if you're arranging lights."
+        "but takes longer to compute. Use if you're arranging lights. "
         "When publishing, this is always used."
     )
 
@@ -519,13 +602,13 @@ def make_pane(tool_frame):
         anchor=N,
     ).grid(row=0, column=0, columnspan=3, sticky=EW)
 
-    UI['count_ent'] = ttk.Progressbar(
+    UI['count_entity'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_ENTS,
-        variable=count_ents,
+        maximum=100,
+        variable=count_entity,
         length=120,
     )
-    UI['count_ent'].grid(
+    UI['count_entity'].grid(
         row=1,
         column=0,
         columnspan=3,
@@ -538,13 +621,13 @@ def make_pane(tool_frame):
         text='Overlay',
         anchor=CENTER,
     ).grid(row=2, column=0, sticky=EW)
-    UI['count_over'] = ttk.Progressbar(
+    UI['count_overlay'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_OVERLAY,
+        maximum=100,
         variable=count_overlay,
         length=50,
     )
-    UI['count_over'].grid(row=3, column=0, sticky=EW, padx=5)
+    UI['count_overlay'].grid(row=3, column=0, sticky=EW, padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
@@ -552,6 +635,11 @@ def make_pane(tool_frame):
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
+    add_tooltip(
+        UI['refresh_counts'],
+        "Refresh the compile progress bars. Press after a compile has been "
+        "performed to show the new values.",
+    )
 
     ttk.Label(
         count_frame,
@@ -560,16 +648,14 @@ def make_pane(tool_frame):
     ).grid(row=2, column=2, sticky=EW)
     UI['count_brush'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_BRUSH,
+        maximum=100,
         variable=count_brush,
         length=50,
     )
     UI['count_brush'].grid(row=3, column=2, sticky=EW, padx=5)
 
-    UI['view_logs'] = ttk.Button(
-        count_frame,
-        text='View Logs',
-    )
-    UI['view_logs'].grid(row=4, column=0, columnspan=3, sticky=EW)
+    for wid_name in ('count_overlay', 'count_entity', 'count_brush'):
+        # Add in tooltip logic to the widgets.
+        add_tooltip(UI[wid_name])
 
     refresh_counts(reload=False)
