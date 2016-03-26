@@ -237,6 +237,9 @@ DEFAULTS = {
     "glass_template":           "",
     "grating_template":         "",
 
+    # The same for the goo_wall textures.
+    "goo_wall_scale_temp":      "",
+
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
 
@@ -2053,6 +2056,12 @@ def change_goo_sides():
     """
     if settings['textures']['special.goo_wall'] == ['']:
         return
+
+    if get_opt('goo_wall_scale_temp'):
+        scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
+    else:
+        scale = None
+
     LOGGER.info("Changing goo sides...")
     face_dict = {}
     for solid in VMF.iter_wbrushes(world=True, detail=False):
@@ -2070,24 +2079,25 @@ def change_goo_sides():
         (-64, 0, 0),  # West
         (0, 0, -64),  # Down
     ]
-    for trig in VMF.by_class['trigger_multiple']:
-        if trig['wait'] != '0.1':
-            continue
-        bbox_min, bbox_max = trig.get_bbox()
-        z = int(bbox_min.z + 64)
-        for x in range(int(bbox_min.x)+64, int(bbox_max.x), 128):
-            for y in range(int(bbox_min.y)+64, int(bbox_max.y), 128):
-                for xoff, yoff, zoff in dirs:
-                    try:
-                        face = face_dict[x+xoff, y+yoff, z+zoff]
-                    except KeyError:
-                        continue
 
-                    if (
-                            face.mat.casefold() in BLACK_PAN or
-                            face.mat.casefold() == 'tools/toolsnodraw'
-                            ):
-                        face.mat = get_tex('special.goo_wall')
+    # We only want to alter black panel surfaces..
+    goo_mats = set(BLACK_PAN)
+
+    for x, y, z in conditions.GOO_LOCS:
+        for xoff, yoff, zoff in dirs:
+            try:
+                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: vmfLib.Face
+            except KeyError:
+                continue
+
+            if face.mat.casefold() in goo_mats:
+                face.mat = get_tex('special.goo_wall')
+                if scale is not None:
+                    # Allow altering the orientation of the texture.
+                    u, v, face.ham_rot = scale[face.normal().as_tuple()]
+                    face.uaxis = u.copy()
+                    face.vaxis = v.copy()
+
     LOGGER.info("Done!")
 
 
