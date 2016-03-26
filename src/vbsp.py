@@ -97,6 +97,7 @@ TEX_DEFAULTS = [
     ('', 'special.white_gap'),
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
+    ('', 'special.goo_floor'),
     ('', 'special.edge_special'),
     ('', 'special.fizz_border'),
 
@@ -2086,15 +2087,23 @@ def change_goo_sides():
     for x, y, z in conditions.GOO_LOCS:
         for xoff, yoff, zoff in dirs:
             try:
-                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: vmfLib.Face
+                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: VLib.Side
             except KeyError:
                 continue
 
             if face.mat.casefold() in goo_mats:
-                face.mat = get_tex('special.goo_wall')
+                norm = face.normal()
+
+                face.mat = ''
+                if norm.z != 0:
+                    face.mat = get_tex('special.goo_floor')
+
+                if face.mat == '':  # goo_floor is invalid, or not used
+                    face.mat = get_tex('special.goo_wall')
+
                 if scale is not None:
                     # Allow altering the orientation of the texture.
-                    u, v, face.ham_rot = scale[face.normal().as_tuple()]
+                    u, v, face.ham_rot = scale[norm.as_tuple()]
                     face.uaxis = u.copy()
                     face.vaxis = v.copy()
 
