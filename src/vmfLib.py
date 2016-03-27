@@ -1556,9 +1556,9 @@ class Entity:
                 for face in solid:
                     yield face
 
-    def add_out(self, output):
-        """Add the output to our list."""
-        self.outputs.append(output)
+    def add_out(self, *outputs):
+        """Add the outputs to our list."""
+        self.outputs.extend(outputs)
 
     def output_targets(self) -> Set[str]:
         """Return a set of the targetnames this entity triggers."""
