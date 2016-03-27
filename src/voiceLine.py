@@ -35,6 +35,12 @@ INST_PREFIX = 'instances/BEE2/voice/'
 # The location of the responses script.
 RESP_LOC = 'bee2/inject/response_data.nut'
 
+RESP_HAS_NAMES = {
+    'death_goo': 'goo',
+    'death_turret': 'turret',
+    'death_laserfield': 'laserfield',
+}
+
 
 # Create a fake instance to pass to condition flags. This way we can
 # reuse all that logic, without breaking flags that check the instance.
@@ -57,6 +63,11 @@ def generate_resp_script(file):
     config = ConfigFile('resp_voice.cfg', root='bee2')
     file.write("BEE2_RESPONSES <- {\n")
     for section in QUOTE_DATA.find_key('CoopResponses', []):
+        voice_attr = RESP_HAS_NAMES.get(section.name, '')
+        if voice_attr and not map_attr[voice_attr]:
+            continue
+            # This response catagory isn't present
+
         section_data = ['\t{} = [\n'.format(section.name)]
         for index, line in enumerate(section):
             if not config.getboolean(section.name, "line_" + str(index), True):
