@@ -1169,7 +1169,7 @@ def retexture_template(
                     )
                 elif norm.z > floor_tolerance:
                     face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_ceil'.format(tex_colour)
+                        'special.bullseye_{}_ceiling'.format(tex_colour)
                     )
                 else:
                     face.mat = ''  # Ensure next if statement triggers

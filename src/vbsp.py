@@ -896,13 +896,16 @@ def make_bullseye_face(
     if orient is None:
         orient = get_face_orient(face)
 
-    mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
+    if orient is ORIENT.ceil: # We use the full 'ceiling' here, instead of 'ceil'.
+        orient = 'ceiling'
+
+    mat = get_tex('special.bullseye_{!s}_{!s}'.format(color, orient))
 
     # Fallback to floor texture if using ceiling or wall
     if orient is not ORIENT.floor and mat == '':
-        face.mat = get_tex('special.bullseye_{}_floor'.format(color))
+        mat = get_tex('special.bullseye_{}_floor'.format(color))
 
-    if face.mat == '':
+    if mat == '':
         return False
     else:
         face.mat = mat
