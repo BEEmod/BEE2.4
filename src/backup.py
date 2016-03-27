@@ -11,7 +11,6 @@ if __name__ == '__main__' and (utils.MAC or utils.LINUX):
     os.chdir(os.path.dirname(sys.argv[0]))
 
 
-import string
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -25,6 +24,8 @@ from codecs import EncodedFile
 import time
 import os
 import shutil
+import string
+import atexit
 
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from zipfile import ZipFile, ZIP_LZMA
@@ -42,7 +43,7 @@ LOGGER = utils.getLogger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
 
-UI = {} # Holds all the widgets
+UI = {}  # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
 
@@ -900,6 +901,15 @@ def init_toplevel():
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
 
     ui_new_backup()
+
+
+@atexit.register
+def deinit():
+    """When shutting down, we need to close the backup zipfile."""
+    for name in ('backup_zip', 'unsaved_file'):
+        obj = BACKUPS[name]
+        if obj is not None:
+            obj.close()
 
 
 if __name__ == '__main__':
