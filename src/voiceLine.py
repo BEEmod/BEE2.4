@@ -27,7 +27,7 @@ QUOTE_EVENTS = {}  # id -> instance mapping
 QUOTE_DATA = Property('Quotes', [])
 
 ALLOW_MID_VOICES = False
-VMF = None
+VMF = None  # type: vmfLib.VMF
 
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
@@ -150,7 +150,7 @@ def find_group_quotes(group, mid_quotes, conf):
                 )
 
 
-def add_quote(quote, targetname, quote_loc):
+def add_quote(quote, targetname, quote_loc, use_dings=False):
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
@@ -185,9 +185,17 @@ def add_quote(quote, targetname, quote_loc):
                 busyactor="1",  # Wait for actor to stop talking
                 onplayerdeath='0',
             )
-            choreo.outputs.append(
-                vmfLib.Output('OnUser1', targetname, 'Start')
-            )
+            if use_dings:
+                # Play ding_on/off before and after the line.
+                choreo.add_out(
+                    vmfLib.Output('OnUser1', '@ding_on', 'Start'),
+                    vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2),
+                    vmfLib.Output('OnCompletion', '@ding_off', 'Start'),
+                )
+            else:
+                choreo.add_out(
+                    vmfLib.Output('OnUser1', targetname, 'Start',)
+                )
             added_ents.append(choreo)
         elif name == 'snd':
             snd = VMF.create_ent(
@@ -198,7 +206,7 @@ def add_quote(quote, targetname, quote_loc):
                 message=prop.value,
                 health='10',  # Volume
             )
-            snd.outputs.append(
+            snd.add_out(
                 vmfLib.Output('OnUser1', targetname, 'PlaySound')
             )
             added_ents.append(snd)
@@ -242,7 +250,7 @@ def add_quote(quote, targetname, quote_loc):
 
     if cc_emit_name:
         for ent in added_ents:
-            ent.outputs.append(vmfLib.Output(
+            ent.add_out(vmfLib.Output(
                 'OnUser1',
                 '@command',
                 'Command',
@@ -301,6 +309,26 @@ def add_voice(
     ALLOW_MID_VOICES = not style_vars.get('NoMidVoices', False)
 
     mid_quotes = []
+
+    # Use the beep before and after choreo lines.
+    use_dings = utils.conv_bool(QUOTE_DATA['use_dings', '0'])
+    if use_dings:
+        VMF.create_ent(
+            classname='logic_choreographed_scene',
+            targetname='@ding_on',
+            origin=quote_loc + (-8, -16, 0),
+            scenefile='scenes/npc/glados_manual/ding_on.vcd',
+            busyactor="1",  # Wait for actor to stop talking
+            onplayerdeath='0',
+        )
+        VMF.create_ent(
+            classname='logic_choreographed_scene',
+            targetname='@ding_off',
+            origin=quote_loc + (8, -16, 0),
+            scenefile='scenes/npc/glados_manual/ding_off.vcd',
+            busyactor="1",  # Wait for actor to stop talking
+            onplayerdeath='0',
+        )
 
     # QuoteEvents allows specifiying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
@@ -370,7 +398,12 @@ def add_voice(
                 chosen
             ))
             # Add one of the associated quotes
-            add_quote(random.choice(chosen), quote_targetname, choreo_loc)
+            add_quote(
+                random.choice(chosen),
+                quote_targetname,
+                choreo_loc,
+                use_dings,
+            )
 
     if ADDED_BULLSEYES or utils.conv_bool(QUOTE_DATA['UseMicrophones', '']):
         # Add microphones that broadcast audio directly at players.
@@ -405,6 +438,6 @@ def add_voice(
         # Add all the mid quotes
         target = mid_item['target', '']
         for prop in mid_item:
-            add_quote(prop, target, quote_loc)
+            add_quote(prop, target, quote_loc, use_dings)
 
     LOGGER.info('Done!')
