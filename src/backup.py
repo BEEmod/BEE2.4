@@ -256,10 +256,18 @@ def load_backup(zip_file):
     # Each P2C init requires reading in the properties file, so this may take
     # some time. Use a loading screen.
     reading_loader.set_length('READ', len(puzzles))
+    LOGGER.info('Loading {} maps..', len(puzzles))
     with reading_loader:
         for file in puzzles:
-            maps.append(P2C.from_file(file, zip_file))
+            new_map = P2C.from_file(file, zip_file)
+            maps.append(new_map)
+            LOGGER.debug(
+                'Loading {} map "{}"',
+                'coop' if new_map.is_coop else 'sp',
+                new_map.title,
+            )
             reading_loader.step('READ')
+    LOGGER.info('Done!')
 
     return maps
 
