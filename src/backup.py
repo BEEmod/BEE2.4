@@ -2,13 +2,16 @@
 
 """
 import utils
-if __name__ == '__main__' and (utils.MAC or utils.LINUX):
-    # Change directory to the location of the executable
-    # Otherwise we can't find our files!
-    # The Windows executable does this automatically.
-    import os
-    import sys
-    os.chdir(os.path.dirname(sys.argv[0]))
+if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        import os
+        import sys
+        os.chdir(os.path.dirname(sys.argv[0]))
+
+    utils.init_logging('../logs/backup.log')
 
 
 import tkinter as tk
