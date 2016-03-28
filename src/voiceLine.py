@@ -104,7 +104,7 @@ def res_quote_event(inst, res):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(group, mid_quotes, conf):
+def find_group_quotes(group, mid_quotes, use_dings, conf):
     """Scan through a group, looking for applicable quote options."""
     is_mid = (group.name == 'midinst')
 
@@ -134,7 +134,7 @@ def find_group_quotes(group, mid_quotes, conf):
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.append(ALLOW_MID_VOICES)
+                    mid_quotes.append((line, use_dings))
                 else:
                     poss_quotes.append(line)
             else:
@@ -310,9 +310,9 @@ def add_voice(
 
     mid_quotes = []
 
-    # Use the beep before and after choreo lines.
-    use_dings = utils.conv_bool(QUOTE_DATA['use_dings', '0'])
-    if use_dings:
+    # Enable using the beep before and after choreo lines.
+    allow_dings = utils.conv_bool(QUOTE_DATA['use_dings', '0'])
+    if allow_dings:
         VMF.create_ent(
             classname='logic_choreographed_scene',
             targetname='@ding_on',
@@ -371,11 +371,13 @@ def add_voice(
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
+        use_dings = utils.conv_bool(group['use_dings', ''], allow_dings)
 
         possible_quotes = sorted(
             find_group_quotes(
                 group,
                 mid_quotes,
+                use_dings,
                 conf=mid_config if group.name == 'midinst' else norm_config,
             ),
             key=sort_func,
@@ -434,10 +436,10 @@ def add_voice(
             )
 
     LOGGER.info('Mid quotes: {}', mid_quotes)
-    for mid_item in mid_quotes:
+    for mid_item, use_ding in mid_quotes:
         # Add all the mid quotes
         target = mid_item['target', '']
         for prop in mid_item:
-            add_quote(prop, target, quote_loc, use_dings)
+            add_quote(prop, target, quote_loc, use_ding)
 
     LOGGER.info('Done!')
