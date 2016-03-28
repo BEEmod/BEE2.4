@@ -58,11 +58,18 @@ def has_responses():
     return 'CoopResponses' in QUOTE_DATA
 
 
-def generate_resp_script(file):
+def generate_resp_script(file, allow_dings):
     """Write the responses section into a file."""
+    use_dings = allow_dings
+
     config = ConfigFile('resp_voice.cfg', root='bee2')
     file.write("BEE2_RESPONSES <- {\n")
     for section in QUOTE_DATA.find_key('CoopResponses', []):
+        if not section.has_children() and section.name == 'use_dings':
+            # Allow overriding specifically for the response script
+            use_dings = utils.conv_bool(section.value, allow_dings)
+            continue
+
         voice_attr = RESP_HAS_NAMES.get(section.name, '')
         if voice_attr and not map_attr[voice_attr]:
             continue
@@ -81,6 +88,10 @@ def generate_resp_script(file):
                 file.write(line)
             file.write('\t],\n')
     file.write('}\n')
+
+    file.write('BEE2_PLAY_DING = {};\n'.format(
+        'true' if use_dings else 'false'
+    ))
 
 
 def mode_quotes(prop_block):
@@ -346,7 +357,7 @@ def add_voice(
     if has_responses():
         LOGGER.info('Generating responses data..')
         with open(RESP_LOC, 'w') as f:
-            generate_resp_script(f)
+            generate_resp_script(f, allow_dings)
     else:
         LOGGER.info('No responses data..')
         try:

@@ -381,7 +381,10 @@ def make_tab(group, config: ConfigFile, tab_type):
             reverse=True,
         )
 
-    for quote in sorted_quotes:
+    for quote in sorted_quotes:  # type: Property
+        if not quote.has_children():
+            continue # Skip over config commands..
+
         if tab_type is TabTypes.RESPONSE:
             try:
                 name = RESPONSE_NAMES[quote.name]
