@@ -1917,11 +1917,11 @@ def make_bottomless_pit(solids, max_height):
     instances = settings['pit']['inst']
 
     side_types = {
-        utils.CONN_TYPES.side: instances['side'],
-        utils.CONN_TYPES.corner: instances['corner'],
-        utils.CONN_TYPES.straight: instances['double'],
-        utils.CONN_TYPES.triple: instances['triple'],
-        utils.CONN_TYPES.all: instances['pillar'],
+        utils.CONN_TYPES.side: instances['side'],  # o|
+        utils.CONN_TYPES.corner: instances['corner'],  # _|
+        utils.CONN_TYPES.straight: instances['side'],  # Add this twice for |o|
+        utils.CONN_TYPES.triple: instances['triple'],  # U-shape
+        utils.CONN_TYPES.all: instances['pillar'],  # [o]
         utils.CONN_TYPES.none: [''],  # Never add instance if no walls
     }
 
@@ -1943,8 +1943,8 @@ def make_bottomless_pit(solids, max_height):
                 file=file,
                 targetname='goo_side',
                 origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
+                    x + tele_off_x,
+                    y + tele_off_y,
                     max(
                         x
                         for x in mask
@@ -1953,6 +1953,27 @@ def make_bottomless_pit(solids, max_height):
                 ),
                 angles=angle,
             ).make_unique()
+
+        # Straight uses two side-instances in parallel - "|o|"
+        if inst_type is utils.CONN_TYPES.straight:
+            file = random.choice(side_types[inst_type])
+            if file != '':
+                VMF.create_ent(
+                    classname='func_instance',
+                    file=file,
+                    targetname='goo_side',
+                    origin='{!s} {!s} {!s}'.format(
+                        x + tele_off_x,
+                        y + tele_off_y,
+                        max(
+                            x
+                            for x in mask
+                            if x is not None
+                        ),
+                    ),
+                    # Reverse direction
+                    angles=Vec.from_str(angle) + (0, 180, 0),
+                ).make_unique()
 
         random.seed(str(x) + str(y) + '-support')
         file = random.choice(instances['support'])
