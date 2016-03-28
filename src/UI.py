@@ -427,7 +427,7 @@ def load_packages(data):
         item_list[it.id] = it
         loader.step("IMG")
 
-    StyleVarPane.add_vars(data['StyleVar'])
+    StyleVarPane.add_vars(data['StyleVar'], data['Style'])
 
     # THese item types don't appear anywhere in the UI, so we just save them.
     for packlist in data['PackList']:
@@ -735,7 +735,7 @@ def export_editoritems(_=None):
     style_vars = {
         var.id: (style_vals[var.id].get() == 1)
         for var in
-        StyleVarPane.var_list
+        StyleVarPane.VAR_LIST
         if var.applies_to_style(chosen_style)
     }
 

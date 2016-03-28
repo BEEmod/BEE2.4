@@ -1394,6 +1394,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         self.id = var_id
         self.name = name
         self.default = default
+        self.enabled = default
         self.desc = desc
         if unstyled:
             self.styles = None
