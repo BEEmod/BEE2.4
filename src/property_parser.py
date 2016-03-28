@@ -487,8 +487,7 @@ class Property:
         """
         if self.has_children():
             return len(self.value)
-        else:
-            return 1
+        # else - TypeError..
 
     def __iter__(self) -> Iterator['Property']:
         """Iterate through the value list.
@@ -497,21 +496,20 @@ class Property:
         if self.has_children():
             return iter(self.value)
         else:
-            return iter((self.value,))
+            raise ValueError(
+                "Can't iterate through {!r} without children!".format(self)
+            )
 
     def __contains__(self, key):
-        """Check to see if a name is present in the children.
-
-        If the Property has no children, this checks if the names match instead.
-        """
+        """Check to see if a name is present in the children."""
         key = key.casefold()
         if self.has_children():
             for prop in self.value:  # type: Property
                 if prop._folded_name == key:
                     return True
             return False
-        else:
-            return self._folded_name == key
+
+        raise ValueError("Can't search through properties without children!")
 
     def __getitem__(
             self,
@@ -528,7 +526,6 @@ class Property:
         - If given a string, it will find the last Property with that name.
           (Default can be chosen by passing a 2-tuple like Prop[key, default])
         - If none are found, it raises IndexError.
-        - [0] maps to the .value if the Property has no children.
         """
         if self.has_children():
             if isinstance(index, int) or isinstance(index, slice):
@@ -542,10 +539,8 @@ class Property:
                         return self.find_key(index).value
                     except NoKeyError as no_key:
                         raise IndexError(no_key) from no_key
-        elif index == 0:
-            return self.value
         else:
-            raise IndexError
+            raise IndexError("Can't index a Property without children!")
 
     def __setitem__(
             self,
@@ -559,26 +554,20 @@ class Property:
         - If none are found, it appends the value to the tree.
         - If given a tuple of strings, it will search through that path,
           and set the value of the last matching Property.
-        - [0] sets the .value if the Property has no children.
         """
         if self.has_children():
             if isinstance(index, int) or isinstance(index, slice):
                 self.value[index] = value
             else:
                 self.set_key(index, value)
-        elif index == 0:
-            self.value = value
         else:
-            raise IndexError(
-                'Cannot index a Property that does not have children!'
-            )
+            raise IndexError("Can't index a Property without children!")
 
     def __delitem__(self, index):
         """Delete the given property index.
 
         - If given an integer, it will delete by position.
         - If given a string, it will delete the last Property with that name.
-        - If the Property has no children, it will blank the value instead.
         """
         if self.has_children():
             if isinstance(index, int):
@@ -589,7 +578,7 @@ class Property:
                 except NoKeyError as no_key:
                     raise IndexError(no_key) from no_key
         else:
-            self.value = ''  # type: _Prop_Value
+            raise IndexError("Can't index a Property without children!")
 
     def __add__(self, other):
         """Allow appending other properties to this one.
