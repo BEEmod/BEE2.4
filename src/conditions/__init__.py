@@ -482,15 +482,14 @@ def check_all():
                 break  # Condition has run out of results, quit early
 
     import vbsp
-
-    LOGGER.info('Map has attributes: ', [
+    LOGGER.info('Map has attributes: {}', [
         key
         for key, value in
         vbsp.settings['has_attr'].items()
         if value
     ])
-    LOGGER.info('Style Vars:', dict(vbsp.settings['style_vars']))
-    LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
+    LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
+    LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
 def check_flag(flag, inst):
