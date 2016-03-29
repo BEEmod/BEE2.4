@@ -142,14 +142,6 @@ def sub_open(ind, _=None):
         selected_sub_item.open_menu_at_sub(pos)
 
 
-def more_info_show_url(_=None):
-    if selected_item.url is not None:
-        tooltip.show(
-            wid['moreinfo'],
-            selected_item.url,
-        )
-
-
 def open_event(e):
     """Read data from the event, and show the window."""
     snd.fx('expand')
