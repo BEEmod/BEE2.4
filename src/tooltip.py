@@ -9,6 +9,9 @@ from tk_tools import TK_ROOT
 
 import utils
 
+PADDING = 0  # Space around the target widget
+CENT_DIST = 50  # Distance around center where we align centered.
+
 window = tk.Toplevel(TK_ROOT)
 window.withdraw()
 window.transient(master=TK_ROOT)
@@ -39,26 +42,54 @@ context_label = tk.Label(
 context_label.grid(row=0, column=0)
 
 
-def show(widget, text, _=None):
+def show(widget: tk.Misc, text, mouse_x, mouse_y):
     """Show the context window."""
     context_label['text'] = text
     window.deiconify()
     window.update_idletasks()
     window.lift()
 
-    # Center vertically below the button
-    x = (
-        widget.winfo_rootx() -
-        (
-            window.winfo_reqwidth()
-            - widget.winfo_reqwidth()
-            ) // 2
+    # We're going to position tooltips towards the center of the main window.
+    # That way they don't tend to stick out, even in multi-window setups.
+
+    # To decide where to put the tooltip, we first want the center of the
+    # main window.
+    cent_x = TK_ROOT.winfo_rootx() + TK_ROOT.winfo_width() / 2
+    cent_y = TK_ROOT.winfo_rooty() + TK_ROOT.winfo_height() / 2
+
+    x_centered = False
+
+    if cent_x > mouse_x + CENT_DIST:
+        # Left of center, so place right of the target
+        x = widget.winfo_rootx() + widget.winfo_width() + PADDING
+    elif cent_x < mouse_x - CENT_DIST:
+        # Right of center, so place left of the target
+        x = widget.winfo_rootx() - window.winfo_width() - PADDING
+    else:  # Center horizontally
+        x = (
+            widget.winfo_rootx() +
+            (widget.winfo_width() - window.winfo_width()) // 2
         )
-    y = (
-        widget.winfo_rooty()
-        + widget.winfo_reqheight()
+        x_centered = True
+
+    if cent_y > mouse_y + CENT_DIST:
+        # Above center, so place below target
+        y = widget.winfo_rooty() + widget.winfo_height() + PADDING
+    elif cent_y < mouse_y - CENT_DIST:
+        # Below center, so place above target
+        y = widget.winfo_rooty() - window.winfo_height() - PADDING
+    else:  # Center vertically
+        y = (
+            widget.winfo_rooty() +
+            (widget.winfo_height() - window.winfo_height()) // 2
         )
-    window.geometry('+' + str(x) + '+' + str(y))
+
+        # If both X and Y are centered, the tooltip will appear on top of
+        # the mouse and immediately hide. Offset it to fix that.
+        if x_centered:
+            y += window.winfo_height()
+
+    window.geometry('+{}+{}'.format(int(x), int(y)))
 
 
 def hide(e=None):
@@ -77,14 +108,14 @@ def add_tooltip(targ_widget, text='', delay=500):
     targ_widget.tooltip_text = text
     event_id = None  # The id of the enter event, so we can cancel it.
 
-    def after_complete():
+    def after_complete(x, y):
         """Remove the id and show the tooltip after the delay."""
         nonlocal event_id
         event_id = None  # Invalidate event id
         if targ_widget.tooltip_text:
-            show(targ_widget, targ_widget.tooltip_text)
+            show(targ_widget, targ_widget.tooltip_text, x, y)
 
-    def enter_handler(e):
+    def enter_handler(event: tk.Event):
         """Schedule showing the tooltip."""
         nonlocal event_id
         if targ_widget.tooltip_text:
@@ -94,6 +125,7 @@ def add_tooltip(targ_widget, text='', delay=500):
             event_id = TK_ROOT.after(
                 delay,
                 after_complete,
+                event.x_root, event.y_root,
             )
 
     def exit_handler(e):
