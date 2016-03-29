@@ -76,6 +76,7 @@ SPRITE_TOOL = {
     'rot_8': 'This item can be placed like light strips.',
     'rot_36': 'This item can be rotated on the floor to face 360 degrees.',
     'rot_catapult': 'This item is positioned using a catapult trajectory.',
+    'rot_paint': 'This item positions the dropper to hit target locations.',
 
     'in_none': 'This item does not accept any inputs.',
     'in_norm': 'This item accepts inputs.',
@@ -289,6 +290,7 @@ def load_item_data():
     wid['moreinfo'].tooltip_text = selected_item.url
 
     editor_data = item_data['editor']
+
     has_inputs = False
     has_polarity = False
     has_outputs = False
@@ -360,6 +362,23 @@ def load_item_data():
         face_spr += "_none"
 
     set_sprite(SPR.FACING, face_spr)
+
+    # Now some special overrides for paint and cube dropper items..
+    if selected_item.id == "ITEM_CUBE":
+        set_sprite(SPR.FACING, 'surf_ceil')
+        set_sprite(SPR.INPUT, 'in_norm')
+        set_sprite(SPR.COLLISION, 'space_embed')
+        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(SPR.ROTATION, 'rot_36')
+        wid['sprite', SPR.ROTATION].tooltip_text += '\n(Reflection Cube only)'
+
+    if editor_data['ItemClass', ''].casefold() == "itempaintsplat":
+        # Reflection or normal gel..
+        set_sprite(SPR.FACING, 'surf_wall_ceil')
+        set_sprite(SPR.INPUT, 'in_norm')
+        set_sprite(SPR.COLLISION, 'space_none')
+        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(SPR.ROTATION, 'rot_paint')
 
 
 def follow_main(_=None):
