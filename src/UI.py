@@ -804,6 +804,7 @@ def export_editoritems(_=None):
 
     if launch_game:
         gameMan.selected_game.launch()
+        TK_ROOT.iconify()
 
 
 def set_disp_name(item, _=None):
