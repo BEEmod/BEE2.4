@@ -1516,6 +1516,10 @@ def res_switch(inst, res):
 
     'method' is the way the search is done - first, last, random, or all.
     'flag' is the name of the flag.
+    Each property group is a case to check - the property name is the flag
+    argument, and the contents are the results to execute in that case.
+    For 'random' mode, you can omit the flag to choose from all objects. In
+    this case the flag arguments are ignored.
     """
     flag_name, cases, method = res.value
 
@@ -1524,9 +1528,10 @@ def res_switch(inst, res):
         random.shuffle(cases)
 
     for case in cases:
-        flag = Property(flag_name, case.real_name)
-        if not check_flag(flag, inst):
-            continue
+        if flag_name is not None:
+            flag = Property(flag_name, case.real_name)
+            if not check_flag(flag, inst):
+                continue
         for res in case:
             Condition.test_result(inst, res)
         if method is not SWITCH_TYPE.ALL:
