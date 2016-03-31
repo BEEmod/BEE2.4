@@ -36,6 +36,14 @@ EXCLUDES = [
     'smtplib',
     'http',
 ]
+# These also aren't required by logging really, but by default
+# they're imported unconditionally. Check to see if it's modified first.
+import logging
+if not hasattr(logging, 'socket'):
+    EXCLUDES.append('socket')
+if not hasattr(logging, 'pickle'):
+    EXCLUDES.append('pickle')
+del logging
 
 if utils.WIN:
     # Subprocess uses these in UNIX-style OSes, but not Windows
