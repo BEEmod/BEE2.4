@@ -1059,7 +1059,7 @@ class Vec:
         # Pitch is applied first, so we need to reconstruct the x-value
         horiz_dist = math.sqrt(self.x ** 2 + self.y ** 2)
         return Vec(
-            math.degrees(math.atan2(self.z, horiz_dist)),
+            math.degrees(math.atan2(-self.z, horiz_dist)),
             math.degrees(math.atan2(self.y, self.x)) % 360,
             roll,
         )
