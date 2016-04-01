@@ -185,9 +185,9 @@ def make_vac_track(start, all_markers):
         spawnflags='1103',  # Clients, Physics, Everything
     )
 
-    for start, end in follow_vac_path(all_markers, start):
+    for inst, end in follow_vac_path(all_markers, start):
         motion_trig.solids.extend(
-            join_markers(start, end)
+            join_markers(inst, end, inst is start)
         )
 
     end_logic = end['ent'].copy()
@@ -208,13 +208,22 @@ def push_trigger(loc, normal, solids):
     return ent
 
 
-def make_straight(origin: Vec, normal: Vec, dist: int, file, name):
+def make_straight(
+        origin: Vec,
+        normal: Vec,
+        dist: int,
+        file,
+        name='',
+        is_start=False,
+    ):
     """Make a straight line of instances from one point to another."""
     solid = vbsp.VMF.make_prism(
         # 32 added to the other directions, plus extended dist in the other
         # directions
         origin + 32 + (normal * (dist + 32)),
-        origin - 32 - (normal * 32),
+        # The starting brush needs to stick out a bit further, to cover the
+        # point_push entity.
+        origin - 32 - (normal * (96 if is_start else 32)),
         mat='tools/toolstrigger',
     ).solid
 
@@ -234,7 +243,7 @@ def make_straight(origin: Vec, normal: Vec, dist: int, file, name):
     return solid.copy()
 
 
-def join_markers(inst_a, inst_b):
+def join_markers(inst_a, inst_b, is_start=False):
     """Join two marker ents together with corners.
 
     This returns a list of solids used for the vphysics_motion trigger.
@@ -248,8 +257,6 @@ def join_markers(inst_a, inst_b):
     config = inst_a['conf']
     name = inst_a['ent']['targetname']
 
-    LOGGER.info('{0}:{2} -> {1}:{3}', origin_a, origin_b, norm_a, norm_b)
-
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
         dist = int((origin_a - origin_b).mag())
@@ -260,7 +267,8 @@ def join_markers(inst_a, inst_b):
                 norm_a,
                 dist,
                 config['straight'],
-                name
+                name,
+                is_start,
             )]
         else:
             # S-bend, we don't do the geometry for this..
