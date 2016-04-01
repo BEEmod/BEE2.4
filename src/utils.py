@@ -1544,6 +1544,15 @@ class Vec:
         else:
             raise KeyError('Invalid axis: {!r}'.format(ind))
 
+    def other_axes(self, axis: str) -> Tuple[float, float]:
+        """Get the values for the other two axes."""
+        if axis == 'x':
+            return self.y, self.z
+        if axis == 'y':
+            return self.x, self.z
+        if axis == 'z':
+            return self.x, self.y
+
     def as_tuple(self):
         """Return the Vector as a tuple."""
         return Vec_tuple(self.x, self.y, self.z)
