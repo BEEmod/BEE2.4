@@ -22,6 +22,34 @@ yn = utils.Vec_tuple(0, -1, 0)
 zp = utils.Vec_tuple(0, 0, 1)
 zn = utils.Vec_tuple(0, 0, -1)
 
+# start, end normals -> angle of corner instance
+CORNER_ANG = {
+    (zp, xp): '0 0 0',
+    (zp, xn): '0 180 0',
+    (zp, yp): '0 90 0',
+    (zp, yn): '0 270 0',
+
+    (zn, xp): '0 0 180',
+    (zn, xn): '0 180 180',
+    (zn, yp): '0 90 180',
+    (zn, yn): '0 270 180',
+
+    (xp, yp): '0 90 90',
+    (xp, yn): '0 270 270',
+    (xp, zp): '270 180 0',
+    (xp, zn): '90 0 0',
+
+    (xn, yp): '0 90 270',
+    (xn, yn): '0 270 90',
+    (xn, zp): '270 0 0',
+    (xn, zn): '90 180 0',
+
+    (yp, zp): '270 270 0',
+    (yp, zn): '90 90 0',
+    (yp, xp): '0 0 270',
+    (yp, xn): '0 180 90',
+}
+
 del xp, xn, yp, yn, zp, zn
 
 
