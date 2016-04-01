@@ -168,6 +168,7 @@ def make_vac_track(start, all_markers):
 
     # First create the start section..
     start_logic = start['ent'].copy()
+    vbsp.VMF.add_ent(start_logic)
 
     start_logic['file'] = start['conf']['entry', (
         'ceiling' if start_normal.z > 1 else
@@ -189,6 +190,7 @@ def make_vac_track(start, all_markers):
         )
 
     end_logic = end['ent'].copy()
+    vbsp.VMF.add_ent(end_logic)
     end_logic['file'] = end['conf']['exit']
 
 
@@ -251,7 +253,6 @@ def join_markers(inst_a, inst_b):
         # Either straight-line, or s-bend.
         dist = int((origin_a - origin_b).mag())
 
-        LOGGER.info('{} -> {}, comp={}', origin_a, origin_b, origin_a + (norm_a * dist))
         if origin_a + (norm_a * dist) == origin_b:
             return [make_straight(
                 origin_a,
@@ -263,3 +264,5 @@ def join_markers(inst_a, inst_b):
         else:
             # S-bend, we don't do the geometry for this..
             return []
+
+
