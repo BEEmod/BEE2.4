@@ -12,6 +12,7 @@ import vbsp
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
 PUSH_SPEED = 400  # The speed of the push triggers.
+UP_PUSH_SPEED = 600  # Make it slightly faster when up to counteract gravity
 
 
 xp = utils.Vec_tuple(1, 0, 0)
@@ -200,7 +201,7 @@ def push_trigger(loc, normal, solids):
         origin=loc,
         # The z-direction is reversed..
         pushdir=normal.to_angle(),
-        speed=PUSH_SPEED,
+        speed=(UP_PUSH_SPEED if normal.z > 0 else PUSH_SPEED),
         spawnflags='1103',  # Clients, Physics, Everything
     )
     ent.solids.extend(solids)
