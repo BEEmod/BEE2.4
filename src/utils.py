@@ -1142,16 +1142,27 @@ class Vec:
         """Multiply the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
-        else:
-            try:
-                return Vec(
-                    self.x * other,
-                    self.y * other,
-                    self.z * other,
-                )
-            except TypeError:
-                return NotImplemented
-    __rmul__ = __mul__
+        try:
+            return Vec(
+                self.x * other,
+                self.y * other,
+                self.z * other,
+            )
+        except TypeError:
+            return NotImplemented
+
+    def __rmul__(self, other: float) -> 'Vec':
+        """Multiply the Vector by a scalar."""
+        if isinstance(other, Vec):
+            return NotImplemented
+        try:
+            return Vec(
+                other * self.x,
+                other * self.y,
+                other * self.z,
+            )
+        except TypeError:
+            return NotImplemented
 
     def __div__(self, other: float) -> 'Vec':
         """Divide the Vector by a scalar."""
