@@ -2,6 +2,7 @@
 """
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
+    import_template, TEMP_TYPES
 )
 from instanceLocs import resolve as resolve_inst
 from utils import Vec
@@ -22,32 +23,32 @@ yn = utils.Vec_tuple(0, -1, 0)
 zp = utils.Vec_tuple(0, 0, 1)
 zn = utils.Vec_tuple(0, 0, -1)
 
-# start, end normals -> angle of corner instance
+# start, end normals -> angle of corner instance and the unchanged axis
 CORNER_ANG = {
-    (zp, xp): '0 0 0',
-    (zp, xn): '0 180 0',
-    (zp, yp): '0 90 0',
-    (zp, yn): '0 270 0',
+    (zp, xp): ('0 0 0', 'y'),
+    (zp, xn): ('0 180 0', 'y'),
+    (zp, yp): ('0 90 0', 'x'),
+    (zp, yn): ('0 270 0', 'x'),
 
-    (zn, xp): '0 0 180',
-    (zn, xn): '0 180 180',
-    (zn, yp): '0 90 180',
-    (zn, yn): '0 270 180',
+    (zn, xp): ('0 0 180', 'y'),
+    (zn, xn): ('0 180 180', 'y'),
+    (zn, yp): ('0 90 180', 'x'),
+    (zn, yn): ('0 270 180', 'x'),
 
-    (xp, yp): '0 90 90',
-    (xp, yn): '0 270 270',
-    (xp, zp): '270 180 0',
-    (xp, zn): '90 0 0',
+    (xp, yp): ('0 90 90', 'z'),
+    (xp, yn): ('0 270 270', 'z'),
+    (xp, zp): ('270 180 0', 'y'),
+    (xp, zn): ('90 0 0', 'y'),
 
-    (xn, yp): '0 90 270',
-    (xn, yn): '0 270 90',
-    (xn, zp): '270 0 0',
-    (xn, zn): '90 180 0',
+    (xn, yp): ('0 90 270', 'z'),
+    (xn, yn): ('0 270 90', 'z'),
+    (xn, zp): ('270 0 0', 'y'),
+    (xn, zn): ('90 180 0', 'y'),
 
-    (yp, zp): '270 270 0',
-    (yp, zn): '90 90 0',
-    (yp, xp): '0 0 270',
-    (yp, xn): '0 180 90',
+    (yp, zp): ('270 270 0', 'x'),
+    (yp, zn): ('90 90 0', 'x'),
+    (yp, xp): ('0 0 270', 'z'),
+    (yp, xn): ('0 180 90', 'z'),
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -87,6 +88,10 @@ def res_vactube_setup(res):
             ('corner', 1): block['corner_small_inst', ''],
             ('corner', 2): block['corner_medium_inst', ''],
             ('corner', 3): block['corner_large_inst', ''],
+
+            ('corner_temp', 1): block['temp_corner_small', ''],
+            ('corner_temp', 2): block['temp_corner_medium', ''],
+            ('corner_temp', 3): block['temp_corner_large', ''],
 
             # Straight instances connected to the next part
             'straight': block['straight_inst', ''],
@@ -241,34 +246,110 @@ def make_straight(
         normal: Vec,
         dist: int,
         file,
-        name='',
         is_start=False,
     ):
     """Make a straight line of instances from one point to another."""
+
+    # 32 added to the other directions, plus extended dist in the other
+    # directions
+    p1 = origin + (normal * (dist + 32))
+    # The starting brush needs to
+    # stick out a bit further, to cover the
+    # point_push entity.
+    p2 = origin - (normal * (96 if is_start else 32))
+
+    # bbox before +- 32 to ensure the above doesn't wipe it out
+    p1, p2 = Vec.bbox(p1, p2)
+
     solid = vbsp.VMF.make_prism(
-        # 32 added to the other directions, plus extended dist in the other
-        # directions
-        origin + 32 + (normal * (dist + 32)),
-        # The starting brush needs to stick out a bit further, to cover the
-        # point_push entity.
-        origin - 32 - (normal * (96 if is_start else 32)),
+        # Expand to 64x64 in the other two directions
+        p1 - 32, p2 + 32,
         mat='tools/toolstrigger',
     ).solid
 
-    push_trigger(origin, normal, (solid,))
+    push_trigger(origin, normal, [solid])
 
     angles = normal.to_angle()
 
-    for pos in range(0, dist + 1, 128):
+    for pos in range(0, int(dist) + 1, 128):
         vbsp.VMF.create_ent(
             classname='func_instance',
-            targetname=name,
             origin=origin + pos * normal,
             angles=angles,
             file=file,
         )
 
     return solid.copy()
+
+
+def make_bend(
+        origin_a: Vec,
+        origin_b: Vec,
+        norm_a: Vec,
+        norm_b: Vec,
+        corner_ang: str,
+        flat_angle: str,
+        config,
+        max_size: int,
+):
+    """Make a corner and the straight sections leading into it."""
+    off = origin_b - origin_a
+    # The distance to move first, then second.
+    first_movement = Vec(norm_a.x * off.x, norm_a.y * off.y, norm_b.z * off.z)
+    sec_movement = Vec(norm_b.x * off.x, norm_b.y * off.y, norm_b.z * off.z)
+
+    LOGGER.info('Corner: angle={}, flat={}, {}+{}={}',
+        corner_ang, flat_angle, first_movement, sec_movement, off
+    )
+
+    # The size of the corner ranges from 1-3. It's
+    # limited by the user's setting and the distance we have in each direction
+    corner_size = min(
+        first_movement.mag() // 128, sec_movement.mag() // 128,
+        3, max_size,
+    )
+
+    solids = []
+
+    straight_a = first_movement.mag() - corner_size * 128
+    straight_b = sec_movement.mag() - corner_size * 128
+
+    if corner_size < 1:
+        return []  # No room!
+
+    solids += make_straight(
+        origin_a,
+        norm_a,
+        straight_a,
+        config['straight'],
+    )
+
+    corner_origin = origin_a + norm_a * (straight_a + 128)
+    vbsp.VMF.create_ent(
+        classname='func_instance',
+        origin=corner_origin,
+        angles=corner_ang,
+        file=config['corner', corner_size],
+    )
+
+    temp = config['corner_temp', corner_size]
+    if temp:
+        solids += import_template(
+            temp,
+            origin=corner_origin,
+            angles=Vec.from_str(corner_ang),
+            force_type=TEMP_TYPES.world,
+        ).world
+
+    #  Move up to the corner, then over to the start of straight parts.
+    solids += make_straight(
+        origin_a + first_movement + (corner_size * 128 * norm_b),
+        norm_b,
+        straight_b,
+        config['straight'],
+    )
+
+    return solids
 
 
 def join_markers(inst_a, inst_b, is_start=False):
@@ -283,11 +364,10 @@ def join_markers(inst_a, inst_b, is_start=False):
     norm_b = Vec(-1, 0, 0).rotate_by_str(inst_b['ent']['angles'])
 
     config = inst_a['conf']
-    name = inst_a['ent']['targetname']
 
     if norm_a == norm_b:
         # Either straight-line, or s-bend.
-        dist = int((origin_a - origin_b).mag())
+        dist = (origin_a - origin_b).mag()
 
         if origin_a + (norm_a * dist) == origin_b:
             return [make_straight(
@@ -295,11 +375,29 @@ def join_markers(inst_a, inst_b, is_start=False):
                 norm_a,
                 dist,
                 config['straight'],
-                name,
                 is_start,
             )]
         else:
             # S-bend, we don't do the geometry for this..
             return []
 
+    try:
+        corner_ang, flat_angle = CORNER_ANG[norm_a.as_tuple(), norm_b.as_tuple()]
 
+        if origin_a[flat_angle] != origin_b[flat_angle]:
+            # It needs to be flat in this angle!
+            raise ValueError
+    except ValueError:
+        # The two tubes point in a u-shape, or need two corners - abort.
+        return []
+    else:
+        return make_bend(
+            origin_a,
+            origin_b,
+            norm_a,
+            norm_b,
+            corner_ang,
+            flat_angle,
+            config,
+            max_size=inst_a['size'],
+        )
