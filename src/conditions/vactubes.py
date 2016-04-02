@@ -8,7 +8,6 @@ from conditions import (
 from instanceLocs import resolve as resolve_inst
 from utils import Vec
 import vmfLib as VLib
-import conditions
 import utils
 import vbsp
 
@@ -176,24 +175,29 @@ def res_make_vactubes(_, res):
         # No actual vactubes..
         return RES_EXHAUSTED
 
+    LOGGER.info('Markers: {}', markers.keys())
+
     for mark_name, marker in markers.items():
-        for next_inst in marker['next']:
+        LOGGER.info('Outputs: {}', marker['next'])
+        next_marker = None
+        for inst in marker['next']:
             try:
-                next_marker = markers[next_inst]
-                break
+                next_marker = markers[inst]
             except KeyError:
                 # Not a marker-instance, remove this (indicator_toggles, etc)
                 # We want to remove any them as well as the assoicated
                 # antlines!
-                for toggle in vbsp.VMF.by_target[next_inst]:
+                for toggle in vbsp.VMF.by_target[inst]:
                     remove_ant_toggle(toggle)
-                continue
-        else:
-            marker['next'] = None
-            continue  # No next-instances
+            else:
+                marker['next'] = inst
+                next_marker['prev'] = mark_name
 
-        marker['next'] = next_inst
-        next_marker['prev'] = mark_name
+        if next_marker is None:
+            # No next-instances were found..
+            # Mark as no-connections
+            marker['next'] = None
+
 
     LOGGER.info('Markers: {}', markers.keys())
 
