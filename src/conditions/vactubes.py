@@ -16,6 +16,8 @@ LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 PUSH_SPEED = 400  # The speed of the push triggers.
 UP_PUSH_SPEED = 600  # Make it slightly faster when up to counteract gravity
 
+PUSH_TRIGS = {}
+
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -259,14 +261,19 @@ def make_vac_track(start, all_markers):
 
 
 def push_trigger(loc, normal, solids):
-    ent = vbsp.VMF.create_ent(
-        classname='trigger_push',
-        origin=loc,
-        # The z-direction is reversed..
-        pushdir=normal.to_angle(),
-        speed=(UP_PUSH_SPEED if normal.z > 0 else PUSH_SPEED),
-        spawnflags='1103',  # Clients, Physics, Everything
-    )
+    # We only need one trigger per direction, for now.
+    try:
+        ent = PUSH_TRIGS[normal.as_tuple()]
+    except KeyError:
+        ent = PUSH_TRIGS[normal.as_tuple()] = vbsp.VMF.create_ent(
+            classname='trigger_push',
+            origin=loc,
+            # The z-direction is reversed..
+            pushdir=normal.to_angle(),
+            speed=(UP_PUSH_SPEED if normal.z > 0 else PUSH_SPEED),
+            spawnflags='1103',  # Clients, Physics, Everything
+        )
+
     ent.solids.extend(solids)
     return ent
 
