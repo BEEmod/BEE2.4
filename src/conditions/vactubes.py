@@ -229,9 +229,12 @@ def make_vac_track(start, all_markers):
             join_markers(inst, end, inst is start)
         )
 
-    end_logic = end['ent'].copy()
-    vbsp.VMF.add_ent(end_logic)
-    end_logic['file'] = end['conf']['exit']
+    # If the end is placed in goo, don't add logic - it isn't visible, and
+    # the object is on a one-way trip anyway.
+    if Vec.from_str(end['ent']['origin']).as_tuple() not in GOO_LOCS:
+        end_logic = end['ent'].copy()
+        vbsp.VMF.add_ent(end_logic)
+        end_logic['file'] = end['conf']['exit']
 
 
 def push_trigger(loc, normal, solids):
