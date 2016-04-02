@@ -211,8 +211,8 @@ def make_vac_track(start, all_markers):
     vbsp.VMF.add_ent(start_logic)
 
     start_logic['file'] = start['conf']['entry', (
-        'ceiling' if start_normal.z > 1 else
-        'floor' if start_normal.z < 1 else
+        'ceiling' if (start_normal.z > 0) else
+        'floor' if (start_normal.z < 0) else
         'wall'
     )]
 
