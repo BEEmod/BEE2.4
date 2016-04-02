@@ -229,9 +229,21 @@ def make_vac_track(start, all_markers):
             join_markers(inst, end, inst is start)
         )
 
+    end_loc = Vec.from_str(end['ent']['origin'])
+    end_norm = Vec(-1, 0, 0).rotate_by_str(end['ent']['angles'])
+
+    # join_markers creates straight parts up-to the marker, but not at it's
+    # location - create the last one.
+    motion_trig.solids.append(make_straight(
+        end_loc,
+        end_norm,
+        128,
+        end['conf']['straight'],
+    ))
+
     # If the end is placed in goo, don't add logic - it isn't visible, and
     # the object is on a one-way trip anyway.
-    if Vec.from_str(end['ent']['origin']).as_tuple() not in GOO_LOCS:
+    if end_loc.as_tuple() not in GOO_LOCS:
         end_logic = end['ent'].copy()
         vbsp.VMF.add_ent(end_logic)
         end_logic['file'] = end['conf']['exit']
@@ -259,9 +271,9 @@ def make_straight(
     ):
     """Make a straight line of instances from one point to another."""
 
-    # 32 added to the other directions, plus extended dist in the other
-    # directions
-    p1 = origin + (normal * (dist + 32))
+    # 32 added to the other directions, plus extended dist in the direction
+    # of the normal - 1
+    p1 = origin + (normal * (dist - 96))
     # The starting brush needs to
     # stick out a bit further, to cover the
     # point_push entity.
@@ -280,7 +292,7 @@ def make_straight(
 
     angles = normal.to_angle()
 
-    for pos in range(0, int(dist) + 1, 128):
+    for pos in range(0, int(dist), 128):
         vbsp.VMF.create_ent(
             classname='func_instance',
             origin=origin + pos * normal,
@@ -315,20 +327,21 @@ def make_bend(
 
     solids = []
 
-    straight_a = first_movement.mag() - corner_size * 128
-    straight_b = sec_movement.mag() - corner_size * 128
+    straight_a = first_movement.mag() - (corner_size - 1) * 128
+    straight_b = sec_movement.mag() - (corner_size * 128)
 
     if corner_size < 1:
         return []  # No room!
 
-    solids.append(make_straight(
-        origin_a,
-        norm_a,
-        straight_a,
-        config['straight'],
-    ))
+    if straight_a > 0:
+        solids.append(make_straight(
+            origin_a,
+            norm_a,
+            straight_a,
+            config['straight'],
+        ))
 
-    corner_origin = origin_a + norm_a * (straight_a + 128)
+    corner_origin = origin_a + norm_a * straight_a
     vbsp.VMF.create_ent(
         classname='func_instance',
         origin=corner_origin,
@@ -348,13 +361,13 @@ def make_bend(
             vbsp.VMF.remove_brush(solid)
         solids += temp_solids
 
-    #  Move up to the corner, then over to the start of straight parts.
-    solids.append(make_straight(
-        origin_a + first_movement + (corner_size * 128 * norm_b),
-        norm_b,
-        straight_b,
-        config['straight'],
-    ))
+    if straight_b > 0:
+        solids.append(make_straight(
+            origin_b - (straight_b * norm_b),
+            norm_b,
+            straight_b,
+            config['straight'],
+        ))
 
     return solids
 
