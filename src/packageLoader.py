@@ -1887,11 +1887,11 @@ class BrushTemplate(PakObject, has_img=False):
 
         self.temp_world = TEMPLATE_FILE.create_ent(
             classname='bee2_template_world',
-            template_id=self.id,
+            template_id=temp_id,
         )
         self.temp_detail = TEMPLATE_FILE.create_ent(
             classname='bee2_template_detail',
-            template_id=self.id,
+            template_id=temp_id,
         )
 
         # Check to see if any func_details have associated solids..
@@ -1942,7 +1942,7 @@ class BrushTemplate(PakObject, has_img=False):
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
             )
-            new_overlay['template_id'] = self.id
+            new_overlay['template_id'] = temp_id
             new_overlay['classname'] = 'bee2_template_overlay'
             sides = overlay['sides'].split()
             new_overlay['sides'] = ' '.join(
@@ -1953,6 +1953,10 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
+
+        if self.temp_detail is None and self.temp_world is None:
+            if not self.temp_overlays:
+                LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
 
     @classmethod
     def parse(cls, data: ParseData):
