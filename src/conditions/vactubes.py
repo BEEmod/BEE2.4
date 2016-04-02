@@ -2,11 +2,13 @@
 """
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    import_template, TEMP_TYPES
+    import_template, remove_ant_toggle,
+    TEMP_TYPES, GOO_LOCS,
 )
 from instanceLocs import resolve as resolve_inst
 from utils import Vec
 import vmfLib as VLib
+import conditions
 import utils
 import vbsp
 
@@ -124,7 +126,6 @@ def res_make_vactubes(_, res):
     Only runs once, and then quits the condition list.
     Instances:
     """
-    LOGGER.info(VAC_CONFIGS)
     if res.value not in VAC_CONFIGS:
         # We've already executed this config group
         return RES_EXHAUSTED
@@ -176,6 +177,11 @@ def res_make_vactubes(_, res):
                 next_marker = markers[next_inst]
                 break
             except KeyError:
+                # Not a marker-instance, remove this (indicator_toggles, etc)
+                # We want to remove any them as well as the assoicated
+                # antlines!
+                for toggle in vbsp.VMF.by_target[next_inst]:
+                    remove_ant_toggle(toggle)
                 continue
         else:
             marker['next'] = None
