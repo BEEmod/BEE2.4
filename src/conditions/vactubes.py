@@ -321,12 +321,12 @@ def make_bend(
     if corner_size < 1:
         return []  # No room!
 
-    solids += make_straight(
+    solids.append(make_straight(
         origin_a,
         norm_a,
         straight_a,
         config['straight'],
-    )
+    ))
 
     corner_origin = origin_a + norm_a * (straight_a + 128)
     vbsp.VMF.create_ent(
@@ -338,20 +338,23 @@ def make_bend(
 
     temp = config['corner_temp', corner_size]
     if temp:
-        solids += import_template(
+        temp_solids = import_template(
             temp,
             origin=corner_origin,
             angles=Vec.from_str(corner_ang),
             force_type=TEMP_TYPES.world,
         ).world
+        for solid in temp_solids:
+            vbsp.VMF.remove_brush(solid)
+        solids += temp_solids
 
     #  Move up to the corner, then over to the start of straight parts.
-    solids += make_straight(
+    solids.append(make_straight(
         origin_a + first_movement + (corner_size * 128 * norm_b),
         norm_b,
         straight_b,
         config['straight'],
-    )
+    ))
 
     return solids
 
