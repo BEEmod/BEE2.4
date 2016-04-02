@@ -200,9 +200,6 @@ def res_make_vactubes(_, res):
             # Mark as no-connections
             marker['next'] = None
 
-
-    LOGGER.info('Markers: {}', markers.keys())
-
     for marker in markers.values():
         if marker['prev'] is not None:
             continue
