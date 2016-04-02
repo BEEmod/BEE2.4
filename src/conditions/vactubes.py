@@ -294,7 +294,6 @@ def make_bend(
         norm_a: Vec,
         norm_b: Vec,
         corner_ang: str,
-        flat_angle: str,
         config,
         max_size: int,
 ):
@@ -303,10 +302,6 @@ def make_bend(
     # The distance to move first, then second.
     first_movement = Vec(norm_a.x * off.x, norm_a.y * off.y, norm_b.z * off.z)
     sec_movement = Vec(norm_b.x * off.x, norm_b.y * off.y, norm_b.z * off.z)
-
-    LOGGER.info('Corner: angle={}, flat={}, {}+{}={}',
-        corner_ang, flat_angle, first_movement, sec_movement, off
-    )
 
     # The size of the corner ranges from 1-3. It's
     # limited by the user's setting and the distance we have in each direction
@@ -403,7 +398,6 @@ def join_markers(inst_a, inst_b, is_start=False):
             norm_a,
             norm_b,
             corner_ang,
-            flat_angle,
             config,
             max_size=inst_a['size'],
         )
