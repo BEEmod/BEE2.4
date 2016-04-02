@@ -275,7 +275,6 @@ def push_trigger(loc, normal, solids):
         )
 
     ent.solids.extend(solids)
-    return ent
 
 
 def make_straight(
