@@ -15,9 +15,9 @@ import vbsp
 
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
-PUSH_SPEED = 400  # The speed of the push triggers.
-UP_PUSH_SPEED = 600  # Make it slightly faster when up to counteract gravity
-DN_PUSH_SPEED = 200  # Slow down when going down since gravity also applies..
+PUSH_SPEED = 700  # The speed of the push triggers.
+UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
+DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
 PUSH_TRIGS = {}
 
