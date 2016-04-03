@@ -1,5 +1,7 @@
 """Implements the cutomisable vactube items.
 """
+from collections import namedtuple
+
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     import_template, remove_ant_toggle,
@@ -15,9 +17,11 @@ LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
 PUSH_SPEED = 400  # The speed of the push triggers.
 UP_PUSH_SPEED = 600  # Make it slightly faster when up to counteract gravity
+DN_PUSH_SPEED = 200  # Slow down when going down since gravity also applies..
 
 PUSH_TRIGS = {}
 
+CornerAng = namedtuple('CornerAng', 'ang, axis')
 
 xp = utils.Vec_tuple(1, 0, 0)
 xn = utils.Vec_tuple(-1, 0, 0)
@@ -28,35 +32,35 @@ zn = utils.Vec_tuple(0, 0, -1)
 
 # start, end normals -> angle of corner instance and the unchanged axis
 CORNER_ANG = {
-    (zp, xp): ('0 0 0', 'y'),
-    (zp, xn): ('0 180 0', 'y'),
-    (zp, yp): ('0 90 0', 'x'),
-    (zp, yn): ('0 270 0', 'x'),
+    (zp, xp): CornerAng('0 0 0', 'y'),
+    (zp, xn): CornerAng('0 180 0', 'y'),
+    (zp, yp): CornerAng('0 90 0', 'x'),
+    (zp, yn): CornerAng('0 270 0', 'x'),
 
-    (zn, xp): ('0 0 180', 'y'),
-    (zn, xn): ('0 180 180', 'y'),
-    (zn, yp): ('0 90 180', 'x'),
-    (zn, yn): ('0 270 180', 'x'),
+    (zn, xp): CornerAng('0 0 180', 'y'),
+    (zn, xn): CornerAng('0 180 180', 'y'),
+    (zn, yp): CornerAng('0 90 180', 'x'),
+    (zn, yn): CornerAng('0 270 180', 'x'),
 
-    (xp, yp): ('0 90 90', 'z'),
-    (xp, yn): ('0 270 270', 'z'),
-    (xp, zp): ('270 180 0', 'y'),
-    (xp, zn): ('90 0 0', 'y'),
+    (xp, yp): CornerAng('0 90 90', 'z'),
+    (xp, yn): CornerAng('0 270 270', 'z'),
+    (xp, zp): CornerAng('270 180 0', 'y'),
+    (xp, zn): CornerAng('90 0 0', 'y'),
 
-    (xn, yp): ('0 90 270', 'z'),
-    (xn, yn): ('0 270 90', 'z'),
-    (xn, zp): ('270 0 0', 'y'),
-    (xn, zn): ('90 180 0', 'y'),
+    (xn, yp): CornerAng('0 90 270', 'z'),
+    (xn, yn): CornerAng('0 270 90', 'z'),
+    (xn, zp): CornerAng('270 0 0', 'y'),
+    (xn, zn): CornerAng('90 180 0', 'y'),
 
-    (yp, zp): ('270 270 0', 'x'),
-    (yp, zn): ('90 90 0', 'x'),
-    (yp, xp): ('0 0 270', 'z'),
-    (yp, xn): ('0 180 90', 'z'),
+    (yp, zp): CornerAng('270 270 0', 'x'),
+    (yp, zn): CornerAng('90 90 0', 'x'),
+    (yp, xp): CornerAng('0 0 270', 'z'),
+    (yp, xn): CornerAng('0 180 90', 'z'),
 
-    (yn, zp): ('270 90 0', 'x'),
-    (yn, zn): ('90 270 0', 'x'),
-    (yn, xn): ('0 180 270', 'z'),
-    (yn, xp): ('0 0 90', 'z'),
+    (yn, zp): CornerAng('270 90 0', 'x'),
+    (yn, zn): CornerAng('90 270 0', 'x'),
+    (yn, xn): CornerAng('0 180 270', 'z'),
+    (yn, xp): CornerAng('0 0 90', 'z'),
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -226,28 +230,11 @@ def make_vac_track(start, all_markers):
 
     end = start
 
-    motion_trig = vbsp.VMF.create_ent(
-        classname='trigger_vphysics_motion',
-        SetGravityScale='0.0',
-        spawnflags='1103',  # Clients, Physics, Everything
-    )
-
     for inst, end in follow_vac_path(all_markers, start):
-        motion_trig.solids.extend(
-            join_markers(inst, end, inst is start)
-        )
+        join_markers(inst, end, inst is start)
 
     end_loc = Vec.from_str(end['ent']['origin'])
     end_norm = Vec(-1, 0, 0).rotate_by_str(end['ent']['angles'])
-
-    # join_markers creates straight parts up-to the marker, but not at it's
-    # location - create the last one.
-    motion_trig.solids.append(make_straight(
-        end_loc,
-        end_norm,
-        128,
-        end['conf']['straight'],
-    ))
 
     # If the end is placed in goo, don't add logic - it isn't visible, and
     # the object is on a one-way trip anyway.
@@ -267,7 +254,11 @@ def push_trigger(loc, normal, solids):
             origin=loc,
             # The z-direction is reversed..
             pushdir=normal.to_angle(),
-            speed=(UP_PUSH_SPEED if normal.z > 0 else PUSH_SPEED),
+            speed=(
+                UP_PUSH_SPEED if normal.z > 0 else
+                DN_PUSH_SPEED if normal.z < 0 else
+                PUSH_SPEED
+            ),
             spawnflags='1103',  # Clients, Physics, Everything
         )
 
@@ -285,7 +276,7 @@ def make_straight(
 
     # 32 added to the other directions, plus extended dist in the direction
     # of the normal - 1
-    p1 = origin + (normal * (dist - 96))
+    p1 = origin + (normal * ((dist // 128 * 128) - 96))
     # The starting brush needs to
     # stick out a bit further, to cover the
     # point_push entity.
@@ -315,6 +306,28 @@ def make_straight(
     return solid.copy()
 
 
+def make_corner(origin, angle, size, config):
+    vbsp.VMF.create_ent(
+        classname='func_instance',
+        origin=origin,
+        angles=angle,
+        file=config['corner', size],
+    )
+
+    temp = config['corner_temp', size]
+    if temp:
+        temp_solids = import_template(
+            temp,
+            origin=origin,
+            angles=Vec.from_str(angle),
+            force_type=TEMP_TYPES.world,
+        ).world
+        for solid in temp_solids:
+            vbsp.VMF.remove_brush(solid)
+        return temp_solids
+    return []
+
+
 def make_bend(
         origin_a: Vec,
         origin_b: Vec,
@@ -323,6 +336,7 @@ def make_bend(
         corner_ang: str,
         config,
         max_size: int,
+        is_start=False,
 ):
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
@@ -351,33 +365,165 @@ def make_bend(
             norm_a,
             straight_a,
             config['straight'],
+            is_start,
         ))
 
     corner_origin = origin_a + norm_a * straight_a
-    vbsp.VMF.create_ent(
-        classname='func_instance',
-        origin=corner_origin,
-        angles=corner_ang,
-        file=config['corner', corner_size],
-    )
-
-    temp = config['corner_temp', corner_size]
-    if temp:
-        temp_solids = import_template(
-            temp,
-            origin=corner_origin,
-            angles=Vec.from_str(corner_ang),
-            force_type=TEMP_TYPES.world,
-        ).world
-        for solid in temp_solids:
-            vbsp.VMF.remove_brush(solid)
-        solids += temp_solids
+    solids.extend(make_corner(
+        corner_origin,
+        corner_ang,
+        corner_size,
+        config,
+    ))
 
     if straight_b > 0:
         solids.append(make_straight(
             origin_b - (straight_b * norm_b),
             norm_b,
             straight_b,
+            config['straight'],
+        ))
+
+    return solids
+
+
+def make_ubend(
+        origin_a: Vec,
+        origin_b: Vec,
+        normal: Vec,
+        config,
+        max_size: int,
+        is_start=False,
+):
+    """Create u-shaped bends."""
+    offset = origin_b - origin_a
+
+    out_axis = normal.axis()
+    out_off = offset[out_axis]
+    offset[out_axis] = 0
+
+    if len(offset) == 2:
+        # Len counts the non-zero values..
+        # If 2, the ubend is diagonal so it's ambigous where to put the bends.
+        return []
+
+    side_norm = offset.norm()
+
+    for side_axis, side_dist in zip('xyz', offset):
+        if side_dist:
+            side_dist = abs(side_dist) + 128
+            break
+    else:
+        # The two tube items are on top of another, that's
+        # impossible to generate.
+        return []
+
+    # Calculate the size of the various parts.
+    # first/second _size = size of the corners.
+    # first/second _straight = length of straight sections
+    # off_straight = length of straight in between corners
+    if out_off == 0:
+        # Both tubes are parallel to each other - use half the distance
+        # for the bends.
+        first_size = second_size = min(
+            3,
+            max_size,
+            side_dist // (128 * 2),
+        )
+        first_straight = second_straight = 0
+        side_straight = side_dist - 2 * 128 * first_size
+    elif out_off > 0:
+        # The second tube is further away than the first - the first bend
+        # should be largest.
+        # We need 1 spot for the second bend.
+        first_size = min(
+            3,
+            max_size,
+            side_dist // 128 - 1,
+            out_off,
+        )
+        second_size = min(3, side_dist // 128 - first_size, max_size)
+
+        first_straight = (out_off + 128) - 128 * second_size
+        second_straight = (first_size - second_size) * 128
+
+        side_straight = (side_dist / 128 - first_size - second_size) * 128
+
+    elif out_off < 0:
+        # The first tube is further away than the second - the second bend
+        # should be largest.
+        second_size = min(
+            3,
+            max_size,
+            side_dist // 128 - 1,
+            -out_off  # -out = abs()
+        )
+        first_size = min(3, side_dist // 128 - second_size, max_size)
+
+        first_straight = (second_size - first_size) * 128
+        second_straight = (-out_off + 128) - 128 * second_size
+
+        side_straight = (side_dist / 128 - first_size - second_size) * 128
+    else:
+        return []  # Not possible..
+
+    # We always have a straight segment at the first marker point - move
+    # everything up slightly.
+
+    first_straight += 128
+
+    LOGGER.info(
+        'Ubend {}: {}, c={}, {}, c={}, {}',
+        out_off,
+        first_straight,
+        first_size,
+        side_straight,
+        second_size,
+        second_straight,
+    )
+
+    solids = [make_straight(
+        origin_a,
+        normal,
+        first_straight,
+        config['straight'],
+        is_start,
+    )]
+
+    first_corner_loc = origin_a + (normal * first_straight)
+
+    solids += make_corner(
+        first_corner_loc,
+        CORNER_ANG[normal.as_tuple(), side_norm.as_tuple()].ang,
+        first_size,
+        config,
+    )
+
+    off_straight_loc = first_corner_loc + normal * (128 * (first_size - 1))
+    off_straight_loc += side_norm * (128 * first_size)
+
+    if side_straight > 0:
+        solids.append(make_straight(
+            off_straight_loc,
+            side_norm,
+            side_straight,
+            config['straight'],
+        ))
+
+    sec_corner_loc = off_straight_loc + side_norm * side_straight
+
+    solids += make_corner(
+        sec_corner_loc,
+        CORNER_ANG[side_norm.as_tuple(), (-normal).as_tuple()].ang,
+        second_size,
+        config,
+    )
+
+    if second_straight > 0:
+        solids.append(make_straight(
+            sec_corner_loc - normal * (128 * second_size),
+            -normal,
+            second_straight,
             config['straight'],
         ))
 
@@ -413,6 +559,16 @@ def join_markers(inst_a, inst_b, is_start=False):
             # S-bend, we don't do the geometry for this..
             return []
 
+    if norm_a == -norm_b:
+        # U-shape bend..
+        return make_ubend(
+            origin_a,
+            origin_b,
+            norm_a,
+            config,
+            max_size=inst_a['size'],
+        )
+
     try:
         corner_ang, flat_angle = CORNER_ANG[norm_a.as_tuple(), norm_b.as_tuple()]
 
@@ -420,7 +576,7 @@ def join_markers(inst_a, inst_b, is_start=False):
             # It needs to be flat in this angle!
             raise ValueError
     except ValueError:
-        # The two tubes point in a u-shape, or need two corners - abort.
+        # The tubes need two corners to join together - abort for that.
         return []
     else:
         return make_bend(

@@ -903,6 +903,16 @@ class Vec:
     """
     __slots__ = ('x', 'y', 'z')
 
+    INV_AXIS = {
+        'x': 'yz',
+        'y': 'xz',
+        'z': 'xy',
+
+        ('y', 'z'): 'x',
+        ('x', 'z'): 'y',
+        ('x', 'y'): 'z',
+    }
+
     def __init__(self, x=0.0, y=0.0, z=0.0):
         """Create a Vector.
 
