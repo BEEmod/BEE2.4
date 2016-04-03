@@ -236,6 +236,15 @@ def make_vac_track(start, all_markers):
     end_loc = Vec.from_str(end['ent']['origin'])
     end_norm = Vec(-1, 0, 0).rotate_by_str(end['ent']['angles'])
 
+    # join_markers creates straight parts up-to the marker, but not at it's
+    # location - create the last one.
+    make_straight(
+        end_loc,
+        end_norm,
+        128,
+        end['conf']['straight'],
+    )
+
     # If the end is placed in goo, don't add logic - it isn't visible, and
     # the object is on a one-way trip anyway.
     if end_loc.as_tuple() not in GOO_LOCS:
@@ -265,6 +274,16 @@ def push_trigger(loc, normal, solids):
     ent.solids.extend(solids)
 
 
+def motion_trigger(*solids):
+    motion_trig = vbsp.VMF.create_ent(
+        classname='trigger_vphysics_motion',
+        SetGravityScale='0.0',
+        origin=solids[0].get_origin(),
+        spawnflags='1103',  # Clients, Physics, Everything
+    )
+    motion_trig.solids.extend(solids)
+
+
 def make_straight(
         origin: Vec,
         normal: Vec,
@@ -291,6 +310,8 @@ def make_straight(
         mat='tools/toolstrigger',
     ).solid
 
+    motion_trigger(solid.copy())
+
     push_trigger(origin, normal, [solid])
 
     angles = normal.to_angle()
@@ -302,8 +323,6 @@ def make_straight(
             angles=angles,
             file=file,
         )
-
-    return solid.copy()
 
 
 def make_corner(origin, angle, size, config):
@@ -324,8 +343,7 @@ def make_corner(origin, angle, size, config):
         ).world
         for solid in temp_solids:
             vbsp.VMF.remove_brush(solid)
-        return temp_solids
-    return []
+        motion_trigger(*temp_solids)
 
 
 def make_bend(
@@ -351,8 +369,6 @@ def make_bend(
         3, max_size,
     )
 
-    solids = []
-
     straight_a = first_movement.mag() - (corner_size - 1) * 128
     straight_b = sec_movement.mag() - (corner_size * 128)
 
@@ -360,31 +376,29 @@ def make_bend(
         return []  # No room!
 
     if straight_a > 0:
-        solids.append(make_straight(
+        make_straight(
             origin_a,
             norm_a,
             straight_a,
             config['straight'],
             is_start,
-        ))
+        )
 
     corner_origin = origin_a + norm_a * straight_a
-    solids.extend(make_corner(
+    make_corner(
         corner_origin,
         corner_ang,
         corner_size,
         config,
-    ))
+    )
 
     if straight_b > 0:
-        solids.append(make_straight(
+        make_straight(
             origin_b - (straight_b * norm_b),
             norm_b,
             straight_b,
             config['straight'],
-        ))
-
-    return solids
+        )
 
 
 def make_ubend(
@@ -482,17 +496,17 @@ def make_ubend(
         second_straight,
     )
 
-    solids = [make_straight(
+    make_straight(
         origin_a,
         normal,
         first_straight,
         config['straight'],
         is_start,
-    )]
+    )
 
     first_corner_loc = origin_a + (normal * first_straight)
 
-    solids += make_corner(
+    make_corner(
         first_corner_loc,
         CORNER_ANG[normal.as_tuple(), side_norm.as_tuple()].ang,
         first_size,
@@ -503,16 +517,16 @@ def make_ubend(
     off_straight_loc += side_norm * (128 * first_size)
 
     if side_straight > 0:
-        solids.append(make_straight(
+        make_straight(
             off_straight_loc,
             side_norm,
             side_straight,
             config['straight'],
-        ))
+        )
 
     sec_corner_loc = off_straight_loc + side_norm * side_straight
 
-    solids += make_corner(
+    make_corner(
         sec_corner_loc,
         CORNER_ANG[side_norm.as_tuple(), (-normal).as_tuple()].ang,
         second_size,
@@ -520,14 +534,12 @@ def make_ubend(
     )
 
     if second_straight > 0:
-        solids.append(make_straight(
+        make_straight(
             sec_corner_loc - normal * (128 * second_size),
             -normal,
             second_straight,
             config['straight'],
-        ))
-
-    return solids
+        )
 
 
 def join_markers(inst_a, inst_b, is_start=False):
@@ -548,26 +560,26 @@ def join_markers(inst_a, inst_b, is_start=False):
         dist = (origin_a - origin_b).mag()
 
         if origin_a + (norm_a * dist) == origin_b:
-            return [make_straight(
+            make_straight(
                 origin_a,
                 norm_a,
                 dist,
                 config['straight'],
                 is_start,
-            )]
-        else:
-            # S-bend, we don't do the geometry for this..
-            return []
+            )
+        # else: S-bend, we don't do the geometry for this..
+        return
 
     if norm_a == -norm_b:
         # U-shape bend..
-        return make_ubend(
+        make_ubend(
             origin_a,
             origin_b,
             norm_a,
             config,
             max_size=inst_a['size'],
         )
+        return
 
     try:
         corner_ang, flat_angle = CORNER_ANG[norm_a.as_tuple(), norm_b.as_tuple()]
@@ -577,9 +589,9 @@ def join_markers(inst_a, inst_b, is_start=False):
             raise ValueError
     except ValueError:
         # The tubes need two corners to join together - abort for that.
-        return []
+        return
     else:
-        return make_bend(
+        make_bend(
             origin_a,
             origin_b,
             norm_a,
