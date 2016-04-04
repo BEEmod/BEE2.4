@@ -29,7 +29,7 @@ COMPILE_DEFAULTS = {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        'use_voice_priority': '0',
+        'use_voice_priority': '1',
     },
     'Corridor': {
         'sp_entry': '1',
@@ -74,6 +74,10 @@ SCREENSHOT_LOC = os.path.abspath(os.path.join(
     'config',
     'screenshot.jpg'
 ))
+
+VOICE_PRIORITY_VAR = IntVar(
+    value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True)
+)
 
 player_model_var = StringVar(
     value=PLAYER_MODELS.get(
@@ -437,12 +441,33 @@ def make_pane(tool_frame):
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     set_screenshot()  # Load the last saved screenshot
 
+    voice_frame = ttk.LabelFrame(
+        window,
+        text='Voicelines:',
+        labelanchor=NW,
+    )
+    voice_frame.grid(row=1, column=0, sticky=EW)
+
+    UI['voice_priority'] = voice_priority = ttk.Checkbutton(
+        voice_frame,
+        text="Use voiceline priorities",
+        variable=VOICE_PRIORITY_VAR,
+        command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
+    )
+    voice_priority.grid(row=0, column=0)
+    add_tooltip(
+        voice_priority,
+        "Only choose the highest-priority voicelines. This means more generic "
+        "lines will can only be chosen if few test elements are in the map. "
+        "If disabled any applicable lines will be used.",
+    )
+
     vrad_frame = ttk.LabelFrame(
         window,
         text='Lighting:',
         labelanchor=N,
     )
-    vrad_frame.grid(row=1, column=0, sticky=EW)
+    vrad_frame.grid(row=2, column=0, sticky=EW)
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
@@ -481,7 +506,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    elev_frame.grid(row=2, column=0, sticky=EW)
+    elev_frame.grid(row=3, column=0, sticky=EW)
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
@@ -521,7 +546,7 @@ def make_pane(tool_frame):
         text='Corridor:',
         labelanchor=N,
     )
-    corr_frame.grid(row=3, column=0, sticky=EW)
+    corr_frame.grid(row=4, column=0, sticky=EW)
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
@@ -567,7 +592,7 @@ def make_pane(tool_frame):
         text='Player Model (SP):',
         labelanchor=N,
     )
-    model_frame.grid(row=4, column=0, sticky=EW)
+    model_frame.grid(row=5, column=0, sticky=EW)
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,
@@ -588,7 +613,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    count_frame.grid(row=5, column=0, sticky=EW)
+    count_frame.grid(row=6, column=0, sticky=EW)
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 

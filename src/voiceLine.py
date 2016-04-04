@@ -1,5 +1,6 @@
 # coding=utf-8
 from decimal import Decimal
+from collections import namedtuple
 import itertools
 import random
 import os
@@ -41,6 +42,8 @@ RESP_HAS_NAMES = {
     'death_laserfield': 'laserfield',
 }
 
+PossibleQuote = namedtuple('PossibleQuote', 'priority, lines')
+
 
 # Create a fake instance to pass to condition flags. This way we can
 # reuse all that logic, without breaking flags that check the instance.
@@ -54,7 +57,6 @@ fake_inst = vmfLib.VMF().create_ent(
 
 def has_responses():
     """Check if we have any valid 'response' data for Coop."""
-    LOGGER.info([prop.name for prop in QUOTE_DATA])
     return 'CoopResponses' in QUOTE_DATA
 
 
@@ -155,10 +157,10 @@ def find_group_quotes(group, mid_quotes, use_dings, conf):
                 )
 
         if poss_quotes:
-            yield (
+            yield PossibleQuote(
                 quote['priority', '0'],
                 poss_quotes,
-                )
+            )
 
 
 def add_quote(quote, targetname, quote_loc, use_dings=False):
@@ -269,23 +271,24 @@ def add_quote(quote, targetname, quote_loc, use_dings=False):
             ))
 
 
-def sort_func(quote):
+def sort_func(quote: PossibleQuote):
     """The quotes will be sorted by their priority value."""
     # We use Decimal so it will adjust to whatever precision a user sets,
     # Without floating-point error.
     try:
-        return Decimal(quote[0])
+        return Decimal(quote.priority)
     except ValueError:
         # Default to priority 0
-        return Decimal()
+        return Decimal(0)
 
 
 def add_voice(
-        has_items,
-        style_vars_,
-        vmf_file,
-        map_seed,
-        ):
+        has_items: dict,
+        style_vars_: dict,
+        vmf_file: vmfLib.VMF,
+        map_seed: str,
+        use_priority=True,
+):
     """Add a voice line to the map."""
     global ALLOW_MID_VOICES, VMF, map_attr, style_vars
     LOGGER.info('Adding Voice Lines!')
@@ -399,17 +402,25 @@ def add_voice(
 
             choreo_loc = group['choreo_loc', quote_loc]
 
-            chosen = possible_quotes[0][1]
+            if use_priority:
+                chosen = possible_quotes[0].lines
+            else:
+                # Chose one of the quote blocks..
+                random.seed('{}-VOICE_QUOTE_{}'.format(
+                    map_seed,
+                    len(possible_quotes),
+                ))
+                chosen = random.choice(possible_quotes).lines
 
-            LOGGER.info('Chosen: {}', '\n'.join(map(repr, chosen)))
-
-            # Join the IDs for the voice lines to the map seed,
+            # Join the IDs for
+            # the voice lines to the map seed,
             # so each quote block will chose different lines.
-            random.seed(map_seed + '-VOICE_' + '|'.join(
+            random.seed(map_seed + '-VOICE_LINE_' + '|'.join(
                 prop['id', 'ID']
                 for prop in
                 chosen
             ))
+
             # Add one of the associated quotes
             add_quote(
                 random.choice(chosen),
