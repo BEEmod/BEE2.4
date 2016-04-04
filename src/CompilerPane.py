@@ -296,15 +296,6 @@ def set_screenshot(img=None):
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def set_screenshot_cleanup():
-    COMPILE_CFG['Screenshot']['del_old'] = str(cleanup_screenshot.get())
-
-
-def set_elev_type():
-    COMPILE_CFG['General']['spawn_elev'] = str(start_in_elev.get())
-    COMPILE_CFG.save()
-
-
 def set_model(_=None):
     """Save the selected player model."""
     text = player_model_var.get()
@@ -326,10 +317,14 @@ def set_corr_dropdown(corr_name, widget):
     widget['values'] = CORRIDOR[corr_name]
 
 
-def set_vrad_type():
-    """Set the compile type override for VRAD."""
-    COMPILE_CFG['General']['vrad_force_full'] = str(vrad_light_type.get())
-    COMPILE_CFG.save()
+def make_setter(section, config, variable):
+    """Create a callback which sets the given config from a variable."""
+
+    def callback():
+        COMPILE_CFG[section][config] = str(variable.get())
+        COMPILE_CFG.save_check()
+
+    return callback
 
 
 def make_pane(tool_frame):
@@ -396,7 +391,7 @@ def make_pane(tool_frame):
         thumb_frame,
         text='Cleanup old screenshots',
         variable=cleanup_screenshot,
-        command=set_screenshot_cleanup,
+        command=make_setter('Screenshot', 'del_old', cleanup_screenshot),
     )
 
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
@@ -453,7 +448,7 @@ def make_pane(tool_frame):
         text='Fast',
         value=0,
         variable=vrad_light_type,
-        command=set_vrad_type,
+        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_fast'].grid(row=0, column=0)
     UI['light_full'] = ttk.Radiobutton(
@@ -461,7 +456,7 @@ def make_pane(tool_frame):
         text='Full',
         value=1,
         variable=vrad_light_type,
-        command=set_vrad_type,
+        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_full'].grid(row=0, column=1)
 
@@ -494,7 +489,7 @@ def make_pane(tool_frame):
         text='Entry Door',
         value=0,
         variable=start_in_elev,
-        command=set_elev_type,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_elevator'] = ttk.Radiobutton(
@@ -502,7 +497,7 @@ def make_pane(tool_frame):
         text='Elevator',
         value=1,
         variable=start_in_elev,
-        command=set_elev_type,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
