@@ -278,7 +278,7 @@ def resolve(path, silent=False) -> List[str]:
 
 
 # Cache the return values, since they're constant.
-@lru_cache()
+@lru_cache(maxsize=256)
 def _resolve(path):
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
@@ -375,6 +375,10 @@ def _resolve(path):
             return []
     else:  # Just a normal path
         return [path.casefold()]
+
+# Copy over the lru_cache() functions to make them easily acessable.
+resolve.cache_info = _resolve.cache_info
+resolve.cache_clear = _resolve.cache_clear
 
 
 def get_cust_inst(item_id: str, inst: str) -> Optional[str]:

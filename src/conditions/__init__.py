@@ -487,6 +487,7 @@ def check_all():
         vbsp.settings['has_attr'].items()
         if value
     ])
+    LOGGER.info('instanceLocs cache: {}', resolve_inst.cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
