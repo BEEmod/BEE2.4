@@ -478,7 +478,6 @@ def check_all():
                 # this condition, and skip to the next condtion.
                 break
             if not condition.results and not condition.else_results:
-                LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
     import vbsp
@@ -1294,7 +1293,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...
-            Vec(normal.x, normal.y, -normal.z).to_angle(),
+            normal.to_angle(),
             force_type=TEMP_TYPES.world,
         ).world
 
