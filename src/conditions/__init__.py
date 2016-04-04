@@ -492,11 +492,12 @@ def check_all():
 
 
 def check_flag(flag, inst):
-    # print('Checking {type} ({val!s} on {inst}'.format(
-    #     type=flag.real_name,
-    #     val=flag.value,
-    #     inst=inst['file'],
-    # ))
+    LOGGER.debug(
+        'Checking {} ({!s}) on {}',
+        flag.real_name,
+        flag.value,
+        inst['file'],
+    )
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
