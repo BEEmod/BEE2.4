@@ -24,12 +24,13 @@ COMPILE_DEFAULTS = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
-        },
+    },
     'General': {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        },
+        'use_voice_priority': '0',
+    },
     'Corridor': {
         'sp_entry': '1',
         'sp_exit': '1',
@@ -44,8 +45,8 @@ COMPILE_DEFAULTS = {
         'max_brush': '8192',
         'max_overlay': '512',
         'max_entity': '2048',
-        },
-    }
+    },
+}
 
 PLAYER_MODELS = {
     'ATLAS': 'ATLAS',
@@ -68,11 +69,11 @@ tk_screenshot = None  # The preview image shown
 
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = os.path.abspath(os.path.join(
-        os.getcwd(),
-        '..',
-        'config',
-        'screenshot.jpg'
-    ))
+    os.getcwd(),
+    '..',
+    'config',
+    'screenshot.jpg'
+))
 
 player_model_var = StringVar(
     value=PLAYER_MODELS.get(
