@@ -287,7 +287,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile: ZipFile, filename):
+def pack_file(zipfile: ZipFile, filename: str):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -295,6 +295,27 @@ def pack_file(zipfile: ZipFile, filename):
         filename, arcname = filename.split('\t')
     else:
         arcname = filename
+
+    if filename[-1] == '*':
+        # Pack a whole folder (blah/blah/*)
+        directory = filename[:-1]
+        file_count = 0
+        for poss_path in RES_ROOT:
+            dir_path = os.path.normpath(
+                os.path.join(poss_path, directory)
+            )
+            if not os.path.isdir(dir_path):
+                continue
+            for subfile in os.listdir(dir_path):
+                full_path = os.path.join(dir_path, subfile)
+                rel_path = os.path.join(directory, subfile)
+                zipfile.write(
+                    filename=full_path,
+                    arcname=rel_path,
+                )
+                file_count += 1
+        LOGGER.info('Packed {} files from folder "{}"', file_count, directory)
+        return
 
     for poss_path in RES_ROOT:
         full_path = os.path.normpath(
@@ -347,7 +368,7 @@ def gen_sound_manifest(additional, excludes):
     for script in excludes:
         try:
             scripts.remove(script)
-        except IndexError:
+        except ValueError:
             LOGGER.warning(
                 '"{}" should be excluded, but it\'s'
                 ' not in the manifest already!',
