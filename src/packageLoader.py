@@ -4,6 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 import operator
 from zipfile import ZipFile
 from collections import defaultdict, namedtuple
+from contextlib import ExitStack
 import os
 import os.path
 import shutil
@@ -208,7 +209,7 @@ def get_config(
         raise
 
 
-def find_packages(pak_dir, zips, zip_name_lst):
+def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
@@ -216,8 +217,12 @@ def find_packages(pak_dir, zips, zip_name_lst):
         is_dir = os.path.isdir(name)
         if name.endswith('.zip') and os.path.isfile(name):
             zip_file = ZipFile(name)
+            # Ensure we quit close this zipfile..
+            zip_stack.enter_context(zip_file)
         elif is_dir:
             zip_file = FakeZip(name)
+            # FakeZips don't actually hold a file handle, we don't need to
+            # close them.
         else:
             LOGGER.info('Extra file: {}', name)
             continue
@@ -231,8 +236,9 @@ def find_packages(pak_dir, zips, zip_name_lst):
             if is_dir:
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name, zips, zip_name_lst)
+                find_packages(name, zips, zip_stack, zip_name_lst)
             else:
+                # Invalid, explicitly close this zipfile handle..
                 zip_file.close()
                 LOGGER.warning('ERROR: Bad package "{}"!', name)
         else:
@@ -289,8 +295,10 @@ def load_packages(
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
     zips = []
     data['zips'] = []
-    try:
-        find_packages(pak_dir, zips, data['zips'])
+
+    # Use ExitStack to dynamically manage the zipfiles we find and open.
+    with ExitStack() as zip_stack:
+        find_packages(pak_dir, zips, zip_stack, data['zips'])
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
@@ -385,11 +393,6 @@ def load_packages(
                     with open(dest_loc, mode='wb') as dest:
                         shutil.copyfileobj(src, dest)
                 loader.step("IMG_EX")
-
-    finally:
-        # close them all, we've already read the contents.
-        for z in zips:
-            z.close()
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
