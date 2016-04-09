@@ -22,6 +22,8 @@ import sound
 import utils
 import tk_tools
 
+from typing import Callable
+
 LOGGER = utils.getLogger(__name__)
 
 ICON_SIZE = 96  # Size of the selector win icons
@@ -45,9 +47,6 @@ BTN_PLAY = '▶'
 BTN_STOP = '■'
 
 
-def _NO_OP(*args):
-    """The default callback, triggered whenever the chosen item is changed."""
-    pass
 
 
 class AttrTypes(Enum):
@@ -309,10 +308,10 @@ class selWin:
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
             desc='',
-            callback=_NO_OP,
+            callback: Callable[..., None]=None,
             callback_params=(),
             attributes=(),
-            ):
+    ):
         """Create a window object.
 
         Read from .selected_id to get the currently-chosen Item name, or None
@@ -365,8 +364,12 @@ class selWin:
         self.chosen_id = None
 
         # Callback function, and positional arugments to pass
-        self.callback = callback
-        self.callback_params = list(callback_params)
+        if callback is not None:
+            self.callback = callback
+            self.callback_params = list(callback_params)
+        else:
+            self.callback = None
+            self.callback_params = ()
 
         # Item object for the currently suggested item.
         self.suggested = None
@@ -877,7 +880,8 @@ class selWin:
 
     def do_callback(self):
         """Call the callback function."""
-        self.callback(self.chosen_id, *self.callback_params)
+        if self.callback is not None:
+            self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item_id(self, it_id):
         """Select the item with the given ID."""
