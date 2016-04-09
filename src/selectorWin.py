@@ -363,13 +363,27 @@ class selWin:
             attributes=dict(none_attrs),
         )
         self.noneItem.icon = img.png('BEE2/none_96')
+
+        # The textbox on the parent window.
+        self.display = None  # type: tk_tools.ReadOnlyEntry
+
+        # Variable associated with self.display.
         self.disp_label = StringVar()
-        self.display = None
-        self.disp_btn = None
+
+        # The '...' button to open our window.
+        self.disp_btn = None  # type: ttk.Button
+
+        # ID of the currently chosen item
         self.chosen_id = None
+
+        # Callback function, and positional arugments to pass
         self.callback = callback
-        self.callback_params = callback_params
+        self.callback_params = list(callback_params)
+
+        # Item object for the currently suggested item.
         self.suggested = None
+
+        # Should we have the 'reset to default' button?
         self.has_def = has_def
         self.description = desc
 
