@@ -968,6 +968,7 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+        self.scroll_to(item)
 
         if self.sampler:
             is_playing = self.sampler.is_playing
@@ -1207,6 +1208,29 @@ class selWin:
             y_off,
         )
         self.pal_frame['height'] = y_off
+
+    def scroll_to(self, item: Item):
+        """Scroll to an item so it's visible."""
+        canvas = self.wid_canvas
+
+        height = canvas.bbox(ALL)[3]  # Returns (x, y, width, height)
+
+        bottom, top = canvas.yview()
+        # The sizes are returned in fractions, but we use the pixel values
+        # for accuracy
+        bottom *= height
+        top *= height
+
+        y = item.button.winfo_y()
+
+        if bottom <= y - 8 and y + ICON_SIZE + 8 <= top:
+            return  # Already in view
+
+        # Center in the view
+        canvas.yview_moveto(
+            (y - (top - bottom) // 2)
+            / height
+        )
 
     def __contains__(self, obj):
         """Determine if the given SelWinItem or item ID is in this item list."""
