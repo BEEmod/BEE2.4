@@ -423,6 +423,11 @@ class selWin:
         # A map from folded name -> display name
         self.group_names = {}
         self.grouped_items = defaultdict(list)
+        # A list of folded group names in the display order.
+        self.group_order = []
+
+        # The maximum number of items that fits per row (set in flow_items)
+        self.item_width = 1
 
         if desc:
             self.desc_label = ttk.Label(
@@ -687,6 +692,10 @@ class selWin:
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
 
+        # Figure out the order for the groups - alphabetical.
+        # Note - empty string should sort to the beginning!
+        self.group_order[:] = sorted(self.grouped_items.keys())
+
         for index, (key, menu) in enumerate(
                 sorted(self.context_menus.items(), key=itemgetter(0)),
                 # We start with the ungrouped items, so increase the index
@@ -922,6 +931,7 @@ class selWin:
             return False
 
     def sel_item(self, item: Item, _=None):
+
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -999,17 +1009,15 @@ class selWin:
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero
+        self.item_width = width
 
         # The offset for the current group
         y_off = 0
 
-        # Note - empty string should sort to the beginning!
-        ordered_groups = sorted(self.grouped_items.keys())
-
         # Hide suggestion indicator if the item's not visible.
         self.sugg_lbl.place_forget()
 
-        for group_key in ordered_groups:
+        for group_key in self.group_order:
             items = self.grouped_items[group_key]
             group_wid = self.group_widgets[group_key]  # type: GroupHeader
             group_wid.place(
@@ -1034,7 +1042,7 @@ class selWin:
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
                     self.sugg_lbl['width'] = item.button.winfo_width()
-                item.button.place(
+                item.set_pos(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
