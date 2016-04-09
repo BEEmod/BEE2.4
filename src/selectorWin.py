@@ -260,20 +260,8 @@ class Item:
         self.button = None  # type: ttk.Button
         self.win = None  # type: Toplevel
 
-    def __repr__(self):
-        return (
-            'Item({nm!r}, {shname!r}, {lname!r}, '
-            '{ico!r}, {auth!r}, {desc!r})'.format(
-                nm=self.name,
-                shname=self.shortName,
-                lname=self.longName,
-                ico=self.ico_file,
-                auth=self.authors,
-                desc=self.desc,
-            )
-        )
 
-    def __str__(self):
+    def __repr__(self):
         return '<Item:' + self.name + '>'
 
     @classmethod
