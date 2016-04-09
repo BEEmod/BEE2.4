@@ -5,7 +5,7 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from tkinter import *  # ui library
-from tkinter import font
+from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
 
@@ -66,7 +66,7 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
             desc='',
             default=None,
             type=AttrTypes.STRING,
-            ):
+        ):
         # Set some reasonable defaults for the different types
         if default is None:
             if type is AttrTypes.STRING:
@@ -82,20 +82,22 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
         if desc != '' and not desc.endswith(': '):
             desc += ': '
 
-        return super().__new__(cls, id, type, desc, default)
+        sup = super()  # type: tuple
+        return sup.__new__(cls, id, type, desc, default)
 
-    for name in AttrTypes.__members__.keys():
+    _member_name = None
+    for _member_name in AttrTypes.__members__.keys():
         # Create a constructor for each AttrType, which presets the type
         # parameter.
-        exec("""\
+        exec('''\
 @classmethod
 def {l_name}(cls, id: str, desc='', default=None):
-    \"""An alternative constructor to create {l_name}-type attrs.\"""
-    return AttrDef(id, desc, default, AttrTypes.{name})""".format(
-            name=name,
-            l_name=name.lower()
+    """An alternative constructor to create {l_name}-type attrs."""
+    return AttrDef(id, desc, default, AttrTypes.{name})'''.format(
+            name=_member_name,
+            l_name=_member_name.lower()
         ), globals(), locals())
-
+    del _member_name
 
 SelitemData = namedtuple(
     'SelitemData',
@@ -181,7 +183,6 @@ class GroupHeader(ttk.Frame):
         )
 
 
-
 class Item:
     """An item on the panel.
 
@@ -216,7 +217,7 @@ class Item:
         'context_lbl',
         'ico_file',
         'attrs',
-        ]
+    ]
 
     def __init__(
             self,
@@ -229,7 +230,7 @@ class Item:
             group: str=None,
             attributes: dict=None,
             snd_sample: str=None,
-            ):
+    ):
         self.name = name
         self.shortName = short_name
         self.group = group
@@ -468,7 +469,7 @@ class selWin:
             relief='raised',
             width=ICON_SIZE,
             height=ICON_SIZE,
-            )
+        )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm)
@@ -483,7 +484,7 @@ class selWin:
             text="Item",
             justify=CENTER,
             font=("Helvetica", 12, "bold"),
-            )
+        )
         name_frame.grid(row=1, column=0, columnspan=4)
         name_frame.columnconfigure(0, weight=1)
         self.prop_name.grid(row=0, column=0)
@@ -531,20 +532,20 @@ class selWin:
             width=40,
             height=4,
             font="TkSmallCaptionFont",
-            )
+        )
         self.prop_desc.grid(
             row=0,
             column=0,
             padx=(2, 0),
             pady=2,
             sticky='NSEW',
-            )
+        )
 
         self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
             orient=VERTICAL,
             command=self.prop_desc.yview,
-            )
+        )
         self.prop_scroll.grid(
             row=0,
             column=1,
@@ -558,46 +559,46 @@ class selWin:
             self.prop_frm,
             text="OK",
             command=self.save,
-            ).grid(
-                row=6,
-                column=0,
-                padx=(8, 8),
-                )
+        ).grid(
+            row=6,
+            column=0,
+            padx=(8, 8),
+            )
 
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
                 text="Reset to Default",
                 command=self.sel_suggested,
-                )
+            )
             self.prop_reset.grid(
                 row=6,
                 column=1,
                 sticky='EW',
-                )
+            )
 
         ttk.Button(
             self.prop_frm,
             text="Cancel",
             command=self.exit,
-            ).grid(
-                row=6,
-                column=2,
-                padx=(8, 8),
-                )
+        ).grid(
+            row=6,
+            column=2,
+            padx=(8, 8),
+        )
 
         self.win.option_add('*tearOff', False)
         self.context_menu = Menu(self.win)
 
-        self.norm_font = font.nametofont('TkMenuFont')
+        self.norm_font = tk_font.nametofont('TkMenuFont')
 
         # Make a font for showing suggested items in the context menu
         self.sugg_font = self.norm_font.copy()
-        self.sugg_font['weight'] = font.BOLD
+        self.sugg_font['weight'] = tk_font.BOLD
 
         # Make a font for previewing the suggested item
         self.mouseover_font = self.norm_font.copy()
-        self.mouseover_font['slant'] = font.ITALIC
+        self.mouseover_font['slant'] = tk_font.ITALIC
         self.context_var = IntVar()
 
         # The headers for the context menu
@@ -611,7 +612,7 @@ class selWin:
                 item.button = ttk.Button(
                     self.pal_frame,
                     image=item.icon,
-                    )
+                )
                 item.context_lbl = '<None>'
             else:
                 item.button = ttk.Button(
@@ -619,7 +620,7 @@ class selWin:
                     text=item.shortName,
                     image=item.icon,
                     compound='top',
-                    )
+                )
 
             group_key = item.group.casefold() if item.group else ''
             self.grouped_items[group_key].append(item)
@@ -732,12 +733,12 @@ class selWin:
                 # Position in a 2-wide grid
                 desc_label.grid(
                     row=index // 2,
-                    column=(index % 2)*2,
+                    column=(index % 2) * 2,
                     sticky=E,
                 )
                 val_label.grid(
                     row=index // 2,
-                    column=(index % 2)*2 + 1,
+                    column=(index % 2) * 2 + 1,
                     sticky=W,
                 )
         else:
@@ -1108,8 +1109,8 @@ if __name__ == '__main__':  # test the window if directly executing this file
             authors=["Valve"],
             desc=[
                 ('line', 'Pure black darkness. Nothing to see here.'),
-                ],
-            ),
+            ],
+        ),
         Item(
             "SKY_BTS",
             "BTS",
@@ -1125,9 +1126,9 @@ if __name__ == '__main__':  # test the window if directly executing this file
                 ('line', 'Abandoned offices can often be found here.'),
                 ('bullet', 'This is a bullet point, with a\n second line'),
                 ('invert', 'white-on-black text')
-                ],
-            ),
-        ]
+            ],
+        ),
+    ]
 
     window = selWin(
         TK_ROOT,
