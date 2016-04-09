@@ -47,6 +47,25 @@ BTN_PLAY = '▶'
 BTN_STOP = '■'
 
 
+class NAV_KEYS(Enum):
+    """Enum representing keys used for shifting through items.
+
+    The value is the TK key-sym value.
+    """
+    UP = 'Up'
+    DOWN = 'Down'
+    LEFT = 'Left'
+    RIGHT = 'Right'
+
+    DN = DOWN
+    LF = LEFT
+    RT = RIGHT
+
+    PG_UP = 'Prior'
+    PG_DOWN = 'Next'
+
+    HOME = 'Home'
+    END = 'End'
 
 
 class AttrTypes(Enum):
@@ -417,6 +436,9 @@ class selWin:
         # on the keyboard.
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
+
+        # Allow navigating with arrow keys.
+        self.win.bind("<KeyPress>", self.key_navigate)
 
         # A map from group name -> header widget
         self.group_widgets = {}
@@ -994,6 +1016,134 @@ class selWin:
                     raise ValueError(
                         'Invalid attribute type: "{}"'.format(label.type)
                     )
+
+    def key_navigate(self, event):
+        """Navigate using arrow keys.
+
+        Allowed keys are set in NAV_KEYS
+        """
+        try:
+            key = NAV_KEYS(event.keysym)
+        except (ValueError, AttributeError):
+            LOGGER.warning(
+                'Invalid nav-key in event: {}',
+                event.__dict__
+            )
+            return
+
+        # A list of groups names, in the order that they're visible onscreen
+        # (skipping hidden ones).
+        ordered_groups = [
+            group_name
+            for group_name in self.group_order
+            if self.group_widgets[group_name].visible
+        ]
+
+        if not ordered_groups:
+            return  # No visible items!
+
+        if key is NAV_KEYS.HOME:
+            self._offset_select(
+                ordered_groups,
+                group_ind=-1,
+                item_ind=0,
+            )
+            return
+        elif key is NAV_KEYS.END:
+            self._offset_select(
+                ordered_groups,
+                group_ind=len(ordered_groups),
+                item_ind=0,
+            )
+            return
+
+        cur_group_name = self.selected.group.casefold()
+        cur_group = self.grouped_items[cur_group_name]
+
+        # The index in the current group for an item
+        item_ind = cur_group.index(self.selected)
+        # The index in the visible groups
+        group_ind = ordered_groups.index(cur_group_name)
+
+        if key is NAV_KEYS.LF:
+            item_ind -= 1
+        elif key is NAV_KEYS.RT:
+            item_ind += 1
+        elif key is NAV_KEYS.UP:
+            item_ind -= self.item_width
+        elif key is NAV_KEYS.DN:
+            item_ind += self.item_width
+
+        self._offset_select(
+            ordered_groups,
+            group_ind,
+            item_ind,
+            key is NAV_KEYS.UP or key is NAV_KEYS.DN,
+        )
+
+    def _offset_select(self, group_list, group_ind, item_ind, is_vert=False):
+        """Helper for key_navigate(), jump to the given index in a group.
+
+        group_list is sorted list of group names.
+        group_ind is the index of the current group, and item_ind is the index
+        in that group to move to.
+        If the index is above or below, it will jump to neighbouring groups.
+        """
+        if group_ind < 0:  # Jump to the first item, out of bounds
+            first_group = self.grouped_items[self.group_order[0]]
+            self.sel_item(first_group[0])
+            return
+        elif group_ind >= len(group_list):  # Ditto, last group
+            last_group = self.grouped_items[self.group_order[-1]]
+            self.sel_item(last_group[-1])
+            return
+
+        cur_group = self.grouped_items[group_list[group_ind]]
+
+        # Go back a group..
+        if item_ind < 0:
+            if group_ind == 0:  # First group - can't go back further!
+                self.sel_item(cur_group[0])
+            else:
+                prev_group = self.grouped_items[group_list[group_ind - 1]]
+                if is_vert:
+                    # Jump to the same horizontal position..
+                    row_num = math.ceil(len(prev_group) / self.item_width)
+                    item_ind += row_num * self.item_width
+                    if item_ind >= len(prev_group):
+                        # The last row is missing an item at this spot.
+                        # Jump back another row again.
+                        item_ind -= self.item_width
+                else:
+                    item_ind += len(prev_group)
+                # Recurse to check the previous group..
+                self._offset_select(
+                    group_list,
+                    group_ind - 1,
+                    item_ind,
+                )
+
+        # Go forward a group..
+        elif item_ind >= len(cur_group):
+            #  Last group - can't go forward further!
+            if group_ind == len(group_list):
+                self.sel_item(cur_group[-1])
+            else:
+                # Recurse to check the next group..
+                if is_vert:
+                    # We just jump to the same horizontal position.
+                    item_ind %= self.item_width
+                else:
+                    item_ind -= len(cur_group)
+
+                self._offset_select(
+                    group_list,
+                    group_ind + 1,
+                    item_ind,
+                )
+
+        else:  # Within this group
+            self.sel_item(cur_group[item_ind])
 
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
