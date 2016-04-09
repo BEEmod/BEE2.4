@@ -382,7 +382,7 @@ class selWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]
+        self.selected = self.item_list[0]  # type: Item
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -391,8 +391,14 @@ class selWin:
         self.win.withdraw()
         self.win.title("BEE2 - " + title)
         self.win.transient(master=tk)
+
+        # Allow resizing in X and Y.
         self.win.resizable(True, True)
+
         self.win.iconbitmap('../BEE2.ico')
+
+        # Run our quit command when the exit button is pressed, or Escape
+        # on the keyboard.
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
 
