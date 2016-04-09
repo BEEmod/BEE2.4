@@ -233,7 +233,7 @@ class Item:
     ):
         self.name = name
         self.shortName = short_name
-        self.group = group
+        self.group = group or ''
         self.longName = long_name or short_name
         if len(self.longName) > 20:
             self.context_lbl = self.shortName
@@ -636,7 +636,7 @@ class selWin:
                     compound='top',
                 )
 
-            group_key = item.group.casefold() if item.group else ''
+            group_key = item.group.casefold()
             self.grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
