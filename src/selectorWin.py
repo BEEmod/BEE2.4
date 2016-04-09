@@ -216,6 +216,8 @@ class Item:
         'context_lbl',
         'ico_file',
         'attrs',
+        'win_x',
+        'win_y',
     ]
 
     def __init__(
@@ -259,6 +261,8 @@ class Item:
         self.button = None  # type: ttk.Button
         self.win = None  # type: Toplevel
 
+        self.win_x = None  # type: int
+        self.win_y = None  # type: int
 
     def __repr__(self):
         return '<Item:' + self.name + '>'
@@ -276,6 +280,18 @@ class Item:
             group=data.group,
             attributes=attrs
         )
+
+    def set_pos(self, x=None, y=None):
+        """Place the item on the palette."""
+        if x is None or y is None:
+            # Remove from the window.
+            self.button.place_forget()
+            self.win_x = self.win_y = None
+        else:
+            self.button.place(x=x, y=y)
+            self.button.lift()  # Force a particular stacking order for widgets
+            self.win_x = x
+            self.win_y = y
 
 
 class selWin:
@@ -1007,7 +1023,7 @@ class selWin:
             if not group_wid.visible:
                 # Hide everything!
                 for item in items:  # type: Item
-                    item.button.place_forget()
+                    item.set_pos()
                 continue
 
             # Place each item
@@ -1022,7 +1038,6 @@ class selWin:
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                item.button.lift()
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
