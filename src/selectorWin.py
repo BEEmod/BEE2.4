@@ -22,6 +22,8 @@ import sound
 import utils
 import tk_tools
 
+from typing import Callable
+
 LOGGER = utils.getLogger(__name__)
 
 ICON_SIZE = 96  # Size of the selector win icons
@@ -45,9 +47,25 @@ BTN_PLAY = '▶'
 BTN_STOP = '■'
 
 
-def _NO_OP(*args):
-    """The default callback, triggered whenever the chosen item is changed."""
-    pass
+class NAV_KEYS(Enum):
+    """Enum representing keys used for shifting through items.
+
+    The value is the TK key-sym value.
+    """
+    UP = 'Up'
+    DOWN = 'Down'
+    LEFT = 'Left'
+    RIGHT = 'Right'
+
+    DN = DOWN
+    LF = LEFT
+    RT = RIGHT
+
+    PG_UP = 'Prior'
+    PG_DOWN = 'Next'
+
+    HOME = 'Home'
+    END = 'End'
 
 
 class AttrTypes(Enum):
@@ -217,6 +235,8 @@ class Item:
         'context_lbl',
         'ico_file',
         'attrs',
+        'win_x',
+        'win_y',
     ]
 
     def __init__(
@@ -260,6 +280,8 @@ class Item:
         self.button = None  # type: ttk.Button
         self.win = None  # type: Toplevel
 
+        self.win_x = None  # type: int
+        self.win_y = None  # type: int
 
     def __repr__(self):
         return '<Item:' + self.name + '>'
@@ -277,6 +299,18 @@ class Item:
             group=data.group,
             attributes=attrs
         )
+
+    def set_pos(self, x=None, y=None):
+        """Place the item on the palette."""
+        if x is None or y is None:
+            # Remove from the window.
+            self.button.place_forget()
+            self.win_x = self.win_y = None
+        else:
+            self.button.place(x=x, y=y)
+            self.button.lift()  # Force a particular stacking order for widgets
+            self.win_x = x
+            self.win_y = y
 
 
 class selWin:
@@ -309,10 +343,10 @@ class selWin:
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
             desc='',
-            callback=_NO_OP,
+            callback: Callable[..., None]=None,
             callback_params=(),
             attributes=(),
-            ):
+    ):
         """Create a window object.
 
         Read from .selected_id to get the currently-chosen Item name, or None
@@ -365,8 +399,12 @@ class selWin:
         self.chosen_id = None
 
         # Callback function, and positional arugments to pass
-        self.callback = callback
-        self.callback_params = list(callback_params)
+        if callback is not None:
+            self.callback = callback
+            self.callback_params = list(callback_params)
+        else:
+            self.callback = None
+            self.callback_params = ()
 
         # Item object for the currently suggested item.
         self.suggested = None
@@ -379,7 +417,7 @@ class selWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]
+        self.selected = self.item_list[0]  # type: Item
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -388,16 +426,30 @@ class selWin:
         self.win.withdraw()
         self.win.title("BEE2 - " + title)
         self.win.transient(master=tk)
+
+        # Allow resizing in X and Y.
         self.win.resizable(True, True)
+
         self.win.iconbitmap('../BEE2.ico')
+
+        # Run our quit command when the exit button is pressed, or Escape
+        # on the keyboard.
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
+
+        # Allow navigating with arrow keys.
+        self.win.bind("<KeyPress>", self.key_navigate)
 
         # A map from group name -> header widget
         self.group_widgets = {}
         # A map from folded name -> display name
         self.group_names = {}
         self.grouped_items = defaultdict(list)
+        # A list of folded group names in the display order.
+        self.group_order = []
+
+        # The maximum number of items that fits per row (set in flow_items)
+        self.item_width = 1
 
         if desc:
             self.desc_label = ttk.Label(
@@ -662,6 +714,10 @@ class selWin:
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
 
+        # Figure out the order for the groups - alphabetical.
+        # Note - empty string should sort to the beginning!
+        self.group_order[:] = sorted(self.grouped_items.keys())
+
         for index, (key, menu) in enumerate(
                 sorted(self.context_menus.items(), key=itemgetter(0)),
                 # We start with the ungrouped items, so increase the index
@@ -877,7 +933,8 @@ class selWin:
 
     def do_callback(self):
         """Call the callback function."""
-        self.callback(self.chosen_id, *self.callback_params)
+        if self.callback is not None:
+            self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item_id(self, it_id):
         """Select the item with the given ID."""
@@ -896,6 +953,7 @@ class selWin:
             return False
 
     def sel_item(self, item: Item, _=None):
+
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -910,6 +968,7 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+        self.scroll_to(item)
 
         if self.sampler:
             is_playing = self.sampler.is_playing
@@ -959,6 +1018,134 @@ class selWin:
                         'Invalid attribute type: "{}"'.format(label.type)
                     )
 
+    def key_navigate(self, event):
+        """Navigate using arrow keys.
+
+        Allowed keys are set in NAV_KEYS
+        """
+        try:
+            key = NAV_KEYS(event.keysym)
+        except (ValueError, AttributeError):
+            LOGGER.warning(
+                'Invalid nav-key in event: {}',
+                event.__dict__
+            )
+            return
+
+        # A list of groups names, in the order that they're visible onscreen
+        # (skipping hidden ones).
+        ordered_groups = [
+            group_name
+            for group_name in self.group_order
+            if self.group_widgets[group_name].visible
+        ]
+
+        if not ordered_groups:
+            return  # No visible items!
+
+        if key is NAV_KEYS.HOME:
+            self._offset_select(
+                ordered_groups,
+                group_ind=-1,
+                item_ind=0,
+            )
+            return
+        elif key is NAV_KEYS.END:
+            self._offset_select(
+                ordered_groups,
+                group_ind=len(ordered_groups),
+                item_ind=0,
+            )
+            return
+
+        cur_group_name = self.selected.group.casefold()
+        cur_group = self.grouped_items[cur_group_name]
+
+        # The index in the current group for an item
+        item_ind = cur_group.index(self.selected)
+        # The index in the visible groups
+        group_ind = ordered_groups.index(cur_group_name)
+
+        if key is NAV_KEYS.LF:
+            item_ind -= 1
+        elif key is NAV_KEYS.RT:
+            item_ind += 1
+        elif key is NAV_KEYS.UP:
+            item_ind -= self.item_width
+        elif key is NAV_KEYS.DN:
+            item_ind += self.item_width
+
+        self._offset_select(
+            ordered_groups,
+            group_ind,
+            item_ind,
+            key is NAV_KEYS.UP or key is NAV_KEYS.DN,
+        )
+
+    def _offset_select(self, group_list, group_ind, item_ind, is_vert=False):
+        """Helper for key_navigate(), jump to the given index in a group.
+
+        group_list is sorted list of group names.
+        group_ind is the index of the current group, and item_ind is the index
+        in that group to move to.
+        If the index is above or below, it will jump to neighbouring groups.
+        """
+        if group_ind < 0:  # Jump to the first item, out of bounds
+            first_group = self.grouped_items[self.group_order[0]]
+            self.sel_item(first_group[0])
+            return
+        elif group_ind >= len(group_list):  # Ditto, last group
+            last_group = self.grouped_items[self.group_order[-1]]
+            self.sel_item(last_group[-1])
+            return
+
+        cur_group = self.grouped_items[group_list[group_ind]]
+
+        # Go back a group..
+        if item_ind < 0:
+            if group_ind == 0:  # First group - can't go back further!
+                self.sel_item(cur_group[0])
+            else:
+                prev_group = self.grouped_items[group_list[group_ind - 1]]
+                if is_vert:
+                    # Jump to the same horizontal position..
+                    row_num = math.ceil(len(prev_group) / self.item_width)
+                    item_ind += row_num * self.item_width
+                    if item_ind >= len(prev_group):
+                        # The last row is missing an item at this spot.
+                        # Jump back another row again.
+                        item_ind -= self.item_width
+                else:
+                    item_ind += len(prev_group)
+                # Recurse to check the previous group..
+                self._offset_select(
+                    group_list,
+                    group_ind - 1,
+                    item_ind,
+                )
+
+        # Go forward a group..
+        elif item_ind >= len(cur_group):
+            #  Last group - can't go forward further!
+            if group_ind == len(group_list):
+                self.sel_item(cur_group[-1])
+            else:
+                # Recurse to check the next group..
+                if is_vert:
+                    # We just jump to the same horizontal position.
+                    item_ind %= self.item_width
+                else:
+                    item_ind -= len(cur_group)
+
+                self._offset_select(
+                    group_list,
+                    group_ind + 1,
+                    item_ind,
+                )
+
+        else:  # Within this group
+            self.sel_item(cur_group[item_ind])
+
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
 
@@ -973,17 +1160,15 @@ class selWin:
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero
+        self.item_width = width
 
         # The offset for the current group
         y_off = 0
 
-        # Note - empty string should sort to the beginning!
-        ordered_groups = sorted(self.grouped_items.keys())
-
         # Hide suggestion indicator if the item's not visible.
         self.sugg_lbl.place_forget()
 
-        for group_key in ordered_groups:
+        for group_key in self.group_order:
             items = self.grouped_items[group_key]
             group_wid = self.group_widgets[group_key]  # type: GroupHeader
             group_wid.place(
@@ -997,7 +1182,7 @@ class selWin:
             if not group_wid.visible:
                 # Hide everything!
                 for item in items:  # type: Item
-                    item.button.place_forget()
+                    item.set_pos()
                 continue
 
             # Place each item
@@ -1008,11 +1193,10 @@ class selWin:
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
                     self.sugg_lbl['width'] = item.button.winfo_width()
-                item.button.place(
+                item.set_pos(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                item.button.lift()
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1024,6 +1208,29 @@ class selWin:
             y_off,
         )
         self.pal_frame['height'] = y_off
+
+    def scroll_to(self, item: Item):
+        """Scroll to an item so it's visible."""
+        canvas = self.wid_canvas
+
+        height = canvas.bbox(ALL)[3]  # Returns (x, y, width, height)
+
+        bottom, top = canvas.yview()
+        # The sizes are returned in fractions, but we use the pixel values
+        # for accuracy
+        bottom *= height
+        top *= height
+
+        y = item.button.winfo_y()
+
+        if bottom <= y - 8 and y + ICON_SIZE + 8 <= top:
+            return  # Already in view
+
+        # Center in the view
+        canvas.yview_moveto(
+            (y - (top - bottom) // 2)
+            / height
+        )
 
     def __contains__(self, obj):
         """Determine if the given SelWinItem or item ID is in this item list."""
