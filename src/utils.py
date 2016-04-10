@@ -956,7 +956,7 @@ class Vec:
 
         Used for Vec.rotate().
         """
-        [a, b, c], [d, e, f], [g, h, i] = matrix
+        a, b, c, d, e, f, g, h, i = matrix
         x, y, z = self.x, self.y, self.z
 
         self.x = (x * a) + (y * b) + (z * c)
@@ -987,20 +987,20 @@ class Vec:
         sin_r = math.sin(rad_roll)
 
         mat_roll = (  # X
-            (1, 0, 0),
-            (0, cos_r, -sin_r),
-            (0, sin_r, cos_r),
+            1, 0, 0,
+            0, cos_r, -sin_r,
+            0, sin_r, cos_r,
         )
         mat_yaw = (  # Z
-            (cos_y, -sin_y, 0),
-            (sin_y, cos_y, 0),
-            (0, 0, 1),
+            cos_y, -sin_y, 0,
+            sin_y, cos_y, 0,
+            0, 0, 1,
         )
 
         mat_pitch = (  # Y
-            (cos_p, 0, sin_p),
-            (0, 1, 0),
-            (-sin_p, 0, cos_p),
+            cos_p, 0, sin_p,
+            0, 1, 0,
+            -sin_p, 0, cos_p,
         )
 
         # Need to do transformations in roll, pitch, yaw order
