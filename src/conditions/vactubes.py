@@ -5,7 +5,7 @@ from collections import namedtuple
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     import_template, remove_ant_toggle,
-    TEMP_TYPES, GOO_LOCS,
+    TEMP_TYPES, GOO_LOCS, SOLIDS
 )
 from instanceLocs import resolve as resolve_inst
 from utils import Vec
@@ -63,6 +63,21 @@ CORNER_ANG = {
     (yn, xp): CornerAng('0 0 90', 'z'),
 }
 
+SUPPORT_POS = {}
+
+
+def _make_support_table():
+    """Make a table of angle/offset values for each direction."""
+    for norm in (xp, xn, yp, yn, zp, zn):
+        table = SUPPORT_POS[norm] = []
+        for x in range(0, 360, 90):
+            ang = Vec(norm).to_angle(roll=x)
+            table.append((
+                ang,
+                Vec(0, 0, -64).rotate(*ang)
+            ))
+_make_support_table()  # Ensure local vars are destroyed
+
 del xp, xn, yp, yn, zp, zn
 
 
@@ -107,6 +122,10 @@ def res_vactube_setup(res):
 
             # Straight instances connected to the next part
             'straight': block['straight_inst', ''],
+
+            # Supports attach to the 4 sides of the straight part,
+            # if there's a brush there.
+            'support': block['support_inst', ''],
 
             'is_tsection': utils.conv_bool(block['is_tsection', '0']),
 
@@ -242,7 +261,7 @@ def make_vac_track(start, all_markers):
         end_loc,
         end_norm,
         128,
-        end['conf']['straight'],
+        end['conf'],
     )
 
     # If the end is placed in goo, don't add logic - it isn't visible, and
@@ -288,7 +307,7 @@ def make_straight(
         origin: Vec,
         normal: Vec,
         dist: int,
-        file,
+        config: dict,
         is_start=False,
     ):
     """Make a straight line of instances from one point to another."""
@@ -316,13 +335,31 @@ def make_straight(
 
     angles = normal.to_angle()
 
-    for pos in range(0, int(dist), 128):
+    support_file = config['support']
+    straight_file = config['straight']
+    support_positions = (
+        SUPPORT_POS[normal.as_tuple()]
+        if support_file else
+        []
+    )
+
+    for off in range(0, int(dist), 128):
+        position = origin + off * normal
         vbsp.VMF.create_ent(
             classname='func_instance',
-            origin=origin + pos * normal,
+            origin=position,
             angles=angles,
-            file=file,
+            file=straight_file,
         )
+
+        for supp_ang, supp_off in support_positions:
+            if (position + supp_off).as_tuple() in SOLIDS:
+                vbsp.VMF.create_ent(
+                    classname='func_instance',
+                    origin=position,
+                    angles=supp_ang,
+                    file=support_file,
+                )
 
 
 def make_corner(origin, angle, size, config):
@@ -380,7 +417,7 @@ def make_bend(
             origin_a,
             norm_a,
             straight_a,
-            config['straight'],
+            config,
             is_start,
         )
 
@@ -397,7 +434,7 @@ def make_bend(
             origin_b - (straight_b * norm_b),
             norm_b,
             straight_b,
-            config['straight'],
+            config,
         )
 
 
@@ -500,7 +537,7 @@ def make_ubend(
         origin_a,
         normal,
         first_straight,
-        config['straight'],
+        config,
         is_start,
     )
 
@@ -521,7 +558,7 @@ def make_ubend(
             off_straight_loc,
             side_norm,
             side_straight,
-            config['straight'],
+            config,
         )
 
     sec_corner_loc = off_straight_loc + side_norm * side_straight
@@ -538,7 +575,7 @@ def make_ubend(
             sec_corner_loc - normal * (128 * second_size),
             -normal,
             second_straight,
-            config['straight'],
+            config,
         )
 
 
@@ -564,7 +601,7 @@ def join_markers(inst_a, inst_b, is_start=False):
                 origin_a,
                 norm_a,
                 dist,
-                config['straight'],
+                config,
                 is_start,
             )
         # else: S-bend, we don't do the geometry for this..
