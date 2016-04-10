@@ -1163,7 +1163,7 @@ class Vec:
         except TypeError:
             return NotImplemented
 
-    def __div__(self, other: float) -> 'Vec':
+    def __truediv__(self, other: float) -> 'Vec':
         """Divide the Vector by a scalar."""
         if isinstance(other, Vec):
             return NotImplemented
@@ -1177,7 +1177,7 @@ class Vec:
             except TypeError:
                 return NotImplemented
 
-    def __rdiv__(self, other: float) -> 'Vec':
+    def __rtruediv__(self, other: float) -> 'Vec':
         """Divide a scalar by a Vector.
 
         """
@@ -1304,7 +1304,7 @@ class Vec:
             self.z *= other
             return self
 
-    def __idiv__(self, other: float) -> 'Vec':
+    def __itruediv__(self, other: float) -> 'Vec':
         """/= operation.
 
         Like the normal one except without duplication.
@@ -1608,13 +1608,13 @@ class Vec:
             self.y * other.z - self.z * other.y,
             self.z * other.x - self.x * other.z,
             self.x * other.y - self.y * other.x,
-            )
+        )
 
     def localise(
             self,
             origin: Union['Vec', tuple],
-            angles: Union['Vec', tuple]=None
-            ):
+            angles: Union['Vec', tuple]=None,
+    ):
         """Shift this point to be local to the given position and angles
 
         """
@@ -1624,8 +1624,3 @@ class Vec:
 
     len = mag
     mag_sq = len_sq
-    __truediv__ = __div__
-    __itruediv__ = __idiv__
-
-abc.Mapping.register(Vec)
-abc.MutableMapping.register(Vec)
