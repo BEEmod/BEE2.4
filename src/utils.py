@@ -1562,7 +1562,11 @@ class Vec:
 
     def __len__(self):
         """The len() of a vector is the number of non-zero axes."""
-        return sum(1 for axis in (self.x, self.y, self.z) if axis != 0)
+        return (
+            (self.x != 0) +
+            (self.y != 0) +
+            (self.z != 0)
+        )
 
     def __contains__(self, val):
         """Check to see if an axis is set to the given value.
