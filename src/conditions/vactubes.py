@@ -359,8 +359,8 @@ def make_bend(
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
     # The distance to move first, then second.
-    first_movement = Vec(norm_a.x * off.x, norm_a.y * off.y, norm_a.z * off.z)
-    sec_movement = Vec(norm_b.x * off.x, norm_b.y * off.y, norm_b.z * off.z)
+    first_movement = off.norm_mask(norm_a)
+    sec_movement = off.norm_mask(norm_b)
 
     # The size of the corner ranges from 1-3. It's
     # limited by the user's setting and the distance we have in each direction

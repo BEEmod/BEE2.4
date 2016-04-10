@@ -1626,5 +1626,14 @@ class Vec:
             self.rotate(angles[0], angles[1], angles[2])
         self.__iadd__(origin)
 
+    def norm_mask(self, normal: 'Vec') -> 'Vec':
+        """Subtract the components of this vector not in the direction of the normal.
+
+        If the normal is axis-aligned, this will zero out the other axes.
+        If not axis-aligned, it will do the equivalent.
+        """
+        normal = normal.norm()
+        return normal * self.dot(normal)
+
     len = mag
     mag_sq = len_sq
