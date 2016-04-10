@@ -7,6 +7,7 @@ from functools import partial
 from operator import itemgetter
 from collections import defaultdict
 from enum import Enum
+import string
 
 import sound as snd
 import optionWindow
@@ -28,6 +29,14 @@ TAG_MODES = {
 TAGS = {}
 # A 'pretty' name for a tag, if it exists
 PRETTY_TAG = {}
+
+
+TAG_REP_TRANSLATE = str.maketrans(
+    # uppercase -> lowercase, remove whitespace
+    string.ascii_uppercase,
+    string.ascii_lowercase,
+    string.whitespace,
+)
 
 # A list of tags, sorted into sections
 TAG_BY_SECTION = defaultdict(list)
@@ -127,12 +136,12 @@ def event_remove_tag(tag, e):
     filter_items()
 
 
-
-def add_tag(section: Section, tag, pretty=None):
+def add_tag(section: Section, tag: str, pretty: str=None):
     """Add the tag to the list of known tags, and return the ID."""
     if pretty is None:
         pretty = tag
-    tag = tag.casefold()
+    # Casefold the text, and strip whitespace
+    tag = tag.translate(TAG_REP_TRANSLATE)
 
     key = (section, tag)
 
