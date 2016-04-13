@@ -1155,7 +1155,7 @@ class Vec:
         )
 
     @staticmethod
-    def bbox(*points: 'Vec'):
+    def bbox(*points: 'Vec') -> Tuple['Vec', 'Vec']:
         """Compute the bounding box for a set of points.
 
         Pass either several Vecs, or an iterable of Vecs.
