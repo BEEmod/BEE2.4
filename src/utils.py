@@ -458,22 +458,22 @@ def parse_str(val: Union[str, 'Vec'], x=0.0, y=0.0, z=0.0) -> Tuple[int, int, in
     if isinstance(val, Vec):
         return val.x, val.y, val.z
 
-    parts = val.split(' ')
-    if len(parts) == 3:
-        # Strip off the brackets if present
-        if parts[0][0] in '({[<':
-            parts[0] = parts[0][1:]
-        if parts[2][-1] in ')}]>':
-            parts[2] = parts[2][:-1]
-        try:
-            return (
-                float(parts[0]),
-                float(parts[1]),
-                float(parts[2]),
-            )
-        except ValueError:
-            return x, y, z
-    else:
+    try:
+        str_x, str_y, str_z = val.split(' ')
+    except ValueError:
+        return x, y, z
+
+    if str_x[0] in '({[<':
+        str_x = str_x[1:]
+    if str_z[-1] in ')}]>':
+        str_z = str_z[:-1]
+    try:
+        return (
+            float(str_x),
+            float(str_y),
+            float(str_z),
+        )
+    except ValueError:
         return x, y, z
 
 
