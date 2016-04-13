@@ -895,6 +895,134 @@ class AtomicWriter:
 
 Vec_tuple = collections.namedtuple('Vec_tuple', ['x', 'y', 'z'])
 
+# Use template code to reduce duplication in the various magic number methods.
+
+_VEC_ADDSUB_TEMP = '''
+def __{func}__(self, other):
+    """{op} operation.
+
+    This additionally works on scalars (adds to all axes).
+    """
+    if isinstance(other, Vec):
+        return Vec(
+            self.x {op} other.x,
+            self.y {op} other.y,
+            self.z {op} other.z,
+        )
+    try:
+        if isinstance(other, tuple):
+            x = self.x {op} other[0]
+            y = self.y {op} other[1]
+            z = self.z {op} other[2]
+        else:
+            x = self.x {op} other
+            y = self.y {op} other
+            z = self.z {op} other
+    except TypeError:
+        return NotImplemented
+    else:
+        return Vec(x, y, z)
+
+def __r{func}__(self, other):
+    """{op} operation with reversed operands.
+
+    This additionally works on scalars (adds to all axes).
+    """
+    if isinstance(other, Vec):
+        return Vec(
+            other.x {op} self.x,
+            other.y {op} self.y,
+            other.z {op} self.z,
+        )
+    try:
+        if isinstance(other, tuple):
+            x = other[0] {op} self.x
+            y = other[1] {op} self.y
+            z = other[2] {op} self.z
+        else:
+            x = other {op} self.x
+            y = other {op} self.y
+            z = other {op} self.z
+    except TypeError:
+        return NotImplemented
+    else:
+        return Vec(x, y, z)
+
+def __i{func}__(self, other):
+    """{op}= operation.
+
+    Like the normal one except without duplication.
+    """
+    if isinstance(other, Vec):
+        self.x {op}= other.x
+        self.y {op}= other.y
+        self.z {op}= other.z
+        return self
+    elif isinstance(other, tuple):
+        self.x {op}= other[0]
+        self.y {op}= other[1]
+        self.z {op}= other[2]
+    else:
+        orig = self.x, self.y, self.z
+        try:
+            self.x {op}= other
+            self.y {op}= other
+            self.z {op}= other
+        except TypeError as e:
+            self.x, self.y, self.z = orig
+            raise TypeError(
+                'Cannot add {{}} to Vector!'.format(type(other))
+            ) from e
+        return self
+'''
+
+# Multiplication and division doesn't work with two vectors - use dot/cross
+# instead.
+
+_VEC_MULDIV_TEMP = '''
+def __{func}__(self, other):
+    """Vector {op} scalar operation."""
+    if isinstance(other, Vec):
+        raise TypeError("Cannot {pretty} 2 Vectors.")
+    else:
+        try:
+            return Vec(
+                self.x {op} other,
+                self.y {op} other,
+                self.z {op} other,
+            )
+        except TypeError:
+            return NotImplemented
+
+def __r{func}__(self, other):
+    """scalar {op} Vector operation."""
+    if isinstance(other, Vec):
+        raise TypeError("Cannot {pretty} 2 Vectors.")
+    else:
+        try:
+            return Vec(
+                other {op} self.x,
+                other {op} self.y,
+                other {op} self.z,
+            )
+        except TypeError:
+            return NotImplemented
+
+
+def __i{func}__(self, other):
+    """{op}= operation.
+
+    Like the normal one except without duplication.
+    """
+    if isinstance(other, Vec):
+        raise TypeError("Cannot {pretty} 2 Vectors.")
+    else:
+        self.x {op}= other
+        self.y {op}= other
+        self.z {op}= other
+        return self
+'''
+
 
 class Vec:
     """A 3D Vector. This has most standard Vector functions.
@@ -1072,266 +1200,60 @@ class Vec:
             abs(self.z),
         )
 
-    def __add__(self, other: Union['Vec', tuple, float]) -> 'Vec':
-        """+ operation.
+    funcname = op = pretty = None
 
-        This additionally works on scalars (adds to all axes).
-        """
-        if isinstance(other, Vec):
-            return Vec(self.x + other.x, self.y + other.y, self.z + other.z)
-        elif isinstance(other, tuple):
-            return Vec(self.x + other[0], self.y + other[1], self.z + other[2])
-        else:
-            return Vec(self.x + other, self.y + other, self.z + other)
-    __radd__ = __add__
+    # Use exec() to generate all the number magic methods. This reduces code
+    # duplication since they're all very similar.
 
-    def __sub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
-        """- operation.
+    for funcname, op in (('add', '+'), ('sub', '-')):
+        exec(
+            _VEC_ADDSUB_TEMP.format(func=funcname, op=op),
+            globals(),
+            locals(),
+        )
 
-        This additionally works on scalars (adds to all axes).
-        """
-        if isinstance(other, Vec):
-            return Vec(
-                self.x - other.x,
-                self.y - other.y,
-                self.z - other.z
-            )
+    for funcname, op, pretty in (
+            ('mul', '*', 'multiply'),
+            ('truediv', '/', 'divide'),
+            ('floordiv', '//', 'floor-divide'),
+            ('mod', '%', 'modulus'),
+    ):
+        exec(
+            _VEC_MULDIV_TEMP.format(func=funcname, op=op, pretty=pretty),
+            globals(),
+            locals(),
+        )
 
-        try:
-            if isinstance(other, tuple):
-                x = self.x - other[0]
-                y = self.y - other[1]
-                z = self.z - other[2]
-            else:
-                x = self.x - other
-                y = self.y - other
-                z = self.z - other
-        except TypeError:
-            return NotImplemented
-        else:
-            return Vec(x, y, z)
+    del funcname, op, pretty
 
-    def __rsub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
-        """- operation.
-
-        This additionally works on scalars (adds to all axes).
-        """
-
-        if isinstance(other, Vec):
-            return Vec(
-                other.x - self.x,
-                other.y - self.x,
-                other.z - self.z
-            )
-
-        try:
-            if isinstance(other, tuple):
-                x = other[0] - self.x
-                y = other[1] - self.y
-                z = other[2] - self.z
-            else:
-                x = other - self.x
-                y = other - self.y
-                z = other - self.z
-        except TypeError:
-            return NotImplemented
-        else:
-            return Vec(x, y, z)
-
-    def __mul__(self, other: float) -> 'Vec':
-        """Multiply the Vector by a scalar."""
-        if isinstance(other, Vec):
-            return NotImplemented
-        else:
-            try:
-                return Vec(
-                    self.x * other,
-                    self.y * other,
-                    self.z * other,
-                )
-            except TypeError:
-                return NotImplemented
-    __rmul__ = __mul__
-
-    def __div__(self, other: float) -> 'Vec':
-        """Divide the Vector by a scalar."""
-        if isinstance(other, Vec):
-            return NotImplemented
-        else:
-            try:
-                return Vec(
-                    self.x / other,
-                    self.y / other,
-                    self.z / other,
-                )
-            except TypeError:
-                return NotImplemented
-
-    def __rdiv__(self, other: float) -> 'Vec':
-        """Divide a scalar by a Vector.
-
-        """
-        if isinstance(other, Vec):
-            return NotImplemented
-        else:
-            try:
-                return Vec(
-                    other / self.x,
-                    other / self.y,
-                    other / self.z,
-                )
-            except TypeError:
-                return NotImplemented
-
-    def __floordiv__(self, other: float) -> 'Vec':
-        """Divide the Vector by a scalar, discarding the remainder."""
-        if isinstance(other, Vec):
-            return NotImplemented
-        else:
-            try:
-                return Vec(
-                    self.x // other,
-                    self.y // other,
-                    self.z // other,
-                )
-            except TypeError:
-                return NotImplemented
-
-    def __mod__(self, other: float) -> 'Vec':
-        """Compute the remainder of the Vector divided by a scalar."""
-        if isinstance(other, Vec):
-            return NotImplemented
-        else:
-            try:
-                return Vec(
-                    self.x % other,
-                    self.y % other,
-                    self.z % other,
-                )
-            except TypeError:
-                return NotImplemented
-
+    # Divmod is entirely unique.
     def __divmod__(self, other: float) -> Tuple['Vec', 'Vec']:
-        """Divide the vector by a scalar, returning the result and remainder.
-
-        """
+        """Divide the vector by a scalar, returning the result and remainder."""
         if isinstance(other, Vec):
-            return NotImplemented
+            raise TypeError("Cannot divide 2 Vectors.")
         else:
             try:
                 x1, x2 = divmod(self.x, other)
                 y1, y2 = divmod(self.y, other)
-                z1, z2 = divmod(self.y, other)
+                z1, z2 = divmod(self.z, other)
             except TypeError:
                 return NotImplemented
             else:
                 return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
-    def __iadd__(self, other: Union['Vec', tuple, float]) -> 'Vec':
-        """+= operation.
-
-        Like the normal one except without duplication.
-        """
+    def __rdivmod__(self, other: float) -> Tuple['Vec', 'Vec']:
+        """Divide a scalar by a vector, returning the result and remainder."""
         if isinstance(other, Vec):
-            self.x += other.x
-            self.y += other.y
-            self.z += other.z
-            return self
-        elif isinstance(other, tuple):
-            self.x += other[0]
-            self.y += other[1]
-            self.z += other[2]
+            return NotImplemented
         else:
-            orig = self.x, self.y, self.z
             try:
-                self.x += other
-                self.y += other
-                self.z += other
-            except TypeError as e:
-                self.x, self.y, self.z = orig
-                raise TypeError(
-                    'Cannot add {} to Vector!'.format(type(other))
-                ) from e
-            return self
-
-    def __isub__(self, other: Union['Vec', tuple, float]) -> 'Vec':
-        """-= operation.
-
-        Like the normal one except without duplication.
-        """
-        if isinstance(other, Vec):
-            self.x -= other.x
-            self.y -= other.y
-            self.z -= other.z
-            return self
-        elif isinstance(other, tuple):
-            self.x -= other[0]
-            self.y -= other[1]
-            self.z -= other[2]
-        else:
-            orig = self.x, self.y, self.z
-            try:
-                self.x -= other
-                self.y -= other
-                self.z -= other
-            except TypeError as e:
-                self.x, self.y, self.z = orig
-                raise TypeError(
-                    'Cannot subtract {} from Vector!'.format(type(other))
-                ) from e
-            return self
-
-    def __imul__(self, other: float) -> 'Vec':
-        """*= operation.
-
-        Like the normal one except without duplication.
-        """
-        if isinstance(other, Vec):
-            raise TypeError("Cannot multiply 2 Vectors.")
-        else:
-            self.x *= other
-            self.y *= other
-            self.z *= other
-            return self
-
-    def __idiv__(self, other: float) -> 'Vec':
-        """/= operation.
-
-        Like the normal one except without duplication.
-        """
-        if isinstance(other, Vec):
-            raise TypeError("Cannot divide 2 Vectors.")
-        else:
-            self.x /= other
-            self.y /= other
-            self.z /= other
-            return self
-
-    def __ifloordiv__(self, other: float) -> 'Vec':
-        """//= operation.
-
-        Like the normal one except without duplication.
-        """
-        if isinstance(other, Vec):
-            raise TypeError("Cannot divide 2 Vectors.")
-        else:
-            self.x //= other
-            self.y //= other
-            self.z //= other
-            return self
-
-    def __imod__(self, other: float) -> 'Vec':
-        """%= operation.
-
-        Like the normal one except without duplication.
-        """
-        if isinstance(other, Vec):
-            raise TypeError("Cannot modulus 2 Vectors.")
-        else:
-            self.x %= other
-            self.y %= other
-            self.z %= other
-            return self
+                x1, x2 = divmod(other, self.x)
+                y1, y2 = divmod(other, self.y)
+                z1, z2 = divmod(other, self.z)
+            except TypeError:
+                return NotImplemented
+            else:
+                return Vec(x1, y1, z1), Vec(x2, y2, z2)
 
     def __bool__(self) -> bool:
         """Vectors are True if any axis is non-zero."""
@@ -1605,8 +1527,6 @@ class Vec:
 
     len = mag
     mag_sq = len_sq
-    __truediv__ = __div__
-    __itruediv__ = __idiv__
 
 abc.Mapping.register(Vec)
 abc.MutableMapping.register(Vec)
