@@ -487,8 +487,15 @@ class Game:
             if not os.path.isfile(src_path):
                 continue
 
+            dest = self.abs_path('bin/' + file)
+
             LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+
             try:
+                if os.path.isfile(dest):
+                    # First try and give ourselves write-permission,
+                    # if it's set read-only.
+                    utils.unset_readonly(dest)
                 shutil.copy(
                     src_path,
                     self.abs_path('bin/')
