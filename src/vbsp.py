@@ -1,5 +1,3 @@
-import contextlib
-
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -3519,11 +3517,15 @@ def instance_symlink():
     We need to symlink maps/styled/instances/ -> maps/instances/ to allow
     instances to be found.
     """
-    map_root = os.path.join(os.getcwd(), '..', 'sdk_content', 'maps')
+    map_root = os.path.abspath(os.path.join(
+        os.getcwd(),
+        '..', 'sdk_content', 'maps',
+    ))
     inst = os.path.join(map_root, 'instances')
     link_loc = os.path.join(map_root, 'styled', 'instances')
 
     if os.path.islink(link_loc) and os.path.samefile(inst, link_loc):
+        LOGGER.info('Symlink already exists..')
         return  # Already done
 
     LOGGER.info('Creating symlink from "{}" -> "{}"', link_loc, inst)
