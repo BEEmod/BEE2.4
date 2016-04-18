@@ -3513,6 +3513,23 @@ def make_vrad_config():
             f.write(line)
 
 
+def instance_symlink():
+    """On OS X and Linux, Valve broke VBSP's instances/ finding code.
+
+    We need to symlink maps/styled/instances/ -> maps/instances/ to allow
+    instances to be found.
+    """
+    map_root = os.path.join(os.getcwd(), '..', 'sdk_content', 'maps')
+    inst = os.path.join(map_root, 'instances')
+    link_loc = os.path.join(map_root, 'styled', 'instances')
+
+    if os.path.islink(link_loc) and os.path.samefile(inst, link_loc):
+        return  # Already done
+
+    LOGGER.info('Creating symlink from "{}" -> "{}"', link_loc, inst)
+    os.symlink(inst, link_loc, target_is_directory=True)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -3550,6 +3567,9 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os_suff = '_linux'
     else:
         os_suff = ''
+
+    if utils.MAC or utils.LINUX and do_swap:
+        instance_symlink()
 
     arg = (
         '"' +
