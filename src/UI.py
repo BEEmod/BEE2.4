@@ -603,6 +603,7 @@ def load_packages(data):
              'elevator rooms. Not all styles feature these. If set to "None", '
              'a random video will be selected each time the map is played, '
              'like in the default PeTI.',
+        readonly_desc='This style does not have a elevator video screen.',
         has_none=True,
         has_def=True,
         none_desc='Choose a random video.',

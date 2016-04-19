@@ -343,6 +343,7 @@ class selWin:
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
             desc='',
+            readonly_desc='',
             callback: Callable[..., None]=None,
             callback_params=(),
             attributes=(),
@@ -377,6 +378,7 @@ class selWin:
           otherwise they're a string.
         - desc is descriptive text to display on the window, and in the widget
           tooltip.
+        - readonly_desc will be displayed on the widget tooltip when readonly.
         """
         self.noneItem = Item(
             'NONE',
@@ -412,6 +414,7 @@ class selWin:
         # Should we have the 'reset to default' button?
         self.has_def = has_def
         self.description = desc
+        self.readonly_description = readonly_desc
 
         if has_none:
             self.item_list = [self.noneItem] + lst
@@ -832,8 +835,7 @@ class selWin:
         )
         self.disp_btn.pack(side=RIGHT)
 
-        if self.description:
-            add_tooltip(self.display, self.description)
+        add_tooltip(self.display, self.description, show_when_disabled=True)
 
         self.save()
 
@@ -852,8 +854,10 @@ class selWin:
         self._readonly = bool(value)
         if value:
             new_st = ['disabled']
+            self.display.tooltip_text = self.readonly_description
         else:
             new_st = ['!disabled']
+            self.display.tooltip_text = self.description
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
