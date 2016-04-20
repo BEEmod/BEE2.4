@@ -119,7 +119,7 @@ def {l_name}(cls, id: str, desc='', default=None):
 
 SelitemData = namedtuple(
     'SelitemData',
-    'name, short_name, auth, icon, desc, group',
+    'name, short_name, auth, icon, desc, group, sort_key',
 )
 
 
@@ -229,6 +229,7 @@ class Item:
         'desc',
         'authors',
         'group',
+        'sort_key',
         'button',
         'win',
         'snd_sample',
@@ -248,6 +249,7 @@ class Item:
             authors: list=None,
             desc=(('line', ''),),
             group: str=None,
+            sort_key: str=None,
             attributes: dict=None,
             snd_sample: str=None,
     ):
@@ -255,6 +257,7 @@ class Item:
         self.shortName = short_name
         self.group = group or ''
         self.longName = long_name or short_name
+        self.sort_key = sort_key
         if len(self.longName) > 20:
             self.context_lbl = self.shortName
         else:
@@ -297,7 +300,8 @@ class Item:
             authors=data.auth,
             desc=data.desc,
             group=data.group,
-            attributes=attrs
+            sort_key=data.sort_key,
+            attributes=attrs,
         )
 
     def set_pos(self, x=None, y=None):
@@ -661,8 +665,8 @@ class selWin:
         # The headers for the context menu
         self.context_menus = {}
 
-        # Sort alphabetically!
-        self.item_list.sort(key=attrgetter('longName'))
+        # Sort alphabetically, prefering a sort key if present.
+        self.item_list.sort(key=lambda it: it.sort_key or it.longName)
 
         for ind, item in enumerate(self.item_list):  # type: int, Item
             if item == self.noneItem:

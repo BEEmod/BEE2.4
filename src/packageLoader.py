@@ -2009,6 +2009,7 @@ def get_selitem_data(info):
     name = info['name']
     icon = info['icon', '_blank']
     group = info['group', '']
+    sort_key = info['sort_key', '']
     if not group:
         group = None
     if not short_name:
@@ -2021,6 +2022,7 @@ def get_selitem_data(info):
         icon,
         desc,
         group,
+        sort_key,
     )
 
 
