@@ -1045,23 +1045,11 @@ class Vec:
             self.x = float(x)
             self.y = float(y)
             self.z = float(z)
-        elif isinstance(x, Vec):
-            self.x, self.y, self.z = x
         else:
-            try:
-                self.x = float(x[0])
-            except (TypeError, KeyError):
-                self.x = 0.0
-            else:
-                try:
-                    self.y = float(x[1])
-                except (TypeError, KeyError):
-                    self.y = 0.0
-                else:
-                    try:
-                        self.z = float(x[2])
-                    except (TypeError, KeyError):
-                        self.z = 0.0
+            it = iter(x)
+            self.x = float(next(it, 0.0))
+            self.y = float(next(it, y))
+            self.z = float(next(it, z))
 
     def copy(self):
         return Vec(self.x, self.y, self.z)
