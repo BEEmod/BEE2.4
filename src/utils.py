@@ -1249,7 +1249,7 @@ class Vec:
 
     def __eq__(
             self,
-            other: Union['Vec', abc.Sequence, SupportsFloat],
+            other: Union['Vec', tuple, SupportsFloat],
             ) -> bool:
         """== test.
 
@@ -1259,7 +1259,7 @@ class Vec:
         """
         if isinstance(other, Vec):
             return other.x == self.x and other.y == self.y and other.z == self.z
-        elif isinstance(other, abc.Sequence):
+        elif isinstance(other, tuple):
             return (
                 self.x == other[0] and
                 self.y == other[1] and
@@ -1287,7 +1287,7 @@ class Vec:
                 self.y < other.y and
                 self.z < other.z
             )
-        elif isinstance(other, abc.Sequence):
+        elif isinstance(other, tuple):
             return (
                 self.x < other[0] and
                 self.y < other[1] and
@@ -1301,7 +1301,7 @@ class Vec:
 
     def __le__(
             self,
-            other: Union['Vec', abc.Sequence, SupportsFloat],
+            other: Union['Vec', tuple, SupportsFloat],
             ) -> bool:
         """A<=B test.
 
@@ -1315,7 +1315,7 @@ class Vec:
                 self.y <= other.y and
                 self.z <= other.z
             )
-        elif isinstance(other, abc.Sequence):
+        elif isinstance(other, tuple):
             return (
                 self.x <= other[0] and
                 self.y <= other[1] and
@@ -1329,7 +1329,7 @@ class Vec:
 
     def __gt__(
             self,
-            other: Union['Vec', abc.Sequence, SupportsFloat],
+            other: Union['Vec', tuple, SupportsFloat],
             ) -> bool:
         """A>B test.
 
@@ -1343,7 +1343,7 @@ class Vec:
                 self.y > other.y and
                 self.z > other.z
             )
-        elif isinstance(other, abc.Sequence):
+        elif isinstance(other, tuple):
             return (
                 self.x > other[0] and
                 self.y > other[1] and
