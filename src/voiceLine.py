@@ -170,6 +170,7 @@ def add_choreo(
         use_dings=False,
         is_first=True,
         is_last=True,
+        times=-1,
     ):
     # Add this to the beginning, since all scenes need it...
     if not c_line.startswith('scenes/'):
@@ -187,8 +188,8 @@ def add_choreo(
         # Play ding_on/off before and after the line.
         if is_first:
             choreo.add_out(
-                vmfLib.Output('OnUser1', '@ding_on', 'Start'),
-                vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2),
+                vmfLib.Output('OnUser1', '@ding_on', 'Start', times=times),
+                vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2, times=times),
             )
         if is_last:
             choreo.add_out(
@@ -196,7 +197,7 @@ def add_choreo(
             )
     elif is_first:
         choreo.add_out(
-            vmfLib.Output('OnUser1', targetname, 'Start', )
+            vmfLib.Output('OnUser1', targetname, 'Start', times=times)
         )
     return choreo
 
@@ -211,7 +212,8 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
 
-    targetname = quote['choreo_name', targetname]
+    # The number of times to trigger the OnUser1 value.
+    times = -1
 
     for prop in quote:
         name = prop.name.casefold()
@@ -250,6 +252,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                         use_dings=use_dings,
                         is_first=(ind == 1),
                         is_last=is_last,
+                        times=times,
                     )
                     # Add a IO command to start the next one.
                     if not is_last:
@@ -267,7 +270,8 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                     prop.value,
                     targetname,
                     quote_loc,
-                    use_dings
+                    use_dings=use_dings,
+                    times=times,
                 ))
         elif name == 'snd':
             snd = VMF.create_ent(
@@ -279,7 +283,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                 health='10',  # Volume
             )
             snd.add_out(
-                vmfLib.Output('OnUser1', targetname, 'PlaySound')
+                vmfLib.Output('OnUser1', targetname, 'PlaySound', times=times)
             )
             added_ents.append(snd)
         elif name == 'bullseye':
@@ -319,6 +323,11 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                 )
             else:
                 vbsp.PACK_FILES.add(prop.value)
+        elif name == 'choreo_name':
+            # Change the targetname used for subsequent entities
+            targetname = quote['choreo_name', targetname]
+        elif name == 'onlyonce':
+            times = 1 if utils.conv_bool(prop.value) else -1
 
     if cc_emit_name:
         for ent in added_ents:
