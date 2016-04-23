@@ -117,9 +117,9 @@ def res_quote_event(inst, res):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(group, mid_quotes, use_dings, conf):
+def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
     """Scan through a group, looking for applicable quote options."""
-    is_mid = (group.name == 'midinst')
+    is_mid = (group.name == 'midchamber')
 
     if is_mid:
         group_id = 'MIDCHAMBER'
@@ -147,7 +147,7 @@ def find_group_quotes(group, mid_quotes, use_dings, conf):
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.append((line, use_dings))
+                    mid_quotes.append((line, use_dings, mid_name))
                 else:
                     poss_quotes.append(line)
             else:
@@ -379,7 +379,7 @@ def add_voice(
         thick=32,
     ))
 
-    ALLOW_MID_VOICES = not style_vars.get('NoMidVoices', False)
+    ALLOW_MID_VOICES = not style_vars.get('nomidvoices', False)
 
     mid_quotes = []
 
@@ -440,7 +440,7 @@ def add_voice(
     # For each group, locate the voice lines.
     for group in itertools.chain(
             QUOTE_DATA.find_all('group'),
-            QUOTE_DATA.find_all('midinst'),
+            QUOTE_DATA.find_all('midchamber'),
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
@@ -451,7 +451,8 @@ def add_voice(
                 group,
                 mid_quotes,
                 use_dings,
-                conf=mid_config if group.name == 'midinst' else norm_config,
+                conf=mid_config if group.name == 'midchamber' else norm_config,
+                mid_name=quote_targetname,
             ),
             key=sort_func,
             reverse=True,
@@ -516,11 +517,9 @@ def add_voice(
                 origin=quote_loc,
             )
 
-    LOGGER.info('Mid quotes: {}', mid_quotes)
-    for mid_item, use_ding in mid_quotes:
+    LOGGER.info('{} Mid quotes', len(mid_quotes))
+    for mid_item, use_ding, mid_name in mid_quotes:
         # Add all the mid quotes
-        target = mid_item['target', '']
-        for prop in mid_item:
-            add_quote(prop, target, quote_loc, use_ding)
+        add_quote(mid_item, mid_name, quote_loc, use_ding)
 
     LOGGER.info('Done!')
