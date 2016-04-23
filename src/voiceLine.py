@@ -163,7 +163,45 @@ def find_group_quotes(group, mid_quotes, use_dings, conf):
             )
 
 
-def add_quote(quote, targetname, quote_loc, use_dings=False):
+def add_choreo(
+        c_line: str,
+        targetname: str,
+        loc: Vec,
+        use_dings=False,
+        is_first=True,
+        is_last=True,
+    ):
+    # Add this to the beginning, since all scenes need it...
+    if not c_line.startswith('scenes/'):
+        c_line = 'scenes/' + c_line
+
+    choreo = VMF.create_ent(
+        classname='logic_choreographed_scene',
+        targetname=targetname,
+        origin=loc,
+        scenefile=c_line,
+        busyactor="1",  # Wait for actor to stop talking
+        onplayerdeath='0',
+    )
+    if use_dings:
+        # Play ding_on/off before and after the line.
+        if is_first:
+            choreo.add_out(
+                vmfLib.Output('OnUser1', '@ding_on', 'Start'),
+                vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2),
+            )
+        if is_last:
+            choreo.add_out(
+                vmfLib.Output('OnCompletion', '@ding_off', 'Start'),
+            )
+    elif is_first:
+        choreo.add_out(
+            vmfLib.Output('OnUser1', targetname, 'Start', )
+        )
+    return choreo
+
+
+def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
@@ -172,6 +210,8 @@ def add_quote(quote, targetname, quote_loc, use_dings=False):
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
+
+    targetname = quote['choreo_name', targetname]
 
     for prop in quote:
         name = prop.name.casefold()
@@ -185,31 +225,50 @@ def add_quote(quote, targetname, quote_loc, use_dings=False):
                 fixup_style='2',  # No fixup
             ))
         elif name == 'choreo':
-            c_line = prop.value
-            # Add this to the beginning, since all scenes need it...
-            if not c_line.startswith('scenes/'):
-                c_line = 'scenes/' + c_line
-
-            choreo = VMF.create_ent(
-                classname='logic_choreographed_scene',
-                targetname=targetname,
-                origin=quote_loc,
-                scenefile=c_line,
-                busyactor="1",  # Wait for actor to stop talking
-                onplayerdeath='0',
-            )
-            if use_dings:
-                # Play ding_on/off before and after the line.
-                choreo.add_out(
-                    vmfLib.Output('OnUser1', '@ding_on', 'Start'),
-                    vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2),
-                    vmfLib.Output('OnCompletion', '@ding_off', 'Start'),
-                )
+            # If the property has children, the children are a set of sequential
+            # voice lines.
+            # If the name is set to '@glados_line', the ents will be named
+            # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
+            if prop.has_children():
+                secondary_name = targetname.lstrip('@') + '_'
+                # Evenly distribute the choreo ents across the width of the
+                # voice-line room.
+                off = Vec(y=120 / (len(prop) + 1))
+                start = quote_loc - (0, 60, 0) + off
+                for ind, choreo_line in enumerate(prop, start=1):  # type: int, Property
+                    is_first = (ind == 1)
+                    is_last = (ind == len(prop))
+                    name = (
+                        targetname
+                        if is_first else
+                        secondary_name + str(ind)
+                    )
+                    choreo = add_choreo(
+                        choreo_line.value,
+                        targetname=name,
+                        loc=start + off * (ind - 1),
+                        use_dings=use_dings,
+                        is_first=(ind == 1),
+                        is_last=is_last,
+                    )
+                    # Add a IO command to start the next one.
+                    if not is_last:
+                        choreo.add_out(vmfLib.Output(
+                            'OnCompletion',
+                            secondary_name + str(ind + 1),
+                            'Start',
+                            delay=0.1,
+                        ))
+                    if is_first:  # Ensure this works with cc_emit
+                        added_ents.append(choreo)
             else:
-                choreo.add_out(
-                    vmfLib.Output('OnUser1', targetname, 'Start',)
-                )
-            added_ents.append(choreo)
+                # Add a single choreo command.
+                added_ents.append(add_choreo(
+                    prop.value,
+                    targetname,
+                    quote_loc,
+                    use_dings
+                ))
         elif name == 'snd':
             snd = VMF.create_ent(
                 classname='ambient_generic',
@@ -234,7 +293,7 @@ def add_quote(quote, targetname, quote_loc, use_dings=False):
                     # Not solid, Take No Damage, Think outside PVS
                     spawnflags='222224',
                     targetname=prop.value,
-                    origin=quote_loc,
+                    origin=quote_loc - (0, 0, 16),
                     angles='0 0 0',
                 )
                 ADDED_BULLSEYES.add(prop.value)
@@ -400,7 +459,7 @@ def add_voice(
 
         if possible_quotes:
 
-            choreo_loc = group['choreo_loc', quote_loc]
+            choreo_loc = Vec.from_str(group['choreo_loc', quote_loc])
 
             if use_priority:
                 chosen = possible_quotes[0].lines
