@@ -1,5 +1,3 @@
-import contextlib
-
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -3513,6 +3511,27 @@ def make_vrad_config():
             f.write(line)
 
 
+def instance_symlink():
+    """On OS X and Linux, Valve broke VBSP's instances/ finding code.
+
+    We need to symlink maps/styled/instances/ -> maps/instances/ to allow
+    instances to be found.
+    """
+    map_root = os.path.abspath(os.path.join(
+        os.getcwd(),
+        '..', 'sdk_content', 'maps',
+    ))
+    inst = os.path.join(map_root, 'instances')
+    link_loc = os.path.join(map_root, 'styled', 'instances')
+
+    if os.path.islink(link_loc) and os.path.samefile(inst, link_loc):
+        LOGGER.info('Symlink already exists..')
+        return  # Already done
+
+    LOGGER.info('Creating symlink from "{}" -> "{}"', link_loc, inst)
+    os.symlink(inst, link_loc, target_is_directory=True)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
@@ -3541,27 +3560,37 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
                 new_path.replace(".vmf", ".log"),
             )
     # Put quotes around args which contain spaces, and remove blank args.
-    vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
+    vbsp_args = [
+        ('"' + x + '"' if " " in x else x)
+        for x in
+        vbsp_args
+        if x
+    ]
 
     # VBSP is named _osx or _linux for those platforms.
+    suffix = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
+        suffix = '.exe'
+
+    if utils.MAC or utils.LINUX and do_swap:
+        instance_symlink()
 
     arg = (
         '"' +
         os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp" + os_suff + "_original"
+                "vbsp" + os_suff + "_original" + suffix
                 )
-            ) +
+        ) +
         '" ' +
         " ".join(vbsp_args)
-        )
+    )
 
     # Use a special name for VBSP's output..
     vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')

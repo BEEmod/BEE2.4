@@ -2,6 +2,7 @@
 import logging
 import math
 import string
+import stat
 import os.path
 import tempfile
 from collections import abc
@@ -578,6 +579,33 @@ def restart_app():
     logging.shutdown()
     os.execv(sys.executable, args)
 
+
+def set_readonly(file):
+    """Make the given file read-only."""
+    # Get the old flags
+    flags = os.stat(file).st_mode
+    # Make it read-only
+    os.chmod(
+        file,
+        flags & ~
+        stat.S_IWUSR & ~
+        stat.S_IWGRP & ~
+        stat.S_IWOTH
+    )
+
+
+def unset_readonly(file):
+    """Set the writeable flag on a file."""
+    # Get the old flags
+    flags = os.stat(file).st_mode
+    # Make it writeable
+    os.chmod(
+        file,
+        flags |
+        stat.S_IWUSR |
+        stat.S_IWGRP |
+        stat.S_IWOTH
+    )
 
 class LogMessage:
     """Allow using str.format() in logging messages.

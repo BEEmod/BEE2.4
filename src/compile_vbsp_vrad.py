@@ -38,10 +38,10 @@ EXCLUDES = [
 ]
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
-import logging
-if not hasattr(logging, 'socket'):
+import logging.handlers
+if not hasattr(logging.handlers, 'socket'):
     EXCLUDES.append('socket')
-if not hasattr(logging, 'pickle'):
+if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
 
