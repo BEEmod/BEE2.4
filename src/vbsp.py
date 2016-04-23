@@ -3560,15 +3560,22 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
                 new_path.replace(".vmf", ".log"),
             )
     # Put quotes around args which contain spaces, and remove blank args.
-    vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
+    vbsp_args = [
+        ('"' + x + '"' if " " in x else x)
+        for x in
+        vbsp_args
+        if x
+    ]
 
     # VBSP is named _osx or _linux for those platforms.
+    suffix = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
+        suffix = '.exe'
 
     if utils.MAC or utils.LINUX and do_swap:
         instance_symlink()
@@ -3578,12 +3585,12 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp" + os_suff + "_original"
+                "vbsp" + os_suff + "_original" + suffix
                 )
-            ) +
+        ) +
         '" ' +
         " ".join(vbsp_args)
-        )
+    )
 
     # Use a special name for VBSP's output..
     vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')
