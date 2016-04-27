@@ -1299,6 +1299,30 @@ class Vec:
             except ValueError:
                 return NotImplemented
 
+    def __ne__(
+            self,
+            other: Union['Vec', tuple, SupportsFloat],
+            ) -> bool:
+        """!= test.
+
+        Two Vectors are compared based on the axes.
+        A Vector can be compared with a 3-tuple as if it was a Vector also.
+        Otherwise the other value will be compared with the magnitude.
+        """
+        if isinstance(other, Vec):
+            return other.x != self.x or other.y != self.y or other.z != self.z
+        elif isinstance(other, tuple):
+            return (
+                self.x != other[0] or
+                self.y != other[1] or
+                self.z != other[2]
+            )
+        else:
+            try:
+                return self.mag() != float(other)
+            except ValueError:
+                return NotImplemented
+
     def __lt__(
             self,
             other: Union['Vec', abc.Sequence, SupportsFloat],
@@ -1380,6 +1404,34 @@ class Vec:
         else:
             try:
                 return self.mag() > float(other)
+            except ValueError:
+                return NotImplemented
+
+    def __ge__(
+            self,
+            other: Union['Vec', tuple, SupportsFloat],
+    ) -> bool:
+        """A>=B test.
+
+        Two Vectors are compared based on the axes.
+        A Vector can be compared with a 3-tuple as if it was a Vector also.
+        Otherwise the other value will be compared with the magnitude.
+        """
+        if isinstance(other, Vec):
+            return (
+                self.x >= other.x and
+                self.y >= other.y and
+                self.z >= other.z
+            )
+        elif isinstance(other, tuple):
+            return (
+                self.x >= other[0] and
+                self.y >= other[1] and
+                self.z >= other[2]
+            )
+        else:
+            try:
+                return self.mag() >= float(other)
             except ValueError:
                 return NotImplemented
 
