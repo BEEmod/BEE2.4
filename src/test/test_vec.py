@@ -98,13 +98,69 @@ class VecTest(unittest.TestCase):
             assertVec(0 // Vec(x, y, z), 0, 0, 0)
             assertVec(0 % Vec(x, y, z), 0, 0, 0)
 
-    def test_eq(self):
-        for x, y, z in iter_vec(VALID_ZERONUMS):
-            test = Vec(x, y, z)
-            self.assertEqual(test, test)
-            self.assertEqual(test, Vec_tuple(x, y, z))
-            self.assertEqual(test, (x, y, z))
-            self.assertEqual(test, test.mag())
+    def test_order(self):
+        """Test ordering operations (>, <, <=, >=, ==)."""
+        comp_ops = [op.eq, op.le, op.lt, op.ge, op.gt, op.ne]
+
+        def test(x1, y1, z1, x2, y2, z2):
+            """Check a Vec pair for incorrect comparisons."""
+            vec1 = Vec(x1, y1, z1)
+            vec2 = Vec(x2, y2, z2)
+            for op_func in comp_ops:
+                if op_func is op.ne:
+                    # special-case - != uses or, not and
+                    corr_result = x1 != x2 or y1 != y2 or z1 != z2
+                else:
+                    corr_result = op_func(x1, x2) and op_func(y1, y2) and op_func(z1, z2)
+                comp = (
+                    'Incorrect {{}} comparison for '
+                    '({} {} {}) {} ({} {} {})'.format(
+                        x1, y1, z1, op_func.__name__, x2, y2, z2
+                    )
+                )
+                self.assertEqual(
+                    op_func(vec1, vec2),
+                    corr_result,
+                    comp.format('Vec')
+                )
+                self.assertEqual(
+                    op_func(vec1, Vec_tuple(x2, y2, z2)),
+                    corr_result,
+                    comp.format('Vec_tuple')
+                )
+                self.assertEqual(
+                    op_func(vec1, (x2, y2, z2)),
+                    corr_result,
+                    comp.format('tuple')
+                )
+                # Bare numbers compare magnitude..
+                self.assertEqual(
+                    op_func(vec1, x2),
+                    op_func(vec1.mag(), x2),
+                    comp.format('x')
+                )
+                self.assertEqual(
+                    op_func(vec1, y2),
+                    op_func(vec1.mag(), y2),
+                    comp.format('y')
+                )
+                self.assertEqual(
+                    op_func(vec1, z2),
+                    op_func(vec1.mag(), z2),
+                    comp.format('z')
+                )
+
+        for num in VALID_ZERONUMS:
+            for num2 in VALID_ZERONUMS:
+                # Test the whole comparison, then each axis pair seperately
+                test(num, num, num, num2, num2, num2)
+                test(0, num, num, num2, num2, num2)
+                test(num, 0, num, num, num2, num2)
+                test(num, num, 0, num2, num2, num2)
+                test(num, num, num, 0, num2, num2)
+                test(num, num, num, num, 0, num2)
+                test(num, num, num, num, num, 0)
+
 
 if __name__ == '__main__':
     unittest.main()
