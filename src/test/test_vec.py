@@ -21,31 +21,34 @@ def iter_vec(nums):
                 yield x, y, z
 
 
-def assertVec(vec, x, y, z, msg=''):
-    """Asserts that Vec is equal to (x,y,z)."""
-    # Trickery to get the calling method's self variable..
-    self = sys._getframe(1).f_locals['self']
+class VecTest(unittest.TestCase):
 
-    msg = '{!r} != ({}, {}, {}) [{}]'.format(vec, x, y, z, msg)
-    self.assertAlmostEqual(vec.x, x, msg=msg)
-    self.assertAlmostEqual(vec.y, y, msg=msg)
-    self.assertAlmostEqual(vec.z, z, msg=msg)
 
+    def assertVec(self, vec, x, y, z, msg=''):
+        """Asserts that Vec is equal to (x,y,z)."""
+        _skip_me = True
+        new_msg = '{!r} != ({}, {}, {})'.format(vec, x, y, z)
+        if msg:
+            new_msg += ': ' + msg
+
+        self.assertAlmostEqual(vec.x, x, msg=new_msg)
+        self.assertAlmostEqual(vec.y, y, msg=new_msg)
+        self.assertAlmostEqual(vec.z, z, msg=new_msg)
 
 class VecTest(unittest.TestCase):
     def test_construction(self):
         """Check various parts of the construction."""
         for x, y, z in iter_vec(VALID_ZERONUMS):
-            assertVec(Vec(x, y, z), x, y, z)
-            assertVec(Vec(x, y), x, y, 0)
-            assertVec(Vec(x), x, 0, 0)
+            self.assertVec(Vec(x, y, z), x, y, z)
+            self.assertVec(Vec(x, y), x, y, 0)
+            self.assertVec(Vec(x), x, 0, 0)
 
-            assertVec(Vec([x, y, z]), x, y, z)
-            assertVec(Vec([x, y], z=z), x, y, z)
-            assertVec(Vec([x], y=y, z=z), x, y, z)
-            assertVec(Vec([x]), x, 0, 0)
-            assertVec(Vec([x, y]), x, y, 0)
-            assertVec(Vec([x, y, z]), x, y, z)
+            self.assertVec(Vec([x, y, z]), x, y, z)
+            self.assertVec(Vec([x, y], z=z), x, y, z)
+            self.assertVec(Vec([x], y=y, z=z), x, y, z)
+            self.assertVec(Vec([x]), x, 0, 0)
+            self.assertVec(Vec([x, y]), x, y, 0)
+            self.assertVec(Vec([x, y, z]), x, y, z)
 
     def test_scalar(self):
         """Check that Vec() + 5, -5, etc does the correct thing.
@@ -66,14 +69,14 @@ class VecTest(unittest.TestCase):
             for x, y, z in iter_vec(domain):
                 for num in domain:
                     targ = Vec(x, y, z)
-                    assertVec(
+                    self.assertVec(
                         op_func(targ, num),
                         op_func(x, num),
                         op_func(y, num),
                         op_func(z, num),
                         'Forward ' + op_name,
                     )
-                    assertVec(
+                    self.assertVec(
                         op_func(num, targ),
                         op_func(num, x),
                         op_func(num, y),
@@ -82,9 +85,9 @@ class VecTest(unittest.TestCase):
                     )
 
                     # Ensure they haven't modified the original
-                    assertVec(targ, x, y, z)
+                    self.assertVec(targ, x, y, z)
 
-                    assertVec(
+                    self.assertVec(
                         op_ifunc(num, targ),
                         op_func(num, x),
                         op_func(num, y),
@@ -94,9 +97,9 @@ class VecTest(unittest.TestCase):
     def test_scalar_zero(self):
         """Check zero behaviour with division ops."""
         for x, y, z in iter_vec(VALID_NUMS):
-            assertVec(0 / Vec(x, y, z), 0, 0, 0)
-            assertVec(0 // Vec(x, y, z), 0, 0, 0)
-            assertVec(0 % Vec(x, y, z), 0, 0, 0)
+            self.assertVec(0 / Vec(x, y, z), 0, 0, 0)
+            self.assertVec(0 // Vec(x, y, z), 0, 0, 0)
+            self.assertVec(0 % Vec(x, y, z), 0, 0, 0)
 
     def test_order(self):
         """Test ordering operations (>, <, <=, >=, ==)."""
