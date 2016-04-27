@@ -985,7 +985,6 @@ def __i{func}__(self, other):
         self.x {op}= other.x
         self.y {op}= other.y
         self.z {op}= other.z
-        return self
     elif isinstance(other, tuple):
         self.x {op}= other[0]
         self.y {op}= other[1]
@@ -1001,7 +1000,7 @@ def __i{func}__(self, other):
             raise TypeError(
                 'Cannot add {{}} to Vector!'.format(type(other))
             ) from e
-        return self
+    return self
 '''
 
 # Multiplication and division doesn't work with two vectors - use dot/cross
