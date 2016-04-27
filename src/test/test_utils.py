@@ -1,6 +1,4 @@
 """Test functions in utils."""
-import set_path
-
 import unittest
 
 import utils

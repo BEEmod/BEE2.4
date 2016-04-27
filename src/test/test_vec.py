@@ -1,5 +1,4 @@
 """Test the Vector object."""
-import set_path
 import sys
 
 import unittest
@@ -13,6 +12,7 @@ VALID_NUMS = [
 VALID_NUMS += [-x for x in VALID_NUMS]
 
 VALID_ZERONUMS = VALID_NUMS + [0, -0]
+
 
 def iter_vec(nums):
     for x in nums:
