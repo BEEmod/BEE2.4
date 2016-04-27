@@ -105,6 +105,102 @@ class VecTest(unittest.TestCase):
                         op_func(num, z),
                         'Reversed ' + op_name,
                     )
+
+    def test_vec_plus_or_minus_vec(self):
+        """Check that Vec() +/- Vec() does the correct thing.
+
+        For +, -, two Vectors apply the operations to all values.
+        """
+        operators = [
+            ('+', op.add, op.iadd),
+            ('-', op.sub, op.isub),
+        ]
+
+        def test(x1, y1, z1, x2, y2, z2, self=self):
+            """Check a Vec pair for addition and subtraction."""
+            vec1 = Vec(x1, y1, z1)
+            vec2 = Vec(x2, y2, z2)
+            for op_name, op_func, op_ifunc in operators:
+                result = (
+                    op_func(x1, x2),
+                    op_func(y1, y2),
+                    op_func(z1, z2),
+                )
+                self.assertVec(
+                    op_func(vec1, vec2),
+                    *result,
+                    msg='Vec({} {} {}) {} Vec({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+                # Ensure they haven't modified the originals
+                self.assertVec(vec1, x1, y1, z1)
+                self.assertVec(vec2, x2, y2, z2)
+
+                self.assertVec(
+                    op_func(vec1, Vec_tuple(x2, y2, z2)),
+                    *result,
+                    msg='Vec({} {} {}) {} Vec_tuple({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+                self.assertVec(vec1, x1, y1, z1)
+
+                self.assertVec(
+                    op_func(Vec_tuple(x1, y1, z1), vec2),
+                    *result,
+                    msg='Vec_tuple({} {} {}) {} Vec({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+
+                self.assertVec(vec2, x2, y2, z2)
+
+                new_vec1 = Vec(x1, y1, z1)
+                self.assertVec(
+                    op_ifunc(new_vec1, vec2),
+                    *result,
+                    msg='Return val: ({} {} {}) {}= ({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+                # Check it modifies the original object too.
+                self.assertVec(
+                    new_vec1,
+                    *result,
+                    msg='Original: ({} {} {}) {}= ({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+
+                new_vec1 = Vec(x1, y1, z1)
+                self.assertVec(
+                    op_ifunc(new_vec1, tuple(vec2)),
+                    *result,
+                    msg='Return val: ({} {} {}) {}= tuple({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+                # Check it modifies the original object too.
+                self.assertVec(
+                    new_vec1,
+                    *result,
+                    msg='Original: ({} {} {}) {}= tuple({} {} {})'.format(
+                        x1, y1, z1, op_name, x2, y2, z2,
+                    )
+                )
+
+        for num in VALID_ZERONUMS:
+            for num2 in VALID_ZERONUMS:
+                # Test the whole value, then each axis individually
+                test(num, num, num, num2, num2, num2)
+                test(0, num, num, num2, num2, num2)
+                test(num, 0, num, num, num2, num2)
+                test(num, num, 0, num2, num2, num2)
+                test(num, num, num, 0, num2, num2)
+                test(num, num, num, num, 0, num2)
+                test(num, num, num, num, num, 0)
+
     def test_scalar_zero(self):
         """Check zero behaviour with division ops."""
         for x, y, z in iter_vec(VALID_NUMS):
