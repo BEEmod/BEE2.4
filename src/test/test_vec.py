@@ -22,7 +22,19 @@ def iter_vec(nums):
 
 
 class VecTest(unittest.TestCase):
+    def run(self, result=None):
+        # Patch the result to skip over VecTest.assertVec in tracebacks
+        result = result or unittest.TestResult()
+        bound_tb_level = result._is_relevant_tb_level
 
+        def is_relevant_tb_level(tb):
+            if tb.tb_frame.f_code is VecTest.assertVec.__code__:
+                return True
+            return bound_tb_level(tb)
+
+        result._is_relevant_tb_level = is_relevant_tb_level
+
+        return super().run(result)
 
     def assertVec(self, vec, x, y, z, msg=''):
         """Asserts that Vec is equal to (x,y,z)."""
@@ -35,7 +47,6 @@ class VecTest(unittest.TestCase):
         self.assertAlmostEqual(vec.y, y, msg=new_msg)
         self.assertAlmostEqual(vec.z, z, msg=new_msg)
 
-class VecTest(unittest.TestCase):
     def test_construction(self):
         """Check various parts of the construction."""
         for x, y, z in iter_vec(VALID_ZERONUMS):
