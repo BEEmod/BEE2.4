@@ -1,6 +1,4 @@
 """Test the Vector object."""
-import sys
-
 import unittest
 import operator as op
 
@@ -80,13 +78,18 @@ class VecTest(unittest.TestCase):
             for x, y, z in iter_vec(domain):
                 for num in domain:
                     targ = Vec(x, y, z)
-                    self.assertVec(
-                        op_func(targ, num),
+                    rx, ry, rz = (
                         op_func(x, num),
                         op_func(y, num),
                         op_func(z, num),
+                    )
+
+                    self.assertVec(
+                        op_func(targ, num),
+                        rx, ry, rz,
                         'Forward ' + op_name,
                     )
+
                     self.assertVec(
                         op_func(num, targ),
                         op_func(num, x),
@@ -99,11 +102,19 @@ class VecTest(unittest.TestCase):
                     self.assertVec(targ, x, y, z)
 
                     self.assertVec(
-                        op_ifunc(num, targ),
-                        op_func(num, x),
-                        op_func(num, y),
-                        op_func(num, z),
-                        'Reversed ' + op_name,
+                        op_ifunc(targ, num),
+                        rx, ry, rz,
+                        'Return value for ({} {} {}) {}= {}'.format(
+                            x, y, z, op_name, num,
+                        ),
+                    )
+                    # Check that the original was modified..
+                    self.assertVec(
+                        targ,
+                        rx, ry, rz,
+                        'Original for ({} {} {}) {}= {}'.format(
+                            x, y, z, op_name, num,
+                        ),
                     )
 
     def test_vec_plus_or_minus_vec(self):
@@ -116,7 +127,7 @@ class VecTest(unittest.TestCase):
             ('-', op.sub, op.isub),
         ]
 
-        def test(x1, y1, z1, x2, y2, z2, self=self):
+        def test(x1, y1, z1, x2, y2, z2):
             """Check a Vec pair for addition and subtraction."""
             vec1 = Vec(x1, y1, z1)
             vec2 = Vec(x2, y2, z2)
