@@ -50,6 +50,7 @@ false_strings = ['0', 'false', 'no', 'faLse', 'False', 'No', 'NO', 'nO']
 true_strings = ['1', 'true', 'yes', 'True', 'trUe', 'Yes', 'yEs', 'yeS']
 
 non_ints = ['-23894.0', '', 'hello', '5j', '6.2', '0.2', '6.9', None, object()]
+non_floats = ['5j', '', 'hello', '6.2.5', '4F', '100-', None, object(), float]
 
 def_vals = [
     1, 0, True, False, None, object(),
@@ -69,16 +70,18 @@ class TestConvFunc(unittest.TestCase):
         for string, result in ints:
             self.assertEqual(utils.conv_int(string), result)
 
+    def test_conv_int_fails_on_float(self):
         # Check that float values fail
         marker = object()
         for string, result in floats:
-            if isinstance(string, str): # We don't want to check float-rounding
+            if isinstance(string, str):  # We don't want to check float-rounding
                 self.assertIs(
                     utils.conv_int(string, marker),
                     marker,
                     msg=string,
                 )
 
+    def test_conv_int_fails_on_str(self):
         for string in non_ints:
             self.assertEqual(utils.conv_int(string), 0)
             for default in def_vals:
@@ -105,6 +108,14 @@ class TestConvFunc(unittest.TestCase):
             self.assertEqual(utils.conv_float(string), float(result))
             self.assertEqual(utils.conv_float(string), result)
 
+    def test_conv_float_fails_on_str(self):
+        for string in non_floats:
+            self.assertEqual(utils.conv_float(string), 0)
+            for default in def_vals:
+                # Check all default values pass through unchanged
+                self.assertIs(utils.conv_float(string, default), default)
+
 
 if __name__ == '__main__':
     unittest.main()
+
