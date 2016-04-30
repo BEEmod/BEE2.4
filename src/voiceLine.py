@@ -130,7 +130,7 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name in ('priority', 'name', 'line', 'line_sp', 'line_coop'):
+            if name in ('priority', 'name', 'id', 'line', 'line_sp', 'line_coop'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
