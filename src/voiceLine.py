@@ -201,7 +201,8 @@ def add_choreo(
             vmfLib.Output('OnUser1', targetname, 'Start', only_once=only_once)
         )
 
-    if is_last and only_once:
+    if only_once:
+        # Remove each section after it's played..
         choreo.add_out(
             vmfLib.Output('OnCompletion', '!self', 'Kill'),
         )
