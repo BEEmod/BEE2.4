@@ -393,11 +393,12 @@ def follow_main(_=None):
 
 def hide_context(_=None):
     """Hide the properties window, if it's open."""
-    global is_open
+    global is_open, selected_item, selected_sub_item
     if is_open:
         is_open = False
         prop_window.withdraw()
         snd.fx('contract')
+        selected_item = selected_sub_item = None
 
 
 def init_widgets():
