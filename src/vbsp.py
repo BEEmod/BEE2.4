@@ -1164,14 +1164,14 @@ def set_player_portalgun(inst):
             'OnMapSpawn',
             '@player_has_blue',
             'Trigger',
-            times=1,
+            only_once=True,
         ))
     if oran_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '@player_has_oran',
             'Trigger',
-            times=1,
+            only_once=True,
         ))
 
     LOGGER.info('Done!')
