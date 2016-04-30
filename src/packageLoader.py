@@ -1033,7 +1033,7 @@ class QuotePack(PakObject):
             self,
             quote_id,
             selitem_data: 'SelitemData',
-            config,
+            config: Property,
             chars=None,
             skin=None,
             ):
@@ -1094,7 +1094,7 @@ class QuotePack(PakObject):
         if exp_data.selected is None:
             return  # No quote pack!
 
-        for voice in data['QuotePack']:
+        for voice in data['QuotePack']:  # type: QuotePack
             if voice.id == exp_data.selected:
                 break
         else:
@@ -1102,8 +1102,15 @@ class QuotePack(PakObject):
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
             )
 
-        vbsp_config = exp_data.vbsp_conf
-        vbsp_config += voice.config
+        vbsp_config = exp_data.vbsp_conf  # type: Property
+
+        # We want to strip 'trans' sections from the voice pack, since
+        # they're not useful.
+        for prop in voice.config:
+            if prop.name == 'quotes':
+                vbsp_config.append(QuotePack.strip_quote_data(prop))
+            else:
+                vbsp_config.append(prop)
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
@@ -1145,6 +1152,33 @@ class QuotePack(PakObject):
                 LOGGER.info('Written "{}voice.cfg"', prefix)
             else:
                 LOGGER.info('No {} voice config!', pretty)
+
+    @staticmethod
+    def strip_quote_data(prop: Property, _depth=0):
+        """Strip unused property blocks from the config files.
+
+        This removes data like the captions which the compiler doesn't need.
+        The returned property tree is a deep-copy of the original.
+        """
+        children = []
+        for sub_prop in prop:
+            # Make sure it's in the right nesting depth - flags might
+            # have arbitrary props in lower depths..
+            LOGGER.info('{} {}', sub_prop.name, _depth)
+            if _depth == 3:  # 'Line' blocks
+                if sub_prop.name == 'trans':
+                    continue
+                elif sub_prop.name == 'name' and 'id' in prop:
+                    continue  # The name isn't needed if an ID is available
+            elif _depth == 2 and sub_prop.name == 'name':
+                # In the "quote" section, the name isn't used in the compiler.
+                continue
+
+            if sub_prop.has_children():
+                children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
+            else:
+                children.append(Property(sub_prop.real_name, sub_prop.value))
+        return Property(prop.real_name, children)
 
 
 class Skybox(PakObject):
