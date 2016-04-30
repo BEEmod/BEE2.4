@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 import os
 import os.path
 import io
@@ -12,6 +13,7 @@ LOGGER = utils.getLogger(__name__)
 PAL_DIR = "palettes\\"
 
 pal_list = []
+
 
 class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
@@ -35,15 +37,20 @@ class Palette:
             if os.path.isdir(path) or os.path.isfile(path):
                 LOGGER.warning('"' + name + '" exists already!')
                 return False
-        try:
+        close_stack = ExitStack()
+        with close_stack:
             if is_zip:
                 pos_file = io.StringIO()
                 prop_file = io.StringIO()
             else:
                 if not os.path.isdir(path):
                     os.mkdir(path)
-                pos_file = open(os.path.join(path, 'positions.txt'), 'w')
-                prop_file = open(os.path.join(path, 'properties.txt'), 'w')
+                pos_file = close_stack.enter_context(
+                    open(os.path.join(path, 'positions.txt'), 'w')
+                )
+                prop_file = close_stack.enter_context(
+                    open(os.path.join(path, 'properties.txt'), 'w')
+                )
 
             for ind, (item_id, item_sub) in enumerate(self.pos):
                 if ind % 4 == 0:
@@ -60,9 +67,6 @@ class Palette:
                 with zipfile.ZipFile(path, 'w') as zip_file:
                     zip_file.writestr('properties.txt', prop_file.getvalue())
                     zip_file.writestr('positions.txt', pos_file.getvalue())
-        finally:
-            pos_file.close()
-            prop_file.close()
 
     def delete_from_disk(self, name=None):
         """Delete this palette from disk."""
@@ -77,7 +81,7 @@ class Palette:
 
 
 def load_palettes(pal_dir):
-    "Scan and read in all palettes in the specified directory."
+    """Scan and read in all palettes in the specified directory."""
     global PAL_DIR, pal_list
     PAL_DIR = os.path.abspath(os.path.join('..', pal_dir))
     full_dir = os.path.join(os.getcwd(), PAL_DIR)
