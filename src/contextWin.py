@@ -32,7 +32,7 @@ OPEN_IN_TAB = 2
 
 wid = {}
 
-selected_item = None # type: UI.Item
+selected_item = None  # type: UI.Item
 selected_sub_item = None  # type: UI.PalItem
 is_open = False
 
@@ -169,28 +169,7 @@ def show_prop(widget, warp_cursor=False):
     selected_sub_item = widget
     is_open = True
 
-    icon_widget = wid['subitem', pos_for_item()]
-
-    # Calculate the pixel offset between the window and the subitem in
-    # the properties dialog, and shift if needed to keep it inside the
-    # window
-    loc_x, loc_y = utils.adjust_inside_screen(
-        x=(
-            widget.winfo_rootx()
-            + prop_window.winfo_rootx()
-            - icon_widget.winfo_rootx()
-        ),
-        y=(
-            widget.winfo_rooty()
-            + prop_window.winfo_rooty()
-            - icon_widget.winfo_rooty()
-        ),
-        win=prop_window,
-    )
-
-    prop_window.geometry('+{x!s}+{y!s}'.format(x=loc_x, y=loc_y))
-    prop_window.relX = loc_x-TK_ROOT.winfo_x()
-    prop_window.relY = loc_y-TK_ROOT.winfo_y()
+    adjust_position()
 
     if off_x is not None and off_y is not None:
         # move the mouse cursor
@@ -381,14 +360,38 @@ def load_item_data():
         set_sprite(SPR.ROTATION, 'rot_paint')
 
 
-def follow_main(_=None):
-    """Move the properties window to keep a relative offset to the main window.
+def adjust_position(_=None):
+    """Move the properties window onto the selected item.
 
+    We call this constantly, so the property window will not go outside
+    the screen, and snap back to the item when the main window returns.
     """
-    prop_window.geometry('+{x}+{y}'.format(
-        x=prop_window.relX + TK_ROOT.winfo_x(),
-        y=prop_window.relY + TK_ROOT.winfo_y(),
-    ))
+    if not is_open or selected_sub_item is None:
+        return
+
+    # Calculate the pixel offset between the window and the subitem in
+    # the properties dialog, and shift if needed to keep it inside the
+    # window
+    icon_widget = wid['subitem', pos_for_item()]
+
+    loc_x, loc_y = utils.adjust_inside_screen(
+        x=(
+            selected_sub_item.winfo_rootx()
+            + prop_window.winfo_rootx()
+            - icon_widget.winfo_rootx()
+        ),
+        y=(
+            selected_sub_item.winfo_rooty()
+            + prop_window.winfo_rooty()
+            - icon_widget.winfo_rooty()
+        ),
+        win=prop_window,
+    )
+
+    prop_window.geometry('+{x!s}+{y!s}'.format(x=loc_x, y=loc_y))
+
+# When the main window moves, move the context window also.
+TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
 def hide_context(_=None):
@@ -409,8 +412,6 @@ def init_widgets():
     prop_window.resizable(False, False)
     prop_window.transient(master=TK_ROOT)
     prop_window.attributes('-topmost', 1)
-    prop_window.relX = 0
-    prop_window.relY = 0
     prop_window.withdraw()  # starts hidden
 
     f = ttk.Frame(prop_window, relief="raised", borderwidth="4")

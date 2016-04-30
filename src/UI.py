@@ -1783,7 +1783,6 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    TK_ROOT.bind("<Configure>", contextWin.follow_main, add='+')
     refresh_pal_ui()
 
     def style_select_callback(style_id):
