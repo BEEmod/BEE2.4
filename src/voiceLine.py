@@ -336,7 +336,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                 vbsp.PACK_FILES.add(prop.value)
         elif name == 'choreo_name':
             # Change the targetname used for subsequent entities
-            targetname = quote['choreo_name', targetname]
+            targetname = prop.value
         elif name == 'onlyonce':
             only_once = utils.conv_bool(prop.value)
 
