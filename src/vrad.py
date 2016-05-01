@@ -120,7 +120,7 @@ MUSIC_GEL_SPEED_MAIN = """\
 \t\t"import_stack" "p2_update_music_play_speed_gel"
 \t\t"speed_velocity_trigger"
 \t\t\t{
-\t\t\t"input2" "250"
+\t\t\t"input2" "300"
 \t\t\t}
 \t\t"speed_play_entry"
 \t\t\t{
