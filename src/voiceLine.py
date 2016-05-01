@@ -217,6 +217,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
     only_once = False
     cc_emit_name = None
     added_ents = []
+    end_commands = []
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
@@ -237,6 +238,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             # voice lines.
             # If the name is set to '@glados_line', the ents will be named
             # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
+            LOGGER.info('End-commands: {}', '\n'.join(map(str,end_commands)))
             if prop.has_children():
                 secondary_name = targetname.lstrip('@') + '_'
                 # Evenly distribute the choreo ents across the width of the
@@ -256,7 +258,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                         targetname=name,
                         loc=start + off * (ind - 1),
                         use_dings=use_dings,
-                        is_first=(ind == 1),
+                        is_first=is_first,
                         is_last=is_last,
                         only_once=only_once,
                     )
@@ -270,15 +272,23 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                         ))
                     if is_first:  # Ensure this works with cc_emit
                         added_ents.append(choreo)
+                    if is_last:
+                        for out in end_commands:
+                            choreo.add_out(out.copy())
+                        end_commands.clear()
             else:
                 # Add a single choreo command.
-                added_ents.append(add_choreo(
+                choreo = add_choreo(
                     prop.value,
                     targetname,
                     quote_loc,
                     use_dings=use_dings,
                     only_once=only_once,
-                ))
+                )
+                added_ents.append(choreo)
+                for out in end_commands:
+                    choreo.add_out(out.copy())
+                end_commands.clear()
         elif name == 'snd':
             snd = VMF.create_ent(
                 classname='ambient_generic',
@@ -339,6 +349,16 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             targetname = prop.value
         elif name == 'onlyonce':
             only_once = utils.conv_bool(prop.value)
+        elif name == 'endcommand':
+            end_commands.append(vmfLib.Output(
+                'OnCompletion',
+                prop['target'],
+                prop['input'],
+                prop['parm', ''],
+                utils.conv_float(prop['delay']),
+                only_once=utils.conv_bool(prop['only_once', None]),
+                times=utils.conv_int(prop['times', None], -1),
+            ))
 
     if cc_emit_name:
         for ent in added_ents:
