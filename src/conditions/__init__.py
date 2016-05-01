@@ -817,22 +817,10 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
     LocalKeys keys will be changed to use instance-local names, where needed.
     If suffix is set, it is a suffix to the two prop_block names
     """
-    for prop in prop_block.find_key('Keys'+suffix, []):
-        if prop.value.startswith('$'):
-            if prop.value in inst.fixup:
-                ent[prop.real_name] = inst.fixup[prop.value]
-            else:
-                LOGGER.warning(
-                    'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
-                    prop.value,
-                    inst['targetname'],
-                    inst,
-                    inst.fixup._fixup
-                )
-        else:
-            ent[prop.real_name] = prop.value
+    for prop in prop_block.find_key('Keys' + suffix, []):
+        ent[prop.real_name] = resolve_value(inst, prop.value)
     name = inst['targetname', ''] + '-'
-    for prop in prop_block.find_key('LocalKeys'+suffix, []):
+    for prop in prop_block.find_key('LocalKeys' + suffix, []):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -841,6 +829,24 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
             ent[prop.real_name] = val
         else:
             ent[prop.real_name] = name + val
+
+
+def resolve_value(inst: VLib.Entity, value: str):
+    """If a value starts with '$', lookup the associated var."""
+    if value.startswith('$'):
+        if value in inst.fixup:
+            return inst.fixup[value]
+        else:
+            LOGGER.warning(
+                'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
+                value,
+                inst['targetname'],
+                inst,
+                inst.fixup._fixup
+            )
+            return ''
+    else:
+        return value
 
 
 def load_templates():
