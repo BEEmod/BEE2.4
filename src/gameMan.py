@@ -555,8 +555,15 @@ class Game:
                     else:
                         # It's a custom definition, remove from editoritems
                         inst_block.value.remove(inst)
+
+                        # Allow the name to start with 'bee2_' also to match
+                        # the <> definitions - it's ignored though.
+                        name = inst.name
+                        if name[:5] == 'bee2_':
+                            name = name[5:]
+
                         cust_inst.set_key(
-                            (item['type'], inst.name),
+                            (item['type'], name),
                             # Allow using either the normal block format,
                             # or just providing the file - we don't use the
                             # other values.
