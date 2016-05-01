@@ -401,10 +401,12 @@ def load_palette(data):
 
 def load_settings():
     """Load options from the general config file."""
+    global selectedPalette
     try:
-        selectedPalette_radio.set(int(GEN_OPTS['Last_Selected']['palette']))
+        selectedPalette = GEN_OPTS.get_int('Last_Selected', 'palette')
     except (KeyError, ValueError):
         pass  # It'll be set to the first palette by default, and then saved
+    selectedPalette_radio.set(selectedPalette)
     GEN_OPTS.has_changed = False
 
     optionWindow.load()
@@ -425,7 +427,7 @@ def load_packages(data):
         item_list[it.id] = it
         loader.step("IMG")
 
-    StyleVarPane.add_vars(data['StyleVar'])
+    StyleVarPane.add_vars(data['StyleVar'], data['Style'])
 
     # THese item types don't appear anywhere in the UI, so we just save them.
     for packlist in data['PackList']:
@@ -601,6 +603,7 @@ def load_packages(data):
              'elevator rooms. Not all styles feature these. If set to "None", '
              'a random video will be selected each time the map is played, '
              'like in the default PeTI.',
+        readonly_desc='This style does not have a elevator video screen.',
         has_none=True,
         has_def=True,
         none_desc='Choose a random video.',
@@ -733,7 +736,7 @@ def export_editoritems(_=None):
     style_vars = {
         var.id: (style_vals[var.id].get() == 1)
         for var in
-        StyleVarPane.var_list
+        StyleVarPane.VAR_LIST
         if var.applies_to_style(chosen_style)
     }
 
@@ -802,6 +805,7 @@ def export_editoritems(_=None):
 
     if launch_game:
         gameMan.selected_game.launch()
+        TK_ROOT.iconify()
 
 
 def set_disp_name(item, _=None):
@@ -1779,7 +1783,6 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    TK_ROOT.bind("<Configure>", contextWin.follow_main, add='+')
     refresh_pal_ui()
 
     def style_select_callback(style_id):

@@ -1,5 +1,6 @@
 # coding=utf-8
 from decimal import Decimal
+from collections import namedtuple
 import itertools
 import random
 import os
@@ -27,13 +28,21 @@ QUOTE_EVENTS = {}  # id -> instance mapping
 QUOTE_DATA = Property('Quotes', [])
 
 ALLOW_MID_VOICES = False
-VMF = None
+VMF = None  # type: vmfLib.VMF
 
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/BEE2/voice/'
 
 # The location of the responses script.
 RESP_LOC = 'bee2/inject/response_data.nut'
+
+RESP_HAS_NAMES = {
+    'death_goo': 'goo',
+    'death_turret': 'turret',
+    'death_laserfield': 'laserfield',
+}
+
+PossibleQuote = namedtuple('PossibleQuote', 'priority, lines')
 
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -48,15 +57,26 @@ fake_inst = vmfLib.VMF().create_ent(
 
 def has_responses():
     """Check if we have any valid 'response' data for Coop."""
-    LOGGER.info([prop.name for prop in QUOTE_DATA])
     return 'CoopResponses' in QUOTE_DATA
 
 
-def generate_resp_script(file):
+def generate_resp_script(file, allow_dings):
     """Write the responses section into a file."""
+    use_dings = allow_dings
+
     config = ConfigFile('resp_voice.cfg', root='bee2')
     file.write("BEE2_RESPONSES <- {\n")
     for section in QUOTE_DATA.find_key('CoopResponses', []):
+        if not section.has_children() and section.name == 'use_dings':
+            # Allow overriding specifically for the response script
+            use_dings = utils.conv_bool(section.value, allow_dings)
+            continue
+
+        voice_attr = RESP_HAS_NAMES.get(section.name, '')
+        if voice_attr and not map_attr[voice_attr]:
+            continue
+            # This response catagory isn't present
+
         section_data = ['\t{} = [\n'.format(section.name)]
         for index, line in enumerate(section):
             if not config.getboolean(section.name, "line_" + str(index), True):
@@ -70,6 +90,10 @@ def generate_resp_script(file):
                 file.write(line)
             file.write('\t],\n')
     file.write('}\n')
+
+    file.write('BEE2_PLAY_DING = {};\n'.format(
+        'true' if use_dings else 'false'
+    ))
 
 
 def mode_quotes(prop_block):
@@ -93,9 +117,9 @@ def res_quote_event(inst, res):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(group, mid_quotes, conf):
+def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
     """Scan through a group, looking for applicable quote options."""
-    is_mid = (group.name == 'midinst')
+    is_mid = (group.name == 'midchamber')
 
     if is_mid:
         group_id = 'MIDCHAMBER'
@@ -106,7 +130,7 @@ def find_group_quotes(group, mid_quotes, conf):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name in ('priority', 'name', 'line', 'line_sp', 'line_coop'):
+            if name in ('priority', 'name', 'id', 'line', 'line_sp', 'line_coop'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
@@ -123,7 +147,7 @@ def find_group_quotes(group, mid_quotes, conf):
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.append(ALLOW_MID_VOICES)
+                    mid_quotes.append((line, use_dings, mid_name))
                 else:
                     poss_quotes.append(line)
             else:
@@ -133,18 +157,67 @@ def find_group_quotes(group, mid_quotes, conf):
                 )
 
         if poss_quotes:
-            yield (
+            yield PossibleQuote(
                 quote['priority', '0'],
                 poss_quotes,
-                )
+            )
 
 
-def add_quote(quote, targetname, quote_loc):
+def add_choreo(
+        c_line: str,
+        targetname: str,
+        loc: Vec,
+        use_dings=False,
+        is_first=True,
+        is_last=True,
+        only_once=False,
+):
+    # Add this to the beginning, since all scenes need it...
+    if not c_line.startswith('scenes/'):
+        c_line = 'scenes/' + c_line
+
+    choreo = VMF.create_ent(
+        classname='logic_choreographed_scene',
+        targetname=targetname,
+        origin=loc,
+        scenefile=c_line,
+        busyactor="1",  # Wait for actor to stop talking
+        onplayerdeath='0',
+    )
+
+    if use_dings:
+        # Play ding_on/off before and after the line.
+        if is_first:
+            choreo.add_out(
+                vmfLib.Output('OnUser1', '@ding_on', 'Start', only_once=only_once),
+                vmfLib.Output('OnUser1', targetname, 'Start', delay=0.2, only_once=only_once),
+            )
+        if is_last:
+            choreo.add_out(
+                vmfLib.Output('OnCompletion', '@ding_off', 'Start'),
+            )
+    elif is_first:
+        choreo.add_out(
+            vmfLib.Output('OnUser1', targetname, 'Start', only_once=only_once)
+        )
+
+    if only_once:
+        # Remove each section after it's played..
+        choreo.add_out(
+            vmfLib.Output('OnCompletion', '!self', 'Kill'),
+        )
+
+    return choreo
+
+
+def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
+    only_once = False
     cc_emit_name = None
     added_ents = []
+    end_commands = []
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
@@ -161,23 +234,61 @@ def add_quote(quote, targetname, quote_loc):
                 fixup_style='2',  # No fixup
             ))
         elif name == 'choreo':
-            c_line = prop.value
-            # Add this to the beginning, since all scenes need it...
-            if not c_line.startswith('scenes/'):
-                c_line = 'scenes/' + c_line
-
-            choreo = VMF.create_ent(
-                classname='logic_choreographed_scene',
-                targetname=targetname,
-                origin=quote_loc,
-                scenefile=c_line,
-                busyactor="1",  # Wait for actor to stop talking
-                onplayerdeath='0',
-            )
-            choreo.outputs.append(
-                vmfLib.Output('OnUser1', targetname, 'Start')
-            )
-            added_ents.append(choreo)
+            # If the property has children, the children are a set of sequential
+            # voice lines.
+            # If the name is set to '@glados_line', the ents will be named
+            # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
+            LOGGER.info('End-commands: {}', '\n'.join(map(str,end_commands)))
+            if prop.has_children():
+                secondary_name = targetname.lstrip('@') + '_'
+                # Evenly distribute the choreo ents across the width of the
+                # voice-line room.
+                off = Vec(y=120 / (len(prop) + 1))
+                start = quote_loc - (0, 60, 0) + off
+                for ind, choreo_line in enumerate(prop, start=1):  # type: int, Property
+                    is_first = (ind == 1)
+                    is_last = (ind == len(prop))
+                    name = (
+                        targetname
+                        if is_first else
+                        secondary_name + str(ind)
+                    )
+                    choreo = add_choreo(
+                        choreo_line.value,
+                        targetname=name,
+                        loc=start + off * (ind - 1),
+                        use_dings=use_dings,
+                        is_first=is_first,
+                        is_last=is_last,
+                        only_once=only_once,
+                    )
+                    # Add a IO command to start the next one.
+                    if not is_last:
+                        choreo.add_out(vmfLib.Output(
+                            'OnCompletion',
+                            secondary_name + str(ind + 1),
+                            'Start',
+                            delay=0.1,
+                        ))
+                    if is_first:  # Ensure this works with cc_emit
+                        added_ents.append(choreo)
+                    if is_last:
+                        for out in end_commands:
+                            choreo.add_out(out.copy())
+                        end_commands.clear()
+            else:
+                # Add a single choreo command.
+                choreo = add_choreo(
+                    prop.value,
+                    targetname,
+                    quote_loc,
+                    use_dings=use_dings,
+                    only_once=only_once,
+                )
+                added_ents.append(choreo)
+                for out in end_commands:
+                    choreo.add_out(out.copy())
+                end_commands.clear()
         elif name == 'snd':
             snd = VMF.create_ent(
                 classname='ambient_generic',
@@ -187,8 +298,13 @@ def add_quote(quote, targetname, quote_loc):
                 message=prop.value,
                 health='10',  # Volume
             )
-            snd.outputs.append(
-                vmfLib.Output('OnUser1', targetname, 'PlaySound')
+            snd.add_out(
+                vmfLib.Output(
+                    'OnUser1',
+                    targetname,
+                    'PlaySound',
+                    only_once=only_once,
+                )
             )
             added_ents.append(snd)
         elif name == 'bullseye':
@@ -202,7 +318,7 @@ def add_quote(quote, targetname, quote_loc):
                     # Not solid, Take No Damage, Think outside PVS
                     spawnflags='222224',
                     targetname=prop.value,
-                    origin=quote_loc,
+                    origin=quote_loc - (0, 0, 16),
                     angles='0 0 0',
                 )
                 ADDED_BULLSEYES.add(prop.value)
@@ -228,10 +344,25 @@ def add_quote(quote, targetname, quote_loc):
                 )
             else:
                 vbsp.PACK_FILES.add(prop.value)
+        elif name == 'choreo_name':
+            # Change the targetname used for subsequent entities
+            targetname = prop.value
+        elif name == 'onlyonce':
+            only_once = utils.conv_bool(prop.value)
+        elif name == 'endcommand':
+            end_commands.append(vmfLib.Output(
+                'OnCompletion',
+                prop['target'],
+                prop['input'],
+                prop['parm', ''],
+                utils.conv_float(prop['delay']),
+                only_once=utils.conv_bool(prop['only_once', None]),
+                times=utils.conv_int(prop['times', None], -1),
+            ))
 
     if cc_emit_name:
         for ent in added_ents:
-            ent.outputs.append(vmfLib.Output(
+            ent.add_out(vmfLib.Output(
                 'OnUser1',
                 '@command',
                 'Command',
@@ -239,23 +370,24 @@ def add_quote(quote, targetname, quote_loc):
             ))
 
 
-def sort_func(quote):
+def sort_func(quote: PossibleQuote):
     """The quotes will be sorted by their priority value."""
     # We use Decimal so it will adjust to whatever precision a user sets,
     # Without floating-point error.
     try:
-        return Decimal(quote[0])
+        return Decimal(quote.priority)
     except ValueError:
         # Default to priority 0
-        return Decimal()
+        return Decimal(0)
 
 
 def add_voice(
-        has_items,
-        style_vars_,
-        vmf_file,
-        map_seed,
-        ):
+        has_items: dict,
+        style_vars_: dict,
+        vmf_file: vmfLib.VMF,
+        map_seed: str,
+        use_priority=True,
+):
     """Add a voice line to the map."""
     global ALLOW_MID_VOICES, VMF, map_attr, style_vars
     LOGGER.info('Adding Voice Lines!')
@@ -287,9 +419,29 @@ def add_voice(
         thick=32,
     ))
 
-    ALLOW_MID_VOICES = not style_vars.get('NoMidVoices', False)
+    ALLOW_MID_VOICES = not style_vars.get('nomidvoices', False)
 
     mid_quotes = []
+
+    # Enable using the beep before and after choreo lines.
+    allow_dings = utils.conv_bool(QUOTE_DATA['use_dings', '0'])
+    if allow_dings:
+        VMF.create_ent(
+            classname='logic_choreographed_scene',
+            targetname='@ding_on',
+            origin=quote_loc + (-8, -16, 0),
+            scenefile='scenes/npc/glados_manual/ding_on.vcd',
+            busyactor="1",  # Wait for actor to stop talking
+            onplayerdeath='0',
+        )
+        VMF.create_ent(
+            classname='logic_choreographed_scene',
+            targetname='@ding_off',
+            origin=quote_loc + (8, -16, 0),
+            scenefile='scenes/npc/glados_manual/ding_off.vcd',
+            busyactor="1",  # Wait for actor to stop talking
+            onplayerdeath='0',
+        )
 
     # QuoteEvents allows specifiying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
@@ -307,7 +459,7 @@ def add_voice(
     if has_responses():
         LOGGER.info('Generating responses data..')
         with open(RESP_LOC, 'w') as f:
-            generate_resp_script(f)
+            generate_resp_script(f, allow_dings)
     else:
         LOGGER.info('No responses data..')
         try:
@@ -328,16 +480,19 @@ def add_voice(
     # For each group, locate the voice lines.
     for group in itertools.chain(
             QUOTE_DATA.find_all('group'),
-            QUOTE_DATA.find_all('midinst'),
+            QUOTE_DATA.find_all('midchamber'),
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
+        use_dings = utils.conv_bool(group['use_dings', ''], allow_dings)
 
         possible_quotes = sorted(
             find_group_quotes(
                 group,
                 mid_quotes,
-                conf=mid_config if group.name == 'midinst' else norm_config,
+                use_dings,
+                conf=mid_config if group.name == 'midchamber' else norm_config,
+                mid_name=quote_targetname,
             ),
             key=sort_func,
             reverse=True,
@@ -345,21 +500,34 @@ def add_voice(
 
         if possible_quotes:
 
-            choreo_loc = group['choreo_loc', quote_loc]
+            choreo_loc = Vec.from_str(group['choreo_loc', quote_loc])
 
-            chosen = possible_quotes[0][1]
+            if use_priority:
+                chosen = possible_quotes[0].lines
+            else:
+                # Chose one of the quote blocks..
+                random.seed('{}-VOICE_QUOTE_{}'.format(
+                    map_seed,
+                    len(possible_quotes),
+                ))
+                chosen = random.choice(possible_quotes).lines
 
-            LOGGER.info('Chosen: {}', '\n'.join(map(repr, chosen)))
-
-            # Join the IDs for the voice lines to the map seed,
+            # Join the IDs for
+            # the voice lines to the map seed,
             # so each quote block will chose different lines.
-            random.seed(map_seed + '-VOICE_' + '|'.join(
+            random.seed(map_seed + '-VOICE_LINE_' + '|'.join(
                 prop['id', 'ID']
                 for prop in
                 chosen
             ))
+
             # Add one of the associated quotes
-            add_quote(random.choice(chosen), quote_targetname, choreo_loc)
+            add_quote(
+                random.choice(chosen),
+                quote_targetname,
+                choreo_loc,
+                use_dings,
+            )
 
     if ADDED_BULLSEYES or utils.conv_bool(QUOTE_DATA['UseMicrophones', '']):
         # Add microphones that broadcast audio directly at players.
@@ -389,11 +557,9 @@ def add_voice(
                 origin=quote_loc,
             )
 
-    LOGGER.info('Mid quotes: {}', mid_quotes)
-    for mid_item in mid_quotes:
+    LOGGER.info('{} Mid quotes', len(mid_quotes))
+    for mid_item, use_ding, mid_name in mid_quotes:
         # Add all the mid quotes
-        target = mid_item['target', '']
-        for prop in mid_item:
-            add_quote(prop, target, quote_loc)
+        add_quote(mid_item, mid_name, quote_loc, use_ding)
 
     LOGGER.info('Done!')

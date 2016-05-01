@@ -274,7 +274,7 @@ def init_win_tab(f):
         section='General',
         item='keep_win_inside',
         desc='Keep windows inside screen',
-        tooltip='Allow sub-windows to move outside the screen borders. '
+        tooltip='Prevent sub-windows from moving outside the screen borders. '
                 'If you have multiple monitors, disable this.',
         var=KEEP_WIN_INSIDE,
     )

@@ -2,16 +2,18 @@
 
 """
 import utils
-if __name__ == '__main__' and (utils.MAC or utils.LINUX):
-    # Change directory to the location of the executable
-    # Otherwise we can't find our files!
-    # The Windows executable does this automatically.
-    import os
-    import sys
-    os.chdir(os.path.dirname(sys.argv[0]))
+if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        import os
+        import sys
+        os.chdir(os.path.dirname(sys.argv[0]))
+
+    utils.init_logging('../logs/backup.log')
 
 
-import string
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -25,6 +27,8 @@ from codecs import EncodedFile
 import time
 import os
 import shutil
+import string
+import atexit
 
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from zipfile import ZipFile, ZIP_LZMA
@@ -42,7 +46,7 @@ LOGGER = utils.getLogger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
 
-UI = {} # Holds all the widgets
+UI = {}  # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
 
@@ -252,10 +256,18 @@ def load_backup(zip_file):
     # Each P2C init requires reading in the properties file, so this may take
     # some time. Use a loading screen.
     reading_loader.set_length('READ', len(puzzles))
+    LOGGER.info('Loading {} maps..', len(puzzles))
     with reading_loader:
         for file in puzzles:
-            maps.append(P2C.from_file(file, zip_file))
+            new_map = P2C.from_file(file, zip_file)
+            maps.append(new_map)
+            LOGGER.debug(
+                'Loading {} map "{}"',
+                'coop' if new_map.is_coop else 'sp',
+                new_map.title,
+            )
             reading_loader.step('READ')
+    LOGGER.info('Done!')
 
     return maps
 
@@ -900,6 +912,15 @@ def init_toplevel():
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
 
     ui_new_backup()
+
+
+@atexit.register
+def deinit():
+    """When shutting down, we need to close the backup zipfile."""
+    for name in ('backup_zip', 'unsaved_file'):
+        obj = BACKUPS[name]
+        if obj is not None:
+            obj.close()
 
 
 if __name__ == '__main__':

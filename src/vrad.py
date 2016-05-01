@@ -120,7 +120,7 @@ MUSIC_GEL_SPEED_MAIN = """\
 \t\t"import_stack" "p2_update_music_play_speed_gel"
 \t\t"speed_velocity_trigger"
 \t\t\t{
-\t\t\t"input2" "250"
+\t\t\t"input2" "300"
 \t\t\t}
 \t\t"speed_play_entry"
 \t\t\t{
@@ -246,33 +246,6 @@ def quote(txt):
     return '"' + txt + '"'
 
 
-def set_readonly(file):
-    """Make the given file read-only."""
-    # Get the old flags
-    flags = os.stat(file).st_mode
-    # Make it read-only
-    os.chmod(
-        file,
-        flags & ~
-        stat.S_IWUSR & ~
-        stat.S_IWGRP & ~
-        stat.S_IWOTH
-    )
-
-
-def unset_readonly(file):
-    """Set the writeable flag on a file."""
-    # Get the old flags
-    flags = os.stat(file).st_mode
-    # Make it writeable
-    os.chmod(
-        file,
-        flags |
-        stat.S_IWUSR |
-        stat.S_IWGRP |
-        stat.S_IWOTH
-    )
-
 
 def load_config():
     global CONF
@@ -287,7 +260,7 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile: ZipFile, filename):
+def pack_file(zipfile: ZipFile, filename: str):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -295,6 +268,27 @@ def pack_file(zipfile: ZipFile, filename):
         filename, arcname = filename.split('\t')
     else:
         arcname = filename
+
+    if filename[-1] == '*':
+        # Pack a whole folder (blah/blah/*)
+        directory = filename[:-1]
+        file_count = 0
+        for poss_path in RES_ROOT:
+            dir_path = os.path.normpath(
+                os.path.join(poss_path, directory)
+            )
+            if not os.path.isdir(dir_path):
+                continue
+            for subfile in os.listdir(dir_path):
+                full_path = os.path.join(dir_path, subfile)
+                rel_path = os.path.join(directory, subfile)
+                zipfile.write(
+                    filename=full_path,
+                    arcname=rel_path,
+                )
+                file_count += 1
+        LOGGER.info('Packed {} files from folder "{}"', file_count, directory)
+        return
 
     for poss_path in RES_ROOT:
         full_path = os.path.normpath(
@@ -339,7 +333,7 @@ def gen_sound_manifest(additional, excludes):
 
     for script in additional:
         scripts.append(script)
-        
+
         # For our packed scripts, force the game to load them
         # (we know they're used).
         scripts.append('!' + script)
@@ -347,7 +341,7 @@ def gen_sound_manifest(additional, excludes):
     for script in excludes:
         try:
             scripts.remove(script)
-        except IndexError:
+        except ValueError:
             LOGGER.warning(
                 '"{}" should be excluded, but it\'s'
                 ' not in the manifest already!',
@@ -521,7 +515,8 @@ def pack_content(path, is_peti):
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
     except (IOError, FileNotFoundError):
-        pass
+        pass  # Assume no files if missing..
+        # There might still be things to inject.
     else:
         with pack_list:
             for line in pack_list:
@@ -706,11 +701,11 @@ def mod_screenshots():
         for screen in find_screenshots():
             LOGGER.info('Replacing "{}"...', screen)
             # Allow us to edit the file...
-            unset_readonly(screen)
+            utils.unset_readonly(screen)
             shutil.copy(scr_loc, screen)
             # Make the screenshot readonly, so P2 can't replace it.
             # Then it'll use our own
-            set_readonly(screen)
+            utils.set_readonly(screen)
 
     else:
         if mod_type != 'peti':
@@ -720,30 +715,32 @@ def mod_screenshots():
         for screen in find_screenshots():
             # Make the screenshot writeable, so P2 will replace it
             LOGGER.info('Making "{}" replaceable...', screen)
-            unset_readonly(screen)
+            utils.unset_readonly(screen)
 
 
 def run_vrad(args):
     "Execute the original VRAD."
 
+    suffix = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
+        suffix = '.exe'
 
     joined_args = (
         '"' + os.path.normpath(
-            os.path.join(os.getcwd(), "vrad" + os_suff + "_original")
-            ) +
+            os.path.join(os.getcwd(), "vrad" + os_suff + "_original" + suffix)
+        ) +
         '" ' +
         " ".join(
             # put quotes around args which contain spaces
             (quote(x) if " " in x else x)
             for x in args
-            )
         )
+    )
     LOGGER.info("Calling original VRAD...")
     LOGGER.info(joined_args)
     code = subprocess.call(

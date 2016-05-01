@@ -264,7 +264,7 @@ class Game:
                         )
                     continue
 
-                with open(info_path, 'w') as file:
+                with utils.AtomicWriter(info_path) as file:
                     for line in data:
                         file.write(line)
         if not add_line:
@@ -465,10 +465,11 @@ class Game:
                 inst_file.write(line)
         export_screen.step('EXP')
 
+        # AtomicWriter writes to a temporary file, then renames in one step.
+        # This ensures editoritems won't be half-written.
         LOGGER.info('Writing Editoritems!')
-        os.makedirs(self.abs_path('portal2_dlc2/scripts/'), exist_ok=True)
-        with open(self.abs_path(
-                'portal2_dlc2/scripts/editoritems.txt'), 'w') as editor_file:
+        with utils.AtomicWriter(self.abs_path(
+                'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
         export_screen.step('EXP')
@@ -486,8 +487,15 @@ class Game:
             if not os.path.isfile(src_path):
                 continue
 
+            dest = self.abs_path('bin/' + file)
+
             LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+
             try:
+                if os.path.isfile(dest):
+                    # First try and give ourselves write-permission,
+                    # if it's set read-only.
+                    utils.unset_readonly(dest)
                 shutil.copy(
                     src_path,
                     self.abs_path('bin/')
@@ -547,8 +555,15 @@ class Game:
                     else:
                         # It's a custom definition, remove from editoritems
                         inst_block.value.remove(inst)
+
+                        # Allow the name to start with 'bee2_' also to match
+                        # the <> definitions - it's ignored though.
+                        name = inst.name
+                        if name[:5] == 'bee2_':
+                            name = name[5:]
+
                         cust_inst.set_key(
-                            (item['type'], inst.name),
+                            (item['type'], name),
                             # Allow using either the normal block format,
                             # or just providing the file - we don't use the
                             # other values.

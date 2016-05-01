@@ -5,7 +5,7 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from tkinter import *  # ui library
-from tkinter import font
+from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
 
@@ -21,6 +21,8 @@ from tooltip import add_tooltip
 import sound
 import utils
 import tk_tools
+
+from typing import Callable
 
 LOGGER = utils.getLogger(__name__)
 
@@ -45,9 +47,25 @@ BTN_PLAY = '▶'
 BTN_STOP = '■'
 
 
-def _NO_OP(*args):
-    """The default callback, triggered whenever the chosen item is changed."""
-    pass
+class NAV_KEYS(Enum):
+    """Enum representing keys used for shifting through items.
+
+    The value is the TK key-sym value.
+    """
+    UP = 'Up'
+    DOWN = 'Down'
+    LEFT = 'Left'
+    RIGHT = 'Right'
+
+    DN = DOWN
+    LF = LEFT
+    RT = RIGHT
+
+    PG_UP = 'Prior'
+    PG_DOWN = 'Next'
+
+    HOME = 'Home'
+    END = 'End'
 
 
 class AttrTypes(Enum):
@@ -66,7 +84,7 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
             desc='',
             default=None,
             type=AttrTypes.STRING,
-            ):
+        ):
         # Set some reasonable defaults for the different types
         if default is None:
             if type is AttrTypes.STRING:
@@ -82,24 +100,26 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
         if desc != '' and not desc.endswith(': '):
             desc += ': '
 
-        return super().__new__(cls, id, type, desc, default)
+        sup = super()  # type: tuple
+        return sup.__new__(cls, id, type, desc, default)
 
-    for name in AttrTypes.__members__.keys():
+    _member_name = None
+    for _member_name in AttrTypes.__members__.keys():
         # Create a constructor for each AttrType, which presets the type
         # parameter.
-        exec("""\
+        exec('''\
 @classmethod
 def {l_name}(cls, id: str, desc='', default=None):
-    \"""An alternative constructor to create {l_name}-type attrs.\"""
-    return AttrDef(id, desc, default, AttrTypes.{name})""".format(
-            name=name,
-            l_name=name.lower()
+    """An alternative constructor to create {l_name}-type attrs."""
+    return AttrDef(id, desc, default, AttrTypes.{name})'''.format(
+            name=_member_name,
+            l_name=_member_name.lower()
         ), globals(), locals())
-
+    del _member_name
 
 SelitemData = namedtuple(
     'SelitemData',
-    'name, short_name, auth, icon, desc, group',
+    'name, short_name, auth, icon, desc, group, sort_key',
 )
 
 
@@ -181,7 +201,6 @@ class GroupHeader(ttk.Frame):
         )
 
 
-
 class Item:
     """An item on the panel.
 
@@ -210,13 +229,16 @@ class Item:
         'desc',
         'authors',
         'group',
+        'sort_key',
         'button',
         'win',
         'snd_sample',
         'context_lbl',
         'ico_file',
         'attrs',
-        ]
+        'win_x',
+        'win_y',
+    ]
 
     def __init__(
             self,
@@ -227,13 +249,15 @@ class Item:
             authors: list=None,
             desc=(('line', ''),),
             group: str=None,
+            sort_key: str=None,
             attributes: dict=None,
             snd_sample: str=None,
-            ):
+    ):
         self.name = name
         self.shortName = short_name
-        self.group = group
+        self.group = group or ''
         self.longName = long_name or short_name
+        self.sort_key = sort_key
         if len(self.longName) > 20:
             self.context_lbl = self.shortName
         else:
@@ -259,20 +283,10 @@ class Item:
         self.button = None  # type: ttk.Button
         self.win = None  # type: Toplevel
 
-    def __repr__(self):
-        return (
-            'Item({nm!r}, {shname!r}, {lname!r}, '
-            '{ico!r}, {auth!r}, {desc!r})'.format(
-                nm=self.name,
-                shname=self.shortName,
-                lname=self.longName,
-                ico=self.ico_file,
-                auth=self.authors,
-                desc=self.desc,
-            )
-        )
+        self.win_x = None  # type: int
+        self.win_y = None  # type: int
 
-    def __str__(self):
+    def __repr__(self):
         return '<Item:' + self.name + '>'
 
     @classmethod
@@ -286,8 +300,21 @@ class Item:
             authors=data.auth,
             desc=data.desc,
             group=data.group,
-            attributes=attrs
+            sort_key=data.sort_key,
+            attributes=attrs,
         )
+
+    def set_pos(self, x=None, y=None):
+        """Place the item on the palette."""
+        if x is None or y is None:
+            # Remove from the window.
+            self.button.place_forget()
+            self.win_x = self.win_y = None
+        else:
+            self.button.place(x=x, y=y)
+            self.button.lift()  # Force a particular stacking order for widgets
+            self.win_x = x
+            self.win_y = y
 
 
 class selWin:
@@ -320,10 +347,11 @@ class selWin:
             none_attrs: dict=utils.EmptyMapping,
             title='BEE2',
             desc='',
-            callback=_NO_OP,
+            readonly_desc='',
+            callback: Callable[..., None]=None,
             callback_params=(),
             attributes=(),
-            ):
+    ):
         """Create a window object.
 
         Read from .selected_id to get the currently-chosen Item name, or None
@@ -354,6 +382,7 @@ class selWin:
           otherwise they're a string.
         - desc is descriptive text to display on the window, and in the widget
           tooltip.
+        - readonly_desc will be displayed on the widget tooltip when readonly.
         """
         self.noneItem = Item(
             'NONE',
@@ -362,21 +391,40 @@ class selWin:
             attributes=dict(none_attrs),
         )
         self.noneItem.icon = img.png('BEE2/none_96')
+
+        # The textbox on the parent window.
+        self.display = None  # type: tk_tools.ReadOnlyEntry
+
+        # Variable associated with self.display.
         self.disp_label = StringVar()
-        self.display = None
-        self.disp_btn = None
+
+        # The '...' button to open our window.
+        self.disp_btn = None  # type: ttk.Button
+
+        # ID of the currently chosen item
         self.chosen_id = None
-        self.callback = callback
-        self.callback_params = callback_params
+
+        # Callback function, and positional arugments to pass
+        if callback is not None:
+            self.callback = callback
+            self.callback_params = list(callback_params)
+        else:
+            self.callback = None
+            self.callback_params = ()
+
+        # Item object for the currently suggested item.
         self.suggested = None
+
+        # Should we have the 'reset to default' button?
         self.has_def = has_def
         self.description = desc
+        self.readonly_description = readonly_desc
 
         if has_none:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]
+        self.selected = self.item_list[0]  # type: Item
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -385,16 +433,30 @@ class selWin:
         self.win.withdraw()
         self.win.title("BEE2 - " + title)
         self.win.transient(master=tk)
+
+        # Allow resizing in X and Y.
         self.win.resizable(True, True)
+
         self.win.iconbitmap('../BEE2.ico')
+
+        # Run our quit command when the exit button is pressed, or Escape
+        # on the keyboard.
         self.win.protocol("WM_DELETE_WINDOW", self.exit)
         self.win.bind("<Escape>", self.exit)
+
+        # Allow navigating with arrow keys.
+        self.win.bind("<KeyPress>", self.key_navigate)
 
         # A map from group name -> header widget
         self.group_widgets = {}
         # A map from folded name -> display name
         self.group_names = {}
         self.grouped_items = defaultdict(list)
+        # A list of folded group names in the display order.
+        self.group_order = []
+
+        # The maximum number of items that fits per row (set in flow_items)
+        self.item_width = 1
 
         if desc:
             self.desc_label = ttk.Label(
@@ -468,7 +530,7 @@ class selWin:
             relief='raised',
             width=ICON_SIZE,
             height=ICON_SIZE,
-            )
+        )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm)
@@ -483,7 +545,7 @@ class selWin:
             text="Item",
             justify=CENTER,
             font=("Helvetica", 12, "bold"),
-            )
+        )
         name_frame.grid(row=1, column=0, columnspan=4)
         name_frame.columnconfigure(0, weight=1)
         self.prop_name.grid(row=0, column=0)
@@ -531,20 +593,20 @@ class selWin:
             width=40,
             height=4,
             font="TkSmallCaptionFont",
-            )
+        )
         self.prop_desc.grid(
             row=0,
             column=0,
             padx=(2, 0),
             pady=2,
             sticky='NSEW',
-            )
+        )
 
         self.prop_scroll = tk_tools.HidingScroll(
             self.prop_desc_frm,
             orient=VERTICAL,
             command=self.prop_desc.yview,
-            )
+        )
         self.prop_scroll.grid(
             row=0,
             column=1,
@@ -558,60 +620,60 @@ class selWin:
             self.prop_frm,
             text="OK",
             command=self.save,
-            ).grid(
-                row=6,
-                column=0,
-                padx=(8, 8),
-                )
+        ).grid(
+            row=6,
+            column=0,
+            padx=(8, 8),
+            )
 
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
                 text="Reset to Default",
                 command=self.sel_suggested,
-                )
+            )
             self.prop_reset.grid(
                 row=6,
                 column=1,
                 sticky='EW',
-                )
+            )
 
         ttk.Button(
             self.prop_frm,
             text="Cancel",
             command=self.exit,
-            ).grid(
-                row=6,
-                column=2,
-                padx=(8, 8),
-                )
+        ).grid(
+            row=6,
+            column=2,
+            padx=(8, 8),
+        )
 
         self.win.option_add('*tearOff', False)
         self.context_menu = Menu(self.win)
 
-        self.norm_font = font.nametofont('TkMenuFont')
+        self.norm_font = tk_font.nametofont('TkMenuFont')
 
         # Make a font for showing suggested items in the context menu
         self.sugg_font = self.norm_font.copy()
-        self.sugg_font['weight'] = font.BOLD
+        self.sugg_font['weight'] = tk_font.BOLD
 
         # Make a font for previewing the suggested item
         self.mouseover_font = self.norm_font.copy()
-        self.mouseover_font['slant'] = font.ITALIC
+        self.mouseover_font['slant'] = tk_font.ITALIC
         self.context_var = IntVar()
 
         # The headers for the context menu
         self.context_menus = {}
 
-        # Sort alphabetically!
-        self.item_list.sort(key=attrgetter('longName'))
+        # Sort alphabetically, prefering a sort key if present.
+        self.item_list.sort(key=lambda it: it.sort_key or it.longName)
 
         for ind, item in enumerate(self.item_list):  # type: int, Item
             if item == self.noneItem:
                 item.button = ttk.Button(
                     self.pal_frame,
                     image=item.icon,
-                    )
+                )
                 item.context_lbl = '<None>'
             else:
                 item.button = ttk.Button(
@@ -619,9 +681,9 @@ class selWin:
                     text=item.shortName,
                     image=item.icon,
                     compound='top',
-                    )
+                )
 
-            group_key = item.group.casefold() if item.group else ''
+            group_key = item.group.casefold()
             self.grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
@@ -658,6 +720,10 @@ class selWin:
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
+
+        # Figure out the order for the groups - alphabetical.
+        # Note - empty string should sort to the beginning!
+        self.group_order[:] = sorted(self.grouped_items.keys())
 
         for index, (key, menu) in enumerate(
                 sorted(self.context_menus.items(), key=itemgetter(0)),
@@ -732,12 +798,12 @@ class selWin:
                 # Position in a 2-wide grid
                 desc_label.grid(
                     row=index // 2,
-                    column=(index % 2)*2,
+                    column=(index % 2) * 2,
                     sticky=E,
                 )
                 val_label.grid(
                     row=index // 2,
-                    column=(index % 2)*2 + 1,
+                    column=(index % 2) * 2 + 1,
                     sticky=W,
                 )
         else:
@@ -773,8 +839,7 @@ class selWin:
         )
         self.disp_btn.pack(side=RIGHT)
 
-        if self.description:
-            add_tooltip(self.display, self.description)
+        add_tooltip(self.display, self.description, show_when_disabled=True)
 
         self.save()
 
@@ -793,8 +858,10 @@ class selWin:
         self._readonly = bool(value)
         if value:
             new_st = ['disabled']
+            self.display.tooltip_text = self.readonly_description
         else:
             new_st = ['!disabled']
+            self.display.tooltip_text = self.description
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -874,7 +941,8 @@ class selWin:
 
     def do_callback(self):
         """Call the callback function."""
-        self.callback(self.chosen_id, *self.callback_params)
+        if self.callback is not None:
+            self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item_id(self, it_id):
         """Select the item with the given ID."""
@@ -893,6 +961,7 @@ class selWin:
             return False
 
     def sel_item(self, item: Item, _=None):
+
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
@@ -907,6 +976,7 @@ class selWin:
         self.selected.button.state(('!alternate',))
         self.selected = item
         item.button.state(('alternate',))
+        self.scroll_to(item)
 
         if self.sampler:
             is_playing = self.sampler.is_playing
@@ -956,6 +1026,134 @@ class selWin:
                         'Invalid attribute type: "{}"'.format(label.type)
                     )
 
+    def key_navigate(self, event):
+        """Navigate using arrow keys.
+
+        Allowed keys are set in NAV_KEYS
+        """
+        try:
+            key = NAV_KEYS(event.keysym)
+        except (ValueError, AttributeError):
+            LOGGER.warning(
+                'Invalid nav-key in event: {}',
+                event.__dict__
+            )
+            return
+
+        # A list of groups names, in the order that they're visible onscreen
+        # (skipping hidden ones).
+        ordered_groups = [
+            group_name
+            for group_name in self.group_order
+            if self.group_widgets[group_name].visible
+        ]
+
+        if not ordered_groups:
+            return  # No visible items!
+
+        if key is NAV_KEYS.HOME:
+            self._offset_select(
+                ordered_groups,
+                group_ind=-1,
+                item_ind=0,
+            )
+            return
+        elif key is NAV_KEYS.END:
+            self._offset_select(
+                ordered_groups,
+                group_ind=len(ordered_groups),
+                item_ind=0,
+            )
+            return
+
+        cur_group_name = self.selected.group.casefold()
+        cur_group = self.grouped_items[cur_group_name]
+
+        # The index in the current group for an item
+        item_ind = cur_group.index(self.selected)
+        # The index in the visible groups
+        group_ind = ordered_groups.index(cur_group_name)
+
+        if key is NAV_KEYS.LF:
+            item_ind -= 1
+        elif key is NAV_KEYS.RT:
+            item_ind += 1
+        elif key is NAV_KEYS.UP:
+            item_ind -= self.item_width
+        elif key is NAV_KEYS.DN:
+            item_ind += self.item_width
+
+        self._offset_select(
+            ordered_groups,
+            group_ind,
+            item_ind,
+            key is NAV_KEYS.UP or key is NAV_KEYS.DN,
+        )
+
+    def _offset_select(self, group_list, group_ind, item_ind, is_vert=False):
+        """Helper for key_navigate(), jump to the given index in a group.
+
+        group_list is sorted list of group names.
+        group_ind is the index of the current group, and item_ind is the index
+        in that group to move to.
+        If the index is above or below, it will jump to neighbouring groups.
+        """
+        if group_ind < 0:  # Jump to the first item, out of bounds
+            first_group = self.grouped_items[self.group_order[0]]
+            self.sel_item(first_group[0])
+            return
+        elif group_ind >= len(group_list):  # Ditto, last group
+            last_group = self.grouped_items[self.group_order[-1]]
+            self.sel_item(last_group[-1])
+            return
+
+        cur_group = self.grouped_items[group_list[group_ind]]
+
+        # Go back a group..
+        if item_ind < 0:
+            if group_ind == 0:  # First group - can't go back further!
+                self.sel_item(cur_group[0])
+            else:
+                prev_group = self.grouped_items[group_list[group_ind - 1]]
+                if is_vert:
+                    # Jump to the same horizontal position..
+                    row_num = math.ceil(len(prev_group) / self.item_width)
+                    item_ind += row_num * self.item_width
+                    if item_ind >= len(prev_group):
+                        # The last row is missing an item at this spot.
+                        # Jump back another row again.
+                        item_ind -= self.item_width
+                else:
+                    item_ind += len(prev_group)
+                # Recurse to check the previous group..
+                self._offset_select(
+                    group_list,
+                    group_ind - 1,
+                    item_ind,
+                )
+
+        # Go forward a group..
+        elif item_ind >= len(cur_group):
+            #  Last group - can't go forward further!
+            if group_ind == len(group_list):
+                self.sel_item(cur_group[-1])
+            else:
+                # Recurse to check the next group..
+                if is_vert:
+                    # We just jump to the same horizontal position.
+                    item_ind %= self.item_width
+                else:
+                    item_ind -= len(cur_group)
+
+                self._offset_select(
+                    group_list,
+                    group_ind + 1,
+                    item_ind,
+                )
+
+        else:  # Within this group
+            self.sel_item(cur_group[item_ind])
+
     def flow_items(self, _=None):
         """Reposition all the items to fit in the current geometry.
 
@@ -970,17 +1168,15 @@ class selWin:
         width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
         if width < 1:
             width = 1  # we got way too small, prevent division by zero
+        self.item_width = width
 
         # The offset for the current group
         y_off = 0
 
-        # Note - empty string should sort to the beginning!
-        ordered_groups = sorted(self.grouped_items.keys())
-
         # Hide suggestion indicator if the item's not visible.
         self.sugg_lbl.place_forget()
 
-        for group_key in ordered_groups:
+        for group_key in self.group_order:
             items = self.grouped_items[group_key]
             group_wid = self.group_widgets[group_key]  # type: GroupHeader
             group_wid.place(
@@ -994,7 +1190,7 @@ class selWin:
             if not group_wid.visible:
                 # Hide everything!
                 for item in items:  # type: Item
-                    item.button.place_forget()
+                    item.set_pos()
                 continue
 
             # Place each item
@@ -1005,11 +1201,10 @@ class selWin:
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
                     self.sugg_lbl['width'] = item.button.winfo_width()
-                item.button.place(
+                item.set_pos(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                item.button.lift()
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1021,6 +1216,29 @@ class selWin:
             y_off,
         )
         self.pal_frame['height'] = y_off
+
+    def scroll_to(self, item: Item):
+        """Scroll to an item so it's visible."""
+        canvas = self.wid_canvas
+
+        height = canvas.bbox(ALL)[3]  # Returns (x, y, width, height)
+
+        bottom, top = canvas.yview()
+        # The sizes are returned in fractions, but we use the pixel values
+        # for accuracy
+        bottom *= height
+        top *= height
+
+        y = item.button.winfo_y()
+
+        if bottom <= y - 8 and y + ICON_SIZE + 8 <= top:
+            return  # Already in view
+
+        # Center in the view
+        canvas.yview_moveto(
+            (y - (top - bottom) // 2)
+            / height
+        )
 
     def __contains__(self, obj):
         """Determine if the given SelWinItem or item ID is in this item list."""
@@ -1108,8 +1326,8 @@ if __name__ == '__main__':  # test the window if directly executing this file
             authors=["Valve"],
             desc=[
                 ('line', 'Pure black darkness. Nothing to see here.'),
-                ],
-            ),
+            ],
+        ),
         Item(
             "SKY_BTS",
             "BTS",
@@ -1125,9 +1343,9 @@ if __name__ == '__main__':  # test the window if directly executing this file
                 ('line', 'Abandoned offices can often be found here.'),
                 ('bullet', 'This is a bullet point, with a\n second line'),
                 ('invert', 'white-on-black text')
-                ],
-            ),
-        ]
+            ],
+        ),
+    ]
 
     window = selWin(
         TK_ROOT,

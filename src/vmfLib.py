@@ -1556,9 +1556,9 @@ class Entity:
                 for face in solid:
                     yield face
 
-    def add_out(self, output):
-        """Add the output to our list."""
-        self.outputs.append(output)
+    def add_out(self, *outputs):
+        """Add the outputs to our list."""
+        self.outputs.extend(outputs)
 
     def output_targets(self) -> Set[str]:
         """Return a set of the targetnames this entity triggers."""
@@ -1922,13 +1922,17 @@ class Output:
         input: The input to fire.
         params: Parameters to give the input, or '' for none.
         delay: The number of seconds before the output should fire.
-        times: The number of times to fire before being deleted.
-            -1 means forever, Hammer only uses (-1, 1).
+
+    Keyword only parameters:
         inst_out: The local entity for an instance output (instance:name;Output)
         inst_in: The local entity we are really triggering in instance inputs
             (instance:name;Input)
         comma_sep: Use a comma as a separator, instead of the OUTPUT_SEP
             character.
+        times: The number of times to fire before being deleted.
+            -1 means forever, Hammer only uses (-1, 1).
+        only_once: Boolean alternative to 'times', setting -1/1 based on
+            True/False.
 
     """
     __slots__ = [
@@ -1943,16 +1947,20 @@ class Output:
         'comma_sep',
     ]
 
-    def __init__(self,
-                 out: str,
-                 targ: str,
-                 inp: str,
-                 param='',
-                 delay=0.0,
-                 times=-1,
-                 inst_out: str=None,
-                 inst_in: str=None,
-                 comma_sep=False):
+    def __init__(
+        self,
+        out: str,
+        targ: str,
+        inp: str,
+        param='',
+        delay=0.0,
+        *,
+        times=-1,
+        only_once=False,
+        inst_out: str=None,
+        inst_in: str=None,
+        comma_sep=False
+    ):
         self.output = out
         self.inst_out = inst_out
         self.target = targ
@@ -1960,8 +1968,17 @@ class Output:
         self.inst_in = inst_in
         self.params = param
         self.delay = delay
-        self.times = times
+        self.times = 1 if only_once else times
         self.comma_sep = comma_sep
+
+    @property
+    def only_once(self):
+        """Check if the output is active only once."""
+        return self.times == 1
+
+    @only_once.setter
+    def only_once(self, is_once):
+        self.times = 1 if is_once else -1
 
     @staticmethod
     def parse(prop: Property):
@@ -2082,12 +2099,13 @@ class Output:
             self.output,
             self.target,
             self.input,
-            param=self.params,
+            self.params,
+            self.delay,
             times=self.times,
             inst_out=self.inst_out,
             inst_in=self.inst_in,
             comma_sep=self.comma_sep,
-            )
+        )
 
 if __name__ == '__main__':
     # Test the VMF parser by duplicating a test file

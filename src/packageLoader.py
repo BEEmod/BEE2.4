@@ -4,6 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 import operator
 from zipfile import ZipFile
 from collections import defaultdict, namedtuple
+from contextlib import ExitStack
 import os
 import os.path
 import shutil
@@ -87,7 +88,9 @@ class _PakObjectMeta(type):
         # Defer to type to create the class..
         cls = type.__new__(mcs, name, bases, namespace)
 
-        if name != 'PakObject':  # Don't register the base class itself!
+        # Only register subclasses of PakObject - those with a parent class.
+        # PakObject isn't created yet so we can't directly check that.
+        if bases:
             OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
 
         return cls
@@ -102,7 +105,7 @@ class PakObject(metaclass=_PakObjectMeta):
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
     If duplicates occur, they will be treated as overrides.
-    Set 'has_img' to control wether the object will count towards the images
+    Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
     """
     @classmethod
@@ -206,7 +209,7 @@ def get_config(
         raise
 
 
-def find_packages(pak_dir, zips, zip_name_lst):
+def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
@@ -214,18 +217,38 @@ def find_packages(pak_dir, zips, zip_name_lst):
         is_dir = os.path.isdir(name)
         if name.endswith('.zip') and os.path.isfile(name):
             zip_file = ZipFile(name)
+            # Ensure we quit close this zipfile..
+            zip_stack.enter_context(zip_file)
         elif is_dir:
             zip_file = FakeZip(name)
+            # FakeZips don't actually hold a file handle, we don't need to
+            # close them.
         else:
             LOGGER.info('Extra file: {}', name)
             continue
 
-        if 'info.txt' in zip_file.namelist():  # Is it valid?
+        LOGGER.debug('Reading package "' + name + '"')
+
+        try:
+            # Valid packages must have an info.txt file!
+            info_file = zip_file.open('info.txt')
+        except KeyError:
+            if is_dir:
+                # This isn't a package, so check the subfolders too...
+                LOGGER.debug('Checking subdir "{}" for packages...', name)
+                find_packages(name, zips, zip_stack, zip_name_lst)
+            else:
+                # Invalid, explicitly close this zipfile handle..
+                zip_file.close()
+                LOGGER.warning('ERROR: Bad package "{}"!', name)
+        else:
+            with info_file:
+                info = Property.parse(info_file, name + ':info.txt')
+
+            # Add the zipfile to the list, it's valid
             zips.append(zip_file)
             zip_name_lst.append(os.path.abspath(name))
-            LOGGER.debug('Reading package "' + name + '"')
-            with zip_file.open('info.txt') as info_file:
-                info = Property.parse(info_file, name + ':info.txt')
+
             pak_id = info['ID']
             packages[pak_id] = Package(
                 pak_id,
@@ -234,14 +257,7 @@ def find_packages(pak_dir, zips, zip_name_lst):
                 name,
             )
             found_pak = True
-        else:
-            if is_dir:
-                # This isn't a package, so check the subfolders too...
-                LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name, zips, zip_name_lst)
-            else:
-                zip_file.close()
-                LOGGER.warning('ERROR: Bad package "{}"!', name)
+
     if not found_pak:
         LOGGER.debug('No packages in folder!')
 
@@ -279,8 +295,10 @@ def load_packages(
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
     zips = []
     data['zips'] = []
-    try:
-        find_packages(pak_dir, zips, data['zips'])
+
+    # Use ExitStack to dynamically manage the zipfiles we find and open.
+    with ExitStack() as zip_stack:
+        find_packages(pak_dir, zips, zip_stack, data['zips'])
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
@@ -375,11 +393,6 @@ def load_packages(
                     with open(dest_loc, mode='wb') as dest:
                         shutil.copyfileobj(src, dest)
                 loader.step("IMG_EX")
-
-    finally:
-        # close them all, we've already read the contents.
-        for z in zips:
-            z.close()
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
@@ -1020,7 +1033,7 @@ class QuotePack(PakObject):
             self,
             quote_id,
             selitem_data: 'SelitemData',
-            config,
+            config: Property,
             chars=None,
             skin=None,
             ):
@@ -1081,7 +1094,7 @@ class QuotePack(PakObject):
         if exp_data.selected is None:
             return  # No quote pack!
 
-        for voice in data['QuotePack']:
+        for voice in data['QuotePack']:  # type: QuotePack
             if voice.id == exp_data.selected:
                 break
         else:
@@ -1089,8 +1102,15 @@ class QuotePack(PakObject):
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
             )
 
-        vbsp_config = exp_data.vbsp_conf
-        vbsp_config += voice.config
+        vbsp_config = exp_data.vbsp_conf  # type: Property
+
+        # We want to strip 'trans' sections from the voice pack, since
+        # they're not useful.
+        for prop in voice.config:
+            if prop.name == 'quotes':
+                vbsp_config.append(QuotePack.strip_quote_data(prop))
+            else:
+                vbsp_config.append(prop)
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
@@ -1132,6 +1152,33 @@ class QuotePack(PakObject):
                 LOGGER.info('Written "{}voice.cfg"', prefix)
             else:
                 LOGGER.info('No {} voice config!', pretty)
+
+    @staticmethod
+    def strip_quote_data(prop: Property, _depth=0):
+        """Strip unused property blocks from the config files.
+
+        This removes data like the captions which the compiler doesn't need.
+        The returned property tree is a deep-copy of the original.
+        """
+        children = []
+        for sub_prop in prop:
+            # Make sure it's in the right nesting depth - flags might
+            # have arbitrary props in lower depths..
+            LOGGER.info('{} {}', sub_prop.name, _depth)
+            if _depth == 3:  # 'Line' blocks
+                if sub_prop.name == 'trans':
+                    continue
+                elif sub_prop.name == 'name' and 'id' in prop:
+                    continue  # The name isn't needed if an ID is available
+            elif _depth == 2 and sub_prop.name == 'name':
+                # In the "quote" section, the name isn't used in the compiler.
+                continue
+
+            if sub_prop.has_children():
+                children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
+            else:
+                children.append(Property(sub_prop.real_name, sub_prop.value))
+        return Property(prop.real_name, children)
 
 
 class Skybox(PakObject):
@@ -1384,6 +1431,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         self.id = var_id
         self.name = name
         self.default = default
+        self.enabled = default
         self.desc = desc
         if unstyled:
             self.styles = None
@@ -1876,11 +1924,11 @@ class BrushTemplate(PakObject, has_img=False):
 
         self.temp_world = TEMPLATE_FILE.create_ent(
             classname='bee2_template_world',
-            template_id=self.id,
+            template_id=temp_id,
         )
         self.temp_detail = TEMPLATE_FILE.create_ent(
             classname='bee2_template_detail',
-            template_id=self.id,
+            template_id=temp_id,
         )
 
         # Check to see if any func_details have associated solids..
@@ -1931,7 +1979,7 @@ class BrushTemplate(PakObject, has_img=False):
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
             )
-            new_overlay['template_id'] = self.id
+            new_overlay['template_id'] = temp_id
             new_overlay['classname'] = 'bee2_template_overlay'
             sides = overlay['sides'].split()
             new_overlay['sides'] = ' '.join(
@@ -1942,6 +1990,10 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
+
+        if self.temp_detail is None and self.temp_world is None:
+            if not self.temp_overlays:
+                LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1991,6 +2043,7 @@ def get_selitem_data(info):
     name = info['name']
     icon = info['icon', '_blank']
     group = info['group', '']
+    sort_key = info['sort_key', '']
     if not group:
         group = None
     if not short_name:
@@ -2003,6 +2056,7 @@ def get_selitem_data(info):
         icon,
         desc,
         group,
+        sort_key,
     )
 
 

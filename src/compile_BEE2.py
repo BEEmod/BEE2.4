@@ -63,8 +63,6 @@ EXCLUDES = [
     'email',
     'smtplib',
 
-    'pkgutil',
-
     'unittest',  # Imported in __name__==__main__..
     'doctest',
     'optparse',

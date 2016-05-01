@@ -95,6 +95,7 @@ TEX_DEFAULTS = [
     ('', 'special.white_gap'),
     ('', 'special.black_gap'),
     ('', 'special.goo_wall'),
+    ('', 'special.goo_floor'),
     ('', 'special.edge_special'),
     ('', 'special.fizz_border'),
 
@@ -235,6 +236,9 @@ DEFAULTS = {
     "glass_template":           "",
     "grating_template":         "",
 
+    # The same for the goo_wall textures.
+    "goo_wall_scale_temp":      "",
+
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
 
@@ -304,7 +308,7 @@ FIZZ_OPTIONS = [
     ('0', 'scanline'),
 ]
 
-BEE2_config = None  # ConfigFile
+BEE2_config = None  # type: ConfigFile
 
 GAME_MODE = 'ERR'  # SP or COOP?
 # Are we in preview mode? (Spawn in entry door instead of elevator)
@@ -599,6 +603,7 @@ def add_voice(_):
         style_vars_=settings['style_vars'],
         vmf_file=VMF,
         map_seed=MAP_RAND_SEED,
+        use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
 
 
@@ -890,13 +895,16 @@ def make_bullseye_face(
     if orient is None:
         orient = get_face_orient(face)
 
-    mat = get_tex('special.bullseye_{}_{!s}'.format(color, orient))
+    if orient is ORIENT.ceil: # We use the full 'ceiling' here, instead of 'ceil'.
+        orient = 'ceiling'
+
+    mat = get_tex('special.bullseye_{!s}_{!s}'.format(color, orient))
 
     # Fallback to floor texture if using ceiling or wall
     if orient is not ORIENT.floor and mat == '':
-        face.mat = get_tex('special.bullseye_{}_floor'.format(color))
+        mat = get_tex('special.bullseye_{}_floor'.format(color))
 
-    if face.mat == '':
+    if mat == '':
         return False
     else:
         face.mat = mat
@@ -1156,14 +1164,14 @@ def set_player_portalgun(inst):
             'OnMapSpawn',
             '@player_has_blue',
             'Trigger',
-            times=1,
+            only_once=True,
         ))
     if oran_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
             '@player_has_oran',
             'Trigger',
-            times=1,
+            only_once=True,
         ))
 
     LOGGER.info('Done!')
@@ -1908,11 +1916,11 @@ def make_bottomless_pit(solids, max_height):
     instances = settings['pit']['inst']
 
     side_types = {
-        utils.CONN_TYPES.side: instances['side'],
-        utils.CONN_TYPES.corner: instances['corner'],
-        utils.CONN_TYPES.straight: instances['double'],
-        utils.CONN_TYPES.triple: instances['triple'],
-        utils.CONN_TYPES.all: instances['pillar'],
+        utils.CONN_TYPES.side: instances['side'],  # o|
+        utils.CONN_TYPES.corner: instances['corner'],  # _|
+        utils.CONN_TYPES.straight: instances['side'],  # Add this twice for |o|
+        utils.CONN_TYPES.triple: instances['triple'],  # U-shape
+        utils.CONN_TYPES.all: instances['pillar'],  # [o]
         utils.CONN_TYPES.none: [''],  # Never add instance if no walls
     }
 
@@ -1934,8 +1942,8 @@ def make_bottomless_pit(solids, max_height):
                 file=file,
                 targetname='goo_side',
                 origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
+                    x + tele_off_x,
+                    y + tele_off_y,
                     max(
                         x
                         for x in mask
@@ -1944,6 +1952,27 @@ def make_bottomless_pit(solids, max_height):
                 ),
                 angles=angle,
             ).make_unique()
+
+        # Straight uses two side-instances in parallel - "|o|"
+        if inst_type is utils.CONN_TYPES.straight:
+            file = random.choice(side_types[inst_type])
+            if file != '':
+                VMF.create_ent(
+                    classname='func_instance',
+                    file=file,
+                    targetname='goo_side',
+                    origin='{!s} {!s} {!s}'.format(
+                        x + tele_off_x,
+                        y + tele_off_y,
+                        max(
+                            x
+                            for x in mask
+                            if x is not None
+                        ),
+                    ),
+                    # Reverse direction
+                    angles=Vec.from_str(angle) + (0, 180, 0),
+                ).make_unique()
 
         random.seed(str(x) + str(y) + '-support')
         file = random.choice(instances['support'])
@@ -2051,6 +2080,12 @@ def change_goo_sides():
     """
     if settings['textures']['special.goo_wall'] == ['']:
         return
+
+    if get_opt('goo_wall_scale_temp'):
+        scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
+    else:
+        scale = None
+
     LOGGER.info("Changing goo sides...")
     face_dict = {}
     for solid in VMF.iter_wbrushes(world=True, detail=False):
@@ -2068,24 +2103,33 @@ def change_goo_sides():
         (-64, 0, 0),  # West
         (0, 0, -64),  # Down
     ]
-    for trig in VMF.by_class['trigger_multiple']:
-        if trig['wait'] != '0.1':
-            continue
-        bbox_min, bbox_max = trig.get_bbox()
-        z = int(bbox_min.z + 64)
-        for x in range(int(bbox_min.x)+64, int(bbox_max.x), 128):
-            for y in range(int(bbox_min.y)+64, int(bbox_max.y), 128):
-                for xoff, yoff, zoff in dirs:
-                    try:
-                        face = face_dict[x+xoff, y+yoff, z+zoff]
-                    except KeyError:
-                        continue
 
-                    if (
-                            face.mat.casefold() in BLACK_PAN or
-                            face.mat.casefold() == 'tools/toolsnodraw'
-                            ):
-                        face.mat = get_tex('special.goo_wall')
+    # We only want to alter black panel surfaces..
+    goo_mats = set(BLACK_PAN)
+
+    for x, y, z in conditions.GOO_LOCS:
+        for xoff, yoff, zoff in dirs:
+            try:
+                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: VLib.Side
+            except KeyError:
+                continue
+
+            if face.mat.casefold() in goo_mats:
+                norm = face.normal()
+
+                face.mat = ''
+                if norm.z != 0:
+                    face.mat = get_tex('special.goo_floor')
+
+                if face.mat == '':  # goo_floor is invalid, or not used
+                    face.mat = get_tex('special.goo_wall')
+
+                if scale is not None:
+                    # Allow altering the orientation of the texture.
+                    u, v, face.ham_rot = scale[norm.as_tuple()]
+                    face.uaxis = u.copy()
+                    face.vaxis = v.copy()
+
     LOGGER.info("Done!")
 
 
@@ -3353,6 +3397,7 @@ def packlist_cond(_, res):
 
     return conditions.RES_EXHAUSTED
 
+
 @conditions.make_result('PackRename')
 def packlist_cond_rename(_, res):
     """Add a file to the packlist, saved under a new name."""
@@ -3419,8 +3464,8 @@ def make_packlist(map_path):
             f.write('{}\t{}\n'.format(file, dest))
             LOGGER.info('"{}" as "{}"', file, dest)
 
-
     LOGGER.info('Packlist written!')
+
 
 def make_vrad_config():
     """Generate a config file for VRAD from our configs.
@@ -3466,62 +3511,114 @@ def make_vrad_config():
             f.write(line)
 
 
+def instance_symlink():
+    """On OS X and Linux, Valve broke VBSP's instances/ finding code.
+
+    We need to symlink maps/styled/instances/ -> maps/instances/ to allow
+    instances to be found.
+    """
+    map_root = os.path.abspath(os.path.join(
+        os.getcwd(),
+        '..', 'sdk_content', 'maps',
+    ))
+    inst = os.path.join(map_root, 'instances')
+    link_loc = os.path.join(map_root, 'styled', 'instances')
+
+    if os.path.islink(link_loc) and os.path.samefile(inst, link_loc):
+        LOGGER.info('Symlink already exists..')
+        return  # Already done
+
+    LOGGER.info('Creating symlink from "{}" -> "{}"', link_loc, inst)
+    os.symlink(inst, link_loc, target_is_directory=True)
+
+
 def save(path):
     """Save the modified map back to the correct location.
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
+    with utils.AtomicWriter(path) as f:
         VMF.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
 
 def run_vbsp(vbsp_args, do_swap, path, new_path):
-    """Execute the original VBSP, copying files around so it works correctly."""
+    """Execute the original VBSP, copying files around so it works correctly.
+
+    vbsp_args are the arguments to pass.
+    path is the original .vmf, new_path is the styled/ name.
+    If do_swap is true VBSP will be run on the map in styled/.
+    """
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
     if do_swap:
+        # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
                 path.replace(".vmf", ".log"),
                 new_path.replace(".vmf", ".log"),
             )
     # Put quotes around args which contain spaces, and remove blank args.
-    vbsp_args = [('"' + x + '"' if " " in x else x) for x in vbsp_args if x]
+    vbsp_args = [
+        ('"' + x + '"' if " " in x else x)
+        for x in
+        vbsp_args
+        if x
+    ]
 
+    # VBSP is named _osx or _linux for those platforms.
+    suffix = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
+        suffix = '.exe'
+
+    if utils.MAC or utils.LINUX and do_swap:
+        instance_symlink()
 
     arg = (
         '"' +
         os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp" + os_suff + "_original"
+                "vbsp" + os_suff + "_original" + suffix
                 )
-            ) +
+        ) +
         '" ' +
         " ".join(vbsp_args)
-        )
-
-    utils.con_log("Calling original VBSP...")
-    utils.con_log(arg)
-    code = subprocess.call(
-        arg,
-        stdout=None,
-        stderr=subprocess.PIPE,
-        shell=True,
     )
-    if code == 0:
-        utils.con_log("Done!")
-    else:
-        utils.con_log("VBSP failed! (" + str(code) + ")")
-        sys.exit(code)
+
+    # Use a special name for VBSP's output..
+    vbsp_logger = utils.getLogger('valve.VBSP', alias='<Valve>')
+
+    LOGGER.info("Calling original VBSP...")
+    LOGGER.info("Arguments: {}", arg)
+    try:
+        output = subprocess.check_output(
+            arg,
+            stderr=subprocess.PIPE,
+            shell=True,
+        )
+    except subprocess.CalledProcessError as err:
+        # VBSP didn't suceed. Print the error log..
+        vbsp_logger.error(err.output.decode('ascii'))
+
+        process_vbsp_fail(err.output)
+
+        LOGGER.error("VBSP failed! ({})", err.returncode)
+        # Propagate the fail code to Portal 2.
+        sys.exit(err.returncode)
+
+    # Print output
+    vbsp_logger.info(output.decode('ascii'))
+    LOGGER.info("VBSP Done!")
+
+    process_vbsp_log(output)
+
     if do_swap:  # copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
             if os.path.isfile(new_path.replace(".vmf", ext)):
@@ -3529,6 +3626,94 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
                     new_path.replace(".vmf", ext),
                     path.replace(".vmf", ext),
                 )
+
+
+def process_vbsp_log(output: bytes):
+    """Read through VBSP's log, extracting entity counts.
+
+    This is then passed back to the main BEE2 application for display.
+    """
+
+    # The output is something like this:
+    # nummapplanes:     (?? / 65536)
+    # nummapbrushes:    (?? / 8192)
+    # nummapbrushsides: (?? / 65536)
+    # num_map_overlays: (?? / 512)
+    # nummodels:        (?? / 1024)
+    # num_entities:     (?? / 16384)
+
+    desired_vals = [
+        # VBSP values -> config names
+        (b'nummapbrushes:', 'brush'),
+        (b'num_map_overlays:', 'overlay'),
+        (b'num_entities:', 'entity'),
+    ]
+    # The other options rarely hit the limits, so we don't track them.
+
+    counts = {
+        'brush': ('0', '8192'),
+        'overlay': ('0', '512'),
+        'entity': ('0', '2048'),
+    }
+
+    for line in output.splitlines():
+        line = line.lstrip()
+        for name, conf in desired_vals:
+            if not line.startswith(name):
+                continue
+            # Grab the value from ( onwards
+            fraction = line.split(b'(', 1)[1]
+            # Grab the two numbers, convert to ascii and strip
+            # whitespace.
+            count_num, count_max = fraction.split(b'/')
+            counts[conf] = (
+                count_num.strip(b' \t\n').decode('ascii'),
+                # Strip the ending ) off the max. We have the value, so
+                # we might as well tell the BEE2 if it changes..
+                count_max.strip(b') \t\n').decode('ascii')
+            )
+
+    LOGGER.info('Retrieved counts: {}', counts)
+    count_section = BEE2_config['Counts']
+    for count_name, (value, limit) in counts.items():
+        count_section[count_name] = value
+        count_section['max_' + count_name] = limit
+    BEE2_config.save()
+
+
+def process_vbsp_fail(output: bytes):
+    """Read through VBSP's logs when failing, to update counts."""
+    # VBSP doesn't output the actual entity counts, so set the errorred
+    # one to max and the others to zero.
+    count_section = BEE2_config['Counts']
+
+    count_section['max_brush'] = '8192'
+    count_section['max_entity'] = '2048'
+    count_section['max_overlay'] = '512'
+
+    for line in reversed(output.splitlines()):  # type: bytes
+        if b'MAX_MAP_OVERLAYS' in line:
+            count_section['entity'] = '0'
+            count_section['brush'] = '0'
+            count_section['overlay'] = '512'
+            # The line is like 'MAX_MAP_OVER = 512', pull out the number from
+            # the end and decode it.
+            count_section['max_overlay'] = line.split(b'=')[1].strip().decode('ascii')
+            break
+        if b'MAX_MAP_BRUSHSIDES' in line or b'MAX_MAP_PLANES' in line:
+            count_section['entity'] = '0'
+            count_section['overlay'] = '0'
+            count_section['brush'] = '8192'
+            break
+        if b'MAX_MAP_ENTITIES' in line:
+            count_section['entity'] = count_section['overlay'] = '0'
+            count_section['brush'] = '8192'
+            break
+    else:
+        count_section['entity'] = '0'
+        count_section['overlay'] = '0'
+        count_section['brush'] = '0'
+    BEE2_config.save_check()
 
 
 def main():

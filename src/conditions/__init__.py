@@ -478,27 +478,27 @@ def check_all():
                 # this condition, and skip to the next condtion.
                 break
             if not condition.results and not condition.else_results:
-                LOGGER.info('Exiting empty condition!')
                 break  # Condition has run out of results, quit early
 
     import vbsp
-
-    LOGGER.info('Map has attributes: ', [
+    LOGGER.info('Map has attributes: {}', [
         key
         for key, value in
         vbsp.settings['has_attr'].items()
         if value
     ])
-    LOGGER.info('Style Vars:', dict(vbsp.settings['style_vars']))
-    LOGGER.info('Global instances: ', GLOBAL_INSTANCES)
+    LOGGER.info('instanceLocs cache: {}', resolve_inst.cache_info())
+    LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
+    LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
 def check_flag(flag, inst):
-    # print('Checking {type} ({val!s} on {inst}'.format(
-    #     type=flag.real_name,
-    #     val=flag.value,
-    #     inst=inst['file'],
-    # ))
+    LOGGER.debug(
+        'Checking {} ({!s}) on {}',
+        flag.real_name,
+        flag.value,
+        inst['file'],
+    )
     try:
         func = FLAG_LOOKUP[flag.name]
     except KeyError:
@@ -817,22 +817,10 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
     LocalKeys keys will be changed to use instance-local names, where needed.
     If suffix is set, it is a suffix to the two prop_block names
     """
-    for prop in prop_block.find_key('Keys'+suffix, []):
-        if prop.value.startswith('$'):
-            if prop.value in inst.fixup:
-                ent[prop.real_name] = inst.fixup[prop.value]
-            else:
-                LOGGER.warning(
-                    'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
-                    prop.value,
-                    inst['targetname'],
-                    inst,
-                    inst.fixup._fixup
-                )
-        else:
-            ent[prop.real_name] = prop.value
+    for prop in prop_block.find_key('Keys' + suffix, []):
+        ent[prop.real_name] = resolve_value(inst, prop.value)
     name = inst['targetname', ''] + '-'
-    for prop in prop_block.find_key('LocalKeys'+suffix, []):
+    for prop in prop_block.find_key('LocalKeys' + suffix, []):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -841,6 +829,24 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
             ent[prop.real_name] = val
         else:
             ent[prop.real_name] = name + val
+
+
+def resolve_value(inst: VLib.Entity, value: str):
+    """If a value starts with '$', lookup the associated var."""
+    if value.startswith('$'):
+        if value in inst.fixup:
+            return inst.fixup[value]
+        else:
+            LOGGER.warning(
+                'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
+                value,
+                inst['targetname'],
+                inst,
+                inst.fixup._fixup
+            )
+            return ''
+    else:
+        return value
 
 
 def load_templates():
@@ -1169,7 +1175,7 @@ def retexture_template(
                     )
                 elif norm.z > floor_tolerance:
                     face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_ceil'.format(tex_colour)
+                        'special.bullseye_{}_ceiling'.format(tex_colour)
                     )
                 else:
                     face.mat = ''  # Ensure next if statement triggers
@@ -1295,7 +1301,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...
-            Vec(normal.x, normal.y, -normal.z).to_angle(),
+            normal.to_angle(),
             force_type=TEMP_TYPES.world,
         ).world
 
@@ -1517,6 +1523,10 @@ def res_switch(inst, res):
 
     'method' is the way the search is done - first, last, random, or all.
     'flag' is the name of the flag.
+    Each property group is a case to check - the property name is the flag
+    argument, and the contents are the results to execute in that case.
+    For 'random' mode, you can omit the flag to choose from all objects. In
+    this case the flag arguments are ignored.
     """
     flag_name, cases, method = res.value
 
@@ -1525,9 +1535,10 @@ def res_switch(inst, res):
         random.shuffle(cases)
 
     for case in cases:
-        flag = Property(flag_name, case.real_name)
-        if not check_flag(flag, inst):
-            continue
+        if flag_name is not None:
+            flag = Property(flag_name, case.real_name)
+            if not check_flag(flag, inst):
+                continue
         for res in case:
             Condition.test_result(inst, res)
         if method is not SWITCH_TYPE.ALL:

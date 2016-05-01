@@ -15,10 +15,6 @@ from tooltip import add_tooltip
 import SubPane
 import utils
 
-MAX_ENTS = 2048
-MAX_OVERLAY = 512
-MAX_BRUSH = 8192
-
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
@@ -28,12 +24,13 @@ COMPILE_DEFAULTS = {
     'Screenshot': {
         'Type': 'AUTO',
         'Loc': '',
-        },
+    },
     'General': {
         'spawn_elev': 'True',
         'player_model': 'PETI',
         'force_final_light': '0',
-        },
+        'use_voice_priority': '1',
+    },
     'Corridor': {
         'sp_entry': '1',
         'sp_exit': '1',
@@ -41,10 +38,15 @@ COMPILE_DEFAULTS = {
     },
     'Counts': {
         'brush': '0',
-        'ent': '0',
         'overlay': '0',
-        },
-    }
+
+        'entity': '0',
+
+        'max_brush': '8192',
+        'max_overlay': '512',
+        'max_entity': '2048',
+    },
+}
 
 PLAYER_MODELS = {
     'ATLAS': 'ATLAS',
@@ -63,15 +65,19 @@ UI = {}
 chosen_thumb = StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
-tk_screenshot = None # The preview image shown
+tk_screenshot = None  # The preview image shown
 
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = os.path.abspath(os.path.join(
-        os.getcwd(),
-        '..',
-        'config',
-        'screenshot.jpg'
-    ))
+    os.getcwd(),
+    '..',
+    'config',
+    'screenshot.jpg'
+))
+
+VOICE_PRIORITY_VAR = IntVar(
+    value=COMPILE_CFG.get_bool('General', 'use_voice_priority', True)
+)
 
 player_model_var = StringVar(
     value=PLAYER_MODELS.get(
@@ -86,8 +92,38 @@ cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = StringVar(value='')
 
 count_brush = IntVar(value=0)
-count_ents = IntVar(value=0)
+count_entity = IntVar(value=0)
 count_overlay = IntVar(value=0)
+
+# Controls flash_count()
+count_brush.should_flash = False
+count_entity.should_flash = False
+count_overlay.should_flash = False
+
+# The data for the 3 progress bars -
+# (variable, config_name, default_max, description)
+COUNT_CATEGORIES = [
+    (
+        count_brush, 'brush', 8192,
+        "Brushes form the walls or other parts of the test chamber. If this "
+        "is high, it may help to reduce the size of the map or remove intricate"
+        " shapes."
+    ),
+    (
+        count_entity, 'entity', 2048,
+        "Entities are the things in the map that have functionality. Removing "
+        "complex moving items will help reduce this. Items have their entity "
+        "count listed in the item description window.\n\n"
+        "This isn't totally accurate, some entity types are counted here "
+        "but don't affect the ingame limit. ",
+    ),
+    (
+        count_overlay, 'overlay', 512,
+        "Overlays are smaller images affixed to surfaces, like signs or "
+        "indicator lights. Hiding long antlines or setting them to signage "
+        "will reduce this."
+    ),
+]
 
 vrad_light_type = IntVar(
     value=COMPILE_CFG.get_bool('General', 'vrad_force_full')
@@ -135,12 +171,64 @@ def make_corr_combo(frm, corr_name, width):
     return widget
 
 
+def flash_count():
+    """Flash the counter between 0 and 100 when on."""
+    should_cont = False
+
+    for var in (count_brush, count_entity, count_overlay):
+        if not var.should_flash:
+            continue  # Abort when it shouldn't be flashing
+
+        if var.get() == 0:
+            var.set(100)
+        else:
+            var.set(0)
+
+        should_cont = True
+
+    if should_cont:
+        TK_ROOT.after(750, flash_count)
+
+
 def refresh_counts(reload=True):
     if reload:
         COMPILE_CFG.load()
-    count_brush.set(COMPILE_CFG.get_int('Counts', 'brush'))
-    count_ents.set(COMPILE_CFG.get_int('Counts', 'ent'))
-    count_overlay.set(COMPILE_CFG.get_int('Counts', 'overlay'))
+
+    # Don't re-run the flash function if it's already on.
+    run_flash = not (
+        count_entity.should_flash or
+        count_overlay.should_flash or
+        count_brush.should_flash
+    )
+
+    for bar_var, name, default, tip_blurb in COUNT_CATEGORIES:
+        value = COMPILE_CFG.get_int('Counts', name)
+
+        if name == 'entity':
+            # The in-engine entity limit is different to VBSP's limit
+            # (that one might include prop_static, lights etc).
+            max_value = default
+        else:
+            # Use or to ensure no divide-by-zero occurs..
+            max_value = COMPILE_CFG.get_int('Counts', 'max_' + name) or default
+
+        # If it's hit the limit, make it continously scroll to draw
+        # attention to the bar.
+        if value >= max_value:
+            bar_var.should_flash = True
+        else:
+            bar_var.should_flash = False
+            bar_var.set(100 * value / max_value)
+
+        UI['count_' + name].tooltip_text = '{}/{} ({:.2%}):\n{}'.format(
+            value,
+            max_value,
+            value / max_value,
+            tip_blurb,
+        )
+
+    if run_flash:
+        flash_count()
 
 
 def find_screenshot(_=None):
@@ -213,15 +301,6 @@ def set_screenshot(img=None):
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def set_screenshot_cleanup():
-    COMPILE_CFG['Screenshot']['del_old'] = str(cleanup_screenshot.get())
-
-
-def set_elev_type():
-    COMPILE_CFG['General']['spawn_elev'] = str(start_in_elev.get())
-    COMPILE_CFG.save()
-
-
 def set_model(_=None):
     """Save the selected player model."""
     text = player_model_var.get()
@@ -243,10 +322,14 @@ def set_corr_dropdown(corr_name, widget):
     widget['values'] = CORRIDOR[corr_name]
 
 
-def set_vrad_type():
-    """Set the compile type override for VRAD."""
-    COMPILE_CFG['General']['vrad_force_full'] = str(vrad_light_type.get())
-    COMPILE_CFG.save()
+def make_setter(section, config, variable):
+    """Create a callback which sets the given config from a variable."""
+
+    def callback():
+        COMPILE_CFG[section][config] = str(variable.get())
+        COMPILE_CFG.save_check()
+
+    return callback
 
 
 def make_pane(tool_frame):
@@ -313,7 +396,7 @@ def make_pane(tool_frame):
         thumb_frame,
         text='Cleanup old screenshots',
         variable=cleanup_screenshot,
-        command=set_screenshot_cleanup,
+        command=make_setter('Screenshot', 'del_old', cleanup_screenshot),
     )
 
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
@@ -358,19 +441,40 @@ def make_pane(tool_frame):
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     set_screenshot()  # Load the last saved screenshot
 
+    voice_frame = ttk.LabelFrame(
+        window,
+        text='Voicelines:',
+        labelanchor=NW,
+    )
+    voice_frame.grid(row=1, column=0, sticky=EW)
+
+    UI['voice_priority'] = voice_priority = ttk.Checkbutton(
+        voice_frame,
+        text="Use voiceline priorities",
+        variable=VOICE_PRIORITY_VAR,
+        command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
+    )
+    voice_priority.grid(row=0, column=0)
+    add_tooltip(
+        voice_priority,
+        "Only choose the highest-priority voicelines. This means more generic "
+        "lines will can only be chosen if few test elements are in the map. "
+        "If disabled any applicable lines will be used.",
+    )
+
     vrad_frame = ttk.LabelFrame(
         window,
         text='Lighting:',
         labelanchor=N,
     )
-    vrad_frame.grid(row=1, column=0, sticky=EW)
+    vrad_frame.grid(row=2, column=0, sticky=EW)
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
         text='Fast',
         value=0,
         variable=vrad_light_type,
-        command=set_vrad_type,
+        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_fast'].grid(row=0, column=0)
     UI['light_full'] = ttk.Radiobutton(
@@ -378,7 +482,7 @@ def make_pane(tool_frame):
         text='Full',
         value=1,
         variable=vrad_light_type,
-        command=set_vrad_type,
+        command=make_setter('General', 'vrad_force_full', vrad_light_type),
     )
     UI['light_full'].grid(row=0, column=1)
 
@@ -392,7 +496,7 @@ def make_pane(tool_frame):
     add_tooltip(
         UI['light_full'],
         "Compile with high-quality lighting. This looks correct, "
-        "but takes longer to compute. Use if you're arranging lights."
+        "but takes longer to compute. Use if you're arranging lights. "
         "When publishing, this is always used."
     )
 
@@ -402,7 +506,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    elev_frame.grid(row=2, column=0, sticky=EW)
+    elev_frame.grid(row=3, column=0, sticky=EW)
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
 
@@ -411,7 +515,7 @@ def make_pane(tool_frame):
         text='Entry Door',
         value=0,
         variable=start_in_elev,
-        command=set_elev_type,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_elevator'] = ttk.Radiobutton(
@@ -419,7 +523,7 @@ def make_pane(tool_frame):
         text='Elevator',
         value=1,
         variable=start_in_elev,
-        command=set_elev_type,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
     )
 
     UI['elev_preview'].grid(row=0, column=0, sticky=W)
@@ -442,7 +546,7 @@ def make_pane(tool_frame):
         text='Corridor:',
         labelanchor=N,
     )
-    corr_frame.grid(row=3, column=0, sticky=EW)
+    corr_frame.grid(row=4, column=0, sticky=EW)
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
@@ -488,7 +592,7 @@ def make_pane(tool_frame):
         text='Player Model (SP):',
         labelanchor=N,
     )
-    model_frame.grid(row=4, column=0, sticky=EW)
+    model_frame.grid(row=5, column=0, sticky=EW)
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,
@@ -509,7 +613,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    count_frame.grid(row=5, column=0, sticky=EW)
+    count_frame.grid(row=6, column=0, sticky=EW)
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
@@ -519,13 +623,13 @@ def make_pane(tool_frame):
         anchor=N,
     ).grid(row=0, column=0, columnspan=3, sticky=EW)
 
-    UI['count_ent'] = ttk.Progressbar(
+    UI['count_entity'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_ENTS,
-        variable=count_ents,
+        maximum=100,
+        variable=count_entity,
         length=120,
     )
-    UI['count_ent'].grid(
+    UI['count_entity'].grid(
         row=1,
         column=0,
         columnspan=3,
@@ -538,13 +642,13 @@ def make_pane(tool_frame):
         text='Overlay',
         anchor=CENTER,
     ).grid(row=2, column=0, sticky=EW)
-    UI['count_over'] = ttk.Progressbar(
+    UI['count_overlay'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_OVERLAY,
+        maximum=100,
         variable=count_overlay,
         length=50,
     )
-    UI['count_over'].grid(row=3, column=0, sticky=EW, padx=5)
+    UI['count_overlay'].grid(row=3, column=0, sticky=EW, padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame,
@@ -552,6 +656,11 @@ def make_pane(tool_frame):
         refresh_counts,
     )
     UI['refresh_counts'].grid(row=3, column=1)
+    add_tooltip(
+        UI['refresh_counts'],
+        "Refresh the compile progress bars. Press after a compile has been "
+        "performed to show the new values.",
+    )
 
     ttk.Label(
         count_frame,
@@ -560,16 +669,14 @@ def make_pane(tool_frame):
     ).grid(row=2, column=2, sticky=EW)
     UI['count_brush'] = ttk.Progressbar(
         count_frame,
-        maximum=MAX_BRUSH,
+        maximum=100,
         variable=count_brush,
         length=50,
     )
     UI['count_brush'].grid(row=3, column=2, sticky=EW, padx=5)
 
-    UI['view_logs'] = ttk.Button(
-        count_frame,
-        text='View Logs',
-    )
-    UI['view_logs'].grid(row=4, column=0, columnspan=3, sticky=EW)
+    for wid_name in ('count_overlay', 'count_entity', 'count_brush'):
+        # Add in tooltip logic to the widgets.
+        add_tooltip(UI[wid_name])
 
     refresh_counts(reload=False)

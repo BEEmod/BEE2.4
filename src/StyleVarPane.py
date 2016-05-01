@@ -10,10 +10,13 @@ import img as png
 
 from BEE2_config import GEN_OPTS
 from SubPane import SubPane
+import packageLoader
 import tooltip
 import utils
 
-stylevar = namedtuple('stylevar', 'id name enabled desc')
+from typing import Union
+
+stylevar = namedtuple('stylevar', 'id name default desc')
 
 # Special StyleVars that are hardcoded into the BEE2
 # These are effectively attributes of Portal 2 itself, and always work
@@ -23,14 +26,14 @@ styleOptions = [
     stylevar(
         id='MultiverseCave',
         name='Multiverse Cave',
-        enabled=1,
+        default=1,
         desc='Play the Workshop Cave Johnson lines on map start.'
     ),
 
     stylevar(
         id='FixFizzlerBump',
         name='Prevent Portal Bump  (fizzler)',
-        enabled=0,
+        default=0,
         desc='Add portal bumpers to make it more difficult to portal across '
              'fizzler edges. This can prevent placing portals in tight spaces '
              'near fizzlers, or fizzle portals on activation.'
@@ -39,14 +42,14 @@ styleOptions = [
     stylevar(
         id='NoMidVoices',
         name='Suppress Mid-Chamber Dialogue',
-        enabled=0,
+        default=0,
         desc='Disable all voicelines other than entry and exit lines.'
     ),
 
     stylevar(
         id='UnlockDefault',
         name='Unlock Default Items',
-        enabled=0,
+        default=0,
         desc='Allow placing and deleting the mandatory Entry/Exit Doors and '
              'Large Observation Room. Use with caution, this can have weird '
              'results!'
@@ -55,7 +58,7 @@ styleOptions = [
     stylevar(
         id='AllowGooMist',
         name='Allow Adding Goo Mist',
-        enabled=1,
+        default=1,
         desc='Add mist particles above Toxic Goo in certain styles. This can '
              'increase the entity count significantly with large, complex '
              'goo pits, so disable if needed.'
@@ -67,7 +70,8 @@ checkbox_chosen = {}
 checkbox_other = {}
 tk_vars = {}
 
-var_list = []
+VAR_LIST = []
+STYLES = {}
 
 window = None
 
@@ -78,16 +82,21 @@ def update_filter():
     pass
 
 
-def add_vars(data):
+def add_vars(style_vars, styles):
     """
     Add the given stylevars to our list.
 
     """
-    global var_list
-    var_list = sorted(data, key=operator.attrgetter('id'))
+    VAR_LIST.clear()
+    VAR_LIST.extend(
+        sorted(style_vars, key=operator.attrgetter('id'))
+    )
 
-    for var in var_list:
-        var.default = GEN_OPTS.get_bool('StyleVar', var.id, var.default)
+    for var in VAR_LIST:  # type: packageLoader.StyleVar
+        var.enabled = GEN_OPTS.get_bool('StyleVar', var.id, var.default)
+
+    for style in styles:
+        STYLES[style.id] = style
 
 
 def set_stylevar(var):
@@ -98,6 +107,31 @@ def set_stylevar(var):
         update_filter()
 
 
+def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
+    """Generate the description text for a StyleVar.
+
+    This adds 'Default: on/off', and which styles it's used in.
+    """
+    if var.desc:
+        desc = [var.desc, '']
+    else:
+        desc = []
+
+    desc.append('Default: {}'.format(
+        'On' if var.default else 'Off'
+    ))
+    desc.append('Styles: {}'.format(
+        'All' if
+        (is_hardcoded or var.styles is None)
+        else ', '.join(sorted(
+            STYLES[sty_id].selitem_data.short_name
+            for sty_id in var.styles
+        ))
+    ))
+
+    return '\n'.join(desc)
+
+
 def refresh(selected_style):
     """Move the stylevars to the correct position.
 
@@ -105,7 +139,7 @@ def refresh(selected_style):
     """
     en_row = 0
     dis_row = 0
-    for var in var_list:
+    for var in VAR_LIST:
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
                 row=en_row,
@@ -200,7 +234,7 @@ def make_pane(tool_frame):
     for pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = IntVar(
-            value=GEN_OPTS.get_bool('StyleVar', var.id, var.enabled)
+            value=GEN_OPTS.get_bool('StyleVar', var.id, var.default)
         )
         checkbox_special[var.id] = ttk.Checkbutton(
             frame_all,
@@ -210,14 +244,13 @@ def make_pane(tool_frame):
             )
         checkbox_special[var.id].grid(row=pos, column=0, sticky="W", padx=3)
 
-        if var.desc:
-            tooltip.add_tooltip(
-                checkbox_special[var.id],
-                var.desc,
-            )
+        tooltip.add_tooltip(
+            checkbox_special[var.id],
+            make_desc(var, is_hardcoded=True),
+        )
 
-    for var in var_list:
-        tk_vars[var.id] = IntVar(value=var.default)
+    for var in VAR_LIST:
+        tk_vars[var.id] = IntVar(value=var.enabled)
         args = {
             'variable': tk_vars[var.id],
             'text': var.name,
@@ -225,15 +258,15 @@ def make_pane(tool_frame):
             }
         checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
         checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
-        if var.desc:
-            tooltip.add_tooltip(
-                checkbox_chosen[var.id],
-                var.desc,
-            )
-            tooltip.add_tooltip(
-                checkbox_other[var.id],
-                var.desc,
-            )
+        desc = make_desc(var)
+        tooltip.add_tooltip(
+            checkbox_chosen[var.id],
+            desc,
+        )
+        tooltip.add_tooltip(
+            checkbox_other[var.id],
+            desc,
+        )
 
     UI['style_can'].create_window(0, 0, window=canvas_frame, anchor="nw")
     UI['style_can'].update_idletasks()

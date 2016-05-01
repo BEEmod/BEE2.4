@@ -32,7 +32,7 @@ OPEN_IN_TAB = 2
 
 wid = {}
 
-selected_item = None # type: UI.Item
+selected_item = None  # type: UI.Item
 selected_sub_item = None  # type: UI.PalItem
 is_open = False
 
@@ -76,6 +76,7 @@ SPRITE_TOOL = {
     'rot_8': 'This item can be placed like light strips.',
     'rot_36': 'This item can be rotated on the floor to face 360 degrees.',
     'rot_catapult': 'This item is positioned using a catapult trajectory.',
+    'rot_paint': 'This item positions the dropper to hit target locations.',
 
     'in_none': 'This item does not accept any inputs.',
     'in_norm': 'This item accepts inputs.',
@@ -142,14 +143,6 @@ def sub_open(ind, _=None):
         selected_sub_item.open_menu_at_sub(pos)
 
 
-def more_info_show_url(_=None):
-    if selected_item.url is not None:
-        tooltip.show(
-            wid['moreinfo'],
-            selected_item.url,
-        )
-
-
 def open_event(e):
     """Read data from the event, and show the window."""
     snd.fx('expand')
@@ -176,28 +169,7 @@ def show_prop(widget, warp_cursor=False):
     selected_sub_item = widget
     is_open = True
 
-    icon_widget = wid['subitem', pos_for_item()]
-
-    # Calculate the pixel offset between the window and the subitem in
-    # the properties dialog, and shift if needed to keep it inside the
-    # window
-    loc_x, loc_y = utils.adjust_inside_screen(
-        x=(
-            widget.winfo_rootx()
-            + prop_window.winfo_rootx()
-            - icon_widget.winfo_rootx()
-        ),
-        y=(
-            widget.winfo_rooty()
-            + prop_window.winfo_rooty()
-            - icon_widget.winfo_rooty()
-        ),
-        win=prop_window,
-    )
-
-    prop_window.geometry('+{x!s}+{y!s}'.format(x=loc_x, y=loc_y))
-    prop_window.relX = loc_x-TK_ROOT.winfo_x()
-    prop_window.relY = loc_y-TK_ROOT.winfo_y()
+    adjust_position()
 
     if off_x is not None and off_y is not None:
         # move the mouse cursor
@@ -297,6 +269,7 @@ def load_item_data():
     wid['moreinfo'].tooltip_text = selected_item.url
 
     editor_data = item_data['editor']
+
     has_inputs = False
     has_polarity = False
     has_outputs = False
@@ -369,24 +342,66 @@ def load_item_data():
 
     set_sprite(SPR.FACING, face_spr)
 
+    # Now some special overrides for paint and cube dropper items..
+    if selected_item.id == "ITEM_CUBE":
+        set_sprite(SPR.FACING, 'surf_ceil')
+        set_sprite(SPR.INPUT, 'in_norm')
+        set_sprite(SPR.COLLISION, 'space_embed')
+        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(SPR.ROTATION, 'rot_36')
+        wid['sprite', SPR.ROTATION].tooltip_text += '\n(Reflection Cube only)'
 
-def follow_main(_=None):
-    """Move the properties window to keep a relative offset to the main window.
+    if editor_data['ItemClass', ''].casefold() == "itempaintsplat":
+        # Reflection or normal gel..
+        set_sprite(SPR.FACING, 'surf_wall_ceil')
+        set_sprite(SPR.INPUT, 'in_norm')
+        set_sprite(SPR.COLLISION, 'space_none')
+        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(SPR.ROTATION, 'rot_paint')
 
+
+def adjust_position(_=None):
+    """Move the properties window onto the selected item.
+
+    We call this constantly, so the property window will not go outside
+    the screen, and snap back to the item when the main window returns.
     """
-    prop_window.geometry('+{x}+{y}'.format(
-        x=prop_window.relX + TK_ROOT.winfo_x(),
-        y=prop_window.relY + TK_ROOT.winfo_y(),
-    ))
+    if not is_open or selected_sub_item is None:
+        return
+
+    # Calculate the pixel offset between the window and the subitem in
+    # the properties dialog, and shift if needed to keep it inside the
+    # window
+    icon_widget = wid['subitem', pos_for_item()]
+
+    loc_x, loc_y = utils.adjust_inside_screen(
+        x=(
+            selected_sub_item.winfo_rootx()
+            + prop_window.winfo_rootx()
+            - icon_widget.winfo_rootx()
+        ),
+        y=(
+            selected_sub_item.winfo_rooty()
+            + prop_window.winfo_rooty()
+            - icon_widget.winfo_rooty()
+        ),
+        win=prop_window,
+    )
+
+    prop_window.geometry('+{x!s}+{y!s}'.format(x=loc_x, y=loc_y))
+
+# When the main window moves, move the context window also.
+TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
 def hide_context(_=None):
     """Hide the properties window, if it's open."""
-    global is_open
+    global is_open, selected_item, selected_sub_item
     if is_open:
         is_open = False
         prop_window.withdraw()
         snd.fx('contract')
+        selected_item = selected_sub_item = None
 
 
 def init_widgets():
@@ -397,8 +412,6 @@ def init_widgets():
     prop_window.resizable(False, False)
     prop_window.transient(master=TK_ROOT)
     prop_window.attributes('-topmost', 1)
-    prop_window.relX = 0
-    prop_window.relY = 0
     prop_window.withdraw()  # starts hidden
 
     f = ttk.Frame(prop_window, relief="raised", borderwidth="4")
