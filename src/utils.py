@@ -1058,6 +1058,16 @@ class Vec:
     """
     __slots__ = ('x', 'y', 'z')
 
+    INV_AXIS = {
+        'x': 'yz',
+        'y': 'xz',
+        'z': 'xy',
+
+        ('y', 'z'): 'x',
+        ('x', 'z'): 'y',
+        ('x', 'y'): 'z',
+    }
+
     def __init__(self, x=0.0, y=0.0, z=0.0):
         """Create a Vector.
 
@@ -1100,7 +1110,7 @@ class Vec:
 
         Used for Vec.rotate().
         """
-        [a, b, c], [d, e, f], [g, h, i] = matrix
+        a, b, c, d, e, f, g, h, i = matrix
         x, y, z = self.x, self.y, self.z
 
         self.x = (x * a) + (y * b) + (z * c)
@@ -1131,20 +1141,20 @@ class Vec:
         sin_r = math.sin(rad_roll)
 
         mat_roll = (  # X
-            (1, 0, 0),
-            (0, cos_r, -sin_r),
-            (0, sin_r, cos_r),
+            1, 0, 0,
+            0, cos_r, -sin_r,
+            0, sin_r, cos_r,
         )
         mat_yaw = (  # Z
-            (cos_y, -sin_y, 0),
-            (sin_y, cos_y, 0),
-            (0, 0, 1),
+            cos_y, -sin_y, 0,
+            sin_y, cos_y, 0,
+            0, 0, 1,
         )
 
         mat_pitch = (  # Y
-            (cos_p, 0, sin_p),
-            (0, 1, 0),
-            (-sin_p, 0, cos_p),
+            cos_p, 0, sin_p,
+            0, 1, 0,
+            -sin_p, 0, cos_p,
         )
 
         # Need to do transformations in roll, pitch, yaw order
@@ -1202,7 +1212,7 @@ class Vec:
         # Pitch is applied first, so we need to reconstruct the x-value
         horiz_dist = math.sqrt(self.x ** 2 + self.y ** 2)
         return Vec(
-            math.degrees(math.atan2(self.z, horiz_dist)),
+            math.degrees(math.atan2(-self.z, horiz_dist)),
             math.degrees(math.atan2(self.y, self.x)) % 360,
             roll,
         )
@@ -1522,6 +1532,15 @@ class Vec:
         else:
             raise KeyError('Invalid axis: {!r}'.format(ind))
 
+    def other_axes(self, axis: str) -> Tuple[float, float]:
+        """Get the values for the other two axes."""
+        if axis == 'x':
+            return self.y, self.z
+        if axis == 'y':
+            return self.x, self.z
+        if axis == 'z':
+            return self.x, self.y
+
     def as_tuple(self):
         """Return the Vector as a tuple."""
         return Vec_tuple(self.x, self.y, self.z)
@@ -1532,7 +1551,11 @@ class Vec:
 
     def __len__(self):
         """The len() of a vector is the number of non-zero axes."""
-        return sum(1 for axis in (self.x, self.y, self.z) if axis != 0)
+        return (
+            (self.x != 0) +
+            (self.y != 0) +
+            (self.z != 0)
+        )
 
     def __contains__(self, val):
         """Check to see if an axis is set to the given value.
@@ -1578,13 +1601,13 @@ class Vec:
             self.y * other.z - self.z * other.y,
             self.z * other.x - self.x * other.z,
             self.x * other.y - self.y * other.x,
-            )
+        )
 
     def localise(
             self,
             origin: Union['Vec', tuple],
-            angles: Union['Vec', tuple]=None
-            ):
+            angles: Union['Vec', tuple]=None,
+    ):
         """Shift this point to be local to the given position and angles
 
         """
@@ -1592,8 +1615,14 @@ class Vec:
             self.rotate(angles[0], angles[1], angles[2])
         self.__iadd__(origin)
 
+    def norm_mask(self, normal: 'Vec') -> 'Vec':
+        """Subtract the components of this vector not in the direction of the normal.
+
+        If the normal is axis-aligned, this will zero out the other axes.
+        If not axis-aligned, it will do the equivalent.
+        """
+        normal = normal.norm()
+        return normal * self.dot(normal)
+
     len = mag
     mag_sq = len_sq
-
-abc.Mapping.register(Vec)
-abc.MutableMapping.register(Vec)
