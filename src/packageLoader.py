@@ -1126,7 +1126,7 @@ class QuotePack(PakObject):
         if voice.cave_skin is not None:
             vbsp_config.set_key(
                 ('Options', 'cave_port_skin'),
-                voice.cave_skin,
+                str(voice.cave_skin),
             )
 
         # Copy the config files for this voiceline..

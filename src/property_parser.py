@@ -665,7 +665,6 @@ class Property:
         """Generate the set of strings for a property file.
 
         Recursively calls itself for all child properties.
-        If the Property is marked invalid, it will immediately return.
         """
         if isinstance(self.value, list):
             if self.name is None:
@@ -681,7 +680,8 @@ class Property:
                     '\t' + line
                     for prop in self.value
                     for line in prop.export()
-                    )
+                )
                 yield '\t}\n'
         else:
-            yield '"' + self.real_name + '" "' + str(self.value) + '"\n'
+            # The should be a string!
+            yield '"' + self.real_name + '" "' + self.value + '"\n'
