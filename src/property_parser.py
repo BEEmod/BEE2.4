@@ -245,6 +245,29 @@ class Property:
                 # Skip blank lines and comments!
                 continue
 
+            if freshline[0] == '{':
+                # Open a new block - make sure the last token was a name..
+                if not requires_block:
+                    raise KeyValError(
+                        'Property cannot have sub-section if it already '
+                        'has an in-line value.',
+                        filename,
+                        line_num,
+                    )
+                requires_block = False
+                cur_block = cur_block[-1]
+                cur_block.value = []
+                open_properties.append(cur_block)
+                continue
+            else:
+                # A "name" line was found, but it wasn't followed by '{'!
+                if requires_block:
+                    raise KeyValError(
+                        "Block opening ('{') required!",
+                        filename,
+                        line_num,
+                    )
+
             if freshline[0] == '"':   # data string
                 line_contents = freshline.split('"')
                 name = line_contents[1]
@@ -280,20 +303,6 @@ class Property:
                 else:
                     # No flag, add unconditionally
                     cur_block.append(Property(name, value))
-
-            elif freshline[0] == '{':
-                # Open a new block - make sure the last token was a name..
-                if not requires_block:
-                    raise KeyValError(
-                        'Property cannot have sub-section if it already '
-                        'has an in-line value.',
-                        filename,
-                        line_num,
-                    )
-                requires_block = False
-                cur_block = cur_block[-1]
-                cur_block.value = []
-                open_properties.append(cur_block)
             elif freshline[0] == '}':
                 # Move back a block
                 open_properties.pop()
@@ -311,21 +320,13 @@ class Property:
             # in VMF files...
             elif is_identifier(freshline):
                 cur_block.append(Property(freshline, ''))
-                requires_block = True
+                requires_block = True  # Ensure the next token must be a '{'.
                 continue
             else:
                 raise KeyValError(
                     "Unexpected beginning character '"
                     + freshline[0]
                     + '"!',
-                    filename,
-                    line_num,
-                )
-
-            # A "name" line was found, but it wasn't followed by '{'!
-            if requires_block:
-                raise KeyValError(
-                    "Block opening ('{') required!",
                     filename,
                     line_num,
                 )
