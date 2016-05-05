@@ -3542,17 +3542,20 @@ def save(path):
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, do_swap, path, new_path):
+def run_vbsp(vbsp_args, path, new_path=None):
     """Execute the original VBSP, copying files around so it works correctly.
 
     vbsp_args are the arguments to pass.
     path is the original .vmf, new_path is the styled/ name.
-    If do_swap is true VBSP will be run on the map in styled/.
+    If new_path is passed VBSP will be run on the map in styled/, and we'll
+    read through the output to find the entity counts.
     """
+
+    is_peti = new_path is not None
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
-    if do_swap:
+    if is_peti:
         # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
@@ -3567,17 +3570,19 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         if x
     ]
 
-    # VBSP is named _osx or _linux for those platforms.
-    suffix = ''
+    # VBSP is named _osx or _linux for those platforms, and has no extension.
+    # Windows uses the exe extension.
+    ext = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
-        suffix = '.exe'
+        ext = '.exe'
 
-    if utils.MAC or utils.LINUX and do_swap:
+    # Ensure we've fixed the instance/ folder so instances are found.
+    if utils.MAC or utils.LINUX and is_peti:
         instance_symlink()
 
     arg = (
@@ -3585,8 +3590,8 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp" + os_suff + "_original" + suffix
-                )
+                "vbsp" + os_suff + "_original" + ext
+            )
         ) +
         '" ' +
         " ".join(vbsp_args)
@@ -3607,7 +3612,8 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         # VBSP didn't suceed. Print the error log..
         vbsp_logger.error(err.output.decode('ascii'))
 
-        process_vbsp_fail(err.output)
+        if is_peti:  # Ignore Hammer maps
+            process_vbsp_fail(err.output)
 
         LOGGER.error("VBSP failed! ({})", err.returncode)
         # Propagate the fail code to Portal 2.
@@ -3617,9 +3623,10 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     vbsp_logger.info(output.decode('ascii'))
     LOGGER.info("VBSP Done!")
 
-    process_vbsp_log(output)
+    if is_peti:  # Ignore Hammer maps
+        process_vbsp_log(output)
 
-    if do_swap:  # copy over the real files so vvis/vrad can read them
+    # Copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
             if os.path.isfile(new_path.replace(".vmf", ext)):
                 shutil.copy(
@@ -3811,9 +3818,7 @@ def main():
         LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
             vbsp_args=old_args,
-            do_swap=False,
             path=path,
-            new_path=new_path,
         )
     else:
         LOGGER.info("PeTI map detected!")
@@ -3831,7 +3836,7 @@ def main():
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
-            )
+        )
 
         fix_inst()
         alter_flip_panel()  # Must be done before conditions!
@@ -3855,7 +3860,6 @@ def main():
         save(new_path)
         run_vbsp(
             vbsp_args=new_args,
-            do_swap=True,
             path=path,
             new_path=new_path,
         )
