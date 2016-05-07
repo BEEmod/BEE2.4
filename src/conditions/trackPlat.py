@@ -29,6 +29,8 @@ def res_track_plat(_, res):
             (_horiz, _horiz_mirrored)
         - plat_suffix: Also add the above _vert or _horiz suffixes to
             the platform.
+        - vert_bottom_suffix: Add '_bottom' / '_vert_bottom' to the track at the
+            bottom of vertical platforms.
         - plat_var: If set, save the orientation to the given $fixup variable
     """
     # Get the instances from editoritems
@@ -36,7 +38,8 @@ def res_track_plat(_, res):
         inst_bot_grate, inst_bottom, inst_middle,
         inst_top, inst_plat, inst_plat_oscil, inst_single
     ) = resolve_inst(res['orig_item'])
-    single_plat_inst = res['single_plat', '']
+    # If invalid, [] = false so ''[0] = ''.
+    single_plat_inst = (resolve_inst(res['single_plat', '']) or '')[0]
     track_targets = res['track_name', '']
 
     track_files = [inst_bottom, inst_middle, inst_top, inst_single]
@@ -146,6 +149,22 @@ def res_track_plat(_, res):
                     conditions.add_suffix(inst, '_vert')
                 if utils.conv_bool(res['plat_suffix', '']):
                     conditions.add_suffix(plat_inst, '_vert')
+            if utils.conv_bool(res['vert_bottom_suffix', '']):
+                # We want to find the bottom/top track which is facing the
+                # same direction as the platform.
+                track_dirs = {
+                    inst_top: Vec(-1, 0, 0),
+                    inst_bottom: Vec(1, 0, 0)
+                }
+                for inst in track_set:
+                    try:
+                        norm_off = track_dirs[inst['file'].casefold()]
+                    except KeyError:
+                        continue
+
+                    if norm_off.rotate_by_str(inst['angles']) == facing:
+                        conditions.add_suffix(inst, '_bottom')
+
         elif track_facing == 'HORIZ_MIRR':
             if utils.conv_bool(res['horiz_suffix', '']):
                 for inst in track_set:
