@@ -1,8 +1,7 @@
 # Better Extended Editor 2 version 4 #
-A Portal 2  Mod tool
+##Portal 2  Mod Tool
 
-[![forthebadge](http://forthebadge.com/images/badges/designed-in-ms-paint.svg)](http://forthebadge.com)
-[![forthebadge](http://forthebadge.com/images/badges/made-with-crayons.svg)](http://forthebadge.com)
+[![Join the chat at https://gitter.im/BenVlodgi/BEE2.4](https://badges.gitter.im/BenVlodgi/BEE2.4.svg)](https://gitter.im/BenVlodgi/BEE2.4?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
 different eras, and configure many other aspects. All vanilla items have been upgraded with additional
