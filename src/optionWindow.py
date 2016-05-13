@@ -16,7 +16,7 @@ UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
-SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_keep_win_inside')
+SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 
 refresh_callbacks = []  # functions called to apply settings.
 
