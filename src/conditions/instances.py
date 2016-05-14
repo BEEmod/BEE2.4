@@ -124,9 +124,10 @@ def res_set_inst_var(inst, res):
     """Set an instance variable to the given value.
 
     Values follow the format "$start_enabled 1", with or without the $.
+    "$out $in" will copy the value of $in into $out.
     """
     var_name, val = res.value.split(' ', 1)
-    inst.fixup[var_name] = val
+    inst.fixup[var_name] = conditions.resolve_value(inst, val)
 
 
 @make_result('clearOutputs', 'clearOutput')
