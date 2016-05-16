@@ -1,5 +1,6 @@
 from cx_Freeze import setup, Executable
-import os, shutil
+import os
+import shutil
 import utils
 
 shutil.rmtree('build_BEE2', ignore_errors=True)
@@ -134,3 +135,27 @@ setup(
         )
     ],
 )
+
+# Now copy the required resources to the build directory.
+
+def copy_resource(tree):
+    src = os.path.join('..', tree)
+    dest = os.path.join('..', 'build_BEE2', tree)
+
+    if os.path.isfile(src):
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy(src, dest)
+    else:
+        os.makedirs(dest, exist_ok=True)
+        for file in os.listdir(src):
+            copy_resource(tree + '/' + file)
+
+copy_resource('basemodui.txt')
+copy_resource('BEE2.ico')
+copy_resource('images/BEE2')
+copy_resource('images/icons')
+copy_resource('palettes')
+for snd in os.listdir('../sounds/'):
+    if snd == 'music_samp':
+        continue
+    copy_resource('sounds/' + snd)
