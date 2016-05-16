@@ -361,7 +361,12 @@ class Game:
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
-        export_screen.set_length('COMP', len(os.listdir('../compiler')))
+        num_compiler_files = len(os.listdir('../compiler'))
+        if num_compiler_files == 0:
+            LOGGER.warning('No compiler files!')
+            export_screen.skip_stage('COMP')
+        else:
+            export_screen.set_length('COMP', num_compiler_files)
 
         LOGGER.info('Should refresh: {}', should_refresh)
         if should_refresh:
