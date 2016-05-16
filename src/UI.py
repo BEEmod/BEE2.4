@@ -117,7 +117,6 @@ class Item:
         self.tags = set()
 
         self.load_data()
-        self.set_properties(self.get_properties())
 
     def load_data(self):
         """Load data from the item."""
@@ -197,24 +196,35 @@ class Item:
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
                 name = prop.name
+
+                if utils.conv_bool(prop['BEE2_ignore', '']):
+                    continue
+
                 # PROP_TYPES is a dict holding all the modifiable properties.
-                if name not in result and name in PROP_TYPES:
+                if name in PROP_TYPES:
+                    if name in result:
+                        LOGGER.warning(
+                            'Duplicate property "{}" in {}!',
+                            name,
+                            self.id
+                        )
+
                     result[name] = item_opts.get_val(
                         self.id,
                         'PROP_' + name,
                         prop["DefaultValue", ''],
-                        )
+                    )
+                else:
+                    LOGGER.warning(
+                        'Unknown property "{}" in {}',
+                        name,
+                        self.id,
+                    )
         return result
 
     def set_properties(self, props):
         """Apply the properties to the item."""
         for prop, value in props.items():
-            for def_prop in self.data['editor'].find_all(
-                    "Properties",
-                    prop,
-                    'DefaultValue',
-                    ):
-                def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
 
     def refresh_subitems(self):
@@ -753,6 +763,17 @@ def export_editoritems(_=None):
         item_list.items()
     }
 
+    item_properties = {
+        it_id: {
+            key[5:]: value
+            for key, value in
+            section.items() if
+            key.startswith('prop_')
+        }
+        for it_id, section in
+        item_opts.items()
+    }
+
     success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
@@ -762,7 +783,7 @@ def export_editoritems(_=None):
             'QuotePack': voice_win.chosen_id,
             'Elevator': elev_win.chosen_id,
 
-            'Item': (pal_data, item_versions),
+            'Item': (pal_data, item_versions, item_properties),
             'StyleVar': style_vars,
 
             # The others don't have one, so it defaults to None.

@@ -1,4 +1,3 @@
-#coding: utf-8
 from tkinter import *  # ui library
 from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
@@ -214,7 +213,7 @@ def paint_fx(e=None):
 
 
 def exit_win(_=None):
-    "Quit and return the new settings."
+    """Quit and save the new settings."""
     global is_open
     win.grab_release()
     win.withdraw()

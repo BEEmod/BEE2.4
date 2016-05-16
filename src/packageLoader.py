@@ -947,14 +947,15 @@ class Item(PakObject):
         """Export all items into the configs.
 
         For the selected attribute, this takes a tuple of values:
-        (pal_list, versions)
+        (pal_list, versions, prop_conf)
         Pal_list is a list of (item, subitem) tuples representing the palette.
         Versions is a {item:version_id} dictionary.
-
+        prop_conf is a {item_id: {prop_name: value}} nested dictionary for
+         overriden property names. Empty dicts can be passed instead.
         """
         editoritems = exp_data.editoritems
         vbsp_config = exp_data.vbsp_conf
-        pal_list, versions = exp_data.selected
+        pal_list, versions, prop_conf = exp_data.selected
 
         for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
             (
@@ -962,13 +963,13 @@ class Item(PakObject):
                 editor_parts,
                 config_part
             ) = item._get_export_data(
-                pal_list, versions, exp_data.selected_style.id,
+                pal_list, versions, exp_data.selected_style.id, prop_conf,
             )
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
 
-    def _get_export_data(self, pal_list, versions, style_id):
+    def _get_export_data(self, pal_list, versions, style_id, prop_conf: Dict[str, Dict[str, str]]):
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -1019,6 +1020,13 @@ class Item(PakObject):
                     # "Palette" block.
                     del editor_section[editor_sec_index]
                     break
+
+        # Apply configured default values to this item
+        prop_overrides = prop_conf.get(self.id, {})
+        for prop_section in new_editor.find_all("Editor", "Properties"):
+            for item_prop in prop_section:
+                if item_prop.name.casefold() in prop_overrides:
+                    item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
 
         return (
             new_editor,
