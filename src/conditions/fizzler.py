@@ -237,6 +237,8 @@ def res_fizzler_pair(begin_inst, res):
     Values:
         - StartInst, EndInst: The instances used for each end
         - MidInst: An instance placed every 128 units between emitters.
+        - SingleInst: If the models are 1 block apart, replace both with this
+            instance.
     """
     orig_target = begin_inst['targetname']
 
@@ -254,6 +256,7 @@ def res_fizzler_pair(begin_inst, res):
     begin_file = res['StartInst', orig_file]
     end_file = res['EndInst', orig_file]
     mid_file = res['MidInst', '']
+    single_file = res['SingleInst', '']
 
     begin_inst['file'] = begin_file
     begin_inst['targetname'] = pair_name
@@ -270,12 +273,18 @@ def res_fizzler_pair(begin_inst, res):
         if (
                 begin_pos[axis_1] == end_pos[axis_1] and
                 begin_pos[axis_2] == end_pos[axis_2]
-                ):
+        ):
             length = int(end_pos[main_axis] - begin_pos[main_axis])
             break
     else:
         LOGGER.warning('No matching pair for {}!!', orig_target)
         return
+
+    if single_file and length == 0:
+        end_inst.remove()
+        begin_inst['file'] = single_file
+        return
+
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
 
@@ -283,7 +292,7 @@ def res_fizzler_pair(begin_inst, res):
         # Go 64 from each side, and always have at least 1 section
         # A 128 gap will have length = 0
         for dis in range(0, abs(length) + 1, 128):
-            new_pos = begin_pos + direction*dis
+            new_pos = begin_pos + direction * dis
             vbsp.VMF.create_ent(
                 classname='func_instance',
                 targetname=pair_name,
