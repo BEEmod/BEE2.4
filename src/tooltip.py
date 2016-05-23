@@ -38,7 +38,7 @@ context_label = tk.Label(
 
     justify='left',
     wraplength=200,  # Stop it getting too long.
-    )
+)
 context_label.grid(row=0, column=0)
 
 
@@ -57,28 +57,36 @@ def show(widget: tk.Misc, text, mouse_x, mouse_y):
     cent_x = TK_ROOT.winfo_rootx() + TK_ROOT.winfo_width() / 2
     cent_y = TK_ROOT.winfo_rooty() + TK_ROOT.winfo_height() / 2
 
-    x_centered = False
+    x_centered = y_centered = True
 
-    if cent_x > mouse_x + CENT_DIST:
-        # Left of center, so place right of the target
-        x = widget.winfo_rootx() + widget.winfo_width() + PADDING
-    elif cent_x < mouse_x - CENT_DIST:
-        # Right of center, so place left of the target
-        x = widget.winfo_rootx() - window.winfo_width() - PADDING
-    else:  # Center horizontally
+    # If the widget is smaller than the context window, always center.
+    if widget.winfo_width() > window.winfo_width():
+        if cent_x > mouse_x + CENT_DIST:
+            # Left of center, so place right of the target
+            x = widget.winfo_rootx() + widget.winfo_width() + PADDING
+            x_centered = False
+        elif cent_x < mouse_x - CENT_DIST:
+            # Right of center, so place left of the target
+            x = widget.winfo_rootx() - window.winfo_width() - PADDING
+            x_centered = False
+
+    if widget.winfo_height() > window.winfo_height():
+        if cent_y > mouse_y + CENT_DIST:
+            # Above center, so place below target
+            y = widget.winfo_rooty() + widget.winfo_height() + PADDING
+            y_centered = False
+        elif cent_y < mouse_y - CENT_DIST:
+            # Below center, so place above target
+            y = widget.winfo_rooty() - window.winfo_height() - PADDING
+            y_centered = False
+
+    if x_centered:  # Center horizontally
         x = (
             widget.winfo_rootx() +
             (widget.winfo_width() - window.winfo_width()) // 2
         )
-        x_centered = True
 
-    if cent_y > mouse_y + CENT_DIST:
-        # Above center, so place below target
-        y = widget.winfo_rooty() + widget.winfo_height() + PADDING
-    elif cent_y < mouse_y - CENT_DIST:
-        # Below center, so place above target
-        y = widget.winfo_rooty() - window.winfo_height() - PADDING
-    else:  # Center vertically
+    if y_centered:
         y = (
             widget.winfo_rooty() +
             (widget.winfo_height() - window.winfo_height()) // 2
