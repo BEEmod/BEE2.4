@@ -15,6 +15,7 @@ from tkinter import messagebox
 from enum import Enum
 import functools
 import webbrowser
+import itertools
 
 from richTextBox import tkRichText
 from tkMarkdown import HRULE_TEXT
@@ -216,20 +217,20 @@ def get_description(global_last, glob_desc, style_desc):
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
         # We have both, we need to join them together.
+        global_text, global_links = glob_desc
+        style_text, style_links = style_desc
+        links = dict(global_links)
+        links.update(style_links)
         if global_last:
-            yield from style_desc
-            yield HRULE_TEXT
-            yield from glob_desc
+            return itertools.chain(style_text, [HRULE_TEXT], glob_desc)
         else:
-            yield from glob_desc
-            yield HRULE_TEXT
-            yield from style_desc
+            return itertools.chain(glob_desc, [HRULE_TEXT], style_text)
     elif glob_desc:
-        yield from glob_desc
+        return glob_desc
     elif style_desc:
-        yield from style_desc
+        return style_desc
     else:
-        return  # No description
+        return ''  # No description
 
 
 def load_item_data():

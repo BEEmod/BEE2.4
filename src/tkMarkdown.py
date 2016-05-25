@@ -1,4 +1,5 @@
 from enum import Enum
+from itertools import count
 
 from markdown.util import etree
 from markdown.extensions import smart_strong, sane_lists
@@ -55,8 +56,15 @@ def iter_elemtext(elem: etree.Element, parent_path=()):
 
 
 def parse_html(element):
-    """Translate markdown HTML into TK tags."""
+    """Translate markdown HTML into TK tags.
+
+    This yields alternating text and tags, matching the arguments for
+    Text widgets.
+    The last yielded value is a tag: url dict for the embedded hyperlinks.
+    """
     ol_nums = []
+    links = {}
+    link_counter = count(start=1)
 
     for path, text in iter_elemtext(element, parent_path=[element]):
         last = path[-1]
@@ -66,20 +74,24 @@ def parse_html(element):
 
         # Line breaks at <br> or at the end of <p> blocks.
         if last.tag == 'br' or (last.tag == 'p' and text is TAG.END):
-            yield '\n', ()
+            yield '\n'
+            yield ()
             continue
 
         # Insert the number or bullet
         if last.tag == 'li' and text is TAG.START:
             list_type = path[-2].tag
             if list_type == 'ul':
-                yield UL_START, ('list_start', 'indent')
+                yield UL_START
+                yield ('list_start', 'indent')
             elif list_type == 'ol':
                 ol_nums[-1] += 1
-                yield OL_START.format(ol_nums[-1]), ('list_start', 'indent')
+                yield OL_START.format(ol_nums[-1])
+                yield ('list_start', 'indent')
 
         if last.tag == 'li' and text is TAG.END:
-            yield '\n', ('indent')
+            yield '\n'
+            yield ('indent', )
 
         if last.tag == 'ol':
             # Set and reset the counter appropriately..
@@ -92,12 +104,31 @@ def parse_html(element):
             # Don't output these internal values.
             continue
 
-        tk_tags = []
+        tk_tags = set()
         for tag in {elem.tag for elem in path}:
             # Simple tags are things like strong, u - no additional value.
             if tag in SIMPLE_TAGS:
-                tk_tags.extend(SIMPLE_TAGS[tag])
-        yield text, tuple(tk_tags)
+                tk_tags.update(SIMPLE_TAGS[tag])
+
+        # Handle links.
+        for elem in path:
+            if elem.tag != 'a':
+                continue
+            try:
+                url = elem.attrib['href']
+            except KeyError:
+                continue  # We don't handle anchor a-tags.
+            try:
+                url_id = links[url]
+            except KeyError:
+                url_id = links[url] = 'link_callback_' + str(next(link_counter))
+            tk_tags.add('link')  # For formatting
+            tk_tags.add(url_id)  # For the click-callback.
+
+        yield text
+        yield tuple(tk_tags)
+
+    yield links
 
 
 class TKConverter(markdown.Extension, Preprocessor):
@@ -123,13 +154,22 @@ class TKConverter(markdown.Extension, Preprocessor):
         return lines  # And don't modify the text..
 
     def serialise(self, element: etree.Element):
+        """Override Markdown's serialising program so it returns our format instead of HTML.
+
+        """
         # We can't directly return the list, since it'll break Markdown.
         # Return an empty document and save it elsewhere.
-        self.result = list(parse_html(element))
+
+        parsed_tags = list(parse_html(element))
+        # The last yielded value is the dictionary of URL link keys.
+        # Pop that off.
+        self.result = parsed_tags, parsed_tags.pop()
 
         # Remove a bare \n at the end of the description
-        if self.result and self.result[-1][0] == '\n':
-            self.result.pop()
+        # It's followed by the tag.
+        if parsed_tags and parsed_tags[-2:-1] == ['\n', ()]:
+            parsed_tags.pop()
+            parsed_tags.pop()
 
         # StripTopLevelTags expects doc_tag in the output,
         # so give it an empty one.
