@@ -1974,12 +1974,14 @@ def desc_parse(info, id=''):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
+    has_warning = False
     lines = []
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
-                if line.name:
-                    LOGGER.warning('Old desc format: ', id)
+                if line.name and not has_warning:
+                    LOGGER.warning('Old desc format: {}', id)
+                    has_warning = True
                 lines.append(line.value)
         else:
             lines.append(prop.value)
@@ -1993,11 +1995,11 @@ def get_selitem_data(info):
 
     """
     auth = sep_values(info['authors', ''])
-    desc = desc_parse(info)
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
     group = info['group', '']
+    desc = desc_parse(info, id=info['id'])
     if not group:
         group = None
     if not short_name:
