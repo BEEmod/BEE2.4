@@ -222,9 +222,9 @@ def get_description(global_last, glob_desc, style_desc):
         links = dict(global_links)
         links.update(style_links)
         if global_last:
-            return itertools.chain(style_text, [HRULE_TEXT], glob_desc)
+            return itertools.chain(style_text, HRULE_TEXT, global_text), links
         else:
-            return itertools.chain(glob_desc, [HRULE_TEXT], style_text)
+            return itertools.chain(global_text, HRULE_TEXT, style_text), links
     elif glob_desc:
         return glob_desc
     elif style_desc:
