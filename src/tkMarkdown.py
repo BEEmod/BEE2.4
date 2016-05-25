@@ -55,7 +55,7 @@ def iter_elemtext(elem: etree.Element, parent_path=()):
         yield parent_path, elem.tail.replace('\n', '')
 
 
-def parse_html(element):
+def parse_html(element: etree.Element):
     """Translate markdown HTML into TK tags.
 
     This yields alternating text and tags, matching the arguments for
@@ -73,7 +73,9 @@ def parse_html(element):
             continue  # This wraps around the entire block..
 
         # Line breaks at <br> or at the end of <p> blocks.
-        if last.tag == 'br' or (last.tag == 'p' and text is TAG.END):
+        # <br> emits a START, '', and END - we only want to output for one
+        # of those.
+        if last.tag in ('br', 'p') and text is TAG.END:
             yield '\n'
             yield ()
             continue
