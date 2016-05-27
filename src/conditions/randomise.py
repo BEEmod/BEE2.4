@@ -113,14 +113,21 @@ def res_random(inst, res):
 
 @make_result_setup('variant')
 def res_add_variant_setup(res):
-    count = utils.conv_int(res['Number', ''], None)
-    if count:
-        return conditions.weighted_random(
-            count,
-            res['weights', ''],
-        )
+    if res.has_children():
+        count = utils.conv_int(res['Number', ''], None)
+        if count:
+            return conditions.weighted_random(
+                count,
+                res['weights', ''],
+            )
+        else:
+            return None
     else:
-        return None
+        count = utils.conv_int(res.value, None)
+        if count:
+            return list(range(count))
+        else:
+            return None
 
 
 @make_result('variant')
