@@ -542,10 +542,10 @@ class Property:
                         return self.find_key(index).value
                     except NoKeyError as no_key:
                         raise IndexError(no_key) from no_key
-        elif index == 0:
-            return self.value
         else:
-            raise IndexError
+            raise IndexError(
+                'Cannot index a Property that does not have children!'
+            )
 
     def __setitem__(
             self,
@@ -566,8 +566,6 @@ class Property:
                 self.value[index] = value
             else:
                 self.set_key(index, value)
-        elif index == 0:
-            self.value = value
         else:
             raise IndexError(
                 'Cannot index a Property that does not have children!'
@@ -589,7 +587,9 @@ class Property:
                 except NoKeyError as no_key:
                     raise IndexError(no_key) from no_key
         else:
-            self.value = ''  # type: _Prop_Value
+            raise IndexError(
+                'Cannot index a Property that does not have children!'
+            )
 
     def __add__(self, other):
         """Allow appending other properties to this one.
