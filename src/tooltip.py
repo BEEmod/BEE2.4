@@ -95,7 +95,10 @@ def show(widget: tk.Misc, text, mouse_x, mouse_y):
         # If both X and Y are centered, the tooltip will appear on top of
         # the mouse and immediately hide. Offset it to fix that.
         if x_centered:
-            y += window.winfo_height()
+            if mouse_y < cent_y:
+                y = widget.winfo_rooty() + widget.winfo_height() + PADDING
+            else:
+                y = widget.winfo_rooty() - window.winfo_height() - PADDING
 
     window.geometry('+{}+{}'.format(int(x), int(y)))
 
