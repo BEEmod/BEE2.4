@@ -23,6 +23,7 @@ Download the latest releases of the BEE2.4 and items from the following pages:
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
 - [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
+- [markdown](https://pythonhosted.org/Markdown/)
 - TKinter/TTK (Standard Library)
 
 ## Compilation: ##

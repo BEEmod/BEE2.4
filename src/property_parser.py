@@ -20,7 +20,7 @@ REPLACE_CHARS = {
 _NO_KEY_FOUND = object()
 
 # We allow bare identifiers on lines, but they can't contain quotes or brackets.
-_RE_IDENTIFIER = re.compile('[^"{}]+')
+_RE_IDENTIFIER = re.compile('[^]"\'{}<>();:[]+')
 
 _Prop_Value = Union[List['Property'], str]
 
@@ -482,13 +482,10 @@ class Property:
             return self.value >= other
 
     def __len__(self):
-        """Determine the number of child properties.
-
-        Singluar Properties have a length of 1.
-        """
+        """Determine the number of child properties."""
         if self.has_children():
             return len(self.value)
-        # else - TypeError..
+        raise ValueError("{!r} has no children!".format(self))
 
     def __iter__(self) -> Iterator['Property']:
         """Iterate through the value list.
