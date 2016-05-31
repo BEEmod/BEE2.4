@@ -1,17 +1,17 @@
 """Results relating to brushwork."""
-from collections import defaultdict
 import random
+from collections import defaultdict
 
-from conditions import (
-    make_result, make_result_setup, RES_EXHAUSTED,
-    SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
-)
-from property_parser import Property
-from utils import Vec
-import utils
 import conditions
-import vmfLib as VLib
+import utils
 import vbsp
+import vmfLib as VLib
+from conditions import (
+    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
+)
+from srctools.property_parser import Property
+from utils import Vec
+
 
 LOGGER = utils.getLogger(__name__)
 

@@ -1,21 +1,22 @@
 # coding: utf-8
-from decimal import Decimal
-from collections import namedtuple, defaultdict
-from enum import Enum
-import random
-import math
 import itertools
-
-from utils import Vec, Vec_tuple
-from property_parser import Property
-from instanceLocs import resolve as resolve_inst
-import vmfLib as VLib
-import utils
+import math
+import random
+from collections import namedtuple, defaultdict
+from decimal import Decimal
+from enum import Enum
 
 from typing import (
-    Optional, Callable, Any,
+    Callable, Any,
     Dict, List, Tuple, NamedTuple,
 )
+
+import utils
+import vmfLib as VLib
+from instanceLocs import resolve as resolve_inst
+from srctools.property_parser import Property
+from utils import Vec, Vec_tuple
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
 

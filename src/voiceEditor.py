@@ -1,19 +1,19 @@
-from tkinter import *
-from tk_tools import TK_ROOT
-from tkinter import ttk
-from tkinter import font
-
-from decimal import Decimal
-from enum import Enum
-import os
 import functools
 import itertools
+import os
+from decimal import Decimal
+from enum import Enum
+from tkinter import *
+from tkinter import font
+from tkinter import ttk
 
-from BEE2_config import ConfigFile
-from property_parser import Property
 import img
-import utils
 import tk_tools
+import utils
+from BEE2_config import ConfigFile
+from srctools.property_parser import Property
+from tk_tools import TK_ROOT
+
 
 LOGGER = utils.getLogger(__name__)
 

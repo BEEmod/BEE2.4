@@ -4,12 +4,11 @@ from io import BytesIO
 
 import os
 import os.path
-import stat
 import shutil
 import sys
 import subprocess
 
-from property_parser import Property
+from srctools import Property
 from BSP import BSP, BSP_LUMPS
 import utils
 

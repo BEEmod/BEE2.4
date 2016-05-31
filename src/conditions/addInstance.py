@@ -1,16 +1,16 @@
 """Results for generating additional instances.
 
 """
+import utils
+import vbsp
+import vmfLib as VLib
 from conditions import (
-    make_result, make_result_setup, RES_EXHAUSTED,
+    make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
 )
-from property_parser import Property
 from instanceLocs import resolve as resolve_inst
+from srctools.property_parser import Property
 from utils import Vec
-import utils
-import vmfLib as VLib
-import vbsp
 
 
 @make_result('addGlobal')

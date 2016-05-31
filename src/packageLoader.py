@@ -2,22 +2,22 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 import operator
-from zipfile import ZipFile
-from collections import defaultdict, namedtuple
-from contextlib import ExitStack
 import os
 import os.path
 import shutil
+from collections import defaultdict, namedtuple
+from contextlib import ExitStack
+from zipfile import ZipFile
 
-from property_parser import Property, NoKeyError
-from FakeZip import FakeZip, zip_names, zip_open_bin
-from selectorWin import SelitemData
-from loadScreen import main_loader as loader
-from packageMan import PACK_CONFIG
-import vmfLib as VLib
 import extract_packages
 import tkMarkdown
 import utils
+import vmfLib as VLib
+from FakeZip import FakeZip, zip_names, zip_open_bin
+from loadScreen import main_loader as loader
+from packageMan import PACK_CONFIG
+from selectorWin import SelitemData
+from srctools import Property, NoKeyError
 
 from typing import (
     Dict,

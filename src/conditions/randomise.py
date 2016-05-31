@@ -1,12 +1,12 @@
 """Conditions for randomising instances."""
 import random
 
-from property_parser import Property
+import conditions
+import utils
 from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
-import conditions
-import utils
+from srctools.property_parser import Property
 
 
 @make_flag('random')

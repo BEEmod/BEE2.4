@@ -1,9 +1,8 @@
 """Results relating to item connections."""
-from conditions import make_result, make_result_setup, resolve_value
-from property_parser import Property
-import conditions
 import utils
 import vmfLib as VLib
+from conditions import make_result, make_result_setup, resolve_value
+from srctools.property_parser import Property
 
 
 @make_result_setup('AddOutput')

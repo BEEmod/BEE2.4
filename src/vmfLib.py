@@ -3,19 +3,18 @@ Wraps property_parser tree in a set of classes which smartly handle
 specifics of VMF files.
 """
 import io
+import itertools
 import operator
 from collections import defaultdict, namedtuple
 from contextlib import suppress
-import itertools
-
-from property_parser import Property
-from utils import Vec
-import utils
 
 from typing import (
     Optional, Union,
     Dict, List, Tuple, Set, Iterable, Iterator
 )
+
+from srctools import Property, Vec
+import utils
 
 # Used to set the defaults for versioninfo
 CURRENT_HAMMER_VERSION = 400

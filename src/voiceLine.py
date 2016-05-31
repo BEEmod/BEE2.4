@@ -1,17 +1,18 @@
 # coding=utf-8
-from decimal import Decimal
-from collections import namedtuple
 import itertools
-import random
 import os
+import random
+from collections import namedtuple
+from decimal import Decimal
 
-from BEE2_config import ConfigFile
-from property_parser import Property
-from utils import Vec
 import conditions
 import utils
-import vmfLib
 import vbsp
+import vmfLib
+from BEE2_config import ConfigFile
+from srctools.property_parser import Property
+from utils import Vec
+
 
 LOGGER = utils.getLogger(__name__)
 

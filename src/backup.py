@@ -34,7 +34,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from zipfile import ZipFile, ZIP_LZMA
 
 from tooltip import add_tooltip
-from property_parser import Property
+from srctools import Property
 from CheckDetails import CheckDetails, Item as CheckItem
 from loadScreen import LoadScreen
 import img

@@ -1,16 +1,17 @@
 """Conditions related to specific kinds of entities."""
-from collections import defaultdict
 import random
+from collections import defaultdict
 
+import conditions
+import utils
+import vmfLib as VLib
 from conditions import (
     make_result, make_result_setup,
     TEMP_TYPES, SOLIDS
 )
-from property_parser import Property
+from srctools.property_parser import Property
 from utils import Vec
-import vmfLib as VLib
-import conditions
-import utils
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
 

@@ -3,17 +3,17 @@
 """
 from collections import defaultdict
 
+import conditions
+import utils
+import vbsp
+import vmfLib as VLib
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
-from property_parser import Property
-from utils import Vec
 from instanceLocs import resolve as resolve_inst
-import utils
-import vmfLib as VLib
-import conditions
-import vbsp
+from srctools.property_parser import Property
+from utils import Vec
 
 # Map sign_type values to the item ID and the resolveInst ID.
 IND_PANEL_TYPES = {

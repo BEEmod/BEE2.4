@@ -1,12 +1,13 @@
-from contextlib import ExitStack
+import io
 import os
 import os.path
-import io
-import zipfile
 import shutil
+import zipfile
+from contextlib import ExitStack
 
-from property_parser import Property
 import utils
+from srctools import Property
+
 
 LOGGER = utils.getLogger(__name__)
 

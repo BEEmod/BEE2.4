@@ -5,23 +5,24 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+from tkinter import *  # ui library
+from tkinter import filedialog  # open/save as dialog creator
+from tkinter import messagebox  # simple, standard modal dialogs
+from tk_tools import TK_ROOT
+
 import os
 import os.path
 import shutil
 
-from tkinter import *  # ui library
-from tkinter import messagebox  # simple, standard modal dialogs
-from tkinter import filedialog  # open/save as dialog creator
-from tk_tools import TK_ROOT
-
-from query_dialogs import ask_string
 from BEE2_config import ConfigFile, GEN_OPTS
-from property_parser import Property
-import utils
+from query_dialogs import ask_string
+from srctools import Property
+import backup
+import extract_packages
 import loadScreen
 import packageLoader
-import extract_packages
-import backup
+import utils
+
 
 LOGGER = utils.getLogger(__name__)
 

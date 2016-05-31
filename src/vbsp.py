@@ -13,8 +13,7 @@ from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
 
-from property_parser import Property
-from utils import Vec
+from srctools import Property, Vec
 from BEE2_config import ConfigFile
 import vmfLib as VLib
 import voiceLine
