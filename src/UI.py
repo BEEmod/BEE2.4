@@ -1344,12 +1344,12 @@ def init_picker(f):
         f,
         text="All Items: ",
         anchor="center",
-        ).grid(
-            row=0,
-            column=0,
-            sticky="EW",
-            )
-    cframe = ttk.Frame(
+    ).grid(
+        row=0,
+        column=0,
+        sticky="EW",
+    )
+    UI['picker_frame'] = cframe = ttk.Frame(
         f,
         borderwidth=4,
         relief="sunken",
@@ -1404,11 +1404,13 @@ def flow_picker(_=None):
                 tagsPane.wid['expand_frame'].winfo_height()
                 - pal_canvas.winfo_rooty()
                 + tagsPane.wid['expand_frame'].winfo_rooty()
-                + 10
+                + 15
             ), 0)
     else:
         offset = 0
-    width = (pal_canvas.winfo_width()-10) // 65
+    UI['picker_frame'].grid(pady=(offset, 0))
+
+    width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
         width = 1  # we got way too small, prevent division by zero
     vis_items = [it for it in pal_items if it.visible]
@@ -1417,18 +1419,18 @@ def flow_picker(_=None):
         item.is_pre = False
         item.place(
             x=((i % width) * 65 + 1),
-            y=((i // width) * 65 + offset + 1),
+            y=((i // width) * 65 + 1),
             )
 
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
-    height = (num_items//width + 1)*65 + offset + 2
+    height = (num_items // width + 1) * 65 + 2
     pal_canvas['scrollregion'] = (
         0,
         0,
-        width*65,
+        width * 65,
         height,
-        )
+    )
     frmScroll['height'] = height
 
     # this adds extra blank items on the end to finish the grid nicely.
@@ -1613,19 +1615,20 @@ def init_windows():
     TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
-        )  # Prevent making the window smaller than the preview pane
+    )  # Prevent making the window smaller than the preview pane
+
     loader.step('UI')
 
     ttk.Separator(
         ui_bg,
         orient=VERTICAL,
-        ).grid(
-            row=0,
-            column=4,
-            sticky="NS",
-            padx=10,
-            pady=10,
-            )
+    ).grid(
+        row=0,
+        column=4,
+        sticky="NS",
+        padx=10,
+        pady=10,
+    )
 
     picker_split_frame = Frame(ui_bg, bg=ItemsBG)
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
@@ -1638,21 +1641,28 @@ def init_windows():
         padding=5,
         borderwidth=0,
         relief="raised",
-        )
+    )
+    # Place doesn't affect .grid() positioning, so this frame will sit on top
+    # of other widgets.
     frames['tags'].place(x=0, y=0, relwidth=1)
     tagsPane.init(frames['tags'])
+    frames['tags'].update_idletasks()  # Refresh so height() is correct
+
     loader.step('UI')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
-        padding=(5, 40, 5, 5),
+        # Offset the picker window under the unexpanded tags pane, so they
+        # don't overlap.
+        padding=(5, frames['tags'].winfo_height(), 5, 5),
         borderwidth=4,
         relief="raised",
-        )
+    )
     frames['picker'].grid(row=0, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(0, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
+
     loader.step('UI')
 
     # Move this to above the picker pane (otherwise it'll be hidden)
@@ -1685,9 +1695,11 @@ def init_windows():
     windows['pal'].rowconfigure(0, weight=1)
 
     init_palette(pal_frame)
+
     loader.step('UI')
 
     packageMan.make_window()
+
     loader.step('UI')
 
     windows['opt'] = SubPane.SubPane(
@@ -1701,12 +1713,15 @@ def init_windows():
         tool_col=2,
     )
     init_option(windows['opt'])
+
     loader.step('UI')
 
     StyleVarPane.make_pane(frames['toolMenu'])
+
     loader.step('UI')
 
     CompilerPane.make_pane(frames['toolMenu'])
+
     loader.step('UI')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
