@@ -22,6 +22,7 @@ import extract_packages
 import loadScreen
 import packageLoader
 import utils
+import srctools
 
 
 LOGGER = utils.getLogger(__name__)
@@ -235,7 +236,7 @@ class Game:
                     data = list(file)
 
                 for line_num, line in reversed(list(enumerate(data))):
-                    clean_line = utils.clean_line(line)
+                    clean_line = srctools.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
                             break  # Already added!
@@ -619,7 +620,7 @@ def find_steam_info(game_dir):
         if os.path.isfile(info_path):
             with open(info_path) as file:
                 for line in file:
-                    clean_line = utils.clean_line(line).replace('\t', ' ')
+                    clean_line = srctools.clean_line(line).replace('\t', ' ')
                     if not found_id and 'steamappid' in clean_line.casefold():
                         raw_id = clean_line.casefold().replace(
                             'steamappid', '').strip()

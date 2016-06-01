@@ -10,6 +10,7 @@ from contextlib import ExitStack
 from zipfile import ZipFile
 
 import extract_packages
+import srctools
 import tkMarkdown
 import utils
 import vmfLib as VLib
@@ -17,7 +18,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
-from srctools import Property, NoKeyError
+from srctools import Property, NoKeyError, Vec
 
 from typing import (
     Dict,
@@ -658,7 +659,7 @@ class Package:
         if self.id == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
-        PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
+        PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
     def is_stale(self):
@@ -699,7 +700,7 @@ class Style(PakObject):
             has_video=True,
             vpk_name='',
             corridor_names=utils.EmptyMapping,
-            ):
+        ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
@@ -724,7 +725,7 @@ class Style(PakObject):
         info = data.info
         selitem_data = get_selitem_data(info)
         base = info['base', '']
-        has_video = utils.conv_bool(
+        has_video = srctools.conv_bool(
             info['has_video', ''],
             not data.is_override,  # Assume no video for override
         )
@@ -860,10 +861,10 @@ class Item(PakObject):
         versions = {}
         def_version = None
         folders = {}
-        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
-        desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
+        desc_last = srctools.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
             data.info,
@@ -873,14 +874,14 @@ class Item(PakObject):
             prop_name='all_conf',
         )
 
-        needs_unlock = utils.conv_bool(data.info['needsUnlock', '0'])
+        needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
 
         for ver in data.info.find_all('version'):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_wip': utils.conv_bool(ver['wip', '0']),
-                'is_dep':  utils.conv_bool(ver['deprecated', '0']),
+                'is_wip': srctools.conv_bool(ver['wip', '0']),
+                'is_dep':  srctools.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,
                 }
@@ -1065,7 +1066,7 @@ class QuotePack(PakObject):
 
         # For Cave Johnson voicelines, this indicates what skin to use on the
         # portrait.
-        port_skin = utils.conv_int(data.info['caveSkin', None], None)
+        port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
         config = get_config(
             data.info,
@@ -1206,7 +1207,7 @@ class Skybox(PakObject):
         self.fog_opts = fog_opts
 
         # Extract this for selector windows to easily display
-        self.fog_color = utils.Vec.from_str(
+        self.fog_color = Vec.from_str(
             fog_opts['primarycolor' ''],
             255, 255, 255
         )
@@ -1334,9 +1335,9 @@ class Music(PakObject):
         if ':' in snd_length:
             # Allow specifying lengths as min:sec.
             minute, second = snd_length.split(':')
-            snd_length = 60 * utils.conv_int(minute) + utils.conv_int(second)
+            snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
         else:
-            snd_length = utils.conv_int(snd_length)
+            snd_length = srctools.conv_int(snd_length)
 
         if not sound.has_children():
             sound = sound.value
@@ -1450,8 +1451,8 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
     @classmethod
     def parse(cls, data):
         name = data.info['name']
-        unstyled = utils.conv_bool(data.info['unstyled', '0'])
-        default = utils.conv_bool(data.info['enabled', '0'])
+        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
+        default = srctools.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
             for prop in
@@ -1516,7 +1517,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         # Add the StyleVars block, containing each style_var.
 
         exp_data.vbsp_conf.append(Property('StyleVars', [
-            Property(key, utils.bool_as_int(val))
+            Property(key, srctools.bool_as_int(val))
             for key, val in
             exp_data.selected.items()
         ]))
@@ -1792,7 +1793,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                     # alow // comments.
                     files = []
                     for line in f:
-                        line = utils.clean_line(line)
+                        line = srctools.clean_line(line)
                         if line:
                             files.append(line)
             except KeyError as ex:
@@ -2019,7 +2020,7 @@ class BrushTemplate(PakObject, has_img=False):
             data.id,
             file,
             force=data.info['force', ''],
-            keep_brushes=utils.conv_bool(data.info['keep_brushes', '1'], True),
+            keep_brushes=srctools.conv_bool(data.info['keep_brushes', '1'], True),
         )
 
     @staticmethod

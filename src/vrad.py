@@ -8,6 +8,7 @@ import shutil
 import sys
 import subprocess
 
+import srctools
 from srctools import Property
 from BSP import BSP, BSP_LUMPS
 import utils
@@ -683,7 +684,7 @@ def mod_screenshots():
             LOGGER.info('No Auto Screenshot found!')
             mod_type = 'peti'  # Suppress the "None not found" error
 
-        if utils.conv_bool(CONF['clean_screenshots', '0']):
+        if srctools.conv_bool(CONF['clean_screenshots', '0']):
             LOGGER.info('Cleaning up screenshots...')
             # Clean up this folder - otherwise users will get thousands of
             # pics in there!
@@ -810,7 +811,7 @@ def main(argv):
         # specified there.
         is_peti = (
             os.path.basename(path) == "preview.bsp" or
-            utils.conv_bool(CONF['force_full'], False)
+            srctools.conv_bool(CONF['force_full'], False)
         )
 
     if '-no_pack' not in args:

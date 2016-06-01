@@ -6,12 +6,12 @@ from collections import namedtuple
 from decimal import Decimal
 
 import conditions
+import srctools
 import utils
 import vbsp
 import vmfLib
 from BEE2_config import ConfigFile
-from srctools.property_parser import Property
-from utils import Vec
+from srctools import Property, Vec
 
 
 LOGGER = utils.getLogger(__name__)
@@ -70,7 +70,7 @@ def generate_resp_script(file, allow_dings):
     for section in QUOTE_DATA.find_key('CoopResponses', []):
         if not section.has_children() and section.name == 'use_dings':
             # Allow overriding specifically for the response script
-            use_dings = utils.conv_bool(section.value, allow_dings)
+            use_dings = srctools.conv_bool(section.value, allow_dings)
             continue
 
         voice_attr = RESP_HAS_NAMES.get(section.name, '')
@@ -349,16 +349,16 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             # Change the targetname used for subsequent entities
             targetname = prop.value
         elif name == 'onlyonce':
-            only_once = utils.conv_bool(prop.value)
+            only_once = srctools.conv_bool(prop.value)
         elif name == 'endcommand':
             end_commands.append(vmfLib.Output(
                 'OnCompletion',
                 prop['target'],
                 prop['input'],
                 prop['parm', ''],
-                utils.conv_float(prop['delay']),
-                only_once=utils.conv_bool(prop['only_once', None]),
-                times=utils.conv_int(prop['times', None], -1),
+                srctools.conv_float(prop['delay']),
+                only_once=srctools.conv_bool(prop['only_once', None]),
+                times=srctools.conv_int(prop['times', None], -1),
             ))
 
     if cc_emit_name:
@@ -425,7 +425,7 @@ def add_voice(
     mid_quotes = []
 
     # Enable using the beep before and after choreo lines.
-    allow_dings = utils.conv_bool(QUOTE_DATA['use_dings', '0'])
+    allow_dings = srctools.conv_bool(QUOTE_DATA['use_dings', '0'])
     if allow_dings:
         VMF.create_ent(
             classname='logic_choreographed_scene',
@@ -485,7 +485,7 @@ def add_voice(
             ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
-        use_dings = utils.conv_bool(group['use_dings', ''], allow_dings)
+        use_dings = srctools.conv_bool(group['use_dings', ''], allow_dings)
 
         possible_quotes = sorted(
             find_group_quotes(
@@ -530,7 +530,7 @@ def add_voice(
                 use_dings,
             )
 
-    if ADDED_BULLSEYES or utils.conv_bool(QUOTE_DATA['UseMicrophones', '']):
+    if ADDED_BULLSEYES or srctools.conv_bool(QUOTE_DATA['UseMicrophones', '']):
         # Add microphones that broadcast audio directly at players.
         # This ensures it is heard regardless of location.
         # This is used for Cave and core Wheatley.

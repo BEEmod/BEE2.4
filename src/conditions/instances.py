@@ -3,12 +3,12 @@
 """
 import operator
 
-import utils
+import srctools
 from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
-from utils import Vec
+from srctools import Vec
 from instanceLocs import resolve as resolve_inst
 import conditions
 import vmfLib as VLib
@@ -173,7 +173,7 @@ def res_replace_instance(inst: VLib.Entity, res):
     origin = Vec.from_str(inst['origin'])
     angles = inst['angles']
 
-    if not utils.conv_bool(res['keep_instance', '0'], False):
+    if not srctools.conv_bool(res['keep_instance', '0'], False):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 

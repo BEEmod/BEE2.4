@@ -3,13 +3,15 @@ from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from utils import Vec
+from srctools import Vec
+import srctools
 import utils
 import conditions
 import vmfLib as VLib
 import vbsp
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
+
 
 @make_result('ResizeableTrigger')
 def res_resizeable_trigger(inst: VLib.Entity, res):
@@ -69,7 +71,7 @@ def res_resizeable_trigger(inst: VLib.Entity, res):
             res['previewActivate', ''])
         pre_deact_name, pre_deact_inp = VLib.Output.parse_name(
             res['previewDeactivate', ''])
-        preview_scale = utils.conv_float(res['previewScale', '0.25'], 0.25)
+        preview_scale = srctools.conv_float(res['previewScale', '0.25'], 0.25)
     else:
         # Deactivate the preview_ options when publishing.
         preview_mat = preview_inst_file = ''

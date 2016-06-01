@@ -5,11 +5,12 @@ import random
 
 from perlin import SimplexNoise
 
-from utils import Vec, Vec_tuple
+from srctools import Vec_tuple, Vec
 from instanceLocs import resolve as resolve_inst
 
 import utils
 import vmfLib as VLib
+import srctools
 import conditions
 import vbsp
 
@@ -61,8 +62,10 @@ def find_indicator_panels(inst):
 
     # Sometimes (light bridges etc) a sign will be halfway between
     # tiles, so in that case we need to force 2 tiles.
-    loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-    loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+    loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
+    loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
+    loc_min += (16, 16, 0)
+    loc_max += (16, 16, 0)
     FORCE_LOCATIONS.add(loc_min.as_tuple())
     FORCE_LOCATIONS.add(loc_max.as_tuple())
 
@@ -109,27 +112,29 @@ def res_cutout_tile(inst, res):
             loc = Vec.from_str(over['origin'])
             # Sometimes (light bridges etc) a sign will be halfway between
             # tiles, so in that case we need to force 2 tiles.
-            loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-            loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-            sign_loc.add(loc_min.as_tuple())
-            sign_loc.add(loc_max.as_tuple())
+            loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
+            loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
+            loc_min += (16, 16, 0)
+            loc_max += (16, 16, 0)
+            FORCE_LOCATIONS.add(loc_min.as_tuple())
+            FORCE_LOCATIONS.add(loc_max.as_tuple())
 
     SETTINGS = {
-        'floor_chance': utils.conv_int(
+        'floor_chance': srctools.conv_int(
             res['floorChance', '100'], 100),
-        'ceil_chance': utils.conv_int(
+        'ceil_chance': srctools.conv_int(
             res['ceilingChance', '100'], 100),
-        'floor_glue_chance': utils.conv_int(
+        'floor_glue_chance': srctools.conv_int(
             res['floorGlueChance', '0']),
-        'ceil_glue_chance': utils.conv_int(
+        'ceil_glue_chance': srctools.conv_int(
             res['ceilingGlueChance', '0']),
 
-        'rotate_beams': int(utils.conv_float(
+        'rotate_beams': int(srctools.conv_float(
             res['rotateMax', '0']) * BEAM_ROT_PRECISION),
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
-        'base_is_disp': utils.conv_bool(res['dispBase', '0']),
+        'base_is_disp': srctools.conv_bool(res['dispBase', '0']),
 
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',

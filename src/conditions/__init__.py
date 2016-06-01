@@ -11,11 +11,11 @@ from typing import (
     Dict, List, Tuple, NamedTuple,
 )
 
+import srctools
 import utils
 import vmfLib as VLib
 from instanceLocs import resolve as resolve_inst
-from srctools.property_parser import Property
-from utils import Vec, Vec_tuple
+from srctools import Property, Vec_tuple, Vec
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
@@ -84,7 +84,7 @@ solidGroup = NamedTuple('solidGroup', [
     ('normal', Vec), # The normal of the face.
     ('color', MAT_TYPES),
 ])
-SOLIDS = {}  # type: Dict[utils.Vec_tuple, solidGroup]
+SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
 # The input/output connection values defined for each item.
 # Each is a tuple of (inst_name, command) values, ready to be passed to
@@ -99,12 +99,12 @@ CONNECTIONS = {}
 TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
 
-xp = utils.Vec_tuple(1, 0, 0)
-xn = utils.Vec_tuple(-1, 0, 0)
-yp = utils.Vec_tuple(0, 1, 0)
-yn = utils.Vec_tuple(0, -1, 0)
-zp = utils.Vec_tuple(0, 0, 1)
-zn = utils.Vec_tuple(0, 0, -1)
+xp = Vec_tuple(1, 0, 0)
+xn = Vec_tuple(-1, 0, 0)
+yp = Vec_tuple(0, 1, 0)
+yn = Vec_tuple(0, -1, 0)
+zp = Vec_tuple(0, 0, 1)
+zn = Vec_tuple(0, 0, -1)
 
 DIRECTIONS = {
     # Translate these words into a normal vector
@@ -1113,12 +1113,12 @@ def retexture_template(
                         face.uaxis = VLib.UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
                         face.vaxis = VLib.UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
                 continue
             # It's a regular wall type!
@@ -1439,7 +1439,7 @@ def res_timed_relay(inst: VLib.Entity, res):
         disabled
     )
 
-    delay = utils.conv_float(
+    delay = srctools.conv_float(
         inst.fixup[var, '0']
         if var.startswith('$') else
         var
@@ -1590,14 +1590,14 @@ def make_static_pist(ent, res):
             VMF.add_ent(logic_ent)
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
-            logic_ent.fixup['manager_a'] = utils.bool_as_int(
+            logic_ent.fixup['manager_a'] = srctools.bool_as_int(
                 ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
         val = res.value[
             'static_' + (
                 ent.fixup['top_level', '1']
-                if utils.conv_bool(ent.fixup['start_up'], False)
+                if srctools.conv_bool(ent.fixup['start_up'], False)
                 else bottom_pos
             )
         ]
@@ -1626,8 +1626,8 @@ def res_goo_debris(_, res):
         # TODO: Make this only apply to the ones chosen to be bottomless.
         return RES_EXHAUSTED
 
-    space = utils.conv_int(res['spacing', '1'], 1)
-    rand_count = utils.conv_int(res['number', ''], None)
+    space = srctools.conv_int(res['spacing', '1'], 1)
+    rand_count = srctools.conv_int(res['number', ''], None)
     if rand_count:
         rand_list = weighted_random(
             rand_count,
@@ -1635,9 +1635,9 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = utils.conv_int(res['chance', '30'], 30) / 100
+    chance = srctools.conv_int(res['chance', '30'], 30) / 100
     file = res['file']
-    offset = utils.conv_int(res['offset', '0'], 0)
+    offset = srctools.conv_int(res['offset', '0'], 0)
 
     if file.endswith('.vmf'):
         file = file[:-4]
@@ -1698,7 +1698,7 @@ WP_LIMIT = 30  # Limit to this many portal instances
 
 @make_result_setup('WPLightstrip')
 def res_portal_lightstrip_setup(res):
-    do_offset = utils.conv_bool(res['doOffset', '0'])
+    do_offset = srctools.conv_bool(res['doOffset', '0'])
     hole_inst = res['HoleInst']
     fallback = res['FallbackInst']
     location = Vec.from_str(res['location', '0 8192 0'])
@@ -1873,7 +1873,7 @@ def res_make_tag_fizzler(inst, res):
         return
 
     # The distance from origin the double signs are seperated by.
-    sign_offset = utils.conv_int(res['signoffset', ''], 16)
+    sign_offset = srctools.conv_int(res['signoffset', ''], 16)
 
     sign_loc = (
         # The actual location of the sign - on the wall
@@ -1884,14 +1884,14 @@ def res_make_tag_fizzler(inst, res):
     # Now deal with the visual aspect:
     # Blue signs should be on top.
 
-    blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
-    oran_enabled = utils.conv_bool(inst.fixup['$start_reversed'])
+    blue_enabled = srctools.conv_bool(inst.fixup['$start_enabled'])
+    oran_enabled = srctools.conv_bool(inst.fixup['$start_reversed'])
 
     if not blue_enabled and not oran_enabled:
         # Hide the sign in this case!
         inst.remove()
 
-    inst_angle = utils.parse_str(inst['angles'])
+    inst_angle = srctools.parse_vec_str(inst['angles'])
 
     inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
     loc = Vec.from_str(inst['origin'])
@@ -2018,7 +2018,7 @@ def res_make_tag_fizzler(inst, res):
     # zero
     fizz_base.fixup['$connectioncount'] = str(max(
         0,
-        utils.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+        srctools.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
     ))
 
     if 'model_inst' in res:
@@ -2134,13 +2134,13 @@ def res_make_tag_fizzler(inst, res):
             output,
             '@BlueIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(neg_blue),
+            param=srctools.bool_as_int(neg_blue),
         ))
         pos_trig.outputs.append(VLib.Output(
             output,
             '@BlueIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(pos_blue),
+            param=srctools.bool_as_int(pos_blue),
         ))
         # Add voice attributes - we have the gun and gel!
         voice_attr['bluegelgun'] = True
@@ -2153,13 +2153,13 @@ def res_make_tag_fizzler(inst, res):
             output,
             '@OrangeIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(neg_oran),
+            param=srctools.bool_as_int(neg_oran),
         ))
         pos_trig.outputs.append(VLib.Output(
             output,
             '@OrangeIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(pos_oran),
+            param=srctools.bool_as_int(pos_oran),
         ))
         voice_attr['orangegelgun'] = True
         voice_attr['orangegel'] = True

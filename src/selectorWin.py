@@ -7,6 +7,7 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
+
 from tk_tools import TK_ROOT
 
 from collections import namedtuple, defaultdict
@@ -18,6 +19,7 @@ import math
 import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
+from srctools import Vec
 import tkMarkdown
 import sound
 import utils
@@ -95,7 +97,7 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
             elif type is AttrTypes.LIST:
                 default = []
             elif type is AttrTypes.COLOR:
-                default = utils.Vec(255, 255, 255)
+                default = Vec(255, 255, 255)
 
         # The description should either be blank, or end in a colon.
         if desc != '' and not desc.endswith(': '):

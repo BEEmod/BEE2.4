@@ -14,6 +14,7 @@ from typing import (
 )
 
 from srctools import Property, Vec
+import srctools
 import utils
 
 # Used to set the defaults for versioninfo
@@ -228,35 +229,35 @@ class VMF:
         self.spawn.solids = self.brushes
         self.spawn.hidden_brushes = self.brushes
 
-        self.is_prefab = utils.conv_bool(map_info.get('prefab'), False)
-        self.cordon_enabled = utils.conv_bool(map_info.get('cordons_on'), False)
-        self.map_ver = utils.conv_int(map_info.get('mapversion'))
+        self.is_prefab = srctools.conv_bool(map_info.get('prefab'), False)
+        self.cordon_enabled = srctools.conv_bool(map_info.get('cordons_on'), False)
+        self.map_ver = srctools.conv_int(map_info.get('mapversion'))
         if 'mapversion' in self.spawn:
             # This is saved only in the main VMF object, delete the copy.
             del self.spawn['mapversion']
 
         # These three are mostly useless for us, but we'll preserve them anyway
-        self.format_ver = utils.conv_int(
+        self.format_ver = srctools.conv_int(
             map_info.get('formatversion'), 100)
-        self.hammer_ver = utils.conv_int(
+        self.hammer_ver = srctools.conv_int(
             map_info.get('editorversion'), CURRENT_HAMMER_VERSION)
-        self.hammer_build = utils.conv_int(
+        self.hammer_build = srctools.conv_int(
             map_info.get('editorbuild'), CURRENT_HAMMER_BUILD)
 
         # Various Hammer settings
-        self.show_grid = utils.conv_bool(
+        self.show_grid = srctools.conv_bool(
             map_info.get('showgrid'), True)
-        self.show_3d_grid = utils.conv_bool(
+        self.show_3d_grid = srctools.conv_bool(
             map_info.get('show3dgrid'), False)
-        self.snap_grid = utils.conv_bool(
+        self.snap_grid = srctools.conv_bool(
             map_info.get('snaptogrid'), True)
-        self.show_logic_grid = utils.conv_bool(
+        self.show_logic_grid = srctools.conv_bool(
             map_info.get('showlogicalgrid'), False)
-        self.grid_spacing = utils.conv_int(
+        self.grid_spacing = srctools.conv_int(
             map_info.get('gridspacing'), 64)
-        self.active_cam = utils.conv_int(
+        self.active_cam = srctools.conv_int(
             map_info.get('active_cam'), -1)
-        self.quickhide_count = utils.conv_int(
+        self.quickhide_count = srctools.conv_int(
             map_info.get('quickhide'), -1)
 
     def add_brush(self, item):
@@ -347,7 +348,7 @@ class VMF:
         map_info['cordons_on'] = cordons['active', '0']
 
         cam_props = tree.find_key('cameras', [])
-        map_info['active_cam'] = utils.conv_int(
+        map_info['active_cam'] = srctools.conv_int(
             (cam_props['activecamera', '']), -1)
         map_info['quickhide'] = tree.find_key('quickhide', [])['count', '']
 
@@ -412,22 +413,22 @@ class VMF:
         dest_file.write('\t"mapversion" "' + str(self.map_ver) + '"\n')
         dest_file.write('\t"formatversion" "' + str(self.format_ver) + '"\n')
         dest_file.write('\t"prefab" "' +
-                        utils.bool_as_int(self.is_prefab) + '"\n}\n')
+                        srctools.bool_as_int(self.is_prefab) + '"\n}\n')
 
         # TODO: Visgroups
 
         if not minimal:
             dest_file.write('viewsettings\n{\n')
             dest_file.write('\t"bSnapToGrid" "' +
-                            utils.bool_as_int(self.snap_grid) + '"\n')
+                            srctools.bool_as_int(self.snap_grid) + '"\n')
             dest_file.write('\t"bShowGrid" "' +
-                            utils.bool_as_int(self.show_grid) + '"\n')
+                            srctools.bool_as_int(self.show_grid) + '"\n')
             dest_file.write('\t"bShowLogicalGrid" "' +
-                            utils.bool_as_int(self.show_logic_grid) + '"\n')
+                            srctools.bool_as_int(self.show_logic_grid) + '"\n')
             dest_file.write('\t"nGridSpacing" "' +
                             str(self.grid_spacing) + '"\n')
             dest_file.write('\t"bShow3DGrid" "' +
-                            utils.bool_as_int(self.show_3d_grid) + '"\n}\n')
+                            srctools.bool_as_int(self.show_3d_grid) + '"\n}\n')
 
         self.spawn['mapversion'] = str(self.map_ver)
         self.spawn.export(dest_file, ent_name='world')
@@ -448,7 +449,7 @@ class VMF:
             dest_file.write('cordons\n{\n')
             if len(self.cordons) > 0:
                 dest_file.write('\t"active" "' +
-                                utils.bool_as_int(self.cordon_enabled) +
+                                srctools.bool_as_int(self.cordon_enabled) +
                                 '"\n')
                 for cord in self.cordons:
                     cord.export(dest_file, '\t')
@@ -756,7 +757,7 @@ class Cordon:
     @staticmethod
     def parse(vmf_file, tree):
         name = tree['name', 'cordon']
-        is_active = utils.conv_bool(tree['active', '0'], False)
+        is_active = srctools.conv_bool(tree['active', '0'], False)
         bounds = tree.find_key('box', [])
         min_ = Vec.from_str(bounds['mins', '(0 0 0)'])
         max_ = Vec.from_str(bounds['maxs', '(128 128 128)'], 128, 128, 128)
@@ -767,7 +768,7 @@ class Cordon:
         buffer.write(ind + '{\n')
         buffer.write(ind + '\t"name" "' + self.name + '"\n')
         buffer.write(ind + '\t"active" "' +
-                     utils.bool_as_int(self.active) +
+                     srctools.bool_as_int(self.active) +
                      '"\n')
         buffer.write(ind + '\tbox\n')
         buffer.write(ind + '\t{\n')
@@ -835,7 +836,7 @@ class Solid:
     @staticmethod
     def parse(vmf_file, tree, hidden=False):
         """Parse a Property tree into a Solid object."""
-        solid_id = utils.conv_int(tree["id", '-1'], -1)
+        solid_id = srctools.conv_int(tree["id", '-1'], -1)
         sides = []
         for side in tree.find_all("side"):
             sides.append(Side.parse(vmf_file, side))
@@ -843,15 +844,15 @@ class Solid:
         editor = {}
         for v in tree.find_key("editor", []):
             if v.name in ('visgroupshown', 'visgroupautoshown', 'cordonsolid'):
-                editor[v.name] = utils.conv_bool(v.value, default=True)
+                editor[v.name] = srctools.conv_bool(v.value, default=True)
             elif v.name == 'color' and ' ' in v.value:
                 editor['color'] = v.value
             elif v.name == 'group':
-                editor[v.name] = utils.conv_int(v.value, default=-1)
+                editor[v.name] = srctools.conv_int(v.value, default=-1)
                 if editor[v.name] == -1:
                     del editor[v.name]
             elif v.name == 'visgroupid':
-                val = utils.conv_int(v.value, default=-1)
+                val = srctools.conv_int(v.value, default=-1)
                 if val:
                     editor.setdefault('visgroup', []).append(val)
         return Solid(
@@ -888,7 +889,7 @@ class Solid:
             if key in self.editor:
                 buffer.write(
                     ind + '\t\t"' + key + '" "' +
-                    utils.bool_as_int(self.editor[key]) +
+                    srctools.bool_as_int(self.editor[key]) +
                     '"\n'
                     )
         buffer.write(ind + '\t}\n')
@@ -1056,15 +1057,15 @@ class Side:
         self.uaxis = uaxis or UVAxis(0, 1, 0)
         self.vaxis = vaxis or UVAxis(0, 0, -1)
         if disp_data is not None:
-            self.disp_power = utils.conv_int(
+            self.disp_power = srctools.conv_int(
                 disp_data.get('power', '_'), 4)
             self.disp_pos = Vec.from_str(
                 disp_data.get('pos', '_'))
-            self.disp_flags = utils.conv_int(
+            self.disp_flags = srctools.conv_int(
                 disp_data.get('flags', '_'))
-            self.disp_elev = utils.conv_float(
+            self.disp_elev = srctools.conv_float(
                 disp_data.get('elevation', '_'))
-            self.disp_is_subdiv = utils.conv_bool(
+            self.disp_is_subdiv = srctools.conv_bool(
                 disp_data.get('subdiv', '_'), False)
             self.disp_allowed_verts = disp_data.get('allowed_verts', {})
             self.disp_data = {}
@@ -1079,7 +1080,7 @@ class Side:
         """Parse the property tree into a Side object."""
         # planes = "(x1 y1 z1) (x2 y2 z2) (x3 y3 z3)"
         verts = tree["plane", "(0 0 0) (0 0 0) (0 0 0)"][1:-1].split(") (")
-        side_id = utils.conv_int(tree["id", '-1'])
+        side_id = srctools.conv_int(tree["id", '-1'])
         planes = [0, 0, 0]
         for i, v in enumerate(verts):
             if i > 3:
@@ -1109,7 +1110,7 @@ class Side:
             for v in _DISP_ROWS:
                 rows = disp_tree[v, []]
                 if len(rows) > 0:
-                    rows.sort(key=lambda x: utils.conv_int(x.name[3:]))
+                    rows.sort(key=lambda x: srctools.conv_int(x.name[3:]))
                     disp_data[v] = [v.value for v in rows]
         else:
             disp_data = None
@@ -1122,11 +1123,11 @@ class Side:
             mat=tree['material', ''],
             uaxis=UVAxis.parse(tree['uaxis', '[0 1 0 0] 0.25']),
             vaxis=UVAxis.parse(tree['vaxis', '[0 0 -1 0] 0.25']),
-            rotation=utils.conv_int(
+            rotation=srctools.conv_int(
                 tree['rotation', '0']),
-            lightmap=utils.conv_int(
+            lightmap=srctools.conv_int(
                 tree['lightmapscale', '16'], 16),
-            smoothing=utils.conv_int(
+            smoothing=srctools.conv_int(
                 tree['smoothing_groups', '0']),
         )
 
@@ -1192,7 +1193,7 @@ class Side:
             buffer.write(ind + '\t\t"elevation" "' + str(self.disp_elev) +
                          '"\n')
             buffer.write(ind + '\t\t"subdiv" "' +
-                         utils.bool_as_int(self.disp_is_subdiv) +
+                         srctools.bool_as_int(self.disp_is_subdiv) +
                          '"\n')
             for v in _DISP_ROWS:
                 if len(self.disp_data[v]) > 0:
@@ -1441,7 +1442,7 @@ class Entity:
             elif name == "editor" and item.has_children():
                 for v in item:
                     if v.name in ("visgroupshown", "visgroupautoshown"):
-                        editor[v.name] = utils.conv_bool(v.value, default=True)
+                        editor[v.name] = srctools.conv_bool(v.value, default=True)
                     elif v.name == 'color' and ' ' in v.value:
                         editor['color'] = v.value
                     elif (
@@ -1453,11 +1454,11 @@ class Entity:
                     elif v.name == 'comments':
                         editor['comments'] = v.value
                     elif v.name == 'group':
-                        editor[v.name] = utils.conv_int(v.value, default=-1)
+                        editor[v.name] = srctools.conv_int(v.value, default=-1)
                         if editor[v.name] == -1:
                             del editor[v.name]
                     elif v.name == 'visgroupid':
-                        val = utils.conv_int(v.value, default=-1)
+                        val = srctools.conv_int(v.value, default=-1)
                         if val:
                             editor['visgroup'].append(val)
             else:
@@ -1534,7 +1535,7 @@ class Entity:
             if key in self.editor:
                 buffer.write(
                     ind + '\t\t"' + key + '" "' +
-                    utils.bool_as_int(self.editor[key]) + '"\n'
+                    srctools.bool_as_int(self.editor[key]) + '"\n'
                 )
         for key in ('logicalpos', 'comments'):
             if key in self.editor:
@@ -1877,10 +1878,10 @@ class EntityGroup:
         return cls(
             vmf_file,
             props['id'],
-            vis_shown=utils.conv_bool(
+            vis_shown=srctools.conv_bool(
                 editor_block['visgroupshown', None], True
             ),
-            vis_auto_shown=utils.conv_bool(
+            vis_auto_shown=srctools.conv_bool(
                 editor_block['visgroupsautoshown', None], True
             ),
         )
@@ -1902,10 +1903,10 @@ class EntityGroup:
         buffer.write(ind + '\teditor\n')
         buffer.write(ind + '\t\t{\n')
         buffer.write(ind + '\t\t"visgroupshown" "{}"'.format(
-            utils.bool_as_int(self.shown)
+            srctools.bool_as_int(self.shown)
         ))
         buffer.write(ind + '\t\t"visgroupautoshown" "{}"'.format(
-            utils.bool_as_int(self.auto_shown)
+            srctools.bool_as_int(self.auto_shown)
         ))
         buffer.write(ind + '\t\t}\n')
         buffer.write(ind + '\t}')

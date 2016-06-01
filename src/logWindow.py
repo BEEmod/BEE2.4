@@ -5,6 +5,7 @@ import tkinter as tk
 
 import logging
 
+import srctools
 from tk_tools import TK_ROOT
 from BEE2_config import GEN_OPTS
 import tk_tools
@@ -109,7 +110,7 @@ def set_visible(is_visible: bool):
         window.deiconify()
     else:
         window.withdraw()
-    GEN_OPTS['Debug']['show_log_win'] = utils.bool_as_int(is_visible)
+    GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
 
 
 def btn_copy():

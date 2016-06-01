@@ -6,6 +6,7 @@ import zipfile
 from contextlib import ExitStack
 
 import utils
+import srctools
 from srctools import Property
 
 
@@ -133,7 +134,7 @@ def parse(posfile, propfile, path):
             opts[option.name.casefold()] = option.value
     pos = []
     for dirty_line in posfile:
-        line = utils.clean_line(dirty_line)
+        line = srctools.clean_line(dirty_line)
         if line:
             # Lines follow the form
             # "ITEM_BUTTON_FLOOR", 2

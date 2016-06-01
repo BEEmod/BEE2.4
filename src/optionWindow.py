@@ -9,6 +9,7 @@ from tooltip import add_tooltip
 
 import sound
 import utils
+import srctools
 import contextWin
 import logWindow
 
@@ -125,7 +126,7 @@ def make_checkbox(
 
     def save_opt():
         """Save the checkbox's values."""
-        GEN_OPTS[section][item] = utils.bool_as_int(
+        GEN_OPTS[section][item] = srctools.bool_as_int(
             var.get()
         )
 

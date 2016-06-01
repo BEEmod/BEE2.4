@@ -1,9 +1,10 @@
 """Conditions relating to track platforms."""
+import srctools
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from utils import Vec
+from srctools import Vec
 import utils
 import conditions
 import vmfLib as VLib
@@ -144,12 +145,12 @@ def res_track_plat(_, res):
             track_facing = 'VERT'
         # Now add the suffixes
         if track_facing == 'VERT':
-            if utils.conv_bool(res['vert_suffix', '']):
+            if srctools.conv_bool(res['vert_suffix', '']):
                 for inst in track_set:
                     conditions.add_suffix(inst, '_vert')
-                if utils.conv_bool(res['plat_suffix', '']):
+                if srctools.conv_bool(res['plat_suffix', '']):
                     conditions.add_suffix(plat_inst, '_vert')
-            if utils.conv_bool(res['vert_bottom_suffix', '']):
+            if srctools.conv_bool(res['vert_bottom_suffix', '']):
                 # We want to find the bottom/top track which is facing the
                 # same direction as the platform.
                 track_dirs = {
@@ -166,16 +167,16 @@ def res_track_plat(_, res):
                         conditions.add_suffix(inst, '_bottom')
 
         elif track_facing == 'HORIZ_MIRR':
-            if utils.conv_bool(res['horiz_suffix', '']):
+            if srctools.conv_bool(res['horiz_suffix', '']):
                 for inst in track_set:
                     conditions.add_suffix(inst, '_horiz_mirrored')
-                if utils.conv_bool(res['plat_suffix', '']):
+                if srctools.conv_bool(res['plat_suffix', '']):
                     conditions.add_suffix(plat_inst, '_horiz')
         else:  # == 'HORIZ'
-            if utils.conv_bool(res['horiz_suffix', '']):
+            if srctools.conv_bool(res['horiz_suffix', '']):
                 for inst in track_set:
                     conditions.add_suffix(inst, '_horiz')
-                if utils.conv_bool(res['plat_suffix', '']):
+                if srctools.conv_bool(res['plat_suffix', '']):
                     conditions.add_suffix(plat_inst, '_horiz')
 
         plat_var = res['plat_var', '']

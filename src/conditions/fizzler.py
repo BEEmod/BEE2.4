@@ -3,7 +3,8 @@ from conditions import (
     make_result,
 )
 from vbsp import TEX_FIZZLER
-from utils import Vec
+from srctools import Vec
+import srctools
 import conditions
 import utils
 import vmfLib as VLib
@@ -38,7 +39,7 @@ def res_cust_fizzler(base_inst, res):
               scale it correctly.
     """
     model_name = res['modelname', None]
-    make_unique = utils.conv_bool(res['UniqueModel', '0'])
+    make_unique = srctools.conv_bool(res['UniqueModel', '0'])
     fizz_name = base_inst['targetname', '']
 
     # search for the model instances
@@ -107,7 +108,7 @@ def res_cust_fizzler(base_inst, res):
                 # skip the resizing since it's already correct.
                 laser_tex = laserfield_conf['texture', 'effects/laserplane']
                 nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                tex_width = utils.conv_int(
+                tex_width = srctools.conv_int(
                     laserfield_conf['texwidth', '512'], 512
                 )
                 is_short = False
@@ -144,7 +145,7 @@ def res_cust_fizzler(base_inst, res):
                         # If we fail, just use the original textures
                         pass
 
-            widen_amount = utils.conv_float(config['thickness', '2'], 2.0)
+            widen_amount = srctools.conv_float(config['thickness', '2'], 2.0)
             if widen_amount != 2:
                 for brush in new_brush.solids:
                     conditions.widen_fizz_brush(

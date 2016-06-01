@@ -6,6 +6,7 @@ import itertools
 import operator
 import random
 
+import srctools
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -197,7 +198,7 @@ class Item:
             for prop in part:
                 name = prop.name
 
-                if utils.conv_bool(prop['BEE2_ignore', '']):
+                if srctools.conv_bool(prop['BEE2_ignore', '']):
                     continue
 
                 # PROP_TYPES is a dict holding all the modifiable properties.
@@ -1061,7 +1062,7 @@ def pal_save_as(_=None):
         if name is None:
             return False
         # Check for non-basic characters
-        elif not utils.is_plain_text(name):
+        elif not srctools.is_plain_text(name):
             messagebox.showinfo(
                 icon=messagebox.ERROR,
                 title='BEE2',

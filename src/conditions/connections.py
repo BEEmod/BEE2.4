@@ -1,8 +1,8 @@
 """Results relating to item connections."""
-import utils
-import vmfLib as VLib
 from conditions import make_result, make_result_setup, resolve_value
-from srctools.property_parser import Property
+from srctools import Property
+import srctools
+import vmfLib as VLib
 
 
 @make_result_setup('AddOutput')
@@ -12,9 +12,9 @@ def res_add_output_setup(res):
     inst_in = res['inst_out', '']
     inst_out = res['inst_out', '']
     targ = res['target']
-    only_once = utils.conv_bool(res['only_once', None])
-    times = 1 if only_once else utils.conv_int(res['times', None], -1)
-    delay = utils.conv_float(res['delay', '0.0'])
+    only_once = srctools.conv_bool(res['only_once', None])
+    times = 1 if only_once else srctools.conv_int(res['times', None], -1)
+    delay = srctools.conv_float(res['delay', '0.0'])
     parm = res['parm', '']
 
     return (

@@ -3,6 +3,7 @@ from tkinter import ttk
 
 import tooltip
 import utils
+import srctools
 import sound as snd
 
 # This is a bit of an ugly hack. On OSX the buttons are set to have
@@ -164,7 +165,7 @@ class SubPane(Toplevel):
     def save_conf(self):
         if self.can_save:
             self.config_file['win_state'][
-                self.win_name + '_visible'] = utils.bool_as_int(self.visible)
+                self.win_name + '_visible'] = srctools.bool_as_int(self.visible)
             self.config_file['win_state'][self.win_name + '_x'] = str(self.relX)
             self.config_file['win_state'][self.win_name + '_y'] = str(self.relY)
             if self.can_resize_x:

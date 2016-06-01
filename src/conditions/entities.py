@@ -5,15 +5,16 @@ from collections import defaultdict
 import conditions
 import utils
 import vmfLib as VLib
+from srctools import Property, Vec
+
 from conditions import (
     make_result, make_result_setup,
     TEMP_TYPES, SOLIDS
 )
-from srctools.property_parser import Property
-from utils import Vec
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
+
 
 @make_result_setup('TemplateOverlay')
 def res_import_template_setup(res):

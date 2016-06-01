@@ -1,6 +1,7 @@
 """Backup and restore P2C maps.
 
 """
+import srctools
 import utils
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
@@ -153,7 +154,7 @@ class P2C:
             zip_file=zip_file,
             title=title,
             desc=props['description', '...'],
-            is_coop=utils.conv_bool(props['coop', '0']),
+            is_coop=srctools.conv_bool(props['coop', '0']),
             create_time=Date(props['timestamp_created', '']),
             mod_time=Date(props['timestamp_modified', '']),
         )
@@ -369,7 +370,7 @@ def auto_backup(game: 'gameMan.Game', loader: LoadScreen):
 
     # A version of the name stripped of special characters
     # Allowed: a-z, A-Z, 0-9, '_-.'
-    safe_name = utils.whitelist(
+    safe_name = srctools.whitelist(
         game.name,
         valid_chars=BACKUP_CHARS,
     )
@@ -799,7 +800,7 @@ def init_backup_settings():
     back_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
 
     def check_callback():
-        GEN_OPTS['General']['enable_auto_backup'] = utils.bool_as_int(
+        GEN_OPTS['General']['enable_auto_backup'] = srctools.bool_as_int(
             check_var.get()
         )
 

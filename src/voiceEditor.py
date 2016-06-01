@@ -8,10 +8,11 @@ from tkinter import font
 from tkinter import ttk
 
 import img
+import srctools
 import tk_tools
 import utils
 from BEE2_config import ConfigFile
-from srctools.property_parser import Property
+from srctools import Property
 from tk_tools import TK_ROOT
 
 
@@ -147,7 +148,7 @@ def show_trans(e):
 
 def check_toggled(var, config_section, quote_id):
     """Update the config file to match the checkbox."""
-    config_section[quote_id] = utils.bool_as_int(var.get())
+    config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
 def configure_canv(e):

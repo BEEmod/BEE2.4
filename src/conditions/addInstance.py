@@ -1,7 +1,8 @@
 """Results for generating additional instances.
 
 """
-import utils
+import srctools
+import srctools.utils
 import vbsp
 import vmfLib as VLib
 from conditions import (
@@ -9,8 +10,7 @@ from conditions import (
     GLOBAL_INSTANCES,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools.property_parser import Property
-from utils import Vec
+from srctools import Property, Vec
 
 
 @make_result('addGlobal')
@@ -30,7 +30,7 @@ def res_add_global_inst(_, res):
     """
     if res.value is not None:
         if (
-                utils.conv_bool(res['allow_multiple', '0']) or
+                srctools.conv_bool(res['allow_multiple', '0']) or
                 res['file'] not in GLOBAL_INSTANCES):
             # By default we will skip adding the instance
             # if was already added - this is helpful for
@@ -84,7 +84,7 @@ def res_add_overlay_inst(inst, res):
         fixup_style=res['fixup_style', '0'],
     )
     # Don't run if the fixup block exists..
-    if utils.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
+    if srctools.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
         # Copy the fixup values across from the original instance
         for fixup, value in inst.fixup.items():
             overlay_inst.fixup[fixup] = value
@@ -96,7 +96,7 @@ def res_add_overlay_inst(inst, res):
         else:
             overlay_inst.fixup[prop.real_name] = prop.value
 
-    if utils.conv_bool(res['move_outputs', '0']):
+    if srctools.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
 
@@ -106,11 +106,11 @@ def res_add_overlay_inst(inst, res):
         # Some special placeholder values:
         if folded_off == '<piston_bottom>':
             offset = Vec(
-                z=utils.conv_int(inst.fixup['$bottom_level']) * 128,
+                z=srctools.conv_int(inst.fixup['$bottom_level']) * 128,
             )
         elif folded_off == '<piston_top>':
             offset = Vec(
-                z=utils.conv_int(inst.fixup['$top_level'], 1) * 128,
+                z=srctools.conv_int(inst.fixup['$top_level'], 1) * 128,
             )
         else:
             # Regular vector

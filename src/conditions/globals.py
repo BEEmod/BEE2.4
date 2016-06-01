@@ -1,4 +1,5 @@
 """Flags related to global properties - stylevars, music, which game, etc."""
+import srctools
 import utils
 
 from conditions import (
@@ -113,7 +114,7 @@ def flag_is_preview(_, flag):
     Preview mode is always False when publishing.
     """
     import vbsp
-    return vbsp.IS_PREVIEW == utils.conv_bool(flag.value, False)
+    return vbsp.IS_PREVIEW == srctools.conv_bool(flag.value, False)
 
 
 @make_flag('hasExitSignage')

@@ -1,12 +1,13 @@
 """Conditions for randomising instances."""
 import random
 
+from srctools import Property, Vec
 import conditions
-import utils
+import srctools
+
 from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
-from srctools.property_parser import Property
 
 
 @make_flag('random')
@@ -20,7 +21,7 @@ def flag_random(inst, res: Property):
         seed = ''
 
     # Allow ending with '%' sign
-    chance = utils.conv_int(chance.rstrip('%'), 100)
+    chance = srctools.conv_int(chance.rstrip('%'), 100)
 
     random.seed('random_chance_{}:{}_{}_{}'.format(
         seed,
@@ -40,7 +41,7 @@ def res_random_setup(res):
     for prop in res:
         if prop.name == 'chance':
             # Allow ending with '%' sign
-            chance = utils.conv_int(
+            chance = srctools.conv_int(
                 prop.value.rstrip('%'),
                 chance,
             )
@@ -114,7 +115,7 @@ def res_random(inst, res):
 @make_result_setup('variant')
 def res_add_variant_setup(res):
     if res.has_children():
-        count = utils.conv_int(res['Number', ''], None)
+        count = srctools.conv_int(res['Number', ''], None)
         if count:
             return conditions.weighted_random(
                 count,
@@ -123,7 +124,7 @@ def res_add_variant_setup(res):
         else:
             return None
     else:
-        count = utils.conv_int(res.value, None)
+        count = srctools.conv_int(res.value, None)
         if count:
             return list(range(count))
         else:
@@ -168,9 +169,9 @@ def res_rand_num(inst, res):
     If 'seed' is set, it will be used to keep the value constant across
     map recompiles. This should be unique.
     """
-    is_float = utils.conv_bool(res['decimal'])
-    max_val = utils.conv_float(res['max', 1.0])
-    min_val = utils.conv_float(res['min', 0.0])
+    is_float = srctools.conv_bool(res['decimal'])
+    max_val = srctools.conv_float(res['max', 1.0])
+    min_val = srctools.conv_float(res['min', 0.0])
     var = res['resultvar', '$random']
     seed = res['seed', 'random']
 
@@ -192,7 +193,7 @@ def res_rand_vec(inst, res):
     are for each section. If the min and max are equal that number will be used
     instead.
     """
-    is_float = utils.conv_bool(res['decimal'])
+    is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']
     seed = res['seed', 'random']
 
@@ -206,8 +207,8 @@ def res_rand_vec(inst, res):
     value = Vec()
 
     for axis in 'xyz':
-        max_val = utils.conv_float(res['max_' + axis, 0.0])
-        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        max_val = srctools.conv_float(res['max_' + axis, 0.0])
+        min_val = srctools.conv_float(res['min_' + axis, 0.0])
         if min_val == max_val:
             value[axis] = min_val
         else:

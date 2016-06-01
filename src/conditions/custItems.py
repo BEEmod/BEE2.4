@@ -4,6 +4,7 @@
 from collections import defaultdict
 
 import conditions
+import srctools
 import utils
 import vbsp
 import vmfLib as VLib
@@ -12,8 +13,8 @@ from conditions import (
     CONNECTIONS,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools.property_parser import Property
-from utils import Vec
+from srctools import Property, Vec
+
 
 # Map sign_type values to the item ID and the resolveInst ID.
 IND_PANEL_TYPES = {
@@ -33,7 +34,7 @@ def res_cust_output_setup(res):
         if sub_res.name == 'targcondition'
     ]
     outputs = list(res.find_all('addOut'))
-    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
+    dec_con_count = srctools.conv_bool(res["decConCount", '0'], False)
     sign_type = IND_PANEL_TYPES.get(res['sign_type', None], None)
 
     if sign_type is None:
@@ -165,11 +166,11 @@ def res_cust_antline_setup(res):
 
     # Allow overriding these options. If unset use the style's value - the
     # amount of destruction will usually be the same.
-    broken_chance = utils.conv_float(res[
+    broken_chance = srctools.conv_float(res[
         'broken_antline_chance',
         vbsp.get_opt('broken_antline_chance')
     ])
-    broken_dist = utils.conv_float(res[
+    broken_dist = srctools.conv_float(res[
         'broken_antline_distance',
         vbsp.get_opt('broken_antline_distance')
     ])
@@ -302,8 +303,8 @@ def res_change_inputs_setup(res: Property):
                 prop['inst_in', None],
                 prop['input'],
                 prop['params', ''],
-                utils.conv_float(prop['delay', 0.0]),
-                1 if utils.conv_bool(prop['only_once', '0']) else -1,
+                srctools.conv_float(prop['delay', 0.0]),
+                1 if srctools.conv_bool(prop['only_once', '0']) else -1,
             )
         else:
             vals[out_key] = None
@@ -373,14 +374,14 @@ def res_faith_mods(inst: VLib.Entity, res: Property):
     fixup_var = res['instvar', '']
     trig_enabled = res['enabledVar', None]
     trig_temp = res['trig_temp', '']
-    offset = utils.conv_int(res['raise_trig', '0'])
+    offset = srctools.conv_int(res['raise_trig', '0'])
     if offset:
         offset = Vec(0, 0, offset).rotate_by_str(inst['angles', '0 0 0'])
     else:
         offset = Vec()
 
     if trig_enabled is not None:
-        trig_enabled = utils.conv_bool(inst.fixup[trig_enabled])
+        trig_enabled = srctools.conv_bool(inst.fixup[trig_enabled])
     else:
         trig_enabled = None
 
@@ -407,7 +408,7 @@ def res_faith_mods(inst: VLib.Entity, res: Property):
                 vbsp.VMF.remove_brush(solid)
 
         if trig_enabled is not None and 'helper' not in trig['targetname']:
-            trig['startdisabled'] = utils.bool_as_int(not trig_enabled)
+            trig['startdisabled'] = srctools.bool_as_int(not trig_enabled)
 
         # Inspect the outputs to determine the type.
         # We also change them if desired, since that's not possible

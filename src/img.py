@@ -7,6 +7,7 @@ it could get deleted, which will make the rendered image vanish.
 from PIL import ImageTk, Image
 import os.path
 
+from srctools import Vec
 import utils
 
 LOGGER = utils.getLogger('img')
@@ -81,7 +82,7 @@ def icon(name, error=None):
     return png(os.path.join("items", name), error=error, resize_to=64)
 
 
-def color_square(color: utils.Vec, size=16):
+def color_square(color: Vec, size=16):
     """Create a square image of the given size, with the given color."""
     key = color.x, color.y, color.z, size
 
