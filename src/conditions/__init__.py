@@ -1032,7 +1032,7 @@ def retexture_template(
         template_data: Template,
         origin: Vec,
         fixup: srctools.vmf.EntityFixup=None,
-        replace_tex: dict=utils.EmptyMapping,
+        replace_tex: dict= srctools.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
         use_bullseye=False,

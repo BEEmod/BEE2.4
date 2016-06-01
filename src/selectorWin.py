@@ -19,7 +19,7 @@ import math
 import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
-from srctools import Vec
+from srctools import Vec, EmptyMapping
 import tkMarkdown
 import sound
 import utils
@@ -347,7 +347,7 @@ class selWin:
             has_def=True,
             has_snd_sample=False,
             none_desc='Do not add anything.',
-            none_attrs: dict=utils.EmptyMapping,
+            none_attrs: dict=EmptyMapping,
             title='BEE2',
             desc='',
             readonly_desc='',

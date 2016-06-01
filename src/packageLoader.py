@@ -17,7 +17,11 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
-from srctools import Property, NoKeyError, Vec, VMF, Entity
+from srctools import (
+    Property, NoKeyError,
+    Vec, EmptyMapping,
+    VMF, Entity,
+)
 
 from typing import (
     Dict,
@@ -698,7 +702,7 @@ class Style(PakObject):
             suggested=None,
             has_video=True,
             vpk_name='',
-            corridor_names=utils.EmptyMapping,
+            corridor_names=EmptyMapping,
         ):
         self.id = style_id
         self.selitem_data = selitem_data
