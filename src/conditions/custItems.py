@@ -12,8 +12,7 @@ from conditions import (
     CONNECTIONS,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Output
-
+from srctools import Property, Vec, Entity, Output
 
 # Map sign_type values to the item ID and the resolveInst ID.
 IND_PANEL_TYPES = {
@@ -277,7 +276,7 @@ def res_change_outputs_setup(res):
 
 
 @make_result('changeOutputs')
-def res_change_outputs(inst: VLib.Entity, res):
+def res_change_outputs(inst: Entity, res):
     """Switch the outputs on an instance.
 
     Each child is a original -> replace value. These match the values
@@ -311,7 +310,7 @@ def res_change_inputs_setup(res: Property):
 
 
 @make_result('changeInputs')
-def res_change_inputs(inst: VLib.Entity, res):
+def res_change_inputs(inst: Entity, res):
     """Switch the inputs for an instance.
 
     Each child is an input to replace. The name is the original input, matching
@@ -354,7 +353,7 @@ def res_change_inputs(inst: VLib.Entity, res):
 
 
 @make_result('faithMods')
-def res_faith_mods(inst: VLib.Entity, res: Property):
+def res_faith_mods(inst: Entity, res: Property):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
     Values:
