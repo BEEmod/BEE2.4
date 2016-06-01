@@ -1,17 +1,17 @@
-from datetime import datetime
-from zipfile import ZipFile
-from io import BytesIO
-
 import os
 import os.path
 import shutil
-import sys
 import subprocess
+import sys
+from datetime import datetime
+from io import BytesIO
+from zipfile import ZipFile
 
 import srctools
-from srctools import Property
-from BSP import BSP, BSP_LUMPS
 import utils
+from srctools import Property
+from srctools.bsp import BSP, BSP_LUMPS
+
 
 LOGGER = utils.init_logging('bee2/VRAD.log')
 

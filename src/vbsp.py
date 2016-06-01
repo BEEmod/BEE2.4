@@ -14,7 +14,7 @@ from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
 
-from srctools import Property, Vec
+from srctools import Property, Vec, AtomicWriter
 from BEE2_config import ConfigFile
 import srctools.vmf as VLib
 import srctools
@@ -3538,7 +3538,7 @@ def save(path):
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with utils.AtomicWriter(path) as f:
+    with AtomicWriter(path) as f:
         VMF.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
