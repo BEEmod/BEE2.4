@@ -2,15 +2,13 @@
 
 """
 import srctools
-import srctools.utils
-import srctools.vmfLib as VLib
 import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec
+from srctools import Property, Vec, Entity
 
 
 @make_result('addGlobal')
@@ -36,7 +34,7 @@ def res_add_global_inst(_, res):
             # if was already added - this is helpful for
             # items that add to original items, or to avoid
             # bugs.
-            new_inst = VLib.Entity(vbsp.VMF, keys={
+            new_inst = Entity(vbsp.VMF, keys={
                 "classname": "func_instance",
                 "targetname": res['name', ''],
                 "file": resolve_inst(res['file'])[0],
