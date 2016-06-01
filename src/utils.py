@@ -6,8 +6,6 @@ import stat
 from enum import Enum
 from sys import platform
 
-from srctools import AtomicWriter
-
 from typing import (
     Tuple, Iterator,
 )
