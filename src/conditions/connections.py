@@ -1,8 +1,7 @@
 """Results relating to item connections."""
 import srctools
-import srctools.vmfLib as VLib
 from conditions import make_result, make_result_setup, resolve_value
-from srctools import Property
+from srctools import Property, Entity, Output
 
 
 @make_result_setup('AddOutput')
@@ -30,7 +29,7 @@ def res_add_output_setup(res):
 
 
 @make_result('AddOutput')
-def res_add_output(inst: VLib.Entity, res: Property):
+def res_add_output(inst: Entity, res: Property):
     """Add an output from an instance to a global name.
 
     Values:
@@ -52,7 +51,7 @@ def res_add_output(inst: VLib.Entity, res: Property):
         inst_out,
     ) = res.value
 
-    inst.add_out(VLib.Output(
+    inst.add_out(Output(
         resolve_value(inst, output),
         resolve_value(inst, targ),
         resolve_value(inst, input_name),

@@ -1,13 +1,12 @@
 """Results for custom fizzlers."""
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
     make_result,
 )
-from srctools import Vec
+from srctools import Vec, Entity
 from vbsp import TEX_FIZZLER
 
 
@@ -156,7 +155,7 @@ def res_cust_fizzler(base_inst, res):
 
 
 def convert_to_laserfield(
-        brush: VLib.Entity,
+        brush: Entity,
         laser_tex: str,
         nodraw_tex: str,
         tex_width: int,

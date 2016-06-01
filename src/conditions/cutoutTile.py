@@ -4,12 +4,11 @@ from collections import defaultdict, namedtuple
 
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from instanceLocs import resolve as resolve_inst
 from perlin import SimplexNoise
-from srctools import Vec_tuple, Vec
+from srctools import Vec_tuple, Vec, Side, UVAxis
 
 LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
@@ -509,16 +508,16 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
             '(expected 1 or 2, got {})'.format(thickness)
         )
 
-    n.uaxis = VLib.UVAxis(
+    n.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    n.vaxis = VLib.UVAxis(
+    n.vaxis = UVAxis(
         1, 0, 0, offset=0)
     s.uaxis = n.uaxis.copy()
     s.vaxis = n.vaxis.copy()
 
-    e.uaxis = VLib.UVAxis(
+    e.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    e.vaxis = VLib.UVAxis(
+    e.vaxis = UVAxis(
         0, 1, 0, offset=0)
     w.uaxis = e.uaxis.copy()
     w.vaxis = e.vaxis.copy()
@@ -699,7 +698,7 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
 
 
 def make_displacement(
-        face: VLib.Side,
+        face: Side,
         noise: SimplexNoise,
         power=3,
         offset=0,

@@ -3,7 +3,6 @@
 from collections import namedtuple
 
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
@@ -12,7 +11,10 @@ from conditions import (
     TEMP_TYPES, GOO_LOCS, SOLIDS
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec, Vec_tuple
+from srctools import (
+    Vec, Vec_tuple,
+    Entity,
+)
 
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
@@ -170,7 +172,7 @@ def res_make_vactubes(_, res):
     markers = {}
 
     # Find all our markers, so we can look them up by targetname.
-    for inst in vbsp.VMF.by_class['func_instance']:  # type: VLib.Entity
+    for inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
         try:
             config, inst_size = INST_CONFIGS[inst['file'].casefold()]
         except KeyError:

@@ -3,13 +3,12 @@ import random
 from collections import defaultdict
 
 import conditions
-import srctools.vmfLib as VLib
 import utils
 from conditions import (
     make_result, make_result_setup,
     TEMP_TYPES, SOLIDS
 )
-from srctools import Property, Vec
+from srctools import Property, Vec, Entity
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
@@ -38,7 +37,7 @@ def res_import_template_setup(res):
 
 
 @make_result('TemplateOverlay')
-def res_insert_overlay(inst: VLib.Entity, res: Property):
+def res_insert_overlay(inst: Entity, res: Property):
     """Use a template to insert one or more overlays on a surface.
 
     Options:

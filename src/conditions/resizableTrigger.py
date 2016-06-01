@@ -1,21 +1,20 @@
 """Logic for trigger items, allowing them to be resized."""
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec
+from srctools import Vec, Entity, Output
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 
 
 @make_result('ResizeableTrigger')
-def res_resizeable_trigger(inst: VLib.Entity, res):
+def res_resizeable_trigger(inst: Entity, res):
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.
@@ -68,9 +67,9 @@ def res_resizeable_trigger(inst: VLib.Entity, res):
     if vbsp.IS_PREVIEW and (not preview_var or vbsp.settings['style_vars'][preview_var]):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
-        pre_act_name, pre_act_inp = VLib.Output.parse_name(
+        pre_act_name, pre_act_inp = Output.parse_name(
             res['previewActivate', ''])
-        pre_deact_name, pre_deact_inp = VLib.Output.parse_name(
+        pre_deact_name, pre_deact_inp = Output.parse_name(
             res['previewDeactivate', ''])
         preview_scale = srctools.conv_float(res['previewScale', '0.25'], 0.25)
     else:
@@ -85,7 +84,7 @@ def res_resizeable_trigger(inst: VLib.Entity, res):
     for targ, inst in list(markers.items()):  # type: str, VLib.Entity
         for out in inst.output_targets():
             if out in markers:
-                other = markers[out]  # type: VLib.Entity
+                other = markers[out]  # type: Entity
                 del markers[out]  # Don't let it get repeated
                 break
         else:
@@ -165,14 +164,14 @@ def res_resizeable_trigger(inst: VLib.Entity, res):
             )
 
             if pre_act_name:
-                trig_ent.outputs.append(VLib.Output(
+                trig_ent.outputs.append(Output(
                     trig_act,
                     targ + '_preview',
                     inst_in=pre_act_name,
                     inp=pre_act_inp,
                 ))
             if pre_deact_name:
-                trig_ent.outputs.append(VLib.Output(
+                trig_ent.outputs.append(Output(
                     trig_deact,
                     targ + '_preview',
                     inst_in=pre_deact_name,
@@ -195,7 +194,7 @@ def res_resizeable_trigger(inst: VLib.Entity, res):
             if trig_out == "":
                 continue  # Allow setting the output to "" to skip
 
-            trig_ent.outputs.append(VLib.Output(
+            trig_ent.outputs.append(Output(
                 trig_out,
                 out.target,
                 inst_in=out.inst_in,

@@ -1,14 +1,13 @@
 """Conditions relating to track platforms."""
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec
+from srctools import Vec, Entity
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.trackPlat')
@@ -191,7 +190,7 @@ def res_track_plat(_, res):
 def track_scan(
         tr_set,
         track_inst,
-        start_track: VLib.Entity,
+        start_track: Entity,
         middle_file: str,
         x_dir: int,
         ):

@@ -5,13 +5,12 @@ import operator
 
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec
+from srctools import Vec, Entity
 
 
 @make_flag('instance')
@@ -159,7 +158,7 @@ def res_local_targetname(inst, res):
 
 
 @make_result('replaceInstance')
-def res_replace_instance(inst: VLib.Entity, res):
+def res_replace_instance(inst: Entity, res):
     """Replace an instance with another entity.
 
     'keys' and 'localkeys' defines the new keyvalues used.

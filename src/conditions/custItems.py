@@ -5,7 +5,6 @@ from collections import defaultdict
 
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
@@ -13,7 +12,7 @@ from conditions import (
     CONNECTIONS,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec
+from srctools import Property, Vec, Output
 
 
 # Map sign_type values to the item ID and the resolveInst ID.
@@ -41,8 +40,8 @@ def res_cust_output_setup(res):
         sign_act = sign_deact = (None, '')
     else:
         # The outputs which trigger the sign.
-        sign_act = VLib.Output.parse_name(res['sign_activate', ''])
-        sign_deact = VLib.Output.parse_name(res['sign_deactivate', ''])
+        sign_act = Output.parse_name(res['sign_activate', ''])
+        sign_deact = Output.parse_name(res['sign_deactivate', ''])
 
     return outputs, dec_con_count, conds, sign_type, sign_act, sign_deact
 
@@ -119,7 +118,7 @@ def res_cust_output(inst, res):
                 )
 
                 if act_inp and sign_act_out:
-                    inst.add_out(VLib.Output(
+                    inst.add_out(Output(
                         inst_out=sign_act_name,
                         out=sign_act_out,
                         inst_in=act_name,
@@ -128,7 +127,7 @@ def res_cust_output(inst, res):
                     ))
 
                 if deact_inp and sign_deact_out:
-                    inst.add_out(VLib.Output(
+                    inst.add_out(Output(
                         inst_out=sign_deact_name,
                         out=sign_deact_out,
                         inst_in=deact_name,
@@ -269,8 +268,8 @@ def res_cust_antline(inst, res):
 def res_change_outputs_setup(res):
     return [
         (
-            VLib.Output.parse_name(prop.real_name),
-            VLib.Output.parse_name(prop.value)
+            Output.parse_name(prop.real_name),
+            Output.parse_name(prop.value)
         )
         for prop in
         res
@@ -297,7 +296,7 @@ def res_change_outputs(inst: VLib.Entity, res):
 def res_change_inputs_setup(res: Property):
     vals = {}
     for prop in res:
-        out_key = VLib.Output.parse_name(prop.real_name)
+        out_key = Output.parse_name(prop.real_name)
         if prop.has_children():
             vals[out_key] = (
                 prop['inst_in', None],

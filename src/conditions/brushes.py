@@ -4,13 +4,12 @@ from collections import defaultdict
 
 import conditions
 import srctools
-import srctools.vmfLib as VLib
 import utils
 import vbsp
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
-from srctools import Property, Vec
+from srctools import Property, Vec, Output, Entity
 
 
 LOGGER = utils.getLogger(__name__)
@@ -114,7 +113,7 @@ def res_fix_rotation_axis(ent, res):
     conditions.set_ent_keys(door_ent, ent, res)
 
     for output in res.find_all('AddOut'):
-        door_ent.add_out(VLib.Output(
+        door_ent.add_out(Output(
             out=output['Output', 'OnUse'],
             inp=output['Input', 'Use'],
             targ=output['Target', ''],
@@ -431,7 +430,7 @@ def res_import_template_setup(res):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: VLib.Entity, res):
+def res_import_template(inst: Entity, res):
     """Import a template VMF file, retexturing it to match orientatation.
 
     It will be placed overlapping the given instance.
