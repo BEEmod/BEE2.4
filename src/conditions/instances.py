@@ -3,15 +3,15 @@
 """
 import operator
 
+import conditions
 import srctools
+import srctools.vmfLib as VLib
 from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
-from srctools import Vec
 from instanceLocs import resolve as resolve_inst
-import conditions
-import vmfLib as VLib
+from srctools import Vec
 
 
 @make_flag('instance')

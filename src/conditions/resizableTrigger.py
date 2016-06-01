@@ -1,14 +1,15 @@
 """Logic for trigger items, allowing them to be resized."""
+import conditions
+import srctools
+import srctools.vmfLib as VLib
+import utils
+import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
 from srctools import Vec
-import srctools
-import utils
-import conditions
-import vmfLib as VLib
-import vbsp
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 

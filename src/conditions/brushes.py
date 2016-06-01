@@ -4,13 +4,13 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import srctools.vmfLib as VLib
 import utils
 import vbsp
-import vmfLib as VLib
-from srctools import Property, Vec
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
+from srctools import Property, Vec
 
 
 LOGGER = utils.getLogger(__name__)

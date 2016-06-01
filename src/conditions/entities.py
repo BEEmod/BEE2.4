@@ -3,14 +3,13 @@ import random
 from collections import defaultdict
 
 import conditions
+import srctools.vmfLib as VLib
 import utils
-import vmfLib as VLib
-from srctools import Property, Vec
-
 from conditions import (
     make_result, make_result_setup,
     TEMP_TYPES, SOLIDS
 )
+from srctools import Property, Vec
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.scaffold')

@@ -1,14 +1,15 @@
 """Conditions relating to track platforms."""
+import conditions
 import srctools
+import srctools.vmfLib as VLib
+import utils
+import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
 from srctools import Vec
-import utils
-import conditions
-import vmfLib as VLib
-import vbsp
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.trackPlat')
 

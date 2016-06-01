@@ -5,9 +5,9 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import srctools.vmfLib as VLib
 import utils
 import vbsp
-import vmfLib as VLib
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,

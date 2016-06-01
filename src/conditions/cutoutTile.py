@@ -1,18 +1,15 @@
 """Generate random quarter tiles, like in Destroyed or Retro maps."""
+import random
 from collections import defaultdict, namedtuple
 
-import random
-
-from perlin import SimplexNoise
-
-from srctools import Vec_tuple, Vec
-from instanceLocs import resolve as resolve_inst
-
-import utils
-import vmfLib as VLib
-import srctools
 import conditions
+import srctools
+import srctools.vmfLib as VLib
+import utils
 import vbsp
+from instanceLocs import resolve as resolve_inst
+from perlin import SimplexNoise
+from srctools import Vec_tuple, Vec
 
 LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 

@@ -13,12 +13,11 @@ import extract_packages
 import srctools
 import tkMarkdown
 import utils
-import vmfLib as VLib
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
-from srctools import Property, NoKeyError, Vec
+from srctools import Property, NoKeyError, Vec, VMF, Entity
 
 from typing import (
     Dict,
@@ -35,7 +34,7 @@ data = {}
 
 res_count = -1
 
-TEMPLATE_FILE = VLib.VMF()
+TEMPLATE_FILE = VMF()
 
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
@@ -1918,7 +1917,7 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VLib.VMF, force=None, keep_brushes=True):
+    def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
         This copies the solids out of vmf_file and into TEMPLATE_FILE.
@@ -1985,7 +1984,7 @@ class BrushTemplate(PakObject, has_img=False):
         self.temp_overlays = []
 
         # Look for overlays, and translate their IDS.
-        for overlay in vmf_file.by_class['info_overlay']:  # type: VLib.Entity
+        for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
             )
@@ -2015,7 +2014,7 @@ class BrushTemplate(PakObject, has_img=False):
             prop_name='file',
             extension='.vmf',
         )
-        file = VLib.VMF.parse(file)
+        file = VMF.parse(file)
         return cls(
             data.id,
             file,

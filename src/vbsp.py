@@ -16,7 +16,7 @@ from decimal import Decimal
 
 from srctools import Property, Vec
 from BEE2_config import ConfigFile
-import vmfLib as VLib
+import srctools.vmf as VLib
 import srctools
 import voiceLine
 import instanceLocs
@@ -602,7 +602,7 @@ def add_voice(_):
     voiceLine.add_voice(
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
-        vmf_file=VMF,
+        vmf_file_=VMF,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )

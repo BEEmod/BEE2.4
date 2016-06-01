@@ -1,14 +1,15 @@
 """Results for custom fizzlers."""
+import conditions
+import srctools
+import srctools.vmfLib as VLib
+import utils
+import vbsp
 from conditions import (
     make_result,
 )
-from vbsp import TEX_FIZZLER
 from srctools import Vec
-import srctools
-import conditions
-import utils
-import vmfLib as VLib
-import vbsp
+from vbsp import TEX_FIZZLER
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 

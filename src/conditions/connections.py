@@ -1,8 +1,8 @@
 """Results relating to item connections."""
+import srctools
+import srctools.vmfLib as VLib
 from conditions import make_result, make_result_setup, resolve_value
 from srctools import Property
-import srctools
-import vmfLib as VLib
 
 
 @make_result_setup('AddOutput')

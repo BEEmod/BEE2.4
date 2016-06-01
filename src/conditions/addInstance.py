@@ -3,8 +3,8 @@
 """
 import srctools
 import srctools.utils
+import srctools.vmfLib as VLib
 import vbsp
-import vmfLib as VLib
 from conditions import (
     make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
