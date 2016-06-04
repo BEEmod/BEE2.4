@@ -35,7 +35,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from zipfile import ZipFile, ZIP_LZMA
 
 from tooltip import add_tooltip
-from srctools import Property
+from srctools import Property, KeyValError
 from CheckDetails import CheckDetails, Item as CheckItem
 from loadScreen import LoadScreen
 import img
@@ -131,21 +131,31 @@ class P2C:
         # Some P2Cs may have non-ASCII characters in descriptions, so we
         # need to read it as bytes and convert to utf-8 ourselves - zips
         # don't convert encodings automatically for us.
-        with zip_open_bin(zip_file, path + '.p2c') as file:
-            props = Property.parse(
-                # Decode the P2C as UTF-8, and skip unknown characters.
-                # We're only using it for display purposes, so that should
-                # be sufficent.
-                EncodedFile(
-                    file,
-                    data_encoding='utf-8',
-                    errors='replace',
-                ),
-                path,
-            )
-        props = props.find_key('portal2_puzzle', [])
+        try:
+            with zip_open_bin(zip_file, path + '.p2c') as file:
+                props = Property.parse(
+                    # Decode the P2C as UTF-8, and skip unknown characters.
+                    # We're only using it for display purposes, so that should
+                    # be sufficent.
+                    EncodedFile(
+                        file,
+                        data_encoding='utf-8',
+                        errors='replace',
+                    ),
+                    path,
+                )
+        except KeyValError:
+            # Silently fail if we can't parse the file. That way it's still
+            # possible to backup.
+            LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
+            props = Property('portal2_puzzle', [])
+            title = None
+            desc = 'Failed to parse this puzzle file. It can still be backed up.'
+        else:
+            props = props.find_key('portal2_puzzle', [])
+            title = props['title', None]
+            desc = props['description', 'No description found.']
 
-        title = props['title', None]
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
 
@@ -153,7 +163,7 @@ class P2C:
             path=path,
             zip_file=zip_file,
             title=title,
-            desc=props['description', '...'],
+            desc=desc,
             is_coop=srctools.conv_bool(props['coop', '0']),
             create_time=Date(props['timestamp_created', '']),
             mod_time=Date(props['timestamp_modified', '']),
