@@ -120,14 +120,25 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
     desc.append('Default: {}'.format(
         'On' if var.default else 'Off'
     ))
-    desc.append('Styles: {}'.format(
-        'All' if
-        (is_hardcoded or var.styles is None)
-        else ', '.join(sorted(
-            STYLES[sty_id].selitem_data.short_name
-            for sty_id in var.styles
-        ))
-    ))
+
+    if is_hardcoded or var.styles is None:
+        desc.append('Styles: Unstyled')
+    else:
+        app_styles = [
+            style
+            for style in
+            STYLES.values()
+            if var.applies_to_style(style)
+        ]
+
+        if len(app_styles) == len(STYLES):
+            desc.append('Styles: All')
+        else:
+            desc.append('Styles: ' + ', '.join(sorted(
+                style.selitem_data.short_name
+                for style in
+                app_styles
+            )))
 
     return '\n'.join(desc)
 

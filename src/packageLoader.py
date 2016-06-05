@@ -1506,7 +1506,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             return True
 
         return any(
-            base in self.styles
+            base.id in self.styles
             for base in
             style.bases
         )
