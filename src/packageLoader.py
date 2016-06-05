@@ -106,7 +106,7 @@ class _PakObjectMeta(type):
 
 
 class PakObject(metaclass=_PakObjectMeta):
-    """The base class for package objects.
+    """PackObject(allow_mult=False, has_img=True): The base class for package objects.
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
     If duplicates occur, they will be treated as overrides.
@@ -859,7 +859,7 @@ class Item(PakObject):
         self.glob_desc_last = desc_last
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse an item definition."""
         versions = {}
         def_version = None
@@ -924,6 +924,9 @@ class Item(PakObject):
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
+        # Copy over all_conf always.
+        self.all_conf += override.all_conf
+
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
                 # We don't have that version!
@@ -936,7 +939,7 @@ class Item(PakObject):
                         our_ver[sty_id] = style
                     else:
                         # We both have a matching folder, merge the
-                        # definitions
+                        # definitions. We don't override editoritems!
                         our_style = our_ver[sty_id]
 
                         our_style['auth'].extend(style['auth'])
@@ -962,19 +965,39 @@ class Item(PakObject):
         vbsp_config = exp_data.vbsp_conf
         pal_list, versions, prop_conf = exp_data.selected
 
+        style_id = exp_data.selected_style.id
+
+        aux_item_configs = {
+            conf.id: conf
+            for conf in data['ItemConfig']
+        }
+
         for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+            ver_id = versions.get(item.id, 'VER_DEFAULT')
+
             (
                 item_block,
                 editor_parts,
                 config_part
             ) = item._get_export_data(
-                pal_list, versions, exp_data.selected_style.id, prop_conf,
+                pal_list, ver_id, style_id, prop_conf,
             )
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
 
-    def _get_export_data(self, pal_list, versions, style_id, prop_conf: Dict[str, Dict[str, str]]):
+            try:
+                aux_conf = aux_item_configs[item.id]  # type: ItemConfig
+            except KeyError:
+                pass
+            else:
+                vbsp_config += aux_conf.all_conf
+                try:
+                    vbsp_config += aux_conf.versions[ver_id][style_id]
+                except KeyError:
+                    pass  # No override.
+
+    def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -986,9 +1009,7 @@ class Item(PakObject):
             if item == self.id
         }
 
-        item_data = self.versions[
-            versions.get(self.id, 'VER_DEFAULT')
-        ]['styles'][style_id]
+        item_data = self.versions[ver_id]['styles'][style_id]
 
         new_editor = item_data['editor'].copy()
 
@@ -1039,6 +1060,67 @@ class Item(PakObject):
             # Add all_conf first so it's conditions run first by default
             self.all_conf + item_data['vbsp'],
         )
+
+
+class ItemConfig(PakObject, allow_mult=True, has_img=False):
+    """Allows adding additional configuration for items.
+
+    The ID should match an item ID.
+    """
+    def __init__(self, it_id, all_conf, version_conf):
+        self.id = it_id
+        self.versions = version_conf
+        self.all_conf = all_conf
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        vers = {}
+
+        all_config = get_config(
+            data.info,
+            data.zip_file,
+            'items',
+            pak_id=data.pak_id,
+            prop_name='all_conf',
+        )
+
+        for ver in data.info.find_all('Version'):  # type: Property
+            ver_id = ver['ID', 'VER_DEFAULT']
+            vers[ver_id] = styles = {}
+            for sty_block in ver.find_all('Styles'):
+                for style in sty_block:  # type: Property
+                    file_loc = 'items/' + style.value + '.cfg'
+                    LOGGER.info(locals())
+                    with data.zip_file.open(file_loc) as f:
+                        styles[style.real_name] = Property.parse(
+                            f,
+                            data.pak_id + ':' + file_loc,
+                        )
+
+        return cls(
+            data.id,
+            all_config,
+            vers,
+        )
+
+    def add_over(self, override: 'ItemConfig'):
+        self.all_conf += override.all_conf
+
+        for vers_id, styles in override.versions.items():
+            our_styles = self.versions.setdefault(vers_id, {})
+            for sty_id, style in styles.items():
+                if sty_id not in our_styles:
+                    our_styles[sty_id] = style
+                else:
+                    our_styles[sty_id] += style
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """This export is done in Item.export().
+
+        Here we don't know the version set for each item.
+        """
+        pass
 
 
 class QuotePack(PakObject):
