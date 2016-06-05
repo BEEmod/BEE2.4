@@ -215,3 +215,51 @@ def res_rand_vec(inst, res):
             value[axis] = func(min_val, max_val)
 
     inst.fixup[var] = value.join(' ')
+
+
+@make_result_setup('randomShift')
+def res_rand_inst_shift_setup(res):
+    min_x = srctools.conv_int(res['min_x', '0'])
+    max_x = srctools.conv_int(res['max_x', '0'])
+    min_y = srctools.conv_int(res['min_y', '0'])
+    max_y = srctools.conv_int(res['max_y', '0'])
+    min_z = srctools.conv_int(res['min_z', '0'])
+    max_z = srctools.conv_int(res['max_z', '0'])
+
+    return (
+        min_x, max_x,
+        min_y, max_y,
+        min_z, max_z,
+    )
+
+
+@make_result('randomShift')
+def res_rand_inst_shift(inst, res):
+    """Randomly shift a instance by the given amounts.
+
+    The positions are local to the instance.
+    """
+    import vbsp
+    (
+        min_x, max_x,
+        min_y, max_y,
+        min_z, max_z,
+    ) = res.value
+
+    random.seed(
+        vbsp.MAP_RAND_SEED +
+        '_random_shift_' +
+        inst['origin'] +
+        inst['angles']
+    )
+
+    offset = Vec(
+        random.uniform(min_x, max_x),
+        random.uniform(min_y, max_y),
+        random.uniform(min_z, max_z),
+    )
+
+    offset.rotate_by_str(inst['angles'])
+    origin = Vec.from_str(inst['origin'])
+    origin += offset
+    inst['origin'] = origin
