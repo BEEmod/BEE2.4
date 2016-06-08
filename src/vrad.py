@@ -246,7 +246,6 @@ def quote(txt):
     return '"' + txt + '"'
 
 
-
 def load_config():
     global CONF
     LOGGER.info('Loading Settings...')
@@ -260,7 +259,40 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile: ZipFile, filename: str):
+def get_zip_writer(zipfile: ZipFile):
+    """Allow dumping the packed files to a folder.
+
+    Returns a zipfile.write() method.
+    """
+    dump_folder = CONF['packfile_dump', '']
+    if not dump_folder:
+        return zipfile.write
+
+    dump_folder = os.path.abspath(dump_folder)
+
+    # Delete files in the folder, but don't delete the folder itself.
+    try:
+        dump_files = os.listdir(dump_folder)
+    except FileNotFoundError:
+        pass
+    else:
+        for name in dump_files:
+            name = os.path.join(dump_folder, name)
+            if os.path.isdir(name):
+                shutil.rmtree(name)
+            else:
+                os.remove(name)
+
+    def write_to_zip(filename, arcname):
+        if dump_folder:
+            dump_loc = os.path.join(dump_folder, arcname)
+            os.makedirs(os.path.dirname(dump_loc), exist_ok=True)
+            shutil.copy(filename, dump_loc)
+        zipfile.write(filename, arcname)
+    return write_to_zip
+
+
+def pack_file(zip_write, filename: str):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -282,7 +314,7 @@ def pack_file(zipfile: ZipFile, filename: str):
             for subfile in os.listdir(dir_path):
                 full_path = os.path.join(dir_path, subfile)
                 rel_path = os.path.join(directory, subfile)
-                zipfile.write(
+                zip_write(
                     filename=full_path,
                     arcname=rel_path,
                 )
@@ -295,7 +327,7 @@ def pack_file(zipfile: ZipFile, filename: str):
             os.path.join(poss_path, filename)
         )
         if os.path.isfile(full_path):
-            zipfile.write(
+            zip_write(
                 filename=full_path,
                 arcname=arcname,
             )
@@ -578,12 +610,14 @@ def pack_content(path, is_peti):
     zipfile = ZipFile(zip_data, mode='a')
     LOGGER.debug(' - Existing zip read')
 
+    zip_write = get_zip_writer(zipfile)
+
     for file in files:
-        pack_file(zipfile, file)
+        pack_file(zip_write, file)
 
     for filename, arcname in inject_names:
         LOGGER.info('Injecting "{}" into packfile.', arcname)
-        zipfile.write(filename, arcname)
+        zip_write(filename, arcname)
 
     LOGGER.debug(' - Added files')
 

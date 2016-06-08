@@ -3493,6 +3493,13 @@ def make_vrad_config():
     )
     conf['game_id'] = get_opt('game_id')
 
+    if BEE2_config.get_bool('General', 'packfile_dump_enable'):
+        conf['packfile_dump'] = BEE2_config.get_val(
+            'General',
+            'packfile_dump_dir',
+            ''
+        )
+
     # Copy over the voice attributes
     conf['VoiceAttr'] = ';'.join(
         key
