@@ -3,6 +3,7 @@ General code used for tkinter portions.
 
 """
 from tkinter import ttk
+from tkinter import font as _tk_font
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
@@ -151,26 +152,35 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):
             self.value = str(self.old_val)
             return False
 
+_file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
+_file_field_char_len = _file_field_font.measure('x')
+
 
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
     """
-    def __init__(self, master, is_dir=False, loc='', width=24, callback=None):
+    def __init__(
+        self,
+        master,
+        is_dir=False,
+        loc='',
+        callback=None,
+    ):
         """Initialise the field.
 
         - Set is_dir to true to look for directories, instead of files.
         - width sets the number of characters to display.
-        - loc is the initial value of the field.
         - callback is a function to be called with the new path whenever it
           changes.
         """
+        from tooltip import add_tooltip
+
         super(FileField, self).__init__(master)
 
         self._location = loc
         self.is_dir = is_dir
-        self.width = width
 
-        self._text_var = tk.StringVar(master=self, value=self._truncate(loc))
+        self._text_var = tk.StringVar(master=self, value='')
         if is_dir:
             self.browser = filedialog.Directory(
                 self,
@@ -185,14 +195,19 @@ class FileField(ttk.Frame):
         if callback is not None:
             self.callback = callback
 
+
         self.textbox = ReadOnlyEntry(
             self,
             textvariable=self._text_var,
-            width=width,
+            font=_file_field_font,
             cursor=utils.CURSORS['regular'],
         )
-        self.textbox.grid(row=0, column=0)
+        self.textbox.grid(row=0, column=0, sticky='ew')
+        self.columnconfigure(0, weight=1)
         utils.bind_leftclick(self.textbox, self.browse)
+        # The full location is displayed in a tooltip.
+        add_tooltip(self.textbox, self._location)
+        self.textbox.bind('<Configure>', self._text_configure)
 
         self.browse_btn = ttk.Button(
             self,
@@ -202,6 +217,8 @@ class FileField(ttk.Frame):
         )
         self.browse_btn.grid(row=0, column=1)
 
+        self._text_var.set(self._truncate(loc))
+
     def browse(self, event=None):
         """Browse for a file."""
         path = self.browser.show()
@@ -210,6 +227,7 @@ class FileField(ttk.Frame):
 
     def callback(self, path):
         """Callback function, called whenever the value changes."""
+        # When passed in, this is shadowed by the user's function.
         pass
 
     @property
@@ -222,14 +240,25 @@ class FileField(ttk.Frame):
         """Set the current path. This calls the callback function."""
         self.callback(path)
         self._location = path
+        self.textbox.tooltip_text = path
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path):
         """Truncate the path to the end portion."""
+        self.textbox.update_idletasks()
+        wid = (self.textbox.winfo_width() // _file_field_char_len) - 3
+
+        if wid <= 4:  # No room from text
+            return '...'
+
         if not self.is_dir:
             path = os.path.basename(path)
 
-        if len(path) > self.width - 4:
-            return '...' + path[-(self.width - 1):]
+        if len(path) > wid + 2:
+            return '...' + path[-(wid - 1):]
+        else:
+            return path
 
-        return path
+    def _text_configure(self, e):
+        """Truncate text every time the text widget resizes."""
+        self._text_var.set(self._truncate(self._location))
