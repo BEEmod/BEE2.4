@@ -158,11 +158,22 @@ def save_pal(items, name):
     LOGGER.debug(name, pos, name, [])
     new_palette = Palette(name, pos)
 
+    # Remove existing palettes with the same name.
     for pal in pal_list[:]:
         if pal.name == name:
-            pal_list.remove(name)
+            pal_list.remove(pal)
+
     pal_list.append(new_palette)
-    return new_palette.save(allow_overwrite=False)
+    return new_palette.save(allow_overwrite=True)
+
+
+def check_exists(name):
+    """Check if a palette with the given name exists."""
+    for pal in pal_list:
+        if pal.name == name:
+            return True
+    return False
+
 
 if __name__ == '__main__':
     results = load_palettes('palettes\\')

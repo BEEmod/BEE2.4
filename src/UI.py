@@ -1058,10 +1058,11 @@ def pal_save_as(_=None):
         name = ask_string(
             "BEE2 - Save Palette",
             "Enter a name:",
-            )
+        )
         if name is None:
+            # Cancelled...
             return False
-        # Check for non-basic characters
+        # Check for non-basic characters to ensure the filename is valid..
         elif not srctools.is_plain_text(name):
             messagebox.showinfo(
                 icon=messagebox.ERROR,
@@ -1069,7 +1070,14 @@ def pal_save_as(_=None):
                 message='Please only use basic characters in palette '
                         'names.',
                 parent=TK_ROOT,
-                )
+            )
+        elif paletteLoader.check_exists(name):
+            if messagebox.askyesno(
+                icon=messagebox.QUESTION,
+                title='BEE2',
+                message='This palette alread exists. Overwrite?',
+            ):
+                break
         else:
             break
     paletteLoader.save_pal(pal_picked, name)
