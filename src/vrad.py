@@ -284,10 +284,9 @@ def get_zip_writer(zipfile: ZipFile):
                 os.remove(name)
 
     def write_to_zip(filename, arcname):
-        if dump_folder:
-            dump_loc = os.path.join(dump_folder, arcname)
-            os.makedirs(os.path.dirname(dump_loc), exist_ok=True)
-            shutil.copy(filename, dump_loc)
+        dump_loc = os.path.join(dump_folder, arcname)
+        os.makedirs(os.path.dirname(dump_loc), exist_ok=True)
+        shutil.copy(filename, dump_loc)
         zipfile.write(filename, arcname)
     return write_to_zip
 
