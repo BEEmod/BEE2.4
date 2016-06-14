@@ -3,6 +3,7 @@ import random
 from collections import defaultdict
 
 import conditions
+import srctools
 import utils
 from conditions import (
     make_result, make_result_setup,
@@ -111,3 +112,112 @@ def res_insert_overlay(inst: Entity, res: Property):
             'Overlay template "{}" could set keep_brushes=0.',
             temp_id,
         )
+
+
+@make_result_setup('WaterSplash')
+def res_water_splash_setup(res: Property):
+    parent = res['parent']
+    name = res['name']
+    scale = srctools.conv_float(res['scale', ''], 8.0)
+    pos1 = Vec.from_str(res['position', ''])
+    lin_off = res['door_dist', '']
+    lin_angles = res['door_angles', '']
+    pos2 = res['position2', '']
+
+    if lin_angles and lin_off:
+        pos2 = lin_angles
+    else:
+        lin_off = None
+
+    return name, parent, scale, pos1, lin_off, pos2
+
+
+@make_result('WaterSplash')
+def res_water_splash(inst: Entity, res: Property):
+    """Creates splashes when something goes in and out of water.
+
+    Arguments:
+        - parent: The name of the parent entity.
+        - name: The name given to the env_splash.
+        - scale: The size of the effect (8 by default).
+        - position: The offset position to place the entity.
+        - position2: The offset to which the entity will move. Set to
+            '<piston_1/2/3/4>' to use $bottom_level and $top_level as offsets.
+        - door_dist: Overrides position2 if set. The distance for a door/movelinear.
+        - door_angles: required for door_dist. The absolute direction the door
+          moves in.
+    """
+    (
+        name,
+        parent,
+        scale,
+        pos1,
+        lin_off,
+        pos2,
+    ) = res.value  # type: str, str, float, Vec, Optional[str], str
+    pos1 = pos1.copy()
+
+    # Movelinear mode - offset by the given position and angles.
+    if lin_off is not None:
+        lin_off = srctools.conv_int(
+            conditions.resolve_value(inst, lin_off),
+            1
+        )
+        pos2 = Vec(x=lin_off).rotate_by_str(
+            conditions.resolve_value(inst, pos2),
+        )
+        pos2 += pos1
+    else:
+        # Directly from the given value.
+        pos2 = Vec.from_str(conditions.resolve_value(inst, pos2))
+
+    origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
+    pos1.localise(origin, angles)
+    pos2.localise(origin, angles)
+
+    conditions.VMF.create_ent(
+        classname='env_beam',
+        targetname=conditions.local_name(inst, 'pos1'),
+        origin=str(pos1),
+        targetpoint=str(pos2),
+    )
+
+    # Since it's a straight line and you can't go through walls,
+    # if pos1 and pos2 aren't in goo we aren't ever in goo.
+
+    grid_pos1 = pos1 // 128 * 128  # type: Vec
+    grid_pos1 += (64, 64, 64)
+    grid_pos2 = pos2 // 128 * 128  # type: Vec
+    grid_pos2 += (64, 64, 64)
+
+    try:
+        surf = conditions.GOO_LOCS[grid_pos1.as_tuple()]
+    except KeyError:
+        try:
+            surf = conditions.GOO_LOCS[grid_pos2.as_tuple()]
+        except KeyError:
+            return
+            # Not in goo at all
+
+    if pos1.z == pos2.z:
+        # Flat - this won't do anything...
+        return
+
+    water_pos = surf.get_origin()
+
+    import vbsp
+
+    conditions.VMF.create_ent(
+        classname='env_splash',
+        # Pass along the water_pos encoded into the targetname.
+        targetname=conditions.local_name(inst, name + "_" + str(water_pos.z)),
+        parentname=conditions.local_name(inst, parent),
+        origin=pos1 + (0, 0, 16),
+        scale=scale,
+        vscripts='BEE2/water_splash.nut',
+        thinkfunction='Think',
+        spawnflags='1',  # Trace downward to water surface.
+    )
+
+    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/water_splash.nut')
