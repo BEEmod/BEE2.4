@@ -38,8 +38,8 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-GOO_LOCS = set()  # A set of all blocks containing goo
-GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
+GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
+GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
@@ -567,10 +567,10 @@ def build_solid_dict():
                 y = bbox_min.y + 64
                 # If goo is multi-level, we want to record all pos!
                 for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
-                    GOO_LOCS.add(Vec_tuple(x, y, z))
+                    GOO_LOCS[Vec_tuple(x, y, z)] = face
 
                 # Add the location of the top face
-                GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
+                GOO_FACE_LOC[Vec_tuple(x, y, bbox_max.z)] = face
 
                 # Indicate that this map contains goo...
                 vbsp.settings['has_attr']['goo'] = True
