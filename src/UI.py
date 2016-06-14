@@ -892,6 +892,11 @@ def drag_start(e):
 def drag_stop(e):
     """User released the mouse button, complete the drag."""
     drag_win = windows['drag_win']
+
+    if drag_win.drag_item is None:
+        # We aren't dragging, ignore the event.
+        return
+
     drag_win.withdraw()
     drag_win.unbind("<B1-Motion>")
     drag_win.grab_release()
@@ -901,7 +906,7 @@ def drag_stop(e):
     snd.fx('config')
 
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    ind = pos_x+pos_y*4
+    ind = pos_x + pos_y * 4
 
     # this prevents a single click on the picker from clearing items
     # off the palette
@@ -931,6 +936,11 @@ def drag_stop(e):
 def drag_move(e):
     """Update the position of dragged items as they move around."""
     drag_win = windows['drag_win']
+
+    if drag_win.drag_item is None:
+        # We aren't dragging, ignore the event.
+        return
+
     set_disp_name(drag_win.drag_item)
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
