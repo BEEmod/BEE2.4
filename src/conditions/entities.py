@@ -120,16 +120,11 @@ def res_water_splash_setup(res: Property):
     name = res['name']
     scale = srctools.conv_float(res['scale', ''], 8.0)
     pos1 = Vec.from_str(res['position', ''])
-    lin_off = res['door_dist', '']
-    lin_angles = res['door_angles', '']
+    calc_type = res['type', '']
     pos2 = res['position2', '']
+    fast_check = srctools.conv_bool(res['fast_check', ''])
 
-    if lin_angles and lin_off:
-        pos2 = lin_angles
-    else:
-        lin_off = None
-
-    return name, parent, scale, pos1, lin_off, pos2
+    return name, parent, scale, pos1, pos2, calc_type, fast_check
 
 
 @make_result('WaterSplash')
@@ -141,44 +136,61 @@ def res_water_splash(inst: Entity, res: Property):
         - name: The name given to the env_splash.
         - scale: The size of the effect (8 by default).
         - position: The offset position to place the entity.
-        - position2: The offset to which the entity will move. Set to
-            '<piston_1/2/3/4>' to use $bottom_level and $top_level as offsets.
-        - door_dist: Overrides position2 if set. The distance for a door/movelinear.
-        - door_angles: required for door_dist. The absolute direction the door
+        - position2: The offset to which the entity will move.
+        - type: Use certain fixup values to calculate pos2 instead:
+           'piston_1/2/3/4': Use $bottom_level and $top_level as offsets.
+           'track_platform': Use $travel_direction, $travel_distance, etc.
           moves in.
+        - fast_check: Check faster for movement. Needed for items which
+          move quickly.
     """
     (
         name,
         parent,
         scale,
         pos1,
-        lin_off,
         pos2,
-    ) = res.value  # type: str, str, float, Vec, Optional[str], str
-    pos1 = pos1.copy()
+        calc_type,
+        fast_check,
+    ) = res.value  # type: str, str, float, Vec, str, str
 
-    # Movelinear mode - offset by the given position and angles.
-    if lin_off is not None:
-        lin_off = srctools.conv_int(
-            conditions.resolve_value(inst, lin_off),
-            1
-        )
-        pos2 = Vec(x=lin_off).rotate_by_str(
-            conditions.resolve_value(inst, pos2),
-        )
+    pos1 = pos1.copy()  # type: Vec
+    splash_pos = pos1.copy()  # type: Vec
+
+    if calc_type == 'track_platform':
+        lin_off = srctools.conv_int(inst.fixup['$travel_distance'])
+        travel_ang = inst.fixup['$travel_direction']
+        start_pos = srctools.conv_float(inst.fixup['$starting_position'])
+        if start_pos:
+            start_pos = round(start_pos * lin_off)
+            pos1 += Vec(x=-start_pos).rotate_by_str(travel_ang)
+
+        pos2 = Vec(x=lin_off).rotate_by_str(travel_ang)
         pos2 += pos1
+    elif calc_type.startswith('piston'):
+        # Use piston-platform offsetting.
+        # The number is the highest offset to move to.
+        max_pist = srctools.conv_int(calc_type.split('_', 2)[1], 4)
+        bottom_pos = srctools.conv_int(inst.fixup['$bottom_level'])
+        top_pos = min(srctools.conv_int(inst.fixup['$top_level']), max_pist)
+
+        pos2 = pos1.copy()
+        pos1 += Vec(z=128 * bottom_pos)
+        pos2 += Vec(z=128 * top_pos)
+        LOGGER.info('Bottom: {}, top: {}', bottom_pos, top_pos)
     else:
         # Directly from the given value.
         pos2 = Vec.from_str(conditions.resolve_value(inst, pos2))
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
+    splash_pos.localise(origin, angles)
     pos1.localise(origin, angles)
     pos2.localise(origin, angles)
 
     conditions.VMF.create_ent(
         classname='env_beam',
-        targetname=conditions.local_name(inst, 'pos1'),
+        targetname=conditions.local_name(inst, name + '_pos'),
         origin=str(pos1),
         targetpoint=str(pos2),
     )
@@ -186,19 +198,23 @@ def res_water_splash(inst: Entity, res: Property):
     # Since it's a straight line and you can't go through walls,
     # if pos1 and pos2 aren't in goo we aren't ever in goo.
 
-    grid_pos1 = pos1 // 128 * 128  # type: Vec
-    grid_pos1 += (64, 64, 64)
-    grid_pos2 = pos2 // 128 * 128  # type: Vec
-    grid_pos2 += (64, 64, 64)
+    check_pos = [pos1, pos2]
 
-    try:
-        surf = conditions.GOO_LOCS[grid_pos1.as_tuple()]
-    except KeyError:
+    if pos1.z < origin.z:
+        # If embedding in the floor, the positions can both be below the
+        # actual surface. In that case check the origin too.
+        check_pos.append(Vec(pos1.x, pos1.y, origin.z))
+
+    for pos in check_pos:
+        grid_pos = pos // 128 * 128  # type: Vec
+        grid_pos += (64, 64, 64)
         try:
-            surf = conditions.GOO_LOCS[grid_pos2.as_tuple()]
+            surf = conditions.GOO_LOCS[grid_pos.as_tuple()]
         except KeyError:
-            return
-            # Not in goo at all
+            continue
+        break
+    else:
+        return # Not in goo at all
 
     if pos1.z == pos2.z:
         # Flat - this won't do anything...
@@ -206,14 +222,29 @@ def res_water_splash(inst: Entity, res: Property):
 
     water_pos = surf.get_origin()
 
+    # Check if both positions are above or below the water..
+    # that means it won't ever trigger.
+    LOGGER.info('pos1: {}, pos2: {}, water_pos: {}', pos1.z, pos2.z, water_pos.z)
+    if max(pos1.z, pos2.z) < water_pos.z - 8:
+        return
+    if min(pos1.z, pos2.z) > water_pos.z + 8:
+        return
+
     import vbsp
+
+    # Pass along the water_pos encoded into the targetname.
+    # Restrict the number of characters to allow direct slicing
+    # in the script.
+    enc_data = '_{:09.3f}{}'.format(
+        water_pos.z + 12,
+        'f' if fast_check else 's',
+    )
 
     conditions.VMF.create_ent(
         classname='env_splash',
-        # Pass along the water_pos encoded into the targetname.
-        targetname=conditions.local_name(inst, name + "_" + str(water_pos.z)),
+        targetname=conditions.local_name(inst, name + enc_data),
         parentname=conditions.local_name(inst, parent),
-        origin=pos1 + (0, 0, 16),
+        origin=splash_pos + (0, 0, 16),
         scale=scale,
         vscripts='BEE2/water_splash.nut',
         thinkfunction='Think',

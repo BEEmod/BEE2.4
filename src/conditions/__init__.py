@@ -1568,6 +1568,7 @@ def make_static_pist(ent, res):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
+    If changed to static pistons, the $bottom and $top level become equal.
     Instances:
         Bottom_1/2/3: Moving piston with the given $bottom_level
         Logic_0/1/2/3: Additional logic instance for the given $bottom_level
