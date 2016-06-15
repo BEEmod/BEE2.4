@@ -1259,7 +1259,6 @@ class QuotePack(PakObject):
         for sub_prop in prop:
             # Make sure it's in the right nesting depth - flags might
             # have arbitrary props in lower depths..
-            LOGGER.info('{} {}', sub_prop.name, _depth)
             if _depth == 3:  # 'Line' blocks
                 if sub_prop.name == 'trans':
                     continue
