@@ -813,18 +813,18 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
             overlay['sides'] = ' '.join(sides)
 
 
-def set_ent_keys(ent, inst, prop_block, suffix=''):
+def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
     """Copy the given key prop block to an entity.
 
-    This uses the 'keys' and 'localkeys' properties on the prop_block.
+    This uses the keys and 'localkeys' properties on the prop_block.
     Values with $fixup variables will be treated appropriately.
     LocalKeys keys will be changed to use instance-local names, where needed.
-    If suffix is set, it is a suffix to the two prop_block names
+    block_name lets you change the 'keys' suffix on the prop_block name.
+    ent can be any mapping.
     """
-    for prop in prop_block.find_key('Keys' + suffix, []):
+    for prop in prop_block.find_key(block_name, []):
         ent[prop.real_name] = resolve_value(inst, prop.value)
-    name = inst['targetname', ''] + '-'
-    for prop in prop_block.find_key('LocalKeys' + suffix, []):
+    for prop in prop_block.find_key('Local' + block_name, []):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -832,7 +832,7 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
         if val.startswith('@'):
             ent[prop.real_name] = val
         else:
-            ent[prop.real_name] = name + val
+            ent[prop.real_name] = local_name(inst, val)
 
 
 def resolve_value(inst: Entity, value: str):

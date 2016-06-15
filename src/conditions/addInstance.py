@@ -1,6 +1,7 @@
 """Results for generating additional instances.
 
 """
+import conditions
 import srctools
 import vbsp
 from conditions import (
@@ -63,13 +64,16 @@ def res_add_overlay_inst(inst, res):
         move_outputs: If true, outputs will be moved to this instance.
         offset: The offset (relative to the base) that the instance
             will be placed. Can be set to '<piston_top>' and
-            '<piston_bottom>' to offset based on the configuration
+            '<piston_bottom>' to offset based on the configuration.
+            '<piston_start>' will set it to the starting position, and
+            '<piston_end>' will set it to the ending position.
             of piston platform handles.
         angles: If set, overrides the base instance angles. This does
             not affect the offset property.
-        fixup: Keyvalues in this block will be copied to the overlay entity.
+        fixup/localfixup: Keyvalues in this block will be copied to the
+            overlay entity.
             If the value starts with $, the variable will be copied over.
-            If this is present, copy_fixup will be disabled
+            If this is present, copy_fixup will be disabled.
     """
 
     angle = res['angles', inst['angles', '0 0 0']]
@@ -82,17 +86,13 @@ def res_add_overlay_inst(inst, res):
         fixup_style=res['fixup_style', '0'],
     )
     # Don't run if the fixup block exists..
-    if srctools.conv_bool(res['copy_fixup', '1']) and 'fixup' not in res:
-        # Copy the fixup values across from the original instance
-        for fixup, value in inst.fixup.items():
-            overlay_inst.fixup[fixup] = value
+    if srctools.conv_bool(res['copy_fixup', '1']):
+        if 'fixup' not in res and 'localfixup' not in res:
+            # Copy the fixup values across from the original instance
+            for fixup, value in inst.fixup.items():
+                overlay_inst.fixup[fixup] = value
 
-    # Copy additional fixup values over
-    for prop in res.find_key('Fixup', []):  # type: Property
-        if prop.value.startswith('$'):
-            overlay_inst.fixup[prop.real_name] = inst.fixup[prop.value]
-        else:
-            overlay_inst.fixup[prop.real_name] = prop.value
+    conditions.set_ent_keys(overlay_inst.fixup, inst, res, 'fixup')
 
     if srctools.conv_bool(res['move_outputs', '0']):
         overlay_inst.outputs = inst.outputs
@@ -102,6 +102,17 @@ def res_add_overlay_inst(inst, res):
         folded_off = res['offset'].casefold()
         # Offset the overlay by the given distance
         # Some special placeholder values:
+        if folded_off == '<piston_start>':
+            if srctools.conv_bool(inst.fixup['$start_up', '']):
+                folded_off = '<piston_top>'
+            else:
+                folded_off = '<piston_bottom>'
+        elif folded_off == '<piston_end>':
+            if srctools.conv_bool(inst.fixup['$start_up', '']):
+                folded_off = '<piston_bottom>'
+            else:
+                folded_off = '<piston_top>'
+
         if folded_off == '<piston_bottom>':
             offset = Vec(
                 z=srctools.conv_int(inst.fixup['$bottom_level']) * 128,
