@@ -62,7 +62,7 @@ def flag_instvar(inst, flag):
     The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
     If ommitted, the operation is assumed to be ==.
     """
-    values = flag.value.split(' ')
+    values = flag.value.split(' ', 3)
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
