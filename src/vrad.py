@@ -3,6 +3,7 @@ import os.path
 import shutil
 import subprocess
 import sys
+import logging
 from datetime import datetime
 from io import BytesIO
 from zipfile import ZipFile
@@ -59,6 +60,15 @@ INJECT_FILES = {
     # A generated soundscript for the current music.
     'music_script.txt': 'scripts/BEE2_generated_music.txt'
 }
+
+# Additional parts to add if we have a mdl file.
+MDL_ADDITIONAL_EXT = [
+    '.sw.vtx',
+    '.dx80.vtx',
+    '.dx90.vtx',
+    '.vvd',
+    '.phy',
+]
 
 
 # Various parts of the soundscript generated for BG music.
@@ -291,7 +301,7 @@ def get_zip_writer(zipfile: ZipFile):
     return write_to_zip
 
 
-def pack_file(zip_write, filename: str):
+def pack_file(zip_write, filename: str, suppress_error=False):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -332,7 +342,10 @@ def pack_file(zip_write, filename: str):
             )
             break
     else:
-        LOGGER.warning('"bee2/' + filename + '" not found! (May be OK if not custom)')
+        if not suppress_error:
+            LOGGER.warning(
+                '"bee2/' + filename + '" not found! (May be OK if not custom)'
+            )
 
 
 def gen_sound_manifest(additional, excludes):
@@ -542,6 +555,7 @@ def pack_content(path, is_peti):
     soundscripts = set()  # Soundscripts need to be added to the manifest too..
     rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
     particles = set()
+    additional_files = set()  # .vvd files etc which also are needed.
 
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
@@ -567,7 +581,17 @@ def pack_content(path, is_peti):
                 if line.startswith('particles/'):
                     particles.add(line)
 
+                if line[-4:] == '.mdl':
+                    additional_files.update({
+                        line[:-4] + ext
+                        for ext in
+                        MDL_ADDITIONAL_EXT
+                    })
+
                 files.add(line)
+
+    # Remove guessed files not in the original list.
+    additional_files -= files
 
     # Only generate a soundscript for PeTI maps..
     if is_peti:
@@ -594,6 +618,11 @@ def pack_content(path, is_peti):
         # \t seperates the original and in-pack name if used.
         LOGGER.info(' # "' + file.replace('\t', '" as "') + '"')
 
+    if additional_files and LOGGER.isEnabledFor(logging.DEBUG):
+        LOGGER.info('Potential additional files:')
+        for file in sorted(additional_files):
+            LOGGER.debug(' # "' + file + '"')
+
     LOGGER.info('Injected files:')
     for _, file in inject_names:
         LOGGER.info(' # "' + file + '"')
@@ -613,6 +642,9 @@ def pack_content(path, is_peti):
 
     for file in files:
         pack_file(zip_write, file)
+
+    for file in additional_files:
+        pack_file(zip_write, file, suppress_error=True)
 
     for filename, arcname in inject_names:
         LOGGER.info('Injecting "{}" into packfile.', arcname)
