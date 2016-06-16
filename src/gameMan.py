@@ -295,14 +295,17 @@ class Game:
         """Copy over the resource files into this game."""
 
         screen_func = export_screen.step
-        copy2 = shutil.copy2
+        copy = shutil.copy
 
         def copy_func(src, dest):
             screen_func('RES')
-            copy2(src, dest)
+            copy(src, dest)
 
         for folder in os.listdir('../cache/resources/'):
             source = os.path.join('../cache/resources/', folder)
+            if not os.path.isdir(source):
+                continue  # Skip DS_STORE, desktop.ini, etc.
+
             if folder == 'instances':
                 dest = self.abs_path(INST_PATH)
             elif folder.casefold() == 'bee2':
