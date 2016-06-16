@@ -1,12 +1,14 @@
-from contextlib import ExitStack
+import io
 import os
 import os.path
-import io
-import zipfile
 import shutil
+import zipfile
+from contextlib import ExitStack
 
-from property_parser import Property
 import utils
+import srctools
+from srctools import Property
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -132,7 +134,7 @@ def parse(posfile, propfile, path):
             opts[option.name.casefold()] = option.value
     pos = []
     for dirty_line in posfile:
-        line = utils.clean_line(dirty_line)
+        line = srctools.clean_line(dirty_line)
         if line:
             # Lines follow the form
             # "ITEM_BUTTON_FLOOR", 2
@@ -156,11 +158,22 @@ def save_pal(items, name):
     LOGGER.debug(name, pos, name, [])
     new_palette = Palette(name, pos)
 
+    # Remove existing palettes with the same name.
     for pal in pal_list[:]:
         if pal.name == name:
-            pal_list.remove(name)
+            pal_list.remove(pal)
+
     pal_list.append(new_palette)
-    return new_palette.save(allow_overwrite=False)
+    return new_palette.save(allow_overwrite=True)
+
+
+def check_exists(name):
+    """Check if a palette with the given name exists."""
+    for pal in pal_list:
+        if pal.name == name:
+            return True
+    return False
+
 
 if __name__ == '__main__':
     results = load_palettes('palettes\\')

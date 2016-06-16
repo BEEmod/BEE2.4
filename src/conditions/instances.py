@@ -3,15 +3,14 @@
 """
 import operator
 
-import utils
+import conditions
+import srctools
 from conditions import (
     make_flag, make_result,
     ALL_INST,
 )
-from utils import Vec
 from instanceLocs import resolve as resolve_inst
-import conditions
-import vmfLib as VLib
+from srctools import Vec, Entity
 
 
 @make_flag('instance')
@@ -63,7 +62,7 @@ def flag_instvar(inst, flag):
     The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
     If ommitted, the operation is assumed to be ==.
     """
-    values = flag.value.split(' ')
+    values = flag.value.split(' ', 3)
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
@@ -124,9 +123,10 @@ def res_set_inst_var(inst, res):
     """Set an instance variable to the given value.
 
     Values follow the format "$start_enabled 1", with or without the $.
+    "$out $in" will copy the value of $in into $out.
     """
     var_name, val = res.value.split(' ', 1)
-    inst.fixup[var_name] = val
+    inst.fixup[var_name] = conditions.resolve_value(inst, val)
 
 
 @make_result('clearOutputs', 'clearOutput')
@@ -158,7 +158,7 @@ def res_local_targetname(inst, res):
 
 
 @make_result('replaceInstance')
-def res_replace_instance(inst: VLib.Entity, res):
+def res_replace_instance(inst: Entity, res):
     """Replace an instance with another entity.
 
     'keys' and 'localkeys' defines the new keyvalues used.
@@ -172,7 +172,7 @@ def res_replace_instance(inst: VLib.Entity, res):
     origin = Vec.from_str(inst['origin'])
     angles = inst['angles']
 
-    if not utils.conv_bool(res['keep_instance', '0'], False):
+    if not srctools.conv_bool(res['keep_instance', '0'], False):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 

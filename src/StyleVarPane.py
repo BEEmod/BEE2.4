@@ -65,7 +65,7 @@ styleOptions = [
     ),
 ]
 
-checkbox_special = {}
+checkbox_all = {}
 checkbox_chosen = {}
 checkbox_other = {}
 tk_vars = {}
@@ -120,14 +120,25 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
     desc.append('Default: {}'.format(
         'On' if var.default else 'Off'
     ))
-    desc.append('Styles: {}'.format(
-        'All' if
-        (is_hardcoded or var.styles is None)
-        else ', '.join(sorted(
-            STYLES[sty_id].selitem_data.short_name
-            for sty_id in var.styles
-        ))
-    ))
+
+    if is_hardcoded or var.styles is None:
+        desc.append('Styles: Unstyled')
+    else:
+        app_styles = [
+            style
+            for style in
+            STYLES.values()
+            if var.applies_to_style(style)
+        ]
+
+        if len(app_styles) == len(STYLES):
+            desc.append('Styles: All')
+        else:
+            desc.append('Styles: ' + ', '.join(sorted(
+                style.selitem_data.short_name
+                for style in
+                app_styles
+            )))
 
     return '\n'.join(desc)
 
@@ -140,6 +151,8 @@ def refresh(selected_style):
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
+        if var.styles is None:
+            continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
                 row=en_row,
@@ -231,21 +244,22 @@ def make_pane(tool_frame):
         justify='center',
         )
 
-    for pos, var in enumerate(styleOptions):
+    all_pos = 0
+    for all_pos, var in enumerate(styleOptions):
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = IntVar(
             value=GEN_OPTS.get_bool('StyleVar', var.id, var.default)
         )
-        checkbox_special[var.id] = ttk.Checkbutton(
+        checkbox_all[var.id] = ttk.Checkbutton(
             frame_all,
             variable=tk_vars[var.id],
             text=var.name,
             command=functools.partial(set_stylevar, var.id)
-            )
-        checkbox_special[var.id].grid(row=pos, column=0, sticky="W", padx=3)
+        )
+        checkbox_all[var.id].grid(row=all_pos, column=0, sticky="W", padx=3)
 
         tooltip.add_tooltip(
-            checkbox_special[var.id],
+            checkbox_all[var.id],
             make_desc(var, is_hardcoded=True),
         )
 
@@ -256,17 +270,26 @@ def make_pane(tool_frame):
             'text': var.name,
             'command': functools.partial(set_stylevar, var.id)
             }
-        checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
-        checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
         desc = make_desc(var)
-        tooltip.add_tooltip(
-            checkbox_chosen[var.id],
-            desc,
-        )
-        tooltip.add_tooltip(
-            checkbox_other[var.id],
-            desc,
-        )
+        if var.styles is None:
+            # Available in all styles - put with the hardcoded variables.
+            all_pos += 1
+
+            checkbox_all[var.id] = check = ttk.Checkbutton(frame_all, **args)
+            check.grid(row=all_pos, column=0, sticky="W", padx=3)
+            tooltip.add_tooltip(check, desc)
+        else:
+            # Swap between checkboxes depending on style.
+            checkbox_chosen[var.id] = ttk.Checkbutton(frm_chosen, **args)
+            checkbox_other[var.id] = ttk.Checkbutton(frm_other, **args)
+            tooltip.add_tooltip(
+                checkbox_chosen[var.id],
+                desc,
+            )
+            tooltip.add_tooltip(
+                checkbox_other[var.id],
+                desc,
+            )
 
     UI['style_can'].create_window(0, 0, window=canvas_frame, anchor="nw")
     UI['style_can'].update_idletasks()

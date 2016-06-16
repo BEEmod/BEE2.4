@@ -3,17 +3,16 @@
 """
 from collections import defaultdict
 
+import conditions
+import srctools
+import utils
+import vbsp
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
-from property_parser import Property
-from utils import Vec
 from instanceLocs import resolve as resolve_inst
-import utils
-import vmfLib as VLib
-import conditions
-import vbsp
+from srctools import Property, Vec, Entity, Output
 
 # Map sign_type values to the item ID and the resolveInst ID.
 IND_PANEL_TYPES = {
@@ -33,15 +32,15 @@ def res_cust_output_setup(res):
         if sub_res.name == 'targcondition'
     ]
     outputs = list(res.find_all('addOut'))
-    dec_con_count = utils.conv_bool(res["decConCount", '0'], False)
+    dec_con_count = srctools.conv_bool(res["decConCount", '0'], False)
     sign_type = IND_PANEL_TYPES.get(res['sign_type', None], None)
 
     if sign_type is None:
         sign_act = sign_deact = (None, '')
     else:
         # The outputs which trigger the sign.
-        sign_act = VLib.Output.parse_name(res['sign_activate', ''])
-        sign_deact = VLib.Output.parse_name(res['sign_deactivate', ''])
+        sign_act = Output.parse_name(res['sign_activate', ''])
+        sign_deact = Output.parse_name(res['sign_deactivate', ''])
 
     return outputs, dec_con_count, conds, sign_type, sign_act, sign_deact
 
@@ -118,7 +117,7 @@ def res_cust_output(inst, res):
                 )
 
                 if act_inp and sign_act_out:
-                    inst.add_out(VLib.Output(
+                    inst.add_out(Output(
                         inst_out=sign_act_name,
                         out=sign_act_out,
                         inst_in=act_name,
@@ -127,7 +126,7 @@ def res_cust_output(inst, res):
                     ))
 
                 if deact_inp and sign_deact_out:
-                    inst.add_out(VLib.Output(
+                    inst.add_out(Output(
                         inst_out=sign_deact_name,
                         out=sign_deact_out,
                         inst_in=deact_name,
@@ -165,11 +164,11 @@ def res_cust_antline_setup(res):
 
     # Allow overriding these options. If unset use the style's value - the
     # amount of destruction will usually be the same.
-    broken_chance = utils.conv_float(res[
+    broken_chance = srctools.conv_float(res[
         'broken_antline_chance',
         vbsp.get_opt('broken_antline_chance')
     ])
-    broken_dist = utils.conv_float(res[
+    broken_dist = srctools.conv_float(res[
         'broken_antline_distance',
         vbsp.get_opt('broken_antline_distance')
     ])
@@ -268,8 +267,8 @@ def res_cust_antline(inst, res):
 def res_change_outputs_setup(res):
     return [
         (
-            VLib.Output.parse_name(prop.real_name),
-            VLib.Output.parse_name(prop.value)
+            Output.parse_name(prop.real_name),
+            Output.parse_name(prop.value)
         )
         for prop in
         res
@@ -277,7 +276,7 @@ def res_change_outputs_setup(res):
 
 
 @make_result('changeOutputs')
-def res_change_outputs(inst: VLib.Entity, res):
+def res_change_outputs(inst: Entity, res):
     """Switch the outputs on an instance.
 
     Each child is a original -> replace value. These match the values
@@ -296,14 +295,14 @@ def res_change_outputs(inst: VLib.Entity, res):
 def res_change_inputs_setup(res: Property):
     vals = {}
     for prop in res:
-        out_key = VLib.Output.parse_name(prop.real_name)
+        out_key = Output.parse_name(prop.real_name)
         if prop.has_children():
             vals[out_key] = (
                 prop['inst_in', None],
                 prop['input'],
                 prop['params', ''],
-                utils.conv_float(prop['delay', 0.0]),
-                1 if utils.conv_bool(prop['only_once', '0']) else -1,
+                srctools.conv_float(prop['delay', 0.0]),
+                1 if srctools.conv_bool(prop['only_once', '0']) else -1,
             )
         else:
             vals[out_key] = None
@@ -311,7 +310,7 @@ def res_change_inputs_setup(res: Property):
 
 
 @make_result('changeInputs')
-def res_change_inputs(inst: VLib.Entity, res):
+def res_change_inputs(inst: Entity, res):
     """Switch the inputs for an instance.
 
     Each child is an input to replace. The name is the original input, matching
@@ -354,7 +353,7 @@ def res_change_inputs(inst: VLib.Entity, res):
 
 
 @make_result('faithMods')
-def res_faith_mods(inst: VLib.Entity, res: Property):
+def res_faith_mods(inst: Entity, res: Property):
     """Modify the trigger_catrapult that is created for ItemFaithPlate items.
 
     Values:
@@ -373,14 +372,14 @@ def res_faith_mods(inst: VLib.Entity, res: Property):
     fixup_var = res['instvar', '']
     trig_enabled = res['enabledVar', None]
     trig_temp = res['trig_temp', '']
-    offset = utils.conv_int(res['raise_trig', '0'])
+    offset = srctools.conv_int(res['raise_trig', '0'])
     if offset:
         offset = Vec(0, 0, offset).rotate_by_str(inst['angles', '0 0 0'])
     else:
         offset = Vec()
 
     if trig_enabled is not None:
-        trig_enabled = utils.conv_bool(inst.fixup[trig_enabled])
+        trig_enabled = srctools.conv_bool(inst.fixup[trig_enabled])
     else:
         trig_enabled = None
 
@@ -407,7 +406,7 @@ def res_faith_mods(inst: VLib.Entity, res: Property):
                 vbsp.VMF.remove_brush(solid)
 
         if trig_enabled is not None and 'helper' not in trig['targetname']:
-            trig['startdisabled'] = utils.bool_as_int(not trig_enabled)
+            trig['startdisabled'] = srctools.bool_as_int(not trig_enabled)
 
         # Inspect the outputs to determine the type.
         # We also change them if desired, since that's not possible

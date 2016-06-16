@@ -2,21 +2,26 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 import operator
-from zipfile import ZipFile
-from collections import defaultdict, namedtuple
-from contextlib import ExitStack
 import os
 import os.path
 import shutil
+from collections import defaultdict, namedtuple
+from contextlib import ExitStack
+from zipfile import ZipFile
 
-from property_parser import Property, NoKeyError
+import extract_packages
+import srctools
+import tkMarkdown
+import utils
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from selectorWin import SelitemData
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
-import vmfLib as VLib
-import extract_packages
-import utils
+from selectorWin import SelitemData
+from srctools import (
+    Property, NoKeyError,
+    Vec, EmptyMapping,
+    VMF, Entity,
+)
 
 from typing import (
     Dict,
@@ -33,7 +38,7 @@ data = {}
 
 res_count = -1
 
-TEMPLATE_FILE = VLib.VMF()
+TEMPLATE_FILE = VMF()
 
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
@@ -101,7 +106,7 @@ class _PakObjectMeta(type):
 
 
 class PakObject(metaclass=_PakObjectMeta):
-    """The base class for package objects.
+    """PackObject(allow_mult=False, has_img=True): The base class for package objects.
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
     If duplicates occur, they will be treated as overrides.
@@ -578,7 +583,7 @@ def parse_item_folder(folders, zip_file, pak_id):
         folders[fold] = {
             'auth':     sep_values(props['authors', '']),
             'tags':     sep_values(props['tags', '']),
-            'desc':     list(desc_parse(props)),
+            'desc':     desc_parse(props, pak_id + ':' + prop_path),
             'ent':      props['ent_count', '??'],
             'url':      props['infoURL', None],
             'icons':    {p.name: p.value for p in props['icon', []]},
@@ -657,7 +662,7 @@ class Package:
         if self.id == CLEAN_PACKAGE:
             raise ValueError('The Clean Style package cannot be disabled!')
 
-        PACK_CONFIG[self.id]['Enabled'] = utils.bool_as_int(value)
+        PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
     def is_stale(self):
@@ -697,8 +702,8 @@ class Style(PakObject):
             suggested=None,
             has_video=True,
             vpk_name='',
-            corridor_names=utils.EmptyMapping,
-            ):
+            corridor_names=EmptyMapping,
+        ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
@@ -723,7 +728,7 @@ class Style(PakObject):
         info = data.info
         selitem_data = get_selitem_data(info)
         base = info['base', '']
-        has_video = utils.conv_bool(
+        has_video = srctools.conv_bool(
             info['has_video', ''],
             not data.is_override,  # Assume no video for override
         )
@@ -854,15 +859,15 @@ class Item(PakObject):
         self.glob_desc_last = desc_last
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse an item definition."""
         versions = {}
         def_version = None
         folders = {}
-        unstyled = utils.conv_bool(data.info['unstyled', '0'])
+        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
 
-        glob_desc = list(desc_parse(data.info))
-        desc_last = utils.conv_bool(data.info['AllDescLast', '0'])
+        glob_desc = desc_parse(data.info, 'global:' + data.id)
+        desc_last = srctools.conv_bool(data.info['AllDescLast', '0'])
 
         all_config = get_config(
             data.info,
@@ -872,14 +877,14 @@ class Item(PakObject):
             prop_name='all_conf',
         )
 
-        needs_unlock = utils.conv_bool(data.info['needsUnlock', '0'])
+        needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
 
         for ver in data.info.find_all('version'):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_wip': utils.conv_bool(ver['wip', '0']),
-                'is_dep':  utils.conv_bool(ver['deprecated', '0']),
+                'is_wip': srctools.conv_bool(ver['wip', '0']),
+                'is_dep':  srctools.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,
                 }
@@ -919,6 +924,9 @@ class Item(PakObject):
 
     def add_over(self, override):
         """Add the other item data to ourselves."""
+        # Copy over all_conf always.
+        self.all_conf += override.all_conf
+
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
                 # We don't have that version!
@@ -931,7 +939,7 @@ class Item(PakObject):
                         our_ver[sty_id] = style
                     else:
                         # We both have a matching folder, merge the
-                        # definitions
+                        # definitions. We don't override editoritems!
                         our_style = our_ver[sty_id]
 
                         our_style['auth'].extend(style['auth'])
@@ -947,28 +955,49 @@ class Item(PakObject):
         """Export all items into the configs.
 
         For the selected attribute, this takes a tuple of values:
-        (pal_list, versions)
+        (pal_list, versions, prop_conf)
         Pal_list is a list of (item, subitem) tuples representing the palette.
         Versions is a {item:version_id} dictionary.
-
+        prop_conf is a {item_id: {prop_name: value}} nested dictionary for
+         overriden property names. Empty dicts can be passed instead.
         """
         editoritems = exp_data.editoritems
         vbsp_config = exp_data.vbsp_conf
-        pal_list, versions = exp_data.selected
+        pal_list, versions, prop_conf = exp_data.selected
+
+        style_id = exp_data.selected_style.id
+
+        aux_item_configs = {
+            conf.id: conf
+            for conf in data['ItemConfig']
+        }
 
         for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+            ver_id = versions.get(item.id, 'VER_DEFAULT')
+
             (
                 item_block,
                 editor_parts,
                 config_part
             ) = item._get_export_data(
-                pal_list, versions, exp_data.selected_style.id,
+                pal_list, ver_id, style_id, prop_conf,
             )
             editoritems += item_block
             editoritems += editor_parts
             vbsp_config += config_part
 
-    def _get_export_data(self, pal_list, versions, style_id):
+            try:
+                aux_conf = aux_item_configs[item.id]  # type: ItemConfig
+            except KeyError:
+                pass
+            else:
+                vbsp_config += aux_conf.all_conf
+                try:
+                    vbsp_config += aux_conf.versions[ver_id][style_id]
+                except KeyError:
+                    pass  # No override.
+
+    def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -980,9 +1009,7 @@ class Item(PakObject):
             if item == self.id
         }
 
-        item_data = self.versions[
-            versions.get(self.id, 'VER_DEFAULT')
-        ]['styles'][style_id]
+        item_data = self.versions[ver_id]['styles'][style_id]
 
         new_editor = item_data['editor'].copy()
 
@@ -1020,12 +1047,80 @@ class Item(PakObject):
                     del editor_section[editor_sec_index]
                     break
 
+        # Apply configured default values to this item
+        prop_overrides = prop_conf.get(self.id, {})
+        for prop_section in new_editor.find_all("Editor", "Properties"):
+            for item_prop in prop_section:
+                if item_prop.name.casefold() in prop_overrides:
+                    item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
+
         return (
             new_editor,
             item_data['editor_extra'],
             # Add all_conf first so it's conditions run first by default
             self.all_conf + item_data['vbsp'],
         )
+
+
+class ItemConfig(PakObject, allow_mult=True, has_img=False):
+    """Allows adding additional configuration for items.
+
+    The ID should match an item ID.
+    """
+    def __init__(self, it_id, all_conf, version_conf):
+        self.id = it_id
+        self.versions = version_conf
+        self.all_conf = all_conf
+
+    @classmethod
+    def parse(cls, data: ParseData):
+        vers = {}
+
+        all_config = get_config(
+            data.info,
+            data.zip_file,
+            'items',
+            pak_id=data.pak_id,
+            prop_name='all_conf',
+        )
+
+        for ver in data.info.find_all('Version'):  # type: Property
+            ver_id = ver['ID', 'VER_DEFAULT']
+            vers[ver_id] = styles = {}
+            for sty_block in ver.find_all('Styles'):
+                for style in sty_block:  # type: Property
+                    file_loc = 'items/' + style.value + '.cfg'
+                    LOGGER.info(locals())
+                    with data.zip_file.open(file_loc) as f:
+                        styles[style.real_name] = Property.parse(
+                            f,
+                            data.pak_id + ':' + file_loc,
+                        )
+
+        return cls(
+            data.id,
+            all_config,
+            vers,
+        )
+
+    def add_over(self, override: 'ItemConfig'):
+        self.all_conf += override.all_conf
+
+        for vers_id, styles in override.versions.items():
+            our_styles = self.versions.setdefault(vers_id, {})
+            for sty_id, style in styles.items():
+                if sty_id not in our_styles:
+                    our_styles[sty_id] = style
+                else:
+                    our_styles[sty_id] += style
+
+    @staticmethod
+    def export(exp_data: ExportData):
+        """This export is done in Item.export().
+
+        Here we don't know the version set for each item.
+        """
+        pass
 
 
 class QuotePack(PakObject):
@@ -1056,7 +1151,7 @@ class QuotePack(PakObject):
 
         # For Cave Johnson voicelines, this indicates what skin to use on the
         # portrait.
-        port_skin = utils.conv_int(data.info['caveSkin', None], None)
+        port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
         config = get_config(
             data.info,
@@ -1126,7 +1221,7 @@ class QuotePack(PakObject):
         if voice.cave_skin is not None:
             vbsp_config.set_key(
                 ('Options', 'cave_port_skin'),
-                voice.cave_skin,
+                str(voice.cave_skin),
             )
 
         # Copy the config files for this voiceline..
@@ -1164,7 +1259,6 @@ class QuotePack(PakObject):
         for sub_prop in prop:
             # Make sure it's in the right nesting depth - flags might
             # have arbitrary props in lower depths..
-            LOGGER.info('{} {}', sub_prop.name, _depth)
             if _depth == 3:  # 'Line' blocks
                 if sub_prop.name == 'trans':
                     continue
@@ -1197,7 +1291,7 @@ class Skybox(PakObject):
         self.fog_opts = fog_opts
 
         # Extract this for selector windows to easily display
-        self.fog_color = utils.Vec.from_str(
+        self.fog_color = Vec.from_str(
             fog_opts['primarycolor' ''],
             255, 255, 255
         )
@@ -1325,9 +1419,9 @@ class Music(PakObject):
         if ':' in snd_length:
             # Allow specifying lengths as min:sec.
             minute, second = snd_length.split(':')
-            snd_length = 60 * utils.conv_int(minute) + utils.conv_int(second)
+            snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
         else:
-            snd_length = utils.conv_int(snd_length)
+            snd_length = srctools.conv_int(snd_length)
 
         if not sound.has_children():
             sound = sound.value
@@ -1441,8 +1535,8 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
     @classmethod
     def parse(cls, data):
         name = data.info['name']
-        unstyled = utils.conv_bool(data.info['unstyled', '0'])
-        default = utils.conv_bool(data.info['enabled', '0'])
+        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
+        default = srctools.conv_bool(data.info['enabled', '0'])
         styles = [
             prop.value
             for prop in
@@ -1493,7 +1587,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             return True
 
         return any(
-            base in self.styles
+            base.id in self.styles
             for base in
             style.bases
         )
@@ -1507,7 +1601,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         # Add the StyleVars block, containing each style_var.
 
         exp_data.vbsp_conf.append(Property('StyleVars', [
-            Property(key, utils.bool_as_int(val))
+            Property(key, srctools.bool_as_int(val))
             for key, val in
             exp_data.selected.items()
         ]))
@@ -1783,7 +1877,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                     # alow // comments.
                     files = []
                     for line in f:
-                        line = utils.clean_line(line)
+                        line = srctools.clean_line(line)
                         if line:
                             files.append(line)
             except KeyError as ex:
@@ -1908,7 +2002,7 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VLib.VMF, force=None, keep_brushes=True):
+    def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
         This copies the solids out of vmf_file and into TEMPLATE_FILE.
@@ -1975,7 +2069,7 @@ class BrushTemplate(PakObject, has_img=False):
         self.temp_overlays = []
 
         # Look for overlays, and translate their IDS.
-        for overlay in vmf_file.by_class['info_overlay']:  # type: VLib.Entity
+        for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
             )
@@ -2005,12 +2099,12 @@ class BrushTemplate(PakObject, has_img=False):
             prop_name='file',
             extension='.vmf',
         )
-        file = VLib.VMF.parse(file)
+        file = VMF.parse(file)
         return cls(
             data.id,
             file,
             force=data.info['force', ''],
-            keep_brushes=utils.conv_bool(data.info['keep_brushes', '1'], True),
+            keep_brushes=srctools.conv_bool(data.info['keep_brushes', '1'], True),
         )
 
     @staticmethod
@@ -2021,16 +2115,24 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.export(temp_file)
 
 
-def desc_parse(info):
+def desc_parse(info, id=''):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
+    has_warning = False
+    lines = []
     for prop in info.find_all("description"):
         if prop.has_children():
             for line in prop:
-                yield (line.name, line.value)
+                if line.name and not has_warning:
+                    LOGGER.warning('Old desc format: {}', id)
+                    has_warning = True
+                lines.append(line.value)
         else:
-            yield ("line", prop.value)
+            lines.append(prop.value)
+
+    return tkMarkdown.convert('\n'.join(lines))
+
 
 
 def get_selitem_data(info):
@@ -2038,12 +2140,12 @@ def get_selitem_data(info):
 
     """
     auth = sep_values(info['authors', ''])
-    desc = list(desc_parse(info))
     short_name = info['shortName', None]
     name = info['name']
     icon = info['icon', '_blank']
     group = info['group', '']
     sort_key = info['sort_key', '']
+    desc = desc_parse(info, id=info['id'])
     if not group:
         group = None
     if not short_name:

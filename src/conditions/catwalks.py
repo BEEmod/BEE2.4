@@ -4,7 +4,7 @@ from conditions import (
     INST_ANGLE,
 )
 from instanceLocs import resolve as resolve_inst
-from utils import Vec
+from srctools import Vec
 import conditions
 import utils
 import vbsp

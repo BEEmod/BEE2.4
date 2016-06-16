@@ -3,12 +3,12 @@
 This way VBSP_config files can generically refer to items, and work in
 multiple styles.
 """
+import logging
 from collections import defaultdict
 from functools import lru_cache
-import logging
 
-from property_parser import Property
 import utils
+from srctools import Property
 
 from typing import Optional, List
 

@@ -1,3 +1,4 @@
+
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -13,10 +14,10 @@ from enum import Enum
 from collections import defaultdict, namedtuple
 from decimal import Decimal
 
-from property_parser import Property
-from utils import Vec
+from srctools import Property, Vec, AtomicWriter
 from BEE2_config import ConfigFile
-import vmfLib as VLib
+import srctools.vmf as VLib
+import srctools
 import voiceLine
 import instanceLocs
 import conditions
@@ -347,7 +348,7 @@ def get_opt(name) -> str:
 
 
 def get_bool_opt(name, default=False):
-    return utils.conv_bool(get_opt(name), default)
+    return srctools.conv_bool(get_opt(name), default)
 
 
 def get_tex(name):
@@ -473,7 +474,7 @@ def load_settings():
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][
-                var.name.casefold()] = utils.conv_bool(var.value)
+                var.name.casefold()] = srctools.conv_bool(var.value)
 
     # Load in the config file holding item data.
     # This is used to lookup item's instances, or their connection commands.
@@ -521,12 +522,12 @@ def load_settings():
         settings['pit'] = {
             'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
             'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
-            'should_tele': utils.conv_bool(pit['teleport', '0']),
+            'should_tele': srctools.conv_bool(pit['teleport', '0']),
             'tele_dest': pit['tele_target', '@goo_targ'],
             'tele_ref': pit['tele_ref', '@goo_ref'],
-            'off_x': utils.conv_int(pit['off_x', '0']),
-            'off_y': utils.conv_int(pit['off_y', '0']),
-            'height': utils.conv_int(pit['max_height', '386'], 386),
+            'off_x': srctools.conv_int(pit['off_x', '0']),
+            'off_y': srctools.conv_int(pit['off_y', '0']),
+            'height': srctools.conv_int(pit['max_height', '386'], 386),
             'skybox': pit['sky_inst', ''],
             'skybox_ceil': pit['sky_inst_ceil', ''],
             'targ': pit['targ_inst', ''],
@@ -601,7 +602,7 @@ def add_voice(_):
     voiceLine.add_voice(
         has_items=settings['has_attr'],
         style_vars_=settings['style_vars'],
-        vmf_file=VMF,
+        vmf_file_=VMF,
         map_seed=MAP_RAND_SEED,
         use_priority=BEE2_config.get_bool('General', 'use_voice_priority', True),
     )
@@ -619,8 +620,8 @@ def add_fizz_borders(_):
         return
 
     flip_uv = get_bool_opt('fizz_border_vertical')
-    overlay_thickness = utils.conv_int(get_opt('fizz_border_thickness'), 8)
-    overlay_repeat = utils.conv_int(get_opt('fizz_border_repeat'), 128)
+    overlay_thickness = srctools.conv_int(get_opt('fizz_border_thickness'), 8)
+    overlay_repeat = srctools.conv_int(get_opt('fizz_border_repeat'), 128)
 
     # First, figure out the orientation of every fizzler via their model.
     fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
@@ -926,7 +927,7 @@ def anti_fizz_bump(inst):
     # Subtract 2 for the fizzler width, and divide
     # to get the difference for each face.
 
-    if not utils.conv_bool(settings['style_vars']['fixfizzlerbump']):
+    if not srctools.conv_bool(settings['style_vars']['fixfizzlerbump']):
         return True
 
     # Only use 1 bumper entity for each fizzler, since we can.
@@ -1143,8 +1144,8 @@ def set_player_portalgun(inst):
             file='instances/BEE2/logic/pgun/pgun_single.vmf',
         )
         # Set which portals this weapon_portalgun can fire
-        inst.fixup['blue_portal'] = utils.bool_as_int(blue_portal)
-        inst.fixup['oran_portal'] = utils.bool_as_int(oran_portal)
+        inst.fixup['blue_portal'] = srctools.bool_as_int(blue_portal)
+        inst.fixup['oran_portal'] = srctools.bool_as_int(oran_portal)
     else:
         has['spawn_dual'] = False
         has['spawn_single'] = False
@@ -1640,7 +1641,7 @@ def mod_entryexit(
         if elev_override:
             inst.fixup['no_player_start'] = '1'
         else:
-            IS_PREVIEW = not utils.conv_bool(inst.fixup['no_player_start'])
+            IS_PREVIEW = not srctools.conv_bool(inst.fixup['no_player_start'])
 
     if normal == (0, 0, 1) and vert_up is not None:
         LOGGER.info(
@@ -2226,8 +2227,8 @@ def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
     glass_clip_mat = get_opt('glass_clip')
-    glass_scale = utils.conv_float(get_opt('glass_scale'), 0.15)
-    goo_scale = utils.conv_float(get_opt('goo_scale'), 1)
+    glass_scale = srctools.conv_float(get_opt('glass_scale'), 0.15)
+    goo_scale = srctools.conv_float(get_opt('goo_scale'), 1)
 
     glass_temp = get_opt("glass_template")
     if glass_temp:
@@ -2236,12 +2237,12 @@ def change_brush():
         glass_temp = None
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = get_bool_opt('goo_mist') and utils.conv_bool(
+    make_goo_mist = get_bool_opt('goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids = set()
 
-    if utils.conv_bool(get_opt('remove_pedestal_plat')):
+    if srctools.conv_bool(get_opt('remove_pedestal_plat')):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
             for side in ent.sides():
@@ -2383,7 +2384,7 @@ def random_walls():
     rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
     edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
+    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -2487,7 +2488,7 @@ def clump_walls():
     texture_lock = get_bool_opt('tile_texture_lock', True)
     rotate_edge = get_bool_opt('rotate_edge')
     edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
+    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
 
     # Possible locations for clumps - every face origin, not including
     # ignored faces or nodraw
@@ -2499,11 +2500,11 @@ def clump_walls():
         if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
     ]
 
-    clump_size = utils.conv_int(get_opt("clump_size"), 4)
-    clump_wid = utils.conv_int(get_opt("clump_width"), 2)
+    clump_size = srctools.conv_int(get_opt("clump_size"), 4)
+    clump_wid = srctools.conv_int(get_opt("clump_width"), 2)
 
     clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
-    clump_numb *= utils.conv_int(get_opt("clump_number"), 6)
+    clump_numb *= srctools.conv_int(get_opt("clump_number"), 6)
 
     # Also clump ceilings or floors?
     clump_ceil = get_bool_opt('clump_ceil')
@@ -2777,7 +2778,7 @@ def change_overlays():
     sign_inst = get_opt('signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = utils.conv_int(get_opt('signSize'), 32) / 2
+    sign_size = srctools.conv_int(get_opt('signSize'), 32) / 2
     if sign_inst == "NONE":
         sign_inst = None
 
@@ -2797,8 +2798,8 @@ def change_overlays():
     broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
     broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
 
-    broken_chance = utils.conv_float(get_opt('broken_antline_chance'))
-    broken_dist = utils.conv_float(get_opt('broken_antline_distance'))
+    broken_chance = srctools.conv_float(get_opt('broken_antline_chance'))
+    broken_dist = srctools.conv_float(get_opt('broken_antline_distance'))
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2906,7 +2907,7 @@ def add_extra_ents(mode):
     # options on the music item.
     sound = get_opt('music_soundscript')
     inst = get_opt('music_instance')
-    snd_length = utils.conv_int(get_opt('music_looplen'))
+    snd_length = srctools.conv_int(get_opt('music_looplen'))
 
     if sound != '':
         music = VMF.create_ent(
@@ -2955,12 +2956,12 @@ def add_extra_ents(mode):
             fixup_style='0',
             )
 
-        has_cave = utils.conv_bool(
+        has_cave = srctools.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
         )
         global_pti_ents.fixup[
             'disable_pti_audio'
-            ] = utils.bool_as_int(not has_cave)
+            ] = srctools.bool_as_int(not has_cave)
 
         # The scripts we want to run on the @glados entity.
         # This gets special functions called (especially in coop) for various
@@ -2987,7 +2988,7 @@ def change_func_brush():
     """Edit func_brushes."""
     LOGGER.info("Editing Brush Entities...")
     grating_clip_mat = get_opt("grating_clip")
-    grating_scale = utils.conv_float(get_opt("grating_scale"), 0.15)
+    grating_scale = srctools.conv_float(get_opt("grating_scale"), 0.15)
 
     grate_temp = get_opt("grating_template")
     if grate_temp:
@@ -3009,12 +3010,12 @@ def change_func_brush():
         edge_tex = 'special.edge'
         rotate_edge = get_bool_opt('rotate_edge', False)
         edge_off = get_bool_opt('reset_edge_off')
-        edge_scale = utils.conv_float(get_opt('edge_scale'), 0.15)
+        edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
     else:
         edge_tex = 'special.edge_special'
         rotate_edge = get_bool_opt('rotate_edge_special', False)
         edge_off = get_bool_opt('reset_edge_off_special')
-        edge_scale = utils.conv_float(get_opt('edge_scale_special'), 0.15)
+        edge_scale = srctools.conv_float(get_opt('edge_scale_special'), 0.15)
 
     # Clips are shared every 512 grid spaces
     grate_clips = {}
@@ -3383,7 +3384,7 @@ def fix_worldspawn():
         # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
         # If the game is Aperture Tag, it's always forced on
-        VMF.spawn['paintinmap'] = utils.bool_as_int(
+        VMF.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
             get_opt('game_id') == utils.STEAM_IDS['APTAG']
         )
@@ -3475,7 +3476,7 @@ def make_vrad_config():
     LOGGER.info('Generating VRAD config...')
     conf = Property('Config', [
     ])
-    conf['force_full'] = utils.bool_as_int(
+    conf['force_full'] = srctools.bool_as_int(
         BEE2_config.get_bool('General', 'vrad_force_full')
     )
     conf['screenshot'] = BEE2_config.get_val(
@@ -3484,13 +3485,20 @@ def make_vrad_config():
     conf['screenshot_type'] = BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
     ).upper()
-    conf['clean_screenshots'] = utils.bool_as_int(
+    conf['clean_screenshots'] = srctools.bool_as_int(
         BEE2_config.get_bool('Screenshot', 'del_old')
     )
-    conf['is_preview'] = utils.bool_as_int(
+    conf['is_preview'] = srctools.bool_as_int(
         IS_PREVIEW
     )
     conf['game_id'] = get_opt('game_id')
+
+    if BEE2_config.get_bool('General', 'packfile_dump_enable'):
+        conf['packfile_dump'] = BEE2_config.get_val(
+            'General',
+            'packfile_dump_dir',
+            ''
+        )
 
     # Copy over the voice attributes
     conf['VoiceAttr'] = ';'.join(
@@ -3537,22 +3545,25 @@ def save(path):
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with utils.AtomicWriter(path) as f:
+    with AtomicWriter(path) as f:
         VMF.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, do_swap, path, new_path):
+def run_vbsp(vbsp_args, path, new_path=None):
     """Execute the original VBSP, copying files around so it works correctly.
 
     vbsp_args are the arguments to pass.
     path is the original .vmf, new_path is the styled/ name.
-    If do_swap is true VBSP will be run on the map in styled/.
+    If new_path is passed VBSP will be run on the map in styled/, and we'll
+    read through the output to find the entity counts.
     """
+
+    is_peti = new_path is not None
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
-    if do_swap:
+    if is_peti:
         # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
@@ -3567,17 +3578,19 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         if x
     ]
 
-    # VBSP is named _osx or _linux for those platforms.
-    suffix = ''
+    # VBSP is named _osx or _linux for those platforms, and has no extension.
+    # Windows uses the exe extension.
+    ext = ''
     if utils.MAC:
         os_suff = '_osx'
     elif utils.LINUX:
         os_suff = '_linux'
     else:
         os_suff = ''
-        suffix = '.exe'
+        ext = '.exe'
 
-    if utils.MAC or utils.LINUX and do_swap:
+    # Ensure we've fixed the instance/ folder so instances are found.
+    if utils.MAC or utils.LINUX and is_peti:
         instance_symlink()
 
     arg = (
@@ -3585,8 +3598,8 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         os.path.normpath(
             os.path.join(
                 os.getcwd(),
-                "vbsp" + os_suff + "_original" + suffix
-                )
+                "vbsp" + os_suff + "_original" + ext
+            )
         ) +
         '" ' +
         " ".join(vbsp_args)
@@ -3607,7 +3620,8 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
         # VBSP didn't suceed. Print the error log..
         vbsp_logger.error(err.output.decode('ascii'))
 
-        process_vbsp_fail(err.output)
+        if is_peti:  # Ignore Hammer maps
+            process_vbsp_fail(err.output)
 
         LOGGER.error("VBSP failed! ({})", err.returncode)
         # Propagate the fail code to Portal 2.
@@ -3617,9 +3631,10 @@ def run_vbsp(vbsp_args, do_swap, path, new_path):
     vbsp_logger.info(output.decode('ascii'))
     LOGGER.info("VBSP Done!")
 
-    process_vbsp_log(output)
+    if is_peti:  # Ignore Hammer maps
+        process_vbsp_log(output)
 
-    if do_swap:  # copy over the real files so vvis/vrad can read them
+    # Copy over the real files so vvis/vrad can read them
         for ext in (".bsp", ".log", ".prt"):
             if os.path.isfile(new_path.replace(".vmf", ext)):
                 shutil.copy(
@@ -3811,9 +3826,7 @@ def main():
         LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
             vbsp_args=old_args,
-            do_swap=False,
             path=path,
-            new_path=new_path,
         )
     else:
         LOGGER.info("PeTI map detected!")
@@ -3831,7 +3844,7 @@ def main():
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
             vmf_file=VMF,
-            )
+        )
 
         fix_inst()
         alter_flip_panel()  # Must be done before conditions!
@@ -3855,7 +3868,6 @@ def main():
         save(new_path)
         run_vbsp(
             vbsp_args=new_args,
-            do_swap=True,
             path=path,
             new_path=new_path,
         )

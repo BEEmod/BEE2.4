@@ -2,16 +2,19 @@
 """
 from collections import namedtuple
 
+import srctools
+import utils
+import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     import_template, remove_ant_toggle,
     TEMP_TYPES, GOO_LOCS, SOLIDS
 )
 from instanceLocs import resolve as resolve_inst
-from utils import Vec
-import vmfLib as VLib
-import utils
-import vbsp
+from srctools import (
+    Vec, Vec_tuple,
+    Entity,
+)
 
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
@@ -23,12 +26,12 @@ PUSH_TRIGS = {}
 
 CornerAng = namedtuple('CornerAng', 'ang, axis')
 
-xp = utils.Vec_tuple(1, 0, 0)
-xn = utils.Vec_tuple(-1, 0, 0)
-yp = utils.Vec_tuple(0, 1, 0)
-yn = utils.Vec_tuple(0, -1, 0)
-zp = utils.Vec_tuple(0, 0, 1)
-zn = utils.Vec_tuple(0, 0, -1)
+xp = Vec_tuple(1, 0, 0)
+xn = Vec_tuple(-1, 0, 0)
+yp = Vec_tuple(0, 1, 0)
+yn = Vec_tuple(0, -1, 0)
+zp = Vec_tuple(0, 0, 1)
+zn = Vec_tuple(0, 0, -1)
 
 # start, end normals -> angle of corner instance and the unchanged axis
 CORNER_ANG = {
@@ -127,7 +130,7 @@ def res_vactube_setup(res):
             # if there's a brush there.
             'support': block['support_inst', ''],
 
-            'is_tsection': utils.conv_bool(block['is_tsection', '0']),
+            'is_tsection': srctools.conv_bool(block['is_tsection', '0']),
 
             ('entry', 'wall'): block['entry_inst'],
             ('entry', 'floor'): block['entry_floor_inst'],
@@ -143,7 +146,7 @@ def res_vactube_setup(res):
                 size = 1
                 file = prop.value
 
-            inst_configs[resolve_inst(file)[0]] = conf, utils.conv_int(size, 1)
+            inst_configs[resolve_inst(file)[0]] = conf, srctools.conv_int(size, 1)
 
     return group
 
@@ -169,7 +172,7 @@ def res_make_vactubes(_, res):
     markers = {}
 
     # Find all our markers, so we can look them up by targetname.
-    for inst in vbsp.VMF.by_class['func_instance']:  # type: VLib.Entity
+    for inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
         try:
             config, inst_size = INST_CONFIGS[inst['file'].casefold()]
         except KeyError:

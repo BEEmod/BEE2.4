@@ -1,17 +1,14 @@
 """Generate random quarter tiles, like in Destroyed or Retro maps."""
+import random
 from collections import defaultdict, namedtuple
 
-import random
-
-from perlin import SimplexNoise
-
-from utils import Vec, Vec_tuple
-from instanceLocs import resolve as resolve_inst
-
-import utils
-import vmfLib as VLib
 import conditions
+import srctools
+import utils
 import vbsp
+from instanceLocs import resolve as resolve_inst
+from perlin import SimplexNoise
+from srctools import Vec_tuple, Vec, Side, UVAxis
 
 LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
@@ -61,8 +58,10 @@ def find_indicator_panels(inst):
 
     # Sometimes (light bridges etc) a sign will be halfway between
     # tiles, so in that case we need to force 2 tiles.
-    loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-    loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
+    loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
+    loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
+    loc_min += (16, 16, 0)
+    loc_max += (16, 16, 0)
     FORCE_LOCATIONS.add(loc_min.as_tuple())
     FORCE_LOCATIONS.add(loc_max.as_tuple())
 
@@ -109,27 +108,29 @@ def res_cutout_tile(inst, res):
             loc = Vec.from_str(over['origin'])
             # Sometimes (light bridges etc) a sign will be halfway between
             # tiles, so in that case we need to force 2 tiles.
-            loc_min = (loc - (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-            loc_max = (loc + (15, 15, 0)) // 32 * 32 + (16, 16, 0)
-            sign_loc.add(loc_min.as_tuple())
-            sign_loc.add(loc_max.as_tuple())
+            loc_min = (loc - (15, 15, 0)) // 32 * 32  # type: Vec
+            loc_max = (loc + (15, 15, 0)) // 32 * 32  # type: Vec
+            loc_min += (16, 16, 0)
+            loc_max += (16, 16, 0)
+            FORCE_LOCATIONS.add(loc_min.as_tuple())
+            FORCE_LOCATIONS.add(loc_max.as_tuple())
 
     SETTINGS = {
-        'floor_chance': utils.conv_int(
+        'floor_chance': srctools.conv_int(
             res['floorChance', '100'], 100),
-        'ceil_chance': utils.conv_int(
+        'ceil_chance': srctools.conv_int(
             res['ceilingChance', '100'], 100),
-        'floor_glue_chance': utils.conv_int(
+        'floor_glue_chance': srctools.conv_int(
             res['floorGlueChance', '0']),
-        'ceil_glue_chance': utils.conv_int(
+        'ceil_glue_chance': srctools.conv_int(
             res['ceilingGlueChance', '0']),
 
-        'rotate_beams': int(utils.conv_float(
+        'rotate_beams': int(srctools.conv_float(
             res['rotateMax', '0']) * BEAM_ROT_PRECISION),
 
         'beam_skin': res['squarebeamsSkin', '0'],
 
-        'base_is_disp': utils.conv_bool(res['dispBase', '0']),
+        'base_is_disp': srctools.conv_bool(res['dispBase', '0']),
 
         'quad_floor': res['FloorSize', '4x4'].casefold() == '2x2',
         'quad_ceil': res['CeilingSize', '4x4'].casefold() == '2x2',
@@ -507,16 +508,16 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
             '(expected 1 or 2, got {})'.format(thickness)
         )
 
-    n.uaxis = VLib.UVAxis(
+    n.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    n.vaxis = VLib.UVAxis(
+    n.vaxis = UVAxis(
         1, 0, 0, offset=0)
     s.uaxis = n.uaxis.copy()
     s.vaxis = n.vaxis.copy()
 
-    e.uaxis = VLib.UVAxis(
+    e.uaxis = UVAxis(
         0, 0, 1, offset=z_off)
-    e.vaxis = VLib.UVAxis(
+    e.vaxis = UVAxis(
         0, 1, 0, offset=0)
     w.uaxis = e.uaxis.copy()
     w.vaxis = e.vaxis.copy()
@@ -697,7 +698,7 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
 
 
 def make_displacement(
-        face: VLib.Side,
+        face: Side,
         noise: SimplexNoise,
         power=3,
         offset=0,
