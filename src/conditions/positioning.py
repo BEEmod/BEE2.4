@@ -152,7 +152,7 @@ def res_force_upright(inst, _):
     if normal.z != 0:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
-    inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
+    inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
 
 
 @make_result('setAngles')
