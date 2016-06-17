@@ -366,7 +366,11 @@ class Game:
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
-        num_compiler_files = len(os.listdir('../compiler'))
+        try:
+            num_compiler_files = len(os.listdir('../compiler'))
+        except FileNotFoundError:
+            num_compiler_files = 0
+
         if num_compiler_files == 0:
             LOGGER.warning('No compiler files!')
             export_screen.skip_stage('COMP')
@@ -491,41 +495,42 @@ class Game:
                 vbsp_file.write(line)
         export_screen.step('EXP')
 
-        LOGGER.info('Copying Custom Compiler!')
-        for file in os.listdir('../compiler'):
-            src_path = os.path.join('../compiler', file)
-            if not os.path.isfile(src_path):
-                continue
+        if num_compiler_files > 0:
+            LOGGER.info('Copying Custom Compiler!')
+            for file in os.listdir('../compiler'):
+                src_path = os.path.join('../compiler', file)
+                if not os.path.isfile(src_path):
+                    continue
 
-            dest = self.abs_path('bin/' + file)
+                dest = self.abs_path('bin/' + file)
 
-            LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+                LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
 
-            try:
-                if os.path.isfile(dest):
-                    # First try and give ourselves write-permission,
-                    # if it's set read-only.
-                    utils.unset_readonly(dest)
-                shutil.copy(
-                    src_path,
-                    self.abs_path('bin/')
-                )
-            except PermissionError:
-                # We might not have permissions, if the compiler is currently
-                # running.
-                export_screen.grab_release()
-                export_screen.reset()
-                messagebox.showerror(
-                    title='BEE2 - Export Failed!',
-                    message='Copying compiler file {file} failed.'
-                            'Ensure the {game} is not running.'.format(
-                                file=file,
-                                game=self.name,
-                            ),
-                    master=TK_ROOT,
-                )
-                return False
-            export_screen.step('COMP')
+                try:
+                    if os.path.isfile(dest):
+                        # First try and give ourselves write-permission,
+                        # if it's set read-only.
+                        utils.unset_readonly(dest)
+                    shutil.copy(
+                        src_path,
+                        self.abs_path('bin/')
+                    )
+                except PermissionError:
+                    # We might not have permissions, if the compiler is currently
+                    # running.
+                    export_screen.grab_release()
+                    export_screen.reset()
+                    messagebox.showerror(
+                        title='BEE2 - Export Failed!',
+                        message='Copying compiler file {file} failed.'
+                                'Ensure the {game} is not running.'.format(
+                                    file=file,
+                                    game=self.name,
+                                ),
+                        master=TK_ROOT,
+                    )
+                    return False
+                export_screen.step('COMP')
 
         if should_refresh:
             LOGGER.info('Copying Resources!')
