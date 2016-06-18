@@ -195,6 +195,7 @@ DEFAULTS = {
     "fizz_border_vertical":     "0",  # The texture is oriented vertically
     "fizz_border_thickness":    "8",  # The width of the overlays
     "fizz_border_repeat":       "128",  # The width lengthways
+    "fizz_visibility":          "1", # Make fizzlers invisible and silent.
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -2883,9 +2884,11 @@ def change_trig():
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_fizz'
 
-        # Apply some config options - scanline and Fast Reflections
+        # Apply some config options - scanline and Fast Reflections, visbility
         trig['useScanline'] = settings["fizzler"]["scanline"]
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
+        # This also controls whether fizzlers play sounds.
+        trig['visible'] = get_opt('fizz_visibility')
 
     for trig in VMF.by_class['trigger_hurt']:
         target = trig['targetname', '']
