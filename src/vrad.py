@@ -58,7 +58,10 @@ INJECT_FILES = {
     'particles_manifest.txt': 'particles/particles_manifest.txt',
 
     # A generated soundscript for the current music.
-    'music_script.txt': 'scripts/BEE2_generated_music.txt'
+    'music_script.txt': 'scripts/BEE2_generated_music.txt',
+
+    # Applied to @glados's entity scripts.
+    'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
 }
 
 # Additional parts to add if we have a mdl file.
@@ -378,10 +381,6 @@ def gen_sound_manifest(additional, excludes):
     for script in additional:
         scripts.append(script)
 
-        # For our packed scripts, force the game to load them
-        # (we know they're used).
-        scripts.append('!' + script)
-
     for script in excludes:
         try:
             scripts.remove(script)
@@ -535,6 +534,28 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
         pack_list.add('sound/' + snds.value.casefold())
 
 
+def gen_auto_script(preload, is_peti):
+    """Run various commands on spawn.
+
+    This allows precaching specific sounds on demand.
+    """
+    dest = os.path.join('bee2', 'inject', 'auto_run.nut')
+    if not preload and not is_peti:
+        return # Don't add for hammer maps
+
+    with open(dest, 'w') as file:
+        if not preload:
+            return  # Leave it empty, don't write an empty body.
+
+        file.write('function Precache() {\n')
+        for entry in preload:
+            if entry.startswith('precache_sound:'):
+                file.write('\tPrecacheSoundScript("{}");\n'.format(
+                    entry[15:],
+                ))
+        file.write('}\n')
+
+
 def inject_files():
     """Generate the names of files to inject, if they exist.."""
     for filename, arcname in INJECT_FILES.items():
@@ -556,6 +577,7 @@ def pack_content(path, is_peti):
     rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
     particles = set()
     additional_files = set()  # .vvd files etc which also are needed.
+    preload_files = set()  # Files we want to force preloading
 
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
@@ -568,6 +590,10 @@ def pack_content(path, is_peti):
                 line = line.strip().lower()
                 if not line or line.startswith('//'):
                     continue  # Skip blanks or comments
+
+                if line[:8] == 'precache':
+                    preload_files.add(line)
+                    continue
 
                 if line[:2] == '-#':
                     rem_soundscripts.add(line[2:])
@@ -605,6 +631,7 @@ def pack_content(path, is_peti):
     # If no files are packed, no manifest will be added either.
     gen_sound_manifest(soundscripts, rem_soundscripts)
     gen_part_manifest(particles)
+    gen_auto_script(preload_files, is_peti)
 
     inject_names = list(inject_files())
 
