@@ -1006,6 +1006,11 @@ def set_pal_listbox_selection(_=None):
 
 def set_palette(_=None):
     """Select a palette."""
+    global selectedPalette
+    if selectedPalette >= len(palettes) or selectedPalette < 0:
+        LOGGER.warning('Invalid palette index!')
+        selectedPalette = 0
+
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
     menus['pal'].entryconfigure(
