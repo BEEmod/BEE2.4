@@ -250,7 +250,10 @@ def res_fizzler_pair(begin_inst, res):
     end_name = orig_target + '_modelEnd'  # What we search for
 
     # The name all these instances get
-    pair_name = orig_target + '-model' + str(begin_inst.id)
+    if srctools.conv_bool(res['uniqueName', '1'], True):
+        pair_name = orig_target + '-model' + str(begin_inst.id)
+    else:
+        pair_name = orig_target
 
     orig_file = begin_inst['file']
 
