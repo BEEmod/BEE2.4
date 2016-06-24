@@ -938,9 +938,12 @@ class Item(PakObject):
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
+                        our_style = our_ver[sty_id]
                         # We both have a matching folder, merge the
                         # definitions. We don't override editoritems!
-                        our_style = our_ver[sty_id]
+
+                        if isinstance(our_style, str) or isinstance(style, str):
+                            raise Exception("Can't override with a <STYLE> def.")
 
                         our_style['auth'].extend(style['auth'])
                         our_style['desc'].extend(style['desc'])
