@@ -6,6 +6,7 @@ import itertools
 import operator
 import random
 
+import srctools
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -117,7 +118,6 @@ class Item:
         self.tags = set()
 
         self.load_data()
-        self.set_properties(self.get_properties())
 
     def load_data(self):
         """Load data from the item."""
@@ -197,24 +197,35 @@ class Item:
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
                 name = prop.name
+
+                if srctools.conv_bool(prop['BEE2_ignore', '']):
+                    continue
+
                 # PROP_TYPES is a dict holding all the modifiable properties.
-                if name not in result and name in PROP_TYPES:
+                if name in PROP_TYPES:
+                    if name in result:
+                        LOGGER.warning(
+                            'Duplicate property "{}" in {}!',
+                            name,
+                            self.id
+                        )
+
                     result[name] = item_opts.get_val(
                         self.id,
                         'PROP_' + name,
                         prop["DefaultValue", ''],
-                        )
+                    )
+                else:
+                    LOGGER.warning(
+                        'Unknown property "{}" in {}',
+                        name,
+                        self.id,
+                    )
         return result
 
     def set_properties(self, props):
         """Apply the properties to the item."""
         for prop, value in props.items():
-            for def_prop in self.data['editor'].find_all(
-                    "Properties",
-                    prop,
-                    'DefaultValue',
-                    ):
-                def_prop.value = str(value)
             item_opts[self.id]['PROP_' + prop] = str(value)
 
     def refresh_subitems(self):
@@ -753,6 +764,17 @@ def export_editoritems(_=None):
         item_list.items()
     }
 
+    item_properties = {
+        it_id: {
+            key[5:]: value
+            for key, value in
+            section.items() if
+            key.startswith('prop_')
+        }
+        for it_id, section in
+        item_opts.items()
+    }
+
     success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
@@ -762,7 +784,7 @@ def export_editoritems(_=None):
             'QuotePack': voice_win.chosen_id,
             'Elevator': elev_win.chosen_id,
 
-            'Item': (pal_data, item_versions),
+            'Item': (pal_data, item_versions, item_properties),
             'StyleVar': style_vars,
 
             # The others don't have one, so it defaults to None.
@@ -870,6 +892,11 @@ def drag_start(e):
 def drag_stop(e):
     """User released the mouse button, complete the drag."""
     drag_win = windows['drag_win']
+
+    if drag_win.drag_item is None:
+        # We aren't dragging, ignore the event.
+        return
+
     drag_win.withdraw()
     drag_win.unbind("<B1-Motion>")
     drag_win.grab_release()
@@ -879,7 +906,7 @@ def drag_stop(e):
     snd.fx('config')
 
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    ind = pos_x+pos_y*4
+    ind = pos_x + pos_y * 4
 
     # this prevents a single click on the picker from clearing items
     # off the palette
@@ -909,6 +936,11 @@ def drag_stop(e):
 def drag_move(e):
     """Update the position of dragged items as they move around."""
     drag_win = windows['drag_win']
+
+    if drag_win.drag_item is None:
+        # We aren't dragging, ignore the event.
+        return
+
     set_disp_name(drag_win.drag_item)
     drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
     pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
@@ -974,6 +1006,11 @@ def set_pal_listbox_selection(_=None):
 
 def set_palette(_=None):
     """Select a palette."""
+    global selectedPalette
+    if selectedPalette >= len(palettes) or selectedPalette < 0:
+        LOGGER.warning('Invalid palette index!')
+        selectedPalette = 0
+
     GEN_OPTS['Last_Selected']['palette'] = str(selectedPalette)
     pal_clear()
     menus['pal'].entryconfigure(
@@ -1036,18 +1073,26 @@ def pal_save_as(_=None):
         name = ask_string(
             "BEE2 - Save Palette",
             "Enter a name:",
-            )
+        )
         if name is None:
+            # Cancelled...
             return False
-        # Check for non-basic characters
-        elif not utils.is_plain_text(name):
+        # Check for non-basic characters to ensure the filename is valid..
+        elif not srctools.is_plain_text(name):
             messagebox.showinfo(
                 icon=messagebox.ERROR,
                 title='BEE2',
                 message='Please only use basic characters in palette '
                         'names.',
                 parent=TK_ROOT,
-                )
+            )
+        elif paletteLoader.check_exists(name):
+            if messagebox.askyesno(
+                icon=messagebox.QUESTION,
+                title='BEE2',
+                message='This palette alread exists. Overwrite?',
+            ):
+                break
         else:
             break
     paletteLoader.save_pal(pal_picked, name)
@@ -1323,12 +1368,12 @@ def init_picker(f):
         f,
         text="All Items: ",
         anchor="center",
-        ).grid(
-            row=0,
-            column=0,
-            sticky="EW",
-            )
-    cframe = ttk.Frame(
+    ).grid(
+        row=0,
+        column=0,
+        sticky="EW",
+    )
+    UI['picker_frame'] = cframe = ttk.Frame(
         f,
         borderwidth=4,
         relief="sunken",
@@ -1383,11 +1428,13 @@ def flow_picker(_=None):
                 tagsPane.wid['expand_frame'].winfo_height()
                 - pal_canvas.winfo_rooty()
                 + tagsPane.wid['expand_frame'].winfo_rooty()
-                + 10
+                + 15
             ), 0)
     else:
         offset = 0
-    width = (pal_canvas.winfo_width()-10) // 65
+    UI['picker_frame'].grid(pady=(offset, 0))
+
+    width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
         width = 1  # we got way too small, prevent division by zero
     vis_items = [it for it in pal_items if it.visible]
@@ -1396,18 +1443,18 @@ def flow_picker(_=None):
         item.is_pre = False
         item.place(
             x=((i % width) * 65 + 1),
-            y=((i // width) * 65 + offset + 1),
+            y=((i // width) * 65 + 1),
             )
 
     for item in (it for it in pal_items if not it.visible):
         item.place_forget()
-    height = (num_items//width + 1)*65 + offset + 2
+    height = (num_items // width + 1) * 65 + 2
     pal_canvas['scrollregion'] = (
         0,
         0,
-        width*65,
+        width * 65,
         height,
-        )
+    )
     frmScroll['height'] = height
 
     # this adds extra blank items on the end to finish the grid nicely.
@@ -1592,19 +1639,20 @@ def init_windows():
     TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
-        )  # Prevent making the window smaller than the preview pane
+    )  # Prevent making the window smaller than the preview pane
+
     loader.step('UI')
 
     ttk.Separator(
         ui_bg,
         orient=VERTICAL,
-        ).grid(
-            row=0,
-            column=4,
-            sticky="NS",
-            padx=10,
-            pady=10,
-            )
+    ).grid(
+        row=0,
+        column=4,
+        sticky="NS",
+        padx=10,
+        pady=10,
+    )
 
     picker_split_frame = Frame(ui_bg, bg=ItemsBG)
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
@@ -1617,21 +1665,28 @@ def init_windows():
         padding=5,
         borderwidth=0,
         relief="raised",
-        )
+    )
+    # Place doesn't affect .grid() positioning, so this frame will sit on top
+    # of other widgets.
     frames['tags'].place(x=0, y=0, relwidth=1)
     tagsPane.init(frames['tags'])
+    frames['tags'].update_idletasks()  # Refresh so height() is correct
+
     loader.step('UI')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
-        padding=(5, 40, 5, 5),
+        # Offset the picker window under the unexpanded tags pane, so they
+        # don't overlap.
+        padding=(5, frames['tags'].winfo_height(), 5, 5),
         borderwidth=4,
         relief="raised",
-        )
+    )
     frames['picker'].grid(row=0, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(0, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
     init_picker(frames['picker'])
+
     loader.step('UI')
 
     # Move this to above the picker pane (otherwise it'll be hidden)
@@ -1664,9 +1719,11 @@ def init_windows():
     windows['pal'].rowconfigure(0, weight=1)
 
     init_palette(pal_frame)
+
     loader.step('UI')
 
     packageMan.make_window()
+
     loader.step('UI')
 
     windows['opt'] = SubPane.SubPane(
@@ -1680,12 +1737,15 @@ def init_windows():
         tool_col=2,
     )
     init_option(windows['opt'])
+
     loader.step('UI')
 
     StyleVarPane.make_pane(frames['toolMenu'])
+
     loader.step('UI')
 
     CompilerPane.make_pane(frames['toolMenu'])
+
     loader.step('UI')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(

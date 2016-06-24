@@ -5,23 +5,25 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+from tkinter import *  # ui library
+from tkinter import filedialog  # open/save as dialog creator
+from tkinter import messagebox  # simple, standard modal dialogs
+from tk_tools import TK_ROOT
+
 import os
 import os.path
 import shutil
 
-from tkinter import *  # ui library
-from tkinter import messagebox  # simple, standard modal dialogs
-from tkinter import filedialog  # open/save as dialog creator
-from tk_tools import TK_ROOT
-
-from query_dialogs import ask_string
 from BEE2_config import ConfigFile, GEN_OPTS
-from property_parser import Property
-import utils
+from query_dialogs import ask_string
+from srctools import Property
+import backup
+import extract_packages
 import loadScreen
 import packageLoader
-import extract_packages
-import backup
+import utils
+import srctools
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -234,7 +236,7 @@ class Game:
                     data = list(file)
 
                 for line_num, line in reversed(list(enumerate(data))):
-                    clean_line = utils.clean_line(line)
+                    clean_line = srctools.clean_line(line)
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
                             break  # Already added!
@@ -264,7 +266,7 @@ class Game:
                         )
                     continue
 
-                with utils.AtomicWriter(info_path) as file:
+                with srctools.AtomicWriter(info_path) as file:
                     for line in data:
                         file.write(line)
         if not add_line:
@@ -295,14 +297,17 @@ class Game:
         """Copy over the resource files into this game."""
 
         screen_func = export_screen.step
-        copy2 = shutil.copy2
+        copy = shutil.copy
 
         def copy_func(src, dest):
             screen_func('RES')
-            copy2(src, dest)
+            copy(src, dest)
 
         for folder in os.listdir('../cache/resources/'):
             source = os.path.join('../cache/resources/', folder)
+            if not os.path.isdir(source):
+                continue  # Skip DS_STORE, desktop.ini, etc.
+
             if folder == 'instances':
                 dest = self.abs_path(INST_PATH)
             elif folder.casefold() == 'bee2':
@@ -361,7 +366,16 @@ class Game:
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
-        export_screen.set_length('COMP', len(os.listdir('../compiler')))
+        try:
+            num_compiler_files = len(os.listdir('../compiler'))
+        except FileNotFoundError:
+            num_compiler_files = 0
+
+        if num_compiler_files == 0:
+            LOGGER.warning('No compiler files!')
+            export_screen.skip_stage('COMP')
+        else:
+            export_screen.set_length('COMP', num_compiler_files)
 
         LOGGER.info('Should refresh: {}', should_refresh)
         if should_refresh:
@@ -468,7 +482,7 @@ class Game:
         # AtomicWriter writes to a temporary file, then renames in one step.
         # This ensures editoritems won't be half-written.
         LOGGER.info('Writing Editoritems!')
-        with utils.AtomicWriter(self.abs_path(
+        with srctools.AtomicWriter(self.abs_path(
                 'portal2_dlc2/scripts/editoritems.txt')) as editor_file:
             for line in editoritems.export():
                 editor_file.write(line)
@@ -481,41 +495,42 @@ class Game:
                 vbsp_file.write(line)
         export_screen.step('EXP')
 
-        LOGGER.info('Copying Custom Compiler!')
-        for file in os.listdir('../compiler'):
-            src_path = os.path.join('../compiler', file)
-            if not os.path.isfile(src_path):
-                continue
+        if num_compiler_files > 0:
+            LOGGER.info('Copying Custom Compiler!')
+            for file in os.listdir('../compiler'):
+                src_path = os.path.join('../compiler', file)
+                if not os.path.isfile(src_path):
+                    continue
 
-            dest = self.abs_path('bin/' + file)
+                dest = self.abs_path('bin/' + file)
 
-            LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
+                LOGGER.info('\t* compiler/{0} -> bin/{0}', file)
 
-            try:
-                if os.path.isfile(dest):
-                    # First try and give ourselves write-permission,
-                    # if it's set read-only.
-                    utils.unset_readonly(dest)
-                shutil.copy(
-                    src_path,
-                    self.abs_path('bin/')
-                )
-            except PermissionError:
-                # We might not have permissions, if the compiler is currently
-                # running.
-                export_screen.grab_release()
-                export_screen.reset()
-                messagebox.showerror(
-                    title='BEE2 - Export Failed!',
-                    message='Copying compiler file {file} failed.'
-                            'Ensure the {game} is not running.'.format(
-                                file=file,
-                                game=self.name,
-                            ),
-                    master=TK_ROOT,
-                )
-                return False
-            export_screen.step('COMP')
+                try:
+                    if os.path.isfile(dest):
+                        # First try and give ourselves write-permission,
+                        # if it's set read-only.
+                        utils.unset_readonly(dest)
+                    shutil.copy(
+                        src_path,
+                        self.abs_path('bin/')
+                    )
+                except PermissionError:
+                    # We might not have permissions, if the compiler is currently
+                    # running.
+                    export_screen.grab_release()
+                    export_screen.reset()
+                    messagebox.showerror(
+                        title='BEE2 - Export Failed!',
+                        message='Copying compiler file {file} failed.'
+                                'Ensure the {game} is not running.'.format(
+                                    file=file,
+                                    game=self.name,
+                                ),
+                        master=TK_ROOT,
+                    )
+                    return False
+                export_screen.step('COMP')
 
         if should_refresh:
             LOGGER.info('Copying Resources!')
@@ -613,7 +628,7 @@ def find_steam_info(game_dir):
         if os.path.isfile(info_path):
             with open(info_path) as file:
                 for line in file:
-                    clean_line = utils.clean_line(line).replace('\t', ' ')
+                    clean_line = srctools.clean_line(line).replace('\t', ' ')
                     if not found_id and 'steamappid' in clean_line.casefold():
                         raw_id = clean_line.casefold().replace(
                             'steamappid', '').strip()

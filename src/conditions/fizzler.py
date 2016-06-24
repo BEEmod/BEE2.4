@@ -1,13 +1,14 @@
 """Results for custom fizzlers."""
+import conditions
+import srctools
+import utils
+import vbsp
 from conditions import (
     make_result,
 )
+from srctools import Vec, Entity
 from vbsp import TEX_FIZZLER
-from utils import Vec
-import conditions
-import utils
-import vmfLib as VLib
-import vbsp
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
@@ -38,7 +39,7 @@ def res_cust_fizzler(base_inst, res):
               scale it correctly.
     """
     model_name = res['modelname', None]
-    make_unique = utils.conv_bool(res['UniqueModel', '0'])
+    make_unique = srctools.conv_bool(res['UniqueModel', '0'])
     fizz_name = base_inst['targetname', '']
 
     # search for the model instances
@@ -107,7 +108,7 @@ def res_cust_fizzler(base_inst, res):
                 # skip the resizing since it's already correct.
                 laser_tex = laserfield_conf['texture', 'effects/laserplane']
                 nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                tex_width = utils.conv_int(
+                tex_width = srctools.conv_int(
                     laserfield_conf['texwidth', '512'], 512
                 )
                 is_short = False
@@ -144,7 +145,7 @@ def res_cust_fizzler(base_inst, res):
                         # If we fail, just use the original textures
                         pass
 
-            widen_amount = utils.conv_float(config['thickness', '2'], 2.0)
+            widen_amount = srctools.conv_float(config['thickness', '2'], 2.0)
             if widen_amount != 2:
                 for brush in new_brush.solids:
                     conditions.widen_fizz_brush(
@@ -154,7 +155,7 @@ def res_cust_fizzler(base_inst, res):
 
 
 def convert_to_laserfield(
-        brush: VLib.Entity,
+        brush: Entity,
         laser_tex: str,
         nodraw_tex: str,
         tex_width: int,
@@ -237,6 +238,8 @@ def res_fizzler_pair(begin_inst, res):
     Values:
         - StartInst, EndInst: The instances used for each end
         - MidInst: An instance placed every 128 units between emitters.
+        - SingleInst: If the models are 1 block apart, replace both with this
+            instance.
     """
     orig_target = begin_inst['targetname']
 
@@ -247,13 +250,17 @@ def res_fizzler_pair(begin_inst, res):
     end_name = orig_target + '_modelEnd'  # What we search for
 
     # The name all these instances get
-    pair_name = orig_target + '-model' + str(begin_inst.id)
+    if srctools.conv_bool(res['uniqueName', '1'], True):
+        pair_name = orig_target + '-model' + str(begin_inst.id)
+    else:
+        pair_name = orig_target
 
     orig_file = begin_inst['file']
 
     begin_file = res['StartInst', orig_file]
     end_file = res['EndInst', orig_file]
     mid_file = res['MidInst', '']
+    single_file = res['SingleInst', '']
 
     begin_inst['file'] = begin_file
     begin_inst['targetname'] = pair_name
@@ -270,12 +277,18 @@ def res_fizzler_pair(begin_inst, res):
         if (
                 begin_pos[axis_1] == end_pos[axis_1] and
                 begin_pos[axis_2] == end_pos[axis_2]
-                ):
+        ):
             length = int(end_pos[main_axis] - begin_pos[main_axis])
             break
     else:
         LOGGER.warning('No matching pair for {}!!', orig_target)
         return
+
+    if single_file and length == 0:
+        end_inst.remove()
+        begin_inst['file'] = single_file
+        return
+
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
 
@@ -283,7 +296,7 @@ def res_fizzler_pair(begin_inst, res):
         # Go 64 from each side, and always have at least 1 section
         # A 128 gap will have length = 0
         for dis in range(0, abs(length) + 1, 128):
-            new_pos = begin_pos + direction*dis
+            new_pos = begin_pos + direction * dis
             vbsp.VMF.create_ent(
                 classname='func_instance',
                 targetname=pair_name,

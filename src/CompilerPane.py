@@ -1,5 +1,5 @@
 from tkinter import *
-from tk_tools import TK_ROOT
+from tk_tools import TK_ROOT, FileField
 from tkinter import ttk
 from tkinter import filedialog
 
@@ -30,6 +30,8 @@ COMPILE_DEFAULTS = {
         'player_model': 'PETI',
         'force_final_light': '0',
         'use_voice_priority': '1',
+        'packfile_dump_dir': '',
+        'packfile_dump_enable': '0',
     },
     'Corridor': {
         'sp_entry': '1',
@@ -90,6 +92,10 @@ start_in_elev = IntVar(
 )
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = StringVar(value='')
+
+packfile_dump_enable = IntVar(
+    value=COMPILE_CFG.get_bool('General', 'packfile_dump_enable')
+)
 
 count_brush = IntVar(value=0)
 count_entity = IntVar(value=0)
@@ -229,6 +235,22 @@ def refresh_counts(reload=True):
 
     if run_flash:
         flash_count()
+
+
+def set_pack_dump_dir(path):
+    COMPILE_CFG['General']['packfile_dump_dir'] = path
+    COMPILE_CFG.save()
+
+
+def set_pack_dump_enabled():
+    is_enabled = packfile_dump_enable.get()
+    COMPILE_CFG['General']['packfile_dump_enable'] = str(is_enabled)
+    COMPILE_CFG.save_check()
+
+    if is_enabled:
+        UI['packfile_filefield'].grid()
+    else:
+        UI['packfile_filefield'].grid_remove()
 
 
 def find_screenshot(_=None):
@@ -541,12 +563,44 @@ def make_pane(tool_frame):
         "When you reach the exit door, the map will restart."
     )
 
+    packfile_enable = ttk.Checkbutton(
+        window,
+        text='Dump packed files to:',
+        variable=packfile_dump_enable,
+        command=set_pack_dump_enabled,
+    )
+
+    packfile_frame = ttk.LabelFrame(
+        window,
+        labelwidget=packfile_enable,
+    )
+    packfile_frame.grid(row=4, column=0, sticky=EW)
+
+    UI['packfile_filefield'] = packfile_filefield = FileField(
+        packfile_frame,
+        is_dir=True,
+        loc=COMPILE_CFG.get_val('General', 'packfile_dump_dir', ''),
+        callback=set_pack_dump_dir,
+    )
+    packfile_filefield.grid(row=0, column=0, sticky=EW)
+    packfile_frame.columnconfigure(0, weight=1)
+    ttk.Frame(packfile_frame).grid(row=1)
+
+    set_pack_dump_enabled()
+
+    add_tooltip(
+        packfile_enable,
+        "When compiling, dump all files which were packed into the map. Useful"
+        "if you're intending to edit maps in Hammer."
+    )
+
     corr_frame = ttk.LabelFrame(
         window,
+        width=18,
         text='Corridor:',
         labelanchor=N,
     )
-    corr_frame.grid(row=4, column=0, sticky=EW)
+    corr_frame.grid(row=5, column=0, sticky=EW)
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
@@ -592,7 +646,7 @@ def make_pane(tool_frame):
         text='Player Model (SP):',
         labelanchor=N,
     )
-    model_frame.grid(row=5, column=0, sticky=EW)
+    model_frame.grid(row=6, column=0, sticky=EW)
     UI['player_mdl'] = ttk.Combobox(
         model_frame,
         exportselection=0,
@@ -613,7 +667,7 @@ def make_pane(tool_frame):
         labelanchor=N,
     )
 
-    count_frame.grid(row=6, column=0, sticky=EW)
+    count_frame.grid(row=7, column=0, sticky=EW)
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 

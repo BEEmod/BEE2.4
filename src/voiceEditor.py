@@ -1,19 +1,20 @@
-from tkinter import *
-from tk_tools import TK_ROOT
-from tkinter import ttk
-from tkinter import font
-
-from decimal import Decimal
-from enum import Enum
-import os
 import functools
 import itertools
+import os
+from decimal import Decimal
+from enum import Enum
+from tkinter import *
+from tkinter import font
+from tkinter import ttk
 
-from BEE2_config import ConfigFile
-from property_parser import Property
 import img
-import utils
+import srctools
 import tk_tools
+import utils
+from BEE2_config import ConfigFile
+from srctools import Property
+from tk_tools import TK_ROOT
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -147,7 +148,7 @@ def show_trans(e):
 
 def check_toggled(var, config_section, quote_id):
     """Update the config file to match the checkbox."""
-    config_section[quote_id] = utils.bool_as_int(var.get())
+    config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
 def configure_canv(e):

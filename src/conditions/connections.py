@@ -1,9 +1,7 @@
 """Results relating to item connections."""
+import srctools
 from conditions import make_result, make_result_setup, resolve_value
-from property_parser import Property
-import conditions
-import utils
-import vmfLib as VLib
+from srctools import Property, Entity, Output
 
 
 @make_result_setup('AddOutput')
@@ -13,9 +11,9 @@ def res_add_output_setup(res):
     inst_in = res['inst_out', '']
     inst_out = res['inst_out', '']
     targ = res['target']
-    only_once = utils.conv_bool(res['only_once', None])
-    times = 1 if only_once else utils.conv_int(res['times', None], -1)
-    delay = utils.conv_float(res['delay', '0.0'])
+    only_once = srctools.conv_bool(res['only_once', None])
+    times = 1 if only_once else srctools.conv_int(res['times', None], -1)
+    delay = srctools.conv_float(res['delay', '0.0'])
     parm = res['parm', '']
 
     return (
@@ -31,7 +29,7 @@ def res_add_output_setup(res):
 
 
 @make_result('AddOutput')
-def res_add_output(inst: VLib.Entity, res: Property):
+def res_add_output(inst: Entity, res: Property):
     """Add an output from an instance to a global name.
 
     Values:
@@ -53,7 +51,7 @@ def res_add_output(inst: VLib.Entity, res: Property):
         inst_out,
     ) = res.value
 
-    inst.add_out(VLib.Output(
+    inst.add_out(Output(
         resolve_value(inst, output),
         resolve_value(inst, targ),
         resolve_value(inst, input_name),

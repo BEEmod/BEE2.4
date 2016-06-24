@@ -5,7 +5,8 @@ from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from utils import Vec
+from srctools import Vec
+import srctools
 import conditions
 import utils
 import vbsp
@@ -43,8 +44,8 @@ def res_unst_scaffold_setup(res):
     for block in res.find_all("Instance"):
         conf = {
             # If set, adjusts the offset appropriately
-            'is_piston': utils.conv_bool(block['isPiston', '0']),
-            'rotate_logic': utils.conv_bool(block['AlterAng', '1'], True),
+            'is_piston': srctools.conv_bool(block['isPiston', '0']),
+            'rotate_logic': srctools.conv_bool(block['AlterAng', '1'], True),
             'off_floor': Vec.from_str(block['FloorOff', '0 0 0']),
             'off_wall': Vec.from_str(block['WallOff', '0 0 0']),
 
@@ -172,7 +173,7 @@ def res_unst_scaffold(_, res):
                     index='*',
                 )
 
-        should_reverse = utils.conv_bool(ent.fixup['$start_reversed'])
+        should_reverse = srctools.conv_bool(ent.fixup['$start_reversed'])
 
         # Now set each instance in the chain, including first and last
         for index, inst in enumerate(scaff_scan(instances, start_inst)):
@@ -187,7 +188,7 @@ def res_unst_scaffold(_, res):
             offset = (conf['off_' + orient]).copy()
             if conf['is_piston']:
                 # Adjust based on the piston position
-                offset.z += 128 * utils.conv_int(ent.fixup[
+                offset.z += 128 * srctools.conv_int(ent.fixup[
                     '$top_level' if
                     ent.fixup['$start_up'] == '1'
                     else '$bottom_level'

@@ -3,15 +3,16 @@
 """
 import operator
 
-import utils
+from typing import Dict, Optional
+
+import conditions
+import srctools
 from conditions import (
-    make_flag, make_result,
+    make_flag, make_result, make_result_setup,
     ALL_INST,
 )
-from utils import Vec
 from instanceLocs import resolve as resolve_inst
-import conditions
-import vmfLib as VLib
+from srctools import Property, Vec, Entity, Output
 
 
 @make_flag('instance')
@@ -63,7 +64,7 @@ def flag_instvar(inst, flag):
     The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
     If ommitted, the operation is assumed to be ==.
     """
-    values = flag.value.split(' ')
+    values = flag.value.split(' ', 3)
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
@@ -124,9 +125,10 @@ def res_set_inst_var(inst, res):
     """Set an instance variable to the given value.
 
     Values follow the format "$start_enabled 1", with or without the $.
+    "$out $in" will copy the value of $in into $out.
     """
     var_name, val = res.value.split(' ', 1)
-    inst.fixup[var_name] = val
+    inst.fixup[var_name] = conditions.resolve_value(inst, val)
 
 
 @make_result('clearOutputs', 'clearOutput')
@@ -158,7 +160,7 @@ def res_local_targetname(inst, res):
 
 
 @make_result('replaceInstance')
-def res_replace_instance(inst: VLib.Entity, res):
+def res_replace_instance(inst: Entity, res):
     """Replace an instance with another entity.
 
     'keys' and 'localkeys' defines the new keyvalues used.
@@ -172,7 +174,7 @@ def res_replace_instance(inst: VLib.Entity, res):
     origin = Vec.from_str(inst['origin'])
     angles = inst['angles']
 
-    if not utils.conv_bool(res['keep_instance', '0'], False):
+    if not srctools.conv_bool(res['keep_instance', '0'], False):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
@@ -190,3 +192,67 @@ def res_replace_instance(inst: VLib.Entity, res):
     new_ent['origin'] = origin
     new_ent['angles'] = angles
     new_ent['targetname'] = inst['targetname']
+
+
+GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
+
+
+@make_result_setup('GlobalInput')
+def res_global_input_setup(res):
+    target = res['target', ''] or None
+    name = res['name', ''] or None
+    output = res['output', 'OnTrigger']
+    param = res['param', '']
+    delay = srctools.conv_float(res['delay', ''])
+    inp_name, inp_command = Output.parse_name(res['input'])
+
+    return name, inp_name, inp_command, output, delay, param, target
+
+
+@make_result('GlobalInput')
+def res_global_input(inst: Entity, res: Property):
+    """Trigger an input either on map spawn, or when a relay is triggered.
+
+    Arguments:
+        - "Input": the input to use, either a name or an instance: command.
+        - "Target": If set, a local name to send commands to.
+        - "Delay": Number of seconds to delay the input.
+        - "Name": If set the name of the logic_relay which must be triggered.
+            If not set the output will fire OnMapSpawn.
+        - "Output": The name of the output, defaulting to OnTrigger. Ignored
+            if Name is not set.
+        - "Param": The parameter for the output.
+    """
+    name, inp_name, inp_command, output, delay, param, target = res.value
+
+    name = conditions.resolve_value(inst, name)
+    target = conditions.resolve_value(inst, target)
+
+    try:
+        glob_ent = GLOBAL_INPUT_ENTS[name]
+    except KeyError:
+        if name is None:
+            glob_ent = GLOBAL_INPUT_ENTS[None] = inst.map.create_ent(
+                classname='logic_auto',
+                origin=inst['origin'],
+            )
+        else:
+            glob_ent = GLOBAL_INPUT_ENTS[name] = inst.map.create_ent(
+                classname='logic_relay',
+                targetname=name,
+                origin=inst['origin'],
+            )
+
+    out = Output(
+        out=('OnMapSpawn' if name is None else output),
+        targ=(
+            conditions.local_name(inst, target)
+            if target else
+            inst['targetname']
+        ),
+        inp=inp_command,
+        inst_in=inp_name,
+        delay=delay,
+        param=conditions.resolve_value(inst, param),
+    )
+    glob_ent.add_out(out)

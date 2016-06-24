@@ -9,6 +9,7 @@ from tooltip import add_tooltip
 
 import sound
 import utils
+import srctools
 import contextWin
 import logWindow
 
@@ -16,7 +17,7 @@ UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
-SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_keep_win_inside')
+SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 
 refresh_callbacks = []  # functions called to apply settings.
 
@@ -125,7 +126,7 @@ def make_checkbox(
 
     def save_opt():
         """Save the checkbox's values."""
-        GEN_OPTS[section][item] = utils.bool_as_int(
+        GEN_OPTS[section][item] = srctools.bool_as_int(
             var.get()
         )
 

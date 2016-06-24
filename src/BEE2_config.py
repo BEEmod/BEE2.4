@@ -1,6 +1,7 @@
 import os.path
 from configparser import ConfigParser, NoOptionError
 
+import srctools
 import utils
 
 LOGGER = utils.getLogger(__name__)
@@ -22,7 +23,7 @@ class ConfigFile(ConfigParser):
         """
         super().__init__()
         self.filename = os.path.join(root, filename)
-        self.writer = utils.AtomicWriter(self.filename)
+        self.writer = srctools.AtomicWriter(self.filename)
         self.has_changed = False
 
         if auto_load:

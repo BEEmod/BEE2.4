@@ -5,13 +5,11 @@ import tkinter as tk
 
 import logging
 
+import srctools
 from tk_tools import TK_ROOT
 from BEE2_config import GEN_OPTS
 import tk_tools
 import utils
-
-# Get the root logger
-LOGGER = logging.getLogger('BEE2')
 
 # Colours to use for each log level
 LVL_COLOURS = {
@@ -69,6 +67,8 @@ class TextHandler(logging.Handler):
             lmargin2=30,
         )
 
+        self.has_text = False
+
         widget['state'] = "disabled"
 
     def emit(self, record: logging.LogRecord):
@@ -83,21 +83,32 @@ class TextHandler(logging.Handler):
         # We don't want to indent the first line.
         firstline, *lines = self.format(record).split('\n')
 
+        if self.has_text:
+            # Start with a newline so it doesn't end with one.
+            self.widget.insert(
+                END,
+                '\n',
+                (),
+            )
+
         self.widget.insert(
             END,
-            # Start with a newline so it doesn't end with one.
-            '\n' + firstline,
+            firstline,
             (record.levelname,),
         )
         for line in lines:
             self.widget.insert(
                 END,
-                '\n' + line,
+                '\n',
+                ('INDENT',),
+                line,
                 # Indent following lines.
                 (record.levelname, 'INDENT'),
             )
         self.widget.see(END)  # Scroll to the end
         self.widget['state'] = "disabled"
+
+        self.has_text = True
 
         # Undo the record overwrite, so other handlers get the correct object.
         record.msg = msg
@@ -109,7 +120,7 @@ def set_visible(is_visible: bool):
         window.deiconify()
     else:
         window.withdraw()
-    GEN_OPTS['Debug']['show_log_win'] = utils.bool_as_int(is_visible)
+    GEN_OPTS['Debug']['show_log_win'] = srctools.bool_as_int(is_visible)
 
 
 def btn_copy():
@@ -126,6 +137,7 @@ def btn_clear():
     """Clear the console."""
     text_box['state'] = "normal"
     text_box.delete(START, END)
+    log_handler.has_text = False
     text_box['state'] = "disabled"
 
 
@@ -164,7 +176,7 @@ def init(start_open, log_level='info'):
         log_level = logging.INFO
     log_handler.setFormatter(utils.short_log_format)
 
-    LOGGER.addHandler(log_handler)
+    logging.getLogger('BEE2').addHandler(log_handler)
 
     scroll = tk_tools.HidingScroll(
         window,
@@ -238,7 +250,8 @@ def init(start_open, log_level='info'):
 
 if __name__ == '__main__':
     utils.init_logging()
-    init(True, log_level=logging.DEBUG)
+    LOGGER = utils.getLogger('BEE2')
+    init(True, log_level='DEBUG')
 
     # Generate a bunch of log messages to test the window.
     def errors():

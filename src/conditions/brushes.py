@@ -1,17 +1,16 @@
 """Results relating to brushwork."""
-from collections import defaultdict
 import random
+from collections import defaultdict
 
-from conditions import (
-    make_result, make_result_setup, RES_EXHAUSTED,
-    SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
-)
-from property_parser import Property
-from utils import Vec
-import utils
 import conditions
-import vmfLib as VLib
+import srctools
+import utils
 import vbsp
+from conditions import (
+    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
+)
+from srctools import Property, Vec, Output, Entity
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -77,13 +76,13 @@ def res_fix_rotation_axis(ent, res):
      * `func_platrot`
     """
     des_axis = res['axis', 'z'].casefold()
-    reverse = utils.conv_bool(res['reversed', '0'])
+    reverse = srctools.conv_bool(res['reversed', '0'])
     door_type = res['classname', 'func_door_rotating']
 
     # Extra stuff to apply to the flags (USE, toggle, etc)
     flags = sum(map(
         # Add together multiple values
-        utils.conv_int,
+        srctools.conv_int,
         res['flags', '0'].split('+')
     ))
 
@@ -114,16 +113,16 @@ def res_fix_rotation_axis(ent, res):
     conditions.set_ent_keys(door_ent, ent, res)
 
     for output in res.find_all('AddOut'):
-        door_ent.add_out(VLib.Output(
+        door_ent.add_out(Output(
             out=output['Output', 'OnUse'],
             inp=output['Input', 'Use'],
             targ=output['Target', ''],
             inst_in=output['Inst_targ', None],
             param=output['Param', ''],
-            delay=utils.conv_float(output['Delay', '']),
+            delay=srctools.conv_float(output['Delay', '']),
             times=(
                 1 if
-                utils.conv_bool(output['OnceOnly', False])
+                srctools.conv_bool(output['OnceOnly', False])
                 else -1),
         ))
 
@@ -203,7 +202,7 @@ def res_set_texture(inst, res):
         inst['angles', '0 0 0']
     )
 
-    if utils.conv_bool(res['gridpos', '0']):
+    if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
@@ -349,7 +348,7 @@ def res_add_brush(inst, res):
     solids.top.mat = vbsp.get_tex(tex_type + '.floor')
     solids.bottom.mat = vbsp.get_tex(tex_type + '.ceiling')
 
-    if utils.conv_bool(res['detail', False], False):
+    if srctools.conv_bool(res['detail', False], False):
         # Add the brush to a func_detail entity
         vbsp.VMF.create_ent(
             classname='func_detail'
@@ -431,7 +430,7 @@ def res_import_template_setup(res):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: VLib.Entity, res):
+def res_import_template(inst: Entity, res):
     """Import a template VMF file, retexturing it to match orientatation.
 
     It will be placed overlapping the given instance.
@@ -481,7 +480,7 @@ def res_import_template(inst: VLib.Entity, res):
             force_colour = conditions.MAT_TYPES.white
         elif invert_val == 'black':
             force_colour = conditions.MAT_TYPES.black
-        elif utils.conv_bool(invert_val):
+        elif srctools.conv_bool(invert_val):
             force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
 
     origin = Vec.from_str(inst['origin'])
@@ -567,5 +566,5 @@ def res_hollow_brush(inst, res):
 
     conditions.hollow_block(
         group,
-        remove_orig_face=utils.conv_bool(res['RemoveFace', False])
+        remove_orig_face=srctools.conv_bool(res['RemoveFace', False])
     )

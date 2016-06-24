@@ -1,17 +1,18 @@
-from datetime import datetime
-from zipfile import ZipFile
-from io import BytesIO
-
 import os
 import os.path
-import stat
 import shutil
-import sys
 import subprocess
+import sys
+import logging
+from datetime import datetime
+from io import BytesIO
+from zipfile import ZipFile
 
-from property_parser import Property
-from BSP import BSP, BSP_LUMPS
+import srctools
 import utils
+from srctools import Property
+from srctools.bsp import BSP, BSP_LUMPS
+
 
 LOGGER = utils.init_logging('bee2/VRAD.log')
 
@@ -57,8 +58,20 @@ INJECT_FILES = {
     'particles_manifest.txt': 'particles/particles_manifest.txt',
 
     # A generated soundscript for the current music.
-    'music_script.txt': 'scripts/BEE2_generated_music.txt'
+    'music_script.txt': 'scripts/BEE2_generated_music.txt',
+
+    # Applied to @glados's entity scripts.
+    'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
 }
+
+# Additional parts to add if we have a mdl file.
+MDL_ADDITIONAL_EXT = [
+    '.sw.vtx',
+    '.dx80.vtx',
+    '.dx90.vtx',
+    '.vvd',
+    '.phy',
+]
 
 
 # Various parts of the soundscript generated for BG music.
@@ -246,7 +259,6 @@ def quote(txt):
     return '"' + txt + '"'
 
 
-
 def load_config():
     global CONF
     LOGGER.info('Loading Settings...')
@@ -260,7 +272,39 @@ def load_config():
     LOGGER.info('Config Loaded!')
 
 
-def pack_file(zipfile: ZipFile, filename: str):
+def get_zip_writer(zipfile: ZipFile):
+    """Allow dumping the packed files to a folder.
+
+    Returns a zipfile.write() method.
+    """
+    dump_folder = CONF['packfile_dump', '']
+    if not dump_folder:
+        return zipfile.write
+
+    dump_folder = os.path.abspath(dump_folder)
+
+    # Delete files in the folder, but don't delete the folder itself.
+    try:
+        dump_files = os.listdir(dump_folder)
+    except FileNotFoundError:
+        pass
+    else:
+        for name in dump_files:
+            name = os.path.join(dump_folder, name)
+            if os.path.isdir(name):
+                shutil.rmtree(name)
+            else:
+                os.remove(name)
+
+    def write_to_zip(filename, arcname):
+        dump_loc = os.path.join(dump_folder, arcname)
+        os.makedirs(os.path.dirname(dump_loc), exist_ok=True)
+        shutil.copy(filename, dump_loc)
+        zipfile.write(filename, arcname)
+    return write_to_zip
+
+
+def pack_file(zip_write, filename: str, suppress_error=False):
     """Check multiple locations for a resource file.
     """
     if '\t' in filename:
@@ -282,7 +326,7 @@ def pack_file(zipfile: ZipFile, filename: str):
             for subfile in os.listdir(dir_path):
                 full_path = os.path.join(dir_path, subfile)
                 rel_path = os.path.join(directory, subfile)
-                zipfile.write(
+                zip_write(
                     filename=full_path,
                     arcname=rel_path,
                 )
@@ -295,13 +339,16 @@ def pack_file(zipfile: ZipFile, filename: str):
             os.path.join(poss_path, filename)
         )
         if os.path.isfile(full_path):
-            zipfile.write(
+            zip_write(
                 filename=full_path,
                 arcname=arcname,
             )
             break
     else:
-        LOGGER.warning('"bee2/' + filename + '" not found! (May be OK if not custom)')
+        if not suppress_error:
+            LOGGER.warning(
+                '"bee2/' + filename + '" not found! (May be OK if not custom)'
+            )
 
 
 def gen_sound_manifest(additional, excludes):
@@ -333,10 +380,6 @@ def gen_sound_manifest(additional, excludes):
 
     for script in additional:
         scripts.append(script)
-
-        # For our packed scripts, force the game to load them
-        # (we know they're used).
-        scripts.append('!' + script)
 
     for script in excludes:
         try:
@@ -491,6 +534,28 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
         pack_list.add('sound/' + snds.value.casefold())
 
 
+def gen_auto_script(preload, is_peti):
+    """Run various commands on spawn.
+
+    This allows precaching specific sounds on demand.
+    """
+    dest = os.path.join('bee2', 'inject', 'auto_run.nut')
+    if not preload and not is_peti:
+        return # Don't add for hammer maps
+
+    with open(dest, 'w') as file:
+        if not preload:
+            return  # Leave it empty, don't write an empty body.
+
+        file.write('function Precache() {\n')
+        for entry in preload:
+            if entry.startswith('precache_sound:'):
+                file.write('\tPrecacheSoundScript("{}");\n'.format(
+                    entry[15:],
+                ))
+        file.write('}\n')
+
+
 def inject_files():
     """Generate the names of files to inject, if they exist.."""
     for filename, arcname in INJECT_FILES.items():
@@ -511,6 +576,8 @@ def pack_content(path, is_peti):
     soundscripts = set()  # Soundscripts need to be added to the manifest too..
     rem_soundscripts = set()  # Soundscripts to exclude, so we can override the sounds.
     particles = set()
+    additional_files = set()  # .vvd files etc which also are needed.
+    preload_files = set()  # Files we want to force preloading
 
     try:
         pack_list = open(path[:-4] + '.filelist.txt')
@@ -524,6 +591,10 @@ def pack_content(path, is_peti):
                 if not line or line.startswith('//'):
                     continue  # Skip blanks or comments
 
+                if line[:8] == 'precache':
+                    preload_files.add(line)
+                    continue
+
                 if line[:2] == '-#':
                     rem_soundscripts.add(line[2:])
                     continue
@@ -536,7 +607,17 @@ def pack_content(path, is_peti):
                 if line.startswith('particles/'):
                     particles.add(line)
 
+                if line[-4:] == '.mdl':
+                    additional_files.update({
+                        line[:-4] + ext
+                        for ext in
+                        MDL_ADDITIONAL_EXT
+                    })
+
                 files.add(line)
+
+    # Remove guessed files not in the original list.
+    additional_files -= files
 
     # Only generate a soundscript for PeTI maps..
     if is_peti:
@@ -550,6 +631,7 @@ def pack_content(path, is_peti):
     # If no files are packed, no manifest will be added either.
     gen_sound_manifest(soundscripts, rem_soundscripts)
     gen_part_manifest(particles)
+    gen_auto_script(preload_files, is_peti)
 
     inject_names = list(inject_files())
 
@@ -562,6 +644,11 @@ def pack_content(path, is_peti):
     for file in sorted(files):
         # \t seperates the original and in-pack name if used.
         LOGGER.info(' # "' + file.replace('\t', '" as "') + '"')
+
+    if additional_files and LOGGER.isEnabledFor(logging.DEBUG):
+        LOGGER.info('Potential additional files:')
+        for file in sorted(additional_files):
+            LOGGER.debug(' # "' + file + '"')
 
     LOGGER.info('Injected files:')
     for _, file in inject_names:
@@ -578,12 +665,17 @@ def pack_content(path, is_peti):
     zipfile = ZipFile(zip_data, mode='a')
     LOGGER.debug(' - Existing zip read')
 
+    zip_write = get_zip_writer(zipfile)
+
     for file in files:
-        pack_file(zipfile, file)
+        pack_file(zip_write, file)
+
+    for file in additional_files:
+        pack_file(zip_write, file, suppress_error=True)
 
     for filename, arcname in inject_names:
         LOGGER.info('Injecting "{}" into packfile.', arcname)
-        zipfile.write(filename, arcname)
+        zip_write(filename, arcname)
 
     LOGGER.debug(' - Added files')
 
@@ -684,7 +776,7 @@ def mod_screenshots():
             LOGGER.info('No Auto Screenshot found!')
             mod_type = 'peti'  # Suppress the "None not found" error
 
-        if utils.conv_bool(CONF['clean_screenshots', '0']):
+        if srctools.conv_bool(CONF['clean_screenshots', '0']):
             LOGGER.info('Cleaning up screenshots...')
             # Clean up this folder - otherwise users will get thousands of
             # pics in there!
@@ -811,7 +903,7 @@ def main(argv):
         # specified there.
         is_peti = (
             os.path.basename(path) == "preview.bsp" or
-            utils.conv_bool(CONF['force_full'], False)
+            srctools.conv_bool(CONF['force_full'], False)
         )
 
     if '-no_pack' not in args:

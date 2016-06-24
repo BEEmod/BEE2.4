@@ -1,28 +1,32 @@
 # coding: utf-8
-from decimal import Decimal
-from collections import namedtuple, defaultdict
-from enum import Enum
-import random
-import math
 import itertools
-
-from utils import Vec, Vec_tuple
-from property_parser import Property
-from instanceLocs import resolve as resolve_inst
-import vmfLib as VLib
-import utils
+import math
+import random
+from collections import namedtuple, defaultdict
+from decimal import Decimal
+from enum import Enum
 
 from typing import (
-    Optional, Callable, Any,
+    Callable, Any,
     Dict, List, Tuple, NamedTuple,
 )
+
+import srctools
+import utils
+from instanceLocs import resolve as resolve_inst
+from srctools import (
+    Property,
+    Vec_tuple, Vec,
+    Entity, Output, Solid, Side, UVAxis
+)
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
 
 # Stuff we get from VBSP in init()
 GLOBAL_INSTANCES = set()
 ALL_INST = set()
-VMF = None  # type: VLib.VMF
+VMF = None  # type: srctools.VMF
 
 conditions = []
 FLAG_LOOKUP = {}
@@ -34,12 +38,12 @@ ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
 
-GOO_LOCS = set()  # A set of all blocks containing goo
-GOO_FACE_LOC = set()  # A set of the locations of all goo top faces
+GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
+GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[VLib.Solid], VLib.Entity, List[VLib.Entity]]]
+TEMPLATES = {}  # type: Dict[str, Tuple[List[Solid], Entity, List[Entity]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
@@ -78,12 +82,12 @@ class MAT_TYPES(Enum):
 
 # A dictionary mapping origins to their brushes
 solidGroup = NamedTuple('solidGroup', [
-    ('face', VLib.Side),
-    ('solid', VLib.Solid),
+    ('face', Side),
+    ('solid', Solid),
     ('normal', Vec), # The normal of the face.
     ('color', MAT_TYPES),
 ])
-SOLIDS = {}  # type: Dict[utils.Vec_tuple, solidGroup]
+SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
 # The input/output connection values defined for each item.
 # Each is a tuple of (inst_name, command) values, ready to be passed to
@@ -98,12 +102,12 @@ CONNECTIONS = {}
 TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
 
-xp = utils.Vec_tuple(1, 0, 0)
-xn = utils.Vec_tuple(-1, 0, 0)
-yp = utils.Vec_tuple(0, 1, 0)
-yn = utils.Vec_tuple(0, -1, 0)
-zp = utils.Vec_tuple(0, 0, 1)
-zn = utils.Vec_tuple(0, 0, -1)
+xp = Vec_tuple(1, 0, 0)
+xn = Vec_tuple(-1, 0, 0)
+yp = Vec_tuple(0, 1, 0)
+yn = Vec_tuple(0, -1, 0)
+zp = Vec_tuple(0, 0, 1)
+zn = Vec_tuple(0, 0, -1)
 
 DIRECTIONS = {
     # Translate these words into a normal vector
@@ -408,7 +412,7 @@ def meta_cond(priority=0, only_once=True):
 
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
-    def x(func: Callable[[VLib.Entity, Property], bool]):
+    def x(func: Callable[[Entity, Property], bool]):
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
@@ -421,7 +425,7 @@ def make_flag(orig_name, *aliases):
 
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
-    def x(func: Callable[[VLib.Entity, Property], Any]):
+    def x(func: Callable[[Entity, Property], Any]):
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
@@ -563,10 +567,10 @@ def build_solid_dict():
                 y = bbox_min.y + 64
                 # If goo is multi-level, we want to record all pos!
                 for z in range(int(bbox_min.z) + 64, int(bbox_max.z), 128):
-                    GOO_LOCS.add(Vec_tuple(x, y, z))
+                    GOO_LOCS[Vec_tuple(x, y, z)] = face
 
                 # Add the location of the top face
-                GOO_FACE_LOC.add(Vec_tuple(x, y, bbox_max.z))
+                GOO_FACE_LOC[Vec_tuple(x, y, bbox_max.z)] = face
 
                 # Indicate that this map contains goo...
                 vbsp.settings['has_attr']['goo'] = True
@@ -603,7 +607,7 @@ def build_connections_dict(prop_block: Property):
         val = item[key, '']
         if not val:
             return None, ''
-        return VLib.Output.parse_name(val)
+        return Output.parse_name(val)
 
     for item_data in prop_block.find_key('Connections', []):
         CONNECTIONS[item_data.name] = ItemConnections(
@@ -697,7 +701,7 @@ def weighted_random(count: int, weights: str):
 
 def add_output(inst, prop, target):
     """Add a customisable output to an instance."""
-    inst.add_out(VLib.Output(
+    inst.add_out(Output(
         prop['output', ''],
         target,
         prop['input', ''],
@@ -714,7 +718,7 @@ def add_suffix(inst, suff):
     inst['file'] = ''.join((old_name, suff, dot, ext))
 
 
-def local_name(inst: VLib.Entity, name: str):
+def local_name(inst: Entity, name: str):
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
@@ -795,7 +799,7 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
 
     The IDs should be strings.
     """
-    for overlay in VMF.by_class['info_overlay']:  # type: VLib.Entity
+    for overlay in VMF.by_class['info_overlay']:  # type: Entity
         sides = overlay['sides', ''].split(' ')
         for side in sides[:]:
             if side not in mapping:
@@ -809,18 +813,18 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
             overlay['sides'] = ' '.join(sides)
 
 
-def set_ent_keys(ent, inst, prop_block, suffix=''):
+def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
     """Copy the given key prop block to an entity.
 
-    This uses the 'keys' and 'localkeys' properties on the prop_block.
+    This uses the keys and 'localkeys' properties on the prop_block.
     Values with $fixup variables will be treated appropriately.
     LocalKeys keys will be changed to use instance-local names, where needed.
-    If suffix is set, it is a suffix to the two prop_block names
+    block_name lets you change the 'keys' suffix on the prop_block name.
+    ent can be any mapping.
     """
-    for prop in prop_block.find_key('Keys' + suffix, []):
+    for prop in prop_block.find_key(block_name, []):
         ent[prop.real_name] = resolve_value(inst, prop.value)
-    name = inst['targetname', ''] + '-'
-    for prop in prop_block.find_key('LocalKeys' + suffix, []):
+    for prop in prop_block.find_key('Local' + block_name, []):
         if prop.value.startswith('$'):
             val = inst.fixup[prop.value]
         else:
@@ -828,10 +832,10 @@ def set_ent_keys(ent, inst, prop_block, suffix=''):
         if val.startswith('@'):
             ent[prop.real_name] = val
         else:
-            ent[prop.real_name] = name + val
+            ent[prop.real_name] = local_name(inst, val)
 
 
-def resolve_value(inst: VLib.Entity, value: str):
+def resolve_value(inst: Entity, value: str):
     """If a value starts with '$', lookup the associated var."""
     if value.startswith('$'):
         if value in inst.fixup:
@@ -853,7 +857,7 @@ def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
-    vmf = VLib.VMF.parse(props)
+    vmf = srctools.VMF.parse(props)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
     overlay_ents = defaultdict(list)
@@ -927,7 +931,7 @@ def import_template(
             brush.localise(origin, angles)
             new_list.append(brush)
 
-    for overlay in orig_over:  # type: VLib.Entity
+    for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
             map=VMF,
         )
@@ -941,7 +945,7 @@ def import_template(
             if side in id_mapping
         )
 
-        VLib.localise_overlay(new_overlay, origin, angles)
+        srctools.vmf.localise_overlay(new_overlay, origin, angles)
         orig_target = new_overlay['targetname']
 
         # Only change the targetname if the overlay is not global, and we have
@@ -990,7 +994,7 @@ def import_template(
 
 def get_scaling_template(
         temp_id,
-    ) -> Dict[Vec_tuple, Tuple[VLib.UVAxis, VLib.UVAxis, float]]:
+    ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
     """Get the scaling data from a template.
 
     This is a dictionary mapping normals to the U,V and rotation data.
@@ -1027,8 +1031,8 @@ TEMP_COLOUR_INVERT = {
 def retexture_template(
         template_data: Template,
         origin: Vec,
-        fixup: VLib.EntityFixup=None,
-        replace_tex: dict=utils.EmptyMapping,
+        fixup: srctools.vmf.EntityFixup=None,
+        replace_tex: dict= srctools.EmptyMapping,
         force_colour: MAT_TYPES=None,
         force_grid: str=None,
         use_bullseye=False,
@@ -1109,15 +1113,15 @@ def retexture_template(
                         face.mat = 'tools/toolsnodraw'
                     else:
                         # Goo always has the same orientation!
-                        face.uaxis = VLib.UVAxis(
+                        face.uaxis = srctools.vmf.UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
-                        face.vaxis = VLib.UVAxis(
+                        face.vaxis = srctools.vmf.UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=utils.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
                 continue
             # It's a regular wall type!
@@ -1145,20 +1149,20 @@ def retexture_template(
                 if norm.z == 1:
                     if grid_size != 'special':
                         grid_size = 'ceiling'
-                    face.uaxis = VLib.UVAxis(1, 0, 0)
-                    face.vaxis = VLib.UVAxis(0, -1, 0)
+                    face.uaxis = UVAxis(1, 0, 0)
+                    face.vaxis = UVAxis(0, -1, 0)
                 elif norm.z == -1:
                     if grid_size != 'special':
                         grid_size = 'floor'
-                    face.uaxis = VLib.UVAxis(1, 0, 0)
-                    face.vaxis = VLib.UVAxis(0, -1, 0)
+                    face.uaxis = UVAxis(1, 0, 0)
+                    face.vaxis = UVAxis(0, -1, 0)
                 # Walls:
                 elif norm.x != 0:
-                    face.uaxis = VLib.UVAxis(0, 1, 0)
-                    face.vaxis = VLib.UVAxis(0, 0, -1)
+                    face.uaxis = UVAxis(0, 1, 0)
+                    face.vaxis = UVAxis(0, 0, -1)
                 elif norm.y != 0:
-                    face.uaxis = VLib.UVAxis(1, 0, 0)
-                    face.vaxis = VLib.UVAxis(0, 0, -1)
+                    face.uaxis = UVAxis(1, 0, 0)
+                    face.vaxis = UVAxis(0, 0, -1)
 
                 # If axis-aligned, make the orientation aligned to world
                 # That way multiple items merge well, and walls are upright.
@@ -1266,7 +1270,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
     If remove_orig_face is true, the starting face will not be kept.
     """
     import vbsp
-    orig_solid = solid_group.solid  # type: VLib.Solid
+    orig_solid = solid_group.solid  # type: Solid
 
     bbox_min, bbox_max = orig_solid.get_bbox()
     if 4 in (bbox_max - bbox_min):
@@ -1306,7 +1310,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
         ).world
 
         # Texture the new brush..
-        for brush in new_brushes:  # type: VLib.Solid
+        for brush in new_brushes:  # type: Solid
             for new_face in brush.sides:
                 # The SKIP brush is the surface, all the others are nodraw.
                 if new_face.mat.casefold() != 'tools/toolsskip':
@@ -1399,13 +1403,13 @@ def res_timed_relay_setup(res):
     flags = res['spawnflags', '0']
 
     final_outs = [
-        VLib.Output.parse(subprop)
+        Output.parse(subprop)
         for prop in res.find_all('FinalOutputs')
         for subprop in prop
     ]
 
     rep_outs = [
-        VLib.Output.parse(subprop)
+        Output.parse(subprop)
         for prop in res.find_all('RepOutputs')
         for subprop in prop
     ]
@@ -1418,7 +1422,7 @@ def res_timed_relay_setup(res):
 
 
 @make_result('timedRelay')
-def res_timed_relay(inst: VLib.Entity, res):
+def res_timed_relay(inst: Entity, res):
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
@@ -1438,7 +1442,7 @@ def res_timed_relay(inst: VLib.Entity, res):
         disabled
     )
 
-    delay = utils.conv_float(
+    delay = srctools.conv_float(
         inst.fixup[var, '0']
         if var.startswith('$') else
         var
@@ -1446,14 +1450,14 @@ def res_timed_relay(inst: VLib.Entity, res):
 
     for off in range(int(math.ceil(delay))):
         for out in rep_outs:
-            new_out = out.copy()  # type: VLib.Output
+            new_out = out.copy()  # type: Output
             new_out.target = local_name(inst, new_out.target)
             new_out.delay += off
             new_out.comma_sep = False
             relay.add_out(new_out)
 
     for out in final_outs:
-        new_out = out.copy()  # type: VLib.Output
+        new_out = out.copy()  # type: Output
         new_out.target = local_name(inst, new_out.target)
         new_out.delay += delay
         new_out.comma_sep = False
@@ -1564,6 +1568,7 @@ def make_static_pist(ent, res):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
+    If changed to static pistons, the $bottom and $top level become equal.
     Instances:
         Bottom_1/2/3: Moving piston with the given $bottom_level
         Logic_0/1/2/3: Additional logic instance for the given $bottom_level
@@ -1589,14 +1594,14 @@ def make_static_pist(ent, res):
             VMF.add_ent(logic_ent)
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
-            logic_ent.fixup['manager_a'] = utils.bool_as_int(
+            logic_ent.fixup['manager_a'] = srctools.bool_as_int(
                 ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
         val = res.value[
             'static_' + (
                 ent.fixup['top_level', '1']
-                if utils.conv_bool(ent.fixup['start_up'], False)
+                if srctools.conv_bool(ent.fixup['start_up'], False)
                 else bottom_pos
             )
         ]
@@ -1625,8 +1630,8 @@ def res_goo_debris(_, res):
         # TODO: Make this only apply to the ones chosen to be bottomless.
         return RES_EXHAUSTED
 
-    space = utils.conv_int(res['spacing', '1'], 1)
-    rand_count = utils.conv_int(res['number', ''], None)
+    space = srctools.conv_int(res['spacing', '1'], 1)
+    rand_count = srctools.conv_int(res['number', ''], None)
     if rand_count:
         rand_list = weighted_random(
             rand_count,
@@ -1634,9 +1639,9 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = utils.conv_int(res['chance', '30'], 30) / 100
+    chance = srctools.conv_int(res['chance', '30'], 30) / 100
     file = res['file']
-    offset = utils.conv_int(res['offset', '0'], 0)
+    offset = srctools.conv_int(res['offset', '0'], 0)
 
     if file.endswith('.vmf'):
         file = file[:-4]
@@ -1697,7 +1702,7 @@ WP_LIMIT = 30  # Limit to this many portal instances
 
 @make_result_setup('WPLightstrip')
 def res_portal_lightstrip_setup(res):
-    do_offset = utils.conv_bool(res['doOffset', '0'])
+    do_offset = srctools.conv_bool(res['doOffset', '0'])
     hole_inst = res['HoleInst']
     fallback = res['FallbackInst']
     location = Vec.from_str(res['location', '0 8192 0'])
@@ -1872,7 +1877,7 @@ def res_make_tag_fizzler(inst, res):
         return
 
     # The distance from origin the double signs are seperated by.
-    sign_offset = utils.conv_int(res['signoffset', ''], 16)
+    sign_offset = srctools.conv_int(res['signoffset', ''], 16)
 
     sign_loc = (
         # The actual location of the sign - on the wall
@@ -1883,14 +1888,14 @@ def res_make_tag_fizzler(inst, res):
     # Now deal with the visual aspect:
     # Blue signs should be on top.
 
-    blue_enabled = utils.conv_bool(inst.fixup['$start_enabled'])
-    oran_enabled = utils.conv_bool(inst.fixup['$start_reversed'])
+    blue_enabled = srctools.conv_bool(inst.fixup['$start_enabled'])
+    oran_enabled = srctools.conv_bool(inst.fixup['$start_reversed'])
 
     if not blue_enabled and not oran_enabled:
         # Hide the sign in this case!
         inst.remove()
 
-    inst_angle = utils.parse_str(inst['angles'])
+    inst_angle = srctools.parse_vec_str(inst['angles'])
 
     inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
     loc = Vec.from_str(inst['origin'])
@@ -2017,7 +2022,7 @@ def res_make_tag_fizzler(inst, res):
     # zero
     fizz_base.fixup['$connectioncount'] = str(max(
         0,
-        utils.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+        srctools.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
     ))
 
     if 'model_inst' in res:
@@ -2100,12 +2105,12 @@ def res_make_tag_fizzler(inst, res):
     neg_trig['targetname'] = fizz_name + '-trig_neg'
 
     pos_trig.outputs = [
-        VLib.Output(
+        Output(
             output,
             fizz_name + '-trig_neg',
             'Enable',
         ),
-        VLib.Output(
+        Output(
             output,
             fizz_name + '-trig_pos',
             'Disable',
@@ -2113,12 +2118,12 @@ def res_make_tag_fizzler(inst, res):
     ]
 
     neg_trig.outputs = [
-        VLib.Output(
+        Output(
             output,
             fizz_name + '-trig_pos',
             'Enable',
         ),
-        VLib.Output(
+        Output(
             output,
             fizz_name + '-trig_neg',
             'Disable',
@@ -2129,17 +2134,17 @@ def res_make_tag_fizzler(inst, res):
 
     if blue_enabled:
         # If this is blue/oran only, don't affect the other color
-        neg_trig.outputs.append(VLib.Output(
+        neg_trig.outputs.append(Output(
             output,
             '@BlueIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(neg_blue),
+            param=srctools.bool_as_int(neg_blue),
         ))
-        pos_trig.outputs.append(VLib.Output(
+        pos_trig.outputs.append(Output(
             output,
             '@BlueIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(pos_blue),
+            param=srctools.bool_as_int(pos_blue),
         ))
         # Add voice attributes - we have the gun and gel!
         voice_attr['bluegelgun'] = True
@@ -2148,17 +2153,17 @@ def res_make_tag_fizzler(inst, res):
         voice_attr['bouncegel'] = True
 
     if oran_enabled:
-        neg_trig.outputs.append(VLib.Output(
+        neg_trig.outputs.append(Output(
             output,
             '@OrangeIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(neg_oran),
+            param=srctools.bool_as_int(neg_oran),
         ))
-        pos_trig.outputs.append(VLib.Output(
+        pos_trig.outputs.append(Output(
             output,
             '@OrangeIsEnabled',
             'SetValue',
-            param=utils.bool_as_int(pos_oran),
+            param=srctools.bool_as_int(pos_oran),
         ))
         voice_attr['orangegelgun'] = True
         voice_attr['orangegel'] = True
@@ -2172,13 +2177,13 @@ def res_make_tag_fizzler(inst, res):
         VMF.remove_ent(pos_trig)
         neg_trig['targetname'] = fizz_name + '-trig'
         neg_trig.outputs.clear()
-        neg_trig.add_out(VLib.Output(
+        neg_trig.add_out(Output(
             output,
             '@BlueIsEnabled',
             'SetValue',
             param='0'
         ))
-        neg_trig.add_out(VLib.Output(
+        neg_trig.add_out(Output(
             output,
             '@OrangeIsEnabled',
             'SetValue',
@@ -2211,13 +2216,13 @@ def res_make_tag_fizzler(inst, res):
         # The fizzler shouldn't kill cubes
         fizz_brush['spawnflags'] = '1'
 
-        fizz_brush.outputs.append(VLib.Output(
+        fizz_brush.outputs.append(Output(
             output,
             '@shake_global',
             'StartShake',
         ))
 
-        fizz_brush.outputs.append(VLib.Output(
+        fizz_brush.outputs.append(Output(
             output,
             '@shake_global_sound',
             'PlaySound',

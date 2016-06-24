@@ -1,5 +1,5 @@
-#coding: utf-8
 from tkinter import *  # ui library
+
 from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
@@ -8,6 +8,7 @@ import random
 
 import sound as snd
 import utils
+import srctools
 import contextWin
 
 # all editable properties in editoritems, Valve probably isn't going to
@@ -183,7 +184,7 @@ def save_pist(key, val):
     values['toplevel'] = start_pos
     values['bottomlevel'] = end_pos
 
-    values['startup'] = utils.bool_as_int(start_pos > end_pos)
+    values['startup'] = srctools.bool_as_int(start_pos > end_pos)
     out_values['toplevel'] = str(max(start_pos, end_pos))
     out_values['bottomlevel'] = str(min(start_pos, end_pos))
 
@@ -214,7 +215,7 @@ def paint_fx(e=None):
 
 
 def exit_win(_=None):
-    "Quit and return the new settings."
+    """Quit and save the new settings."""
     global is_open
     win.grab_release()
     win.withdraw()
@@ -280,7 +281,7 @@ def init(cback):
         labels[key] = ttk.Label(frame, text=prop_name+':')
         if prop_type == 'checkbox':
             values[key] = IntVar(value=DEFAULTS[key])
-            out_values[key] = utils.bool_as_int(DEFAULTS[key])
+            out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
                 frame,
                 variable=values[key],
@@ -297,7 +298,7 @@ def init(cback):
 
         elif prop_type == 'railLift':
             values[key] = IntVar(value=DEFAULTS[key])
-            out_values[key] = utils.bool_as_int(DEFAULTS[key])
+            out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
                 frame,
                 variable=values[key],
@@ -377,15 +378,15 @@ def show_window(used_props, parent, item_name):
     is_open = True
     spec_row = 1
 
-    start_up = utils.conv_bool(used_props.get('startup', '0'))
+    start_up = srctools.conv_bool(used_props.get('startup', '0'))
     values['startup'] = start_up
     for prop, value in used_props.items():
         if prop in PROP_TYPES and value is not None:
             prop_type = PROP_TYPES[prop][0]
             if prop_type == 'checkbox':
-                values[prop].set(utils.conv_bool(value))
+                values[prop].set(srctools.conv_bool(value))
             elif prop_type == 'railLift':
-                values[prop].set(utils.conv_bool(value))
+                values[prop].set(srctools.conv_bool(value))
                 save_rail(prop)
             elif prop_type == 'gelType':
                 values[prop].set(value)

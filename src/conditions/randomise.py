@@ -1,12 +1,13 @@
 """Conditions for randomising instances."""
 import random
 
-from property_parser import Property
+from srctools import Property, Vec
+import conditions
+import srctools
+
 from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
-import conditions
-import utils
 
 
 @make_flag('random')
@@ -20,7 +21,7 @@ def flag_random(inst, res: Property):
         seed = ''
 
     # Allow ending with '%' sign
-    chance = utils.conv_int(chance.rstrip('%'), 100)
+    chance = srctools.conv_int(chance.rstrip('%'), 100)
 
     random.seed('random_chance_{}:{}_{}_{}'.format(
         seed,
@@ -40,7 +41,7 @@ def res_random_setup(res):
     for prop in res:
         if prop.name == 'chance':
             # Allow ending with '%' sign
-            chance = utils.conv_int(
+            chance = srctools.conv_int(
                 prop.value.rstrip('%'),
                 chance,
             )
@@ -113,14 +114,21 @@ def res_random(inst, res):
 
 @make_result_setup('variant')
 def res_add_variant_setup(res):
-    count = utils.conv_int(res['Number', ''], None)
-    if count:
-        return conditions.weighted_random(
-            count,
-            res['weights', ''],
-        )
+    if res.has_children():
+        count = srctools.conv_int(res['Number', ''], None)
+        if count:
+            return conditions.weighted_random(
+                count,
+                res['weights', ''],
+            )
+        else:
+            return None
     else:
-        return None
+        count = srctools.conv_int(res.value, None)
+        if count:
+            return list(range(count))
+        else:
+            return None
 
 
 @make_result('variant')
@@ -136,6 +144,9 @@ def res_add_variant(inst, res):
     being chosen, and the other 2 have a 1/4 chance of being chosen.
     The chosen variant depends on the position, direction and name of
     the instance.
+
+    Alternatively, you can use "variant" "number" to choose from equally-weighted
+    options.
     """
     import vbsp
     if inst['targetname', ''] == '':
@@ -158,9 +169,9 @@ def res_rand_num(inst, res):
     If 'seed' is set, it will be used to keep the value constant across
     map recompiles. This should be unique.
     """
-    is_float = utils.conv_bool(res['decimal'])
-    max_val = utils.conv_float(res['max', 1.0])
-    min_val = utils.conv_float(res['min', 0.0])
+    is_float = srctools.conv_bool(res['decimal'])
+    max_val = srctools.conv_float(res['max', 1.0])
+    min_val = srctools.conv_float(res['min', 0.0])
     var = res['resultvar', '$random']
     seed = res['seed', 'random']
 
@@ -182,7 +193,7 @@ def res_rand_vec(inst, res):
     are for each section. If the min and max are equal that number will be used
     instead.
     """
-    is_float = utils.conv_bool(res['decimal'])
+    is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']
     seed = res['seed', 'random']
 
@@ -196,11 +207,59 @@ def res_rand_vec(inst, res):
     value = Vec()
 
     for axis in 'xyz':
-        max_val = utils.conv_float(res['max_' + axis, 0.0])
-        min_val = utils.conv_float(res['min_' + axis, 0.0])
+        max_val = srctools.conv_float(res['max_' + axis, 0.0])
+        min_val = srctools.conv_float(res['min_' + axis, 0.0])
         if min_val == max_val:
             value[axis] = min_val
         else:
             value[axis] = func(min_val, max_val)
 
     inst.fixup[var] = value.join(' ')
+
+
+@make_result_setup('randomShift')
+def res_rand_inst_shift_setup(res):
+    min_x = srctools.conv_int(res['min_x', '0'])
+    max_x = srctools.conv_int(res['max_x', '0'])
+    min_y = srctools.conv_int(res['min_y', '0'])
+    max_y = srctools.conv_int(res['max_y', '0'])
+    min_z = srctools.conv_int(res['min_z', '0'])
+    max_z = srctools.conv_int(res['max_z', '0'])
+
+    return (
+        min_x, max_x,
+        min_y, max_y,
+        min_z, max_z,
+    )
+
+
+@make_result('randomShift')
+def res_rand_inst_shift(inst, res):
+    """Randomly shift a instance by the given amounts.
+
+    The positions are local to the instance.
+    """
+    import vbsp
+    (
+        min_x, max_x,
+        min_y, max_y,
+        min_z, max_z,
+    ) = res.value
+
+    random.seed(
+        vbsp.MAP_RAND_SEED +
+        '_random_shift_' +
+        inst['origin'] +
+        inst['angles']
+    )
+
+    offset = Vec(
+        random.uniform(min_x, max_x),
+        random.uniform(min_y, max_y),
+        random.uniform(min_z, max_z),
+    )
+
+    offset.rotate_by_str(inst['angles'])
+    origin = Vec.from_str(inst['origin'])
+    origin += offset
+    inst['origin'] = origin

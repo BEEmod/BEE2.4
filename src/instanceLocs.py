@@ -3,12 +3,12 @@
 This way VBSP_config files can generically refer to items, and work in
 multiple styles.
 """
+import logging
 from collections import defaultdict
 from functools import lru_cache
-import logging
 
-from property_parser import Property
 import utils
+from srctools import Property
 
 from typing import Optional, List
 
@@ -252,6 +252,7 @@ def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
+    - "<ITEM_ID>" matches all indexes, plus extra instances.
     - "<ITEM_ID:1,2,5>": matches the given indexes for that item.
     - "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
     - "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
@@ -355,11 +356,14 @@ def _resolve(path):
             # It's just the <item_id>, return all the values
             try:
                 # Skip "" instances
-                return [
+                out = [
                     inst for inst in
                     INSTANCE_FILES[path]
                     if inst != ''
                     ]
+                # Add custom values too
+                out.extend(CUST_INST_FILES[path].values())
+                return out
             except KeyError:
                 LOGGER.warning(
                     '"{}" not a valid item!',

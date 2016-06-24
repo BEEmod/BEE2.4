@@ -4,8 +4,8 @@ from conditions import (
     make_flag, make_result,
     DIRECTIONS, SOLIDS, GOO_LOCS,
 )
-from utils import Vec
-import utils
+from srctools import Vec
+import srctools
 
 
 @make_flag(
@@ -38,7 +38,7 @@ def flag_angles(inst, flag):
             from_dir = Vec(DIRECTIONS[from_dir.casefold()])
         else:
             from_dir = Vec.from_str(from_dir, 0, 0, 1)
-        allow_inverse = utils.conv_bool(flag['allow_inverse', '0'])
+        allow_inverse = srctools.conv_bool(flag['allow_inverse', '0'])
     else:
         targ_angle = flag.value
         from_dir = Vec(0, 0, 1)
@@ -94,7 +94,7 @@ def flag_brush_at_loc(inst, flag):
             inst['angles', '0 0 0'],
         )
 
-    if utils.conv_bool(flag['gridpos', '0']) and norm is not None:
+    if srctools.conv_bool(flag['gridpos', '0']) and norm is not None:
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
@@ -102,7 +102,7 @@ def flag_brush_at_loc(inst, flag):
                 pos[axis] = pos[axis] // 128 * 128 + 64
 
     result_var = flag['setVar', '']
-    should_remove = utils.conv_bool(flag['RemoveBrush', False], False)
+    should_remove = srctools.conv_bool(flag['RemoveBrush', False], False)
     des_type = flag['type', 'any'].casefold()
 
     brush = SOLIDS.get(pos.as_tuple(), None)
@@ -152,7 +152,7 @@ def res_force_upright(inst, _):
     if normal.z != 0:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
-    inst['angles'] = '0 {} 0'.format(ang % 360)  # Don't use negatives
+    inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
 
 
 @make_result('setAngles')
@@ -173,14 +173,14 @@ def res_translate_inst(inst, res):
     if folded_val == '<piston>':
         folded_val = (
             '<piston_top>' if
-            utils.conv_bool(inst.fixup['$start_up'])
+            srctools.conv_bool(inst.fixup['$start_up'])
             else '<piston_bottom>'
         )
 
     if folded_val == '<piston_top>':
-        val = Vec(z=128 * utils.conv_int(inst.fixup['$top_level', '1'], 1))
+        val = Vec(z=128 * srctools.conv_int(inst.fixup['$top_level', '1'], 1))
     elif folded_val == '<piston_bottom>':
-        val = Vec(z=128 * utils.conv_int(inst.fixup['$bottom_level', '0'], 0))
+        val = Vec(z=128 * srctools.conv_int(inst.fixup['$bottom_level', '0'], 0))
     else:
         val = Vec.from_str(res.value)
 

@@ -2,7 +2,10 @@ from cx_Freeze import setup, Executable
 import os
 import utils
 import pkgutil
+import shutil
 
+shutil.rmtree('../compiler', ignore_errors=True)
+shutil.rmtree('../build_BEE2/compiler', ignore_errors=True)
 
 ico_path = os.path.join(os.getcwd(), "../bee2.ico")
 
@@ -111,3 +114,6 @@ setup(
         ),
     ]
 )
+
+# Copy the compiler to the frozen-BEE2 build location also
+shutil.copytree('../compiler', '../build_BEE2/compiler')

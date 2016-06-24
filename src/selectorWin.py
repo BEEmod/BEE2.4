@@ -7,6 +7,7 @@ Each item has a description, author, and icon.
 from tkinter import *  # ui library
 from tkinter import font as tk_font
 from tkinter import ttk  # themed ui components that match the OS
+
 from tk_tools import TK_ROOT
 
 from collections import namedtuple, defaultdict
@@ -18,6 +19,8 @@ import math
 import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
+from srctools import Vec, EmptyMapping
+import tkMarkdown
 import sound
 import utils
 import tk_tools
@@ -94,7 +97,7 @@ class AttrDef(namedtuple('AttrDef', 'id type desc default')):
             elif type is AttrTypes.LIST:
                 default = []
             elif type is AttrTypes.COLOR:
-                default = utils.Vec(255, 255, 255)
+                default = Vec(255, 255, 255)
 
         # The description should either be blank, or end in a colon.
         if desc != '' and not desc.endswith(': '):
@@ -247,7 +250,7 @@ class Item:
             long_name: str=None,
             icon=None,
             authors: list=None,
-            desc=(('line', ''),),
+            desc='',
             group: str=None,
             sort_key: str=None,
             attributes: dict=None,
@@ -343,8 +346,8 @@ class selWin:
             has_none=True,
             has_def=True,
             has_snd_sample=False,
-            none_desc=(('line', 'Do not add anything.'),),
-            none_attrs: dict=utils.EmptyMapping,
+            none_desc='Do not add anything.',
+            none_attrs: dict=EmptyMapping,
             title='BEE2',
             desc='',
             readonly_desc='',
@@ -387,7 +390,7 @@ class selWin:
         self.noneItem = Item(
             'NONE',
             '',
-            desc=none_desc,
+            desc=tkMarkdown.convert(none_desc),
             attributes=dict(none_attrs),
         )
         self.noneItem.icon = img.png('BEE2/none_96')
@@ -1324,9 +1327,7 @@ if __name__ == '__main__':  # test the window if directly executing this file
             long_name="Darkness",
             icon="skies/black",
             authors=["Valve"],
-            desc=[
-                ('line', 'Pure black darkness. Nothing to see here.'),
-            ],
+            desc='Pure black darkness. Nothing to see here.',
         ),
         Item(
             "SKY_BTS",
@@ -1334,18 +1335,16 @@ if __name__ == '__main__':  # test the window if directly executing this file
             long_name="Behind The Scenes - Factory",
             icon="voices/glados",
             authors=["TeamSpen210"],
-            desc=[
-                ('line', 'The dark constuction and office areas of Aperture. '
-                         'Catwalks extend between different buildings, with '
-                         'vactubes and cranes carrying objects throughout '
-                         'the facility.'),
-                ('rule', ''),
-                ('line', 'Abandoned offices can often be found here.'),
-                ('bullet', 'This is a bullet point, with a\n second line'),
-                ('invert', 'white-on-black text')
-            ],
-        ),
-    ]
+
+            desc='The dark constuction and office areas of Aperture. '
+                 'Catwalks extend between different buildings, with '
+                 'vactubes and cranes carrying objects throughout '
+                 'the facility.  \n'
+                 'Abandoned offices can often be found here.\n\n'
+                 '* This is a bullet point, with a\n second line'
+                 '> white-on-black text',
+            ),
+        ]
 
     window = selWin(
         TK_ROOT,
