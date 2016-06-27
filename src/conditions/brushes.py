@@ -449,8 +449,11 @@ def res_import_template(inst: Entity, res):
             This brush will be removed, and overlays will be fixed to use
             all faces with the same normal.
     - keys/localkeys: If set, a brush entity will instead be generated with
-            these values. This overrides force world/detail. The origin is
-            set automatically.
+            these values. This overrides force world/detail.
+            Specially-handled keys:
+            - "origin", offset automatically.
+            - "movedir" on func_movelinear - set a normal surounded by <>,
+              this gets replaced with angles.
     - invertVar: If this fixup value is true, tile colour will be swapped to
             the opposite of the current force option. If it is set to
             'white' or 'black', that colour will be forced instead.
@@ -506,6 +509,12 @@ def res_import_template(inst: Entity, res):
         br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
         br_origin.localise(origin, angles)
         temp_data.detail['origin'] = br_origin
+
+        move_dir = temp_data.detail['movedir', '']
+        if move_dir.startswith('<') and move_dir.endswith('>'):
+            move_dir = Vec.from_str(move_dir).rotate(*angles)
+            temp_data.detail['movedir'] = move_dir.to_angle()
+
         # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
         # modify it.
         vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)

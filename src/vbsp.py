@@ -1219,6 +1219,7 @@ def add_fog_ents(_):
         fogenable='1',
         use_angles='1',
         foglerptime='2',
+        fogMaxDensity='1',
 
         heightFogStart=fog_opt['height_start'],
         heightFogDensity=fog_opt['height_density'],
