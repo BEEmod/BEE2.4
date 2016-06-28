@@ -6,10 +6,8 @@ from conditions import (
     make_result, make_result_setup, meta_cond
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Entity, Output
+from srctools import Property, Vec, Entity, VMF
 import srctools
-import conditions
-import voiceLine
 import utils
 
 LOGGER = utils.getLogger(__name__, 'cond.monitor')
@@ -21,6 +19,9 @@ MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
 
 Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
 Monitor = namedtuple('Monitor', 'inst config')
+
+# The location of the voiceline room, used to position the camera.
+VOICELINE_LOC = Vec()
 
 
 @make_result_setup('Monitor')
@@ -121,8 +122,10 @@ def res_camera(inst: Entity, res: Property):
 
     ALL_CAMERAS.append(Camera(inst, res.value, cam_pos, cam_angles))
 
+#  Note that we happen after voiceline adding!
 
-@meta_cond(priority=100, only_once=True)
+
+@meta_cond(priority=150, only_once=True)
 def mon_camera_link(_):
     """Link cameras to monitors."""
     import vbsp
@@ -140,7 +143,6 @@ def mon_camera_link(_):
         ALL_CAMERAS
     ]
 
-
     for index, cam in enumerate(ALL_CAMERAS):  # type: int, Camera
         if srctools.conv_int(cam.inst.fixup['$connectioncount']) == 0:
             continue
@@ -156,9 +158,17 @@ def mon_camera_link(_):
             start_angles = cam.cam_angles
             break
     else:
-        # Start in arrival_departure_transition_ents...
-        start_pos = '-2500 -2500 0'
-        start_angles = '0 90 0'
+        if vbsp.get_opt('voice_studio_inst'):
+            # Start at the studio, if it exists.
+            start_pos = VOICELINE_LOC
+            start_angles = '{:g} {:g} 0'.format(
+                srctools.conv_float(vbsp.get_opt('voice_studio_cam_pitch')),
+                srctools.conv_float(vbsp.get_opt('voice_studio_cam_yaw')),
+            )
+        else:
+            # Start in arrival_departure_transition_ents...
+            start_pos = '-2500 -2500 0'
+            start_angles = '0 90 0'
 
     vbsp.VMF.create_ent(
         classname='point_camera',
@@ -180,6 +190,7 @@ def mon_camera_link(_):
     )
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/mon_camera.nut')
 
+
     with open(MON_ARGS_SCRIPT, 'w') as scr:
         scr.write('CAM_NUM <- {};\n'.format(len(ALL_CAMERAS)))
         scr.write('CAM_ACTIVE_NUM <- {};\n'.format(sum(active_counts)))
@@ -196,3 +207,50 @@ def mon_camera_link(_):
             for cam in ALL_CAMERAS
         ]))
         scr.write('\n];\n')
+
+        if vbsp.get_opt('voice_studio_inst'):
+            # We have a voice studio, send values to the script.
+            scr.write(
+                'CAM_STUDIO_LOC <- Vector({0.x:.3f}, '
+                '{0.y:.3f}, {0.z:.3f});\n'.format(VOICELINE_LOC),
+            )
+            scr.write(
+                'CAM_STUDIO_CHANCE <- {chance};\n'
+                'CAM_STUDIO_PITCH <- {pitch};\n'
+                'CAM_STUDIO_YAW <- {yaw};\n'.format(
+                    chance=srctools.conv_float(vbsp.get_opt('voice_studio_cam_chance')),
+                    pitch=srctools.conv_float(vbsp.get_opt('voice_studio_cam_pitch')),
+                    yaw=srctools.conv_float(vbsp.get_opt('voice_studio_cam_yaw')),
+                )
+            )
+        else:
+            scr.write('CAM_STUDIO_CHANCE <- -1;\n')
+
+
+def make_voice_studio(vmf: VMF, loc: Vec):
+    """Create the voice-line studio.
+
+    This is either an instance (if monitors are present), or a nodraw room.
+    """
+    global VOICELINE_LOC
+    import vbsp
+
+    # Blank = don't use.
+    studio_file = vbsp.get_opt('voice_studio_inst')
+
+    if ALL_MONITORS and studio_file:
+        vmf.create_ent(
+            classname='func_instance',
+            file=studio_file,
+            origin=loc,
+            angles='0 0 0',
+        )
+        VOICELINE_LOC = loc + Vec.from_str(vbsp.get_opt('voice_studio_cam_loc'))
+    else:
+        # If there aren't monitors, the studio instance isn't used.
+        # We need to seal anyway.
+        vmf.add_brushes(vmf.make_hollow(
+            loc - 256,
+            loc + 256,
+            thick=32,
+        ))

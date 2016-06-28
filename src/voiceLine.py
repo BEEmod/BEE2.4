@@ -5,7 +5,7 @@ import random
 from collections import namedtuple
 from decimal import Decimal
 
-import conditions
+import conditions.monitor
 import srctools
 import utils
 import vbsp
@@ -384,7 +384,7 @@ def sort_func(quote: PossibleQuote):
 def add_voice(
         has_items: dict,
         style_vars_: dict,
-        vmf_file_: 7,
+        vmf_file_: VMF,
         map_seed: str,
         use_priority=True,
 ):
@@ -412,12 +412,8 @@ def add_voice(
             fixup_style='0',
         )
 
-    # Always add a box around the lines - it may be needed for quoteEvents.
-    vmf_file.add_brushes(vmf_file.make_hollow(
-        quote_loc - 64,
-        quote_loc + 64,
-        thick=32,
-    ))
+    # Either box in with nodraw, or place the voiceline studio.
+    conditions.monitor.make_voice_studio(vmf_file, quote_loc)
 
     ALLOW_MID_VOICES = not style_vars.get('nomidvoices', False)
 
@@ -468,6 +464,8 @@ def add_voice(
             pass
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
+        if not file:
+            return
         vmf_file.create_ent(
             classname='func_instance',
             targetname='voice_event_' + str(ind),
