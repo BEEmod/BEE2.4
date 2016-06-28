@@ -3,11 +3,12 @@ import os
 import math
 
 from conditions import (
-    make_result, make_result_setup, meta_cond,
+    make_result, make_result_setup, meta_cond
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Entity
+from srctools import Property, Vec, Entity, Output
 import srctools
+import conditions
 import voiceLine
 import utils
 
@@ -20,6 +21,7 @@ MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
 
 Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
 Monitor = namedtuple('Monitor', 'inst config')
+
 
 @make_result_setup('Monitor')
 def res_monitor_setup(res: Property):
@@ -41,13 +43,13 @@ def res_camera_setup(res: Property):
         'yaw_off': Vec.from_str(res['YawOff', '']),
         'pitch_off': Vec.from_str(res['PitchOff', '']),
 
+        'io_inst': resolve_inst(res['IO_inst'])[0],
         'yaw_inst': resolve_inst(res['yawInst', ''])[0],
-        'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
-
         'pitch_inst': resolve_inst(res['pitchInst', ''])[0],
+
+        'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
         'pitch_range': srctools.conv_int(res['YawRange', ''], 90),
 
-        'vert_yaw': srctools.conv_float(res['VertYaw', ''], 0)
     }
 
 
@@ -86,14 +88,6 @@ def res_camera(inst: Entity, res: Property):
     # Move three times to position the camera arms and lens.
     yaw_pos = Vec(conf['yaw_off']).rotate_by_str(inst['angles'])
     yaw_pos += base_loc
-
-    inst.map.create_ent(
-        classname='env_beam',
-        targetname=inst['targetname'],
-        origin=base_loc,
-        targetpoint=target_loc,
-        angles=(target_loc - base_loc).to_angle(),
-    )
 
     pitch, yaw, _ = (target_loc - yaw_pos).to_angle()
 
@@ -140,11 +134,39 @@ def mon_camera_link(_):
 
     fog_opt = vbsp.settings['fog']
 
+    active_counts = [
+        srctools.conv_int(cam.inst.fixup['$start_enabled', '0'])
+        for cam in
+        ALL_CAMERAS
+    ]
+
+
+    for index, cam in enumerate(ALL_CAMERAS):  # type: int, Camera
+        if srctools.conv_int(cam.inst.fixup['$connectioncount']) == 0:
+            continue
+
+        io_ent = cam.inst.copy()
+        io_ent.map.add_ent(io_ent)
+        io_ent['file'] = cam.config['io_inst']
+        io_ent.fixup['$toggle_func'] = 'ToggleCam({})'.format(index)
+
+    for is_act, cam in zip(active_counts, ALL_CAMERAS):
+        if is_act:
+            start_pos = cam.cam_pos
+            start_angles = cam.cam_angles
+            break
+    else:
+        # Start in arrival_departure_transition_ents...
+        start_pos = '-2500 -2500 0'
+        start_angles = '0 90 0'
+
     vbsp.VMF.create_ent(
         classname='point_camera',
-        targetname='@mon_camera',
-        spawnflags='0',
-        origin=ALL_CAMERAS[0].inst['origin'],
+        targetname='@camera',
+        spawnflags='0',  # Start on
+        origin=start_pos,
+        angles=start_angles,
+        fov='60',
 
         vscripts='BEE2/mon_camera_args.nut BEE2/mon_camera.nut',
         thinkfunction='Think',
@@ -157,12 +179,6 @@ def mon_camera_link(_):
         fogEnd=fog_opt['end'],
     )
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/mon_camera.nut')
-
-    active_counts = [
-        srctools.conv_int(cam.inst.fixup['$start_enabled', '0'])
-        for cam in
-        ALL_CAMERAS
-    ]
 
     with open(MON_ARGS_SCRIPT, 'w') as scr:
         scr.write('CAM_NUM <- {};\n'.format(len(ALL_CAMERAS)))
