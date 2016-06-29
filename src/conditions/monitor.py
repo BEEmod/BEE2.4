@@ -1,9 +1,9 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import os
 import math
 
 from conditions import (
-    make_result, make_result_setup, meta_cond
+    make_result, make_result_setup, meta_cond, RES_EXHAUSTED
 )
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, VMF
@@ -14,6 +14,11 @@ LOGGER = utils.getLogger(__name__, 'cond.monitor')
 
 ALL_MONITORS = []
 ALL_CAMERAS = []
+
+# Keep a counter of the number of monitor bullseyes at a pos.
+# This allows us to ensure we don't remove catapults also aiming here,
+# and that we remove when more than one camera is pointed here.
+BULLSYE_LOCS = defaultdict(int)
 
 MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
 
@@ -84,6 +89,8 @@ def res_camera(inst: Entity, res: Property):
     target_loc = Vec.from_str(target['origin'])
     target.remove()  # Not needed...
 
+    BULLSYE_LOCS[target_loc.as_tuple()] += 1
+
     base_loc = Vec.from_str(inst['origin'])
 
     # Move three times to position the camera arms and lens.
@@ -122,6 +129,29 @@ def res_camera(inst: Entity, res: Property):
 
     ALL_CAMERAS.append(Camera(inst, res.value, cam_pos, cam_angles))
 
+
+@meta_cond(priority=-5, only_once=False)
+def mon_remove_bullseyes(inst: Entity):
+    """Remove bullsyes used for cameras."""
+    if not BULLSYE_LOCS:
+        return RES_EXHAUSTED
+
+    if inst['file'].casefold() not in resolve_inst('<ITEM_CATAPULT_TARGET>'):
+        return
+
+    LOGGER.info('Bullseye {}', BULLSYE_LOCS)
+
+    origin = Vec(0, 0, -64)
+    origin.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
+    origin = origin.as_tuple()
+
+    LOGGER.info('Pos: {} -> ', origin, BULLSYE_LOCS[origin])
+
+    if BULLSYE_LOCS[origin]:
+        BULLSYE_LOCS[origin] -= 1
+        inst.remove()
+
+
 #  Note that we happen after voiceline adding!
 
 
@@ -129,6 +159,7 @@ def res_camera(inst: Entity, res: Property):
 def mon_camera_link(_):
     """Link cameras to monitors."""
     import vbsp
+    LOGGER.info('Bullseye {}', BULLSYE_LOCS)
 
     if not ALL_MONITORS:
         return
