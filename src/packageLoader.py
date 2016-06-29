@@ -1135,6 +1135,7 @@ class QuotePack(PakObject):
             chars=None,
             skin=None,
             studio: str=None,
+            studio_actor='',
             cam_loc: Vec=None,
             interrupt=0.0,
             cam_pitch=0.0,
@@ -1146,6 +1147,7 @@ class QuotePack(PakObject):
         self.config = config
         self.chars = chars or ['??']
         self.studio = studio
+        self.studio_actor = studio_actor
         self.cam_loc = cam_loc
         self.inter_chance = interrupt
         self.cam_pitch = cam_pitch
@@ -1170,12 +1172,14 @@ class QuotePack(PakObject):
 
         if monitor_data.value is not None:
             mon_studio = monitor_data['studio']
+            mon_studio_actor = monitor_data['studio_actor', '']
             mon_interrupt = srctools.conv_int(monitor_data['', 0])
             mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
             mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
         else:
             mon_studio = mon_cam_loc = None
             mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_studio_actor = ''
 
         config = get_config(
             data.info,
@@ -1192,6 +1196,7 @@ class QuotePack(PakObject):
             chars=chars,
             skin=port_skin,
             studio=mon_studio,
+            studio_actor=mon_studio_actor,
             interrupt=mon_interrupt,
             cam_loc=mon_cam_loc,
             cam_pitch=mon_cam_pitch,
@@ -1211,6 +1216,7 @@ class QuotePack(PakObject):
 
         if self.studio is None:
             self.studio = override.studio
+            self.studio_actor = override.studio_actor
             self.cam_loc = override.cam_loc
             self.inter_chance = override.inter_chance
             self.cam_pitch = override.cam_pitch
@@ -1257,6 +1263,7 @@ class QuotePack(PakObject):
 
         if voice.studio is not None:
             options['voice_studio_inst'] = voice.studio
+            options['voice_studio_actor'] = voice.studio_actor
             options['voice_studio_chance'] = str(voice.inter_chance)
             options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)

@@ -289,6 +289,7 @@ DEFAULTS = {
     "voice_studio_cam_loc":     "0 0 0",  # Location for camera
     "voice_studio_cam_pitch":   "0",  # Direction of the camera.
     "voice_studio_cam_yaw":     "0",
+    "voice_studio_actor":       "",  # If set, no bullseye is output with this name..
     }
 
 # angles needed to ensure fizzlers are not upside-down
