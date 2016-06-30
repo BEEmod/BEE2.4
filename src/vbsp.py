@@ -285,7 +285,7 @@ DEFAULTS = {
     "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
 
     "voice_studio_inst":        "",  # Instance to use for monitor backdrop.
-    "voice_studio_cam_chance":  "0",  # Chance to switch to the voice character.
+    "voice_studio_inter_chance": "0",  # Chance to switch to the voice character.
     "voice_studio_cam_loc":     "0 0 0",  # Location for camera
     "voice_studio_cam_pitch":   "0",  # Direction of the camera.
     "voice_studio_cam_yaw":     "0",

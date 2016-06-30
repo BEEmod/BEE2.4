@@ -1173,7 +1173,7 @@ class QuotePack(PakObject):
         if monitor_data.value is not None:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = srctools.conv_int(monitor_data['', 0])
+            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
             mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
             mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
         else:
@@ -1264,7 +1264,7 @@ class QuotePack(PakObject):
         if voice.studio is not None:
             options['voice_studio_inst'] = voice.studio
             options['voice_studio_actor'] = voice.studio_actor
-            options['voice_studio_chance'] = str(voice.inter_chance)
+            options['voice_studio_inter_chance'] = str(voice.inter_chance)
             options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)

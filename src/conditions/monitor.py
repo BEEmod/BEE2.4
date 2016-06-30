@@ -249,7 +249,7 @@ def mon_camera_link(_):
                 'CAM_STUDIO_CHANCE <- {chance};\n'
                 'CAM_STUDIO_PITCH <- {pitch};\n'
                 'CAM_STUDIO_YAW <- {yaw};\n'.format(
-                    chance=srctools.conv_float(vbsp.get_opt('voice_studio_cam_chance')),
+                    chance=srctools.conv_float(vbsp.get_opt('voice_studio_inter_chance')),
                     pitch=srctools.conv_float(vbsp.get_opt('voice_studio_cam_pitch')),
                     yaw=srctools.conv_float(vbsp.get_opt('voice_studio_cam_yaw')),
                 )
