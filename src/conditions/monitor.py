@@ -277,6 +277,7 @@ def make_voice_studio(vmf: VMF, loc: Vec):
             angles='0 0 0',
         )
         VOICELINE_LOC = loc + Vec.from_str(vbsp.get_opt('voice_studio_cam_loc'))
+        return True
     else:
         # If there aren't monitors, the studio instance isn't used.
         # We need to seal anyway.
@@ -285,3 +286,4 @@ def make_voice_studio(vmf: VMF, loc: Vec):
             loc + 256,
             thick=32,
         ))
+        return False

@@ -424,10 +424,10 @@ def add_voice(
         )
 
     # Either box in with nodraw, or place the voiceline studio.
-    conditions.monitor.make_voice_studio(vmf_file, quote_loc)
+    has_studio = conditions.monitor.make_voice_studio(vmf_file, quote_loc)
 
     bullsye_actor = vbsp.get_opt('voice_studio_actor')
-    if bullsye_actor:
+    if bullsye_actor and has_studio:
         ADDED_BULLSEYES.add(bullsye_actor)
 
     global_bullseye = QUOTE_DATA['bullseye', '']
