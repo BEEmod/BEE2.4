@@ -146,13 +146,14 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
         valid_quotes += 1
 
         poss_quotes = []
+        line_mid_quotes = []
         for line in mode_quotes(quote):
             line_id = line['id', line['name', '']].casefold()
 
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.append((line, use_dings, mid_name))
+                    line_mid_quotes.append((line, use_dings, mid_name))
                 else:
                     poss_quotes.append(line)
             else:
@@ -160,6 +161,9 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
                     'Line "{}" is disabled..',
                     line['name', '??'],
                 )
+
+        if line_mid_quotes:
+            mid_quotes.append(line_mid_quotes)
 
         if poss_quotes:
             yield PossibleQuote(
@@ -576,8 +580,9 @@ def add_voice(
             )
 
     LOGGER.info('{} Mid quotes', len(mid_quotes))
-    for mid_item, use_ding, mid_name in mid_quotes:
-        # Add all the mid quotes
+    for mid_lines in mid_quotes:
+        line = random.choice(mid_lines)
+        mid_item, use_ding, mid_name = line
         add_quote(mid_item, mid_name, quote_loc, use_ding)
 
     LOGGER.info('Done!')
