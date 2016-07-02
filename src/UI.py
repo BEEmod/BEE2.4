@@ -668,10 +668,11 @@ def reposition_panes():
     pal_win.move(
         x=pal_x,
         y=(TK_ROOT.winfo_rooty() - 50),
-        height=(
+        height=max(
             TK_ROOT.winfo_reqheight() -
             comp_win.winfo_reqheight() -
-            25
+            25,
+            30,
         ),
         width=comp_win.winfo_reqwidth(),
     )
