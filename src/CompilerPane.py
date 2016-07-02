@@ -788,7 +788,8 @@ def init_application():
     window.resizable(True, False)
 
     window.columnconfigure(0, weight=1)
-    window.rowconfigure(0, weight=1)
+    window.rowconfigure(0, weight=1)  # Resizing screenshots
+    window.rowconfigure(4, weight=1)  # Resizing pack-dump
 
     make_widgets()
 
