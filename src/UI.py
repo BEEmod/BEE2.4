@@ -819,6 +819,9 @@ def export_editoritems(_=None):
     GEN_OPTS.save_check()
     item_opts.save_check()
 
+    # Update corridor configs for standalone mode..
+    CompilerPane.save_corridors()
+
     # Since last_export is a zip, users won't be able to overwrite it
     # normally!
     palettes.append(new_pal)

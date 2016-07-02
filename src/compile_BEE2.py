@@ -130,6 +130,13 @@ setup(
             icon=ico_path,
             compress=True,
             targetName='backup_tool' + ('.exe' if utils.WIN else ''),
+        ),
+        Executable(
+            'CompilerPane.py',
+            base=base,
+            icon=ico_path,
+            compress=True,
+            targetName='compiler_options' + ('.exe' if utils.WIN else ''),
         )
     ],
 )

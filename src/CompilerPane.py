@@ -1,3 +1,15 @@
+import utils
+if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        import os
+        import sys
+        os.chdir(os.path.dirname(sys.argv[0]))
+
+    utils.init_logging('../logs/compiler_pane.log')
+
 from tkinter import *
 from tk_tools import TK_ROOT, FileField
 from tkinter import ttk
@@ -13,12 +25,16 @@ import img as png
 from BEE2_config import ConfigFile, GEN_OPTS
 from tooltip import add_tooltip
 import SubPane
-import utils
 
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
+CORRIDOR_COUNTS = [
+    ('sp_entry', 7),
+    ('sp_exit', 4),
+    ('coop', 4),
+]
 
 COMPILE_DEFAULTS = {
     'Screenshot': {
@@ -48,6 +64,11 @@ COMPILE_DEFAULTS = {
         'max_overlay': '512',
         'max_entity': '2048',
     },
+    'CorridorNames': {
+        '{}_{}'.format(group, i): '{}: Corridor'.format(i)
+        for group, length in CORRIDOR_COUNTS
+        for i in range(1,length + 1)
+    }
 }
 
 PLAYER_MODELS = {
@@ -141,6 +162,24 @@ cleanup_screenshot = IntVar(
 CORRIDOR = {}
 
 
+def save_corridors():
+    """Save corridor names to the config file."""
+    corridor_conf = COMPILE_CFG['CorridorNames']
+    for group, corr in CORRIDOR.items():
+        for i, name in enumerate(corr[1:], start=1):
+            corridor_conf['{}_{}'.format(group, i)] = name
+
+
+def load_corridors():
+    corridor_conf = COMPILE_CFG['CorridorNames']
+    for group, length in CORRIDOR_COUNTS:
+        CORRIDOR[group] = ['Random'] + [
+            corridor_conf['{}_{}'.format(group, i)]
+            for i in
+            range(1, length + 1)
+        ]
+
+
 def set_corr_values(group_name, props):
     """Set the corrdors according to the passed prop_block."""
     count = 7 if group_name == 'sp_entry' else 4
@@ -160,7 +199,6 @@ def set_corr_values(group_name, props):
 
 
 def make_corr_combo(frm, corr_name, width):
-    set_corr_values(corr_name, {corr_name: []})
     widget = ttk.Combobox(
         frm,
         values=CORRIDOR[corr_name],
@@ -354,24 +392,10 @@ def make_setter(section, config, variable):
     return callback
 
 
-def make_pane(tool_frame):
+def make_widgets():
     """Create the compiler options pane.
 
     """
-    global window
-    window = SubPane.SubPane(
-        TK_ROOT,
-        options=GEN_OPTS,
-        title='Compile Options',
-        name='compiler',
-        resize_x=True,
-        resize_y=False,
-        tool_frame=tool_frame,
-        tool_img=png.png('icons/win_compiler'),
-        tool_col=4,
-    )
-    window.columnconfigure(0, weight=1)
-
     thumb_frame = ttk.LabelFrame(
         window,
         text='Thumbnail',
@@ -604,6 +628,8 @@ def make_pane(tool_frame):
     corr_frame.columnconfigure(0, weight=1)
     corr_frame.columnconfigure(1, weight=1)
 
+    load_corridors()
+
     UI['corr_sp_entry'] = make_corr_combo(
         corr_frame,
         'sp_entry',
@@ -734,3 +760,43 @@ def make_pane(tool_frame):
         add_tooltip(UI[wid_name])
 
     refresh_counts(reload=False)
+
+
+def make_pane(tool_frame):
+    """Initialise when part of the BEE2."""
+    global window
+    window = SubPane.SubPane(
+        TK_ROOT,
+        options=GEN_OPTS,
+        title='Compile Options',
+        name='compiler',
+        resize_x=True,
+        resize_y=False,
+        tool_frame=tool_frame,
+        tool_img=png.png('icons/win_compiler'),
+        tool_col=4,
+    )
+    window.columnconfigure(0, weight=1)
+    make_widgets()
+
+
+def init_application():
+    """Initialise when standalone."""
+    global window
+    window = TK_ROOT
+    window.title('Compiler Options - {}'.format(utils.BEE_VERSION))
+    window.resizable(True, False)
+
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(0, weight=1)
+
+    make_widgets()
+
+
+if __name__ == '__main__':
+    # Run this standalone.
+
+    init_application()
+
+    TK_ROOT.deiconify()
+    TK_ROOT.mainloop()
