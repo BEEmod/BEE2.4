@@ -123,7 +123,7 @@ def res_add_overlay_inst(inst, res):
             )
         else:
             # Regular vector
-            offset = Vec.from_str(res['offset'])
+            offset = Vec.from_str(conditions.resolve_value(inst, res['offset']))
 
         offset.rotate_by_str(
             inst['angles', '0 0 0']
