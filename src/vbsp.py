@@ -195,7 +195,7 @@ DEFAULTS = {
     "fizz_border_vertical":     "0",  # The texture is oriented vertically
     "fizz_border_thickness":    "8",  # The width of the overlays
     "fizz_border_repeat":       "128",  # The width lengthways
-    "fizz_visibility":          "1", # Make fizzlers invisible and silent.
+    "fizz_visibility":          "1",  # Make fizzlers invisible and silent.
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -209,8 +209,15 @@ DEFAULTS = {
     # Template used for static panels set to 0 degrees
     "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
     # Template used for angled static panels
-    "static_pan_temp_white":     "BEE2_STATIC_PAN_ANGLED",
-    "static_pan_temp_black":     "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_white":    "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_black":    "BEE2_STATIC_PAN_ANGLED",
+    # If set, replace panel func_brushes with this. Top should be set to
+    # black_wall_metal_002c
+    "dynamic_pan_temp":         "",
+    # The local name that the panel func_brush should parent to.
+    # Adding the attachment name to the parent after a comma
+    # automatically sets the attachment point for us.
+    "dynamic_pan_parent":       "model_arms,panel_attach",
 
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
@@ -3000,6 +3007,9 @@ def change_func_brush():
     else:
         grate_temp = None
 
+    dynamic_pan_temp = get_opt("dynamic_pan_temp")
+    dynamic_pan_parent = get_opt("dynamic_pan_parent")
+
     # All the textures used for faith plate bullseyes
     bullseye_white = set(itertools.chain.from_iterable(
         settings['textures']['special.bullseye_white_' + orient]
@@ -3045,6 +3055,8 @@ def change_func_brush():
         # Func_brush/func_rotating (for angled panels and flip panels)
         # often use different textures, so let the style do that.
 
+        surf_face = None # The angled-panel top face..
+
         is_grating = False
         delete_brush = False
         for side in brush.sides():
@@ -3073,10 +3085,12 @@ def change_func_brush():
             if side.mat.casefold() in WHITE_PAN:
                 brush_type = "white"
                 set_special_mat(side, 'white')
+                surf_face = side
 
             elif side.mat.casefold() in BLACK_PAN:
                 brush_type = "black"
                 set_special_mat(side, 'black')
+                surf_face = side
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
@@ -3108,9 +3122,6 @@ def change_func_brush():
             brush['solidbsp'] = '1'
             settings['has_attr']['grating'] = True
 
-            brush_loc = brush.get_origin()  # type: Vec
-            brush_key = (brush_loc // 512 * 512).as_tuple()
-
             # Merge nearby grating brush entities
             if brush_key not in grating_brush:
                 grating_brush[brush_key] = brush
@@ -3119,7 +3130,10 @@ def change_func_brush():
                 VMF.remove_ent(brush)
 
         if is_grating and grating_clip_mat:
-            grate_clip = make_barrier_solid(brush.get_origin(), grating_clip_mat)
+            brush_loc = brush.get_origin()  # type: Vec
+            brush_key = (brush_loc // 512 * 512).as_tuple()
+
+            grate_clip = make_barrier_solid(brush_loc, grating_clip_mat)
             VMF.add_brush(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
@@ -3141,9 +3155,9 @@ def change_func_brush():
             targ = '-'.join(parent.split("-")[:-1])
             # Now find the associated instance
             for ins in (
-                    VMF.by_class['func_instance'] &
-                    VMF.by_target[targ]
-                    ):
+                VMF.by_class['func_instance'] &
+                VMF.by_target[targ]
+            ):
 
                 if 'connectioncount' not in ins.fixup:
                     continue  # It's a static-style overlay instance, ignore.
@@ -3159,11 +3173,33 @@ def change_func_brush():
                         '_panel_top',
                         '-brush',
                         )
-                    # Add the attachment name to the parent, so it
-                    # automatically sets the attachment point for us.
-                    brush['parentname'] += ',panel_attach'
+                    brush['parentname'] = conditions.local_name(
+                        ins,
+                        dynamic_pan_parent,
+                    )
 
-                break # Don't run twice - there might be a second matching
+                    if dynamic_pan_temp:
+                        # Allow replacing the brush used for the surface.
+                        new_brush = conditions.import_template(
+                            dynamic_pan_temp,
+                            Vec.from_str(ins['origin']),
+                            Vec.from_str(ins['angles']),
+                            targetname=targ,
+                            force_type=conditions.TEMP_TYPES.detail,
+                        )
+                        brush.solids = new_brush.detail.solids
+                        new_brush.detail.remove()
+                        for side in brush.sides():
+                            if side.mat.casefold() == 'metal/black_wall_metal_002c':
+                                # Copy data from the original face...
+                                side.mat = surf_face.mat
+                                side.uaxis = surf_face.uaxis
+                                side.vaxis = surf_face.vaxis
+                                side.ham_rot = surf_face.ham_rot
+                                side.smooth = surf_face.smooth
+                                side.lightmap = surf_face.lightmap
+
+                break  # Don't run twice - there might be a second matching
                 # overlay instance!
 
     if get_opt('grating_pack') and settings['has_attr']['grating']:
