@@ -3182,7 +3182,7 @@ def change_func_brush():
                         # Allow replacing the brush used for the surface.
                         new_brush = conditions.import_template(
                             dynamic_pan_temp,
-                            Vec.from_str(ins['origin']),
+                            Vec.from_str(brush['origin']),
                             Vec.from_str(ins['angles']),
                             targetname=targ,
                             force_type=conditions.TEMP_TYPES.detail,
