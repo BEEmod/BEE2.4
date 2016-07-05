@@ -20,6 +20,7 @@ import srctools.vmf as VLib
 import srctools
 import voiceLine
 import instanceLocs
+import brushLoc
 import conditions
 
 from typing import (
@@ -3879,6 +3880,8 @@ def main():
         MAP_RAND_SEED = calc_rand_seed()
 
         all_inst = get_map_info()
+
+        brushLoc.POS.read_from_map(VMF)
 
         conditions.init(
             seed=MAP_RAND_SEED,
