@@ -1807,7 +1807,7 @@ def fixup_goo_sides():
         scale = None
 
     LOGGER.info("Changing goo sides...")
-    for solid in VMF.iter_wbrushes(world=True, detail=False):
+    for solid in VMF.brushes[:]:
         for face in solid:
             if face in IGNORED_FACES:
                 continue
@@ -1841,8 +1841,7 @@ def fixup_goo_sides():
 
                 if block_type.is_pit:
                     if block_type.is_bottom and norm.z != 0:
-                        face.mat = 'tools/toolsskybox'
-                        IGNORED_FACES.add(face)
+                        bottomlessPit.fix_base_brush(VMF, solid, face)
                     else:
                         # Use the black textures, this should be textured normally.
                         face.mat = BLACK_PAN[1]

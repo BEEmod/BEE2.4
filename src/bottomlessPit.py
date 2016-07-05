@@ -1,7 +1,7 @@
 """Generates Bottomless Pits."""
 import random
 
-from srctools import Vec, Property, VMF, Output
+from srctools import Vec, Property, VMF, Solid, Side, Output
 import srctools
 import utils
 import vbsp
@@ -35,7 +35,7 @@ def load_settings(pit: Property):
         return
 
     SETTINGS.update({
-        'should_tele': srctools.conv_bool(pit['teleport', '0']),
+        'use_skybox': srctools.conv_bool(pit['teleport', '0']),
         'tele_dest': pit['tele_target', '@goo_targ'],
         'tele_ref': pit['tele_ref', '@goo_ref'],
         'off_x': srctools.conv_int(pit['off_x', '0']),
@@ -65,20 +65,24 @@ def load_settings(pit: Property):
 
 def make_bottomless_pit(vmf: VMF, max_height):
     """Generate bottomless pits."""
-    teleport = SETTINGS['should_tele']
 
     tele_ref = SETTINGS['tele_ref']
     tele_dest = SETTINGS['tele_dest']
 
-    tele_off = Vec(
-        x=SETTINGS['off_x'],
-        y=SETTINGS['off_y'],
-    )
+    use_skybox = bool(SETTINGS['skybox'])
+
+    if use_skybox:
+        tele_off = Vec(
+            x=SETTINGS['off_x'],
+            y=SETTINGS['off_y'],
+        )
+    else:
+        tele_off = Vec(0, 0, 0)
 
     # Controlled by the style, not skybox!
     blend_light = vbsp.get_opt('pit_blend_light')
 
-    if SETTINGS['skybox'] != '':
+    if use_skybox:
         # Add in the actual skybox edges and triggers.
         vmf.create_ent(
             classname='func_instance',
@@ -119,26 +123,26 @@ def make_bottomless_pit(vmf: VMF, max_height):
             sky_camera['fogblend'] = '0'
             sky_camera['use_angles'] = '0'
 
-    if SETTINGS['skybox_ceil'] != '':
-        # We dynamically add the ceiling so it resizes to match the map,
-        # and lighting won't be too far away.
-        vmf.create_ent(
-            classname='func_instance',
-            file=SETTINGS['skybox_ceil'],
-            targetname='skybox',
-            angles='0 0 0',
-            origin=tele_off + (0, 0, max_height),
-        )
+        if SETTINGS['skybox_ceil'] != '':
+            # We dynamically add the ceiling so it resizes to match the map,
+            # and lighting won't be too far away.
+            vmf.create_ent(
+                classname='func_instance',
+                file=SETTINGS['skybox_ceil'],
+                targetname='skybox',
+                angles='0 0 0',
+                origin=tele_off + (0, 0, max_height),
+            )
 
-    if SETTINGS['targ'] != '':
-        # Add in the teleport reference target.
-        vmf.create_ent(
-            classname='func_instance',
-            file=SETTINGS['targ'],
-            targetname='skybox',
-            angles='0 0 0',
-            origin='0 0 0',
-        )
+        if SETTINGS['targ'] != '':
+            # Add in the teleport reference target.
+            vmf.create_ent(
+                classname='func_instance',
+                file=SETTINGS['targ'],
+                targetname='skybox',
+                angles='0 0 0',
+                origin='0 0 0',
+            )
 
     # First, remove all of Valve's triggers inside pits.
     for trig in vmf.by_class['trigger_multiple'] | vmf.by_class['trigger_hurt']:
@@ -166,7 +170,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             continue
 
         # Physics objects teleport when they hit the bottom of a pit.
-        if block_type.is_bottom:
+        if block_type.is_bottom and use_skybox:
             if tele_trig is None:
                 tele_trig = vmf.create_ent(
                     classname='trigger_teleport',
@@ -198,8 +202,8 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 )
             hurt_trig.solids.append(
                 vmf.make_prism(
-                    pos + (-64, -64, -64),
-                    pos + (64, 64, 48),
+                    Vec(pos.x - 64, pos.y - 64, -128),
+                    pos + (64, 64, 48 if use_skybox else 16),
                     mat='tools/toolstrigger',
                 ).solid,
             )
@@ -208,7 +212,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             continue
         # Everything else is only added to the bottom-most position.
 
-        if blend_light:
+        if use_skybox and blend_light:
             # Generate dim lights at the skybox location,
             # to blend the lighting together.
             light_pos = pos + (0, 0, -60)
@@ -227,11 +231,11 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 _zero_percent_distance='512',
             )
 
-            wall_pos.update([
-                (pos + off).as_tuple()
-                for off in
-                side_dirs
-            ])
+        wall_pos.update([
+            (pos + off).as_tuple()
+            for off in
+            side_dirs
+        ])
 
     if tele_trig is not None:
         vbsp.IGNORED_BRUSH_ENTS.add(tele_trig)
@@ -245,18 +249,22 @@ def make_bottomless_pit(vmf: VMF, max_height):
             ),
         )
 
+    if not use_skybox:
+        make_pit_shell(vmf)
+        return
+
     # Now determine the position of side instances.
     # We use the utils.CONN_TYPES dict to determine instance positions
     # based on where nearby walls are.
-        side_types = {
-            utils.CONN_TYPES.side: PIT_INST['side'],  # o|
-            utils.CONN_TYPES.corner: PIT_INST['corner'],  # _|
-            utils.CONN_TYPES.straight: PIT_INST['side'],  # Add this twice for |o|
-            utils.CONN_TYPES.triple: PIT_INST['triple'],  # U-shape
-            utils.CONN_TYPES.all: PIT_INST['pillar'],  # [o]
-        }
+    side_types = {
+        utils.CONN_TYPES.side: PIT_INST['side'],  # o|
+        utils.CONN_TYPES.corner: PIT_INST['corner'],  # _|
+        utils.CONN_TYPES.straight: PIT_INST['side'],  # Add this twice for |o|
+        utils.CONN_TYPES.triple: PIT_INST['triple'],  # U-shape
+        utils.CONN_TYPES.all: PIT_INST['pillar'],  # [o]
+    }
 
-        LOGGER.info('Pit instances: {}', side_types)
+    LOGGER.info('Pit instances: {}', side_types)
 
     for pos in wall_pos:
         pos = Vec(pos)
@@ -302,3 +310,92 @@ def make_bottomless_pit(vmf: VMF, max_height):
                     # Reverse direction
                     angles=Vec.from_str(angle) + (0, 180, 0),
                 ).make_unique()
+
+
+def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
+    """Retexture the brush forming the bottom of a pit."""
+    if SETTINGS['skybox'] != '':
+        face.mat = 'tools/toolsskybox'
+        vbsp.IGNORED_FACES.add(face)
+    else:
+        # We have a pit shell, we don't want a bottom.
+        vmf.remove_brush(solid)
+
+
+def make_pit_shell(vmf: VMF):
+    """If the pit is surrounded on all sides, we can just extend walls down.
+
+    That avoids needing to use skybox workarounds."""
+    LOGGER.info('Making pit shell...')
+    for x in range(-8, 20):
+        for y in range(-8, 20):
+            block_types = [
+                brushLoc.POS[x, y, z]
+                for z in
+                range(-15, 1)
+            ]
+            lowest = max((
+                z for z in
+                range(-15, 1)
+                if block_types[z] is not brushLoc.Block.VOID
+            ), default=None)
+
+            if lowest is None:
+                continue
+                # TODO: For opened areas (wheatley), generate a floor...
+                real_pos = brushLoc.grid_to_world(Vec(x, y, 0))
+                prism = vmf.make_prism(
+                    real_pos + (64, 64, BOTTOMLESS_PIT_MIN + 8),
+                    real_pos + (-64, -64, BOTTOMLESS_PIT_MIN),
+                    mat='tools/toolsnodraw',
+                )
+                prism.bottom.mat = 'anim_wp/framework/backpanels_cheap'
+
+                vmf.add_brush(prism.solid)
+                continue
+
+            if block_types[lowest].is_solid:
+                real_pos = brushLoc.grid_to_world(Vec(x, y, lowest))
+                for z in range(0, 10):
+                    br_pos = real_pos - (0, 0, 512 * z)
+                    vmf.add_brush(
+                        vmf.make_prism(br_pos + 64, br_pos - (64, 64, 512-64), vbsp.BLACK_PAN[1]).solid
+                    )
+
+    prism = vmf.make_prism(
+        Vec(-8 * 128, -8 * 128, -4864),
+        Vec(20 * 128, 20 * 128, -4896),
+    )
+    prism.top.mat = 'tools/toolsblack'
+    vmf.add_brush(prism.solid)
+
+    diss_trig = vmf.create_ent(
+        classname='trigger_multiple',
+        spawnflags=4104,
+        wait=0.1,
+        origin=vbsp.get_opt('global_pti_ents_loc'),
+    )
+    diss_trig.solids = [vmf.make_prism(
+        Vec(-8 * 128, -8 * 128, -4182),
+        Vec(20 * 128, 20 * 128, -4864),
+        mat='tools/toolstrigger',
+    ).solid]
+    diss_trig.add_out(
+        Output('OnStartTouch', '!activator', 'SilentDissolve'),
+        Output('OnStartTouch', '!activator', 'Break', delay=0.1),
+        Output('OnStartTouch', '!activator', 'Kill', delay=0.5),
+    )
+
+    # Since we can chuck gel down the pit, cover it in a noportal_volume
+    # to stop players from portalling past the hurt trigger.
+    diss_trig = vmf.create_ent(
+        classname='func_noportal_volume',
+        origin=vbsp.get_opt('global_pti_ents_loc'),
+    )
+    diss_trig.solids = [vmf.make_prism(
+        Vec(-8 * 128, -8 * 128, -64),
+        Vec(20 * 128, 20 * 128, -4864),
+        mat='tools/toolstrigger',
+    ).solid]
+
+
