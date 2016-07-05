@@ -11,7 +11,7 @@ from tkinter import ttk  # themed ui components that match the OS
 from tk_tools import TK_ROOT
 
 from collections import namedtuple, defaultdict
-from operator import itemgetter, attrgetter
+from operator import itemgetter
 from enum import Enum
 import functools
 import math

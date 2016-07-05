@@ -9,7 +9,7 @@ from conditions import (
     GLOBAL_INSTANCES,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Entity
+from srctools import Vec, Entity
 
 
 @make_result('addGlobal')

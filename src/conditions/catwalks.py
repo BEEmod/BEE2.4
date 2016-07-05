@@ -1,6 +1,6 @@
 
 from conditions import (
-    make_result, make_result_setup, RES_EXHAUSTED,
+    make_result, RES_EXHAUSTED,
     INST_ANGLE,
 )
 from instanceLocs import resolve as resolve_inst
