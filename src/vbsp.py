@@ -1814,6 +1814,8 @@ def fixup_goo_sides():
             if face.mat.casefold() != 'tools/toolsnodraw':
                 origin = face.get_origin()
                 norm = face.normal()
+                if len(norm) != 1:
+                    continue  # Not aligned to grid...
 
                 block_type = brushLoc.POS['world': origin - 64 * norm]
 
