@@ -99,15 +99,31 @@ class Block(Enum):
         """Is this the base of goo or a bottomless pit?"""
         return self.value in (10, 13, 20, 23)
 
-_grid_keys = Union[Vec, Vec_tuple, tuple]
+_grid_keys = Union[Vec, Vec_tuple, tuple, slice]
 
 
 class Grid(Dict[_grid_keys, Block]):
-    """Mapping for grid positions."""
+    """Mapping for grid positions.
+
+    When doing lookups, the key can be prefixed with 'world': to treat
+    as a world position.
+    """
+
+    @staticmethod
+    def _conv_key(pos: _grid_keys) -> Vec_tuple:
+        """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
+        if isinstance(pos, slice):
+            system, pos = pos.start, pos.stop
+            pos = Grid._conv_key(pos)
+            if system == 'world':
+                return tuple(world_to_grid(Vec(pos)))
+            else:
+                return pos
+        x, y, z = pos
+        return x, y, z
 
     def __getitem__(self, pos: _grid_keys):
-        x, y, z = pos
-        return super().get((x, y, z), Block.VOID)
+        return super().get(self._conv_key(pos), Block.VOID)
 
     get = __getitem__
 
@@ -115,12 +131,10 @@ class Grid(Dict[_grid_keys, Block]):
         if type(value) is not Block:
             raise ValueError('Must be set to a Block item!')
 
-        x, y, z = pos
-        super().__setitem__((x, y, z), value)
+        super().__setitem__(self._conv_key(pos), value)
 
     def __contains__(self, pos: _grid_keys):
-        x, y, z = pos
-        return super().__contains__((x, y, z))
+        return super().__contains__(self._conv_key(pos))
 
     def keys(self):
         yield from map(Vec, super().keys())
