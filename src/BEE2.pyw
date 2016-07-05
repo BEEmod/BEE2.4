@@ -11,7 +11,7 @@ if __name__ == '__main__':
         os.chdir(os.path.dirname(sys.argv[0]))
 
     if is_forking(sys.argv):
-        # Initialise the logger, which ensures sys.stdout & stderr are availible
+        # Initialise the logger, which ensures sys.stdout & stderr are available
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
         # again though.
         LOGGER = utils.init_logging()

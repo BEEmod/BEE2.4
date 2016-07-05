@@ -33,7 +33,7 @@ FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
 RESULT_SETUP = {}
 
-# Used to dump a list of the flags, results, meta-conds
+# Used to dump a list of the flags, results, meta-conditions
 ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
