@@ -1,11 +1,11 @@
 """Generates Bottomless Pits."""
 import random
-from collections import defaultdict
 
-from srctools import Vec, Property, VMF
+from srctools import Vec, Property, VMF, Output
 import srctools
 import utils
 import vbsp
+import brushLoc
 
 LOGGER = utils.getLogger(__name__)
 
@@ -70,8 +70,10 @@ def make_bottomless_pit(vmf: VMF, max_height):
     tele_ref = SETTINGS['tele_ref']
     tele_dest = SETTINGS['tele_dest']
 
-    tele_off_x = SETTINGS['off_x'] + 64
-    tele_off_y = SETTINGS['off_y'] + 64
+    tele_off = Vec(
+        x=SETTINGS['off_x'],
+        y=SETTINGS['off_y'],
+    )
 
     # Controlled by the style, not skybox!
     blend_light = vbsp.get_opt('pit_blend_light')
@@ -83,10 +85,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             file=SETTINGS['skybox'],
             targetname='skybox',
             angles='0 0 0',
-            origin='{!s} {!s} 0'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-            ),
+            origin=tele_off,
         )
 
         fog_opt = vbsp.settings['fog']
@@ -96,10 +95,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             classname='sky_camera',
             scale='1.0',
 
-            origin='{!s} {!s} 0'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-            ),
+            origin=tele_off,
 
             angles=fog_opt['direction'],
             fogdir=fog_opt['direction'],
@@ -131,11 +127,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             file=SETTINGS['skybox_ceil'],
             targetname='skybox',
             angles='0 0 0',
-            origin='{!s} {!s} {!s}'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-                max_height,
-            ),
+            origin=tele_off + (0, 0, max_height),
         )
 
     if SETTINGS['targ'] != '':
@@ -148,117 +140,144 @@ def make_bottomless_pit(vmf: VMF, max_height):
             origin='0 0 0',
         )
 
-    # To figure out what positions need edge pieces, we use a dict
-    # indexed by XY tuples. The four Nones match the NSEW directions.
-    # For each trigger, we loop through the grid points it's in. We
-    # set all the center parts to None, but set the 4 neighbouring
-    # blocks if they aren't None.
-    # If a value = None, it is occupied by goo.
-    edges = defaultdict(lambda: [None, None, None, None])
-    dirs = [
-        # x, y, offsets
-        (0, 128),   # North
-        (0, -128),  # South
-        (128, 0),   # East
-        (-128, 0)   # West
+    # First, remove all of Valve's triggers inside pits.
+    for trig in vmf.by_class['trigger_multiple'] | vmf.by_class['trigger_hurt']:
+        if brushLoc.POS['world': Vec.from_str(trig['origin'])].is_pit:
+            trig.remove()
+
+    # Potential locations of bordering brushes..
+    wall_pos = set()
+
+    side_dirs = [
+        (0, -128, 0),   # N
+        (0, +128, 0),  # S
+        (-128, 0, 0),   # E
+        (+128, 0, 0)   # W
     ]
-    if teleport:
-        # Transform the skybox physics triggers into teleports to move cubes
-        # into the skybox zone
 
-        # Only use 1 entity for the teleport triggers. If multiple are used,
-        # cubes can contact two at once and get teleported odd places.
-        tele_trig = None
-        for trig in vmf.by_class['trigger_multiple']:
-            if trig['wait'] != '0.1' or trig in vbsp.IGNORED_BRUSH_ENTS:
-                continue
+    # Only use 1 entity for the teleport triggers. If multiple are used,
+    # cubes can contact two at once and get teleported odd places.
+    tele_trig = None
+    hurt_trig = None
 
-            bbox_min, bbox_max = trig.get_bbox()
-            origin = (bbox_min + bbox_max) / 2  # type: Vec
-            # We only modify triggers which are below the given z-index
-            if bbox_min.z > BOTTOMLESS_PIT_MIN:
-                continue
+    for grid_pos, block_type in brushLoc.POS.items():  # type: Vec, brushLoc.Block
+        pos = brushLoc.grid_to_world(grid_pos)
+        if not block_type.is_pit:
+            continue
 
+        # Physics objects teleport when they hit the bottom of a pit.
+        if block_type.is_bottom:
             if tele_trig is None:
-                tele_trig = trig
-                trig['classname'] = 'trigger_teleport'
-                trig['spawnflags'] = '4106'  # Physics and npcs
-                trig['landmark'] = tele_ref
-                trig['target'] = tele_dest
-                trig.outputs.clear()
-            else:
-                tele_trig.solids.extend(trig.solids)
-                trig.remove()
+                tele_trig = vmf.create_ent(
+                    classname='trigger_teleport',
+                    spawnflags='4106',  # Physics and npcs
+                    landmark=tele_ref,
+                    target=tele_dest,
+                    origin=pos,
+                )
+            tele_trig.solids.append(
+                vmf.make_prism(
+                    pos + (-64, -64, -64),
+                    pos + (64, 64, -8),
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
 
-            for x, y in utils.iter_grid(
-                min_x=int(bbox_min.x),
-                max_x=int(bbox_max.x),
-                min_y=int(bbox_min.y),
-                max_y=int(bbox_max.y),
-                stride=128,
-            ):
-                # Remove the pillar from the center of the item
-                edges[x, y] = None
-                for i, (xoff, yoff) in enumerate(dirs):
-                    side = edges[x + xoff, y + yoff]
-                    if side is not None:
-                        side[i] = origin.z - 13
+        # Players, however get hurt as soon as they enter - that way it's
+        # harder to see that they don't teleport.
+        if block_type.is_top:
+            if hurt_trig is None:
+                hurt_trig = vmf.create_ent(
+                    classname='trigger_hurt',
+                    damagetype=32,  # FALL
+                    spawnflags=1,  # CLients
+                    damage=100000,
+                    nodmgforce=1,  # No physics force when hurt..
+                    damagemodel=0,  # Always apply full damage.
+                    origin=pos,  # We know this is not in the void..
+                )
+            hurt_trig.solids.append(
+                vmf.make_prism(
+                    pos + (-64, -64, -64),
+                    pos + (64, 64, 48),
+                    mat='tools/toolstrigger',
+                ).solid,
+            )
 
-                if blend_light:
-                    # Generate dim lights at the skybox location,
-                    # to blend the lighting together.
-                    vmf.create_ent(
-                        classname='light',
-                        origin='{} {} {}'.format(
-                            x + 64,
-                            y + 64,
-                            origin.z + 3,
-                        ),
-                        _light=blend_light,
-                        _fifty_percent_distance='256',
-                        _zero_percent_distance='512',
-                    )
-                    vmf.create_ent(
-                        classname='light',
-                        origin='{} {} {}'.format(
-                            x + tele_off_x,
-                            y + tele_off_y,
-                            origin.z + 3,
-                        ),
-                        _light=blend_light,
-                        _fifty_percent_distance='256',
-                        _zero_percent_distance='512',
-                    )
+        if not block_type.is_bottom:
+            continue
+        # Everything else is only added to the bottom-most position.
 
-            # The triggers are 26 high, make them 10 units thick to
-            # make it harder to see the teleport
-            for side in trig.sides():
-                for plane in side.planes:
-                    if plane.z > origin.z:
-                        plane.z -= 16
-        if tele_trig is not None:
-            vbsp.IGNORED_BRUSH_ENTS.add(tele_trig)
+        if blend_light:
+            # Generate dim lights at the skybox location,
+            # to blend the lighting together.
+            light_pos = pos + (0, 0, -60)
+            vmf.create_ent(
+                classname='light',
+                origin=light_pos,
+                _light=blend_light,
+                _fifty_percent_distance='256',
+                _zero_percent_distance='512',
+            )
+            vmf.create_ent(
+                classname='light',
+                origin=light_pos + tele_off,
+                _light=blend_light,
+                _fifty_percent_distance='256',
+                _zero_percent_distance='512',
+            )
 
-    instances = SETTINGS['inst']
+            wall_pos.update([
+                (pos + off).as_tuple()
+                for off in
+                side_dirs
+            ])
 
-    side_types = {
-        utils.CONN_TYPES.side: instances['side'],  # o|
-        utils.CONN_TYPES.corner: instances['corner'],  # _|
-        utils.CONN_TYPES.straight: instances['side'],  # Add this twice for |o|
-        utils.CONN_TYPES.triple: instances['triple'],  # U-shape
-        utils.CONN_TYPES.all: instances['pillar'],  # [o]
-        utils.CONN_TYPES.none: [''],  # Never add instance if no walls
-    }
+    if tele_trig is not None:
+        vbsp.IGNORED_BRUSH_ENTS.add(tele_trig)
+    if hurt_trig is not None:
+        vbsp.IGNORED_BRUSH_ENTS.add(hurt_trig)
+        hurt_trig.outputs.append(
+            Output(
+                'OnHurtPlayer',
+                '@goo_fade',
+                'Fade',
+            ),
+        )
 
-    for (x, y), mask in edges.items():
-        if mask is None:
-            continue  # This is goo
+    # Now determine the position of side instances.
+    # We use the utils.CONN_TYPES dict to determine instance positions
+    # based on where nearby walls are.
+        side_types = {
+            utils.CONN_TYPES.side: PIT_INST['side'],  # o|
+            utils.CONN_TYPES.corner: PIT_INST['corner'],  # _|
+            utils.CONN_TYPES.straight: PIT_INST['side'],  # Add this twice for |o|
+            utils.CONN_TYPES.triple: PIT_INST['triple'],  # U-shape
+            utils.CONN_TYPES.all: PIT_INST['pillar'],  # [o]
+        }
 
-        random.seed(str(x) + str(y) + 'sides')
+        LOGGER.info('Pit instances: {}', side_types)
 
-        inst_type, angle = utils.CONN_LOOKUP[
-            tuple((val is not None) for val in mask)
-        ]
+    for pos in wall_pos:
+        pos = Vec(pos)
+        if not brushLoc.POS['world': pos].is_solid:
+            # Not actually a wall here!
+            continue
+
+        # CONN_TYPES has n,s,e,w as keys - whether there's something in that direction.
+        nsew = tuple(
+            brushLoc.POS['world': pos + off].is_pit
+            for off in
+            side_dirs
+        )
+        LOGGER.info('Pos: {}, NSEW: {}, lookup: {}', pos, nsew, utils.CONN_LOOKUP[nsew])
+        inst_type, angle = utils.CONN_LOOKUP[nsew]
+
+        if inst_type is utils.CONN_TYPES.none:
+            # Middle of the pit...
+            continue
+
+        random.seed('pit_' + str(pos.x) + str(pos.y) + 'sides')
 
         file = random.choice(side_types[inst_type])
 
@@ -267,15 +286,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 classname='func_instance',
                 file=file,
                 targetname='goo_side',
-                origin='{!s} {!s} {!s}'.format(
-                    x + tele_off_x,
-                    y + tele_off_y,
-                    max(
-                        x
-                        for x in mask
-                        if x is not None
-                    ),
-                ),
+                origin=tele_off + pos,
                 angles=angle,
             ).make_unique()
 
@@ -287,31 +298,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                     classname='func_instance',
                     file=file,
                     targetname='goo_side',
-                    origin='{!s} {!s} {!s}'.format(
-                        x + tele_off_x,
-                        y + tele_off_y,
-                        max(
-                            x
-                            for x in mask
-                            if x is not None
-                        ),
-                    ),
+                    origin=tele_off + pos,
                     # Reverse direction
                     angles=Vec.from_str(angle) + (0, 180, 0),
                 ).make_unique()
-
-        random.seed(str(x) + str(y) + '-support')
-        file = random.choice(instances['support'])
-
-        if file != '':
-            vmf.create_ent(
-                classname='func_instance',
-                file=file,
-                targetname='goo_support',
-                angles='0 ' + str(random.randrange(0, 360, 90)) + ' 0',
-                origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
-                    BOTTOMLESS_PIT_MIN,
-                ),
-            ).make_unique()
