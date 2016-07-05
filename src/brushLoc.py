@@ -14,6 +14,11 @@ from typing import Dict, Union
 
 LOGGER = utils.getLogger(__name__)
 
+# The attribute to set if these are in the map.
+VOICE_ATTR_GOO = 'goo'
+VOICE_ATTR_PIT = 'bottomless_pit'
+
+
 def world_to_grid(pos: Vec) -> Vec:
     """Given real coordinates, find the grid position."""
     return pos // 128
@@ -68,6 +73,11 @@ class Block(Enum):
         Embed is assumed to be solid.
         """
         return self.value > 3
+
+    @property
+    def is_solid(self):
+        """Is this a solid brush? """
+        return self.value in (1, 2)
 
     @property
     def is_goo(self):
@@ -179,7 +189,10 @@ class Grid(Dict[_grid_keys, Block]):
                     vmf.remove_brush(brush)
 
                 # Indicate that this map contains goo/pits
-                vbsp.settings['has_attr']['pit' if is_pit else 'goo'] = True
+                if is_pit:
+                    vbsp.settings['has_attr'][VOICE_ATTR_PIT] = True
+                else:
+                    vbsp.settings['has_attr'][VOICE_ATTR_GOO] = True
 
                 continue
 
