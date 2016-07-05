@@ -1794,12 +1794,12 @@ def fit_goo_mist(
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
-def change_goo_sides():
-    """Replace the textures on the sides of goo with specific ones.
+def fixup_goo_sides():
+    """Replace the textures on the sides of goo and bottomless pits.
 
+    For goo these can use special textures, or black 4x4 walls.
+    For pits sides use normal black walls.
     """
-    if settings['textures']['special.goo_wall'] == ['']:
-        return
 
     if get_opt('goo_wall_scale_temp'):
         scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
@@ -1807,48 +1807,43 @@ def change_goo_sides():
         scale = None
 
     LOGGER.info("Changing goo sides...")
-    face_dict = {}
     for solid in VMF.iter_wbrushes(world=True, detail=False):
         for face in solid:
-            if face.mat.casefold() != 'tools/toolsnodraw':
-                # Don't record the goo textured brushes
-                x, y, z = face.get_origin()
-                face_dict[x, y, z] = face
-
-    dirs = [
-        # x, y, z
-        (0, 64, 0),  # North
-        (0, -64, 0),  # South
-        (64, 0, 0),  # East
-        (-64, 0, 0),  # West
-        (0, 0, -64),  # Down
-    ]
-
-    # We only want to alter black panel surfaces..
-    goo_mats = set(BLACK_PAN)
-
-    for x, y, z in conditions.GOO_LOCS:
-        for xoff, yoff, zoff in dirs:
-            try:
-                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: VLib.Side
-            except KeyError:
+            if face in IGNORED_FACES:
                 continue
-
-            if face.mat.casefold() in goo_mats:
+            if face.mat.casefold() != 'tools/toolsnodraw':
+                origin = face.get_origin()
                 norm = face.normal()
 
-                face.mat = ''
-                if norm.z != 0:
-                    face.mat = get_tex('special.goo_floor')
+                block_type = brushLoc.POS['world': origin - 64 * norm]
 
-                if face.mat == '':  # goo_floor is invalid, or not used
-                    face.mat = get_tex('special.goo_wall')
+                # We only want to alter black panel surfaces..
+                if block_type.is_goo and face.mat.casefold() in BLACK_PAN:
+                    face.mat = ''
+                    if norm.z != 0:
+                        face.mat = get_tex('special.goo_floor')
 
-                if scale is not None:
-                    # Allow altering the orientation of the texture.
-                    u, v, face.ham_rot = scale[norm.as_tuple()]
-                    face.uaxis = u.copy()
-                    face.vaxis = v.copy()
+                    if face.mat == '':  # goo_floor is invalid, or not used
+                        face.mat = get_tex('special.goo_wall')
+
+                    if face.mat == '': # No overrides, use normal textures.
+                        face.mat = get_tex('black.4x4')
+
+                    if scale is not None:
+                        # Allow altering the orientation of the texture.
+                        u, v, face.ham_rot = scale[norm.as_tuple()]
+                        face.uaxis = u.copy()
+                        face.vaxis = v.copy()
+
+                    IGNORED_FACES.add(face)
+
+                if block_type.is_pit:
+                    if block_type.is_bottom and norm.z != 0:
+                        face.mat = 'tools/toolsskybox'
+                        IGNORED_FACES.add(face)
+                    else:
+                        # Use the black textures, this should be textured normally.
+                        face.mat = BLACK_PAN[1]
 
     LOGGER.info("Done!")
 
@@ -1860,6 +1855,9 @@ def collapse_goo_trig():
     hurt_trig = None
     cube_trig = None
     for trig in VMF.by_class['trigger_multiple']:
+        if trig in IGNORED_BRUSH_ENTS:
+            continue
+
         if trig['wait'] == '0.1' and trig['targetname', ''] == '':
             if cube_trig is None:
                 cube_trig = trig
@@ -1868,6 +1866,9 @@ def collapse_goo_trig():
                 trig.remove()
 
     for trig in VMF.by_class['trigger_hurt']:
+        if trig in IGNORED_BRUSH_ENTS:
+            continue
+
         if trig['targetname', ''] == '':
             if hurt_trig is None:
                 hurt_trig = trig
@@ -1969,16 +1970,8 @@ def change_brush():
                     VMF.remove_ent(ent)
                     break  # Skip to next entity
 
-    make_bottomless = settings['pit'] is not None
+    make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
-    if make_bottomless:
-        pit_solids = []
-        pit_height = settings['pit']['height']
-        pit_goo_tex = settings['pit']['tex_goo']
-    else:
-        pit_height = 0
-        pit_solids = None
-        pit_goo_tex = ''
 
     highest_brush = 0
 
@@ -1992,20 +1985,7 @@ def change_brush():
                 face.planes[2].z,
             )
             if face.mat.casefold() in GOO_TEX:
-                # Force this voice attribute on, since conditions can't
-                # detect goo pits / bottomless pits
-                settings['has_attr']['goo'] = True
-                if make_bottomless:
-                    if face.planes[2].z < pit_height:
-                        settings['has_attr']['bottomless_pit'] = True
-                        pit_solids.append((solid, face))
-                    else:
-                        face.mat = pit_goo_tex
-                        if make_goo_mist:
-                            mist_solids.add(
-                                solid.get_origin().as_tuple()
-                            )
-                elif make_goo_mist:
+                if make_goo_mist:
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
@@ -3605,11 +3585,11 @@ def main():
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
-        change_goo_sides()  # Must be done before change_brush()!
+        fixup_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
         change_trig()
-        collapse_goo_trig()  # Do after make_bottomless_pits
+        collapse_goo_trig()
         change_func_brush()
         remove_static_ind_toggles()
         remove_barrier_ents()
