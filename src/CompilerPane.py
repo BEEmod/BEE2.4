@@ -615,7 +615,7 @@ def make_widgets():
     add_tooltip(
         packfile_enable,
         "When compiling, dump all files which were packed into the map. Useful"
-        "if you're intending to edit maps in Hammer."
+        " if you're intending to edit maps in Hammer."
     )
 
     corr_frame = ttk.LabelFrame(
