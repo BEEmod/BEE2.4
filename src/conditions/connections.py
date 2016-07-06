@@ -13,7 +13,7 @@ def res_add_output_setup(res):
     targ = res['target']
     only_once = srctools.conv_bool(res['only_once', None])
     times = 1 if only_once else srctools.conv_int(res['times', None], -1)
-    delay = srctools.conv_float(res['delay', '0.0'])
+    delay = res['delay', '0.0']
     parm = res['parm', '']
 
     return (
@@ -56,7 +56,7 @@ def res_add_output(inst: Entity, res: Property):
         resolve_value(inst, targ),
         resolve_value(inst, input_name),
         resolve_value(inst, parm),
-        resolve_value(inst, delay),
+        srctools.conv_float(resolve_value(inst, delay)),
         times=times,
         inst_out=resolve_value(inst, inst_out),
         inst_in=resolve_value(inst, inst_in),
