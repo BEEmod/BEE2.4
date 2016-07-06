@@ -3572,7 +3572,7 @@ def main():
 
         all_inst = get_map_info()
 
-        brushLoc.POS.read_from_map(VMF)
+        brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
         conditions.init(
             seed=MAP_RAND_SEED,

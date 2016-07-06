@@ -7,7 +7,6 @@ from srctools import Vec, Vec_tuple, Property, Entity, VMF
 from enum import Enum
 
 import utils
-import vbsp
 import bottomlessPit
 
 from typing import Dict, Union
@@ -143,7 +142,7 @@ class Grid(Dict[_grid_keys, Block]):
         for pos, block in super().items():
             yield Vec(pos), block
 
-    def read_from_map(self, vmf: VMF):
+    def read_from_map(self, vmf: VMF, has_attr: dict):
         """Given the map file, set blocks."""
         search_locs = []
 
@@ -204,9 +203,9 @@ class Grid(Dict[_grid_keys, Block]):
 
                 # Indicate that this map contains goo/pits
                 if is_pit:
-                    vbsp.settings['has_attr'][VOICE_ATTR_PIT] = True
+                    has_attr[VOICE_ATTR_PIT] = True
                 else:
-                    vbsp.settings['has_attr'][VOICE_ATTR_GOO] = True
+                    has_attr[VOICE_ATTR_GOO] = True
 
                 continue
 
