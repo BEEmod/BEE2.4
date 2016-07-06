@@ -1617,18 +1617,13 @@ def res_goo_debris(_, res):
         - file: The filename for the instance. The variant files should be
             suffixed with '_1.vmf', '_2.vmf', etc.
         - space: the number of border squares which must be filled with goo
-                 for a square to be eligable - defaults to 1.
+                 for a square to be eligible - defaults to 1.
         - weight, number: see the 'Variant' result, a set of weights for the
                 options
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.
     """
-    import vbsp
-
-    if vbsp.settings['pit'] is not None:
-        # We have bottomless pits - don't place goo debris.
-        # TODO: Make this only apply to the ones chosen to be bottomless.
-        return RES_EXHAUSTED
+    import brushLoc
 
     space = srctools.conv_int(res['spacing', '1'], 1)
     rand_count = srctools.conv_int(res['number', ''], None)
@@ -1646,32 +1641,39 @@ def res_goo_debris(_, res):
     if file.endswith('.vmf'):
         file = file[:-4]
 
+    goo_top_locs = {
+        pos.as_tuple()
+        for pos, block in
+        brushLoc.POS.items()
+        if block.is_goo and block.is_top
+    }
+
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
+        possible_locs = [Vec(loc) for loc in goo_top_locs]
     else:
         possible_locs = []
-        for x, y, z in set(GOO_FACE_LOC):
+        for x, y, z in goo_top_locs:
             # Check to ensure the neighbouring blocks are also
             # goo brushes (depending on spacing).
             for x_off, y_off in utils.iter_grid(
-                    min_x=-space,
-                    max_x=space + 1,
-                    min_y=-space,
-                    max_y=space + 1,
-                    stride=128,
-                    ):
+                min_x=-space,
+                max_x=space + 1,
+                min_y=-space,
+                max_y=space + 1,
+                stride=1,
+            ):
                 if x_off == y_off == 0:
-                    continue # We already know this is a goo location
-                if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
+                    continue  # We already know this is a goo location
+                if (x + x_off, y + y_off, z) not in goo_top_locs:
                     break  # This doesn't qualify
             else:
-                possible_locs.append(Vec(x,y,z))
+                possible_locs.append(brushLoc.grid_to_world(Vec(x,y,z)))
 
     LOGGER.info(
         'GooDebris: {}/{} locations',
         len(possible_locs),
-        len(GOO_FACE_LOC),
+        len(goo_top_locs),
     )
 
     suff = ''
