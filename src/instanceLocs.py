@@ -252,7 +252,8 @@ def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
-    - "<ITEM_ID>" matches all indexes, plus extra instances.
+    - "<ITEM_ID>" matches all indexes.
+    - "<ITEM_ID:>" gives all indexes and custom extra instances.
     - "<ITEM_ID:1,2,5>": matches the given indexes for that item.
     - "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
     - "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
@@ -299,6 +300,13 @@ def _resolve(path):
                 return []
             cust_item_vals = CUST_INST_FILES[item]
             out = []
+            if not subitem:
+                # <ITEM_ID:> gives all items + subitems...
+                return [
+                    inst for inst in
+                    item_values
+                    if inst != ''
+                ] + list(CUST_INST_FILES[item].values())
             for val in subitem.split(','):
                 folded_value = val.strip().casefold()
                 if folded_value.startswith('bee2_'):
@@ -356,14 +364,11 @@ def _resolve(path):
             # It's just the <item_id>, return all the values
             try:
                 # Skip "" instances
-                out = [
+                return [
                     inst for inst in
                     INSTANCE_FILES[path]
                     if inst != ''
                     ]
-                # Add custom values too
-                out.extend(CUST_INST_FILES[path].values())
-                return out
             except KeyError:
                 LOGGER.warning(
                     '"{}" not a valid item!',
