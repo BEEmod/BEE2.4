@@ -294,7 +294,7 @@ def set_pack_dump_enabled():
 def find_screenshot(_=None):
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
-        title='Find Game Exe',
+        title='Find Screenshot',
         filetypes=[
             ('Image File', '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
                            '*.tiff *.tga *.ico *.psd'),
