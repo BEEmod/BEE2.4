@@ -2814,6 +2814,9 @@ def change_func_brush():
             brush['solidbsp'] = '1'
             settings['has_attr']['grating'] = True
 
+            brush_loc = brush.get_origin()  # type: Vec
+            brush_key = (brush_loc // 512 * 512).as_tuple()
+
             # Merge nearby grating brush entities
             if brush_key not in grating_brush:
                 grating_brush[brush_key] = brush
@@ -2822,9 +2825,6 @@ def change_func_brush():
                 VMF.remove_ent(brush)
 
         if is_grating and grating_clip_mat:
-            brush_loc = brush.get_origin()  # type: Vec
-            brush_key = (brush_loc // 512 * 512).as_tuple()
-
             grate_clip = make_barrier_solid(brush_loc, grating_clip_mat)
             VMF.add_brush(grate_clip.solid)
 
