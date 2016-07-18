@@ -801,7 +801,10 @@ class Style(PakObject):
         """Add the additional commands to ourselves."""
         self.editor.append(override.editor)
         self.config.append(override.config)
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
 
         self.has_video = self.has_video or override.has_video
         # If overrides have suggested IDs, use those. Unset values = ''.
@@ -1174,7 +1177,10 @@ class QuotePack(PakObject):
 
     def add_over(self, override: 'QuotePack'):
         """Add the additional lines to ourselves."""
-        self.selitem_data.auth += override.selitem_data.auth
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
         self.config += override.config
         self.config.merge_children(
             'quotes_sp',
@@ -1323,7 +1329,10 @@ class Skybox(PakObject):
 
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
         self.config += override.config
         self.fog_opts += override.fog_opts
 
@@ -1455,7 +1464,10 @@ class Music(PakObject):
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
         self.config.append(override.config)
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
 
     def __repr__(self):
         return '<Music ' + self.id + '>'
@@ -2153,7 +2165,6 @@ def desc_parse(info, id=''):
 
 def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
-
     """
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
@@ -2175,6 +2186,43 @@ def get_selitem_data(info):
         desc,
         group,
         sort_key,
+    )
+
+
+def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
+    """Join together two sets of selitem data.
+
+    This uses the over_data values if defined, using our_data if not.
+    Authors and descriptions will be joined to each other.
+    """
+    (
+        our_name,
+        our_short_name,
+        our_auth,
+        our_icon,
+        our_desc,
+        our_group,
+        our_sort_key,
+    ) = our_data
+
+    (
+        over_name,
+        over_short_name,
+        over_auth,
+        over_icon,
+        over_desc,
+        over_group,
+        over_sort_key,
+    ) = over_data
+
+    return SelitemData(
+        our_name if over_name == '???' else over_name,
+        our_short_name if over_short_name == '???' else over_short_name,
+        our_auth + over_auth,
+        our_icon if over_icon == '_blank' else our_icon,
+        tkMarkdown.join(our_desc, over_desc),
+        over_group or our_group,
+        over_sort_key or our_sort_key,
     )
 
 
