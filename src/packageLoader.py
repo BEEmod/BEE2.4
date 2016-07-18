@@ -1536,8 +1536,9 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             self.styles = styles
 
     @classmethod
-    def parse(cls, data):
-        name = data.info['name']
+    def parse(cls, data: 'ParseData'):
+        name = data.info['name', '']
+
         unstyled = srctools.conv_bool(data.info['unstyled', '0'])
         default = srctools.conv_bool(data.info['enabled', '0'])
         styles = [
