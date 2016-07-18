@@ -1568,16 +1568,28 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             self.styles = None
         else:
             self.styles.extend(override.styles)
+
+        if not self.name:
+            self.name = override.name
+
         # If they both have descriptions, add them together.
         # Don't do it if they're both identical though.
-        if override.desc and override.desc not in self.desc:
-            if self.desc:
+        # bool(strip()) = has a non-whitespace character
+        stripped_over = override.desc.strip()
+        if stripped_over and stripped_over not in self.desc:
+            if self.desc.strip():
                 self.desc += '\n\n' + override.desc
             else:
                 self.desc = override.desc
 
     def __repr__(self):
-        return '<StyleVar ' + self.id + '>'
+        return '<Stylevar "{}", name="{}", default={}, styles={}>:\n{}'.format(
+            self.id,
+            self.name,
+            self.default,
+            ','.join(self.styles),
+            self.desc,
+        )
 
     def applies_to_style(self, style):
         """Check to see if this will apply for the given style.
