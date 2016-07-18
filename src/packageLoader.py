@@ -1635,6 +1635,68 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         ]))
 
 
+class DecorationSet(PakObject, allow_mult=True, has_img=True):
+    def __init__(
+        self,
+        deco_id,
+        selitem_data: 'SelitemData',
+        config: 'Property',
+    ):
+        self.id = deco_id
+        self.selitem_data = selitem_data
+        self.config = config
+
+    @classmethod
+    def parse(cls, data: ParseData) -> 'PakObject':
+        selitem_data = get_selitem_data(data.info)
+
+        config = get_config(
+            data.info,
+            data.zip_file,
+            folder='decoration',
+        )
+
+        return cls(
+            selitem_data,
+            config,
+        )
+
+    @staticmethod
+    def export(exp_data: ExportData):
+
+        dest = exp_data.game.abs_path(os.path.join(
+            'bin',
+            'bee2',
+            'decoration.cfg',
+        ))
+
+        if exp_data.selected is None:
+            # Blank the config file.
+            open(dest, 'wb').close()
+            return
+        else:
+            for deco in data['Elevator']:
+                if deco.id == exp_data.selected:
+                    break
+            else:
+                raise Exception(
+                    "Selected decoration set ({}) "
+                    "doesn't exist?".format(exp_data.selected)
+                )
+
+        LOGGER.info('Writing decoration.cfg...')
+        with open(dest, 'w'):
+            for line in deco.config.export():
+                dest.write(line)
+
+    def add_over(self, override: 'DecorationSet'):
+        self.config += override.config
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
+
+
 class StyleVPK(PakObject, has_img=False):
     """A set of VPK files used for styles.
 
@@ -2168,7 +2230,7 @@ def get_selitem_data(info):
     """
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
-    name = info['name']
+    name = info['name', '???']
     icon = info['icon', '_blank']
     group = info['group', '']
     sort_key = info['sort_key', '']
