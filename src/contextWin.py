@@ -18,10 +18,10 @@ import webbrowser
 import itertools
 
 from richTextBox import tkRichText
-from tkMarkdown import HRULE_TEXT
 import img as png
 import sound as snd
 import itemPropWin
+import tkMarkdown
 import tooltip
 import tk_tools
 import utils
@@ -188,21 +188,16 @@ def set_item_version(_=None):
 def get_description(global_last, glob_desc, style_desc):
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
-        # We have both, we need to join them together.
-        global_text, global_links = glob_desc
-        style_text, style_links = style_desc
-        links = dict(global_links)
-        links.update(style_links)
         if global_last:
-            return itertools.chain(style_text, HRULE_TEXT, global_text), links
+            return tkMarkdown.join(style_desc, glob_desc)
         else:
-            return itertools.chain(global_text, HRULE_TEXT, style_text), links
+            return tkMarkdown.join(glob_desc, style_desc)
     elif glob_desc:
         return glob_desc
     elif style_desc:
         return style_desc
     else:
-        return ''  # No description
+        return tkMarkdown.blank_desc()  # No description
 
 
 def load_item_data():
