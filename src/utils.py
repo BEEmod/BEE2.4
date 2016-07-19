@@ -32,7 +32,6 @@ long_log_format = None
 # Various logger handlers
 stdout_loghandler = None
 stderr_loghandler = None
-file_loghandler = None
 
 # App IDs for various games. Used to determine which game we're modding
 # and activate special support for them
@@ -541,7 +540,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     If filename is set, all logs will be written to this file.
     """
     global short_log_format, long_log_format
-    global stderr_loghandler, stdout_loghandler, file_loghandler
+    global stderr_loghandler, stdout_loghandler
     import logging
     from logging import handlers
     import sys, io, os
