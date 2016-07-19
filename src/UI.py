@@ -11,14 +11,15 @@ from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-import sound as snd
 from loadScreen import main_loader as loader
+from paletteLoader import pal_list as palettes
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
+import sound as snd
 import paletteLoader
 import img
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
 import voiceEditor
 import contextWin
@@ -402,12 +403,6 @@ def quit_application():
     sys.exit(0)
 
 gameMan.quit_application = quit_application
-
-
-def load_palette(data):
-    """Import in all defined palettes."""
-    global palettes
-    palettes = data
 
 
 def load_settings():

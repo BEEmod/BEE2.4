@@ -84,12 +84,12 @@ class Palette:
 
 def load_palettes(pal_dir):
     """Scan and read in all palettes in the specified directory."""
-    global PAL_DIR, pal_list
+    global PAL_DIR
     PAL_DIR = os.path.abspath(os.path.join('..', pal_dir))
     full_dir = os.path.join(os.getcwd(), PAL_DIR)
     contents = os.listdir(full_dir)  # this is both files and dirs
 
-    pal_list = []
+    pal_list.clear()
     for name in contents:
         LOGGER.info('Loading "{}"', name)
         path = os.path.join(full_dir, name)
@@ -119,7 +119,6 @@ def load_palettes(pal_dir):
                 pos_file.close()
             if prop_file:
                 prop_file.close()
-    return pal_list
 
 
 def parse(posfile, propfile, path):

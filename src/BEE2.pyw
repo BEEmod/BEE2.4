@@ -125,9 +125,7 @@ if __name__ == '__main__':
         LOGGER.info('Done!')
 
         LOGGER.info('Loading Palettes...')
-        UI.load_palette(
-            paletteLoader.load_palettes(GEN_OPTS['Directories']['palette']),
-            )
+        paletteLoader.load_palettes(GEN_OPTS['Directories']['palette'])
         LOGGER.info('Done!')
 
         LOGGER.info('Loading Item Translations...')
