@@ -1657,6 +1657,7 @@ class DecorationSet(PakObject, allow_mult=True, has_img=True):
         )
 
         return cls(
+            data.id,
             selitem_data,
             config,
         )

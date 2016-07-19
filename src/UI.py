@@ -47,6 +47,13 @@ pal_items_fake = []  # Labels for empty picker positions
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
+# The selector windows used to pick various things.
+skybox_win = None  # type: selWin
+voice_win = None  # type: selWin
+music_win = None  # type: selWin
+style_win = None  # type: selWin
+elev_win = None  # type: selWin
+deco_win = None  # type: selWin
 
 selected_style = "BEE2_CLEAN"
 selectedPalette = 0
@@ -55,13 +62,8 @@ selectedPalette_radio = IntVar(value=0)
 
 # All the stuff we've loaded in
 item_list = {}
-skyboxes = {}
-voices = {}
 styles = {}
-musics = {}
-elevators = {}
-pack_lists = {}
-editor_sounds = {}
+voices = {}
 
 item_opts = ConfigFile('item_configs.cfg')
 # A config file which remembers changed property options, chosen
@@ -424,8 +426,7 @@ def load_packages(data):
     A lot of our other data is initialised here too.
     This must be called before initMain() can run.
     """
-    global skybox_win, voice_win, music_win, style_win, elev_win
-    global item_list
+    global skybox_win, voice_win, music_win, style_win, elev_win, deco_win
     global selected_style
 
     for item in data['Item']:
@@ -435,24 +436,20 @@ def load_packages(data):
 
     StyleVarPane.add_vars(data['StyleVar'], data['Style'])
 
-    # THese item types don't appear anywhere in the UI, so we just save them.
-    for packlist in data['PackList']:
-        pack_lists[packlist.id] = packlist
-
-    for editor_sound in data['EditorSound']:
-        editor_sounds[editor_sound.id] = editor_sound
-
     sky_list = []
     voice_list = []
     style_list = []
     music_list = []
     elev_list = []
+    deco_list = []
+
+    musics = {}
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
     # the object.
     obj_types = [
-        (sky_list, skyboxes, 'Skybox', {
+        (sky_list, None, 'Skybox', {
             '3D': 'config.value',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
@@ -467,8 +464,10 @@ def load_packages(data):
             'GEL_BOUNCE': 'has_bouncegel',
             'GEL_SPEED': 'has_speedgel',
         }),
-        (elev_list, elevators, 'Elevator', {
+        (elev_list, None, 'Elevator', {
             'ORIENT': 'has_orient',
+        }),
+        (deco_list, None, 'DecorationSet', {
         }),
     ]
 
@@ -494,12 +493,14 @@ def load_packages(data):
                     attr_commands
                 }
             ))
-            obj_list[obj.id] = obj
+            if obj_list is not None:
+                obj_list[obj.id] = obj
+
             # Every item has an image
             loader.step("IMG")
 
     # Set the 'sample' value for music items
-    for sel_item in music_list: # type: selWinItem
+    for sel_item in music_list:  # type: selWinItem
         sel_item.snd_sample = musics[sel_item.name].sample
 
     def win_callback(style_id, win_name):
@@ -555,7 +556,7 @@ def load_packages(data):
         desc='Voice lines choose which extra voices play as the player enters '
              'or exits a chamber. They are chosen based on which items are '
              'present in the map. The additional "Multiverse" Cave lines are'
-             ' controlled seperately in Style Properties.',
+             ' controlled separately in Style Properties.',
         has_none=True,
         none_desc='Add no extra voice lines.',
         none_attrs={
@@ -620,6 +621,22 @@ def load_packages(data):
         ]
     )
 
+    deco_win = selWin(
+        TK_ROOT,
+        deco_list,
+        title='Select Decoration Set',
+        desc='The selected decoration set will be randomly placed throughout '
+             'the map, on surfaces marked by a decoration marker as '
+             'non-important.',
+        has_none=True,
+        has_def=True,
+        none_desc='Do not add decorations.',
+        callback=win_callback,
+        callback_params=['Decoration'],
+        attributes=[
+        ],
+    )
+
     last_style = GEN_OPTS.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
     if last_style in style_win:
         style_win.sel_item_id(last_style)
@@ -633,11 +650,13 @@ def load_packages(data):
         (music_win, 'Music'),
         (skybox_win, 'Skybox'),
         (elev_win, 'Elevator'),
-        ]
+        (deco_win, 'Decoration'),
+    ]
+
     for (sel_win, opt_name), default in zip(
-            obj_types,
-            styles[selected_style].suggested,
-            ):
+        obj_types,
+        styles[selected_style].suggested,
+    ):
         sel_win.sel_item_id(
             GEN_OPTS.get_val('Last_Selected', opt_name, default)
         )
@@ -774,11 +793,12 @@ def export_editoritems(_=None):
     success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
-            # Specfify the 'chosen item' for each object type
+            # Specify the 'chosen item' for each object type
             'Music': music_win.chosen_id,
             'Skybox': skybox_win.chosen_id,
             'QuotePack': voice_win.chosen_id,
             'Elevator': elev_win.chosen_id,
+            'DecorationSet': deco_win.chosen_id,
 
             'Item': (pal_data, item_versions, item_properties),
             'StyleVar': style_vars,
@@ -1215,19 +1235,19 @@ def init_option(f):
 
         """
         sugg = styles[selected_style].suggested
-        win_types = (voice_win, music_win, skybox_win, elev_win)
+        win_types = (voice_win, music_win, skybox_win, elev_win, deco_win)
         for win, sugg_val in zip(win_types, sugg):
             win.sel_item_id(sugg_val)
         UI['suggested_style'].state(['disabled'])
 
     def suggested_style_mousein(_):
         """When mousing over the button, show the suggested items."""
-        for win in (voice_win, music_win, skybox_win, elev_win):
+        for win in (voice_win, music_win, skybox_win, elev_win, deco_win):
             win.rollover_suggest()
 
     def suggested_style_mouseout(_):
         """Return text to the normal value on mouseout."""
-        for win in (voice_win, music_win, skybox_win, elev_win):
+        for win in (voice_win, music_win, skybox_win, elev_win, deco_win):
             win.set_disp()
 
     UI['suggested_style'] = ttk.Button(
@@ -1246,13 +1266,14 @@ def init_option(f):
         if chosen is not None:
             voiceEditor.show(chosen)
     for ind, name in enumerate([
-            "Style",
-            None,
-            "Music",
-            "Voice",
-            "Skybox",
-            "Elev Vid",
-            ]):
+        "Style",
+        None,
+        "Music",
+        "Voice",
+        "Skybox",
+        "Elev Vid",
+        "Decorations",
+    ]):
         if name is None:
             # This is the "Suggested" button!
             continue
@@ -1280,6 +1301,7 @@ def init_option(f):
     skybox_win.widget(props).grid(row=4, column=1, sticky='EW')
     elev_win.widget(props).grid(row=5, column=1, sticky='EW')
     voice_win.widget(voice_frame).grid(row=0, column=1, sticky='EW')
+    deco_win.widget(props).grid(row=6, column=1, sticky='EW')
 
     if utils.USE_SIZEGRIP:
         ttk.Sizegrip(
@@ -1865,7 +1887,7 @@ def init_windows():
         CompilerPane.set_corr_values('coop', style_obj.corridor_names)
 
         sugg = style_obj.suggested
-        win_types = (voice_win, music_win, skybox_win, elev_win)
+        win_types = (voice_win, music_win, skybox_win, elev_win, deco_win)
         for win, sugg_val in zip(win_types, sugg):
             win.set_suggested(sugg_val)
         suggested_refresh()
