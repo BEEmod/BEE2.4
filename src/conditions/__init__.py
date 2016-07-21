@@ -504,14 +504,21 @@ def check_flag(flag, inst):
         flag.value,
         inst['file'],
     )
+    name = flag.name
+    # If starting with '!', invert the result.
+    if name[:1] == '!':
+        desired_result = False
+        name = name[1:]
+    else:
+        desired_result = True
     try:
-        func = FLAG_LOOKUP[flag.name]
+        func = FLAG_LOOKUP[name]
     except KeyError:
-        LOGGER.warning('"' + flag.name + '" is not a valid condition flag!')
+        LOGGER.warning('"' + name + '" is not a valid condition flag!')
         return False
     else:
         res = func(inst, flag)
-        return res
+        return res == desired_result
 
 
 def import_conditions():
