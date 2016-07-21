@@ -1680,7 +1680,7 @@ class DecorationSet(PakObject, allow_mult=True, has_img=True):
             open(dest, 'wb').close()
             return
         else:
-            for deco in data['Elevator']:
+            for deco in data['DecorationSet']:
                 if deco.id == exp_data.selected:
                     break
             else:
