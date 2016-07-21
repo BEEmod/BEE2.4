@@ -206,7 +206,7 @@ class CheckDetails(ttk.Frame):
 
         self.parent = parent
         self.headers = list(headers)
-        self.items = []
+        self.items = []  # type: List[Item]
         self.sort_ind = None
         self.rev_sort = False  # Should we sort in reverse?
 
@@ -389,7 +389,7 @@ class CheckDetails(ttk.Frame):
 
     def toggle_allcheck(self):
         value = self.head_check_var.get()
-        for item in self.items:  # type: Item
+        for item in self.items:
             if item.locked:
                 continue  # Don't change!
 

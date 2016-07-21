@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from typing import (
-    Callable, Any,
+    Callable, Any, Iterable,
     Dict, List, Tuple, NamedTuple,
 )
 
@@ -66,7 +66,7 @@ class TEMP_TYPES(Enum):
     world = 1
     detail = 2
 
-Template = namedtuple('Template', ['world', 'detail', 'overlay'])
+Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
 
 
 class MAT_TYPES(Enum):
@@ -201,6 +201,7 @@ TEMPLATE_RETEXTURE = {
     'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
 del B, W
+
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
     # We decrease offset to this much +- at maximum (so adjacient template
@@ -813,6 +814,58 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
             overlay['sides'] = ' '.join(sides)
 
 
+def steal_from_brush(
+    temp_data: Template,
+    brush_group: 'solidGroup',
+    rem_brush=True,
+    additional: Iterable[int]=(),
+):
+    """Copy IDs from a brush to a template."""
+    LOGGER.info('Steal: {}', locals())
+
+    temp_brushes = temp_data.world.copy()
+    # Overlays can't be applied to entities (other than func_detail).
+    if temp_data.detail is not None and temp_data.detail['classname'] == 'func_detail':
+        temp_brushes.extend(temp_data.detail.solids)
+
+    if rem_brush:
+        VMF.remove_brush(brush_group.solid)
+    else:
+        # Switch it to nodraw if still in the map, since it must be
+        # covered.
+        brush_group.face.mat = 'tools/toolsnodraw'
+
+    # Additional is a list of IDs in the template VMF, not the final one.
+    additional = [
+        temp_data.orig_ids.get(face_id, -1)
+        for face_id in
+        additional
+    ]
+    new_ids = []
+
+    for brush in temp_brushes:
+        for face in brush.sides:
+            # Only faces pointing the same way!
+            if face.normal() == brush_group.normal:
+                # Skip tool brushes in the template (nodraw, player clips..)
+                if face.mat.casefold().startswith('tools/'):
+                    continue
+                new_ids.append(str(face.id))
+            # If the original ID is present in the 'additional' values
+            # use it. This allows specifying specific faces.
+            elif face.id in additional:
+                new_ids.append(str(face.id))
+
+    LOGGER.info('New IDS: {}', {
+            str(brush_group.face.id): new_ids,
+        })
+
+    if new_ids:
+        reallocate_overlays({
+            str(brush_group.face.id): new_ids,
+        })
+
+
 def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
     """Copy the given key prop block to an entity.
 
@@ -857,7 +910,7 @@ def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
-    vmf = srctools.VMF.parse(props)
+    vmf = srctools.VMF.parse(props, preserve_ids=True)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
     overlay_ents = defaultdict(list)
@@ -920,7 +973,7 @@ def import_template(
     new_detail = []
     new_over = []
 
-    id_mapping = {}
+    id_mapping = {}  # A map of the original -> new face IDs.
 
     for orig_list, new_list in [
             (orig_world, new_world),
@@ -940,9 +993,9 @@ def import_template(
 
         sides = overlay['sides'].split()
         new_overlay['sides'] = ' '.join(
-            id_mapping[side]
+            str(id_mapping[side])
             for side in sides
-            if side in id_mapping
+            if int(side) in id_mapping
         )
 
         srctools.vmf.localise_overlay(new_overlay, origin, angles)
@@ -989,7 +1042,7 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return Template(new_world, detail_ent, new_over)
+    return Template(new_world, detail_ent, new_over, id_mapping)
 
 
 def get_scaling_template(

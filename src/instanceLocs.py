@@ -10,7 +10,7 @@ from functools import lru_cache
 import utils
 from srctools import Property
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 LOGGER = utils.getLogger(__name__)
 
@@ -19,7 +19,7 @@ INSTANCE_FILES = {}
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES = defaultdict(dict)
+CUST_INST_FILES = defaultdict(dict)  # type: Dict[str, Dict[str, str]]
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,

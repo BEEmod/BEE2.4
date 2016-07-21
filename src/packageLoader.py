@@ -38,7 +38,11 @@ data = {}
 
 res_count = -1
 
-TEMPLATE_FILE = VMF()
+# Don't change face IDs when copying to here.
+# This allows users to refer to the stuff in templates specifically.
+# The combined VMF isn't to be compiled or edited outside of us, so it's fine
+# to have overlapping IDs between templates.
+TEMPLATE_FILE = VMF(preserve_ids=True)
 
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
