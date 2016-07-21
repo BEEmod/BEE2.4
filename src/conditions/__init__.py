@@ -1201,34 +1201,11 @@ def retexture_template(
                 grid_size = force_grid
 
             if 1 in norm or -1 in norm:  # Facing NSEW or up/down
-                # Save the originals
-                u_off = face.uaxis.offset
-                v_off = face.vaxis.offset
-
-                # Floor / ceiling is always 1 size - 4x4
-                if norm.z == 1:
-                    if grid_size != 'special':
-                        grid_size = 'ceiling'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                elif norm.z == -1:
-                    if grid_size != 'special':
-                        grid_size = 'floor'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                # Walls:
-                elif norm.x != 0:
-                    face.uaxis = UVAxis(0, 1, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-                elif norm.y != 0:
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-
                 # If axis-aligned, make the orientation aligned to world
                 # That way multiple items merge well, and walls are upright.
                 # We allow offsets < 1 grid tile, so items can be offset.
-                face.uaxis.offset = u_off % TEMP_TILE_PIX_SIZE[grid_size]
-                face.vaxis.offset = v_off % TEMP_TILE_PIX_SIZE[grid_size]
+                face.uaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
+                face.vaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
 
             if use_bullseye:
                 # We want to use the bullseye textures, instead of normal
