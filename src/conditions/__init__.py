@@ -1173,12 +1173,12 @@ def retexture_template(
                         face.mat = 'tools/toolsnodraw'
                     else:
                         # Goo always has the same orientation!
-                        face.uaxis = srctools.vmf.UVAxis(
+                        face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
-                        face.vaxis = srctools.vmf.UVAxis(
+                        face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
@@ -1670,7 +1670,7 @@ def make_static_pist(ent, res):
 
 
 @make_result('GooDebris')
-def res_goo_debris(_, res):
+def res_goo_debris(_, res: Property):
     """Add random instances to goo squares.
 
     Options:
@@ -1685,8 +1685,8 @@ def res_goo_debris(_, res):
     """
     import brushLoc
 
-    space = srctools.conv_int(res['spacing', '1'], 1)
-    rand_count = srctools.conv_int(res['number', ''], None)
+    space = res.int('spacing', 1)
+    rand_count = res.int('number', None)
     if rand_count:
         rand_list = weighted_random(
             rand_count,
@@ -1694,9 +1694,9 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = srctools.conv_int(res['chance', '30'], 30) / 100
+    chance = res.int('chance', 30) / 100
     file = res['file']
-    offset = srctools.conv_int(res['offset', '0'], 0)
+    offset = res.int('offset', 0)
 
     if file.endswith('.vmf'):
         file = file[:-4]

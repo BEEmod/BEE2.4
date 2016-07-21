@@ -94,7 +94,7 @@ def res_add_overlay_inst(inst, res):
 
     conditions.set_ent_keys(overlay_inst.fixup, inst, res, 'fixup')
 
-    if srctools.conv_bool(res['move_outputs', '0']):
+    if res.bool('move_outputs', False):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
 
