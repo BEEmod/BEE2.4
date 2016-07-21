@@ -1741,10 +1741,10 @@ WP_LIMIT = 30  # Limit to this many portal instances
 
 @make_result_setup('WPLightstrip')
 def res_portal_lightstrip_setup(res):
-    do_offset = srctools.conv_bool(res['doOffset', '0'])
+    do_offset = res.bool('doOffset')
     hole_inst = res['HoleInst']
     fallback = res['FallbackInst']
-    location = Vec.from_str(res['location', '0 8192 0'])
+    location = res.vec('location', 0, 8192, 0)
     strip_name = res['strip_name']
     hole_name = res['hole_name']
     return [
@@ -1916,7 +1916,7 @@ def res_make_tag_fizzler(inst, res):
         return
 
     # The distance from origin the double signs are seperated by.
-    sign_offset = srctools.conv_int(res['signoffset', ''], 16)
+    sign_offset = res.int('signoffset', 16)
 
     sign_loc = (
         # The actual location of the sign - on the wall
