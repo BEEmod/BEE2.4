@@ -57,7 +57,7 @@ fake_inst = VMF().create_ent(
 
 def has_responses():
     """Check if we have any valid 'response' data for Coop."""
-    return 'CoopResponses' in QUOTE_DATA
+    return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
 
 def generate_resp_script(file, allow_dings):

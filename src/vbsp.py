@@ -12,7 +12,6 @@ import random
 import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
-from decimal import Decimal
 
 from srctools import Property, Vec, AtomicWriter
 from BEE2_config import ConfigFile
@@ -2672,7 +2671,7 @@ def add_extra_ents(mode):
             'choreo/glados.nut',  # Implements Multiverse Cave..
             'BEE2/auto_run.nut',  # Automatically run to cache sounds.
         ]
-        if GAME_MODE == 'COOP' and voiceLine.has_responses():
+        if voiceLine.has_responses():
             glados_scripts.append('BEE2/coop_responses.nut')
             PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
