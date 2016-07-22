@@ -697,23 +697,29 @@ class Package:
 
 class Style(PakObject):
     def __init__(
-            self,
-            style_id,
-            selitem_data: 'SelitemData',
-            editor,
-            config=None,
-            base_style=None,
-            suggested=None,
-            has_video=True,
-            vpk_name='',
-            corridor_names=EmptyMapping,
-        ):
+        self,
+        style_id,
+        selitem_data: 'SelitemData',
+        editor,
+        config=None,
+        base_style=None,
+        suggested=None,
+        has_video=True,
+        vpk_name='',
+        corridor_names=EmptyMapping,
+    ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
         self.bases = []  # Set by setup_style_tree()
-        self.suggested = suggested or {}
+        self.suggested = suggested or (
+            '<NONE>',
+            '<NONE>',
+            'SKY_BLACK',
+            '<NONE>',
+            '<NONE>'
+        )
         self.has_video = has_video
         self.vpk_name = vpk_name
         self.corridor_names = {
@@ -753,6 +759,7 @@ class Style(PakObject):
                 sugg['music', '<NONE>'],
                 sugg['skybox', 'SKY_BLACK'],
                 sugg['elev', '<NONE>'],
+                sugg['deco', '<NONE>'],
             )
 
         corridors = info.find_key('corridors', [])
@@ -1690,9 +1697,9 @@ class DecorationSet(PakObject, allow_mult=True, has_img=True):
                 )
 
         LOGGER.info('Writing decoration.cfg...')
-        with open(dest, 'w'):
+        with open(dest, 'w') as f:
             for line in deco.config.export():
-                dest.write(line)
+                f.write(line)
 
     def add_over(self, override: 'DecorationSet'):
         self.config += override.config
