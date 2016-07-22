@@ -22,6 +22,7 @@ import voiceLine
 import instanceLocs
 import brushLoc
 import bottomlessPit
+import decoration
 import conditions
 
 from typing import (
@@ -494,6 +495,9 @@ def load_settings():
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
     conditions.build_connections_dict(instance_file)
+
+    # Load in the configuration for decoration items.
+    decoration.load_deco()
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
