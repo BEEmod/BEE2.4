@@ -1,6 +1,6 @@
 """Results relating to item connections."""
 import srctools
-from conditions import make_result, make_result_setup, resolve_value
+from conditions import make_result, make_result_setup, resolve_value, local_name
 from srctools import Property, Entity, Output
 
 
@@ -8,7 +8,7 @@ from srctools import Property, Entity, Output
 def res_add_output_setup(res):
     output = res['output']
     input_name = res['input']
-    inst_in = res['inst_out', '']
+    inst_in = res['inst_in', '']
     inst_out = res['inst_out', '']
     targ = res['target']
     only_once = srctools.conv_bool(res['only_once', None])
@@ -30,7 +30,7 @@ def res_add_output_setup(res):
 
 @make_result('AddOutput')
 def res_add_output(inst: Entity, res: Property):
-    """Add an output from an instance to a global name.
+    """Add an output from an instance to a global or local name.
 
     Values:
     - target: The name of the target entity
@@ -53,11 +53,11 @@ def res_add_output(inst: Entity, res: Property):
 
     inst.add_out(Output(
         resolve_value(inst, output),
-        resolve_value(inst, targ),
+        local_name(inst, resolve_value(inst, targ)),
         resolve_value(inst, input_name),
         resolve_value(inst, parm),
         srctools.conv_float(resolve_value(inst, delay)),
         times=times,
-        inst_out=resolve_value(inst, inst_out),
-        inst_in=resolve_value(inst, inst_in),
+        inst_out=resolve_value(inst, inst_out) or None,
+        inst_in=resolve_value(inst, inst_in) or None,
     ))
