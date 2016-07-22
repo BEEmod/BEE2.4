@@ -504,14 +504,21 @@ def check_flag(flag, inst):
         flag.value,
         inst['file'],
     )
+    name = flag.name
+    # If starting with '!', invert the result.
+    if name[:1] == '!':
+        desired_result = False
+        name = name[1:]
+    else:
+        desired_result = True
     try:
-        func = FLAG_LOOKUP[flag.name]
+        func = FLAG_LOOKUP[name]
     except KeyError:
-        LOGGER.warning('"' + flag.name + '" is not a valid condition flag!')
+        LOGGER.warning('"' + name + '" is not a valid condition flag!')
         return False
     else:
         res = func(inst, flag)
-        return res
+        return res == desired_result
 
 
 def import_conditions():
@@ -1166,12 +1173,12 @@ def retexture_template(
                         face.mat = 'tools/toolsnodraw'
                     else:
                         # Goo always has the same orientation!
-                        face.uaxis = srctools.vmf.UVAxis(
+                        face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
-                        face.vaxis = srctools.vmf.UVAxis(
+                        face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
@@ -1194,34 +1201,11 @@ def retexture_template(
                 grid_size = force_grid
 
             if 1 in norm or -1 in norm:  # Facing NSEW or up/down
-                # Save the originals
-                u_off = face.uaxis.offset
-                v_off = face.vaxis.offset
-
-                # Floor / ceiling is always 1 size - 4x4
-                if norm.z == 1:
-                    if grid_size != 'special':
-                        grid_size = 'ceiling'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                elif norm.z == -1:
-                    if grid_size != 'special':
-                        grid_size = 'floor'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                # Walls:
-                elif norm.x != 0:
-                    face.uaxis = UVAxis(0, 1, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-                elif norm.y != 0:
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-
                 # If axis-aligned, make the orientation aligned to world
                 # That way multiple items merge well, and walls are upright.
                 # We allow offsets < 1 grid tile, so items can be offset.
-                face.uaxis.offset = u_off % TEMP_TILE_PIX_SIZE[grid_size]
-                face.vaxis.offset = v_off % TEMP_TILE_PIX_SIZE[grid_size]
+                face.uaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
+                face.vaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
 
             if use_bullseye:
                 # We want to use the bullseye textures, instead of normal
@@ -1663,7 +1647,7 @@ def make_static_pist(ent, res):
 
 
 @make_result('GooDebris')
-def res_goo_debris(_, res):
+def res_goo_debris(_, res: Property):
     """Add random instances to goo squares.
 
     Options:
@@ -1678,8 +1662,8 @@ def res_goo_debris(_, res):
     """
     import brushLoc
 
-    space = srctools.conv_int(res['spacing', '1'], 1)
-    rand_count = srctools.conv_int(res['number', ''], None)
+    space = res.int('spacing', 1)
+    rand_count = res.int('number', None)
     if rand_count:
         rand_list = weighted_random(
             rand_count,
@@ -1687,9 +1671,9 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = srctools.conv_int(res['chance', '30'], 30) / 100
+    chance = res.int('chance', 30) / 100
     file = res['file']
-    offset = srctools.conv_int(res['offset', '0'], 0)
+    offset = res.int('offset', 0)
 
     if file.endswith('.vmf'):
         file = file[:-4]
@@ -1757,10 +1741,10 @@ WP_LIMIT = 30  # Limit to this many portal instances
 
 @make_result_setup('WPLightstrip')
 def res_portal_lightstrip_setup(res):
-    do_offset = srctools.conv_bool(res['doOffset', '0'])
+    do_offset = res.bool('doOffset')
     hole_inst = res['HoleInst']
     fallback = res['FallbackInst']
-    location = Vec.from_str(res['location', '0 8192 0'])
+    location = res.vec('location', 0, 8192, 0)
     strip_name = res['strip_name']
     hole_name = res['hole_name']
     return [
@@ -1932,7 +1916,7 @@ def res_make_tag_fizzler(inst, res):
         return
 
     # The distance from origin the double signs are seperated by.
-    sign_offset = srctools.conv_int(res['signoffset', ''], 16)
+    sign_offset = res.int('signoffset', 16)
 
     sign_loc = (
         # The actual location of the sign - on the wall

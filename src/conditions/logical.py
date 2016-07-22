@@ -9,8 +9,7 @@ def flag_and(inst, flag):
     for sub_flag in flag:
         if not check_flag(sub_flag, inst):
             return False
-    # If the AND block is empty, return True
-    return len(flag.value) == 0
+    return True
 
 
 @make_flag('OR')
