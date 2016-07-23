@@ -273,7 +273,7 @@ class Decoration:
                 angles=rand_angles,
                 model=prop.model,
                 skin=prop.skin,
-                disableshadows=prop.no_shadows,
+                disableshadows=int(prop.no_shadows),
             )
 
         for pos1, pos2 in self.noport:
