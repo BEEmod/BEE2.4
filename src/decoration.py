@@ -16,6 +16,7 @@ from typing import (
     Tuple, NamedTuple, List, Dict, Set
 )
 
+
 LOGGER = utils.getLogger(__name__, 'cond.deco')
 
 SETTINGS = {
@@ -28,6 +29,7 @@ Prop = NamedTuple('Prop', [
     ('model', str),
     ('skin', int),
     ('offset', Vec),
+    ('no_shadows', bool),
 ])
 
 Instance = NamedTuple('Instance', [
@@ -104,29 +106,11 @@ class ORIENT(Enum):
     CEILING = 'CEILING'
     WALLS = 'WALLS'
 
-
-class ROT_TYPES(Enum):
-    """Types of rotation..."""
-    PITCH_90 = 'PITCH_90'  # 90-deg angles only
-    PITCH = 'PITCH'  # 0.1 precision
-    YAW = 'YAW'
-    YAW_90 = 'YAW_90'
-    ROLL = 'ROLL'
-    ROLL_90 = 'ROLL_90'
-
-    NONE = 'NONE'
-
-# The interval for each axis..
-ROT_MASK = {
-    ROT_TYPES.PITCH: (0.1, 0, 0),
-    ROT_TYPES.PITCH_90: (90, 0, 0),
-    ROT_TYPES.YAW: (0, 0.1, 0),
-    ROT_TYPES.YAW_90: (0, 90, 0),
-    ROT_TYPES.ROLL: (0, 0, 0.1),
-    ROT_TYPES.ROLL_90: (0, 0, 90),
-
-    ROT_TYPES.NONE: (0, 0, 0),
-}
+class ROT_TYPES:
+    PITCH = 'x'
+    YAW = 'y'
+    ROLL = 'z'
+    NONE = ''
 
 DECORATIONS = []  # type: List[Decoration]
 
@@ -137,7 +121,7 @@ class Decoration:
         self,
         name,
         orient,
-        rotation=ROT_TYPES.NONE,
+        rotation: Vec=(0, 0, 0),
         block_others=False,
         side_off=0,
         norm_off=-64,
@@ -147,17 +131,21 @@ class Decoration:
         instances=(),
         noport=(),
     ):
+        # We don't flip the rotation, so this gets used in the wrong direction.
+        if orient is ORIENT.CEILING:
+            norm_off = -norm_off
+
         self.name = name
         self.orient = orient
-        self.rotation = rotation
+        self.rotation = Vec(rotation)
         self.block_others = block_others
         self.side_off = side_off
         self.norm_off = norm_off
         self.rot_off = Vec(rot_off)
         self.locs = dict(locs)
-        self.props = list(props)
-        self.noport = list(noport)
-        self.instances = list(instances)
+        self.props = list(props)  # type: List[Prop]
+        self.noport = list(noport)  # type: List[NoPortalVolume]
+        self.instances = list(instances)  # type: List[Instance]
 
     @classmethod
     def parse(cls, props: Property):
@@ -167,11 +155,6 @@ class Decoration:
             orient = ORIENT(props['orient', ''].upper())
         except ValueError:
             orient = ORIENT.FLOOR
-
-        try:
-            rotation = ROT_TYPES(props['Rotation', ''].upper())
-        except ValueError:
-            rotation = ROT_TYPES.NONE
 
         models = []
         instances = []
@@ -183,6 +166,7 @@ class Decoration:
                 model['model'],
                 model.int('skin', 0),
                 model.vec('offset'),
+                model.bool('no_shadows'),
             ))
 
         for inst in props.find_all('Instance'):
@@ -208,7 +192,6 @@ class Decoration:
                     value = OCCUPY_TYPES[pos.name.upper()]
                 except KeyError:
                     continue
-                LOGGER.info('Req-Space: {!r} -> {}', pos, value)
                 if pos.has_children():
                     bbox_min, bbox_max = Vec.bbox(
                         pos.vec('Pos1'),
@@ -230,7 +213,7 @@ class Decoration:
         return cls(
             props.real_name,
             orient,
-            rotation,
+            props.vec('Rotation'),
             props.bool('BlocksOthers'),
             props.float('sideOff', 0),
             # Default to place things at the surface
@@ -266,34 +249,31 @@ class Decoration:
             self.norm_off,
         ).rotate(*rot_angles)
 
-        occu_locs = [
-            (marker_pos + Vec(loc).rotate(*rot_angles)).as_tuple()
-            for loc in self.locs
-        ]
+        rand_angles = Vec(rot_angles)
 
         # Randomise rotation as desired...
-        for axis, mask in zip('xyz', ROT_MASK[self.rotation]):
-            if mask == 0:
+        for axis, dist in zip('xyz', self.rotation):
+            if dist == 0:
                 continue
-            elif mask == 0.1:
-                rot_angles[axis] += random.randrange(0, 3600) / 10
-            elif mask == 90:
-                rot_angles[axis] += random.randrange(0, 360, 90)
-            elif mask == 180:
-                rot_angles[axis] += random.choice((0, 180)) % 360
-            rot_angles[axis] %= 360
+            elif dist == 180:
+                rand_angles[axis] += random.choice((0, 180)) % 360
+            else:
+                rand_angles[axis] += random.uniform(-dist, dist)
+
+                rand_angles[axis] %= 360
 
         # First rotate around the given offset..
-        origin = Vec(-self.rot_off).rotate(*rot_angles) + self.rot_off
+        origin = Vec(-self.rot_off).rotate(*rand_angles) + self.rot_off
         origin += offset + world_pos
 
         for prop in self.props:
             VMF.create_ent(
                 classname='prop_static',
-                origin=origin + prop.offset,
-                angles=rot_angles,
+                origin=origin + Vec(prop.offset).rotate(*rand_angles),
+                angles=rand_angles,
                 model=prop.model,
                 skin=prop.skin,
+                disableshadows=prop.no_shadows,
             )
 
         for pos1, pos2 in self.noport:
@@ -311,7 +291,7 @@ class Decoration:
                 Vec(pos2.x, pos2.y, pos2.z),
             ]
             for v in corners:
-                v.localise(origin, rot_angles)
+                v.localise(origin, rand_angles)
             noport = VMF.create_ent(classname='func_noportal_volume')
             pos1, pos2 = Vec.bbox(corners)
             noport.solids.append(VMF.make_prism(
@@ -320,7 +300,11 @@ class Decoration:
                 mat='tools/toolsinvisible',
             ).solid)
 
-        return occu_locs
+        # Return the positions we used so we can invalidate them for others.
+        return [
+            (marker_pos + Vec(loc).rotate(*rot_angles)).as_tuple()
+            for loc in self.locs
+        ]
 
 
 @make_result('DecorationMarker')
@@ -389,6 +373,15 @@ def place_decorations(_):
                     marker_pos,
                     placement,
                     ORIENT.FLOOR,
+                    Vec(0, yaw, 0),
+                )
+        if (0, 0, -1) in normals:
+            for yaw in range(0, 360, 90):
+                add_poss_deco(
+                    poss_deco,
+                    marker_pos,
+                    placement,
+                    ORIENT.CEILING,
                     Vec(0, yaw, 0),
                 )
 
