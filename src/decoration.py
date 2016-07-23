@@ -3,9 +3,10 @@
 """
 from collections import defaultdict
 from enum import Enum
+import random
 
-from brushLoc import Block, POS
-from srctools import Property, Vec, EmptyMapping
+from brushLoc import Block, POS, grid_to_world
+from srctools import Property, Vec, EmptyMapping, conv_int
 from srctools.vmf import Entity, EntityFixup
 from conditions import make_result, meta_cond
 import utils
@@ -17,6 +18,12 @@ from typing import (
 
 LOGGER = utils.getLogger(__name__, 'cond.deco')
 
+SETTINGS = {
+    # Percent of positions that will get decorations..
+    'percent_deco': 75,
+    'deco_variance': 10,  # +- this quantity.
+}
+
 Prop = NamedTuple('Prop', [
     ('model', str),
     ('skin', int),
@@ -27,6 +34,11 @@ Instance = NamedTuple('Instance', [
     ('filename', str),
     ('offset', Vec),
     ('fixups', EntityFixup),
+])
+
+NoPortalVolume = NamedTuple('NoPortalVolume', [
+    ('pos1', Vec),
+    ('pos2', Vec),
 ])
 
 # Locations of marker points: origin -> set(normals)
@@ -92,6 +104,30 @@ class ORIENT(Enum):
     CEILING = 'CEILING'
     WALLS = 'WALLS'
 
+
+class ROT_TYPES(Enum):
+    """Types of rotation..."""
+    PITCH_90 = 'PITCH_90'  # 90-deg angles only
+    PITCH = 'PITCH'  # 0.1 precision
+    YAW = 'YAW'
+    YAW_90 = 'YAW_90'
+    ROLL = 'ROLL'
+    ROLL_90 = 'ROLL_90'
+
+    NONE = 'NONE'
+
+# The interval for each axis..
+ROT_MASK = {
+    ROT_TYPES.PITCH: (0.1, 0, 0),
+    ROT_TYPES.PITCH_90: (90, 0, 0),
+    ROT_TYPES.YAW: (0, 0.1, 0),
+    ROT_TYPES.YAW_90: (0, 90, 0),
+    ROT_TYPES.ROLL: (0, 0, 0.1),
+    ROT_TYPES.ROLL_90: (0, 0, 90),
+
+    ROT_TYPES.NONE: (0, 0, 0),
+}
+
 DECORATIONS = []  # type: List[Decoration]
 
 
@@ -101,20 +137,26 @@ class Decoration:
         self,
         name,
         orient,
-        rotation_interval=0,
+        rotation=ROT_TYPES.NONE,
+        block_others=False,
         side_off=0,
         norm_off=-64,
+        rot_off=(0, 0, 0),
         locs=EmptyMapping,
         props=(),
         instances=(),
+        noport=(),
     ):
         self.name = name
         self.orient = orient
-        self.rotation = rotation_interval
+        self.rotation = rotation
+        self.block_others = block_others
         self.side_off = side_off
         self.norm_off = norm_off
+        self.rot_off = Vec(rot_off)
         self.locs = dict(locs)
         self.props = list(props)
+        self.noport = list(noport)
         self.instances = list(instances)
 
     @classmethod
@@ -126,8 +168,14 @@ class Decoration:
         except ValueError:
             orient = ORIENT.FLOOR
 
+        try:
+            rotation = ROT_TYPES(props['Rotation', ''].upper())
+        except ValueError:
+            rotation = ROT_TYPES.NONE
+
         models = []
         instances = []
+        noportal_volumes = []
         locs = {}
 
         for model in props.find_all('Prop'):
@@ -146,6 +194,12 @@ class Decoration:
                 inst['file', ''],
                 inst.vec('offset'),
                 fixups,
+            ))
+
+        for noport in props.find_all('NoPortal'):
+            noportal_volumes.append(NoPortalVolume(
+                noport.vec('pos1'),
+                noport.vec('pos2'),
             ))
 
         for loc_block in props.find_all('RequiredSpace'):
@@ -176,13 +230,16 @@ class Decoration:
         return cls(
             props.real_name,
             orient,
-            props.float('rotation', 0),
-            props.float('side_off', 0),
+            rotation,
+            props.bool('BlocksOthers'),
+            props.float('sideOff', 0),
             # Default to place things at the surface
-            props.float('norm_off', -64),
+            props.float('normOff', -64),
+            props.vec('rotOff'),
             locs,
             models,
             instances,
+            noportal_volumes,
         )
 
     def __str__(self):
@@ -197,6 +254,73 @@ class Decoration:
                 inst=self.instances
             )
         )
+
+    def place(self, marker_pos: Vec, rot_angles: Vec):
+        """Place a decoration at this position, and return all occupied locations."""
+        from vbsp import VMF
+
+        world_pos = Vec(grid_to_world(marker_pos))
+        offset = Vec(
+            random.uniform(-self.side_off, +self.side_off),
+            random.uniform(-self.side_off, +self.side_off),
+            self.norm_off,
+        ).rotate(*rot_angles)
+
+        occu_locs = [
+            (marker_pos + Vec(loc).rotate(*rot_angles)).as_tuple()
+            for loc in self.locs
+        ]
+
+        # Randomise rotation as desired...
+        for axis, mask in zip('xyz', ROT_MASK[self.rotation]):
+            if mask == 0:
+                continue
+            elif mask == 0.1:
+                rot_angles[axis] += random.randrange(0, 3600) / 10
+            elif mask == 90:
+                rot_angles[axis] += random.randrange(0, 360, 90)
+            elif mask == 180:
+                rot_angles[axis] += random.choice((0, 180)) % 360
+            rot_angles[axis] %= 360
+
+        # First rotate around the given offset..
+        origin = Vec(-self.rot_off).rotate(*rot_angles) + self.rot_off
+        origin += offset + world_pos
+
+        for prop in self.props:
+            VMF.create_ent(
+                classname='prop_static',
+                origin=origin + prop.offset,
+                angles=rot_angles,
+                model=prop.model,
+                skin=prop.skin,
+            )
+
+        for pos1, pos2 in self.noport:
+            # noportal_volumes use the bounding box, so just use that for the shape.
+
+            # All combinations of the positions -> the corners of the brush.
+            corners = [
+                Vec(pos1.x, pos1.y, pos1.z),
+                Vec(pos2.x, pos1.y, pos1.z),
+                Vec(pos1.x, pos2.y, pos1.z),
+                Vec(pos2.x, pos2.y, pos1.z),
+                Vec(pos1.x, pos1.y, pos2.z),
+                Vec(pos2.x, pos1.y, pos2.z),
+                Vec(pos1.x, pos2.y, pos2.z),
+                Vec(pos2.x, pos2.y, pos2.z),
+            ]
+            for v in corners:
+                v.localise(origin, rot_angles)
+            noport = VMF.create_ent(classname='func_noportal_volume')
+            pos1, pos2 = Vec.bbox(corners)
+            noport.solids.append(VMF.make_prism(
+                pos1,
+                pos2,
+                mat='tools/toolsinvisible',
+            ).solid)
+
+        return occu_locs
 
 
 @make_result('DecorationMarker')
@@ -228,7 +352,12 @@ def load_deco():
         props = Property.parse(f)
     for deco_block in props.find_all('Decorations'):
         for deco in deco_block:
-            DECORATIONS.append(Decoration.parse(deco))
+            if deco.has_children():
+                DECORATIONS.append(Decoration.parse(deco))
+            elif deco.name == 'percent':
+                SETTINGS['percent_deco'] = conv_int(deco.value.rstrip('%'), 60)
+            elif deco.name == 'variance':
+                SETTINGS['deco_variance'] = conv_int(deco.value, 0)
     LOGGER.info('Loaded decoration data..')
 
 
@@ -244,12 +373,78 @@ def place_decorations(_):
         return
 
     # First, we want to figure out all unique placement shapes for items.
-    placement = defaultdict(list)
+    placement = defaultdict(lambda: defaultdict(list))
     for deco in DECORATIONS:
-        shape = frozenset({
-            (x, y, z, block)
-            for (x, y, z), block in
-            deco.locs.items()
-        })
-        placement[shape].append(deco)
+        shape = frozenset(deco.locs.items())
+        placement[deco.orient][shape].append(deco)
 
+    # Now figure out what can fit in each position...
+    poss_deco = []
+
+    for marker_pos, normals in MARKER_LOCS.items():
+        if (0, 0, 1) in normals:
+            for yaw in range(0, 360, 90):
+                add_poss_deco(
+                    poss_deco,
+                    marker_pos,
+                    placement,
+                    ORIENT.FLOOR,
+                    Vec(0, yaw, 0),
+                )
+
+    deco_quant = (
+        SETTINGS['percent_deco'] / 100 * len(MARKER_LOCS) +
+        random.randint(-SETTINGS['deco_variance'], SETTINGS['deco_variance'])
+    )
+
+    LOGGER.info('{}/{} possible positions...', deco_quant, len(poss_deco))
+
+    random.shuffle(poss_deco)
+
+    used_locs = set()
+    block_locs = set()
+
+    added_count = 0
+
+    # Start adding decorations...
+    while poss_deco and added_count < deco_quant:
+        (pos, deco, angles) = poss_deco.pop()
+
+        if deco.block_others:
+            blacklist = used_locs
+        else:
+            blacklist = block_locs
+
+        if not check_placement(deco.locs.items(), pos, angles, blacklist):
+            continue  # Already occupied by another decoration..
+
+        occu_locs = deco.place(pos, angles)
+        if deco.block_others:
+            blacklist.update(occu_locs)
+        used_locs.update(occu_locs)
+        added_count += 1
+
+
+def add_poss_deco(
+    poss_deco,
+    marker_pos,
+    placement,
+    orientation,
+    rot_angles: Vec,
+):
+    """Check to see if decorations fit here, and add them to the list."""
+    marker_pos = Vec(marker_pos)
+    for shape, deco in placement[orientation].items():
+        if check_placement(shape, marker_pos, rot_angles):
+            poss_deco.extend((marker_pos, dec, rot_angles) for dec in deco)
+
+
+def check_placement(shape, marker_pos: Vec, rot_angles: Vec, blacklist=()):
+    """Check if a placement shape can fit here."""
+    for pos, occu_type in shape:
+        block_pos = (Vec(pos).rotate(*rot_angles) + marker_pos).as_tuple()
+        if block_pos in blacklist or POS[block_pos] not in occu_type:
+            break
+    else:
+        return True
+    return False
