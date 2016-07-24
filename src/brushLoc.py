@@ -8,6 +8,7 @@ from enum import Enum
 
 import utils
 import bottomlessPit
+import instanceLocs
 
 from typing import Dict, Union
 
@@ -17,6 +18,9 @@ LOGGER = utils.getLogger(__name__)
 VOICE_ATTR_GOO = 'goo'
 VOICE_ATTR_PIT = 'bottomless_pit'
 
+# Maps item IDs to the defined EmbeddedVoxel positions they use.
+
+ITEM_EMBED = {}
 
 def world_to_grid(pos: Vec) -> Vec:
     """Given real coordinates, find the grid position."""
@@ -33,8 +37,9 @@ class Block(Enum):
     VOID = 0  # Outside the map
     SOLID = 1  # Occupied by a full-block brush
     EMBED = 2  # Occupied by EmbeddedVoxel brushes
+    EMBED_OCCUPIED = 4  # EmbeddedVoxel brush, but with no walls - obs rooms for example.
     OCCUPIED = 3  # Manually set - air, but filled by some item...
-    AIR = 4  # Inside the map
+    AIR = 5  # Inside the map
 
     GOO_SINGLE = 10  # 1-block high goo
     GOO_TOP = 11  # Top of goo
@@ -71,7 +76,7 @@ class Block(Enum):
 
         Embed is assumed to be solid.
         """
-        return self.value > 3
+        return self.value > 4
 
     @property
     def is_solid(self):
@@ -99,6 +104,16 @@ class Block(Enum):
         return self.value in (10, 13, 20, 23)
 
 _grid_keys = Union[Vec, Vec_tuple, tuple, slice]
+
+
+def load_embed_data(embed: Property):
+    """Load the data defining embed positions for different item IDs."""
+    ITEM_EMBED.clear()
+    for item in embed:
+        ITEM_EMBED[item.real_name] = [
+            Vec.from_str(prop.value)
+            for prop in item
+        ]
 
 
 class Grid(Dict[_grid_keys, Block]):
@@ -146,16 +161,30 @@ class Grid(Dict[_grid_keys, Block]):
         """Given the map file, set blocks."""
         search_locs = []
 
+        embed_locs = []
+
         for ent in vmf.entities:
-            pos = ent['origin', None]
-            if pos is None:
+            origin = ent['origin', None]
+            if origin is None:
                 continue
-            pos = world_to_grid(Vec.from_str(pos))
+            origin = world_to_grid(Vec.from_str(origin))
 
             # Exclude entities outside the main area - elevators mainly.
             # The border should never be set to air!
-            if (0, 0, 0) <= pos <= (25, 25, 25):
-                search_locs.append(pos)
+            if (0, 0, 0) <= origin <= (25, 25, 25):
+                search_locs.append(origin)
+
+            filename = ent['file'].casefold()
+            try:
+                embed_loc = ITEM_EMBED[instanceLocs.INST_TO_ID[filename]]
+            except KeyError:
+                pass
+            else:
+                angles = Vec.from_str(ent['angles'])
+                for pos in embed_loc:
+                    pos = pos.copy()
+                    pos.localise(origin, angles)
+                    embed_locs.append(pos)
 
         can_have_pit = bottomlessPit.pits_allowed()
 
@@ -224,6 +253,13 @@ class Grid(Dict[_grid_keys, Block]):
         )
         self.fill_air(search_locs)
         LOGGER.info('Air filled!')
+
+        # Now set the embed_occupied locations. These are positions
+        # we know are embedded (from editoritems), but have no brushes.
+        # They should be filled with air.
+        for pos in embed_locs:
+            if self[pos] is Block.AIR:
+                self[pos] = Block.EMBED_OCCUPIED
 
     def fill_air(self, search_locs):
         """Flood-fill the area, making all inside spaces air.
