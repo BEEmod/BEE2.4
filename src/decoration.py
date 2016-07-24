@@ -126,6 +126,7 @@ class Decoration:
         vert_off=0,
         norm_off=-64,
         rot_off=(0, 0, 0),
+        occu_locs=(),
         locs=EmptyMapping,
         props=(),
         instances=(),
@@ -144,6 +145,7 @@ class Decoration:
         self.norm_off = norm_off
         self.vert_off = vert_off
         self.rot_off = Vec(rot_off)
+        self.occu_locs = set(occu_locs)
         self.locs = dict(locs)
         self.props = list(props)  # type: List[Prop]
         self.noport = list(noport)  # type: List[NoPortalVolume]
@@ -162,6 +164,7 @@ class Decoration:
         instances = []
         noportal_volumes = []
         locs = {}
+        occu_space = set()
 
         for model in props.find_all('Prop'):
             models.append(Prop(
@@ -199,18 +202,33 @@ class Decoration:
                         pos.vec('Pos1'),
                         pos.vec('Pos2'),
                     )
-                    for x in range(int(bbox_min.x), int(bbox_max.x) + 1):
-                        for y in range(int(bbox_min.y), int(bbox_max.y) + 1):
-                            for z in range(int(bbox_min.z), int(bbox_max.z) + 1):
-                                locs[x, y, z] = value
+                    for x, y, z in Vec.iter_grid(bbox_min, bbox_max):
+                        locs[x, y, z] = value
                 else:
                     # One location
                     locs[Vec.from_str(pos.value).as_tuple()] = value
+
+        for loc_block in props.find_all('OccupiedVoxels'):
+            for pos in loc_block:
+                if pos.has_children():
+                    bbox_min, bbox_max = Vec.bbox(
+                        pos.vec('Pos1'),
+                        pos.vec('Pos2'),
+                    )
+                    for sub_loc in Vec.iter_grid(bbox_min, bbox_max):
+                        occu_space.add(sub_loc.as_tuple())
+                else:
+                    # One location
+                    occu_space.add(Vec.from_str(pos.value).as_tuple())
 
         if not locs:
             # By default, we want the square to be air, and the floor to be solid.
             locs[0, 0, 0] = OCCUPY_TYPES['AIR']
             locs[0, 0, -1] = OCCUPY_TYPES['BLOCK']
+
+        if not occu_space:
+            # We default to occupying the center block only.
+            occu_space = {(0, 0, 0)}
 
         return cls(
             props.real_name,
@@ -223,6 +241,7 @@ class Decoration:
             # Default to place things at the surface
             props.float('normOff', -64),
             props.vec('rotOff'),
+            occu_space,
             locs,
             models,
             instances,
@@ -242,8 +261,21 @@ class Decoration:
             )
         )
 
-    def place(self, marker_pos: Vec, rot_angles: Vec):
-        """Place a decoration at this position, and return all occupied locations."""
+    def place(self, marker_pos: Vec, rot_angles: Vec, blocked_pos: Set[tuple]) -> int:
+        """Try to place a decoration at this position, and return the number actually placed."""
+
+        occu_pos = []
+        for pos in self.occu_locs:
+            pos = Vec(pos)
+            pos.localise(marker_pos, rot_angles)
+            occu_pos.append(pos.as_tuple())
+
+        # Ensure we don't overlap another decoration, or place one outside
+        # the markers.
+        for pos in occu_pos:
+            if pos in blocked_pos or pos not in MARKER_LOCS:
+                return 0
+
         from vbsp import VMF
 
         world_pos = Vec(grid_to_world(marker_pos))
@@ -313,11 +345,10 @@ class Decoration:
                 mat='tools/toolsinvisible',
             ).solid)
 
-        # Return the positions we used so we can invalidate them for others.
-        return [
-            (marker_pos + Vec(loc).rotate(*rot_angles)).as_tuple()
-            for loc in self.locs
-        ]
+        if self.block_others:
+            blocked_pos.update(occu_pos)
+
+        return 1
 
 
 @make_result('DecorationMarker')
@@ -438,7 +469,6 @@ def place_decorations(_):
 
     LOGGER.info('{}/{} possible positions...', deco_quant, len(poss_deco))
 
-    used_locs = set()
     block_locs = set()
 
     added_count = 0
@@ -456,19 +486,7 @@ def place_decorations(_):
         decorations = decorations[:random.randrange(len(decorations))]
 
         for deco, angles in decorations:
-            if deco.block_others:
-                blacklist = used_locs
-            else:
-                blacklist = block_locs
-
-            if not check_placement(deco.locs.items(), pos, angles, blacklist):
-                continue  # Already occupied by another decoration..
-
-            occu_locs = deco.place(pos, angles)
-            if deco.block_others:
-                blacklist.update(occu_locs)
-            used_locs.update(occu_locs)
-            added_count += 1
+            added_count += deco.place(pos, angles, block_locs)
 
 
 def add_poss_deco(
@@ -491,11 +509,11 @@ def add_poss_deco(
                 )
 
 
-def check_placement(shape, marker_pos: Vec, rot_angles: Vec, blacklist=()):
+def check_placement(shape, marker_pos: Vec, rot_angles: Vec):
     """Check if a placement shape can fit here."""
     for pos, occu_type in shape:
         block_pos = (Vec(pos).rotate(*rot_angles) + marker_pos).as_tuple()
-        if block_pos in blacklist or POS[block_pos] not in occu_type:
+        if POS[block_pos] not in occu_type:
             break
     else:
         return True
