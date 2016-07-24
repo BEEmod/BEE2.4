@@ -166,7 +166,7 @@ class Decoration:
                 model['model'],
                 model.int('skin', 0),
                 model.vec('offset'),
-                model.bool('no_shadows'),
+                model.bool('NoShadow'),
             ))
 
         for inst in props.find_all('Instance'):
