@@ -8,6 +8,8 @@ Does stuff related to the actual games.
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
+
+from srctools.vec import Vec
 from tk_tools import TK_ROOT
 
 import os
@@ -455,7 +457,7 @@ class Game:
         # These have to come last, so we need to special case it.
         editoritems += style.editor.find_key("Renderables", [])
 
-        # Special-case: implement the UnlockDefault stlylevar here,
+        # Special-case: implement the UnlockDefault stylevar here,
         # so all items are modified.
         if selected_objects['StyleVar']['UnlockDefault']:
             LOGGER.info('Unlocking Items!')
@@ -552,13 +554,16 @@ class Game:
         instance_locs = Property("AllInstances", [])
         cust_inst = Property("CustInstances", [])
         commands = Property("Connections", [])
-        root_block = Property(None, [instance_locs, cust_inst, commands])
+        embed_blocks = Property("EmbeddedVoxel", [])
+
+        root_block = Property(None, [instance_locs, cust_inst, commands, embed_blocks])
 
         for item in editoritems.find_all("Item"):
             instance_block = Property(item['Type'], [])
             instance_locs.append(instance_block)
 
             comm_block = Property(item['Type'], [])
+            embed_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
                 for inst in inst_block.value[:]:  # type: Property
@@ -601,9 +606,41 @@ class Game:
                     for io_prop in block:
                         comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
 
+            # Identify positions used for embed blocks..
+            # Subtract 1 from Z, since 0 0 0 is below the instance.
+            for embedded_voxel in item.find_all('Exporting', 'EmbeddedVoxels'):
+                for section in embedded_voxel:
+                    if section.name == 'volume':
+                        # Pos1/Pos2..
+                        bbox_min, bbox_max = Vec.bbox(
+                            section.vec('Pos1'),
+                            section.vec('Pos2'),
+                        )
+                        for x in range(int(bbox_min.x), int(bbox_max.x) + 1):
+                            for y in range(int(bbox_min.y), int(bbox_max.y) + 1):
+                                for z in range(int(bbox_min.z), int(bbox_max.z) + 1):
+                                    embed_block.append(
+                                        Property(
+                                            'Pos',
+                                            str(Vec(x, y, z - 1)),
+                                        )
+                                    )
+
+                    elif section.name == 'voxel':
+                        embed_block.append(Property(
+                            'Pos',
+                            str(section.vec('Pos') - (0, 0, 1)),
+                        ))
+
+            if item['ItemClass', 'ItemBase'].casefold() == 'itemrailplatform':
+                # These are hardcoded to embed in a specific pattern...
+                embed_block.value = [Property('Pos', '0 0 0')]
+
             # Only add the block if the item actually has IO.
             if comm_block.value:
                 commands.append(comm_block)
+            if embed_block.value:
+                embed_blocks.append(embed_block)
 
         return root_block.export()
 
