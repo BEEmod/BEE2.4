@@ -141,6 +141,7 @@ class Decoration:
         self.block_others = block_others
         self.side_off = side_off
         self.norm_off = norm_off
+        self.vert_off = vert_off
         self.rot_off = Vec(rot_off)
         self.locs = dict(locs)
         self.props = list(props)  # type: List[Prop]
@@ -243,11 +244,18 @@ class Decoration:
         from vbsp import VMF
 
         world_pos = Vec(grid_to_world(marker_pos))
-        offset = Vec(
-            random.uniform(-self.side_off, +self.side_off),
-            random.uniform(-self.side_off, +self.side_off),
-            self.norm_off,
-        ).rotate(*rot_angles)
+        if self.orient is ORIENT.WALLS:
+            offset = Vec(
+                self.norm_off,
+                random.uniform(-self.side_off, +self.side_off),
+                random.uniform(-self.vert_off, +self.vert_off),
+            ).rotate(*rot_angles)
+        else:
+            offset = Vec(
+                random.uniform(-self.side_off, +self.side_off),
+                random.uniform(-self.side_off, +self.side_off),
+                self.norm_off + random.uniform(-self.vert_off, +self.vert_off),
+            ).rotate(*rot_angles)
 
         rand_angles = Vec(rot_angles)
 
