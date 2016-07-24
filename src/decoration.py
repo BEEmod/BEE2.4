@@ -97,8 +97,6 @@ OCCUPY_TYPES = {
     OCCUPY_TYPES.items()
 }
 
-LOGGER.info(OCCUPY_TYPES)
-
 
 class ORIENT(Enum):
     """Orientation types."""
@@ -378,7 +376,7 @@ def place_decorations(_):
         placement[deco.orient][shape].append(deco)
 
     # Now figure out what can fit in each position...
-    poss_deco = []
+    poss_deco = defaultdict(list)
 
     for marker_pos, normals in MARKER_LOCS.items():
         if (0, 0, 1) in normals:
@@ -434,13 +432,11 @@ def place_decorations(_):
             )
 
     deco_quant = (
-        SETTINGS['percent_deco'] / 100 * len(MARKER_LOCS) +
+        SETTINGS['percent_deco'] / 100 * len(poss_deco) +
         random.randint(-SETTINGS['deco_variance'], SETTINGS['deco_variance'])
     )
 
     LOGGER.info('{}/{} possible positions...', deco_quant, len(poss_deco))
-
-    random.shuffle(poss_deco)
 
     used_locs = set()
     block_locs = set()
@@ -448,35 +444,35 @@ def place_decorations(_):
     added_count = 0
 
     # Start adding decorations...
-    # Poss_deco has the same list included multiple times, to change chances.
-    # We only want to pick it once though.
     while poss_deco and added_count < deco_quant:
-        deco_val = poss_deco.pop()
-        if not deco_val:
-            continue  # Already added...
+        pos, decorations = poss_deco.popitem()
+        if not decorations:
+            continue
 
-        pos, deco, angles = deco_val
-        # This list may be duplicated in poss_deco, so clearing it
-        # also affects the others.
-        deco_val.clear()
+        pos = Vec(pos)
 
-        if deco.block_others:
-            blacklist = used_locs
-        else:
-            blacklist = block_locs
+        # Add a random number of decorations to this location.
+        random.shuffle(decorations)
+        decorations = decorations[:random.randrange(len(decorations))]
 
-        if not check_placement(deco.locs.items(), pos, angles, blacklist):
-            continue  # Already occupied by another decoration..
+        for deco, angles in decorations:
+            if deco.block_others:
+                blacklist = used_locs
+            else:
+                blacklist = block_locs
 
-        occu_locs = deco.place(pos, angles)
-        if deco.block_others:
-            blacklist.update(occu_locs)
-        used_locs.update(occu_locs)
-        added_count += 1
+            if not check_placement(deco.locs.items(), pos, angles, blacklist):
+                continue  # Already occupied by another decoration..
+
+            occu_locs = deco.place(pos, angles)
+            if deco.block_others:
+                blacklist.update(occu_locs)
+            used_locs.update(occu_locs)
+            added_count += 1
 
 
 def add_poss_deco(
-    poss_deco,
+    poss_deco: Dict[Tuple[int, int, int], List[Tuple[Decoration, Vec]]],
     marker_pos,
     placement,
     orientation,
@@ -484,21 +480,15 @@ def add_poss_deco(
 ):
     """Check to see if decorations fit here, and add them to the list."""
     marker_pos = Vec(marker_pos)
-    for shape, deco in placement[orientation].items():
+    for shape, decorations in placement[orientation].items():
         if check_placement(shape, marker_pos, rot_angles):
-            for dec in deco:
-                if random.randrange(100) > dec.chance:
+            for deco in decorations:
+                if random.randrange(100) > deco.chance:
                     continue
 
-                vals = [[marker_pos, dec, rot_angles]]
-                if orientation is ORIENT.WALLS:
-                    # Wall rotation is only 1 direction, whereas floor/ceilng
-                    # has 4 possible orientations - this makes walls less common.
-                    # duplicate values 4 times to compensate.
-                    vals *= 4
-                    # Note that these are the same object..
-
-                poss_deco.extend(vals)
+                poss_deco[marker_pos.as_tuple()].append(
+                    (deco, rot_angles),
+                )
 
 
 def check_placement(shape, marker_pos: Vec, rot_angles: Vec, blacklist=()):
