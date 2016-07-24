@@ -58,7 +58,7 @@ OCCUPY_TYPES = {
     'VOID': Block.VOID,
     # Pits are also empty...
     'AIR': (Block.AIR, Block.PIT_TOP, Block.PIT_MID),
-    'SOLID': Block.SOLID,
+    # 'SOLID': Block.SOLID,
     'EMBED': Block.EMBED,
 
     'GOO_FLOOR': (Block.GOO_BOTTOM, Block.GOO_SINGLE),
@@ -121,9 +121,11 @@ class Decoration:
         self,
         name,
         orient,
+        chance=100,
         rotation: Vec=(0, 0, 0),
         block_others=False,
         side_off=0,
+        vert_off=0,
         norm_off=-64,
         rot_off=(0, 0, 0),
         locs=EmptyMapping,
@@ -137,6 +139,7 @@ class Decoration:
 
         self.name = name
         self.orient = orient
+        self.chance = chance
         self.rotation = Vec(rotation)
         self.block_others = block_others
         self.side_off = side_off
@@ -214,9 +217,11 @@ class Decoration:
         return cls(
             props.real_name,
             orient,
+            props.int('Chance', 100),
             props.vec('Rotation'),
             props.bool('BlocksOthers'),
             props.float('sideOff', 0),
+            props.float('vertOff', 0),
             # Default to place things at the surface
             props.float('normOff', -64),
             props.vec('rotOff'),
@@ -264,7 +269,9 @@ class Decoration:
             if dist == 0:
                 continue
             elif dist == 180:
-                rand_angles[axis] += random.choice((0, 180)) % 360
+                rand_angles[axis] += random.choice((0, 180))
+            elif dist == 90:
+                rand_angles[axis] += random.randrange(0, 360, 90)
             else:
                 rand_angles[axis] += random.uniform(-dist, dist)
 
@@ -393,6 +400,39 @@ def place_decorations(_):
                     Vec(0, yaw, 0),
                 )
 
+        if (1, 0, 0) in normals:
+            add_poss_deco(
+                poss_deco,
+                marker_pos,
+                placement,
+                ORIENT.WALLS,
+                Vec(0, 0, 0),
+            )
+        if (-1, 0, 0) in normals:
+            add_poss_deco(
+                poss_deco,
+                marker_pos,
+                placement,
+                ORIENT.WALLS,
+                Vec(0, 180, 0),
+            )
+        if (0, 1, 0) in normals:
+            add_poss_deco(
+                poss_deco,
+                marker_pos,
+                placement,
+                ORIENT.WALLS,
+                Vec(0, 270, 0),
+            )
+        if (0, -1, 0) in normals:
+            add_poss_deco(
+                poss_deco,
+                marker_pos,
+                placement,
+                ORIENT.WALLS,
+                Vec(0, 90, 0),
+            )
+
     deco_quant = (
         SETTINGS['percent_deco'] / 100 * len(MARKER_LOCS) +
         random.randint(-SETTINGS['deco_variance'], SETTINGS['deco_variance'])
@@ -408,8 +448,17 @@ def place_decorations(_):
     added_count = 0
 
     # Start adding decorations...
+    # Poss_deco has the same list included multiple times, to change chances.
+    # We only want to pick it once though.
     while poss_deco and added_count < deco_quant:
-        (pos, deco, angles) = poss_deco.pop()
+        deco_val = poss_deco.pop()
+        if not deco_val:
+            continue  # Already added...
+
+        pos, deco, angles = deco_val
+        # This list may be duplicated in poss_deco, so clearing it
+        # also affects the others.
+        deco_val.clear()
 
         if deco.block_others:
             blacklist = used_locs
@@ -437,7 +486,19 @@ def add_poss_deco(
     marker_pos = Vec(marker_pos)
     for shape, deco in placement[orientation].items():
         if check_placement(shape, marker_pos, rot_angles):
-            poss_deco.extend((marker_pos, dec, rot_angles) for dec in deco)
+            for dec in deco:
+                if random.randrange(100) > dec.chance:
+                    continue
+
+                vals = [[marker_pos, dec, rot_angles]]
+                if orientation is ORIENT.WALLS:
+                    # Wall rotation is only 1 direction, whereas floor/ceilng
+                    # has 4 possible orientations - this makes walls less common.
+                    # duplicate values 4 times to compensate.
+                    vals *= 4
+                    # Note that these are the same object..
+
+                poss_deco.extend(vals)
 
 
 def check_placement(shape, marker_pos: Vec, rot_angles: Vec, blacklist=()):
