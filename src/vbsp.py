@@ -495,6 +495,7 @@ def load_settings():
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
     conditions.build_connections_dict(instance_file)
+    brushLoc.load_embed_data(instance_file.find_key('EmbeddedVoxel', []))
 
     # Load in the configuration for decoration items.
     decoration.load_deco()

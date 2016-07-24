@@ -17,6 +17,10 @@ LOGGER = utils.getLogger(__name__)
 # The list of instance each item uses.
 INSTANCE_FILES = {}
 
+# Instance -> ID mapping. Only useful before conditions change instances,
+# and might be inaccurate (two items could use the same instance.)
+INST_TO_ID = {}
+
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
 CUST_INST_FILES = defaultdict(dict)  # type: Dict[str, Dict[str, str]]
@@ -179,19 +183,25 @@ def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
-    for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.real_name] = [
-            inst.value.casefold()
-            for inst in
-            prop
-        ]
+    for item in prop_block.find_key('AllInstances', []):
+        INSTANCE_FILES[item.real_name] = item_inst = []
+        for inst in item:
+            inst_file = inst.value.casefold()
+            item_inst.append(inst_file)
 
-    for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.real_name] = {
-            inst.name: inst.value.casefold()
-            for inst in
-            prop
-        }
+            INST_TO_ID[inst_file] = item.real_name
+
+    for item in prop_block.find_key('CustInstances', []):
+        CUST_INST_FILES[item.real_name] = item_inst = {}
+        for inst in item:
+            inst_file = inst.value.casefold()
+            item_inst[inst.name] = inst_file
+
+            INST_TO_ID[inst_file] = item.real_name
+
+    # Empty-string is used often to mean no-instance, it shouldn't be detected.
+    if '' in INST_TO_ID:
+        del INST_TO_ID['']
 
     INST_SPECIAL = {
         key.casefold(): resolve(val_string, silent=True)
