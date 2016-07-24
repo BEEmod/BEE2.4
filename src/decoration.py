@@ -261,20 +261,25 @@ class Decoration:
             )
         )
 
-    def place(self, marker_pos: Vec, rot_angles: Vec, blocked_pos: Set[tuple]) -> int:
-        """Try to place a decoration at this position, and return the number actually placed."""
+    def place(self, marker_pos: Vec, rot_angles: Vec, blocked_pos: Set[tuple]) -> bool:
+        """Try to place a decoration at this position.
 
-        occu_pos = []
+        This returns whether it succeeded.
+        """
+
+        occu_pos = set()
         for pos in self.occu_locs:
             pos = Vec(pos)
             pos.localise(marker_pos, rot_angles)
-            occu_pos.append(pos.as_tuple())
+            occu_pos.add(pos.as_tuple())
 
-        # Ensure we don't overlap another decoration, or place one outside
-        # the markers.
-        for pos in occu_pos:
-            if pos in blocked_pos or pos not in MARKER_LOCS:
-                return 0
+        # Ensure we don't overlap another decoration if set to block..
+        if self.block_others and not occu_pos.isdisjoint(blocked_pos):
+            return False
+
+        # Ensure we aren't outside the markers.
+        if not occu_pos.issubset(MARKER_LOCS):
+            return False
 
         from vbsp import VMF
 
@@ -337,7 +342,10 @@ class Decoration:
             ]
             for v in corners:
                 v.localise(origin, rand_angles)
-            noport = VMF.create_ent(classname='func_noportal_volume')
+            noport = VMF.create_ent(
+                classname='func_noportal_volume',
+                origin=world_pos,
+            )
             pos1, pos2 = Vec.bbox(corners)
             noport.solids.append(VMF.make_prism(
                 pos1,
@@ -348,7 +356,7 @@ class Decoration:
         if self.block_others:
             blocked_pos.update(occu_pos)
 
-        return 1
+        return True
 
 
 @make_result('DecorationMarker')
@@ -485,8 +493,14 @@ def place_decorations(_):
         random.shuffle(decorations)
         decorations = decorations[:random.randrange(len(decorations))]
 
+        placed = False
         for deco, angles in decorations:
-            added_count += deco.place(pos, angles, block_locs)
+            placed |= deco.place(pos, angles, block_locs)
+
+        # Our counter should count how many markers are used, not how many
+        # are placed there.
+        if placed:
+            added_count += 1
 
 
 def add_poss_deco(
