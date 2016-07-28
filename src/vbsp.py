@@ -126,6 +126,9 @@ TEX_DEFAULTS = [
     ('', 'special.bullseye_black_wall'),
     ('', 'special.bullseye_black_floor'),
     ('', 'special.bullseye_black_ceiling'),
+
+    # Add a beam every few blocks for glass on floors.
+    ('', 'special.glass_floorbeam'),
 ]
 
 
@@ -250,6 +253,10 @@ DEFAULTS = {
 
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
+
+    # Add beams to the middle of large glass floors.
+    "glass_floorbeam_size":     "0",  # The size of the border for the beams
+    "glass_floorbeam_sep":      "2",  # Number of blocks between beams
 
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
