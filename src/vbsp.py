@@ -251,6 +251,10 @@ DEFAULTS = {
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
 
+    # Add beams to the middle of large glass floors.
+    "glass_floorbeam_temp":     "",  # Two brushes for the texture scaling.
+    "glass_floorbeam_sep":      "2",  # Number of blocks between beams
+
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
     "clump_floor":              "0",  # Use it for floors?
@@ -1956,6 +1960,11 @@ def change_brush():
     else:
         glass_temp = None
 
+    if get_opt('glass_floorbeam_temp'):
+        floorbeam_locs = []
+    else:
+        floorbeam_locs = None
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -2006,8 +2015,13 @@ def change_brush():
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_clip_mat:
-            glass_clip = make_barrier_solid(solid.get_origin(), glass_clip_mat)
+            glass_clip, glass_loc, glass_norm = make_barrier_solid(
+                solid.get_origin(),
+                glass_clip_mat,
+            )
             VMF.add_brush(glass_clip.solid)
+            if floorbeam_locs is not None and glass_norm.z != 0:
+                floorbeam_locs.append((glass_loc, glass_norm))
 
     if get_opt('glass_pack') and settings['has_attr']['glass']:
         TO_PACK.add(get_opt('glass_pack').casefold())
@@ -2020,6 +2034,11 @@ def change_brush():
     if make_goo_mist:
         LOGGER.info('Adding Goo Mist...')
         add_goo_mist(mist_solids)
+        LOGGER.info('Done!')
+
+    if floorbeam_locs:
+        LOGGER.info('Adding Glass floor beams...')
+        add_glass_floorbeams(floorbeam_locs)
         LOGGER.info('Done!')
 
     if can_clump():
@@ -2048,7 +2067,7 @@ def make_barrier_solid(origin, material):
         origin.x // 128 * 128 + 64,
         origin.y // 128 * 128 + 64,
         origin.z // 128 * 128 + 64,
-        )
+    )
     normal = (origin - loc).norm()  # This points outward.
     # This sets the two side axes to 1, and the normal axis to 0.
     side_offset = 1 - abs(normal)  # type: Vec
@@ -2061,7 +2080,92 @@ def make_barrier_solid(origin, material):
         (loc + normal * 60 + side_offset),
         (loc + normal * 64 - side_offset),
         mat=material,
-    )
+    ), loc, normal
+
+
+def add_glass_floorbeams(glass_locs):
+    """Add beams to separate large glass panels.
+
+    The texture is assumed to match plasticwall004a's shape.
+    """
+    temp_name = get_opt('glass_floorbeam_temp')
+
+    separation = srctools.conv_int(get_opt('glass_floorbeam_sep'), 2) + 1
+    separation *= 128
+
+    # First we want to find all the groups of contiguous glass sections.
+    # This is a mapping from some glass piece to its group list.
+    groups = {}
+
+    for origin, normal in glass_locs:
+        pos = origin + normal * 62  # type: Vec
+
+        groups[pos.as_tuple()] = [pos]
+
+    # Loop over every pos and check in the +x/y diections for another glass
+    # piece. If there, merge the two lists and set every pos in the group to
+    # point to the new list.
+    # Once done, every unique list = a group.
+
+    for pos_tup in groups.keys():
+        pos = Vec(pos_tup)
+        for off in ((128, 0, 0), (0, 128, 0)):
+            neighbour = (pos + off).as_tuple()
+            if neighbour in groups:
+                our_group = groups[pos_tup]
+                neigh_group = groups[neighbour]
+                if our_group is neigh_group:
+                    continue
+
+                # Now merge the two lists. We then need to update all dict locs
+                # to point to the new list.
+
+                if len(neigh_group) > len(our_group):
+                    small_group, large_group = our_group, neigh_group
+                else:
+                    small_group, large_group = neigh_group, our_group
+
+                large_group.extend(small_group)
+                for pos in small_group:
+                    groups[pos.as_tuple()] = large_group
+
+    # Remove duplicates objects by using the ID as key..
+    groups = list({
+        id(group): group
+        for group in groups.values()
+    }.values())
+
+    LOGGER.info('Groups: {}', groups)
+
+    # Side -> u, v or None
+
+    for group in groups:
+
+        bbox_min, bbox_max = Vec.bbox(group)
+        dimensions = bbox_max - bbox_min
+        LOGGER.info('Size = {}', dimensions)
+
+        if dimensions.y > dimensions.x:
+            axis = 'y'
+            rot = Vec(0, 0, 0)
+        else:
+            axis = 'x'
+            rot = Vec(0, 90, 0)
+
+        # Add 128 so the first pos isn't a beam.
+        offset = bbox_min[axis] + 128
+
+        for pos in group:
+            # Every 'sep' positions..
+            if (pos[axis] - offset) % separation == 0:
+                conditions.import_template(
+                    temp_name,
+                    pos,
+                    rot,
+                    force_type=conditions.TEMP_TYPES.detail,
+                )
+
+
 
 
 def face_seed(face):
@@ -2824,7 +2928,7 @@ def change_func_brush():
                 VMF.remove_ent(brush)
 
         if is_grating and grating_clip_mat:
-            grate_clip = make_barrier_solid(brush_loc, grating_clip_mat)
+            grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
             VMF.add_brush(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
