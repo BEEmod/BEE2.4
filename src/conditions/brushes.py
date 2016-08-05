@@ -394,7 +394,7 @@ def res_import_template_setup(res: Property):
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
-    rem_replace_brush = False
+    rem_replace_brush = True
     additional_ids = ()
     try:
         replace_brush = res.find_key('replaceBrush')
