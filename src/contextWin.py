@@ -339,8 +339,9 @@ def load_item_data():
 
     set_sprite(SPR.FACING, face_spr)
 
-    # Now some special overrides for paint and cube dropper items..
+    # Now some special overrides for certain classes.
     if selected_item.id == "ITEM_CUBE":
+        # Cubes - they should show info for the dropper.
         set_sprite(SPR.FACING, 'surf_ceil')
         set_sprite(SPR.INPUT, 'in_norm')
         set_sprite(SPR.COLLISION, 'space_embed')
@@ -348,13 +349,18 @@ def load_item_data():
         set_sprite(SPR.ROTATION, 'rot_36')
         wid['sprite', SPR.ROTATION].tooltip_text += '\n(Reflection Cube only)'
 
-    if editor_data['ItemClass', ''].casefold() == "itempaintsplat":
+    item_class = editor_data['ItemClass', ''].casefold()
+    if item_class == "itempaintsplat":
         # Reflection or normal gel..
         set_sprite(SPR.FACING, 'surf_wall_ceil')
         set_sprite(SPR.INPUT, 'in_norm')
         set_sprite(SPR.COLLISION, 'space_none')
         set_sprite(SPR.OUTPUT, 'out_none')
         set_sprite(SPR.ROTATION, 'rot_paint')
+    elif item_class == 'itemrailplatform':
+        # Track platform - always embeds into the floor.
+        set_sprite(SPR.COLLISION, 'space_embed')
+
 
 
 def adjust_position(_=None):
