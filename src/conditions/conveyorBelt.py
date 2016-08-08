@@ -27,6 +27,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
         return
 
     move_dir = Vec(1, 0, 0).rotate_by_str(inst.fixup['$travel_direction'])
+    move_dir.rotate_by_str(inst['angles'])
     start_offset = srctools.conv_float(inst.fixup['$starting_position'], 0)
     teleport_to_start = res.bool('TrackTeleport', True)
     segment_inst_file = res['SegmentInst', '']
