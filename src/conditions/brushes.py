@@ -221,7 +221,6 @@ def res_set_texture(inst, res):
 
     if tex.startswith('[') and tex.endswith(']'):
         brush.face.mat = vbsp.get_tex(tex[1:-1])
-        brush.face.mat = tex
     elif tex.startswith('<') and tex.endswith('>'):
         # Special texture names!
         tex = tex[1:-1].casefold()
