@@ -89,7 +89,9 @@ def res_conveyor_belt(inst: Entity, res: Property):
 
         last_track = track
 
-        if segment_inst_file:
+        # Don't place at the last point - it doesn't teleport correctly,
+        # and would be one too many.
+        if segment_inst_file and pos != end_pos:
             seg_inst = vmf.create_ent(
                 classname='func_instance',
                 targetname=track_name.format(index),
