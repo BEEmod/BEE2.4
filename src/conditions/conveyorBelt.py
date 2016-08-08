@@ -114,9 +114,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
         output.target = conditions.local_name(inst, output.target)
         last_track.add_out(output)
 
+    # Add the EnableMotion trigger_multiple seen in platform items.
+    # This wakes up cubes when it starts moving - only needed on floors.
     motion_filter = res['motionTrig', None]
-    if motion_filter is not None:
-        # Add the EnableMotion trigger_multiple seen in platform items.
+    if motion_filter is not None and norm == (0, 0, 1):
         motion_trig = vmf.create_ent(
             classname='trigger_multiple',
             targetname=conditions.local_name(inst, 'enable_motion_trig'),
