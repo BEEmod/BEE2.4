@@ -38,9 +38,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
     if segment_inst_file:
         segment_inst_file = conditions.resolve_inst(segment_inst_file)[0]
 
-    speed = srctools.conv_float(
-        conditions.resolve_value(inst, res['speed', '100'])
-    )
+    track_speed = res['speed', None]
 
     start_pos = Vec.from_str(inst['origin'])
     end_pos = start_pos + move_dist * move_dir
@@ -79,9 +77,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
             targetname=track_name.format(index) + '-track',
             origin=pos,
             spawnflags=0,
-            speed=speed,
             orientationtype=0,  # Don't rotate
         )
+        if track_speed is not None:
+            track['speed'] = track_speed
         if last_track:
             last_track['target'] = track['targetname']
 
