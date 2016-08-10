@@ -15,9 +15,11 @@ def res_conveyor_belt(inst: Entity, res: Property):
         TrackTeleport: Set the track points so they teleport trains to the start.
         Speed: The fixup or number for the train speed.
         MotionTrig: If set, a trigger_multiple will be spawned that EnableMotions
-        weighted cubes. The value is the name of the relevant filter.
+          weighted cubes. The value is the name of the relevant filter.
         EndOutput: Adds an output to the last track. The value is the same as
-        outputs in VMFs.
+          outputs in VMFs.
+        RotateSegments: If true (default), force segments to face in the
+          direction of movement
     """
     move_dist = srctools.conv_int(inst.fixup['$travel_distance'])
 
@@ -33,7 +35,6 @@ def res_conveyor_belt(inst: Entity, res: Property):
     segment_inst_file = res['SegmentInst', '']
 
     vmf = inst.map
-
 
     if segment_inst_file:
         segment_inst_file = conditions.resolve_inst(segment_inst_file)[0]
@@ -67,7 +68,16 @@ def res_conveyor_belt(inst: Entity, res: Property):
             ' z={} and x={}!'.format(norm, move_dir)
         )
 
-    inst['angles'] = angles
+    if res.bool('rotateSegments', True):
+        inst['angles'] = angles
+
+    # Add the EnableMotion trigger_multiple seen in platform items.
+    # This wakes up cubes when it starts moving.
+    motion_filter = res['motionTrig', None]
+
+    # Disable on walls, or if the conveyor can't be turned on.
+    if norm != (0, 0, 1) or inst.fixup['$connectioncount'] == '0':
+        motion_filter = None
 
     track_name = conditions.local_name(inst, 'segment_{}')
     last_track = None
@@ -114,10 +124,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
         output.target = conditions.local_name(inst, output.target)
         last_track.add_out(output)
 
-    # Add the EnableMotion trigger_multiple seen in platform items.
-    # This wakes up cubes when it starts moving - only needed on floors.
-    motion_filter = res['motionTrig', None]
-    if motion_filter is not None and norm == (0, 0, 1):
+    if motion_filter is not None:
         motion_trig = vmf.create_ent(
             classname='trigger_multiple',
             targetname=conditions.local_name(inst, 'enable_motion_trig'),
@@ -134,3 +141,21 @@ def res_conveyor_belt(inst: Entity, res: Property):
             mat='tools/toolstrigger',
         ).solid)
 
+    # A brush covering under the platform.
+    base_trig = vmf.make_prism(
+        start_pos + Vec(-64, -64, 48).rotate(*angles),
+        end_pos + Vec(64, 64, 56).rotate(*angles),
+        mat='tools/toolsinvisible',
+    ).solid
+
+    vmf.add_brush(base_trig)
+
+    # Make a paint_cleanser under the belt..
+    if res.bool('PaintFizzler'):
+        pfizz = vmf.create_ent(
+            classname='trigger_paint_cleanser',
+            origin=start_pos,
+        )
+        pfizz.solids.append(base_trig.copy())
+        for face in pfizz.sides():
+            face.mat = 'tools/toolstrigger'
