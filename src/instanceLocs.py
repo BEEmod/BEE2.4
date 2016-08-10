@@ -160,6 +160,8 @@ SUBITEMS = {
     'track_plat_oscil': 5,
     'track_single': 6,
 
+    'track_plats': (4, 5),
+    'track_platforms': (4, 5),
     'track_rail': (1, 2, 3, 6),
 
     # Funnels
