@@ -115,6 +115,30 @@ def res_conveyor_belt(inst: Entity, res: Property):
         # Link back to the first track..
         last_track['target'] = track_name.format(1) + '-track'
 
+    # Generate an env_beam pointing from the start to the end of the track.
+    beam_keys = res.find_key('BeamKeys', [])
+    if beam_keys.value:
+        beam = vmf.create_ent(classname='env_beam')
+
+        # 3 offsets - x = distance from walls, y = side, z = height
+        beam_off = beam_keys.vec('origin', 0, 63, 56)
+
+        for prop in beam_keys:
+            beam[prop.real_name] = prop.value
+
+        # Localise the targetname so it can be triggered..
+        beam['LightningStart'] = beam['targetname'] = conditions.local_name(
+            inst,
+            beam['targetname', 'beam']
+        )
+        del beam['LightningEnd']
+        beam['origin'] = start_pos + Vec(
+            -beam_off.x, beam_off.y, beam_off.z,
+        ).rotate(*angles)
+        beam['TargetPoint'] = end_pos + Vec(
+            +beam_off.x, beam_off.y, beam_off.z,
+        ).rotate(*angles)
+
     # Allow adding outputs to the last path_track.
     for prop in res.find_all('EndOutput'):
         output = Output.parse(prop)
