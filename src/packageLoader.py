@@ -24,7 +24,7 @@ from srctools import (
 )
 
 from typing import (
-    Dict,
+    Dict, List
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -463,7 +463,12 @@ def parse_package(pack: 'Package'):
     return img_count
 
 
-def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
+def setup_style_tree(
+    item_data,
+    style_data,
+    log_fallbacks,
+    log_missing_styles,
+):
     """Modify all items so item inheritance is properly handled.
 
     This will guarantee that all items have a definition for each
@@ -492,12 +497,12 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
         style.bases = base
 
     # All styles now have a .bases attribute, which is a list of the
-    # parent styles that exist.
+    # parent styles that exist (plus the style).
 
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver = list(item.versions.values())
+        all_ver = list(item.versions.values())  # type: List[Dict[str, Dict[str, Style]]]
         # Move default version to the beginning, so it's read first
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
@@ -712,7 +717,9 @@ class Style(PakObject):
         self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
-        self.bases = []  # Set by setup_style_tree()
+        # Set by setup_style_tree() after all objects are read..
+        # this is a list of this style, plus parents in order.
+        self.bases = []
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -969,7 +976,7 @@ class Item(PakObject):
         Pal_list is a list of (item, subitem) tuples representing the palette.
         Versions is a {item:version_id} dictionary.
         prop_conf is a {item_id: {prop_name: value}} nested dictionary for
-         overriden property names. Empty dicts can be passed instead.
+         overridden property names. Empty dicts can be passed instead.
         """
         editoritems = exp_data.editoritems
         vbsp_config = exp_data.vbsp_conf
@@ -996,6 +1003,7 @@ class Item(PakObject):
             editoritems += editor_parts
             vbsp_config += config_part
 
+            # Add auxiliary configs as well.
             try:
                 aux_conf = aux_item_configs[item.id]  # type: ItemConfig
             except KeyError:
@@ -1003,9 +1011,16 @@ class Item(PakObject):
             else:
                 vbsp_config += aux_conf.all_conf
                 try:
-                    vbsp_config += aux_conf.versions[ver_id][style_id]
+                    version_data = aux_conf.versions[ver_id]
                 except KeyError:
                     pass  # No override.
+                else:
+                    # Find the first style definition for the selected one
+                    # that's defined for this config
+                    for poss_style in exp_data.selected_style.bases:
+                        if poss_style.id in version_data:
+                            vbsp_config += version_data[poss_style.id]
+                            break
 
     def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
         """Get the data for an exported item."""
