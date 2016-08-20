@@ -81,7 +81,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
 
     track_name = conditions.local_name(inst, 'segment_{}')
     last_track = None
-    for index, pos in enumerate(start_pos.iter_line(end_pos, stride=128), start=1):
+    # Place beams at the top, so they don't appear inside wall sections.
+    beam_start = start_pos + 48 * norm  # type: Vec
+    beam_end = end_pos + 48 * norm  # type: Vec
+    for index, pos in enumerate(beam_start.iter_line(beam_end, stride=128), start=1):
         track = vmf.create_ent(
             classname='path_track',
             targetname=track_name.format(index) + '-track',
