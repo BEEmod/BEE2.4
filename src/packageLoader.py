@@ -1934,6 +1934,12 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                         path,
                     )
                 ) from ex
+
+        # We know that if it's a material, it must be packing the VMT at the
+        # very least.
+        for mat in mats:
+            files.append('materials/' + mat + '.vmt')
+
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
             zip_files = {
