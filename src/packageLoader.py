@@ -1909,20 +1909,22 @@ class PackList(PakObject, allow_mult=True, has_img=False):
             for prop in
             data.info.find_all('AddIfMat')
         ]
+
+        files = []
+
         if conf.has_children():
             # Allow having a child block to define packlists inline
             files = [
                 prop.value
                 for prop in conf
             ]
-        else:
+        elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
             try:
                 with data.zip_file.open(path) as f:
                     # Each line is a file to pack.
                     # Skip blank lines, strip whitespace, and
-                    # alow // comments.
-                    files = []
+                    # allow // comments.
                     for line in f:
                         line = srctools.clean_line(line)
                         if line:
@@ -1939,6 +1941,9 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         # very least.
         for mat in mats:
             files.append('materials/' + mat + '.vmt')
+
+        if not files:
+            raise ValueError('"{}" has no files to pack!'.format(data.id))
 
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
