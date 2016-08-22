@@ -9,6 +9,7 @@ class TYPE(Enum):
     """The types arguments can have."""
     STR = str
     INT = int
+    FLOAT = float
     BOOL = bool
     VEC = Vec
 
@@ -77,7 +78,7 @@ DEFAULTS = [
     Opt('fizz_border_repeat', 128,
         """For fizzler borders, the distance before the
         texture will repeat again.
-        """,
+        """),
 
     Opt('fizz_visibility', True,
         """Whether fizzlers should be visible.
@@ -154,7 +155,7 @@ DEFAULTS = [
         """Scale of the goo textures.
         """),
 
-    Opt('pit_blend_light', TYPE.Vec,
+    Opt('pit_blend_light', TYPE.VEC,
         """Color of lights in bottomless pits.
 
         These are added at in the skybox and in the map, to blend together the
@@ -270,7 +271,7 @@ DEFAULTS = [
 
         This shouldn't need to be changed.
         """),
-    #
+    
     Opt('global_pti_ents_loc', Vec(-2400, -2800, 0),
         """Location of global_pti_ents.
 
@@ -322,11 +323,11 @@ DEFAULTS = [
         """Comma-separated list of characters in the pack.
         """),
     Opt('cave_port_skin', TYPE.INT,
-    	"""If a Cave map, indicate which portrait to use.
-    	
-    	* 0: 50's Cave
+        """If a Cave map, indicate which portrait to use.
+        
+        * 0: 50's Cave
         * 1: 80's Cave
-    	* 2: 70's Cave 
-    	* 3: 70's Cave with Caroline
-    	"""),
+        * 2: 70's Cave 
+        * 3: 70's Cave with Caroline
+        """),
 ]
