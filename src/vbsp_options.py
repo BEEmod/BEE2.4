@@ -321,5 +321,12 @@ DEFAULTS = [
     Opt('voice_char', TYPE.STR,
         """Comma-separated list of characters in the pack.
         """),
-    "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
+    Opt('cave_port_skin', TYPE.INT,
+    	"""If a Cave map, indicate which portrait to use.
+    	
+    	* 0: 50's Cave
+        * 1: 80's Cave
+    	* 2: 70's Cave 
+    	* 3: 70's Cave with Caroline
+    	"""),
 ]
