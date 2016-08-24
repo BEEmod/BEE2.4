@@ -2,8 +2,15 @@
 from collections import namedtuple
 from enum import Enum
 
-from srctools import Vec
+import inspect
+import io
 
+from srctools import Property, Vec, parse_vec_str
+import srctools
+
+from typing import TypeVar, Type, Optional
+
+SETTINGS = {}
 
 class TYPE(Enum):
     """The types arguments can have."""
@@ -12,12 +19,114 @@ class TYPE(Enum):
     FLOAT = float
     BOOL = bool
     VEC = Vec
+    
+TYPE_NAMES = {
+    TYPE.STR: 'Text',
+    TYPE.INT: 'Whole Number',
+    TYPE.FLOAT: 'Decimal Number',
+    TYPE.BOOL: 'True/False',
+    TYPE.VEC: 'Vector',
+}
 
-# If the default is TYPE.x, the value is of that type, but default=None.
-# otherwise type = type(default).
-Opt = namedtuple('Opt', 'id default doc')
+class Opt:
+    def __init__(self, id, default, doc):
+        if isinstance(default, TYPE):
+            self.type = default
+            self.default = None
+        else:
+            self.type = TYPE(type(default))
+            self.default = default
+        self.id = id.casefold()
+        self.name = id
+        # Remove indentation, and trailing carriage return
+        self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
+        
+def load(opt_block: Property):
+    """Read settings from the given property block."""
+    SETTINGS.clear()
+    set_vals = {}
+    for prop in opt_block:
+        set_vals[prop.name] = prop.value
+    for opt in DEFAULTS:
+        try:
+            val = set_vals.pop(opt.id)
+        except KeyError:
+            SETTINGS[opt.id] = opt.default
+            continue
+        if opt.type is TYPE.VEC:
+            # Pass nones so we can check if it failed.. 
+            parsed_vals = parse_vec_str(val, x=None)
+            if parsed_vals[0] is None:
+                SETTINGS[opt.id] = opt.default
+            else:
+                SETTINGS[opt.id] = Vec(*parsed_vals)
+        elif opt.type is TYPE.BOOL:
+            SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
+        else: # int, float, str - no special handling...
+            try:
+                SETTINGS[opt.id] = opt.type.value(val)
+            except (ValueError, TypeError):
+                SETTINGS[opt.id] = opt.default
+    if set_vals:
+        LOGGER.warning('Extra config options: {}', set_vals)
+ 
+T = TypeVar('T')           
+                                              
+def get(expected_type: Type[T], name) -> Optional[T]:
+    """Get the given option. 
+    expected_type should be the class of the value that's expected.
+    The value can be None if unset.
+    """
+    try:
+        val = SETTINGS[name.casefold()]
+    except KeyError:
+        raise TypeError('Option "{}" does not exist!'.format(name)) from None
+    
+    if val is None:
+        return None
+        
+    # Don't allow subclasses (bool/int)
+    if type(val) is not expected_type:
+        raise ValueError('Option "{}" is {} (expected {})'.format(
+            name, 
+            type(val), 
+            expected_type,
+        ))
+     # Vec is mutable, don't allow modifying the original.
+    if expected_type is Vec:
+        return val.copy()
+    else:
+        return val
+        
+INFO_DUMP_FORMAT = """\
+## `{id}`{default} ({type})
+{desc}
 
-
+"""
+        
+def dump_info():
+    """Create a Markdown description of all options."""
+    file = io.StringIO()
+    print('*' * 20, file=file)
+    
+    print('# VBSP_config options:', file=file)
+    
+    for opt in DEFAULTS:
+        if opt.default is None:
+            default = ''
+        elif type(opt.default) is Vec:
+            default =  '(`' + opt.default.join(' ') + '`)' 
+        else:
+            default = ' = `' + repr(opt.default) + '`'
+        file.write(INFO_DUMP_FORMAT.format(
+            id=opt.name, 
+            default=default,
+            type=TYPE_NAMES[opt.type],
+            desc='\n'.join(opt.doc),
+        ))
+    
+    print('*' * 20, file=file)
+    return file.getvalue()
 
 DEFAULTS = [
     Opt('goo_mist', False,
@@ -267,7 +376,7 @@ DEFAULTS = [
         """),
     # Instance used for pti_ents
     Opt('global_pti_ents', "instances/BEE2/global_pti_ents.vmf",
-        """The instance used for global_pti_ents.
+        """The instance used for `global_pti_ents`.
 
         This shouldn't need to be changed.
         """),
@@ -331,3 +440,5 @@ DEFAULTS = [
         * 3: 70's Cave with Caroline
         """),
 ]
+
+del T, Type, TypeVar, Optional
