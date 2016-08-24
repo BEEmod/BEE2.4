@@ -13,6 +13,7 @@ from typing import (
 
 import srctools
 import utils
+import vbsp_options
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property,
@@ -1176,12 +1177,12 @@ def retexture_template(
                         face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=vbsp_options.get(float, 'goo_scale'),
                         )
                         face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=vbsp_options.get(float, 'goo_scale'),
                         )
                 continue
             # It's a regular wall type!
@@ -1827,8 +1828,7 @@ def res_find_potential_tag_fizzlers(inst):
 
     This is used for Aperture Tag paint fizzlers.
     """
-    import vbsp
-    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
     if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
@@ -1888,8 +1888,7 @@ def res_make_tag_fizzler(inst, res):
     These fizzlers are created via signs, and work very specially.
     MUST be priority -100 so it runs before fizzlers!
     """
-    import vbsp
-    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         inst.remove()
         return

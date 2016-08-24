@@ -269,7 +269,7 @@ DEFAULTS = [
         """Scale of the goo textures.
         """),
 
-    Opt('pit_blend_light', TYPE.VEC,
+    Opt('pit_blend_light', TYPE.STR,
         """Color of lights in bottomless pits.
 
         These are added at in the skybox and in the map, to blend together the

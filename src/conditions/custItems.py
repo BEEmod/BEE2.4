@@ -7,6 +7,7 @@ import conditions
 import srctools
 import utils
 import vbsp
+import vbsp_options
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
@@ -166,11 +167,11 @@ def res_cust_antline_setup(res):
     # amount of destruction will usually be the same.
     broken_chance = srctools.conv_float(res[
         'broken_antline_chance',
-        vbsp.get_opt('broken_antline_chance')
+        vbsp_options.get(float, 'broken_antline_chance'),
     ])
     broken_dist = srctools.conv_float(res[
         'broken_antline_distance',
-        vbsp.get_opt('broken_antline_distance')
+        vbsp_options.get(float, 'broken_antline_distance'),
     ])
 
     toggle_inst = res['instance', '']

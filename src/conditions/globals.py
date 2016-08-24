@@ -1,6 +1,7 @@
 """Flags related to global properties - stylevars, music, which game, etc."""
 import srctools
 import utils
+import vbsp_options
 
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
@@ -81,8 +82,7 @@ def res_cave_portrait(inst, res):
 
     skin pack.
     """
-    import vbsp
-    return vbsp.get_opt('cave_port_skin') != ''
+    return vbsp_options.get(int, 'cave_port_skin') is not None
 
 
 @make_flag('ifOption')

@@ -6,6 +6,8 @@ import srctools
 import utils
 import vbsp
 import brushLoc
+import vbsp_options
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -80,7 +82,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
         tele_off = Vec(0, 0, 0)
 
     # Controlled by the style, not skybox!
-    blend_light = vbsp.get_opt('pit_blend_light')
+    blend_light = vbsp_options.get(str, 'pit_blend_light')
 
     if use_skybox:
         # Add in the actual skybox edges and triggers.
