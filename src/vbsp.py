@@ -1,6 +1,9 @@
 
 import utils
 # Do this very early, so we log the startup sequence.
+import vbsp_options
+
+
 LOGGER = utils.init_logging('bee2/vbsp.log')
 
 import os
@@ -172,128 +175,6 @@ ANTLINES = {
     'corner': "signage/indicator_lights/indicator_lights_corner_floor",
     }
 
-DEFAULTS = {
-    "goo_mist":                 "0",  # Add info_particle_systems to goo pits
-
-    "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
-    "remove_pedestal_plat":     "0",  # Remove pedestal button platforms
-    "remove_exit_signs":        "0",  # Remove the exit sign overlays
-
-    "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
-
-    "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
-    "reset_edge_off":           "0",  # Reset the scale on
-    "edge_scale":               "0.15",  # The scale on squarebeams textures
-    "rotate_edge_special":      "0",    # Ditto for angled/flip panels
-    "reset_edge_off_special":   "",
-    "edge_scale_special":       "0.15",
-
-    # Reset offsets for all white/black brushes, so embedface has correct
-    # texture matching
-    "tile_texture_lock":        "1",
-
-    "fizz_border_vertical":     "0",  # The texture is oriented vertically
-    "fizz_border_thickness":    "8",  # The width of the overlays
-    "fizz_border_repeat":       "128",  # The width lengthways
-    "fizz_visibility":          "1",  # Make fizzlers invisible and silent.
-
-    "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
-    "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
-
-    # Allow changing flip panel sounds.
-    "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
-    "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
-
-
-    "staticPan":                "NONE",  # folder for static panels
-    # Template used for static panels set to 0 degrees
-    "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
-    # Template used for angled static panels
-    "static_pan_temp_white":    "BEE2_STATIC_PAN_ANGLED",
-    "static_pan_temp_black":    "BEE2_STATIC_PAN_ANGLED",
-    # If set, replace panel func_brushes with this. Top should be set to
-    # black_wall_metal_002c
-    "dynamic_pan_temp":         "",
-    # The local name that the panel func_brush should parent to.
-    # Adding the attachment name to the parent after a comma
-    # automatically sets the attachment point for us.
-    "dynamic_pan_parent":       "model_arms,panel_attach",
-
-    "signInst":                 "NONE",  # adds this instance on all the signs.
-    "signSize":                 "32",  # Allow resizing the sign overlays
-    "signPack":                 "",  # Packlist to use when sign inst is added
-
-    "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
-    # The maximum distance of a single broken section
-    "broken_antline_distance":  "3",
-    "goo_scale":                "1",  # Scale of goo material
-
-    # Add lights to disguise the bottomless pit transition
-    "pit_blend_light":          "",
-
-    # Textures used for the glass/grating clips.
-    "glass_clip":               "BEE2/glass_player_clip",
-    "grating_clip":             "BEE2/grate_player_clip",
-    # Packlists for glass and gratings
-    "glass_pack":               "PACK_PLAYER_CLIP_GLASS",
-    "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
-    # Filter used on grating vphysics_clips
-    "grating_filter":           "@not_paint_bomb",
-    # A template holding a brush used to decide the
-    # rotation and scaling of glass. This overrides glass_scale
-    # and grating_scale, if set.
-    "glass_template":           "",
-    "grating_template":         "",
-
-    # The same for the goo_wall textures.
-    "goo_wall_scale_temp":      "",
-
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
-
-    # Add beams to the middle of large glass floors.
-    "glass_floorbeam_temp":     "",  # Two brushes for the texture scaling.
-    "glass_floorbeam_sep":      "2",  # Number of blocks between beams
-
-    "clump_wall_tex":           "0",  # Use the clumping wall algorithm
-    "clump_ceil":               "0",  # Use if for ceilings?
-    "clump_floor":              "0",  # Use it for floors?
-    "clump_size":               "4",  # The maximum length of a clump
-    "clump_width":              "2",  # The width of a clump
-    "clump_number":             "6",  # The number of clumps created
-
-    # Default to the origin of the elevator instance - that's likely to
-    # be enclosed
-    "music_location_sp":        "-2000 2000 0",
-    "music_location_coop":      "-2000 -2000 0",
-    # Instance used for pti_ents
-    "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
-    # Default pos is next to arrival_departure_ents
-    # Note that many other ents are added at this point, since it's
-    # boxed in.
-    "global_pti_ents_loc":      "-2400 -2800 0",
-    # Location of the model changer instance if needed
-    "model_changer_loc":        "-2400 -2800 -256",
-
-    ######
-    # The following are set by the BEE2.4 app automatically:
-
-    # The file path of the BEE2 app that generated the config
-    "bee2_loc":                 "",
-    "game_id":                  "620",  # The game's steam ID
-    "music_id":                 "<NONE>",  # The music ID which was selected
-    "music_instance":           "",  # The instance for the chosen music
-    "music_soundscript":        "",  # The soundscript for the chosen music
-    "music_looplen":            "0",  # If set, re-trigger music after this time.
-    "elev_type":                "RAND",  # What type of script to use:
-    # Either "RAND", "FORCE", "NONE" or "BSOD"
-    "elev_horiz":               "",  # The horizontal elevator video to use
-    "elev_vert":                "",  # The vertical elevator video to use
-    "voice_id":                 "<NONE>",  # The voice pack which was selected
-    "voice_char":               "",  # Characters in the pack
-    "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
-    }
-
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
 FIZZLER_ANGLE_FIX = {
@@ -458,14 +339,8 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
-    # Get main config options. All options must be in the DEFAULTS dict -
-    # if not set, they fallback to that value.
-    for option_block in conf.find_all('options'):
-        for opt in option_block:
-            settings['options'][opt.name.casefold()] = opt.value
-    for key, default in DEFAULTS.items():
-        if key.casefold() not in settings['options']:
-            settings['options'][key.casefold()] = default
+    # Load in our main configs..
+    vbsp_options.load(conf.find_all('Options'))
 
     # Load in fizzler options and textures. This works similarly to the normal
     # textures/options.

@@ -7,8 +7,11 @@ import io
 
 from srctools import Property, Vec, parse_vec_str
 import srctools
+import utils
 
-from typing import TypeVar, Type, Optional
+from typing import TypeVar, Type, Optional, Iterator
+
+LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
 
@@ -40,13 +43,15 @@ class Opt:
         self.name = id
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
-        
-def load(opt_block: Property):
+
+
+def load(opt_blocks: Iterator[Property]):
     """Read settings from the given property block."""
     SETTINGS.clear()
     set_vals = {}
-    for prop in opt_block:
-        set_vals[prop.name] = prop.value
+    for opt_block in opt_blocks:
+        for prop in opt_block:
+            set_vals[prop.name] = prop.value
     for opt in DEFAULTS:
         try:
             val = set_vals.pop(opt.id)
@@ -440,5 +445,3 @@ DEFAULTS = [
         * 3: 70's Cave with Caroline
         """),
 ]
-
-del T, Type, TypeVar, Optional
