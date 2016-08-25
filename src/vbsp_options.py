@@ -97,7 +97,7 @@ def get(expected_type: Type[T], name) -> Optional[T]:
             type(val), 
             expected_type,
         ))
-     # Vec is mutable, don't allow modifying the original.
+    # Vec is mutable, don't allow modifying the original.
     if expected_type is Vec:
         return val.copy()
     else:

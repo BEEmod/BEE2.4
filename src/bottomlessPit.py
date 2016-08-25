@@ -375,7 +375,7 @@ def make_pit_shell(vmf: VMF):
         classname='trigger_multiple',
         spawnflags=4104,
         wait=0.1,
-        origin=vbsp.get_opt('global_pti_ents_loc'),
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -4182),
@@ -392,7 +392,7 @@ def make_pit_shell(vmf: VMF):
     # to stop players from portalling past the hurt trigger.
     diss_trig = vmf.create_ent(
         classname='func_noportal_volume',
-        origin=vbsp.get_opt('global_pti_ents_loc'),
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -64),
