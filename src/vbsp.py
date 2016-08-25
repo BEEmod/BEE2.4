@@ -433,10 +433,10 @@ def load_settings():
 
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
-    if get_opt('BEE2_loc') != '':
+    if vbsp_options.get(str, 'BEE2_loc'):
         BEE2_config = ConfigFile(
             'config/compile.cfg',
-            root=get_opt('BEE2_loc'),
+            root=vbsp_options.get(str, 'BEE2_loc'),
         )
     else:
         BEE2_config = ConfigFile(None)
@@ -877,7 +877,7 @@ def set_player_model(_):
     if GAME_MODE == 'COOP':  # Not in coop..
         return
 
-    loc = Vec.from_str(get_opt('model_changer_loc'))
+    loc = vbsp_options.get(Vec, 'model_changer_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -932,7 +932,7 @@ def set_player_model(_):
         delay=0.1,
     ))
 
-    if pgun_skin and get_opt('game_id') == utils.STEAM_IDS['PORTAL2']:
+    if pgun_skin and vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(VLib.Output(
@@ -972,7 +972,7 @@ def set_player_portalgun(inst):
     """
     if GAME_MODE == 'COOP':
         return  # Don't change portalgun in Portal 2 Coop
-    if get_opt('game_id') == utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
     LOGGER.info('Setting Portalgun:')
@@ -998,7 +998,7 @@ def set_player_portalgun(inst):
         inst = VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=get_opt('global_pti_ents_loc'),  # Reuse this location
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),  # Reuse this location
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/pgun_single.vmf',
         )
@@ -1014,7 +1014,7 @@ def set_player_portalgun(inst):
         VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=get_opt('global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
@@ -1680,8 +1680,10 @@ def fixup_goo_sides():
     For pits sides use normal black walls.
     """
 
-    if get_opt('goo_wall_scale_temp'):
-        scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
+    if vbsp_options.get(str, 'goo_wall_scale_temp'):
+        scale = conditions.get_scaling_template(
+            vbsp_options.get(str, 'goo_wall_scale_temp')
+        )
     else:
         scale = None
 
@@ -1792,7 +1794,10 @@ def remove_barrier_ents():
 
     They're not used since we added their contents into the map directly.
     """
-    if not get_opt('grating_clip') or not get_opt('glass_clip'):
+    if (
+        not vbsp_options.get(str, 'grating_clip') or
+        not vbsp_options.get(str, 'glass_clip')
+    ):
         return  # They're being used.
 
     barrier_file = instanceLocs.resolve('[glass_128]')
@@ -2057,7 +2062,7 @@ def random_walls():
     rotate_edge = get_bool_opt('rotate_edge')
     texture_lock = get_bool_opt('tile_texture_lock', True)
     edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
+    edge_scale = vbsp_options.get(float, 'edge_scale')
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -2161,7 +2166,7 @@ def clump_walls():
     texture_lock = get_bool_opt('tile_texture_lock', True)
     rotate_edge = get_bool_opt('rotate_edge')
     edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
+    edge_scale = vbsp_options.get(float, 'edge_scale')
 
     # Possible locations for clumps - every face origin, not including
     # ignored faces or nodraw
@@ -2173,11 +2178,11 @@ def clump_walls():
         if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
     ]
 
-    clump_size = srctools.conv_int(get_opt("clump_size"), 4)
-    clump_wid = srctools.conv_int(get_opt("clump_width"), 2)
+    clump_size = vbsp_options.get(int, "clump_size")
+    clump_wid = vbsp_options.get(int, "clump_width")
 
     clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
-    clump_numb *= srctools.conv_int(get_opt("clump_number"), 6)
+    clump_numb *= vbsp_options.get(int, "clump_number")
 
     # Also clump ceilings or floors?
     clump_ceil = get_bool_opt('clump_ceil')
@@ -2448,15 +2453,13 @@ def change_overlays():
     LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
-    sign_inst = get_opt('signInst')
+    sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = srctools.conv_int(get_opt('signSize'), 32) / 2
-    if sign_inst == "NONE":
-        sign_inst = None
+    sign_size =  vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack = get_opt('signPack')
+    sign_inst_pack =  vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
@@ -2471,8 +2474,8 @@ def change_overlays():
     broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
     broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
 
-    broken_chance = srctools.conv_float(get_opt('broken_antline_chance'))
-    broken_dist = srctools.conv_float(get_opt('broken_antline_distance'))
+    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
+    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2558,9 +2561,9 @@ def change_trig():
 
         # Apply some config options - scanline and Fast Reflections, visbility
         trig['useScanline'] = settings["fizzler"]["scanline"]
-        trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
+        trig['drawInFastReflection'] = vbsp_options.get(bool, "force_fizz_reflect")
         # This also controls whether fizzlers play sounds.
-        trig['visible'] = get_opt('fizz_visibility')
+        trig['visible'] = vbsp_options.get(bool, 'fizz_visibility')
 
     for trig in VMF.by_class['trigger_hurt']:
         target = trig['targetname', '']
@@ -2904,7 +2907,8 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     """Convert a regular panel into a static version.
 
     This is done to save entities and improve lighting."""
-    if get_opt("staticPan") == "NONE":
+    static_pan_folder = vbsp_options.get(str, 'staticPan')
+    if not static_pan_folder:
         return False  # no conversion allowed!
 
     angle = "00"
@@ -2917,17 +2921,17 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         return False
     # Handle glass panels
     if pan_type == 'glass':
-        ent["file"] = get_opt("staticPan") + angle + '_glass.vmf'
+        ent["file"] = static_pan_folder + angle + '_glass.vmf'
         return True
 
     # Handle white/black panels:
-    ent['file'] = get_opt("staticPan") + angle + '_surf.vmf'
+    ent['file'] = static_pan_folder + angle + '_surf.vmf'
 
     # We use a template for the surface, so it can use correct textures.
     if angle == '00':
         # Special case: flat panels use different templates
         temp_data = conditions.import_template(
-            get_opt('static_pan_temp_flat'),
+            vbsp_options.get(str, 'static_pan_temp_flat'),
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
@@ -2978,7 +2982,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos.localise(temp_origin, temp_angles)
 
         temp_data = conditions.import_template(
-            get_opt('static_pan_temp_' + pan_type),
+            vbsp_options.get(str, 'static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
             force_type=conditions.TEMP_TYPES.detail,
@@ -3088,7 +3092,7 @@ def fix_worldspawn():
         # If the game is Aperture Tag, it's always forced on
         VMF.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
-            get_opt('game_id') == utils.STEAM_IDS['APTAG']
+            vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
@@ -3193,7 +3197,7 @@ def make_vrad_config():
     conf['is_preview'] = srctools.bool_as_int(
         IS_PREVIEW
     )
-    conf['game_id'] = get_opt('game_id')
+    conf['game_id'] = vbsp_options.get(str, 'game_id')
 
     if BEE2_config.get_bool('General', 'packfile_dump_enable'):
         conf['packfile_dump'] = BEE2_config.get_val(
