@@ -235,16 +235,6 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 # UTIL functions #
 ##################
 
-
-def get_opt(name) -> str:
-    raise NotImplementedError
-    return settings['options'][name.casefold()]
-
-
-def get_bool_opt(name, default=False):
-    return srctools.conv_bool(get_opt(name), default)
-
-
 def get_tex(name):
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
@@ -478,7 +468,7 @@ def add_fizz_borders(_):
         # No textures were defined!
         return
 
-    flip_uv = get_bool_opt('fizz_border_vertical')
+    flip_uv = vbsp_options.get(bool, 'fizz_border_vertical')
     overlay_thickness = vbsp_options.get(int, 'fizz_border_thickness')
     overlay_repeat = vbsp_options.get(int, 'fizz_border_repeat')
 
@@ -1847,7 +1837,7 @@ def change_brush():
         floorbeam_locs = None
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = get_bool_opt('goo_mist') and srctools.conv_bool(
+    make_goo_mist = vbsp_options.get(bool, 'goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids = set()
@@ -2059,9 +2049,9 @@ def face_seed(face):
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
-    rotate_edge = get_bool_opt('rotate_edge')
-    texture_lock = get_bool_opt('tile_texture_lock', True)
-    edge_off = get_bool_opt('reset_edge_off', False)
+    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
+    edge_off = vbsp_options.get(bool, 'reset_edge_off')
     edge_scale = vbsp_options.get(float, 'edge_scale')
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
@@ -2163,9 +2153,9 @@ def clump_walls():
     # After that, we fill in any unset textures with the white/black_gap ones.
     # This makes it look like those areas were patched up.
 
-    texture_lock = get_bool_opt('tile_texture_lock', True)
-    rotate_edge = get_bool_opt('rotate_edge')
-    edge_off = get_bool_opt('reset_edge_off', False)
+    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
+    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+    edge_off = vbsp_options.get(bool, 'reset_edge_off')
     edge_scale = vbsp_options.get(float, 'edge_scale')
 
     # Possible locations for clumps - every face origin, not including
@@ -2185,8 +2175,8 @@ def clump_walls():
     clump_numb *= vbsp_options.get(int, "clump_number")
 
     # Also clump ceilings or floors?
-    clump_ceil = get_bool_opt('clump_ceil')
-    clump_floor = get_bool_opt('clump_floor')
+    clump_ceil = vbsp_options.get(bool, 'clump_ceil')
+    clump_floor = vbsp_options.get(bool, 'clump_floor')
 
     LOGGER.info(
         'Clumping: {} clumps (+ {} special)',
@@ -2485,7 +2475,7 @@ def change_overlays():
 
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
-            if get_bool_opt("remove_exit_signs"):
+            if vbsp_options.get(bool, "remove_exit_signs"):
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
                 VMF.remove_ent(over)
@@ -2690,13 +2680,13 @@ def change_func_brush():
 
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
-        rotate_edge = get_bool_opt('rotate_edge', False)
-        edge_off = get_bool_opt('reset_edge_off')
+        rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+        edge_off = vbsp_options.get(bool, 'reset_edge_off')
         edge_scale = vbsp_options.get(float, 'edge_scale')
     else:
         edge_tex = 'special.edge_special'
-        rotate_edge = get_bool_opt('rotate_edge_special', False)
-        edge_off = get_bool_opt('reset_edge_off_special')
+        rotate_edge = vbsp_options.get(bool, 'rotate_edge_special')
+        edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
         edge_scale = vbsp_options.get(float, 'edge_scale_special')
 
     # Clips are shared every 512 grid spaces
@@ -3015,7 +3005,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
 def change_ents():
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if get_bool_opt("remove_info_lighting"):
+    if vbsp_options.get(bool, "remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
         for ent in VMF.by_class['info_lighting']:

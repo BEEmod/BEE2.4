@@ -6,6 +6,7 @@ import conditions
 import srctools
 import utils
 import vbsp
+import vbsp_options
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
@@ -235,7 +236,7 @@ def res_set_texture(inst, res):
             vbsp.alter_mat(
                 brush.face,
                 vbsp.face_seed(brush.face),
-                vbsp.get_bool_opt('tile_texture_lock', True),
+                vbsp_options.get(bool, 'tile_texture_lock'),
             )
 
         if tex == 'special':
