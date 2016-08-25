@@ -9,7 +9,6 @@ from conditions import (
 import vbsp
 
 STYLE_VARS = vbsp.settings['style_vars']
-OPTIONS = vbsp.settings['options']
 VOICE_ATTR = vbsp.settings['has_attr']
 
 
@@ -37,7 +36,7 @@ def flag_music(_, flag):
 
     Use "<NONE>" for no music.
     """
-    return OPTIONS['music_id'] == flag.value
+    return vbsp_options.get(str, 'music_id') == flag.value
 
 
 @make_flag('Game')
@@ -53,7 +52,7 @@ def flag_game(_, flag):
      - TWTM,
      - Thinking With Time Machine
     """
-    return OPTIONS['game_id'] == utils.STEAM_IDS.get(
+    return vbsp_options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),
         flag.value,
     )
@@ -69,8 +68,8 @@ def flag_voice_char(_, flag):
     """
     targ_char = flag.value.casefold()
     if targ_char == '<none>':
-        return OPTIONS['voice_id'] == '<NONE>'
-    for char in OPTIONS['voice_char'].split(','):
+        return vbsp_options.get(str, 'voice_id') == '<NONE>'
+    for char in vbsp_options.get(str, 'voice_char').split(','):
         if targ_char in char.casefold():
             return True
     return False
