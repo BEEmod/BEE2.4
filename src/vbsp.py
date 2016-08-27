@@ -1920,7 +1920,7 @@ def change_brush():
 
 def can_clump():
     """Check the clump algorithm is enabled."""
-    return vbsp_options.get(str, "clump_wall_tex")
+    return vbsp_options.get(bool, "clump_wall_tex")
 
 
 def make_barrier_solid(origin, material):
