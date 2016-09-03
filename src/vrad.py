@@ -541,7 +541,7 @@ def gen_auto_script(preload, is_peti):
     """
     dest = os.path.join('bee2', 'inject', 'auto_run.nut')
     if not preload and not is_peti:
-        return # Don't add for hammer maps
+        return  # Don't add for hammer maps
 
     with open(dest, 'w') as file:
         if not preload:
@@ -550,7 +550,7 @@ def gen_auto_script(preload, is_peti):
         file.write('function Precache() {\n')
         for entry in preload:
             if entry.startswith('precache_sound:'):
-                file.write('\tPrecacheSoundScript("{}");\n'.format(
+                file.write('\tself.PrecacheSoundScript("{}");\n'.format(
                     entry[15:],
                 ))
         file.write('}\n')
