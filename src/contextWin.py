@@ -197,7 +197,7 @@ def get_description(global_last, glob_desc, style_desc):
     elif style_desc:
         return style_desc
     else:
-        return tkMarkdown.blank_desc()  # No description
+        return tkMarkdown.MarkdownData()  # No description
 
 
 def load_item_data():
