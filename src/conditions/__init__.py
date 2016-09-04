@@ -58,13 +58,12 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
     """
-    default = 0
-    world = 1
-    detail = 2
+    default = 0  # Based on the original VMF settings
+    world = 1  # Import and add to world
+    detail = 2  # Import as a func_detail
 
 Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
 
@@ -963,6 +962,7 @@ def import_template(
         angles=None,
         targetname='',
         force_type=TEMP_TYPES.default,
+        add_to_map=True,
     ) -> Template:
     """Import the given template at a location.
 
@@ -972,6 +972,7 @@ def import_template(
     returned instead of an invalid entity.
 
     If targetname is set, it will be used to localise overlay names.
+    add_to_map sets whether to add the brushes and func_detail to the map.
     """
     import vbsp
     orig_world, orig_detail, orig_over = get_template(temp_name)
@@ -1031,13 +1032,16 @@ def import_template(
         new_world.extend(new_detail)
         new_detail.clear()
 
-    VMF.add_brushes(new_world)
+    if add_to_map:
+        VMF.add_brushes(new_world)
 
     if new_detail:
         detail_ent = VMF.create_ent(
             classname='func_detail'
         )
         detail_ent.solids = new_detail
+        if not add_to_map:
+            detail_ent.remove()
     else:
         detail_ent = None
         new_detail = []

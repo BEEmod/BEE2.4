@@ -20,6 +20,8 @@ def res_conveyor_belt(inst: Entity, res: Property):
           outputs in VMFs.
         RotateSegments: If true (default), force segments to face in the
           direction of movement
+        RailTemplate: A template for the railings. This is made into a non-solid
+          func_brush, combining all sections.
     """
     move_dist = srctools.conv_int(inst.fixup['$travel_distance'])
 
@@ -33,6 +35,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
     start_offset = srctools.conv_float(inst.fixup['$starting_position'], 0)
     teleport_to_start = res.bool('TrackTeleport', True)
     segment_inst_file = res['SegmentInst', '']
+    rail_template = res['RailTemplate', None]
 
     vmf = inst.map
 
@@ -70,6 +73,8 @@ def res_conveyor_belt(inst: Entity, res: Property):
 
     if res.bool('rotateSegments', True):
         inst['angles'] = angles
+    else:
+        angles = Vec.from_str(inst['angles'])
 
     # Add the EnableMotion trigger_multiple seen in platform items.
     # This wakes up cubes when it starts moving.
@@ -80,6 +85,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
         motion_filter = None
 
     track_name = conditions.local_name(inst, 'segment_{}')
+    rail_temp_solids = []
     last_track = None
     # Place beams at the top, so they don't appear inside wall sections.
     beam_start = start_pos + 48 * norm  # type: Vec
@@ -110,9 +116,29 @@ def res_conveyor_belt(inst: Entity, res: Property):
                 targetname=track_name.format(index),
                 file=segment_inst_file,
                 origin=pos,
-                angles=inst['angles'],
+                angles=angles,
             )
             seg_inst.fixup.update(inst.fixup)
+
+        if rail_template:
+            temp = conditions.import_template(
+                rail_template,
+                pos,
+                angles,
+                force_type=conditions.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            rail_temp_solids.extend(temp.world)
+
+    if rail_temp_solids:
+        vmf.create_ent(
+            classname='func_brush',
+            origin=beam_start,
+            spawnflags=1,  # Ignore +USE
+            solidity=1,  # Not solid
+            vrad_brush_cast_shadows=1,
+            drawinfastreflection=1,
+        ).solids = rail_temp_solids
 
     if teleport_to_start:
         # Link back to the first track..
