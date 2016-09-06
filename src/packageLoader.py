@@ -1156,12 +1156,24 @@ class QuotePack(PakObject):
             config: Property,
             chars=None,
             skin=None,
+            studio: str=None,
+            studio_actor='',
+            cam_loc: Vec=None,
+            interrupt=0.0,
+            cam_pitch=0.0,
+            cam_yaw=0.0,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
         self.chars = chars or ['??']
+        self.studio = studio
+        self.studio_actor = studio_actor
+        self.cam_loc = cam_loc
+        self.inter_chance = interrupt
+        self.cam_pitch = cam_pitch
+        self.cam_yaw = cam_yaw
 
     @classmethod
     def parse(cls, data):
@@ -1178,6 +1190,19 @@ class QuotePack(PakObject):
         # portrait.
         port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
+        monitor_data = data.info.find_key('monitor', None)
+
+        if monitor_data.value is not None:
+            mon_studio = monitor_data['studio']
+            mon_studio_actor = monitor_data['studio_actor', '']
+            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
+            mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
+            mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
+        else:
+            mon_studio = mon_cam_loc = None
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_studio_actor = ''
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -1192,6 +1217,12 @@ class QuotePack(PakObject):
             config,
             chars=chars,
             skin=port_skin,
+            studio=mon_studio,
+            studio_actor=mon_studio_actor,
+            interrupt=mon_interrupt,
+            cam_loc=mon_cam_loc,
+            cam_pitch=mon_cam_pitch,
+            cam_yaw=mon_cam_yaw,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -1207,6 +1238,15 @@ class QuotePack(PakObject):
         )
         if self.cave_skin is None:
             self.cave_skin = override.cave_skin
+
+        if self.studio is None:
+            self.studio = override.studio
+            self.studio_actor = override.studio_actor
+            self.cam_loc = override.cam_loc
+            self.inter_chance = override.inter_chance
+            self.cam_pitch = override.cam_pitch
+            self.cam_yaw = override.cam_yaw
+
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'
@@ -1237,20 +1277,22 @@ class QuotePack(PakObject):
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
-        vbsp_config.set_key(
-            ('Options', 'voice_pack'),
-            voice.id,
-        )
-        vbsp_config.set_key(
-            ('Options', 'voice_char'),
-            ','.join(voice.chars)
-        )
+        vbsp_config.ensure_exists('Options')
+        options = vbsp_config.find_key('Options')
+
+        options['voice_pack'] = voice.id
+        options['voice_char'] = ','.join(voice.chars)
 
         if voice.cave_skin is not None:
-            vbsp_config.set_key(
-                ('Options', 'cave_port_skin'),
-                str(voice.cave_skin),
-            )
+            options['cave_port_skin'] = str(voice.cave_skin)
+
+        if voice.studio is not None:
+            options['voice_studio_inst'] = voice.studio
+            options['voice_studio_actor'] = voice.studio_actor
+            options['voice_studio_inter_chance'] = str(voice.inter_chance)
+            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
+            options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
+            options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
 
         # Copy the config files for this voiceline..
         for prefix, pretty in [

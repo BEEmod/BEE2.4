@@ -281,10 +281,12 @@ DEFAULTS = {
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
     "game_id":                  "620",  # The game's steam ID
+
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
     "music_looplen":            "0",  # If set, re-trigger music after this time.
+
     "elev_type":                "RAND",  # What type of script to use:
     # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
@@ -292,6 +294,13 @@ DEFAULTS = {
     "voice_id":                 "<NONE>",  # The voice pack which was selected
     "voice_char":               "",  # Characters in the pack
     "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
+
+    "voice_studio_inst":        "",  # Instance to use for monitor backdrop.
+    "voice_studio_inter_chance": "0",  # Chance to switch to the voice character.
+    "voice_studio_cam_loc":     "0 0 0",  # Location for camera
+    "voice_studio_cam_pitch":   "0",  # Direction of the camera.
+    "voice_studio_cam_yaw":     "0",
+    "voice_studio_actor":       "",  # If set, no bullseye is output with this name..
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -1201,6 +1210,7 @@ def add_fog_ents(_):
         fogenable='1',
         use_angles='1',
         foglerptime='2',
+        fogMaxDensity='1',
 
         heightFogStart=fog_opt['height_start'],
         heightFogDensity=fog_opt['height_density'],

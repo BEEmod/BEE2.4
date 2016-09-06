@@ -62,6 +62,9 @@ INJECT_FILES = {
 
     # Applied to @glados's entity scripts.
     'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
+
+    # Commands for monitor items.
+    'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
 }
 
 # Additional parts to add if we have a mdl file.

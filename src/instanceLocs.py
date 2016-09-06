@@ -247,8 +247,6 @@ def load_conf(prop_block: Property):
         resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
     )
 
-    LOGGER.warning('None in vals: {}', None in INST_SPECIAL.values())
-
 
 def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
