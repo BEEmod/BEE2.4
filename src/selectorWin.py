@@ -25,7 +25,7 @@ import sound
 import utils
 import tk_tools
 
-from typing import Callable
+from typing import Callable, Union
 
 LOGGER = utils.getLogger(__name__)
 
@@ -250,7 +250,7 @@ class Item:
             long_name: str=None,
             icon=None,
             authors: list=None,
-            desc='',
+            desc: Union[tkMarkdown.MarkdownData, str]='',
             group: str=None,
             sort_key: str=None,
             attributes: dict=None,
@@ -279,7 +279,10 @@ class Item:
                 resize_to=ICON_SIZE,
             )
             self.ico_file = icon
-        self.desc = desc
+        if isinstance(desc, str):
+            self.desc = tkMarkdown.convert(desc)
+        else:
+            self.desc = desc
         self.snd_sample = snd_sample
         self.authors = authors or []
         self.attrs = attributes or {}
@@ -343,9 +346,11 @@ class selWin:
             self,
             tk,
             lst,
+            *,  # Make all keyword-only for readability
             has_none=True,
             has_def=True,
             has_snd_sample=False,
+            modal=False,
             none_desc='Do not add anything.',
             none_attrs: dict=EmptyMapping,
             title='BEE2',
@@ -353,7 +358,7 @@ class selWin:
             readonly_desc='',
             callback: Callable[..., None]=None,
             callback_params=(),
-            attributes=(),
+            attributes=()
     ):
         """Create a window object.
 
@@ -386,6 +391,7 @@ class selWin:
         - desc is descriptive text to display on the window, and in the widget
           tooltip.
         - readonly_desc will be displayed on the widget tooltip when readonly.
+        - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
             'NONE',
@@ -431,6 +437,7 @@ class selWin:
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
+        self.modal = modal
 
         self.win = Toplevel(tk)
         self.win.withdraw()
@@ -880,7 +887,8 @@ class selWin:
         if self.sampler:
             self.sampler.stop()
 
-        self.win.grab_release()
+        if self.modal:
+            self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
         self.do_callback()
@@ -922,7 +930,8 @@ class selWin:
 
         self.win.deiconify()
         self.win.lift(self.parent)
-        self.win.grab_set()
+        if self.modal:
+            self.win.grab_set()
         self.win.focus_force()  # Focus here to deselect the textbox
 
         utils.center_win(self.win, parent=self.parent)
