@@ -10,7 +10,7 @@ from functools import lru_cache
 import utils
 from srctools import Property
 
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 LOGGER = utils.getLogger(__name__)
 
@@ -19,7 +19,7 @@ INSTANCE_FILES = {}
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES = defaultdict(dict)
+CUST_INST_FILES = defaultdict(dict)  # type: Dict[str, Dict[str, str]]
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
@@ -160,6 +160,8 @@ SUBITEMS = {
     'track_plat_oscil': 5,
     'track_single': 6,
 
+    'track_plats': (4, 5),
+    'track_platforms': (4, 5),
     'track_rail': (1, 2, 3, 6),
 
     # Funnels
@@ -245,14 +247,13 @@ def load_conf(prop_block: Property):
         resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
     )
 
-    LOGGER.warning('None in vals: {}', None in INST_SPECIAL.values())
-
 
 def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
 
     Valid paths:
-    - "<ITEM_ID>" matches all indexes, plus extra instances.
+    - "<ITEM_ID>" matches all indexes.
+    - "<ITEM_ID:>" gives all indexes and custom extra instances.
     - "<ITEM_ID:1,2,5>": matches the given indexes for that item.
     - "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
     - "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
@@ -299,6 +300,13 @@ def _resolve(path):
                 return []
             cust_item_vals = CUST_INST_FILES[item]
             out = []
+            if not subitem:
+                # <ITEM_ID:> gives all items + subitems...
+                return [
+                    inst for inst in
+                    item_values
+                    if inst != ''
+                ] + list(CUST_INST_FILES[item].values())
             for val in subitem.split(','):
                 folded_value = val.strip().casefold()
                 if folded_value.startswith('bee2_'):
@@ -356,14 +364,11 @@ def _resolve(path):
             # It's just the <item_id>, return all the values
             try:
                 # Skip "" instances
-                out = [
+                return [
                     inst for inst in
                     INSTANCE_FILES[path]
                     if inst != ''
                     ]
-                # Add custom values too
-                out.extend(CUST_INST_FILES[path].values())
-                return out
             except KeyError:
                 LOGGER.warning(
                     '"{}" not a valid item!',

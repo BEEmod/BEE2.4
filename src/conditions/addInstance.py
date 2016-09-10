@@ -9,7 +9,7 @@ from conditions import (
     GLOBAL_INSTANCES,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Entity
+from srctools import Vec, Entity
 
 
 @make_result('addGlobal')
@@ -94,7 +94,7 @@ def res_add_overlay_inst(inst, res):
 
     conditions.set_ent_keys(overlay_inst.fixup, inst, res, 'fixup')
 
-    if srctools.conv_bool(res['move_outputs', '0']):
+    if res.bool('move_outputs', False):
         overlay_inst.outputs = inst.outputs
         inst.outputs = []
 
@@ -123,7 +123,7 @@ def res_add_overlay_inst(inst, res):
             )
         else:
             # Regular vector
-            offset = Vec.from_str(res['offset'])
+            offset = Vec.from_str(conditions.resolve_value(inst, res['offset']))
 
         offset.rotate_by_str(
             inst['angles', '0 0 0']

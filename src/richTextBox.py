@@ -104,11 +104,10 @@ class tkRichText(tkinter.Text):
             super().insert("end", text_data)
             return
 
-        tag_list, links = text_data
+        if text_data.tags:
+            super().insert('end', *text_data.tags)
 
-        super().insert('end', *tag_list)
-
-        for url, link_id in links.items():
+        for url, link_id in text_data.links.items():
             func = self.make_link_callback(url)
             self.link_commands[link_id] = self.tag_bind(
                 link_id,

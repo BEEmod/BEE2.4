@@ -1,3 +1,15 @@
+import utils
+if __name__ == '__main__':
+    if utils.MAC or utils.LINUX:
+        # Change directory to the location of the executable
+        # Otherwise we can't find our files!
+        # The Windows executable does this automatically.
+        import os
+        import sys
+        os.chdir(os.path.dirname(sys.argv[0]))
+
+    utils.init_logging('../logs/compiler_pane.log')
+
 from tkinter import *
 from tk_tools import TK_ROOT, FileField
 from tkinter import ttk
@@ -13,12 +25,16 @@ import img as png
 from BEE2_config import ConfigFile, GEN_OPTS
 from tooltip import add_tooltip
 import SubPane
-import utils
 
 # The size of PeTI screenshots
 PETI_WIDTH = 555
 PETI_HEIGHT = 312
 
+CORRIDOR_COUNTS = [
+    ('sp_entry', 7),
+    ('sp_exit', 4),
+    ('coop', 4),
+]
 
 COMPILE_DEFAULTS = {
     'Screenshot': {
@@ -48,6 +64,11 @@ COMPILE_DEFAULTS = {
         'max_overlay': '512',
         'max_entity': '2048',
     },
+    'CorridorNames': {
+        '{}_{}'.format(group, i): '{}: Corridor'.format(i)
+        for group, length in CORRIDOR_COUNTS
+        for i in range(1,length + 1)
+    }
 }
 
 PLAYER_MODELS = {
@@ -141,6 +162,24 @@ cleanup_screenshot = IntVar(
 CORRIDOR = {}
 
 
+def save_corridors():
+    """Save corridor names to the config file."""
+    corridor_conf = COMPILE_CFG['CorridorNames']
+    for group, corr in CORRIDOR.items():
+        for i, name in enumerate(corr[1:], start=1):
+            corridor_conf['{}_{}'.format(group, i)] = name
+
+
+def load_corridors():
+    corridor_conf = COMPILE_CFG['CorridorNames']
+    for group, length in CORRIDOR_COUNTS:
+        CORRIDOR[group] = ['Random'] + [
+            corridor_conf['{}_{}'.format(group, i)]
+            for i in
+            range(1, length + 1)
+        ]
+
+
 def set_corr_values(group_name, props):
     """Set the corrdors according to the passed prop_block."""
     count = 7 if group_name == 'sp_entry' else 4
@@ -160,7 +199,6 @@ def set_corr_values(group_name, props):
 
 
 def make_corr_combo(frm, corr_name, width):
-    set_corr_values(corr_name, {corr_name: []})
     widget = ttk.Combobox(
         frm,
         values=CORRIDOR[corr_name],
@@ -256,7 +294,7 @@ def set_pack_dump_enabled():
 def find_screenshot(_=None):
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
-        title='Find Game Exe',
+        title='Find Screenshot',
         filetypes=[
             ('Image File', '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
                            '*.tiff *.tga *.ico *.psd'),
@@ -354,26 +392,35 @@ def make_setter(section, config, variable):
     return callback
 
 
-def make_pane(tool_frame):
+def make_widgets():
     """Create the compiler options pane.
 
     """
-    global window
-    window = SubPane.SubPane(
-        TK_ROOT,
-        options=GEN_OPTS,
-        title='Compile Options',
-        name='compiler',
-        resize_x=True,
-        resize_y=False,
-        tool_frame=tool_frame,
-        tool_img=png.png('icons/win_compiler'),
-        tool_col=4,
-    )
-    window.columnconfigure(0, weight=1)
+    UI['nbook'] = nbook = ttk.Notebook(window)
+
+    nbook.grid(row=0, column=0, sticky=NSEW)
+
+    nbook.enable_traversal()
+
+    map_frame = ttk.Frame(nbook)
+    nbook.add(map_frame, text='Map Settings')
+    make_map_widgets(map_frame)
+
+    comp_frame = ttk.Frame(nbook)
+    nbook.add(comp_frame, text='Compile Settings')
+    make_comp_widgets(comp_frame)
+
+
+def make_comp_widgets(frame: ttk.Frame):
+    """Create widgets for the compiler settings pane.
+
+    These are generally things that are aesthetic, and to do with the file and
+    compilation process.
+    """
+    frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(
-        window,
+        frame,
         text='Thumbnail',
         labelanchor=N,
     )
@@ -463,33 +510,12 @@ def make_pane(tool_frame):
         UI['thumb_label'].grid(row=2, column=0, columnspan=2, sticky='EW')
     set_screenshot()  # Load the last saved screenshot
 
-    voice_frame = ttk.LabelFrame(
-        window,
-        text='Voicelines:',
-        labelanchor=NW,
-    )
-    voice_frame.grid(row=1, column=0, sticky=EW)
-
-    UI['voice_priority'] = voice_priority = ttk.Checkbutton(
-        voice_frame,
-        text="Use voiceline priorities",
-        variable=VOICE_PRIORITY_VAR,
-        command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
-    )
-    voice_priority.grid(row=0, column=0)
-    add_tooltip(
-        voice_priority,
-        "Only choose the highest-priority voicelines. This means more generic "
-        "lines will can only be chosen if few test elements are in the map. "
-        "If disabled any applicable lines will be used.",
-    )
-
     vrad_frame = ttk.LabelFrame(
-        window,
+        frame,
         text='Lighting:',
         labelanchor=N,
     )
-    vrad_frame.grid(row=2, column=0, sticky=EW)
+    vrad_frame.grid(row=1, column=0, sticky=EW)
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
@@ -522,59 +548,18 @@ def make_pane(tool_frame):
         "When publishing, this is always used."
     )
 
-    elev_frame = ttk.LabelFrame(
-        window,
-        text='Spawn at:',
-        labelanchor=N,
-    )
-
-    elev_frame.grid(row=3, column=0, sticky=EW)
-    elev_frame.columnconfigure(0, weight=1)
-    elev_frame.columnconfigure(1, weight=1)
-
-    UI['elev_preview'] = ttk.Radiobutton(
-        elev_frame,
-        text='Entry Door',
-        value=0,
-        variable=start_in_elev,
-        command=make_setter('General', 'spawn_elev', start_in_elev),
-    )
-
-    UI['elev_elevator'] = ttk.Radiobutton(
-        elev_frame,
-        text='Elevator',
-        value=1,
-        variable=start_in_elev,
-        command=make_setter('General', 'spawn_elev', start_in_elev),
-    )
-
-    UI['elev_preview'].grid(row=0, column=0, sticky=W)
-    UI['elev_elevator'].grid(row=0, column=1, sticky=W)
-
-    add_tooltip(
-        UI['elev_elevator'],
-        "When previewing in SP, spawn inside the entry elevator. "
-        "This also disables the map restarts when you reach the "
-        "exit door. Use this to examine the entry and exit corridors."
-    )
-    add_tooltip(
-        UI['elev_preview'],
-        "When previewing in SP, spawn just before the entry door. "
-        "When you reach the exit door, the map will restart."
-    )
-
     packfile_enable = ttk.Checkbutton(
-        window,
+        frame,
         text='Dump packed files to:',
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
     )
 
     packfile_frame = ttk.LabelFrame(
-        window,
+        frame,
         labelwidget=packfile_enable,
     )
-    packfile_frame.grid(row=4, column=0, sticky=EW)
+    packfile_frame.grid(row=2, column=0, sticky=EW)
 
     UI['packfile_filefield'] = packfile_filefield = FileField(
         packfile_frame,
@@ -591,78 +576,11 @@ def make_pane(tool_frame):
     add_tooltip(
         packfile_enable,
         "When compiling, dump all files which were packed into the map. Useful"
-        "if you're intending to edit maps in Hammer."
+        " if you're intending to edit maps in Hammer."
     )
-
-    corr_frame = ttk.LabelFrame(
-        window,
-        width=18,
-        text='Corridor:',
-        labelanchor=N,
-    )
-    corr_frame.grid(row=5, column=0, sticky=EW)
-    corr_frame.columnconfigure(0, weight=1)
-    corr_frame.columnconfigure(1, weight=1)
-
-    UI['corr_sp_entry'] = make_corr_combo(
-        corr_frame,
-        'sp_entry',
-        width=9,
-    )
-
-    UI['corr_sp_exit'] = make_corr_combo(
-        corr_frame,
-        'sp_exit',
-        width=9,
-    )
-
-    UI['corr_coop'] = make_corr_combo(
-        corr_frame,
-        'coop',
-        width=9,
-    )
-
-    UI['corr_sp_entry'].grid(row=1, column=0, sticky=EW)
-    UI['corr_sp_exit'].grid(row=1, column=1, sticky=EW)
-    UI['corr_coop'].grid(row=2, column=1, sticky=EW)
-    ttk.Label(
-        corr_frame,
-        text='SP Entry:',
-        anchor=CENTER,
-    ).grid(row=0, column=0, sticky=EW)
-    ttk.Label(
-        corr_frame,
-        text='SP Exit:',
-        anchor=CENTER,
-    ).grid(row=0, column=1, sticky=EW)
-    ttk.Label(
-        corr_frame,
-        text='Coop:',
-        anchor=CENTER,
-    ).grid(row=2, column=0, sticky=EW)
-
-    model_frame = ttk.LabelFrame(
-        window,
-        text='Player Model (SP):',
-        labelanchor=N,
-    )
-    model_frame.grid(row=6, column=0, sticky=EW)
-    UI['player_mdl'] = ttk.Combobox(
-        model_frame,
-        exportselection=0,
-        textvariable=player_model_var,
-        values=PLAYER_MODEL_ORDER,
-        width=20,
-    )
-    # Users can only use the dropdown
-    UI['player_mdl'].state(['readonly'])
-    UI['player_mdl'].grid(row=0, column=0, sticky=EW)
-
-    UI['player_mdl'].bind('<<ComboboxSelected>>', set_model)
-    model_frame.columnconfigure(0, weight=1)
 
     count_frame = ttk.LabelFrame(
-        window,
+        frame,
         text='Last Compile:',
         labelanchor=N,
     )
@@ -734,3 +652,184 @@ def make_pane(tool_frame):
         add_tooltip(UI[wid_name])
 
     refresh_counts(reload=False)
+
+
+def make_map_widgets(frame: ttk.Frame):
+    """Create widgets for the map settings pane.
+
+    These are things which mainly affect the geometry or gameplay of the map.
+    """
+    frame.columnconfigure(0, weight=1)
+
+    voice_frame = ttk.LabelFrame(
+        frame,
+        text='Voicelines:',
+        labelanchor=NW,
+    )
+    voice_frame.grid(row=1, column=0, sticky=EW)
+
+    UI['voice_priority'] = voice_priority = ttk.Checkbutton(
+        voice_frame,
+        text="Use voiceline priorities",
+        variable=VOICE_PRIORITY_VAR,
+        command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
+    )
+    voice_priority.grid(row=0, column=0)
+    add_tooltip(
+        voice_priority,
+        "Only choose the highest-priority voicelines. This means more generic "
+        "lines will can only be chosen if few test elements are in the map. "
+        "If disabled any applicable lines will be used.",
+    )
+
+    elev_frame = ttk.LabelFrame(
+        frame,
+        text='Spawn at:',
+        labelanchor=N,
+    )
+
+    elev_frame.grid(row=2, column=0, sticky=EW)
+    elev_frame.columnconfigure(0, weight=1)
+    elev_frame.columnconfigure(1, weight=1)
+
+    UI['elev_preview'] = ttk.Radiobutton(
+        elev_frame,
+        text='Entry Door',
+        value=0,
+        variable=start_in_elev,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
+    )
+
+    UI['elev_elevator'] = ttk.Radiobutton(
+        elev_frame,
+        text='Elevator',
+        value=1,
+        variable=start_in_elev,
+        command=make_setter('General', 'spawn_elev', start_in_elev),
+    )
+
+    UI['elev_preview'].grid(row=0, column=0, sticky=W)
+    UI['elev_elevator'].grid(row=0, column=1, sticky=W)
+
+    add_tooltip(
+        UI['elev_elevator'],
+        "When previewing in SP, spawn inside the entry elevator. "
+        "This also disables the map restarts when you reach the "
+        "exit door. Use this to examine the entry and exit corridors."
+    )
+    add_tooltip(
+        UI['elev_preview'],
+        "When previewing in SP, spawn just before the entry door. "
+        "When you reach the exit door, the map will restart."
+    )
+
+    corr_frame = ttk.LabelFrame(
+        frame,
+        width=18,
+        text='Corridor:',
+        labelanchor=N,
+    )
+    corr_frame.grid(row=3, column=0, sticky=EW)
+    corr_frame.columnconfigure(0, weight=1)
+    corr_frame.columnconfigure(1, weight=1)
+
+    load_corridors()
+
+    UI['corr_sp_entry'] = make_corr_combo(
+        corr_frame,
+        'sp_entry',
+        width=9,
+    )
+
+    UI['corr_sp_exit'] = make_corr_combo(
+        corr_frame,
+        'sp_exit',
+        width=9,
+    )
+
+    UI['corr_coop'] = make_corr_combo(
+        corr_frame,
+        'coop',
+        width=9,
+    )
+
+    UI['corr_sp_entry'].grid(row=1, column=0, sticky=EW)
+    UI['corr_sp_exit'].grid(row=1, column=1, sticky=EW)
+    UI['corr_coop'].grid(row=2, column=1, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='SP Entry:',
+        anchor=CENTER,
+    ).grid(row=0, column=0, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='SP Exit:',
+        anchor=CENTER,
+    ).grid(row=0, column=1, sticky=EW)
+    ttk.Label(
+        corr_frame,
+        text='Coop:',
+        anchor=CENTER,
+    ).grid(row=2, column=0, sticky=EW)
+
+    model_frame = ttk.LabelFrame(
+        frame,
+        text='Player Model (SP):',
+        labelanchor=N,
+    )
+    model_frame.grid(row=4, column=0, sticky=EW)
+    UI['player_mdl'] = ttk.Combobox(
+        model_frame,
+        exportselection=0,
+        textvariable=player_model_var,
+        values=PLAYER_MODEL_ORDER,
+        width=20,
+    )
+    # Users can only use the dropdown
+    UI['player_mdl'].state(['readonly'])
+    UI['player_mdl'].grid(row=0, column=0, sticky=EW)
+
+    UI['player_mdl'].bind('<<ComboboxSelected>>', set_model)
+    model_frame.columnconfigure(0, weight=1)
+
+
+def make_pane(tool_frame):
+    """Initialise when part of the BEE2."""
+    global window
+    window = SubPane.SubPane(
+        TK_ROOT,
+        options=GEN_OPTS,
+        title='Compile Options',
+        name='compiler',
+        resize_x=True,
+        resize_y=False,
+        tool_frame=tool_frame,
+        tool_img=png.png('icons/win_compiler'),
+        tool_col=4,
+    )
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(0, weight=1)
+    make_widgets()
+
+
+def init_application():
+    """Initialise when standalone."""
+    global window
+    window = TK_ROOT
+    window.title('Compiler Options - {}'.format(utils.BEE_VERSION))
+    window.resizable(True, False)
+
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(0, weight=1)  # Resizing screenshots
+    window.rowconfigure(4, weight=1)  # Resizing pack-dump
+
+    make_widgets()
+
+
+if __name__ == '__main__':
+    # Run this standalone.
+
+    init_application()
+
+    TK_ROOT.deiconify()
+    TK_ROOT.mainloop()

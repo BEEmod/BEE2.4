@@ -9,7 +9,7 @@ import vbsp
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
-from srctools import Property, Vec, Output, Entity
+from srctools import Property, NoKeyError, Vec, Output, Entity, conv_bool
 
 
 LOGGER = utils.getLogger(__name__)
@@ -221,7 +221,6 @@ def res_set_texture(inst, res):
 
     if tex.startswith('[') and tex.endswith(']'):
         brush.face.mat = vbsp.get_tex(tex[1:-1])
-        brush.face.mat = tex
     elif tex.startswith('<') and tex.endswith('>'):
         # Special texture names!
         tex = tex[1:-1].casefold()
@@ -361,7 +360,7 @@ def res_add_brush(inst, res):
 
 
 @make_result_setup('TemplateBrush')
-def res_import_template_setup(res):
+def res_import_template_setup(res: Property):
     temp_id = res['id'].casefold()
 
     force = res['force', ''].casefold().split()
@@ -394,12 +393,25 @@ def res_import_template_setup(res):
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
-    replace_brush = res['replaceBrush', None]
-    if replace_brush:
-        replace_brush_pos = Vec.from_str(replace_brush)
-        replace_brush_pos.z -= 64  # 0 0 0 defaults to the floor.
-    else:
+    rem_replace_brush = True
+    additional_ids = ()
+    try:
+        replace_brush = res.find_key('replaceBrush')
+    except NoKeyError:
         replace_brush_pos = None
+    else:
+        if replace_brush.has_children():
+            replace_brush_pos = replace_brush['Pos', '0 0 0']
+            additional_ids = list(map(
+                srctools.conv_int,
+                replace_brush['additionalIDs', ''].split(),
+            ))
+            rem_replace_brush = conv_bool(replace_brush['removeBrush', None], True)
+        else:
+            replace_brush_pos = replace_brush.value  # type: str
+
+        replace_brush_pos = Vec.from_str(replace_brush_pos)
+        replace_brush_pos.z -= 64  # 0 0 0 defaults to the floor.
 
     key_values = res.find_key("Keys", [])
     if key_values:
@@ -424,6 +436,8 @@ def res_import_template_setup(res):
         force_grid,
         force_type,
         replace_brush_pos,
+        rem_replace_brush,
+        additional_ids,
         invert_var,
         keys,
     )
@@ -447,10 +461,18 @@ def res_import_template(inst: Entity, res):
             otherwise.
     - replaceBrush: The position of a brush to replace (0 0 0=the surface).
             This brush will be removed, and overlays will be fixed to use
-            all faces with the same normal.
+            all faces with the same normal. Can alternately be a block:
+            - Pos: The position to replace.
+            - additionalIDs: Space-separated list of face IDs in the template
+              to also fix for overlays. The surface should have close to a
+              vertical normal, to prevent rescaling the overlay.
+            - removeBrush: If true, the original brush will not be removed.
     - keys/localkeys: If set, a brush entity will instead be generated with
-            these values. This overrides force world/detail. The origin is
-            set automatically.
+            these values. This overrides force world/detail.
+            Specially-handled keys:
+            - "origin", offset automatically.
+            - "movedir" on func_movelinear - set a normal surounded by <>,
+              this gets replaced with angles.
     - invertVar: If this fixup value is true, tile colour will be swapped to
             the opposite of the current force option. If it is set to
             'white' or 'black', that colour will be forced instead.
@@ -462,6 +484,8 @@ def res_import_template(inst: Entity, res):
         force_grid,
         force_type,
         replace_brush_pos,
+        rem_replace_brush,
+        additional_replace_ids,
         invert_var,
         key_block,
     ) = res.value
@@ -492,6 +516,44 @@ def res_import_template(inst: Entity, res):
         targetname=inst['targetname', ''],
         force_type=force_type,
     )
+
+    if key_block is not None:
+        conditions.set_ent_keys(temp_data.detail, inst, key_block)
+        br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
+        br_origin.localise(origin, angles)
+        temp_data.detail['origin'] = br_origin
+
+        move_dir = temp_data.detail['movedir', '']
+        if move_dir.startswith('<') and move_dir.endswith('>'):
+            move_dir = Vec.from_str(move_dir).rotate(*angles)
+            temp_data.detail['movedir'] = move_dir.to_angle()
+
+        # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
+        # modify it.
+        vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
+
+    try:
+        # This is the original brush the template is replacing. We fix overlay
+        # face IDs, so this brush is replaced by the faces in the template
+        # pointing
+        # the same way.
+        if replace_brush_pos is None:
+            raise KeyError  # Not set, raise to jump out of the try block
+
+        pos = Vec(replace_brush_pos).rotate(angles.x, angles.y, angles.z)
+        pos += origin
+        brush_group = SOLIDS[pos.as_tuple()]
+    except KeyError:
+        # Not set or solid group doesn't exist, skip..
+        pass
+    else:
+        conditions.steal_from_brush(
+            temp_data,
+            brush_group,
+            rem_replace_brush,
+            additional_replace_ids,
+        )
+
     conditions.retexture_template(
         temp_data,
         origin,
@@ -500,51 +562,6 @@ def res_import_template(inst: Entity, res):
         force_colour,
         force_grid,
     )
-
-    if key_block is not None:
-        conditions.set_ent_keys(temp_data.detail, inst, key_block)
-        br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
-        br_origin.localise(origin, angles)
-        temp_data.detail['origin'] = br_origin
-        # Add it to the list of ignored brushes, so vbsp.change_brush() doesn't
-        # modify it.
-        vbsp.IGNORED_BRUSH_ENTS.add(temp_data.detail)
-
-    # This is the original brush the template is replacing. We fix overlay
-    # face IDs, so this brush is replaced by the faces in the template pointing
-    # the same way.
-    if replace_brush_pos is None:
-        return
-
-    pos = Vec(replace_brush_pos).rotate(angles.x, angles.y, angles.z)
-    pos += origin
-
-    try:
-        brush_group = SOLIDS[pos.as_tuple()]
-    except KeyError:
-        return
-
-    vbsp.VMF.remove_brush(brush_group.solid)
-    new_ids = []
-
-    all_brushes = temp_data.world
-    # Overlays can't be applied to entities (other than func_detail).
-    if temp_data.detail is not None and key_block is None:
-        all_brushes.extend(temp_data.detail.solids)
-
-    for brush in all_brushes:  # type: VLib.Solid
-        for face in brush.sides:
-            # Only faces pointing the same way!
-            if face.normal() == brush_group.normal:
-                # Skip tool brushes (nodraw, player clips..)
-                if face.mat.casefold().startswith('tools/'):
-                    continue
-                new_ids.append(str(face.id))
-
-    if new_ids:
-        conditions.reallocate_overlays({
-            str(brush_group.face.id): new_ids,
-        })
 
 
 @make_result('HollowBrush')

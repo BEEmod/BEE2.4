@@ -24,10 +24,26 @@ UL_START = '\u2022 '
 OL_START = '{}. '
 HRULE_TEXT = ('\n ', ('hrule', ))
 
+LINK_TAG_START = 'link_callback_'
 
 class TAG(Enum):
     START = 0
     END = 1
+
+
+class MarkdownData:
+    """The output of the conversion, a set of tags and link references for callbacks.
+
+    Tags is a tuple of alternating strings and tag tuples.
+    links is a dict mapping urls to callback IDs.
+    """
+    def __init__(self, tags=(), links=None):
+        self.tags = tuple(tags)
+        self.links = links if links is not None else {}
+
+    def __bool__(self):
+        """Empty data is false."""
+        return bool(self.tags)
 
 
 def iter_elemtext(elem: etree.Element, parent_path=()):
@@ -123,7 +139,7 @@ def parse_html(element: etree.Element):
             try:
                 url_id = links[url]
             except KeyError:
-                url_id = links[url] = 'link_callback_' + str(next(link_counter))
+                url_id = links[url] = LINK_TAG_START + str(next(link_counter))
             tk_tags.add('link')  # For formatting
             tk_tags.add(url_id)  # For the click-callback.
 
@@ -137,7 +153,7 @@ class TKConverter(markdown.Extension, Preprocessor):
     """Extension needed to extract our list from the tree.
     """
     def __init__(self, *args, **kwargs):
-        self.result = []
+        self.result = MarkdownData()
         self.md = None  # type: markdown.Markdown
         super().__init__(*args, **kwargs)
 
@@ -147,7 +163,7 @@ class TKConverter(markdown.Extension, Preprocessor):
         md.preprocessors.add('TKConverter', self, '_end')
 
     def reset(self):
-        self.result = []
+        self.result = MarkdownData()
 
     def run(self, lines):
         # Set the markdown class to use our serialiser when run..
@@ -165,13 +181,18 @@ class TKConverter(markdown.Extension, Preprocessor):
         parsed_tags = list(parse_html(element))
         # The last yielded value is the dictionary of URL link keys.
         # Pop that off.
-        self.result = parsed_tags, parsed_tags.pop()
+        links = parsed_tags.pop()
 
         # Remove a bare \n at the end of the description
         # It's followed by the tag.
         if parsed_tags and parsed_tags[-2:-1] == ['\n', ()]:
             parsed_tags.pop()
             parsed_tags.pop()
+
+        self.result = MarkdownData(
+            parsed_tags,
+            links,
+        )
 
         # StripTopLevelTags expects doc_tag in the output,
         # so give it an empty one.
@@ -187,8 +208,55 @@ _MD = markdown.Markdown(extensions=[
 ])
 
 
-def convert(text):
-    """Convert markdown syntax into a list ready to be passed to richTextBox."""
+def convert(text: str) -> MarkdownData:
+    """Convert markdown syntax into data ready to be passed to richTextBox."""
     _MD.reset()
     _MD.convert(text)
     return _converter.result
+
+
+def join(*args: MarkdownData) -> MarkdownData:
+    """Join several text blocks together.
+
+    This merges together blocks, reassigning link callbacks as needed.
+    """
+    # If no tags are present, a block is empty entirely.
+    # Skip processing empty blocks.
+    to_join = list(filter(None, args))
+
+    if len(to_join) == 1:
+        # We only have one block, just copy and return.
+        return MarkdownData(
+            to_join[0].tags,
+            to_join[0].links.copy(),
+        )
+
+    link_ind = 0
+    combined_links = {}
+    new_text = []
+    old_to_new = {}  # Maps original callback to new callback
+    for data in to_join:
+        tags = data.tags
+        links = data.links
+
+        old_to_new.clear()
+
+        # First find any links in the tags..
+        for url, call_name in links.items():
+            if url not in combined_links:
+                link_ind += 1
+                old_to_new[call_name] = combined_links[url] = LINK_TAG_START + str(link_ind)
+
+        for tag_text in tags:
+            if isinstance(tag_text, str):  # Text to display
+                new_text.append(tag_text)
+                continue
+            new_tag = []
+            for tag in tag_text:
+                if tag.startswith(LINK_TAG_START):
+                    # Replace with the new tag we've set.
+                    new_tag.append(old_to_new[tag])
+                else:
+                    new_tag.append(tag)
+            new_text.append(tuple(new_tag))
+    return MarkdownData(new_text, combined_links)

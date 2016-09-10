@@ -39,7 +39,7 @@ except ImportError:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
 
     def fx(*args, **kwargs):
-        """Pygame has failed to initialise!
+        """Pyglet has failed to initialise!
 
         No sounds will be played.
         """

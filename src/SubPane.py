@@ -127,10 +127,10 @@ class SubPane(Toplevel):
 
         x, y = utils.adjust_inside_screen(x, y, win=self)
         self.geometry('{!s}x{!s}+{!s}+{!s}'.format(
-            str(width),
-            str(height),
-            str(x),
-            str(y),
+            max(10, width),
+            max(10, height),
+            x,
+            y,
         ))
 
         self.relX = x - self.parent.winfo_x()

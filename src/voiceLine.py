@@ -5,7 +5,7 @@ import random
 from collections import namedtuple
 from decimal import Decimal
 
-import conditions
+import conditions.monitor
 import srctools
 import utils
 import vbsp
@@ -57,7 +57,7 @@ fake_inst = VMF().create_ent(
 
 def has_responses():
     """Check if we have any valid 'response' data for Coop."""
-    return 'CoopResponses' in QUOTE_DATA
+    return vbsp.GAME_MODE == 'COOP' and 'CoopResponses' in QUOTE_DATA
 
 
 def generate_resp_script(file, allow_dings):
@@ -126,7 +126,10 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
     else:
         group_id = group['name'].upper()
 
-    for quote in group.find_all('quote'):
+    all_quotes = list(group.find_all('quote'))
+    valid_quotes = 0
+
+    for quote in all_quotes:
         valid_quote = True
         for flag in quote:
             name = flag.name
@@ -140,14 +143,17 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
         if not valid_quote:
             continue
 
+        valid_quotes += 1
+
         poss_quotes = []
+        line_mid_quotes = []
         for line in mode_quotes(quote):
             line_id = line['id', line['name', '']].casefold()
 
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line_id, True):
                 if ALLOW_MID_VOICES and is_mid:
-                    mid_quotes.append((line, use_dings, mid_name))
+                    line_mid_quotes.append((line, use_dings, mid_name))
                 else:
                     poss_quotes.append(line)
             else:
@@ -156,11 +162,33 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
                     line['name', '??'],
                 )
 
+        if line_mid_quotes:
+            mid_quotes.append(line_mid_quotes)
+
         if poss_quotes:
             yield PossibleQuote(
                 quote['priority', '0'],
                 poss_quotes,
             )
+
+    LOGGER.info('"{}": {}/{} quotes..', group_id, valid_quotes, len(all_quotes))
+
+
+def add_bullseye(quote_loc: Vec, name: str):
+    """Add a bullseye to the map."""
+    # Cave's voice lines require a special named bullseye to
+    # work correctly.
+    # Don't add the same one more than once.
+    if name not in ADDED_BULLSEYES:
+        vmf_file.create_ent(
+            classname='npc_bullseye',
+            # Not solid, Take No Damage, Think outside PVS
+            spawnflags='222224',
+            targetname=name,
+            origin=quote_loc - (0, 0, 16),
+            angles='0 0 0',
+        )
+        ADDED_BULLSEYES.add(name)
 
 
 def add_choreo(
@@ -308,20 +336,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             )
             added_ents.append(snd)
         elif name == 'bullseye':
-            # Cave's voice lines require a special named bullseye to
-            # work correctly.
-
-            # Don't add the same one more than once.
-            if prop.value not in ADDED_BULLSEYES:
-                vmf_file.create_ent(
-                    classname='npc_bullseye',
-                    # Not solid, Take No Damage, Think outside PVS
-                    spawnflags='222224',
-                    targetname=prop.value,
-                    origin=quote_loc - (0, 0, 16),
-                    angles='0 0 0',
-                )
-                ADDED_BULLSEYES.add(prop.value)
+            add_bullseye(quote_loc, prop.value)
         elif name == 'cc_emit':
             # In Aperture Tag, this additional console command is used
             # to add the closed captions.
@@ -384,7 +399,7 @@ def sort_func(quote: PossibleQuote):
 def add_voice(
         has_items: dict,
         style_vars_: dict,
-        vmf_file_: 7,
+        vmf_file_: VMF,
         map_seed: str,
         use_priority=True,
 ):
@@ -412,12 +427,16 @@ def add_voice(
             fixup_style='0',
         )
 
-    # Always add a box around the lines - it may be needed for quoteEvents.
-    vmf_file.add_brushes(vmf_file.make_hollow(
-        quote_loc - 64,
-        quote_loc + 64,
-        thick=32,
-    ))
+    # Either box in with nodraw, or place the voiceline studio.
+    has_studio = conditions.monitor.make_voice_studio(vmf_file, quote_loc)
+
+    bullsye_actor = vbsp.get_opt('voice_studio_actor')
+    if bullsye_actor and has_studio:
+        ADDED_BULLSEYES.add(bullsye_actor)
+
+    global_bullseye = QUOTE_DATA['bullseye', '']
+    if global_bullseye:
+        add_bullseye(quote_loc, global_bullseye)
 
     ALLOW_MID_VOICES = not style_vars.get('nomidvoices', False)
 
@@ -468,6 +487,8 @@ def add_voice(
             pass
 
     for ind, file in enumerate(QUOTE_EVENTS.values()):
+        if not file:
+            continue
         vmf_file.create_ent(
             classname='func_instance',
             targetname='voice_event_' + str(ind),
@@ -479,9 +500,9 @@ def add_voice(
 
     # For each group, locate the voice lines.
     for group in itertools.chain(
-            QUOTE_DATA.find_all('group'),
-            QUOTE_DATA.find_all('midchamber'),
-            ):
+        QUOTE_DATA.find_all('group'),
+        QUOTE_DATA.find_all('midchamber'),
+    ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
         use_dings = srctools.conv_bool(group['use_dings', ''], allow_dings)
@@ -533,12 +554,13 @@ def add_voice(
         # Add microphones that broadcast audio directly at players.
         # This ensures it is heard regardless of location.
         # This is used for Cave and core Wheatley.
+        LOGGER.info('Using microphones...')
         if vbsp.GAME_MODE == 'SP':
             vmf_file.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_sp',
                 speakername='!player',
-                maxRange='96',
+                maxRange='386',
                 origin=quote_loc,
             )
         else:
@@ -546,20 +568,21 @@ def add_voice(
                 classname='env_microphone',
                 targetname='player_speaker_blue',
                 speakername='!player_blue',
-                maxRange='96',
+                maxRange='386',
                 origin=quote_loc,
             )
             vmf_file.create_ent(
                 classname='env_microphone',
                 targetname='player_speaker_orange',
                 speakername='!player_orange',
-                maxRange='96',
+                maxRange='386',
                 origin=quote_loc,
             )
 
     LOGGER.info('{} Mid quotes', len(mid_quotes))
-    for mid_item, use_ding, mid_name in mid_quotes:
-        # Add all the mid quotes
+    for mid_lines in mid_quotes:
+        line = random.choice(mid_lines)
+        mid_item, use_ding, mid_name = line
         add_quote(mid_item, mid_name, quote_loc, use_ding)
 
     LOGGER.info('Done!')

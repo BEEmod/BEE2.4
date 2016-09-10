@@ -12,7 +12,6 @@ import random
 import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
-from decimal import Decimal
 
 from srctools import Property, Vec, AtomicWriter
 from BEE2_config import ConfigFile
@@ -20,6 +19,8 @@ import srctools.vmf as VLib
 import srctools
 import voiceLine
 import instanceLocs
+import brushLoc
+import bottomlessPit
 import conditions
 
 from typing import (
@@ -32,7 +33,6 @@ settings = {
     "textures":       {},
     "fizzler":        {},
     "options":        {},
-    "pit":            None,
     "fog":            {},
     "elev_opt":       {},
     'music_conf':     None,
@@ -195,7 +195,7 @@ DEFAULTS = {
     "fizz_border_vertical":     "0",  # The texture is oriented vertically
     "fizz_border_thickness":    "8",  # The width of the overlays
     "fizz_border_repeat":       "128",  # The width lengthways
-    "fizz_visibility":          "1", # Make fizzlers invisible and silent.
+    "fizz_visibility":          "1",  # Make fizzlers invisible and silent.
 
     "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
     "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
@@ -209,8 +209,15 @@ DEFAULTS = {
     # Template used for static panels set to 0 degrees
     "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
     # Template used for angled static panels
-    "static_pan_temp_white":     "BEE2_STATIC_PAN_ANGLED",
-    "static_pan_temp_black":     "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_white":    "BEE2_STATIC_PAN_ANGLED",
+    "static_pan_temp_black":    "BEE2_STATIC_PAN_ANGLED",
+    # If set, replace panel func_brushes with this. Top should be set to
+    # black_wall_metal_002c
+    "dynamic_pan_temp":         "",
+    # The local name that the panel func_brush should parent to.
+    # Adding the attachment name to the parent after a comma
+    # automatically sets the attachment point for us.
+    "dynamic_pan_parent":       "model_arms,panel_attach",
 
     "signInst":                 "NONE",  # adds this instance on all the signs.
     "signSize":                 "32",  # Allow resizing the sign overlays
@@ -244,6 +251,10 @@ DEFAULTS = {
     "glass_scale":              "0.15",  # Scale of glass texture
     "grating_scale":            "0.15",  # Scale of grating texture
 
+    # Add beams to the middle of large glass floors.
+    "glass_floorbeam_temp":     "",  # Two brushes for the texture scaling.
+    "glass_floorbeam_sep":      "2",  # Number of blocks between beams
+
     "clump_wall_tex":           "0",  # Use the clumping wall algorithm
     "clump_ceil":               "0",  # Use if for ceilings?
     "clump_floor":              "0",  # Use it for floors?
@@ -270,10 +281,12 @@ DEFAULTS = {
     # The file path of the BEE2 app that generated the config
     "bee2_loc":                 "",
     "game_id":                  "620",  # The game's steam ID
+
     "music_id":                 "<NONE>",  # The music ID which was selected
     "music_instance":           "",  # The instance for the chosen music
     "music_soundscript":        "",  # The soundscript for the chosen music
     "music_looplen":            "0",  # If set, re-trigger music after this time.
+
     "elev_type":                "RAND",  # What type of script to use:
     # Either "RAND", "FORCE", "NONE" or "BSOD"
     "elev_horiz":               "",  # The horizontal elevator video to use
@@ -281,6 +294,13 @@ DEFAULTS = {
     "voice_id":                 "<NONE>",  # The voice pack which was selected
     "voice_char":               "",  # Characters in the pack
     "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
+
+    "voice_studio_inst":        "",  # Instance to use for monitor backdrop.
+    "voice_studio_inter_chance": "0",  # Chance to switch to the voice character.
+    "voice_studio_cam_loc":     "0 0 0",  # Location for camera
+    "voice_studio_cam_pitch":   "0",  # Direction of the camera.
+    "voice_studio_cam_yaw":     "0",
+    "voice_studio_actor":       "",  # If set, no bullseye is output with this name..
     }
 
 # angles needed to ensure fizzlers are not upside-down
@@ -519,36 +539,7 @@ def load_settings():
 
     # Bottomless pit configuration
     pit = conf.find_key("bottomless_pit", [])
-    if pit:
-        settings['pit'] = {
-            'tex_goo': pit['goo_tex', 'nature/toxicslime_a2_bridge_intro'],
-            'tex_sky': pit['sky_tex', 'tools/toolsskybox'],
-            'should_tele': srctools.conv_bool(pit['teleport', '0']),
-            'tele_dest': pit['tele_target', '@goo_targ'],
-            'tele_ref': pit['tele_ref', '@goo_ref'],
-            'off_x': srctools.conv_int(pit['off_x', '0']),
-            'off_y': srctools.conv_int(pit['off_y', '0']),
-            'height': srctools.conv_int(pit['max_height', '386'], 386),
-            'skybox': pit['sky_inst', ''],
-            'skybox_ceil': pit['sky_inst_ceil', ''],
-            'targ': pit['targ_inst', ''],
-            'blend_light': pit['blend_light', '']
-        }
-        pit_inst = settings['pit']['inst'] = {}
-        for inst_type in (
-                'support',
-                'side',
-                'corner',
-                'double',
-                'triple',
-                'pillar',
-                ):
-            vals = [prop.value for prop in pit.find_all(inst_type + '_inst')]
-            if len(vals) == 0:
-                vals = [""]
-            pit_inst[inst_type] = vals
-    else:
-        settings['pit'] = None
+    bottomlessPit.load_settings(pit)
 
     # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
     fog_config = conf.find_key("fog", [])
@@ -1219,6 +1210,7 @@ def add_fog_ents(_):
         fogenable='1',
         use_angles='1',
         foglerptime='2',
+        fogMaxDensity='1',
 
         heightFogStart=fog_opt['height_start'],
         heightFogDensity=fog_opt['height_density'],
@@ -1730,267 +1722,6 @@ def calc_rand_seed():
         return '|'.join(lst)
 
 
-def make_bottomless_pit(solids, max_height):
-    """Transform all the goo pits into bottomless pits."""
-    tex_sky = settings['pit']['tex_sky']
-    teleport = settings['pit']['should_tele']
-
-    tele_ref = settings['pit']['tele_ref']
-    tele_dest = settings['pit']['tele_dest']
-
-    tele_off_x = settings['pit']['off_x']+64
-    tele_off_y = settings['pit']['off_y']+64
-
-    # Controlled by the style, not skybox!
-    blend_light = get_opt('pit_blend_light')
-
-    for solid, wat_face in solids:
-        wat_face.mat = tex_sky
-        for vec in wat_face.planes:
-            vec.z = float(Decimal(vec.z) - Decimal('95.5'))
-            # subtract 95.5 from z axis to make it 0.5 units thick
-            # we do the calc with Decimal to ensure precision
-    pit_height = settings['pit']['height']
-
-    if settings['pit']['skybox'] != '':
-        # Add in the actual skybox edges and triggers.
-        VMF.create_ent(
-            classname='func_instance',
-            file=settings['pit']['skybox'],
-            targetname='skybox',
-            angles='0 0 0',
-            origin='{!s} {!s} 0'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-            ),
-        )
-
-        fog_opt = settings['fog']
-
-        # Now generate the sky_camera, with appropriate values.
-        sky_camera = VMF.create_ent(
-            classname='sky_camera',
-            scale='1.0',
-
-            origin='{!s} {!s} 0'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-            ),
-
-            angles=fog_opt['direction'],
-            fogdir=fog_opt['direction'],
-            fogcolor=fog_opt['primary'],
-            fogstart=fog_opt['start'],
-            fogend=fog_opt['end'],
-
-            fogenable='1',
-
-            heightFogStart=fog_opt['height_start'],
-            heightFogDensity=fog_opt['height_density'],
-            heightFogMaxDensity=fog_opt['height_max_density'],
-        )
-
-        if fog_opt['secondary']:
-            # Only enable fog blending if a secondary color is enabled
-            sky_camera['fogblend'] = '1'
-            sky_camera['fogcolor2'] = fog_opt['secondary']
-            sky_camera['use_angles'] = '1'
-        else:
-            sky_camera['fogblend'] = '0'
-            sky_camera['use_angles'] = '0'
-
-    if settings['pit']['skybox_ceil'] != '':
-        # We dynamically add the ceiling so it resizes to match the map,
-        # and lighting won't be too far away.
-        VMF.create_ent(
-            classname='func_instance',
-            file=settings['pit']['skybox_ceil'],
-            targetname='skybox',
-            angles='0 0 0',
-            origin='{!s} {!s} {!s}'.format(
-                tele_off_x - 64,
-                tele_off_y - 64,
-                max_height,
-            ),
-        )
-
-    if settings['pit']['targ'] != '':
-        # Add in the teleport reference target.
-        VMF.create_ent(
-            classname='func_instance',
-            file=settings['pit']['targ'],
-            targetname='skybox',
-            angles='0 0 0',
-            origin='0 0 0',
-        )
-
-    # To figure out what positions need edge pieces, we use a dict
-    # indexed by XY tuples. The four Nones match the NSEW directions.
-    # For each trigger, we loop through the grid points it's in. We
-    # set all the center parts to None, but set the 4 neighbouring
-    # blocks if they aren't None.
-    # If a value = None, it is occupied by goo.
-    edges = defaultdict(lambda: [None, None, None, None])
-    dirs = [
-        # x, y, offsets
-        (0, 128),   # North
-        (0, -128),  # South
-        (128, 0),   # East
-        (-128, 0)   # West
-    ]
-    if teleport:
-        # Transform the skybox physics triggers into teleports to move cubes
-        # into the skybox zone
-
-        # Only use 1 entity for the teleport triggers. If multiple are used,
-        # cubes can contact two at once and get teleported odd places.
-        tele_trig = None
-        for trig in VMF.by_class['trigger_multiple']:
-            if trig['wait'] != '0.1' or trig in IGNORED_BRUSH_ENTS:
-                continue
-
-            bbox_min, bbox_max = trig.get_bbox()
-            origin = (bbox_min + bbox_max) / 2  # type: Vec
-            # We only modify triggers which are below the given z-index
-            if origin.z >= pit_height:
-                continue
-
-            if tele_trig is None:
-                tele_trig = trig
-                trig['classname'] = 'trigger_teleport'
-                trig['spawnflags'] = '4106'  # Physics and npcs
-                trig['landmark'] = tele_ref
-                trig['target'] = tele_dest
-                trig.outputs.clear()
-            else:
-                tele_trig.solids.extend(trig.solids)
-                trig.remove()
-
-            for x, y in utils.iter_grid(
-                min_x=int(bbox_min.x),
-                max_x=int(bbox_max.x),
-                min_y=int(bbox_min.y),
-                max_y=int(bbox_max.y),
-                stride=128,
-            ):
-                # Remove the pillar from the center of the item
-                edges[x, y] = None
-                for i, (xoff, yoff) in enumerate(dirs):
-                    side = edges[x + xoff, y + yoff]
-                    if side is not None:
-                        side[i] = origin.z - 13
-
-                if blend_light:
-                    # Generate dim lights at the skybox location,
-                    # to blend the lighting together.
-                    VMF.create_ent(
-                        classname='light',
-                        origin='{} {} {}'.format(
-                            x + 64,
-                            y + 64,
-                            origin.z + 3,
-                        ),
-                        _light=blend_light,
-                        _fifty_percent_distance='256',
-                        _zero_percent_distance='512',
-                    )
-                    VMF.create_ent(
-                        classname='light',
-                        origin='{} {} {}'.format(
-                            x + tele_off_x,
-                            y + tele_off_y,
-                            origin.z + 3,
-                        ),
-                        _light=blend_light,
-                        _fifty_percent_distance='256',
-                        _zero_percent_distance='512',
-                    )
-
-            # The triggers are 26 high, make them 10 units thick to
-            # make it harder to see the teleport
-            for side in trig.sides():
-                for plane in side.planes:
-                    if plane.z > origin.z:
-                        plane.z -= 16
-        if tele_trig is not None:
-            IGNORED_BRUSH_ENTS.add(tele_trig)
-
-    instances = settings['pit']['inst']
-
-    side_types = {
-        utils.CONN_TYPES.side: instances['side'],  # o|
-        utils.CONN_TYPES.corner: instances['corner'],  # _|
-        utils.CONN_TYPES.straight: instances['side'],  # Add this twice for |o|
-        utils.CONN_TYPES.triple: instances['triple'],  # U-shape
-        utils.CONN_TYPES.all: instances['pillar'],  # [o]
-        utils.CONN_TYPES.none: [''],  # Never add instance if no walls
-    }
-
-    for (x, y), mask in edges.items():
-        if mask is None:
-            continue  # This is goo
-
-        random.seed(str(x) + str(y) + 'sides')
-
-        inst_type, angle = utils.CONN_LOOKUP[
-            tuple((val is not None) for val in mask)
-        ]
-
-        file = random.choice(side_types[inst_type])
-
-        if file != '':
-            VMF.create_ent(
-                classname='func_instance',
-                file=file,
-                targetname='goo_side',
-                origin='{!s} {!s} {!s}'.format(
-                    x + tele_off_x,
-                    y + tele_off_y,
-                    max(
-                        x
-                        for x in mask
-                        if x is not None
-                    ),
-                ),
-                angles=angle,
-            ).make_unique()
-
-        # Straight uses two side-instances in parallel - "|o|"
-        if inst_type is utils.CONN_TYPES.straight:
-            file = random.choice(side_types[inst_type])
-            if file != '':
-                VMF.create_ent(
-                    classname='func_instance',
-                    file=file,
-                    targetname='goo_side',
-                    origin='{!s} {!s} {!s}'.format(
-                        x + tele_off_x,
-                        y + tele_off_y,
-                        max(
-                            x
-                            for x in mask
-                            if x is not None
-                        ),
-                    ),
-                    # Reverse direction
-                    angles=Vec.from_str(angle) + (0, 180, 0),
-                ).make_unique()
-
-        random.seed(str(x) + str(y) + '-support')
-        file = random.choice(instances['support'])
-
-        if file != '':
-            VMF.create_ent(
-                classname='func_instance',
-                file=file,
-                targetname='goo_support',
-                angles='0 ' + str(random.randrange(0, 360,90)) + ' 0',
-                origin='{!s} {!s} {!s}'.format(
-                    x+tele_off_x,
-                    y+tele_off_y,
-                    pit_height,
-                ),
-            ).make_unique()
 
 
 def add_goo_mist(sides):
@@ -2076,12 +1807,12 @@ def fit_goo_mist(
                 needs_mist.remove((pos.x+x, pos.y+y, pos.z))
 
 
-def change_goo_sides():
-    """Replace the textures on the sides of goo with specific ones.
+def fixup_goo_sides():
+    """Replace the textures on the sides of goo and bottomless pits.
 
+    For goo these can use special textures, or black 4x4 walls.
+    For pits sides use normal black walls.
     """
-    if settings['textures']['special.goo_wall'] == ['']:
-        return
 
     if get_opt('goo_wall_scale_temp'):
         scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
@@ -2089,48 +1820,44 @@ def change_goo_sides():
         scale = None
 
     LOGGER.info("Changing goo sides...")
-    face_dict = {}
-    for solid in VMF.iter_wbrushes(world=True, detail=False):
+    for solid in VMF.brushes[:]:
         for face in solid:
-            if face.mat.casefold() != 'tools/toolsnodraw':
-                # Don't record the goo textured brushes
-                x, y, z = face.get_origin()
-                face_dict[x, y, z] = face
-
-    dirs = [
-        # x, y, z
-        (0, 64, 0),  # North
-        (0, -64, 0),  # South
-        (64, 0, 0),  # East
-        (-64, 0, 0),  # West
-        (0, 0, -64),  # Down
-    ]
-
-    # We only want to alter black panel surfaces..
-    goo_mats = set(BLACK_PAN)
-
-    for x, y, z in conditions.GOO_LOCS:
-        for xoff, yoff, zoff in dirs:
-            try:
-                face = face_dict[x + xoff, y + yoff, z + zoff]  # type: VLib.Side
-            except KeyError:
+            if face in IGNORED_FACES:
                 continue
-
-            if face.mat.casefold() in goo_mats:
+            if face.mat.casefold() != 'tools/toolsnodraw':
+                origin = face.get_origin()
                 norm = face.normal()
+                if len(norm) != 1:
+                    continue  # Not aligned to grid...
 
-                face.mat = ''
-                if norm.z != 0:
-                    face.mat = get_tex('special.goo_floor')
+                block_type = brushLoc.POS['world': origin - 64 * norm]
 
-                if face.mat == '':  # goo_floor is invalid, or not used
-                    face.mat = get_tex('special.goo_wall')
+                # We only want to alter black panel surfaces..
+                if block_type.is_goo and face.mat.casefold() in BLACK_PAN:
+                    face.mat = ''
+                    if norm.z != 0:
+                        face.mat = get_tex('special.goo_floor')
 
-                if scale is not None:
-                    # Allow altering the orientation of the texture.
-                    u, v, face.ham_rot = scale[norm.as_tuple()]
-                    face.uaxis = u.copy()
-                    face.vaxis = v.copy()
+                    if face.mat == '':  # goo_floor is invalid, or not used
+                        face.mat = get_tex('special.goo_wall')
+
+                    if face.mat == '': # No overrides, use normal textures.
+                        face.mat = get_tex('black.4x4')
+
+                    if scale is not None:
+                        # Allow altering the orientation of the texture.
+                        u, v, face.ham_rot = scale[norm.as_tuple()]
+                        face.uaxis = u.copy()
+                        face.vaxis = v.copy()
+
+                    IGNORED_FACES.add(face)
+
+                if block_type.is_pit:
+                    if block_type.is_bottom and norm.z != 0:
+                        bottomlessPit.fix_base_brush(VMF, solid, face)
+                    else:
+                        # Use the black textures, this should be textured normally.
+                        face.mat = BLACK_PAN[1]
 
     LOGGER.info("Done!")
 
@@ -2142,6 +1869,9 @@ def collapse_goo_trig():
     hurt_trig = None
     cube_trig = None
     for trig in VMF.by_class['trigger_multiple']:
+        if trig in IGNORED_BRUSH_ENTS:
+            continue
+
         if trig['wait'] == '0.1' and trig['targetname', ''] == '':
             if cube_trig is None:
                 cube_trig = trig
@@ -2150,6 +1880,9 @@ def collapse_goo_trig():
                 trig.remove()
 
     for trig in VMF.by_class['trigger_hurt']:
+        if trig in IGNORED_BRUSH_ENTS:
+            continue
+
         if trig['targetname', ''] == '':
             if hurt_trig is None:
                 hurt_trig = trig
@@ -2237,6 +1970,11 @@ def change_brush():
     else:
         glass_temp = None
 
+    if get_opt('glass_floorbeam_temp'):
+        floorbeam_locs = []
+    else:
+        floorbeam_locs = None
+
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = get_bool_opt('goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
@@ -2251,16 +1989,8 @@ def change_brush():
                     VMF.remove_ent(ent)
                     break  # Skip to next entity
 
-    make_bottomless = settings['pit'] is not None
+    make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
-    if make_bottomless:
-        pit_solids = []
-        pit_height = settings['pit']['height']
-        pit_goo_tex = settings['pit']['tex_goo']
-    else:
-        pit_height = 0
-        pit_solids = None
-        pit_goo_tex = ''
 
     highest_brush = 0
 
@@ -2274,20 +2004,7 @@ def change_brush():
                 face.planes[2].z,
             )
             if face.mat.casefold() in GOO_TEX:
-                # Force this voice attribute on, since conditions can't
-                # detect goo pits / bottomless pits
-                settings['has_attr']['goo'] = True
-                if make_bottomless:
-                    if face.planes[2].z < pit_height:
-                        settings['has_attr']['bottomless_pit'] = True
-                        pit_solids.append((solid, face))
-                    else:
-                        face.mat = pit_goo_tex
-                        if make_goo_mist:
-                            mist_solids.add(
-                                solid.get_origin().as_tuple()
-                            )
-                elif make_goo_mist:
+                if make_goo_mist:
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
@@ -2308,20 +2025,30 @@ def change_brush():
                 settings['has_attr']['glass'] = True
                 is_glass = True
         if is_glass and glass_clip_mat:
-            glass_clip = make_barrier_solid(solid.get_origin(), glass_clip_mat)
+            glass_clip, glass_loc, glass_norm = make_barrier_solid(
+                solid.get_origin(),
+                glass_clip_mat,
+            )
             VMF.add_brush(glass_clip.solid)
+            if floorbeam_locs is not None and glass_norm.z != 0:
+                floorbeam_locs.append((glass_loc, glass_norm))
 
     if get_opt('glass_pack') and settings['has_attr']['glass']:
         TO_PACK.add(get_opt('glass_pack').casefold())
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
-        make_bottomless_pit(pit_solids, highest_brush)
+        bottomlessPit.make_bottomless_pit(VMF, highest_brush)
         LOGGER.info('Done!')
 
     if make_goo_mist:
         LOGGER.info('Adding Goo Mist...')
         add_goo_mist(mist_solids)
+        LOGGER.info('Done!')
+
+    if floorbeam_locs:
+        LOGGER.info('Adding Glass floor beams...')
+        add_glass_floorbeams(floorbeam_locs)
         LOGGER.info('Done!')
 
     if can_clump():
@@ -2350,7 +2077,7 @@ def make_barrier_solid(origin, material):
         origin.x // 128 * 128 + 64,
         origin.y // 128 * 128 + 64,
         origin.z // 128 * 128 + 64,
-        )
+    )
     normal = (origin - loc).norm()  # This points outward.
     # This sets the two side axes to 1, and the normal axis to 0.
     side_offset = 1 - abs(normal)  # type: Vec
@@ -2363,7 +2090,92 @@ def make_barrier_solid(origin, material):
         (loc + normal * 60 + side_offset),
         (loc + normal * 64 - side_offset),
         mat=material,
-    )
+    ), loc, normal
+
+
+def add_glass_floorbeams(glass_locs):
+    """Add beams to separate large glass panels.
+
+    The texture is assumed to match plasticwall004a's shape.
+    """
+    temp_name = get_opt('glass_floorbeam_temp')
+
+    separation = srctools.conv_int(get_opt('glass_floorbeam_sep'), 2) + 1
+    separation *= 128
+
+    # First we want to find all the groups of contiguous glass sections.
+    # This is a mapping from some glass piece to its group list.
+    groups = {}
+
+    for origin, normal in glass_locs:
+        pos = origin + normal * 62  # type: Vec
+
+        groups[pos.as_tuple()] = [pos]
+
+    # Loop over every pos and check in the +x/y diections for another glass
+    # piece. If there, merge the two lists and set every pos in the group to
+    # point to the new list.
+    # Once done, every unique list = a group.
+
+    for pos_tup in groups.keys():
+        pos = Vec(pos_tup)
+        for off in ((128, 0, 0), (0, 128, 0)):
+            neighbour = (pos + off).as_tuple()
+            if neighbour in groups:
+                our_group = groups[pos_tup]
+                neigh_group = groups[neighbour]
+                if our_group is neigh_group:
+                    continue
+
+                # Now merge the two lists. We then need to update all dict locs
+                # to point to the new list.
+
+                if len(neigh_group) > len(our_group):
+                    small_group, large_group = our_group, neigh_group
+                else:
+                    small_group, large_group = neigh_group, our_group
+
+                large_group.extend(small_group)
+                for pos in small_group:
+                    groups[pos.as_tuple()] = large_group
+
+    # Remove duplicates objects by using the ID as key..
+    groups = list({
+        id(group): group
+        for group in groups.values()
+    }.values())
+
+    LOGGER.info('Groups: {}', groups)
+
+    # Side -> u, v or None
+
+    for group in groups:
+
+        bbox_min, bbox_max = Vec.bbox(group)
+        dimensions = bbox_max - bbox_min
+        LOGGER.info('Size = {}', dimensions)
+
+        if dimensions.y > dimensions.x:
+            axis = 'y'
+            rot = Vec(0, 0, 0)
+        else:
+            axis = 'x'
+            rot = Vec(0, 90, 0)
+
+        # Add 128 so the first pos isn't a beam.
+        offset = bbox_min[axis] + 128
+
+        for pos in group:
+            # Every 'sep' positions..
+            if (pos[axis] - offset) % separation == 0:
+                conditions.import_template(
+                    temp_name,
+                    pos,
+                    rot,
+                    force_type=conditions.TEMP_TYPES.detail,
+                )
+
+
 
 
 def face_seed(face):
@@ -2973,7 +2785,7 @@ def add_extra_ents(mode):
             'choreo/glados.nut',  # Implements Multiverse Cave..
             'BEE2/auto_run.nut',  # Automatically run to cache sounds.
         ]
-        if GAME_MODE == 'COOP' and voiceLine.has_responses():
+        if voiceLine.has_responses():
             glados_scripts.append('BEE2/coop_responses.nut')
             PACK_FILES.add('scripts/vscripts/BEE2/coop_responses.nut')
 
@@ -2999,6 +2811,9 @@ def change_func_brush():
         grate_temp = conditions.get_scaling_template(grate_temp)
     else:
         grate_temp = None
+
+    dynamic_pan_temp = get_opt("dynamic_pan_temp")
+    dynamic_pan_parent = get_opt("dynamic_pan_parent")
 
     # All the textures used for faith plate bullseyes
     bullseye_white = set(itertools.chain.from_iterable(
@@ -3045,6 +2860,8 @@ def change_func_brush():
         # Func_brush/func_rotating (for angled panels and flip panels)
         # often use different textures, so let the style do that.
 
+        surf_face = None # The angled-panel top face..
+
         is_grating = False
         delete_brush = False
         for side in brush.sides():
@@ -3073,10 +2890,12 @@ def change_func_brush():
             if side.mat.casefold() in WHITE_PAN:
                 brush_type = "white"
                 set_special_mat(side, 'white')
+                surf_face = side
 
             elif side.mat.casefold() in BLACK_PAN:
                 brush_type = "black"
                 set_special_mat(side, 'black')
+                surf_face = side
             else:
                 if side.mat.casefold() == 'metal/metalgrate018':
                     is_grating = True
@@ -3119,7 +2938,7 @@ def change_func_brush():
                 VMF.remove_ent(brush)
 
         if is_grating and grating_clip_mat:
-            grate_clip = make_barrier_solid(brush.get_origin(), grating_clip_mat)
+            grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
             VMF.add_brush(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
@@ -3141,9 +2960,9 @@ def change_func_brush():
             targ = '-'.join(parent.split("-")[:-1])
             # Now find the associated instance
             for ins in (
-                    VMF.by_class['func_instance'] &
-                    VMF.by_target[targ]
-                    ):
+                VMF.by_class['func_instance'] &
+                VMF.by_target[targ]
+            ):
 
                 if 'connectioncount' not in ins.fixup:
                     continue  # It's a static-style overlay instance, ignore.
@@ -3159,11 +2978,33 @@ def change_func_brush():
                         '_panel_top',
                         '-brush',
                         )
-                    # Add the attachment name to the parent, so it
-                    # automatically sets the attachment point for us.
-                    brush['parentname'] += ',panel_attach'
+                    brush['parentname'] = conditions.local_name(
+                        ins,
+                        dynamic_pan_parent,
+                    )
 
-                break # Don't run twice - there might be a second matching
+                    if dynamic_pan_temp:
+                        # Allow replacing the brush used for the surface.
+                        new_brush = conditions.import_template(
+                            dynamic_pan_temp,
+                            Vec.from_str(brush['origin']),
+                            Vec.from_str(ins['angles']),
+                            targetname=targ,
+                            force_type=conditions.TEMP_TYPES.detail,
+                        )
+                        brush.solids = new_brush.detail.solids
+                        new_brush.detail.remove()
+                        for side in brush.sides():
+                            if side.mat.casefold() == 'metal/black_wall_metal_002c':
+                                # Copy data from the original face...
+                                side.mat = surf_face.mat
+                                side.uaxis = surf_face.uaxis
+                                side.vaxis = surf_face.vaxis
+                                side.ham_rot = surf_face.ham_rot
+                                side.smooth = surf_face.smooth
+                                side.lightmap = surf_face.lightmap
+
+                break  # Don't run twice - there might be a second matching
                 # overlay instance!
 
     if get_opt('grating_pack') and settings['has_attr']['grating']:
@@ -3844,6 +3685,8 @@ def main():
 
         all_inst = get_map_info()
 
+        brushLoc.POS.read_from_map(VMF, settings['has_attr'])
+
         conditions.init(
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
@@ -3856,11 +3699,11 @@ def main():
         add_extra_ents(mode=GAME_MODE)
 
         change_ents()
-        change_goo_sides()  # Must be done before change_brush()!
+        fixup_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
         change_trig()
-        collapse_goo_trig()  # Do after make_bottomless_pits
+        collapse_goo_trig()
         change_func_brush()
         remove_static_ind_toggles()
         remove_barrier_ents()

@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from typing import (
-    Callable, Any,
+    Callable, Any, Iterable,
     Dict, List, Tuple, NamedTuple,
 )
 
@@ -33,7 +33,7 @@ FLAG_LOOKUP = {}
 RESULT_LOOKUP = {}
 RESULT_SETUP = {}
 
-# Used to dump a list of the flags, results, meta-conds
+# Used to dump a list of the flags, results, meta-conditions
 ALL_FLAGS = []
 ALL_RESULTS = []
 ALL_META = []
@@ -58,15 +58,14 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
     """
-    default = 0
-    world = 1
-    detail = 2
+    default = 0  # Based on the original VMF settings
+    world = 1  # Import and add to world
+    detail = 2  # Import as a func_detail
 
-Template = namedtuple('Template', ['world', 'detail', 'overlay'])
+Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
 
 
 class MAT_TYPES(Enum):
@@ -201,6 +200,7 @@ TEMPLATE_RETEXTURE = {
     'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
 }
 del B, W
+
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
     # We decrease offset to this much +- at maximum (so adjacient template
@@ -503,14 +503,21 @@ def check_flag(flag, inst):
         flag.value,
         inst['file'],
     )
+    name = flag.name
+    # If starting with '!', invert the result.
+    if name[:1] == '!':
+        desired_result = False
+        name = name[1:]
+    else:
+        desired_result = True
     try:
-        func = FLAG_LOOKUP[flag.name]
+        func = FLAG_LOOKUP[name]
     except KeyError:
-        LOGGER.warning('"' + flag.name + '" is not a valid condition flag!')
+        LOGGER.warning('"' + name + '" is not a valid condition flag!')
         return False
     else:
         res = func(inst, flag)
-        return res
+        return res == desired_result
 
 
 def import_conditions():
@@ -813,6 +820,58 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
             overlay['sides'] = ' '.join(sides)
 
 
+def steal_from_brush(
+    temp_data: Template,
+    brush_group: 'solidGroup',
+    rem_brush=True,
+    additional: Iterable[int]=(),
+):
+    """Copy IDs from a brush to a template."""
+    LOGGER.info('Steal: {}', locals())
+
+    temp_brushes = temp_data.world.copy()
+    # Overlays can't be applied to entities (other than func_detail).
+    if temp_data.detail is not None and temp_data.detail['classname'] == 'func_detail':
+        temp_brushes.extend(temp_data.detail.solids)
+
+    if rem_brush:
+        VMF.remove_brush(brush_group.solid)
+    else:
+        # Switch it to nodraw if still in the map, since it must be
+        # covered.
+        brush_group.face.mat = 'tools/toolsnodraw'
+
+    # Additional is a list of IDs in the template VMF, not the final one.
+    additional = [
+        temp_data.orig_ids.get(face_id, -1)
+        for face_id in
+        additional
+    ]
+    new_ids = []
+
+    for brush in temp_brushes:
+        for face in brush.sides:
+            # Only faces pointing the same way!
+            if face.normal() == brush_group.normal:
+                # Skip tool brushes in the template (nodraw, player clips..)
+                if face.mat.casefold().startswith('tools/'):
+                    continue
+                new_ids.append(str(face.id))
+            # If the original ID is present in the 'additional' values
+            # use it. This allows specifying specific faces.
+            elif face.id in additional:
+                new_ids.append(str(face.id))
+
+    LOGGER.info('New IDS: {}', {
+            str(brush_group.face.id): new_ids,
+        })
+
+    if new_ids:
+        reallocate_overlays({
+            str(brush_group.face.id): new_ids,
+        })
+
+
 def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
     """Copy the given key prop block to an entity.
 
@@ -857,7 +916,7 @@ def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
-    vmf = srctools.VMF.parse(props)
+    vmf = srctools.VMF.parse(props, preserve_ids=True)
     detail_ents = defaultdict(list)
     world_ents = defaultdict(list)
     overlay_ents = defaultdict(list)
@@ -903,6 +962,7 @@ def import_template(
         angles=None,
         targetname='',
         force_type=TEMP_TYPES.default,
+        add_to_map=True,
     ) -> Template:
     """Import the given template at a location.
 
@@ -912,6 +972,7 @@ def import_template(
     returned instead of an invalid entity.
 
     If targetname is set, it will be used to localise overlay names.
+    add_to_map sets whether to add the brushes and func_detail to the map.
     """
     import vbsp
     orig_world, orig_detail, orig_over = get_template(temp_name)
@@ -920,7 +981,7 @@ def import_template(
     new_detail = []
     new_over = []
 
-    id_mapping = {}
+    id_mapping = {}  # A map of the original -> new face IDs.
 
     for orig_list, new_list in [
             (orig_world, new_world),
@@ -940,9 +1001,9 @@ def import_template(
 
         sides = overlay['sides'].split()
         new_overlay['sides'] = ' '.join(
-            id_mapping[side]
+            str(id_mapping[side])
             for side in sides
-            if side in id_mapping
+            if int(side) in id_mapping
         )
 
         srctools.vmf.localise_overlay(new_overlay, origin, angles)
@@ -971,13 +1032,16 @@ def import_template(
         new_world.extend(new_detail)
         new_detail.clear()
 
-    VMF.add_brushes(new_world)
+    if add_to_map:
+        VMF.add_brushes(new_world)
 
     if new_detail:
         detail_ent = VMF.create_ent(
             classname='func_detail'
         )
         detail_ent.solids = new_detail
+        if not add_to_map:
+            detail_ent.remove()
     else:
         detail_ent = None
         new_detail = []
@@ -989,7 +1053,7 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return Template(new_world, detail_ent, new_over)
+    return Template(new_world, detail_ent, new_over, id_mapping)
 
 
 def get_scaling_template(
@@ -1113,12 +1177,12 @@ def retexture_template(
                         face.mat = 'tools/toolsnodraw'
                     else:
                         # Goo always has the same orientation!
-                        face.uaxis = srctools.vmf.UVAxis(
+                        face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
                         )
-                        face.vaxis = srctools.vmf.UVAxis(
+                        face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
                             scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
@@ -1141,34 +1205,11 @@ def retexture_template(
                 grid_size = force_grid
 
             if 1 in norm or -1 in norm:  # Facing NSEW or up/down
-                # Save the originals
-                u_off = face.uaxis.offset
-                v_off = face.vaxis.offset
-
-                # Floor / ceiling is always 1 size - 4x4
-                if norm.z == 1:
-                    if grid_size != 'special':
-                        grid_size = 'ceiling'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                elif norm.z == -1:
-                    if grid_size != 'special':
-                        grid_size = 'floor'
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, -1, 0)
-                # Walls:
-                elif norm.x != 0:
-                    face.uaxis = UVAxis(0, 1, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-                elif norm.y != 0:
-                    face.uaxis = UVAxis(1, 0, 0)
-                    face.vaxis = UVAxis(0, 0, -1)
-
                 # If axis-aligned, make the orientation aligned to world
                 # That way multiple items merge well, and walls are upright.
                 # We allow offsets < 1 grid tile, so items can be offset.
-                face.uaxis.offset = u_off % TEMP_TILE_PIX_SIZE[grid_size]
-                face.vaxis.offset = v_off % TEMP_TILE_PIX_SIZE[grid_size]
+                face.uaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
+                face.vaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
 
             if use_bullseye:
                 # We want to use the bullseye textures, instead of normal
@@ -1610,28 +1651,23 @@ def make_static_pist(ent, res):
 
 
 @make_result('GooDebris')
-def res_goo_debris(_, res):
+def res_goo_debris(_, res: Property):
     """Add random instances to goo squares.
 
     Options:
         - file: The filename for the instance. The variant files should be
             suffixed with '_1.vmf', '_2.vmf', etc.
         - space: the number of border squares which must be filled with goo
-                 for a square to be eligable - defaults to 1.
+                 for a square to be eligible - defaults to 1.
         - weight, number: see the 'Variant' result, a set of weights for the
                 options
         - chance: The percentage chance a square will have a debris item
         - offset: A random xy offset applied to the instances.
     """
-    import vbsp
+    import brushLoc
 
-    if vbsp.settings['pit'] is not None:
-        # We have bottomless pits - don't place goo debris.
-        # TODO: Make this only apply to the ones chosen to be bottomless.
-        return RES_EXHAUSTED
-
-    space = srctools.conv_int(res['spacing', '1'], 1)
-    rand_count = srctools.conv_int(res['number', ''], None)
+    space = res.int('spacing', 1)
+    rand_count = res.int('number', None)
     if rand_count:
         rand_list = weighted_random(
             rand_count,
@@ -1639,39 +1675,46 @@ def res_goo_debris(_, res):
         )
     else:
         rand_list = None
-    chance = srctools.conv_int(res['chance', '30'], 30) / 100
+    chance = res.int('chance', 30) / 100
     file = res['file']
-    offset = srctools.conv_int(res['offset', '0'], 0)
+    offset = res.int('offset', 0)
 
     if file.endswith('.vmf'):
         file = file[:-4]
 
+    goo_top_locs = {
+        pos.as_tuple()
+        for pos, block in
+        brushLoc.POS.items()
+        if block.is_goo and block.is_top
+    }
+
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in GOO_FACE_LOC]
+        possible_locs = [Vec(loc) for loc in goo_top_locs]
     else:
         possible_locs = []
-        for x, y, z in set(GOO_FACE_LOC):
+        for x, y, z in goo_top_locs:
             # Check to ensure the neighbouring blocks are also
             # goo brushes (depending on spacing).
             for x_off, y_off in utils.iter_grid(
-                    min_x=-space,
-                    max_x=space + 1,
-                    min_y=-space,
-                    max_y=space + 1,
-                    stride=128,
-                    ):
+                min_x=-space,
+                max_x=space + 1,
+                min_y=-space,
+                max_y=space + 1,
+                stride=1,
+            ):
                 if x_off == y_off == 0:
-                    continue # We already know this is a goo location
-                if (x + x_off*128, y + y_off*128, z) not in GOO_FACE_LOC:
+                    continue  # We already know this is a goo location
+                if (x + x_off, y + y_off, z) not in goo_top_locs:
                     break  # This doesn't qualify
             else:
-                possible_locs.append(Vec(x,y,z))
+                possible_locs.append(brushLoc.grid_to_world(Vec(x,y,z)))
 
     LOGGER.info(
         'GooDebris: {}/{} locations',
         len(possible_locs),
-        len(GOO_FACE_LOC),
+        len(goo_top_locs),
     )
 
     suff = ''
@@ -1702,10 +1745,10 @@ WP_LIMIT = 30  # Limit to this many portal instances
 
 @make_result_setup('WPLightstrip')
 def res_portal_lightstrip_setup(res):
-    do_offset = srctools.conv_bool(res['doOffset', '0'])
+    do_offset = res.bool('doOffset')
     hole_inst = res['HoleInst']
     fallback = res['FallbackInst']
-    location = Vec.from_str(res['location', '0 8192 0'])
+    location = res.vec('location', 0, 8192, 0)
     strip_name = res['strip_name']
     hole_name = res['hole_name']
     return [
@@ -1877,7 +1920,7 @@ def res_make_tag_fizzler(inst, res):
         return
 
     # The distance from origin the double signs are seperated by.
-    sign_offset = srctools.conv_int(res['signoffset', ''], 16)
+    sign_offset = res.int('signoffset', 16)
 
     sign_loc = (
         # The actual location of the sign - on the wall

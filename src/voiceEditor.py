@@ -164,11 +164,14 @@ def configure_canv(e):
 
 
 def save():
-    LOGGER.info('Saving Configs!')
-    config.save_check()
-    config_mid.save_check()
-    config_resp.save_check()
-    win.withdraw()
+    global voice_item
+    if voice_item is not None:
+        voice_item = None
+        LOGGER.info('Saving Configs!')
+        config.save_check()
+        config_mid.save_check()
+        config_resp.save_check()
+        win.withdraw()
 
 
 def add_tabs():
@@ -208,6 +211,9 @@ def add_tabs():
 def show(quote_pack):
     """Display the editing window."""
     global voice_item, config, config_mid, config_resp
+    if voice_item is not None:
+        return
+
     voice_item = quote_pack
 
     win.title('BEE2 - Configure "' + voice_item.selitem_data.name + '"')

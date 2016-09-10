@@ -520,8 +520,10 @@ def load_packages(data):
     def voice_callback(style_id):
         """Special callback for the voice selector window.
 
-        The configuration button is disabled whin no music is selected.
+        The configuration button is disabled when no music is selected.
         """
+        # This might be open, so force-close it to ensure it isn't corrupt...
+        voiceEditor.save()
         try:
             if style_id is None:
                 style_id = '<NONE>'
@@ -601,6 +603,10 @@ def load_packages(data):
              'The style broadly defines the time period a chamber is set in.',
         has_none=False,
         has_def=False,
+        # Selecting items changes much of the gui - don't allow when other
+        # things are open..
+        modal=True,
+        # callback set in the main initialisation function..
         attributes=[
             SelAttr.bool('VID', 'Elevator Videos', default=True),
         ]
@@ -668,10 +674,11 @@ def reposition_panes():
     pal_win.move(
         x=pal_x,
         y=(TK_ROOT.winfo_rooty() - 50),
-        height=(
+        height=max(
             TK_ROOT.winfo_reqheight() -
             comp_win.winfo_reqheight() -
-            25
+            25,
+            30,
         ),
         width=comp_win.winfo_reqwidth(),
     )
@@ -818,6 +825,9 @@ def export_editoritems(_=None):
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
     item_opts.save_check()
+
+    # Update corridor configs for standalone mode..
+    CompilerPane.save_corridors()
 
     # Since last_export is a zip, users won't be able to overwrite it
     # normally!

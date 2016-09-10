@@ -62,6 +62,9 @@ INJECT_FILES = {
 
     # Applied to @glados's entity scripts.
     'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
+
+    # Commands for monitor items.
+    'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
 }
 
 # Additional parts to add if we have a mdl file.
@@ -541,7 +544,7 @@ def gen_auto_script(preload, is_peti):
     """
     dest = os.path.join('bee2', 'inject', 'auto_run.nut')
     if not preload and not is_peti:
-        return # Don't add for hammer maps
+        return  # Don't add for hammer maps
 
     with open(dest, 'w') as file:
         if not preload:
@@ -550,7 +553,7 @@ def gen_auto_script(preload, is_peti):
         file.write('function Precache() {\n')
         for entry in preload:
             if entry.startswith('precache_sound:'):
-                file.write('\tPrecacheSoundScript("{}");\n'.format(
+                file.write('\tself.PrecacheSoundScript("{}");\n'.format(
                     entry[15:],
                 ))
         file.write('}\n')

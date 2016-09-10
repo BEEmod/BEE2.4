@@ -24,7 +24,7 @@ from srctools import (
 )
 
 from typing import (
-    Dict,
+    Dict, List
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -38,7 +38,11 @@ data = {}
 
 res_count = -1
 
-TEMPLATE_FILE = VMF()
+# Don't change face IDs when copying to here.
+# This allows users to refer to the stuff in templates specifically.
+# The combined VMF isn't to be compiled or edited outside of us, so it's fine
+# to have overlapping IDs between templates.
+TEMPLATE_FILE = VMF(preserve_ids=True)
 
 # Various namedtuples to allow passing blocks of data around
 # (especially to functions that only use parts.)
@@ -459,7 +463,12 @@ def parse_package(pack: 'Package'):
     return img_count
 
 
-def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
+def setup_style_tree(
+    item_data,
+    style_data,
+    log_fallbacks,
+    log_missing_styles,
+):
     """Modify all items so item inheritance is properly handled.
 
     This will guarantee that all items have a definition for each
@@ -488,12 +497,12 @@ def setup_style_tree(item_data, style_data, log_fallbacks, log_missing_styles):
         style.bases = base
 
     # All styles now have a .bases attribute, which is a list of the
-    # parent styles that exist.
+    # parent styles that exist (plus the style).
 
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver = list(item.versions.values())
+        all_ver = list(item.versions.values())  # type: List[Dict[str, Dict[str, Style]]]
         # Move default version to the beginning, so it's read first
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
@@ -708,7 +717,9 @@ class Style(PakObject):
         self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
-        self.bases = []  # Set by setup_style_tree()
+        # Set by setup_style_tree() after all objects are read..
+        # this is a list of this style, plus parents in order.
+        self.bases = []
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -801,7 +812,10 @@ class Style(PakObject):
         """Add the additional commands to ourselves."""
         self.editor.append(override.editor)
         self.config.append(override.config)
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
 
         self.has_video = self.has_video or override.has_video
         # If overrides have suggested IDs, use those. Unset values = ''.
@@ -962,7 +976,7 @@ class Item(PakObject):
         Pal_list is a list of (item, subitem) tuples representing the palette.
         Versions is a {item:version_id} dictionary.
         prop_conf is a {item_id: {prop_name: value}} nested dictionary for
-         overriden property names. Empty dicts can be passed instead.
+         overridden property names. Empty dicts can be passed instead.
         """
         editoritems = exp_data.editoritems
         vbsp_config = exp_data.vbsp_conf
@@ -989,6 +1003,7 @@ class Item(PakObject):
             editoritems += editor_parts
             vbsp_config += config_part
 
+            # Add auxiliary configs as well.
             try:
                 aux_conf = aux_item_configs[item.id]  # type: ItemConfig
             except KeyError:
@@ -996,9 +1011,16 @@ class Item(PakObject):
             else:
                 vbsp_config += aux_conf.all_conf
                 try:
-                    vbsp_config += aux_conf.versions[ver_id][style_id]
+                    version_data = aux_conf.versions[ver_id]
                 except KeyError:
                     pass  # No override.
+                else:
+                    # Find the first style definition for the selected one
+                    # that's defined for this config
+                    for poss_style in exp_data.selected_style.bases:
+                        if poss_style.id in version_data:
+                            vbsp_config += version_data[poss_style.id]
+                            break
 
     def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
         """Get the data for an exported item."""
@@ -1134,12 +1156,24 @@ class QuotePack(PakObject):
             config: Property,
             chars=None,
             skin=None,
+            studio: str=None,
+            studio_actor='',
+            cam_loc: Vec=None,
+            interrupt=0.0,
+            cam_pitch=0.0,
+            cam_yaw=0.0,
             ):
         self.id = quote_id
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
         self.chars = chars or ['??']
+        self.studio = studio
+        self.studio_actor = studio_actor
+        self.cam_loc = cam_loc
+        self.inter_chance = interrupt
+        self.cam_pitch = cam_pitch
+        self.cam_yaw = cam_yaw
 
     @classmethod
     def parse(cls, data):
@@ -1156,6 +1190,19 @@ class QuotePack(PakObject):
         # portrait.
         port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
+        monitor_data = data.info.find_key('monitor', None)
+
+        if monitor_data.value is not None:
+            mon_studio = monitor_data['studio']
+            mon_studio_actor = monitor_data['studio_actor', '']
+            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
+            mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
+            mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
+        else:
+            mon_studio = mon_cam_loc = None
+            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
+            mon_studio_actor = ''
+
         config = get_config(
             data.info,
             data.zip_file,
@@ -1170,11 +1217,20 @@ class QuotePack(PakObject):
             config,
             chars=chars,
             skin=port_skin,
+            studio=mon_studio,
+            studio_actor=mon_studio_actor,
+            interrupt=mon_interrupt,
+            cam_loc=mon_cam_loc,
+            cam_pitch=mon_cam_pitch,
+            cam_yaw=mon_cam_yaw,
             )
 
     def add_over(self, override: 'QuotePack'):
         """Add the additional lines to ourselves."""
-        self.selitem_data.auth += override.selitem_data.auth
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
         self.config += override.config
         self.config.merge_children(
             'quotes_sp',
@@ -1182,6 +1238,15 @@ class QuotePack(PakObject):
         )
         if self.cave_skin is None:
             self.cave_skin = override.cave_skin
+
+        if self.studio is None:
+            self.studio = override.studio
+            self.studio_actor = override.studio_actor
+            self.cam_loc = override.cam_loc
+            self.inter_chance = override.inter_chance
+            self.cam_pitch = override.cam_pitch
+            self.cam_yaw = override.cam_yaw
+
 
     def __repr__(self):
         return '<Voice:' + self.id + '>'
@@ -1212,20 +1277,22 @@ class QuotePack(PakObject):
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
-        vbsp_config.set_key(
-            ('Options', 'voice_pack'),
-            voice.id,
-        )
-        vbsp_config.set_key(
-            ('Options', 'voice_char'),
-            ','.join(voice.chars)
-        )
+        vbsp_config.ensure_exists('Options')
+        options = vbsp_config.find_key('Options')
+
+        options['voice_pack'] = voice.id
+        options['voice_char'] = ','.join(voice.chars)
 
         if voice.cave_skin is not None:
-            vbsp_config.set_key(
-                ('Options', 'cave_port_skin'),
-                str(voice.cave_skin),
-            )
+            options['cave_port_skin'] = str(voice.cave_skin)
+
+        if voice.studio is not None:
+            options['voice_studio_inst'] = voice.studio
+            options['voice_studio_actor'] = voice.studio_actor
+            options['voice_studio_inter_chance'] = str(voice.inter_chance)
+            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
+            options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
+            options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
 
         # Copy the config files for this voiceline..
         for prefix, pretty in [
@@ -1323,7 +1390,10 @@ class Skybox(PakObject):
 
     def add_over(self, override: 'Skybox'):
         """Add the additional vbsp_config commands to ourselves."""
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
         self.config += override.config
         self.fog_opts += override.fog_opts
 
@@ -1455,7 +1525,10 @@ class Music(PakObject):
     def add_over(self, override: 'Music'):
         """Add the additional vbsp_config commands to ourselves."""
         self.config.append(override.config)
-        self.selitem_data.auth.extend(override.selitem_data.auth)
+        self.selitem_data = join_selitem_data(
+            self.selitem_data,
+            override.selitem_data
+        )
 
     def __repr__(self):
         return '<Music ' + self.id + '>'
@@ -1536,8 +1609,9 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             self.styles = styles
 
     @classmethod
-    def parse(cls, data):
-        name = data.info['name']
+    def parse(cls, data: 'ParseData'):
+        name = data.info['name', '']
+
         unstyled = srctools.conv_bool(data.info['unstyled', '0'])
         default = srctools.conv_bool(data.info['enabled', '0'])
         styles = [
@@ -1568,16 +1642,28 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             self.styles = None
         else:
             self.styles.extend(override.styles)
+
+        if not self.name:
+            self.name = override.name
+
         # If they both have descriptions, add them together.
         # Don't do it if they're both identical though.
-        if override.desc and override.desc not in self.desc:
-            if self.desc:
+        # bool(strip()) = has a non-whitespace character
+        stripped_over = override.desc.strip()
+        if stripped_over and stripped_over not in self.desc:
+            if self.desc.strip():
                 self.desc += '\n\n' + override.desc
             else:
                 self.desc = override.desc
 
     def __repr__(self):
-        return '<StyleVar ' + self.id + '>'
+        return '<Stylevar "{}", name="{}", default={}, styles={}>:\n{}'.format(
+            self.id,
+            self.name,
+            self.default,
+            ','.join(self.styles),
+            self.desc,
+        )
 
     def applies_to_style(self, style):
         """Check to see if this will apply for the given style.
@@ -1865,20 +1951,22 @@ class PackList(PakObject, allow_mult=True, has_img=False):
             for prop in
             data.info.find_all('AddIfMat')
         ]
+
+        files = []
+
         if conf.has_children():
             # Allow having a child block to define packlists inline
             files = [
                 prop.value
                 for prop in conf
             ]
-        else:
+        elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
             try:
                 with data.zip_file.open(path) as f:
                     # Each line is a file to pack.
                     # Skip blank lines, strip whitespace, and
-                    # alow // comments.
-                    files = []
+                    # allow // comments.
                     for line in f:
                         line = srctools.clean_line(line)
                         if line:
@@ -1890,6 +1978,15 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                         path,
                     )
                 ) from ex
+
+        # We know that if it's a material, it must be packing the VMT at the
+        # very least.
+        for mat in mats:
+            files.append('materials/' + mat + '.vmt')
+
+        if not files:
+            raise ValueError('"{}" has no files to pack!'.format(data.id))
+
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
             zip_files = {
@@ -2140,7 +2237,6 @@ def desc_parse(info, id=''):
 
 def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
-
     """
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
@@ -2162,6 +2258,43 @@ def get_selitem_data(info):
         desc,
         group,
         sort_key,
+    )
+
+
+def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
+    """Join together two sets of selitem data.
+
+    This uses the over_data values if defined, using our_data if not.
+    Authors and descriptions will be joined to each other.
+    """
+    (
+        our_name,
+        our_short_name,
+        our_auth,
+        our_icon,
+        our_desc,
+        our_group,
+        our_sort_key,
+    ) = our_data
+
+    (
+        over_name,
+        over_short_name,
+        over_auth,
+        over_icon,
+        over_desc,
+        over_group,
+        over_sort_key,
+    ) = over_data
+
+    return SelitemData(
+        our_name if over_name == '???' else over_name,
+        our_short_name if over_short_name == '???' else over_short_name,
+        our_auth + over_auth,
+        our_icon if over_icon == '_blank' else our_icon,
+        tkMarkdown.join(our_desc, over_desc),
+        over_group or our_group,
+        over_sort_key or our_sort_key,
     )
 
 
