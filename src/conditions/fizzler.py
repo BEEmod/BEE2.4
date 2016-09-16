@@ -273,6 +273,9 @@ def res_fizzler_pair(begin_inst, res):
         if end_inst['targetname', ''] != end_name:
             # Only examine this barrier hazard's instances!
             continue
+        if end_inst['file'] != orig_file:
+            # Allow adding overlays or other instances at the ends.
+            continue
         end_pos = Vec.from_str(end_inst['origin'])
         if (
                 begin_pos[axis_1] == end_pos[axis_1] and
