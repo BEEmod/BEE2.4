@@ -12,6 +12,8 @@ from vbsp import TEX_FIZZLER
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
+FIZZ_BRUSH_ENTS = {} # The brush entities we generated, used when merging.
+# Key = (conf id, targetname)
 
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
@@ -81,25 +83,37 @@ def res_cust_fizzler(base_inst, res):
             vbsp.VMF.by_target[fizz_name + '_brush']):
         orig_brush.remove()
         for config in new_brush_config:
+
             new_brush = orig_brush.copy()
-            vbsp.VMF.add_ent(new_brush)
-            # Don't allow restyling it
-            vbsp.IGNORED_BRUSH_ENTS.add(new_brush)
+            # Unique to the particular config property & fizzler name
+            merge_key = (id(config), fizz_name)
+            should_merge = config.bool('MergeBrushes')
+            if should_merge and merge_key in FIZZ_BRUSH_ENTS:
+                # These are shared by both ents, but new_brush won't be added to
+                # the map. (We need it though for the widening code to work).
+                FIZZ_BRUSH_ENTS[merge_key].solids.extend(new_brush.solids)
+            else:
+                vbsp.VMF.add_ent(new_brush)
+                # Don't allow restyling it
+                vbsp.IGNORED_BRUSH_ENTS.add(new_brush)
 
-            new_brush.clear_keys()  # Wipe the original keyvalues
-            new_brush['origin'] = orig_brush['origin']
-            new_brush['targetname'] = (
-                fizz_name +
-                '-' +
-                config['name', 'brush']
-            )
-            # All ents must have a classname!
-            new_brush['classname'] = 'trigger_portal_cleanser'
+                new_brush.clear_keys()  # Wipe the original keyvalues
+                new_brush['origin'] = orig_brush['origin']
+                new_brush['targetname'] = (
+                    fizz_name +
+                    '-' +
+                    config['name', 'brush']
+                )
+                # All ents must have a classname!
+                new_brush['classname'] = 'trigger_portal_cleanser'
 
-            conditions.set_ent_keys(
-                new_brush, base_inst,
-                config,
-            )
+                conditions.set_ent_keys(
+                    new_brush, base_inst,
+                    config,
+                )
+
+                if should_merge: # The first brush...
+                    FIZZ_BRUSH_ENTS[merge_key] = new_brush
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
@@ -108,9 +122,7 @@ def res_cust_fizzler(base_inst, res):
                 # skip the resizing since it's already correct.
                 laser_tex = laserfield_conf['texture', 'effects/laserplane']
                 nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                tex_width = srctools.conv_int(
-                    laserfield_conf['texwidth', '512'], 512
-                )
+                tex_width = laserfield_conf.int('texwidth', 512)
                 is_short = False
                 for side in new_brush.sides():
                     if side.mat.casefold() == 'effects/fizzler':
@@ -145,7 +157,7 @@ def res_cust_fizzler(base_inst, res):
                         # If we fail, just use the original textures
                         pass
 
-            widen_amount = srctools.conv_float(config['thickness', '2'], 2.0)
+            widen_amount = config.float('thickness', 2.0)
             if widen_amount != 2:
                 for brush in new_brush.solids:
                     conditions.widen_fizz_brush(
