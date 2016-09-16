@@ -194,6 +194,18 @@ def res_conveyor_belt(inst: Entity, res: Property):
             mat='tools/toolstrigger',
         ).solid)
 
+    if res.bool('NoPortalFloor'):
+        # Block portals on the floor..
+        floor_noportal = vmf.create_ent(
+            classname='func_noportal_volume',
+            origin=beam_start,
+        )
+        floor_noportal.solids.append(vmf.make_prism(
+            start_pos + Vec(-60, -60, -66).rotate(*angles),
+            end_pos + Vec(60, 60, -60).rotate(*angles),
+            mat='tools/toolsinvisible',
+        ).solid)
+
     # A brush covering under the platform.
     base_trig = vmf.make_prism(
         start_pos + Vec(-64, -64, 48).rotate(*angles),
