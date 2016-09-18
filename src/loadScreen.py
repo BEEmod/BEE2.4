@@ -153,12 +153,16 @@ class LoadScreen(Toplevel):
             self.widgets[stage].update()
 
     def set_nums(self, stage):
-        self.bar_var[stage].set(
-            1000 * self.bar_val[stage] / self.maxes[stage]
-        )
+        max_val = self.maxes[stage]
+        if max_val == 0:  # 0/0 sections are skipped automatically.
+            self.bar_var[stage].set(1000)
+        else:
+            self.bar_var[stage].set(
+                1000 * self.bar_val[stage] / max_val
+            )
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.bar_val[stage],
-            self.maxes[stage],
+            max_val,
         )
 
     def skip_stage(self, stage):
