@@ -520,19 +520,6 @@ class LoggerAdapter(logging.LoggerAdapter):
                 extra={'alias': self.alias},
             )
 
-class NewLogRecord(logging.getLogRecordFactory()):
-    """Allow passing an alias for log modules."""
-
-    def getMessage(self):
-        """We have to hook here to change the value of .module.
-
-        It's called just before the formatting call is made.
-        """
-        if self.alias is not None:
-            self.module = self.alias
-        return str(self.msg)
-logging.setLogRecordFactory(NewLogRecord)
-
 
 def init_logging(filename: str=None) -> logging.Logger:
     """Setup the logger and logging handlers.
@@ -544,6 +531,22 @@ def init_logging(filename: str=None) -> logging.Logger:
     import logging
     from logging import handlers
     import sys, io, os
+
+    class NewLogRecord(logging.getLogRecordFactory()):
+        """Allow passing an alias for log modules."""
+        # This breaks %-formatting, so only set when init_logging() is called.
+
+        alias = None
+
+        def getMessage(self):
+            """We have to hook here to change the value of .module.
+
+            It's called just before the formatting call is made.
+            """
+            if self.alias is not None:
+                self.module = self.alias
+            return str(self.msg)
+    logging.setLogRecordFactory(NewLogRecord)
 
     logger = logging.getLogger('BEE2')
     logger.setLevel(logging.DEBUG)
