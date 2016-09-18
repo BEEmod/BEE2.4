@@ -45,6 +45,7 @@ def res_cust_output_setup(res):
     return outputs, dec_con_count, conds, sign_type, sign_act, sign_deact
 
 
+
 @make_result('custOutput')
 def res_cust_output(inst, res):
     """Add an additional output to the instance with any values.
@@ -326,7 +327,8 @@ def res_change_inputs(inst: Entity, res):
         LOGGER.warning('Empty targetname for changeInputs...')
         return  # No name, it can't be triggered...
 
-    for inst in vbsp.VMF.by_class['func_instance']:
+    # ReplaceInstance might make some not instances anymore..
+    for inst in vbsp.VMF.entities:
         for out in inst.outputs[:]:  # type: VLib.Output
             if out.target.casefold() != name:
                 continue
