@@ -444,6 +444,13 @@ def save_backup():
         UI['back_details'].items
     ]
 
+    if not maps:
+        messagebox.showerror(
+            'BEE2 Backup',
+            'No maps were chosen to backup!',
+        )
+        return
+
     copy_loader.set_length('COPY', len(maps))
 
     with copy_loader:
@@ -665,6 +672,17 @@ def ui_restore_all():
         UI['back_details'].items
     ])
 
+def ui_delete_backup():
+    """Delete the selected items in the backup."""
+    BACKUPS['back'] = [
+        item.p2c
+        for item in
+        UI['back_details'].items
+        if not item.state
+    ]
+
+    refresh_back_details()
+
 
 def init():
     """Initialise all widgets in the given window."""
@@ -741,9 +759,12 @@ def init():
 
     UI['game_btn_all']['command'] = ui_backup_all
     UI['game_btn_sel']['command'] = ui_backup_sel
+    UI['game_btn_del'].state(['disabled'])
 
     UI['back_btn_all']['command'] = ui_restore_all
     UI['back_btn_sel']['command'] = ui_restore_sel
+    UI['back_btn_del']['command'] = ui_delete_backup
+
 
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
