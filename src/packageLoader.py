@@ -21,6 +21,7 @@ from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
     VMF, Entity,
+    VPK,
 )
 
 from typing import (
@@ -69,13 +70,10 @@ CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
 
-# The binary data comprising a blank VPK file.
-EMPTY_VPK = bytes([
-    52, 18, 170, 85,  # VPK identifier
-    1,  # Version 1
-    0,  # 0 bytes of directory info
-    0, 0, 1, 0, 0, 0, 0,
-])
+VPK_OVERRIDE_README = """\
+Files in this folder will be written to the VPK during every BEE2 export.
+Use to override resources as you please.
+"""
 
 # The folder we want to copy our VPKs to.
 VPK_FOLDER = {
@@ -1703,12 +1701,8 @@ class StyleVPK(PakObject, has_img=False):
     textures.
     """
     def __init__(self, vpk_id, file_count=0):
-        """Initialise a StyleVPK object.
-
-        The file_count is the number of VPK files - 0 = just pak01_dir.
-        """
+        """Initialise a StyleVPK object."""
         self.id = vpk_id
-        self.file_count = file_count
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1720,27 +1714,26 @@ class StyleVPK(PakObject, has_img=False):
         zip_file = data.zip_file  # type: ZipFile
 
         has_files = False
-        file_count = 0
+        source_folder = os.path.normpath('vpk/' + vpk_name)
 
-        for file_count, name in enumerate(cls.iter_vpk_names()):
-            src = 'vpk/' + vpk_name + name
-            dest = os.path.join(dest_folder, 'pak01' + name)
-            try:
-                src_file = zip_open_bin(zip_file, src)
-            except KeyError:
-                # This VPK filename isn't present, we've found them all..
-                break
-            else:
-                with src_file, open(dest, 'wb') as dest_file:
-                    shutil.copyfileobj(src_file, dest_file)
+        for filename in zip_names(zip_file):
+            if os.path.normpath(filename).startswith(source_folder):
+                dest_loc = os.path.join(
+                    dest_folder,
+                    os.path.relpath(filename, source_folder)
+                )
+                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
+                with zip_open_bin(zip_file, filename) as fsrc:
+                    with open(dest_loc, 'wb') as fdest:
+                        shutil.copyfileobj(fsrc, fdest)
                 has_files = True
 
         if not has_files:
             raise Exception(
-                'VPK object "{}" has no associated VPK files!'.format(data.id)
+                'VPK object "{}" has no associated files!'.format(data.id)
             )
 
-        return cls(data.id, file_count)
+        return cls(data.id)
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1777,27 +1770,33 @@ class StyleVPK(PakObject, has_img=False):
                     ),
                     sound_cache,
                 )
+        # Generate the VPK.
+        vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
+        if sel_vpk is not None:
+            src_folder = os.path.abspath(
+                os.path.join(
+                    '../vpk_cache',
+                    sel_vpk.id.casefold()
+                ))
+            vpk_file.add_folder(src_folder)
 
-        if sel_vpk is None:
-            # Write a blank VPK file.
-            with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
-                f.write(EMPTY_VPK)
-            LOGGER.info('Written empty VPK to "{}"', dest_folder)
-        else:
-            src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
-            for index, suffix in zip(
-                    range(sel_vpk.file_count),  # Limit to the number of files
-                    sel_vpk.iter_vpk_names()):
-                shutil.copy(
-                    os.path.join(src_folder, 'pak01' + suffix),
-                    os.path.join(dest_folder, 'pak01' + suffix),
-                )
-            LOGGER.info(
-                'Written {} VPK{} to "{}"',
-                sel_vpk.file_count,
-                '' if sel_vpk.file_count == 1 else 's',
-                dest_folder,
-            )
+        # Additionally, pack in game/vpk_override/ into the vpk - this allows
+        # users to easily override resources in general.
+
+        override_folder = exp_data.game.abs_path('vpk_override')
+        os.makedirs(override_folder, exist_ok=True)
+
+        # Also write a file to explain what it's for..
+        with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
+            f.write(VPK_OVERRIDE_README)
+
+        vpk_file.add_folder(override_folder)
+        del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
+
+        vpk_file.write_dirfile()
+
+        LOGGER.info('Written {} files to VPK!', len(vpk_file))
+
 
     @staticmethod
     def iter_vpk_names():
