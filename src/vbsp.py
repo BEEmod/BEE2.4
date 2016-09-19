@@ -2696,11 +2696,20 @@ def change_trig():
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_fizz'
 
-        # Apply some config options - scanline and Fast Reflections, visbility
-        trig['useScanline'] = settings["fizzler"]["scanline"]
+        # Apply some config options - scanline and Fast Reflections, visibility
         trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
         # This also controls whether fizzlers play sounds.
         trig['visible'] = get_opt('fizz_visibility')
+
+        use_scanline = settings["fizzler"]["scanline"]
+        # Scanlines always move vertically - on horizontal fizzlers they won't
+        # work.
+        if use_scanline:
+            bbox_min, bbox_max = trig.get_bbox()
+            if (bbox_max - bbox_min).z < 64:
+                # On the floor - no scanline..
+                use_scanline = False
+        trig['useScanline'] = use_scanline
 
     for trig in VMF.by_class['trigger_hurt']:
         target = trig['targetname', '']
