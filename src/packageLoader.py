@@ -417,19 +417,21 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
     """Parse through the given package to find all the components."""
     for pre in Property.find_key(pack.info, 'Prerequisites', []):
         # Special case - disable these packages when the music isn't copied.
-        if pre.value == '<TAG_MUSIC>' and not has_tag:
-            return False
-        if pre.value == '<MEL_MUSIC>' and not has_mel:
-            return False
-
-        if pre.value not in packages:
+        if pre.value == '<TAG_MUSIC>':
+            if not has_tag:
+                return 0
+        elif pre.value == '<MEL_MUSIC>':
+            if not has_mel:
+                return 0
+        elif pre.value not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
                 'ignoring package!',
                 pre=pre.value,
                 id=pack.id,
             )
-            return False
+            return 0
+
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in OBJ_TYPES:
