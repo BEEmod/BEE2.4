@@ -24,7 +24,7 @@ import packageLoader
 import utils
 import srctools
 
-from typing import List
+from typing import List, Optional
 
 LOGGER = utils.getLogger(__name__)
 
@@ -78,6 +78,7 @@ export_screen = loadScreen.LoadScreen(
     ('EXP', 'Export Configuration'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
+    ('MUS', 'Copy Music'),
     title_text='Exporting',
 )
 
@@ -90,12 +91,74 @@ EXE_SUFFIX = (
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
-MUSIC_MEL_VPK = None
-MUSIC_TAG_LOC = None
+MUSIC_MEL_VPK = None  # type: VPK
+MUSIC_TAG_LOC = None  # type: str
 
 # The folder with the file...
 MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
 MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
+
+# All the PS:Mel track names - all the resources are in the VPK,
+# this allows us to skip looking through all the other files..
+MEL_MUSIC_NAMES = """\
+sp_a1_garden.wav
+sp_a1_garden_jukebox01.wav
+sp_a1_jazz.wav
+sp_a1_jazz_enterstation.wav
+sp_a1_jazz_tramride.wav
+sp_a1_lift.wav
+sp_a1_mel_intro.wav
+sp_a1_tramride.wav
+sp_a2_dont_meet_virgil.wav
+sp_a2_firestorm_exploration.wav
+sp_a2_firestorm_explosion.wav
+sp_a2_firestorm_openvault.wav
+sp_a2_garden_destroyed_01.wav
+sp_a2_garden_destroyed_02.wav
+sp_a2_garden_destroyed_portalgun.wav
+sp_a2_garden_destroyed_vault.wav
+sp_a2_once_upon.wav
+sp_a2_past_power_01.wav
+sp_a2_past_power_02.wav
+sp_a2_underbounce.wav
+sp_a3_concepts.wav
+sp_a3_concepts_funnel.wav
+sp_a3_faith_plate.wav
+sp_a3_faith_plate_funnel.wav
+sp_a3_junkyard.wav
+sp_a3_junkyard_offices.wav
+sp_a3_paint_fling.wav
+sp_a3_paint_fling_funnel.wav
+sp_a3_transition.wav
+sp_a3_transition_funnel.wav
+sp_a4_destroyed.wav
+sp_a4_destroyed_funnel.wav
+sp_a4_factory.wav
+sp_a4_factory_radio.wav
+sp_a4_overgrown.wav
+sp_a4_overgrown_funnel.wav
+sp_a4_tb_over_goo.wav
+sp_a4_tb_over_goo_funnel.wav
+sp_a4_two_of_a_kind.wav
+sp_a4_two_of_a_kind_funnel.wav
+sp_a5_finale01_01.wav
+sp_a5_finale01_02.wav
+sp_a5_finale01_03.wav
+sp_a5_finale01_funnel.wav
+sp_a5_finale02_aegis_revealed.wav
+sp_a5_finale02_lastserver.wav
+sp_a5_finale02_room01.wav
+sp_a5_finale02_room02.wav
+sp_a5_finale02_room02_serious.wav
+sp_a5_finale02_stage_00.wav
+sp_a5_finale02_stage_01.wav
+sp_a5_finale02_stage_02.wav
+sp_a5_finale02_stage_end.wav\
+""".split()
+# Not used...
+# portal2_background01.wav
+# still_alive_gutair_cover.wav
+# want_you_gone_guitar_cover.wav
 
 
 def init_trans():
@@ -396,6 +459,7 @@ class Game:
             export_screen.set_length('RES', extract_packages.res_count)
         else:
             export_screen.skip_stage('RES')
+            export_screen.skip_stage('MUS')
 
         # The items, plus editoritems, vbsp_config and the instance list.
         export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
@@ -546,6 +610,8 @@ class Game:
             LOGGER.info('Copying Resources!')
             self.refresh_cache()
 
+            self.copy_mod_music()
+
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
         return True
@@ -622,6 +688,38 @@ class Game:
         import webbrowser
         url = 'steam://rungameid/' + str(self.steamID)
         webbrowser.open(url)
+
+    def copy_mod_music(self):
+        """Copy music files from Tag and PS:Mel."""
+        music_dest = self.abs_path('bee2/sound/music/')
+        # Obviously Tag has its music already...
+        copy_tag = (
+            self.steamID != utils.STEAM_IDS['APERTURE TAG'] and
+            MUSIC_TAG_LOC is not None
+        )
+
+        file_count = 0
+        if copy_tag:
+            file_count += len(os.listdir(MUSIC_TAG_LOC))
+        if MUSIC_MEL_VPK is not None:
+            file_count += len(MEL_MUSIC_NAMES)
+
+        export_screen.set_length('MUS', file_count)
+
+        if copy_tag:
+            os.makedirs(music_dest, exist_ok=True)
+            for filename in os.listdir(MUSIC_TAG_LOC):
+                src_loc = os.path.join(MUSIC_TAG_LOC, filename)
+                if os.path.isfile(src_loc):
+                    shutil.copy(src_loc, music_dest)
+                    export_screen.step('MUS')
+
+        if MUSIC_MEL_VPK is not None:
+            os.makedirs(music_dest, exist_ok=True)
+            for filename in MEL_MUSIC_NAMES:
+                with open(os.path.join(music_dest, filename), 'wb') as dest:
+                    dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
+                export_screen.step('MUS')
 
 
 def find_steam_info(game_dir):
