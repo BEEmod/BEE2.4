@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property
+from srctools import Property, VPK
 import backup
 import extract_packages
 import loadScreen
@@ -24,10 +24,11 @@ import packageLoader
 import utils
 import srctools
 
+from typing import List
 
 LOGGER = utils.getLogger(__name__)
 
-all_games = []
+all_games = [] # type: List[Game]
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
@@ -86,6 +87,15 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
+
+# We search for Tag and Mel's music files, and copy them to games on export.
+# That way they can use the files.
+MUSIC_MEL_VPK = None
+MUSIC_TAG_LOC = None
+
+# The folder with the file...
+MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
+MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
 
 
 def init_trans():
@@ -643,6 +653,31 @@ def find_steam_info(game_dir):
         if found_name and found_id:
             break
     return game_id, name
+
+
+def scan_music_locs():
+    """Try and determine the location of Aperture Tag and PS:Mel.
+
+    If successful we can export the music to games.
+    """
+    global MUSIC_TAG_LOC, MUSIC_MEL_VPK
+    steamapp_locs = set()
+    for gm in all_games:
+        steamapp_locs.add(os.path.normpath(gm.abs_path('../')))
+
+    for loc in steamapp_locs:
+        tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
+        mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
+        if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
+            MUSIC_TAG_LOC = tag_loc
+            LOGGER.info('Ap-Tag dir: {}', tag_loc)
+
+        if os.path.exists(mel_loc) and MUSIC_MEL_VPK is None:
+            MUSIC_MEL_VPK = VPK(mel_loc)
+            LOGGER.info('PS-Mel dir: {}', mel_loc)
+
+        if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
+            break
 
 
 def save():
