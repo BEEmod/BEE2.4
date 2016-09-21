@@ -108,6 +108,7 @@ if __name__ == '__main__':
         gameMan.set_game_by_name(
             GEN_OPTS.get_val('Last_Selected', 'Game', ''),
             )
+        gameMan.scan_music_locs()
 
         LOGGER.info('Loading Packages...')
         pack_data = packageLoader.load_packages(
