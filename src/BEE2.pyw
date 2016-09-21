@@ -121,6 +121,8 @@ if __name__ == '__main__':
                 'Debug', 'log_missing_ent_count'),
             log_incorrect_packfile=GEN_OPTS.get_bool(
                 'Debug', 'log_incorrect_packfile'),
+            has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
+            has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
         )
         UI.load_packages(pack_data)
         LOGGER.info('Done!')
