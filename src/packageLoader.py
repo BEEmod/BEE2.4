@@ -275,6 +275,8 @@ def load_packages(
         log_missing_styles=False,
         log_missing_ent_count=False,
         log_incorrect_packfile=False,
+        has_mel_music=False,
+        has_tag_music=False,
         ):
     """Scan and read in all packages in the specified directory."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
@@ -324,7 +326,7 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            img_count = parse_package(pack)
+            img_count = parse_package(pack, has_tag_music, has_mel_music)
             images += img_count
             loader.step("PAK")
 
@@ -411,17 +413,25 @@ def load_packages(
     return data
 
 
-def parse_package(pack: 'Package'):
+def parse_package(pack: 'Package', has_tag=False, has_mel=False):
     """Parse through the given package to find all the components."""
     for pre in Property.find_key(pack.info, 'Prerequisites', []):
-        if pre.value not in packages:
+        # Special case - disable these packages when the music isn't copied.
+        if pre.value == '<TAG_MUSIC>':
+            if not has_tag:
+                return 0
+        elif pre.value == '<MEL_MUSIC>':
+            if not has_mel:
+                return 0
+        elif pre.value not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
                 'ignoring package!',
                 pre=pre.value,
                 id=pack.id,
             )
-            return False
+            return 0
+
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in OBJ_TYPES:
@@ -1113,7 +1123,6 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
-                    LOGGER.info(locals())
                     with data.zip_file.open(file_loc) as f:
                         styles[style.real_name] = Property.parse(
                             f,
