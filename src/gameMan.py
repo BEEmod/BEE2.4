@@ -691,7 +691,10 @@ class Game:
 
     def copy_mod_music(self):
         """Copy music files from Tag and PS:Mel."""
-        music_dest = self.abs_path('bee2/sound/music/')
+        tag_dest = self.abs_path('bee2/sound/music/')
+        # Mel's music has similar names to P2's, so put it in a subdir
+        # to avoid confusion.
+        mel_dest = self.abs_path('bee2/sound/music/mel/')
         # Obviously Tag has its music already...
         copy_tag = (
             self.steamID != utils.STEAM_IDS['APERTURE TAG'] and
@@ -707,17 +710,17 @@ class Game:
         export_screen.set_length('MUS', file_count)
 
         if copy_tag:
-            os.makedirs(music_dest, exist_ok=True)
+            os.makedirs(tag_dest, exist_ok=True)
             for filename in os.listdir(MUSIC_TAG_LOC):
                 src_loc = os.path.join(MUSIC_TAG_LOC, filename)
                 if os.path.isfile(src_loc):
-                    shutil.copy(src_loc, music_dest)
+                    shutil.copy(src_loc, tag_dest)
                     export_screen.step('MUS')
 
         if MUSIC_MEL_VPK is not None:
-            os.makedirs(music_dest, exist_ok=True)
+            os.makedirs(mel_dest, exist_ok=True)
             for filename in MEL_MUSIC_NAMES:
-                with open(os.path.join(music_dest, filename), 'wb') as dest:
+                with open(os.path.join(mel_dest, filename), 'wb') as dest:
                     dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
                 export_screen.step('MUS')
 
