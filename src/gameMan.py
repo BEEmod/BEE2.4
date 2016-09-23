@@ -101,11 +101,8 @@ MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
 # All the PS:Mel track names - all the resources are in the VPK,
 # this allows us to skip looking through all the other files..
 MEL_MUSIC_NAMES = """\
+portal2_background01.wav
 sp_a1_garden.wav
-sp_a1_garden_jukebox01.wav
-sp_a1_jazz.wav
-sp_a1_jazz_enterstation.wav
-sp_a1_jazz_tramride.wav
 sp_a1_lift.wav
 sp_a1_mel_intro.wav
 sp_a1_tramride.wav
@@ -156,7 +153,10 @@ sp_a5_finale02_stage_02.wav
 sp_a5_finale02_stage_end.wav\
 """.split()
 # Not used...
-# portal2_background01.wav
+# sp_a1_garden_jukebox01.wav
+# sp_a1_jazz.wav
+# sp_a1_jazz_enterstation.wav
+# sp_a1_jazz_tramride.wav
 # still_alive_gutair_cover.wav
 # want_you_gone_guitar_cover.wav
 
