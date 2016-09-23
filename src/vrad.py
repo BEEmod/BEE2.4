@@ -79,6 +79,9 @@ MDL_ADDITIONAL_EXT = [
 
 # Various parts of the soundscript generated for BG music.
 
+# Things that can appear at the beginning of filenames..
+SOUND_CHARS = '*#@><^)}$!?'
+
 # The starting section defining the name and volume.
 # SNDLVL_NONE means it's infinite range.
 MUSIC_START = """\
@@ -521,7 +524,7 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
         for snd in snds:
             file.write(
                 '\t"wave" "{sndchar}{file}"\n'.format(
-                    file=snd.value,
+                    file=snd.value.lstrip(SOUND_CHARS),
                     sndchar=snd_prefix,
                 )
             )
@@ -530,7 +533,7 @@ def write_sound(file, snds: Property, pack_list, snd_prefix='*'):
     else:
         file.write(
             '"wave" "{sndchar}{file}"\n'.format(
-                file=snds.value,
+                file=snds.value.lstrip(SOUND_CHARS),
                 sndchar=snd_prefix,
             )
         )
