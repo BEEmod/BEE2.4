@@ -1001,7 +1001,7 @@ def import_template(
 
         sides = overlay['sides'].split()
         new_overlay['sides'] = ' '.join(
-            str(id_mapping[side])
+            str(id_mapping[int(side)])
             for side in sides
             if int(side) in id_mapping
         )

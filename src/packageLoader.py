@@ -2121,9 +2121,6 @@ class BrushTemplate(PakObject, has_img=False):
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the original VMF object can vanish.
 
-        # If we have overlays, we need to ensure the IDs crossover correctly
-        id_mapping = {}
-
         self.temp_world = TEMPLATE_FILE.create_ent(
             classname='bee2_template_world',
             template_id=temp_id,
@@ -2143,7 +2140,7 @@ class BrushTemplate(PakObject, has_img=False):
         # Copy world brushes
         if keep_brushes and vmf_file.brushes:
             self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
+                solid.copy(map=TEMPLATE_FILE)
                 for solid in
                 vmf_file.brushes
             ]
@@ -2152,7 +2149,7 @@ class BrushTemplate(PakObject, has_img=False):
         if keep_brushes and has_detail:
             for ent in vmf_file.by_class['func_detail']:
                 self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
+                    solid.copy(map=TEMPLATE_FILE)
                     for solid in
                     ent.solids
                 )
@@ -2176,19 +2173,12 @@ class BrushTemplate(PakObject, has_img=False):
 
         self.temp_overlays = []
 
-        # Look for overlays, and translate their IDS.
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
             )
             new_overlay['template_id'] = temp_id
             new_overlay['classname'] = 'bee2_template_overlay'
-            sides = overlay['sides'].split()
-            new_overlay['sides'] = ' '.join(
-                id_mapping[side]
-                for side in sides
-                if side in id_mapping
-            )
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
