@@ -70,6 +70,9 @@ class NAV_KEYS(Enum):
     HOME = 'Home'
     END = 'End'
 
+    # Space plays the current item.
+    PLAY_SOUND = 'space'
+
 
 class AttrTypes(Enum):
     """The type of labels used for selectoritem attributes."""
@@ -1046,10 +1049,15 @@ class selWin:
         try:
             key = NAV_KEYS(event.keysym)
         except (ValueError, AttributeError):
-            LOGGER.warning(
+            LOGGER.debug(
                 'Invalid nav-key in event: {}',
                 event.__dict__
             )
+            return
+
+        if key is NAV_KEYS.PLAY_SOUND:
+            if self.sampler is not None:
+                self.sampler.play_sample()
             return
 
         # A list of groups names, in the order that they're visible onscreen
