@@ -327,16 +327,8 @@ def set_screen_type():
 def load_screenshot(path):
     """Copy the selected image, changing format if needed."""
     img = Image.open(path)
-    resized_img = img.resize(
-        # Resize to the same propotions as the original
-        # PeTI screenshots.
-        (
-            img.width,
-            int(img.height * PETI_WIDTH / PETI_HEIGHT)
-        )
-    )
     COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
-    resized_img.save(SCREENSHOT_LOC)
+    img.save(SCREENSHOT_LOC)
     set_screenshot(img)
 
 
