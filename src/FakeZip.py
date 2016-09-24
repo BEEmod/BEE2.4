@@ -116,7 +116,12 @@ def zip_names(zip):
     if hasattr(zip, 'names'):
         return zip.names()
     else:
-        return zip.namelist()
+        def zip_filter():
+            # 'Fix' an issue where directories are also being listed...
+            for name in zip.namelist():
+                if name[-1] != '/':
+                    yield name
+        return zip_filter()
 
 
 def zip_open_bin(zip, filename):
