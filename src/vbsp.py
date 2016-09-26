@@ -18,6 +18,7 @@ from BEE2_config import ConfigFile
 import srctools.vmf as VLib
 import srctools
 import voiceLine
+import vbsp_options
 import instanceLocs
 import brushLoc
 import bottomlessPit
@@ -172,137 +173,6 @@ ANTLINES = {
     'corner': "signage/indicator_lights/indicator_lights_corner_floor",
     }
 
-DEFAULTS = {
-    "goo_mist":                 "0",  # Add info_particle_systems to goo pits
-
-    "remove_info_lighting":     "0",  # Remove the glass info_lighting ents
-    "remove_pedestal_plat":     "0",  # Remove pedestal button platforms
-    "remove_exit_signs":        "0",  # Remove the exit sign overlays
-
-    "random_blackwall_scale":   "0",  # P1 style randomly sized black walls
-
-    "rotate_edge":              "0",  # Rotate squarebeams textures 90 degrees.
-    "reset_edge_off":           "0",  # Reset the scale on
-    "edge_scale":               "0.15",  # The scale on squarebeams textures
-    "rotate_edge_special":      "0",    # Ditto for angled/flip panels
-    "reset_edge_off_special":   "",
-    "edge_scale_special":       "0.15",
-
-    # Reset offsets for all white/black brushes, so embedface has correct
-    # texture matching
-    "tile_texture_lock":        "1",
-
-    "fizz_border_vertical":     "0",  # The texture is oriented vertically
-    "fizz_border_thickness":    "8",  # The width of the overlays
-    "fizz_border_repeat":       "128",  # The width lengthways
-    "fizz_visibility":          "1",  # Make fizzlers invisible and silent.
-
-    "force_fizz_reflect":       "0",  # Force fast reflections on fizzlers
-    "force_brush_reflect":      "0",  # Force fast reflections on func_brushes
-
-    # Allow changing flip panel sounds.
-    "flip_sound_start":        "World.a3JumpIntroRotatingPanelTravel",
-    "flip_sound_stop":         "World.a3JumpIntroRotatingPanelArrive",
-
-
-    "staticPan":                "NONE",  # folder for static panels
-    # Template used for static panels set to 0 degrees
-    "static_pan_temp_flat":     "BEE2_STATIC_PAN_FLAT",
-    # Template used for angled static panels
-    "static_pan_temp_white":    "BEE2_STATIC_PAN_ANGLED",
-    "static_pan_temp_black":    "BEE2_STATIC_PAN_ANGLED",
-    # If set, replace panel func_brushes with this. Top should be set to
-    # black_wall_metal_002c
-    "dynamic_pan_temp":         "",
-    # The local name that the panel func_brush should parent to.
-    # Adding the attachment name to the parent after a comma
-    # automatically sets the attachment point for us.
-    "dynamic_pan_parent":       "model_arms,panel_attach",
-
-    "signInst":                 "NONE",  # adds this instance on all the signs.
-    "signSize":                 "32",  # Allow resizing the sign overlays
-    "signPack":                 "",  # Packlist to use when sign inst is added
-
-    "broken_antline_chance":    "0",  # The chance an antline will be 'broken'
-    # The maximum distance of a single broken section
-    "broken_antline_distance":  "3",
-    "goo_scale":                "1",  # Scale of goo material
-
-    # Add lights to disguise the bottomless pit transition
-    "pit_blend_light":          "",
-
-    # Textures used for the glass/grating clips.
-    "glass_clip":               "BEE2/glass_player_clip",
-    "grating_clip":             "BEE2/grate_player_clip",
-    # Packlists for glass and gratings
-    "glass_pack":               "PACK_PLAYER_CLIP_GLASS",
-    "grating_pack":             "PACK_PLAYER_CLIP_GRATE",
-    # Filter used on grating vphysics_clips
-    "grating_filter":           "@not_paint_bomb",
-    # A template holding a brush used to decide the
-    # rotation and scaling of glass. This overrides glass_scale
-    # and grating_scale, if set.
-    "glass_template":           "",
-    "grating_template":         "",
-
-    # The same for the goo_wall textures.
-    "goo_wall_scale_temp":      "",
-
-    "glass_scale":              "0.15",  # Scale of glass texture
-    "grating_scale":            "0.15",  # Scale of grating texture
-
-    # Add beams to the middle of large glass floors.
-    "glass_floorbeam_temp":     "",  # Two brushes for the texture scaling.
-    "glass_floorbeam_sep":      "2",  # Number of blocks between beams
-
-    "clump_wall_tex":           "0",  # Use the clumping wall algorithm
-    "clump_ceil":               "0",  # Use if for ceilings?
-    "clump_floor":              "0",  # Use it for floors?
-    "clump_size":               "4",  # The maximum length of a clump
-    "clump_width":              "2",  # The width of a clump
-    "clump_number":             "6",  # The number of clumps created
-
-    # Default to the origin of the elevator instance - that's likely to
-    # be enclosed
-    "music_location_sp":        "-2000 2000 0",
-    "music_location_coop":      "-2000 -2000 0",
-    # Instance used for pti_ents
-    "global_pti_ents":          "instances/BEE2/global_pti_ents.vmf",
-    # Default pos is next to arrival_departure_ents
-    # Note that many other ents are added at this point, since it's
-    # boxed in.
-    "global_pti_ents_loc":      "-2400 -2800 0",
-    # Location of the model changer instance if needed
-    "model_changer_loc":        "-2400 -2800 -256",
-
-    ######
-    # The following are set by the BEE2.4 app automatically:
-
-    # The file path of the BEE2 app that generated the config
-    "bee2_loc":                 "",
-    "game_id":                  "620",  # The game's steam ID
-
-    "music_id":                 "<NONE>",  # The music ID which was selected
-    "music_instance":           "",  # The instance for the chosen music
-    "music_soundscript":        "",  # The soundscript for the chosen music
-    "music_looplen":            "0",  # If set, re-trigger music after this time.
-
-    "elev_type":                "RAND",  # What type of script to use:
-    # Either "RAND", "FORCE", "NONE" or "BSOD"
-    "elev_horiz":               "",  # The horizontal elevator video to use
-    "elev_vert":                "",  # The vertical elevator video to use
-    "voice_id":                 "<NONE>",  # The voice pack which was selected
-    "voice_char":               "",  # Characters in the pack
-    "cave_port_skin":           "",  # If a Cave map, indicate which portrait to use.
-
-    "voice_studio_inst":        "",  # Instance to use for monitor backdrop.
-    "voice_studio_inter_chance": "0",  # Chance to switch to the voice character.
-    "voice_studio_cam_loc":     "0 0 0",  # Location for camera
-    "voice_studio_cam_pitch":   "0",  # Direction of the camera.
-    "voice_studio_cam_yaw":     "0",
-    "voice_studio_actor":       "",  # If set, no bullseye is output with this name..
-    }
-
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
 FIZZLER_ANGLE_FIX = {
@@ -362,15 +232,6 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 ##################
 # UTIL functions #
 ##################
-
-
-def get_opt(name) -> str:
-    return settings['options'][name.casefold()]
-
-
-def get_bool_opt(name, default=False):
-    return srctools.conv_bool(get_opt(name), default)
-
 
 def get_tex(name):
     if name in settings['textures']:
@@ -467,14 +328,8 @@ def load_settings():
         else:
             settings['textures'][key] = value
 
-    # Get main config options. All options must be in the DEFAULTS dict -
-    # if not set, they fallback to that value.
-    for option_block in conf.find_all('options'):
-        for opt in option_block:
-            settings['options'][opt.name.casefold()] = opt.value
-    for key, default in DEFAULTS.items():
-        if key.casefold() not in settings['options']:
-            settings['options'][key.casefold()] = default
+    # Load in our main configs..
+    vbsp_options.load(conf.find_all('Options'))
 
     # Load in fizzler options and textures. This works similarly to the normal
     # textures/options.
@@ -566,10 +421,10 @@ def load_settings():
 
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
-    if get_opt('BEE2_loc') != '':
+    if vbsp_options.get(str, 'BEE2_loc'):
         BEE2_config = ConfigFile(
             'config/compile.cfg',
-            root=get_opt('BEE2_loc'),
+            root=vbsp_options.get(str, 'BEE2_loc'),
         )
     else:
         BEE2_config = ConfigFile(None)
@@ -611,9 +466,9 @@ def add_fizz_borders(_):
         # No textures were defined!
         return
 
-    flip_uv = get_bool_opt('fizz_border_vertical')
-    overlay_thickness = srctools.conv_int(get_opt('fizz_border_thickness'), 8)
-    overlay_repeat = srctools.conv_int(get_opt('fizz_border_repeat'), 128)
+    flip_uv = vbsp_options.get(bool, 'fizz_border_vertical')
+    overlay_thickness = vbsp_options.get(int, 'fizz_border_thickness')
+    overlay_repeat = vbsp_options.get(int, 'fizz_border_repeat')
 
     # First, figure out the orientation of every fizzler via their model.
     fizz_directions = {}  # type: Dict[str, Tuple[Vec, Vec, Vec]]
@@ -1010,7 +865,7 @@ def set_player_model(_):
     if GAME_MODE == 'COOP':  # Not in coop..
         return
 
-    loc = Vec.from_str(get_opt('model_changer_loc'))
+    loc = vbsp_options.get(Vec, 'model_changer_loc')
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
     if chosen_model == 'peti':
@@ -1065,7 +920,7 @@ def set_player_model(_):
         delay=0.1,
     ))
 
-    if pgun_skin and get_opt('game_id') == utils.STEAM_IDS['PORTAL2']:
+    if pgun_skin and vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(VLib.Output(
@@ -1105,7 +960,7 @@ def set_player_portalgun(inst):
     """
     if GAME_MODE == 'COOP':
         return  # Don't change portalgun in Portal 2 Coop
-    if get_opt('game_id') == utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
     LOGGER.info('Setting Portalgun:')
@@ -1131,7 +986,7 @@ def set_player_portalgun(inst):
         inst = VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=get_opt('global_pti_ents_loc'),  # Reuse this location
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),  # Reuse this location
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/pgun_single.vmf',
         )
@@ -1147,7 +1002,7 @@ def set_player_portalgun(inst):
         VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=get_opt('global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
@@ -1179,7 +1034,7 @@ def add_screenshot_logic(inst):
         VMF.create_ent(
             classname='func_instance',
             file='instances/BEE2/logic/screenshot_logic.vmf',
-            origin=get_opt('global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
@@ -1188,7 +1043,7 @@ def add_screenshot_logic(inst):
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents(_):
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = Vec.from_str(get_opt('global_pti_ents_loc'))
+    pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -1345,7 +1200,7 @@ def ap_tag_modifications(_):
     * Override the transition ent instance to have the Gel Gun
     * Create subdirectories with the user's steam ID
     """
-    if get_opt('game_id') != utils.STEAM_IDS['APTAG']:
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
 
     LOGGER.info('Performing Aperture Tag modifications...')
@@ -1379,7 +1234,7 @@ def ap_tag_modifications(_):
         VMF.create_ent(
             classname='info_target',
             targetname='supress_blue_portalgun_spawn',
-            origin=get_opt('global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
             angles='0 0 0'
         )
 
@@ -1822,8 +1677,10 @@ def fixup_goo_sides():
     For pits sides use normal black walls.
     """
 
-    if get_opt('goo_wall_scale_temp'):
-        scale = conditions.get_scaling_template(get_opt('goo_wall_scale_temp'))
+    if vbsp_options.get(str, 'goo_wall_scale_temp'):
+        scale = conditions.get_scaling_template(
+            vbsp_options.get(str, 'goo_wall_scale_temp')
+        )
     else:
         scale = None
 
@@ -1934,7 +1791,10 @@ def remove_barrier_ents():
 
     They're not used since we added their contents into the map directly.
     """
-    if not get_opt('grating_clip') or not get_opt('glass_clip'):
+    if (
+        not vbsp_options.get(str, 'grating_clip') or
+        not vbsp_options.get(str, 'glass_clip')
+    ):
         return  # They're being used.
 
     barrier_file = instanceLocs.resolve('[glass_128]')
@@ -1968,28 +1828,28 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
-    glass_clip_mat = get_opt('glass_clip')
-    glass_scale = srctools.conv_float(get_opt('glass_scale'), 0.15)
-    goo_scale = srctools.conv_float(get_opt('goo_scale'), 1)
+    glass_clip_mat = vbsp_options.get(str, 'glass_clip')
+    glass_scale = vbsp_options.get(float, 'glass_scale')
+    goo_scale = vbsp_options.get(float, 'goo_scale')
 
-    glass_temp = get_opt("glass_template")
+    glass_temp = vbsp_options.get(str, "glass_template")
     if glass_temp:
         glass_temp = conditions.get_scaling_template(glass_temp)
     else:
         glass_temp = None
 
-    if get_opt('glass_floorbeam_temp'):
+    if vbsp_options.get(str, 'glass_floorbeam_temp'):
         floorbeam_locs = []
     else:
         floorbeam_locs = None
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = get_bool_opt('goo_mist') and srctools.conv_bool(
+    make_goo_mist = vbsp_options.get(bool, 'goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids = set()
 
-    if srctools.conv_bool(get_opt('remove_pedestal_plat')):
+    if vbsp_options.get(bool, 'remove_pedestal_plat'):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
             for side in ent.sides():
@@ -2041,8 +1901,8 @@ def change_brush():
             if floorbeam_locs is not None and glass_norm.z != 0:
                 floorbeam_locs.append((glass_loc, glass_norm))
 
-    if get_opt('glass_pack') and settings['has_attr']['glass']:
-        TO_PACK.add(get_opt('glass_pack').casefold())
+    if vbsp_options.get(str, 'glass_pack') and settings['has_attr']['glass']:
+        TO_PACK.add(vbsp_options.get(str, 'glass_pack').casefold())
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
@@ -2066,14 +1926,8 @@ def change_brush():
 
 
 def can_clump():
-    """Check the clump algorithm has all its arguments."""
-    if not get_bool_opt("clump_wall_tex"):
-        return False
-    if not get_opt("clump_size").isnumeric():
-        return False
-    if not get_opt("clump_width").isnumeric():
-        return False
-    return get_opt("clump_number").isnumeric()
+    """Check the clump algorithm is enabled."""
+    return vbsp_options.get(bool, "clump_wall_tex")
 
 
 def make_barrier_solid(origin, material):
@@ -2106,9 +1960,9 @@ def add_glass_floorbeams(glass_locs):
 
     The texture is assumed to match plasticwall004a's shape.
     """
-    temp_name = get_opt('glass_floorbeam_temp')
+    temp_name = vbsp_options.get(str, 'glass_floorbeam_temp')
 
-    separation = srctools.conv_int(get_opt('glass_floorbeam_sep'), 2) + 1
+    separation = vbsp_options.get(int, 'glass_floorbeam_sep') + 1
     separation *= 128
 
     # First we want to find all the groups of contiguous glass sections.
@@ -2202,10 +2056,10 @@ def face_seed(face):
 
 def random_walls():
     """The original wall style, with completely randomised walls."""
-    rotate_edge = get_bool_opt('rotate_edge')
-    texture_lock = get_bool_opt('tile_texture_lock', True)
-    edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
+    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
+    edge_off = vbsp_options.get(bool, 'reset_edge_off')
+    edge_scale = vbsp_options.get(float, 'edge_scale')
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         for face in solid:
@@ -2306,10 +2160,10 @@ def clump_walls():
     # After that, we fill in any unset textures with the white/black_gap ones.
     # This makes it look like those areas were patched up.
 
-    texture_lock = get_bool_opt('tile_texture_lock', True)
-    rotate_edge = get_bool_opt('rotate_edge')
-    edge_off = get_bool_opt('reset_edge_off', False)
-    edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
+    texture_lock = vbsp_options.get(bool, 'tile_texture_lock')
+    rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+    edge_off = vbsp_options.get(bool, 'reset_edge_off')
+    edge_scale = vbsp_options.get(float, 'edge_scale')
 
     # Possible locations for clumps - every face origin, not including
     # ignored faces or nodraw
@@ -2321,15 +2175,15 @@ def clump_walls():
         if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
     ]
 
-    clump_size = srctools.conv_int(get_opt("clump_size"), 4)
-    clump_wid = srctools.conv_int(get_opt("clump_width"), 2)
+    clump_size = vbsp_options.get(int, "clump_size")
+    clump_wid = vbsp_options.get(int, "clump_width")
 
     clump_numb = len(possible_locs) // (clump_size * clump_wid * clump_wid)
-    clump_numb *= srctools.conv_int(get_opt("clump_number"), 6)
+    clump_numb *= vbsp_options.get(int, "clump_number")
 
     # Also clump ceilings or floors?
-    clump_ceil = get_bool_opt('clump_ceil')
-    clump_floor = get_bool_opt('clump_floor')
+    clump_ceil = vbsp_options.get(bool, 'clump_ceil')
+    clump_floor = vbsp_options.get(bool, 'clump_floor')
 
     LOGGER.info(
         'Clumping: {} clumps (+ {} special)',
@@ -2596,15 +2450,13 @@ def change_overlays():
     LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
-    sign_inst = get_opt('signInst')
+    sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = srctools.conv_int(get_opt('signSize'), 32) / 2
-    if sign_inst == "NONE":
-        sign_inst = None
+    sign_size =  vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack = get_opt('signPack')
+    sign_inst_pack =  vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
@@ -2619,8 +2471,8 @@ def change_overlays():
     broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
     broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
 
-    broken_chance = srctools.conv_float(get_opt('broken_antline_chance'))
-    broken_dist = srctools.conv_float(get_opt('broken_antline_distance'))
+    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
+    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
 
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
@@ -2630,7 +2482,7 @@ def change_overlays():
 
         if (over['targetname'] == 'exitdoor_stickman' or
                 over['targetname'] == 'exitdoor_arrow'):
-            if get_bool_opt("remove_exit_signs"):
+            if vbsp_options.get(bool, "remove_exit_signs"):
                 # Some styles have instance-based ones, remove the
                 # originals if needed to ensure it looks nice.
                 VMF.remove_ent(over)
@@ -2704,10 +2556,9 @@ def change_trig():
         if target.endswith('_brush'):
             trig['targetname'] = target[:-6] + '-br_fizz'
 
-        # Apply some config options - scanline and Fast Reflections, visibility
-        trig['drawInFastReflection'] = get_opt("force_fizz_reflect")
+        trig['drawInFastReflection'] = vbsp_options.get(bool, "force_fizz_reflect")
         # This also controls whether fizzlers play sounds.
-        trig['visible'] = get_opt('fizz_visibility')
+        trig['visible'] = vbsp_options.get(bool, 'fizz_visibility')
 
         use_scanline = settings["fizzler"]["scanline"]
         # Scanlines always move vertically - on horizontal fizzlers they won't
@@ -2731,17 +2582,17 @@ def add_extra_ents(mode):
     LOGGER.info("Adding Music...")
 
     if mode == "COOP":
-        loc = get_opt('music_location_coop')
+        loc = vbsp_options.get(Vec, 'music_location_coop')
     else:
-        loc = get_opt('music_location_sp')
+        loc = vbsp_options.get(Vec, 'music_location_sp')
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    sound = get_opt('music_soundscript')
-    inst = get_opt('music_instance')
-    snd_length = srctools.conv_int(get_opt('music_looplen'))
+    sound = vbsp_options.get(str, 'music_soundscript')
+    inst = vbsp_options.get(str, 'music_instance')
+    snd_length = vbsp_options.get(int, 'music_looplen')
 
-    if sound != '':
+    if sound:
         music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
@@ -2761,7 +2612,7 @@ def add_extra_ents(mode):
             # Set to non-looping, so re-playing will restart it correctly.
             music['spawnflags'] = '49'
 
-    if inst != '':
+    if inst:
         VMF.create_ent(
             classname='func_instance',
             targetname='music',
@@ -2774,10 +2625,10 @@ def add_extra_ents(mode):
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
 
-    pti_file = get_opt("global_pti_ents")
-    pti_loc = Vec.from_str(get_opt('global_pti_ents_loc'))
+    pti_file = vbsp_options.get(str, 'global_pti_ents')
+    pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
 
-    if pti_file != '':
+    if pti_file:
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = VMF.create_ent(
             classname='func_instance',
@@ -2820,17 +2671,17 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     LOGGER.info("Editing Brush Entities...")
-    grating_clip_mat = get_opt("grating_clip")
-    grating_scale = srctools.conv_float(get_opt("grating_scale"), 0.15)
+    grating_clip_mat = vbsp_options.get(str, "grating_clip")
+    grating_scale = vbsp_options.get(float, "grating_scale")
 
-    grate_temp = get_opt("grating_template")
+    grate_temp = vbsp_options.get(str, "grating_template")
     if grate_temp:
         grate_temp = conditions.get_scaling_template(grate_temp)
     else:
         grate_temp = None
 
-    dynamic_pan_temp = get_opt("dynamic_pan_temp")
-    dynamic_pan_parent = get_opt("dynamic_pan_parent")
+    dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
+    dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
 
     # All the textures used for faith plate bullseyes
     bullseye_white = set(itertools.chain.from_iterable(
@@ -2844,14 +2695,14 @@ def change_func_brush():
 
     if get_tex('special.edge_special') == '':
         edge_tex = 'special.edge'
-        rotate_edge = get_bool_opt('rotate_edge', False)
-        edge_off = get_bool_opt('reset_edge_off')
-        edge_scale = srctools.conv_float(get_opt('edge_scale'), 0.15)
+        rotate_edge = vbsp_options.get(bool, 'rotate_edge')
+        edge_off = vbsp_options.get(bool, 'reset_edge_off')
+        edge_scale = vbsp_options.get(float, 'edge_scale')
     else:
         edge_tex = 'special.edge_special'
-        rotate_edge = get_bool_opt('rotate_edge_special', False)
-        edge_off = get_bool_opt('reset_edge_off_special')
-        edge_scale = srctools.conv_float(get_opt('edge_scale_special'), 0.15)
+        rotate_edge = vbsp_options.get(bool, 'rotate_edge_special')
+        edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
+        edge_scale = vbsp_options.get(float, 'edge_scale_special')
 
     # Clips are shared every 512 grid spaces
     grate_clips = {}
@@ -2862,7 +2713,7 @@ def change_func_brush():
         if brush in IGNORED_BRUSH_ENTS:
             continue
 
-        brush['drawInFastReflection'] = get_opt("force_brush_reflect")
+        brush['drawInFastReflection'] = vbsp_options.get(bool, "force_brush_reflect")
         parent = brush['parentname', '']
         # Used when creating static panels
         brush_type = ""
@@ -2966,7 +2817,7 @@ def change_func_brush():
                 grate_clips[brush_key] = clip_ent = VMF.create_ent(
                     classname='func_clip_vphysics',
                     origin=brush_loc.join(' '),
-                    filtername=get_opt('grating_filter')
+                    filtername=vbsp_options.get(str, 'grating_filter')
                 )
             else:
                 clip_ent = grate_clips[brush_key]
@@ -3024,21 +2875,18 @@ def change_func_brush():
                 break  # Don't run twice - there might be a second matching
                 # overlay instance!
 
-    if get_opt('grating_pack') and settings['has_attr']['grating']:
-        TO_PACK.add(get_opt('grating_pack').casefold())
+    if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
+        TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
 
 
 def alter_flip_panel():
-    flip_panel_start = get_opt('flip_sound_start')
-    flip_panel_stop = get_opt('flip_sound_stop')
-    if (
-            flip_panel_start != DEFAULTS['flip_sound_start'] or
-            flip_panel_stop != DEFAULTS['flip_sound_stop']
-            ):
+    flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
+    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
+    if flip_panel_start is not None or flip_panel_stop is not None:
         for flip_pan in VMF.by_class['func_door_rotating']:
             # Change flip panel sounds by editing the func_door_rotating
-            flip_pan['noise1'] = flip_panel_start
-            flip_pan['noise2'] = flip_panel_stop
+            flip_pan['noise1'] = flip_panel_start or ''
+            flip_pan['noise2'] = flip_panel_stop or ''
 
 
 def set_special_mat(face, side_type):
@@ -3064,7 +2912,8 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     """Convert a regular panel into a static version.
 
     This is done to save entities and improve lighting."""
-    if get_opt("staticPan") == "NONE":
+    static_pan_folder = vbsp_options.get(str, 'staticPan')
+    if not static_pan_folder:
         return False  # no conversion allowed!
 
     angle = "00"
@@ -3077,17 +2926,17 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         return False
     # Handle glass panels
     if pan_type == 'glass':
-        ent["file"] = get_opt("staticPan") + angle + '_glass.vmf'
+        ent["file"] = static_pan_folder + angle + '_glass.vmf'
         return True
 
     # Handle white/black panels:
-    ent['file'] = get_opt("staticPan") + angle + '_surf.vmf'
+    ent['file'] = static_pan_folder + angle + '_surf.vmf'
 
     # We use a template for the surface, so it can use correct textures.
     if angle == '00':
         # Special case: flat panels use different templates
         temp_data = conditions.import_template(
-            get_opt('static_pan_temp_flat'),
+            vbsp_options.get(str, 'static_pan_temp_flat'),
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
@@ -3138,7 +2987,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos.localise(temp_origin, temp_angles)
 
         temp_data = conditions.import_template(
-            get_opt('static_pan_temp_' + pan_type),
+            vbsp_options.get(str, 'static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
             force_type=conditions.TEMP_TYPES.detail,
@@ -3171,7 +3020,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
 def change_ents():
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if get_bool_opt("remove_info_lighting"):
+    if vbsp_options.get(bool, "remove_info_lighting"):
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
         for ent in VMF.by_class['info_lighting']:
@@ -3248,7 +3097,7 @@ def fix_worldspawn():
         # If the game is Aperture Tag, it's always forced on
         VMF.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
-            get_opt('game_id') == utils.STEAM_IDS['APTAG']
+            vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
     VMF.spawn['skyname'] = get_tex("special.sky")
 
@@ -3353,7 +3202,7 @@ def make_vrad_config():
     conf['is_preview'] = srctools.bool_as_int(
         IS_PREVIEW
     )
-    conf['game_id'] = get_opt('game_id')
+    conf['game_id'] = vbsp_options.get(str, 'game_id')
 
     if BEE2_config.get_bool('General', 'packfile_dump_enable'):
         conf['packfile_dump'] = BEE2_config.get_val(

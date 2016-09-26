@@ -7,6 +7,7 @@ import conditions
 import srctools
 import utils
 import vbsp
+import vbsp_options
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
@@ -158,21 +159,21 @@ def res_cust_output(inst, res):
 
 
 @make_result_setup('custAntline')
-def res_cust_antline_setup(res):
+def res_cust_antline_setup(res: Property):
     def find(cat):
         """Helper to reduce code duplication."""
         return [p.value for p in res.find_all(cat)]
 
     # Allow overriding these options. If unset use the style's value - the
     # amount of destruction will usually be the same.
-    broken_chance = srctools.conv_float(res[
+    broken_chance = res.float(
         'broken_antline_chance',
-        vbsp.get_opt('broken_antline_chance')
-    ])
-    broken_dist = srctools.conv_float(res[
+        vbsp_options.get(float, 'broken_antline_chance'),
+    )
+    broken_dist = res.int(
         'broken_antline_distance',
-        vbsp.get_opt('broken_antline_distance')
-    ])
+        vbsp_options.get(int, 'broken_antline_distance'),
+    )
 
     toggle_inst = res['instance', '']
     toggle_out = list(res.find_all('addOut'))

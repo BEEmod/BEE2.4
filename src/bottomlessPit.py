@@ -6,6 +6,8 @@ import srctools
 import utils
 import vbsp
 import brushLoc
+import vbsp_options
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -80,7 +82,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
         tele_off = Vec(0, 0, 0)
 
     # Controlled by the style, not skybox!
-    blend_light = vbsp.get_opt('pit_blend_light')
+    blend_light = vbsp_options.get(str, 'pit_blend_light')
 
     if use_skybox:
         # Add in the actual skybox edges and triggers.
@@ -373,7 +375,7 @@ def make_pit_shell(vmf: VMF):
         classname='trigger_multiple',
         spawnflags=4104,
         wait=0.1,
-        origin=vbsp.get_opt('global_pti_ents_loc'),
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -4182),
@@ -390,7 +392,7 @@ def make_pit_shell(vmf: VMF):
     # to stop players from portalling past the hurt trigger.
     diss_trig = vmf.create_ent(
         classname='func_noportal_volume',
-        origin=vbsp.get_opt('global_pti_ents_loc'),
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -64),
