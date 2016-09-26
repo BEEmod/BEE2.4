@@ -1530,12 +1530,20 @@ def get_map_info():
             )
         elif file_coop_exit == file:
             GAME_MODE = 'COOP'
+            # Elevator instances don't get named - fix that...
+            item['targetname'] = 'coop_exit'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
         elif file_sp_exit == file or file_sp_entry == file:
             GAME_MODE = 'SP'
             if elev_override:
                 item.fixup['no_player_start'] = '1'
+            # Elevator instances don't get named - fix that...
+            item['targetname'] = (
+                'elev_entry' if
+                file_sp_entry == file
+                else 'elev_exit'
+            )
         elif file in file_sp_door_frame:
             # We need to inspect origins to determine the entry door type.
             door_frames.append(item)
