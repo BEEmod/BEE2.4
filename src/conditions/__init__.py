@@ -8,7 +8,7 @@ from enum import Enum
 
 from typing import (
     Callable, Any, Iterable,
-    Dict, List, Tuple, NamedTuple,
+    Dict, List, Tuple, NamedTuple, Set,
 )
 
 import srctools
@@ -44,7 +44,7 @@ GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[Solid], Entity, List[Entity]]]
+TEMPLATES = {}  # type: Dict[str, Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
@@ -913,34 +913,71 @@ def resolve_value(inst: Entity, value: str):
         return value
 
 
+def parse_temp_name(name) -> Tuple[str, Set[str]]:
+    if ':' in name:
+        temp_name, visgroups = name.rsplit(':', 1)
+        return temp_name.casefold(), {
+            vis.strip().casefold()
+            for vis in
+            visgroups.split(',')
+        }
+    else:
+        return name.casefold(), set()
+
+
 def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
     vmf = srctools.VMF.parse(props, preserve_ids=True)
-    detail_ents = defaultdict(list)
-    world_ents = defaultdict(list)
-    overlay_ents = defaultdict(list)
+
+    def make_subdict():
+        return defaultdict(list)
+    # detail_ents[temp_id][visgroup]
+    detail_ents = defaultdict(make_subdict)
+    world_ents = defaultdict(make_subdict)
+    overlay_ents = defaultdict(make_subdict)
+
     for ent in vmf.by_class['bee2_template_world']:
-        world_ents[ent['template_id'].casefold()].extend(ent.solids)
+        world_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold(),
+        ].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[ent['template_id'].casefold()].extend(ent.solids)
+        detail_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold()
+        ].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_overlay']:
-        overlay_ents[ent['template_id'].casefold()].append(ent)
+        overlay_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold()
+        ].append(ent)
 
-    for temp_id in set(detail_ents.keys()
-            ).union(world_ents.keys(), overlay_ents.keys()):
-        TEMPLATES[temp_id] = (
-            world_ents[temp_id],
-            detail_ents[temp_id],
-            overlay_ents[temp_id]
-        )
+    for temp_id in set(detail_ents).union(world_ents, overlay_ents):
+        world = world_ents[temp_id]
+        detail = detail_ents[temp_id]
+        overlay = overlay_ents[temp_id]
+        visgroup_ids = set(world).union(detail, overlay)
+        TEMPLATES[temp_id] = {
+            visgroup: (
+                world[visgroup],
+                detail[visgroup],
+                overlay[visgroup],
+            ) for visgroup in visgroup_ids
+        }
 
 
 def get_template(temp_name):
-    """Get the data associated with a given template."""
+    """Get the data associated with a given template.
+
+    This is a dictionary mapping visgroups -> (world, detail, over) tuples.
+    """
     try:
         return TEMPLATES[temp_name.casefold()]
     except KeyError as err:
@@ -964,6 +1001,7 @@ def import_template(
         targetname='',
         force_type=TEMP_TYPES.default,
         add_to_map=True,
+        visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     ) -> Template:
     """Import the given template at a location.
 
@@ -974,28 +1012,47 @@ def import_template(
 
     If targetname is set, it will be used to localise overlay names.
     add_to_map sets whether to add the brushes and func_detail to the map.
+    visgroup_choose is a callback used to determine if visgroups should be
+    added - it's passed a list of names, and should return a list of ones to use.
     """
     import vbsp
-    orig_world, orig_detail, orig_over = get_template(temp_name)
+    temp_name, visgroup_ids = parse_temp_name(temp_name)
+    visgroups = get_template(temp_name)
+    orig_world = []  # type: List[List[Solid]]
+    orig_detail = []  # type: List[List[Solid]]
+    orig_over = []  # type: List[Entity]
 
-    new_world = []
-    new_detail = []
-    new_over = []
+    chosen_groups = visgroup_ids.union(visgroup_choose(
+        # Skip the '' visgroup in the callback.
+        filter(None, visgroups.keys()),
+    ), ('', ))  # '' = no visgroup, always used.
+
+    for group in chosen_groups:
+        world, detail, over = visgroups[group]
+        orig_world.append(world)
+        orig_detail.append(detail)
+        orig_over.extend(over)
+
+    new_world = []  # type: List[Solid]
+    new_detail = []  # type: List[Solid]
+    new_over = []  # type: List[Entity]
 
     id_mapping = {}  # A map of the original -> new face IDs.
 
-    for orig_list, new_list in [
+    for orig_lists, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
-        for old_brush in orig_list:
-            brush = old_brush.copy(map=VMF, side_mapping=id_mapping)
-            brush.localise(origin, angles)
-            new_list.append(brush)
+        for orig_list in orig_lists:
+            for old_brush in orig_list:
+                brush = old_brush.copy(map=VMF, side_mapping=id_mapping, keep_vis=False)
+                brush.localise(origin, angles)
+                new_list.append(brush)
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
             map=VMF,
+            keep_vis=False,
         )
         del new_overlay['template_id']  # Remove this, it's not part of overlays
         new_overlay['classname'] = 'info_overlay'
@@ -1058,18 +1115,21 @@ def import_template(
 
 
 def get_scaling_template(
-        temp_id,
+        temp_id: str,
     ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
     """Get the scaling data from a template.
 
     This is a dictionary mapping normals to the U,V and rotation data.
     """
-    world, detail, over = get_template(temp_id)
+    if ':' in temp_id:
+        temp_name, over_name = temp_id.split(':', 1)
+    else:
+        temp_name = temp_id
+        over_name = ''
+    world, detail, over = get_template(temp_name)[over_name]
 
     if detail:
-        world = world + detail.solids # Don't mutate the lists
-    else:
-        world = list(world)
+        world = world + detail  # Don't mutate the lists
 
     uvs = {}
 
@@ -1892,6 +1952,7 @@ def res_make_tag_fizzler(inst, res):
     These fizzlers are created via signs, and work very specially.
     MUST be priority -100 so it runs before fizzlers!
     """
+    import vbsp
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         inst.remove()

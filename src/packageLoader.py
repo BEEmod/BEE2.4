@@ -20,12 +20,13 @@ from selectorWin import SelitemData
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
-    VMF, Entity,
+    VMF, Entity, Solid,
     VPK,
 )
 
 from typing import (
-    Dict, List
+    Dict, List, Tuple,
+    Iterator
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -2121,63 +2122,80 @@ class BrushTemplate(PakObject, has_img=False):
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the original VMF object can vanish.
 
-        self.temp_world = TEMPLATE_FILE.create_ent(
-            classname='bee2_template_world',
-            template_id=temp_id,
-        )
-        self.temp_detail = TEMPLATE_FILE.create_ent(
-            classname='bee2_template_detail',
-            template_id=temp_id,
-        )
+        self.temp_world = {}
+        self.temp_detail = {}
 
-        # Check to see if any func_details have associated solids..
-        has_detail = any(
-            e.is_brush()
-            for e in
-            vmf_file.by_class['func_detail']
-        )
+        visgroup_names = {
+            vis.id: vis.name
+            for vis in
+            vmf_file.vis_tree
+        }
 
-        # Copy world brushes
-        if keep_brushes and vmf_file.brushes:
-            self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE)
-                for solid in
-                vmf_file.brushes
-            ]
+        # For each template, give them a visgroup to match - that
+        # makes it easier to swap between them.
+        temp_visgroup_id = TEMPLATE_FILE.create_visgroup(temp_id).id
 
-        # Copy detail brushes
-        if keep_brushes and has_detail:
-            for ent in vmf_file.by_class['func_detail']:
-                self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE)
-                    for solid in
-                    ent.solids
+        if force.casefold() == 'detail':
+            force_is_detail = True
+        elif force.casefold() == 'world':
+            force_is_detail = False
+        else:
+            force_is_detail = None
+
+        if keep_brushes:
+            for brush, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+                if force_is_detail is not None:
+                    is_detail = force_is_detail
+                if len(vis_ids) > 1:
+                    raise ValueError('Template "{}" has brush with two'
+                                     ' visgroups!'.format(
+                        temp_id
+                    ))
+                visgroups = [
+                    visgroup_names[id]
+                    for id in
+                    vis_ids
+                ]
+                # No visgroup = ''
+                visgroup = visgroups[0] if visgroups else ''
+                targ_dict = self.temp_detail if is_detail else self.temp_world
+                try:
+                    ent = targ_dict[temp_id, visgroup]
+                except KeyError:
+                    ent = targ_dict[temp_id, visgroup] = TEMPLATE_FILE.create_ent(
+                        classname=(
+                            'bee2_template_detail' if
+                            is_detail
+                            else 'bee2_template_world'
+                        ),
+                        template_id=temp_id,
+                        visgroup=visgroup,
+                    )
+                ent.visgroup_ids.add(temp_visgroup_id)
+                ent.solids.append(
+                    brush.copy(map=TEMPLATE_FILE, keep_vis=False)
                 )
-
-        # Allow switching world brushes to detail or vice-versa.
-        if force.casefold == 'world':
-            self.temp_world.solids.extend(self.temp_detail.solids)
-            del self.temp_detail.solids[:]
-
-        if force.casefold == 'detail':
-            self.temp_detail.solids.extend(self.temp_world.solids)
-            del self.temp_world.solids[:]
-
-        # Destroy the entity object if it's unused.
-        if not self.temp_detail.solids:
-            self.temp_detail.remove()
-            self.temp_detail = None
-        if not self.temp_world.solids:
-            self.temp_world.remove()
-            self.temp_world = None
 
         self.temp_overlays = []
 
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
+            visgroups = [
+                visgroup_names[id]
+                for id in
+                overlay.visgroup_ids
+                ]
+            if len(visgroups) > 1:
+                raise ValueError('Template "{}" has overlay with two'
+                                 ' visgroups!'.format(
+                    self.id,
+                ))
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
+                keep_vis=False
             )
-            new_overlay['template_id'] = temp_id
+            new_overlay.visgroup_ids.add(temp_visgroup_id)
+            new_overlay['template_id'] = self.id
+            new_overlay['visgroup_id'] = visgroups[0] if visgroups else ''
             new_overlay['classname'] = 'bee2_template_overlay'
             TEMPLATE_FILE.add_ent(new_overlay)
 
@@ -2208,9 +2226,25 @@ class BrushTemplate(PakObject, has_img=False):
     @staticmethod
     def export(exp_data: ExportData):
         """Write the template VMF file."""
+        # Sort the visgroup list by name, to make it easier to search through.
+        TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
+
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:
             TEMPLATE_FILE.export(temp_file)
+
+    @staticmethod
+    def yield_world_detail(map: VMF) -> Iterator[Tuple[Solid, bool, set]]:
+        """Yield all world/detail solids in the map.
+
+        This also indicates if it's a func_detail, and the visgroup IDs.
+        (Those are stored in the ent for detail, and the solid for world.)
+        """
+        for brush in map.brushes:
+            yield brush, False, brush.visgroup_ids
+        for ent in map.by_class['func_detail']:
+            for brush in ent.solids:
+                yield brush, True, ent.visgroup_ids
 
 
 def desc_parse(info, id=''):

@@ -429,6 +429,30 @@ def res_import_template_setup(res: Property):
         force_type = TEMP_TYPES.detail
     else:
         keys = None
+    visgroup_mode = res['visgroup', 'none'].casefold()
+    if visgroup_mode not in ('none', 'choose'):
+        visgroup_mode = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
+        if visgroup_mode == 0:
+            visgroup_mode = 'none'
+
+    # Generate the function which picks which visgroups to add to the map.
+    LOGGER.info('{} -> {}', temp_id, visgroup_mode)
+    if visgroup_mode == 'none':
+        def visgroup_func(_):
+            """none = don't add any visgroups."""
+            return ()
+    elif visgroup_mode == 'choose':
+        def visgroup_func(groups):
+            """choose = add one random group."""
+            return [random.choice(groups)]
+    else:
+        def visgroup_func(groups):
+            """Number = percent chance for each to be added"""
+            for group in groups:
+                val = random.uniform(0, 100)
+                LOGGER.info('RAND: {}', locals())
+                if val <= visgroup_mode:
+                    yield group
 
     return (
         temp_id,
@@ -440,6 +464,7 @@ def res_import_template_setup(res: Property):
         rem_replace_brush,
         additional_ids,
         invert_var,
+        visgroup_func,
         keys,
     )
 
@@ -477,6 +502,9 @@ def res_import_template(inst: Entity, res):
     - invertVar: If this fixup value is true, tile colour will be swapped to
             the opposite of the current force option. If it is set to
             'white' or 'black', that colour will be forced instead.
+    - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
+            they are ignored. If 'choose', one is chosen. If a number, that
+            is the percentage chance for each visgroup to be added.
     """
     (
         temp_id,
@@ -488,6 +516,7 @@ def res_import_template(inst: Entity, res):
         rem_replace_brush,
         additional_replace_ids,
         invert_var,
+        visgroup_func,
         key_block,
     ) = res.value
 
@@ -516,6 +545,7 @@ def res_import_template(inst: Entity, res):
         angles,
         targetname=inst['targetname', ''],
         force_type=force_type,
+        visgroup_choose=visgroup_func,
     )
 
     if key_block is not None:
