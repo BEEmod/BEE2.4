@@ -444,4 +444,25 @@ DEFAULTS = [
         * 2: 70's Cave 
         * 3: 70's Cave with Caroline
         """),
+
+    Opt('voice_studio_inst', TYPE.STR,
+        """Instance to use for monitor backdrop.
+        """),
+    Opt('voice_studio_inter_chance', 0.0,
+        """Chance to switch to the voice character.
+        """),
+    Opt('voice_studio_cam_loc', Vec(0, 0, 0),
+        """Offset for the camera in the studio.
+        """),
+    Opt('voice_studio_cam_pitch', 0.0,
+        """Pitch direction of the camera.
+        """),
+    Opt('voice_studio_cam_yaw', 0.0,
+        """Yaw direction of the camera.
+        """),
+    Opt('voice_studio_actor', TYPE.STR,
+        """Indicates that an actor is in the instance.
+
+        If set, no bullseye is output with this name in voicelines.
+        """),
 ]
