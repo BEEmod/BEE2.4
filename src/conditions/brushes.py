@@ -436,7 +436,6 @@ def res_import_template_setup(res: Property):
             visgroup_mode = 'none'
 
     # Generate the function which picks which visgroups to add to the map.
-    LOGGER.info('{} -> {}', temp_id, visgroup_mode)
     if visgroup_mode == 'none':
         def visgroup_func(_):
             """none = don't add any visgroups."""
