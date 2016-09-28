@@ -8,6 +8,7 @@ from conditions import (
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, VMF
 import srctools
+import vbsp_options
 import utils
 
 LOGGER = utils.getLogger(__name__, 'cond.monitor')
@@ -189,12 +190,12 @@ def mon_camera_link(_):
             start_angles = cam.cam_angles
             break
     else:
-        if vbsp.get_opt('voice_studio_inst'):
+        if vbsp_options.get(str, 'voice_studio_inst'):
             # Start at the studio, if it exists.
             start_pos = VOICELINE_LOC
             start_angles = '{:g} {:g} 0'.format(
-                srctools.conv_float(vbsp.get_opt('voice_studio_cam_pitch')),
-                srctools.conv_float(vbsp.get_opt('voice_studio_cam_yaw')),
+                vbsp_options.get(float, 'voice_studio_cam_pitch'),
+                vbsp_options.get(float, 'voice_studio_cam_yaw'),
             )
         else:
             # Start in arrival_departure_transition_ents...
@@ -239,7 +240,7 @@ def mon_camera_link(_):
         ]))
         scr.write('\n];\n')
 
-        if vbsp.get_opt('voice_studio_inst'):
+        if vbsp_options.get(str, 'voice_studio_inst'):
             # We have a voice studio, send values to the script.
             scr.write(
                 'CAM_STUDIO_LOC <- Vector({0.x:.3f}, '
@@ -249,9 +250,9 @@ def mon_camera_link(_):
                 'CAM_STUDIO_CHANCE <- {chance};\n'
                 'CAM_STUDIO_PITCH <- {pitch};\n'
                 'CAM_STUDIO_YAW <- {yaw};\n'.format(
-                    chance=srctools.conv_float(vbsp.get_opt('voice_studio_inter_chance')),
-                    pitch=srctools.conv_float(vbsp.get_opt('voice_studio_cam_pitch')),
-                    yaw=srctools.conv_float(vbsp.get_opt('voice_studio_cam_yaw')),
+                    chance=vbsp_options.get(float, 'voice_studio_inter_chance'),
+                    pitch=vbsp_options.get(float, 'voice_studio_cam_pitch'),
+                    yaw=vbsp_options.get(float, 'voice_studio_cam_yaw'),
                 )
             )
         else:
@@ -264,10 +265,8 @@ def make_voice_studio(vmf: VMF, loc: Vec):
     This is either an instance (if monitors are present), or a nodraw room.
     """
     global VOICELINE_LOC
-    import vbsp
 
-    # Blank = don't use.
-    studio_file = vbsp.get_opt('voice_studio_inst')
+    studio_file = vbsp_options.get(str, 'voice_studio_inst')
 
     if ALL_MONITORS and studio_file:
         vmf.create_ent(
@@ -276,7 +275,7 @@ def make_voice_studio(vmf: VMF, loc: Vec):
             origin=loc,
             angles='0 0 0',
         )
-        VOICELINE_LOC = loc + Vec.from_str(vbsp.get_opt('voice_studio_cam_loc'))
+        VOICELINE_LOC = loc + vbsp_options.get(Vec, 'voice_studio_cam_loc')
         return True
     else:
         # If there aren't monitors, the studio instance isn't used.
