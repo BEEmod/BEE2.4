@@ -942,7 +942,7 @@ def load_templates():
         world_ents[
             ent['template_id'].casefold()
         ][
-            ent['visgroup'].casefold(),
+            ent['visgroup'].casefold()
         ].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
