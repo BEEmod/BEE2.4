@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Tuple, Dict, List
 
 from srctools import Vec
-from srctools import Entity, Side, Solid
+from srctools import VMF, Entity, Side, Solid
 
 
 TILE_TEMP = {}  # Face surfaces used to generate tiles.
@@ -25,6 +25,10 @@ PRISM_NORMALS = {
     (-1,  0,  0): 6,  # West
 }
 
+# All the tiledefs in the map.
+# Maps a point -> tiledef, where the points are block origin + 63*normal
+TILES = {}
+
 
 class TileType(Enum):
     """Physical types of geometry for each 1/4 tile."""
@@ -35,7 +39,7 @@ class TileType(Enum):
     
     # Below ignore the associated TILE_STYLE.
      
-    NODRAW = 10 # Covered, so it should be set to nodraw
+    NODRAW = 10  # Covered, so it should be set to nodraw
     
     # Clean light strips which have a 3-unit recess with nodraw.
     LIGHT_STRIP_CLEAN = 11
@@ -150,7 +154,8 @@ PATTERNS = {
         ),
     ],
 }
-    
+
+
 class TileDef:
     """Represents one 128 block side.
     
@@ -232,3 +237,21 @@ def make_tile(
         * bevel_min/max u/v: If that side should be 45° angled.      
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
+
+
+def gen_tile_temp():
+    """Generate the sides used to create tiles.
+
+    This populates TILE_TEMP.
+    """
+
+def on_16_grid(face: Side):
+    """Check if this side is on the 16-unit grid.
+
+    This assumes face vertices = corners, which is usually true.
+    """
+
+def analyse_map(vmf_file: VMF):
+    """Create TileDefs from all the brush sides."""
+    for brush in vmf_file.brushes[:]:
+        pass
