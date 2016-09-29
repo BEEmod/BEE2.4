@@ -1,5 +1,4 @@
 """Manages reading general options from vbsp_config."""
-from collections import namedtuple
 from enum import Enum
 
 import inspect
@@ -32,7 +31,7 @@ TYPE_NAMES = {
 }
 
 class Opt:
-    def __init__(self, id, default, doc):
+    def __init__(self, id, default, doc, fallback=None):
         if isinstance(default, TYPE):
             self.type = default
             self.default = None
@@ -41,8 +40,11 @@ class Opt:
             self.default = default
         self.id = id.casefold()
         self.name = id
+        self.fallback = fallback
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
+        if fallback is not None:
+            self.doc += 'If unset, the default is read from `{}`.'.format(default)
 
 
 def load(opt_blocks: Iterator[Property]):
@@ -52,11 +54,28 @@ def load(opt_blocks: Iterator[Property]):
     for opt_block in opt_blocks:
         for prop in opt_block:
             set_vals[prop.name] = prop.value
+
+    options = {opt.id: opt for opt in DEFAULTS}
+    if len(options) != len(DEFAULTS):
+        from collections import Counter
+        # Find ids used more than once..
+        raise Exception('Duplicate option(s)! ({})'.format(', '.join(
+            k for k, v in
+            Counter(opt.id for opt in DEFAULTS).items()
+            if v > 1
+        )))
+
+    fallback_opts = []
+
     for opt in DEFAULTS:
         try:
             val = set_vals.pop(opt.id)
         except KeyError:
-            SETTINGS[opt.id] = opt.default
+            if opt.fallback is not None:
+                fallback_opts.append(opt)
+                assert opt.fallback in options, 'Invalid fallback in ' + opt.id
+            else:
+                SETTINGS[opt.id] = opt.default
             continue
         if opt.type is TYPE.VEC:
             # Pass nones so we can check if it failed.. 
@@ -72,6 +91,16 @@ def load(opt_blocks: Iterator[Property]):
                 SETTINGS[opt.id] = opt.type.value(val)
             except (ValueError, TypeError):
                 SETTINGS[opt.id] = opt.default
+
+    for opt in fallback_opts:
+        try:
+            SETTINGS[opt.id] = SETTINGS[opt.fallback]
+        except KeyError:
+            raise Exception('Bad fallback for "{}"!'.format(opt.id))
+        # Check they have the same type.
+        assert opt.type is options[opt.fallback].type
+
+
     if set_vals:
         LOGGER.warning('Extra config options: {}', set_vals)
  
@@ -162,19 +191,13 @@ DEFAULTS = [
        """),
     Opt('rotate_edge_special', TYPE.BOOL,
         """Rotate squarebeams textures on angled/flip panels 90 degrees.
-
-        If unset, the default is read from `rotate_edge`.
-        """),
+        """, fallback='rotate_edge'),
     Opt('reset_edge_off_special', TYPE.BOOL,
         """Set the offset of squarebeams on angled/flip panels to 0.
-
-        If unset, the default is read from `reset_edge_off`.
-        """),
+        """, fallback='reset_edge_off'),
     Opt('edge_scale_special', TYPE.FLOAT,
         """The scale on angled/flip panel squarebeams textures.
-
-        If unset, the default is read from `reset_edge_scale_special`.
-        """),
+        """, fallback='edge_scale'),
 
     Opt('tile_texture_lock', True,
         """If disabled, reset offsets for all white/black brushes.
@@ -374,7 +397,7 @@ DEFAULTS = [
 
         The default is the location of the entry elevator instance.
         """),
-    Opt('music_location_sp', Vec(-2000, -2000, 0),
+    Opt('music_location_coop', Vec(-2000, -2000, 0),
         """The location of music entities in Coop.
 
         The default is the location of the disassembly room instance.
