@@ -6,6 +6,7 @@ import conditions
 import srctools
 import utils
 import vbsp
+import comp_consts as consts
 from instanceLocs import resolve as resolve_inst
 from perlin import SimplexNoise
 from srctools import Vec_tuple, Vec, Side, UVAxis
@@ -13,11 +14,11 @@ from srctools import Vec_tuple, Vec, Side, UVAxis
 LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
 TEX_DEFAULT = [
-    ('squarebeams', 'anim_wp/framework/squarebeams'),
-    ('ceilingwalls', 'anim_wp/framework/backpanels_cheap'),
-    ('floorbase', 'anim_wp/framework/backpanels'),
+    ('squarebeams', consts.Special.SQUAREBEAMS),
+    ('ceilingwalls', consts.Special.BACKPANELS_CHEAP),
+    ('floorbase', consts.Special.BACKPANELS),
     ('tile_glue', 'concrete/concrete_modular_floor001e'),
-    ('clip', 'tools/toolsplayerclip'),
+    ('clip', consts.Tools.PLAYER_CLIP),
 ]
 
 # Materials set for the cutout tile
@@ -409,7 +410,7 @@ def convert_floor(
             loc,
             # Switch to use the configured squarebeams texture
             replace_tex={
-                'anim_wp/framework/squarebeams': random.choice(
+                consts.Special.SQUAREBEAMS: random.choice(
                     MATS['squarebeams']
                 ),
             }
@@ -808,7 +809,7 @@ def add_floor_sides(locs):
             wall_loc,
             # Switch to use the configured squarebeams texture
             replace_tex={
-                'anim_wp/framework/squarebeams': random.choice(
+                consts.Special.SQUAREBEAMS: random.choice(
                     MATS['squarebeams']
                 ),
             }

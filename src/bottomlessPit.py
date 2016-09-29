@@ -351,7 +351,7 @@ def make_pit_shell(vmf: VMF):
                     real_pos + (-64, -64, BOTTOMLESS_PIT_MIN),
                     mat='tools/toolsnodraw',
                 )
-                prism.bottom.mat = 'anim_wp/framework/backpanels_cheap'
+                prism.bottom.mat = consts.Special.BACKPANELS_CHEAP
 
                 vmf.add_brush(prism.solid)
                 continue

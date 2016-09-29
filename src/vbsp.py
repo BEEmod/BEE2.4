@@ -23,6 +23,7 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import comp_consts as consts
 
 from typing import (
     Dict, Tuple,
@@ -47,26 +48,26 @@ settings = {
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
     # replacement keys:
-    'signage/signage_exit': "overlay.exit",
-    "signage/signage_overlay_arrow": "overlay.arrow",
-    "signage/shape01": "overlay.dot",
-    "signage/shape02": "overlay.moon",
-    "signage/shape03": "overlay.triangle",
-    "signage/shape04": "overlay.cross",
-    "signage/shape05": "overlay.square",
-    "signage/signage_shape_circle": "overlay.circle",
-    "signage/signage_shape_sine": "overlay.sine",
-    "signage/signage_shape_slash": "overlay.slash",
-    "signage/signage_shape_star": "overlay.star",
-    "signage/signage_shape_wavy": "overlay.wavy",
-    "anim_wp/framework/backpanels_cheap": "special.behind",
-    "plastic/plasticwall004a": "special.pedestalside",
-    "anim_wp/framework/squarebeams": "special.edge",
-    "nature/toxicslime_a2_bridge_intro": "special.goo",
-    "nature/toxicslime_puzzlemaker_cheap": "special.goo_cheap",
-    "glass/glasswindow007a_less_shiny": "special.glass",
-    "metal/metalgrate018": "special.grating",
-    "effects/laserplane": "special.laserfield",
+    consts.Signage.EXIT: "overlay.exit",
+    consts.Signage.ARROW: "overlay.arrow",
+    consts.Signage.SHAPE_DOT: "overlay.dot",
+    consts.Signage.SHAPE_MOON: "overlay.moon",
+    consts.Signage.SHAPE_TRIANGLE: "overlay.triangle",
+    consts.Signage.SHAPE_CROSS: "overlay.cross",
+    consts.Signage.SHAPE_SQUARE: "overlay.square",
+    consts.Signage.SHAPE_CIRCLE: "overlay.circle",
+    consts.Signage.SHAPE_SINE: "overlay.sine",
+    consts.Signage.SHAPE_SLASH: "overlay.slash",
+    consts.Signage.SHAPE_STAR: "overlay.star",
+    consts.Signage.SHAPE_WAVY: "overlay.wavy",
+    consts.Special.BACKPANELS_CHEAP: "special.behind",
+    consts.Special.PED_SIDE: "special.pedestalside",
+    consts.Special.SQUAREBEAMS: "special.edge",
+    consts.Goo.REFLECTIVE: "special.goo",
+    consts.Goo.CHEAP: "special.goo_cheap",
+    consts.Special.GLASS: "special.glass",
+    consts.Special.GRATING: "special.grating",
+    consts.Special.LASERFIELD: "special.laserfield",
     "sky_black": "special.sky",
 }
 
@@ -76,18 +77,18 @@ TEX_DEFAULTS = [
 
     # These have the same item so we can't store this in the regular
     # dictionary.
-    ('metal/black_floor_metal_001c', 'black.floor'),
-    ('tile/white_floor_tile002a',    'white.floor'),
-    ('metal/black_floor_metal_001c', 'black.ceiling'),
-    ('tile/white_floor_tile002a',    'white.ceiling'),
-    ('tile/white_wall_tile003a',     'white.wall'),
-    ('tile/white_wall_tile003h',     'white.wall'),
-    ('tile/white_wall_tile003c',     'white.2x2'),
-    ('tile/white_wall_tile003f',     'white.4x4'),
-    ('metal/black_wall_metal_002c',  'black.wall'),
-    ('metal/black_wall_metal_002e',  'black.wall'),
-    ('metal/black_wall_metal_002a',  'black.2x2'),
-    ('metal/black_wall_metal_002b',  'black.4x4'),
+    (consts.BlackPan.BLACK_FLOOR,    'black.floor'),
+    (consts.WhitePan.WHITE_FLOOR,    'white.floor'),
+    (consts.BlackPan.BLACK_FLOOR,    'black.ceiling'),
+    (consts.WhitePan.WHITE_FLOOR,    'white.ceiling'),
+    (consts.WhitePan.WHITE_1x1,     'white.wall'),
+    (consts.WhitePan.WHITE_2x1,     'white.wall'),
+    (consts.WhitePan.WHITE_2x2,     'white.2x2'),
+    (consts.WhitePan.WHITE_4x4,     'white.4x4'),
+    (consts.BlackPan.BLACK_1,  'black.wall'),
+    (consts.BlackPan.BLACK_2,  'black.wall'),
+    (consts.BlackPan.BLACK_2x2,  'black.2x2'),
+    (consts.BlackPan.BLACK_4x4,  'black.4x4'),
 
     # These replacements are deactivated when unset
     ('', 'special.white'),
@@ -103,10 +104,8 @@ TEX_DEFAULTS = [
 
     # And these defaults have the extra scale information, which isn't
     # in the maps.
-    ('0.25|signage/indicator_lights/indicator_lights_floor',
-        'overlay.antline'),
-    ('1|signage/indicator_lights/indicator_lights_corner_floor',
-        'overlay.antlinecorner'),
+    ('0.25|' + consts.Antlines.STRAIGHT, 'overlay.antline'),
+    ('1|' + consts.Antlines.CORNER, 'overlay.antlinecorner'),
 
     # This is for the P1 style, where antlines use different textures
     # on the floor and wall.
@@ -163,15 +162,6 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-GOO_TEX = [
-    "nature/toxicslime_a2_bridge_intro",
-    "nature/toxicslime_puzzlemaker_cheap",
-    ]
-
-ANTLINES = {
-    'straight': "signage/indicator_lights/indicator_lights_floor",
-    'corner': "signage/indicator_lights/indicator_lights_corner_floor",
-    }
 
 # angles needed to ensure fizzlers are not upside-down
 # (key=original, val=fixed)
@@ -188,12 +178,13 @@ FIZZLER_ANGLE_FIX = {
     "-90 -90 0":  "90 90 0",
     }
 
+# Texture -> fizzler.x
 TEX_FIZZLER = {
-    "effects/fizzler_center": "center",
-    "effects/fizzler_l": "left",
-    "effects/fizzler_r": "right",
-    "effects/fizzler": "short",
-    "tools/toolsnodraw": "nodraw",
+    consts.Fizzler.CENTER: "center",
+    consts.Fizzler.LEFT: "left",
+    consts.Fizzler.RIGHT: "right",
+    consts.Fizzler.SHORT: "short",
+    consts.Tools.NODRAW: "nodraw",
     }
 
 FIZZ_OPTIONS = [
@@ -257,7 +248,7 @@ def alter_mat(face, seed=None, texture_lock=True):
     if mat in TEX_VALVE:  # should we convert it?
         face.mat = get_tex(TEX_VALVE[mat])
         return True
-    elif mat in BLACK_PAN or mat in WHITE_PAN:
+    elif mat in consts.BlackPan or mat in consts.WhitePan:
         orient = get_face_orient(face)
         face.mat = get_tex(get_tile_type(mat, orient))
 
@@ -273,18 +264,16 @@ def alter_mat(face, seed=None, texture_lock=True):
 
 def get_tile_type(mat, orient):
     """Get the texture command for a texture."""
-    surf_type = 'white' if mat in WHITE_PAN else 'black'
+    surf_type = 'white' if mat in consts.WhitePan else 'black'
     # We need to handle specially the 4x4 and 2x4 variants.
     # These are used in the embedface brushes, so they should
     # remain having small tile size. Wall textures have 4x4 and 2x2,
     # but floor/ceilings only have 4x4 sizes (since they usually
     # just stay the same).
     if orient == ORIENT.wall:
-        if (mat == 'metal/black_wall_metal_002b' or
-                mat == 'tile/white_wall_tile003f'):
+        if mat == consts.BlackPan.BLACK_4x4 or mat == consts.WhitePan.WHITE_4x4:
             orient = '4x4'
-        elif (mat == 'metal/black_wall_metal_002a' or
-                mat == 'tile/white_wall_tile003c'):
+        elif mat == consts.BlackPan.BLACK_2x2 or mat == consts.WhitePan.WHITE_2x2:
             orient = '2x2'
         else:
             orient = 'wall'
@@ -324,7 +313,7 @@ def load_settings():
         ]
         if len(value) == 0:
             # If there are no values, just use the original value
-            settings['textures'][key] = [item]
+            settings['textures'][key] = [str(item)]
         else:
             settings['textures'][key] = value
 
@@ -617,15 +606,20 @@ PANEL_FAITH_TARGETS = defaultdict(list)
 @conditions.meta_cond(-1000)
 def find_panel_locs(_):
     """Find the locations of panels, used for FaithBullseye."""
+
+    non_panel_mats = {
+        consts.Special.SQUAREBEAMS,
+        consts.Special.BACKPANELS,
+        consts.Special.BACKPANELS_CHEAP
+    }
+
     # Angled Panels
     for brush in VMF.by_class['func_brush']:
         if "-model_arms" not in brush['parentname', '']:
             continue
         for face in brush.sides():
             # Find the face which isn't backpanel/squarebeams
-            if face.mat.casefold() not in (
-                    'anim_wp/framework/squarebeams',
-                    'anim_wp/framework/backpanels_cheap'):
+            if face.mat.casefold() not in non_panel_mats:
                 ANGLED_PAN_BRUSH[face.get_origin().as_tuple()] = (
                     face,
                     # Repeat the change done later in change_func_brush()
@@ -641,9 +635,9 @@ def find_panel_locs(_):
         white_face = None
         black_face = None
         for face in brush.sides():
-            if face.mat.casefold() in WHITE_PAN:
+            if face.mat in consts.WhitePan:
                 white_face = face
-            if face.mat.casefold() in BLACK_PAN:
+            if face.mat in consts.BlackPan:
                 black_face = face
         if white_face and black_face:
             # The white face is positioned facing outward, so its origin is
@@ -691,9 +685,9 @@ def res_faith_bullseye(inst, res):
     # Look for angled panels
     if face is None and pos in ANGLED_PAN_BRUSH:
         face, br_name = ANGLED_PAN_BRUSH[pos]
-        if face.mat.casefold() in WHITE_PAN:
+        if face.mat in consts.WhitePan:
             color = 'white'
-        elif face.mat.casefold() in BLACK_PAN:
+        elif face.mat in consts.BlackPan:
             color = 'black'
         else:
             # Should never happen - no angled panel should be textured
@@ -1871,14 +1865,14 @@ def change_brush():
                 face.planes[1].z,
                 face.planes[2].z,
             )
-            if face.mat.casefold() in GOO_TEX:
+            if face.mat in consts.Goo:
                 if make_goo_mist:
                     mist_solids.add(
                         solid.get_origin().as_tuple()
                     )
                 # Apply goo scaling
                 face.scale = goo_scale
-            if face.mat.casefold() == "glass/glasswindow007a_less_shiny":
+            if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
                     try:
                         u, v, face.ham_rot = glass_temp[face.normal().as_tuple()]
@@ -2066,7 +2060,7 @@ def random_walls():
             if face in IGNORED_FACES:
                 continue
 
-            if face.mat.casefold() == 'anim_wp/framework/squarebeams':
+            if face.mat == consts.Special.SQUAREBEAMS:
                 fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
 
             # Conditions can define special clumps for items, we want to
@@ -2167,12 +2161,13 @@ def clump_walls():
 
     # Possible locations for clumps - every face origin, not including
     # ignored faces or nodraw
+    panel_mats = set(consts.WhitePan).union(consts.BlackPan)
     possible_locs = [
         face.get_origin()
         for face in
         VMF.iter_wfaces(world=True, detail=True)
         if face not in IGNORED_FACES
-        if face.mat.casefold() in WHITE_PAN or face.mat.casefold() in BLACK_PAN
+        if face.mat.casefold() in panel_mats
     ]
 
     clump_size = vbsp_options.get(int, "clump_size")
@@ -2233,13 +2228,13 @@ def clump_walls():
 
         mat = face.mat.casefold()
 
-        if mat == 'anim_wp/framework/squarebeams':
+        if mat == consts.Special.SQUAREBEAMS:
             # Handle squarebeam transformations
             alter_mat(face, face_seed(face), texture_lock)
             fix_squarebeams(face, rotate_edge, edge_off, edge_scale)
             continue
 
-        if mat not in WHITE_PAN and mat not in BLACK_PAN:
+        if mat not in panel_mats:
             # Don't clump non-wall textures
             alter_mat(face, face_seed(face), texture_lock)
             continue
@@ -2276,12 +2271,12 @@ def clump_walls():
             # Not in a clump!
             # Allow using special textures for these, to fill in gaps.
             orig_mat = mat
-            if mat in WHITE_PAN:
+            if mat in consts.WhitePan:
                 face.mat = get_tex("special.white_gap")
                 if not face.mat:
                     face.mat = orig_mat
                     alter_mat(face, texture_lock=texture_lock)
-            elif mat in BLACK_PAN:
+            elif mat in consts.BlackPan:
                 face.mat = get_tex("special.black_gap")
                 if not face.mat:
                     face.mat = orig_mat
@@ -2494,7 +2489,7 @@ def change_overlays():
 
         case_mat = over['material'].casefold()
 
-        if case_mat in TEX_VALVE:
+        if case_mat in consts.Signage:
             sign_type = TEX_VALVE[case_mat]
             if sign_inst is not None:
                 new_inst = VMF.create_ent(
@@ -2521,7 +2516,7 @@ def change_overlays():
                     val /= 16
                     val *= sign_size
                     over[prop] = val.join(' ')
-        if case_mat == ANTLINES['straight']:
+        if case_mat == consts.Antlines.STRAIGHT:
             set_antline_mat(
                 over,
                 ant_str,
@@ -2531,7 +2526,7 @@ def change_overlays():
                 broken_ant_str,
                 broken_ant_str_floor,
             )
-        elif case_mat == ANTLINES['corner']:
+        elif case_mat == consts.Antlines.CORNER:
             set_antline_mat(
                 over,
                 ant_corn,
@@ -2745,7 +2740,7 @@ def change_func_brush():
             if side in IGNORED_FACES:
                 continue
 
-            if side.mat.casefold() == "anim_wp/framework/squarebeams":
+            if side.mat == consts.Special.SQUAREBEAMS:
                 side.mat = get_tex(edge_tex)
                 fix_squarebeams(
                     side,
@@ -2755,17 +2750,17 @@ def change_func_brush():
                 )
                 continue
 
-            if side.mat.casefold() in WHITE_PAN:
+            if side.mat in consts.WhitePan:
                 brush_type = "white"
                 set_special_mat(side, 'white')
                 surf_face = side
 
-            elif side.mat.casefold() in BLACK_PAN:
+            elif side.mat in consts.BlackPan:
                 brush_type = "black"
                 set_special_mat(side, 'black')
                 surf_face = side
             else:
-                if side.mat.casefold() == 'metal/metalgrate018':
+                if side.mat == consts.Special.GRATING:
                     is_grating = True
                     if grate_temp is not None:
                         try:

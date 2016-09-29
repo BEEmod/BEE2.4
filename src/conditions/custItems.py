@@ -8,6 +8,7 @@ import srctools
 import utils
 import vbsp
 import vbsp_options
+import comp_consts as consts
 from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
@@ -229,8 +230,8 @@ def res_cust_antline(inst, res):
     straight_args, corner_args, toggle_inst, toggle_out = res.value
 
     # The original textures for straight and corner antlines
-    straight_ant = vbsp.ANTLINES['straight']
-    corner_ant = vbsp.ANTLINES['corner']
+    straight_ant = consts.Antlines.STRAIGHT
+    corner_ant = consts.Antlines.CORNER
 
     over_name = '@' + inst['targetname'] + '_indicator'
 

@@ -14,6 +14,7 @@ from typing import (
 import srctools
 import utils
 import vbsp_options
+import comp_consts as consts
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property,
@@ -193,12 +194,12 @@ TEMPLATE_RETEXTURE = {
     'tile/white_wall_tile004j': (W, 'special'),
     'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
 
-    'anim_wp/framework/backpanels': 'special.behind',
-    'anim_wp/framework/squarebeams': 'special.edge',
-    'glass/glasswindow007a_less_shiny': 'special.glass',
-    'metal/metalgrate018': 'special.grating',
+    consts.Special.BACKPANELS: 'special.behind',
+    consts.Special.SQUAREBEAMS: 'special.edge',
+    consts.Special.GLASS: 'special.glass',
+    consts.Special.GRATING: 'special.grating',
 
-    'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
+    consts.Goo.CHEAP: 'special.goo_cheap',
 }
 del B, W
 
@@ -566,9 +567,7 @@ def build_solid_dict():
 
     for solid in VMF.brushes:
         for face in solid:
-            if face.mat.casefold() in (
-                    'nature/toxicslime_a2_bridge_intro',
-                    'nature/toxicslime_puzzlemaker_cheap'):
+            if face.mat.casefold in consts.Goo:
                 # Record all locations containing goo.
                 bbox_min, bbox_max = solid.get_bbox()
                 x = bbox_min.x + 64
@@ -594,8 +593,8 @@ def build_solid_dict():
                     # The only time two textures will be in the same
                     # place is if they are covering each other -
                     # nodraw them both and ignore them
-                    SOLIDS.pop(origin).face.mat = 'tools/toolsnodraw'
-                    face.mat = 'tools/toolsnodraw'
+                    SOLIDS.pop(origin).face.mat = consts.Tools.NODRAW
+                    face.mat = consts.Tools.NODRAW
                     continue
 
                 SOLIDS[origin] = solidGroup(

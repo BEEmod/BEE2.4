@@ -48,6 +48,10 @@ class ConstGroup(str, Enum, metaclass=ConstGroupMeta):
     def __str__(self):
         return self.value
 
+    def __hash__(self):
+        """Allow hashing ConstGroup values."""
+        return hash(self.value)
+
 
 class WhitePan(ConstGroup):
     """White tiling."""
@@ -84,17 +88,24 @@ class Signage(ConstGroup):
 
 
 class Special(ConstGroup):
-    BACKPANELS = "anim_wp/framework/backpanels_cheap"
+    BACKPANELS = "anim_wp/framework/backpanels"
+    # Note - this is used in PeTI maps.
+    BACKPANELS_CHEAP = "anim_wp/framework/backpanels_cheap"
     PED_SIDE = "plastic/plasticwall004a"
     SQUAREBEAMS = "anim_wp/framework/squarebeams"
-    GOO = "nature/toxicslime_a2_bridge_intro"
-    GOO_CHEAP = "nature/toxicslime_puzzlemaker_cheap"
     GLASS = "glass/glasswindow007a_less_shiny"
     GRATING = "metal/metalgrate018"
     LASERFIELD = "effects/laserplane"
-    
-    ANT_STRAIGHT = "signage/indicator_lights/indicator_lights_floor"
-    ANT_CORNER = "signage/indicator_lights/indicator_lights_corner_floor"
+
+
+class Goo(ConstGroup):
+    REFLECTIVE = "nature/toxicslime_a2_bridge_intro"
+    CHEAP = "nature/toxicslime_puzzlemaker_cheap"
+
+
+class Antlines(ConstGroup):
+    STRAIGHT = "signage/indicator_lights/indicator_lights_floor"
+    CORNER = "signage/indicator_lights/indicator_lights_corner_floor"
 
 
 class Tools(ConstGroup):
@@ -112,6 +123,7 @@ class Tools(ConstGroup):
     BLOCK_LOS = 'tools/toolsblock_los'
     BLOCK_LIGHT = 'tools/toolsblocklight'
     BLOCK_BULLETS = 'tools/toolsblockbullets'
+    PLAYER_CLIP = 'tools/toolsplayerclip'
     
     SKYBOX = 'tools/toolsskybox'
     BLACK = 'tools/toolsblack'
