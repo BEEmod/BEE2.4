@@ -84,6 +84,7 @@ The various `cache` folders and `config` folders should not be included.
 - VBSP and VRAD:
 	- `BSP`: Library for reading and writing BSP files. Used to pack files during compile.
 	- `compile_vbsp_vrad`: Cx-Freeze setup script to compile the VBSP and VRAD hooks.
+	- `comp_consts`: Constants for material names and other values.
 	- `conditions`: Implements the conditions system, controlling item-specific transformations.
 	    Submodules add the individual conditions:
 	    - `addInstance`: Results which add additional instances.  
