@@ -26,7 +26,7 @@ import conditions
 import comp_consts as consts
 
 from typing import (
-    Dict, Tuple,
+    Dict, Tuple, List
 )
 
 
@@ -1780,6 +1780,60 @@ def remove_static_ind_toggles():
     LOGGER.info('Done!')
 
 
+@conditions.meta_cond(priority=-50)
+def set_barrier_frame_type(_):
+    """Set a $type instvar on glass frame.
+
+    This allows using different instances on glass and grating.
+    """
+    barrier_types = {}  # origin, normal -> 'glass' / 'grating'
+
+    barrier_pos = [] # type: List[Tuple[Vec, str]]
+
+    # Find glass and grating brushes..
+    for brush in VMF.iter_wbrushes(world=False, detail=True):
+        for side in brush:
+            if side.mat == consts.Special.GLASS:
+                break
+        else:
+            # Not glass..
+            continue
+        barrier_pos.append((brush.get_origin(), 'glass'))
+
+    for brush_ent in VMF.by_class['func_brush']:
+        for side in brush_ent.sides():
+            if side.mat == consts.Special.GRATING:
+                break
+        else:
+            # Not grating..
+            continue
+        barrier_pos.append((brush_ent.get_origin(), 'grating'))
+
+    # The origins are at weird offsets, calc a grid pos + normal instead
+    for pos, barrier_type in barrier_pos:
+        grid_pos = pos // 128 * 128 + (64, 64, 64)
+        barrier_types[
+            grid_pos.as_tuple(),
+            (pos - grid_pos).norm().as_tuple()
+        ] = barrier_type
+
+    barrier_files = instanceLocs.resolve('<ITEM_BARRIER>')
+    glass_file = instanceLocs.resolve('[glass_128]')
+    for inst in VMF.by_class['func_instance']:
+        if inst['file'].casefold() not in barrier_files:
+            continue
+        if inst['file'].casefold() in glass_file:
+            # The glass instance faces a different way to the frames..
+            norm = Vec(-1, 0, 0).rotate_by_str(inst['angles'])
+        else:
+            norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
+        origin = Vec.from_str(inst['origin'])
+        try:
+            inst.fixup['$barrier_type'] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+        except KeyError:
+            pass
+
+
 def remove_barrier_ents():
     """If glass_clip or grating_clip is defined, we should remove the glass instances.
 
@@ -1787,7 +1841,8 @@ def remove_barrier_ents():
     """
     if (
         not vbsp_options.get(str, 'grating_clip') or
-        not vbsp_options.get(str, 'glass_clip')
+        not vbsp_options.get(str, 'glass_clip') or
+        vbsp_options.get(bool, 'keep_barrier_inst')
     ):
         return  # They're being used.
 

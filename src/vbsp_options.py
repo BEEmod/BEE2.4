@@ -305,6 +305,10 @@ DEFAULTS = [
     Opt('grating_clip', "BEE2/grate_player_clip",
         """Texture used for grating player clips.
         """),
+    Opt('keep_barrier_inst', False,
+        """Keep glass/grating brush instances. If glass_clip or grating_clip
+        is set, they are removed by default. This disables that behaviour.
+        """),
 
     # Packlists for glass and gratings
     Opt('glass_pack', "PACK_PLAYER_CLIP_GLASS",
