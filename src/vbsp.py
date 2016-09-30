@@ -3602,7 +3602,6 @@ def main():
         all_inst = get_map_info()
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
-        tiling.analyse_map(VMF)
 
         conditions.init(
             seed=MAP_RAND_SEED,
@@ -3610,14 +3609,19 @@ def main():
             vmf_file=VMF,
         )
 
+        tiling.gen_tile_temp()
+        tiling.analyse_map(VMF)
+
         fix_inst()
         alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 
+
         change_ents()
         fixup_goo_sides()  # Must be done before change_brush()!
         change_brush()
+        tiling.generate_brushes(VMF)
         change_overlays()
         change_trig()
         collapse_goo_trig()

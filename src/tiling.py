@@ -8,16 +8,17 @@ from typing import Tuple, Dict, List
 
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
-from brushLoc import POS as BLOCK_POS, Block
+from brushLoc import POS as BLOCK_POS, Block, grid_to_world, world_to_grid
 import comp_consts as consts
 import utils
+import conditions
 
 LOGGER = utils.getLogger(__name__)
 
 TILE_TEMP = {}  # Face surfaces used to generate tiles.
-# TILE_TEMP[tile_norm][u_norm, v_norm] = (bevel_face, flat_face)
+# TILE_TEMP[tile_norm][u_norm, v_norm] = (flat_face, bevel_face)
 # TILE_TEMP[tile_norm]['tile'] = front_face
-# TILE_TEMP[tile_norm]['bck'] = back_face
+# TILE_TEMP[tile_norm]['back'] = back_face
 # Maps normals to the index in PrismFace.
 PRISM_NORMALS = {
     # 0 = solid
@@ -28,6 +29,10 @@ PRISM_NORMALS = {
     ( 1,  0,  0): 5,  # East
     (-1,  0,  0): 6,  # West
 }
+
+NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
+NORM_ANGLES = {v.as_tuple(): v.to_angle() for v in NORMALS}
+UV_NORMALS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
 # All the tiledefs in the map.
 # Maps a pos, normal -> tiledef
@@ -216,11 +221,32 @@ class TileDef:
             self.brush_type.name,
         )
 
+    def export(self, vmf: VMF):
+        """Create the solid for this."""
+        vmf.add_brush(make_tile(
+            vmf,
+            self.pos + self.normal * 64,
+            self.normal,
+            top_surf=(
+                consts.BlackPan.BLACK_4x4 if
+                self.base_type is TileType.BLACK
+                else consts.WhitePan.WHITE_4x4
+            ),
+            width=128,
+            height=128,
+            bevel_umin=True,
+            bevel_umax=True,
+            bevel_vmin=True,
+            bevel_vmax=True,
+        ))
+
 
 def make_tile(
+    vmf: VMF,
     origin: Vec, 
     normal: Vec, 
-    top_surf: str, 
+    top_surf: str,
+    back_surf: str=consts.Tools.NODRAW.value,
     recess_dist=0,
     thickness=4,
     width=16,
@@ -237,6 +263,7 @@ def make_tile(
         * origin: Location of the center of the tile, on the block surface.
         * normal: Unit vector pointing out of the tile.
         * top_surf: Texture to apply to the front of the tile.
+        * back_surf: Texture to apply to the back of the tile.
         * recess_dist: How far the front is below the block surface.
         * thickness: How far back the back surface is (normally 4). Max of 4, 
            Must be > recess_dist.
@@ -245,13 +272,92 @@ def make_tile(
         * bevel_min/max u/v: If that side should be 45° angled.      
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
+    template = TILE_TEMP[normal.as_tuple()]
+
+    assert width >=8 and height >=8, 'Tile is too small!'
+
+    top_side = template['front'].copy(map=vmf)  # type: Side
+    top_side.mat = top_surf
+    top_side.translate(origin - recess_dist * normal)
+
+    back_side = template['back'].copy(map=vmf)  # type: Side
+    back_side.mat = back_surf
+    back_side.translate(origin - thickness * normal)
+
+    axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
+
+    print('TEMP: ', template.keys())
+
+    umin_side = template[-1, 0][bevel_umin].copy(map=vmf)
+    umin_side.translate(origin + Vec(**{axis_u: -width/2}))
+
+    umax_side = template[1, 0][bevel_umax].copy(map=vmf)
+    umax_side.translate(origin + Vec(**{axis_u: width/2}))
+
+    vmin_side = template[0, -1][bevel_vmin].copy(map=vmf)
+    vmin_side.translate(origin + Vec(**{axis_v: -height/2}))
+
+    vmax_side = template[0, 1][bevel_vmax].copy(map=vmf)
+    vmax_side.translate(origin + Vec(**{axis_v: height/2}))
+
+    return Solid(vmf, sides=[
+        top_side, back_side,
+        umin_side, umax_side,
+        vmin_side, vmax_side,
+    ])
 
 
 def gen_tile_temp():
     """Generate the sides used to create tiles.
 
-    This populates TILE_TEMP.
+    This populates TILE_TEMP with pre-rotated solids in each direction,
+     with each side identified.
     """
+    try:
+        template = conditions.get_template('__TILING_TEMPLATE__')
+        # Template -> world -> first solid
+        # We restrict what templates can be used here.
+        bevel_temp = template['bevel'][0][0]
+        flat_temp = template['flat'][0][0]
+    except KeyError:
+        raise Exception('Bad Tiling Template!')
+
+    for norm_tup, angles in NORM_ANGLES.items():
+        norm = Vec(norm_tup)
+        axis_norm = norm.axis()
+
+        rotated_bevel = bevel_temp.copy()
+        rotated_flat = flat_temp.copy()
+
+        rotated_bevel.localise(Vec(), angles)
+        rotated_flat.localise(Vec(), angles)
+
+        TILE_TEMP[norm_tup] = temp_part = {}
+
+        bevel_sides = {}
+
+        for face in rotated_bevel:
+            if face.mat in consts.BlackPan or face.mat in consts.WhitePan:
+                temp_part['front'] = face
+                face.translate(-2 * norm)
+            elif face.mat == consts.Special.BACKPANELS:
+                temp_part['back'] = face
+                face.translate(2 * norm)
+            else:
+                # Squarebeams
+                face_norm = round(face.get_origin().norm())  # type: Vec
+                bevel_sides[face_norm.as_tuple()] = face
+                face.translate(-14 * face_norm)
+
+        for face in rotated_flat:
+            face_norm = face.normal()
+            if face_norm[axis_norm]:
+                continue
+            temp_part[face_norm.other_axes(norm.axis())] = (
+                face,
+                bevel_sides[face_norm.as_tuple()],
+            )
+
 
 
 def analyse_map(vmf_file: VMF):
@@ -295,3 +401,18 @@ def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
             override_tex=special_tex,
         )
         TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef
+
+
+def generate_brushes(vmf: VMF):
+    """Generate all the brushes in the map."""
+    for pos, block in BLOCK_POS.items():
+        if block is not Block.SOLID and block is not Block.EMBED:
+            continue
+
+        for normal in NORMALS:
+            try:
+                tile = TILES[(grid_to_world(pos)).as_tuple(), normal.as_tuple()]
+            except KeyError:
+                continue
+            tile.export(vmf)
+
