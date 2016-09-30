@@ -6,9 +6,13 @@ That allows any wall cube to be split into separate brushes, and make quarter-ti
 from enum import Enum
 from typing import Tuple, Dict, List
 
-from srctools import Vec
+from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
+from brushLoc import POS as BLOCK_POS, Block
+import comp_consts as consts
+import utils
 
+LOGGER = utils.getLogger(__name__)
 
 TILE_TEMP = {}  # Face surfaces used to generate tiles.
 # TILE_TEMP[tile_norm][u_norm, v_norm] = (bevel_face, flat_face)
@@ -26,8 +30,8 @@ PRISM_NORMALS = {
 }
 
 # All the tiledefs in the map.
-# Maps a point -> tiledef, where the points are block origin + 63*normal
-TILES = {}
+# Maps a pos, normal -> tiledef
+TILES = {}  # type: Dict[Tuple[Vec_tuple, Vec_tuple], TileDef]
 
 
 class TileType(Enum):
@@ -36,8 +40,6 @@ class TileType(Enum):
     WHITE_4x4 = 1
     BLACK = 2
     BLACK_4x4 = 3
-    
-    # Below ignore the associated TILE_STYLE.
      
     NODRAW = 10  # Covered, so it should be set to nodraw
     
@@ -162,7 +164,7 @@ class TileDef:
     Attributes:
         pos: Vec for the center of the side.
         normal: The direction out of the block.
-        brush_faces: A list of brush faces that this block uses.
+        brush_faces: A list of off-grid brushes that this block uses.
         brush_type: BrushType - what sort of brush this is.
         base_type: TileType this tile started with.
         override_tex: If set, a specific texture to use (skybox, light, backpanels etc)
@@ -173,22 +175,21 @@ class TileDef:
         panel_ent: The brush entity for the panel, if it's a panel brush_type.
     """
     __slots__ = [
-        'pos', 
-        'normal', 
-        'brush_faces', 
-        'brush_type', 
-        'base_type', 
+        'pos',
+        'normal',
+        'brush_type',
+        'base_type',
         'sub_tiles',
         'override_tex',
-        'is_bullseye', 
-        'panel_inst', 
+        'is_bullseye',
+        'panel_inst',
         'panel_ent',
+        'extra_brushes',
     ]
     def __init__(
         self,
         pos: Vec, 
         normal: Vec,
-        brush_faces: List[Side],
         base_type: TileType,
         brush_type=BrushType.NORMAL,
         subtiles: Dict[Tuple[int, int], TileType]=None,
@@ -196,10 +197,10 @@ class TileDef:
         is_bullseye: bool=False,
         panel_inst: Entity=None,
         panel_ent: Entity=None,
+        extra_brushes: List[Solid]=(),
     ):
         self.pos = pos
         self.normal = normal
-        self.brush_faces = brush_faces
         self.brush_type = brush_type
         self.override_tex = override_tex
         self.base_type = base_type
@@ -207,6 +208,13 @@ class TileDef:
         self.is_bullseye = is_bullseye
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
+        self.extra_brushes = list(extra_brushes)
+
+    def __repr__(self):
+        return '<{},{} TileDef>'.format(
+            self.base_type.name,
+            self.brush_type.name,
+        )
 
 
 def make_tile(
@@ -245,13 +253,45 @@ def gen_tile_temp():
     This populates TILE_TEMP.
     """
 
-def on_16_grid(face: Side):
-    """Check if this side is on the 16-unit grid.
-
-    This assumes face vertices = corners, which is usually true.
-    """
 
 def analyse_map(vmf_file: VMF):
     """Create TileDefs from all the brush sides."""
+
     for brush in vmf_file.brushes[:]:
-        pass
+        bbox_min, bbox_max = brush.get_bbox()
+        dim = bbox_max - bbox_min
+        grid_pos = bbox_min // 128 * 128 + (64, 64, 64)
+        if dim == (128, 128, 128):
+            tiledefs_from_cube(brush, grid_pos)
+            vmf_file.remove_brush(brush)
+
+
+def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
+    """Generate a tiledef matching a 128^3 block."""
+    for face in brush:
+        normal = -face.normal()
+        normal.z *= -1
+        special_tex = None
+
+        # These cubes don't contain any items, so it's fine
+        # if we get rid of sides that aren't useful.
+        # if it's bordering void or another solid, it's unneeded.
+        neighbour_block = BLOCK_POS['world': grid_pos + 128 * normal]
+        if not neighbour_block.traversable:
+            continue
+
+        if face.mat in consts.BlackPan:
+            tex_kind = TileType.BLACK
+        elif face.mat in consts.WhitePan:
+            tex_kind = TileType.WHITE
+        else:
+            tex_kind = TileType.BLACK
+            special_tex = face.mat
+
+        tiledef = TileDef(
+            grid_pos,
+            normal,
+            base_type=tex_kind,
+            override_tex=special_tex,
+        )
+        TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef

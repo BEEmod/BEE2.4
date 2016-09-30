@@ -1,4 +1,3 @@
-
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -23,6 +22,7 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import tiling
 import comp_consts as consts
 
 from typing import (
@@ -3602,6 +3602,7 @@ def main():
         all_inst = get_map_info()
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
+        tiling.analyse_map(VMF)
 
         conditions.init(
             seed=MAP_RAND_SEED,
