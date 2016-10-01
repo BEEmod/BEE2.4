@@ -65,10 +65,10 @@ class WhitePan(ConstGroup):
 class BlackPan(ConstGroup):
     """Black tiling."""
     BLACK_FLOOR = "metal/black_floor_metal_001c"
-    BLACK_1 = "metal/black_wall_metal_002c"
-    BLACK_2 = "metal/black_wall_metal_002e"
-    BLACK_2x2 = "metal/black_wall_metal_002a"  # 2x2
-    BLACK_4x4 = "metal/black_wall_metal_002b"  # 4x4
+    BLACK_1x1 = "metal/black_wall_metal_002c"
+    BLACK_2x1 = "metal/black_wall_metal_002e"
+    BLACK_2x2 = "metal/black_wall_metal_002a"
+    BLACK_4x4 = "metal/black_wall_metal_002b"
 
 
 class Signage(ConstGroup):

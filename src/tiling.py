@@ -141,14 +141,14 @@ PATTERNS = {
             wall_only=True,
         ),
         Pattern('2x2', 
-            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3), # Corners
-            (0, 1, 3, 2), # Special case - horizontal 2x1, don't use center.
-            (1, 1, 2, 2), # Center
-            (1, 0, 2, 1), (1, 2, 2, 3), # Vertical
-            (0, 1, 1, 2), (2, 1, 3, 2), # Horizontal
+            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3),  # Corners
+            (0, 1, 3, 2),  # Special case - horizontal 2x1, don't use center.
+            (1, 1, 2, 2),  # Center
+            (1, 0, 2, 1), (1, 2, 2, 3),  # Vertical
+            (0, 1, 1, 2), (2, 1, 3, 2),  # Horizontal
         ),
     ],
-    
+
     # Don't have 2x2/1x1 tiles off-grid..
     'grid_only': [
         Pattern('1x1', (0, 0, 3, 3)),
@@ -157,7 +157,7 @@ PATTERNS = {
             wall_only=True,
         ),
         Pattern('2x2', 
-            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3), # Corners
+            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3),  # Corners
         ),
     ],
 }
@@ -191,6 +191,7 @@ class TileDef:
         'panel_ent',
         'extra_brushes',
     ]
+
     def __init__(
         self,
         pos: Vec, 
@@ -216,29 +217,30 @@ class TileDef:
         self.extra_brushes = list(extra_brushes)
 
     def __repr__(self):
-        return '<{},{} TileDef>'.format(
+        return '<{}, {} TileDef>'.format(
             self.base_type.name,
             self.brush_type.name,
         )
 
     def export(self, vmf: VMF):
         """Create the solid for this."""
-        vmf.add_brush(make_tile(
-            vmf,
-            self.pos + self.normal * 64,
-            self.normal,
-            top_surf=(
-                consts.BlackPan.BLACK_4x4 if
-                self.base_type is TileType.BLACK
-                else consts.WhitePan.WHITE_4x4
-            ),
-            width=128,
-            height=128,
-            bevel_umin=True,
-            bevel_umax=True,
-            bevel_vmin=True,
-            bevel_vmax=True,
-        ))
+        if not self.sub_tiles:
+            vmf.add_brush(make_tile(
+                vmf,
+                self.pos + self.normal * 64,
+                self.normal,
+                top_surf=(
+                    consts.BlackPan.BLACK_4x4 if
+                    self.base_type is TileType.BLACK
+                    else consts.WhitePan.WHITE_4x4
+                ),
+                width=128,
+                height=128,
+                bevel_umin=True,
+                bevel_umax=True,
+                bevel_vmin=True,
+                bevel_vmax=True,
+            ))
 
 
 def make_tile(
@@ -285,8 +287,6 @@ def make_tile(
     back_side.translate(origin - thickness * normal)
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
-
-    print('TEMP: ', template.keys())
 
     umin_side = template[-1, 0][bevel_umin].copy(map=vmf)
     umin_side.translate(origin + Vec(**{axis_u: -width/2}))
@@ -350,9 +350,11 @@ def gen_tile_temp():
                 face.translate(-14 * face_norm)
 
         for face in rotated_flat:
-            face_norm = face.normal()
+            face_norm = round(face.get_origin().norm())  # type: Vec
             if face_norm[axis_norm]:
                 continue
+
+            face.translate(-16 * face_norm)
             temp_part[face_norm.other_axes(norm.axis())] = (
                 face,
                 bevel_sides[face_norm.as_tuple()],
@@ -376,7 +378,6 @@ def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()
-        normal.z *= -1
         special_tex = None
 
         # These cubes don't contain any items, so it's fine
@@ -405,14 +406,6 @@ def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
 
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map."""
-    for pos, block in BLOCK_POS.items():
-        if block is not Block.SOLID and block is not Block.EMBED:
-            continue
-
-        for normal in NORMALS:
-            try:
-                tile = TILES[(grid_to_world(pos)).as_tuple(), normal.as_tuple()]
-            except KeyError:
-                continue
-            tile.export(vmf)
+    for tile in TILES.values():
+        tile.export(vmf)
 

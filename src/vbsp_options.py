@@ -1,18 +1,22 @@
 """Manages reading general options from vbsp_config."""
 from enum import Enum
+from collections import defaultdict
 
 import inspect
 import io
+import random
 
 from srctools import Property, Vec, parse_vec_str
 import srctools
 import utils
+import comp_consts as consts
 
 from typing import TypeVar, Type, Optional, Iterator
 
 LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
+TEXTURES = {}
 
 class TYPE(Enum):
     """The types arguments can have."""
@@ -47,7 +51,18 @@ class Opt:
             self.doc += 'If unset, the default is read from `{}`.'.format(default)
 
 
-def load(opt_blocks: Iterator[Property]):
+class Tex:
+    def __init__(self, group, name, default=(), fallback=None):
+        self.group = group
+        self.name = name
+        if isinstance(default, str):
+            self.default = [default]
+        else:
+            self.default = list(default)
+        self.fallback = fallback
+
+
+def load_options(opt_blocks: Iterator[Property]):
     """Read settings from the given property block."""
     SETTINGS.clear()
     set_vals = {}
@@ -86,7 +101,7 @@ def load(opt_blocks: Iterator[Property]):
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
             SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
-        else: # int, float, str - no special handling...
+        else:  # int, float, str - no special handling...
             try:
                 SETTINGS[opt.id] = opt.type.value(val)
             except (ValueError, TypeError):
@@ -100,12 +115,58 @@ def load(opt_blocks: Iterator[Property]):
         # Check they have the same type.
         assert opt.type is options[opt.fallback].type
 
-
     if set_vals:
         LOGGER.warning('Extra config options: {}', set_vals)
- 
-T = TypeVar('T')           
-                                              
+
+
+def load_tex(blocks: Iterator[Property]):
+    """Load in texture definitions."""
+    TEXTURES.clear()
+    raw_configs = defaultdict(list)
+
+    for block in blocks:
+        for group in block:
+            for prop in group:
+                raw_configs[group.name, prop.name].append(prop.value)
+
+    tex_options = {tex.group + '.' + tex.name: tex for tex in TEX_DEFAULTS}
+
+    for tex_opt in TEX_DEFAULTS:
+        if not tex_opt.fallback:
+            continue
+        fallback = tex_options[tex_opt.fallback]
+        if fallback.fallback:
+            raise TypeError('"{}.{}"' " can't double-fallback!".format(
+                tex_opt.group,
+                tex_opt.name,
+            ))
+
+    need_fallback = []
+    for tex_opt in TEX_DEFAULTS:  # type: Tex
+        pair = (tex_opt.group, tex_opt.name)
+        dotted = tex_opt.group + '.' + tex_opt.name
+        try:
+            TEXTURES[dotted] = raw_configs[pair]
+            continue
+        except KeyError:
+            pass
+
+        if tex_opt.fallback:
+            fallback = tex_options[tex_opt.fallback]
+            need_fallback.append((dotted, fallback))
+        else:
+            TEXTURES[dotted] = tex_opt.default
+
+    for dotted, fallback in need_fallback:
+        TEXTURES[dotted] = TEXTURES[fallback.group + '.' + fallback.name]
+
+    for name, tex in TEXTURES.items():
+        if not tex or tex == ['']:
+            TEXTURES[name] = []
+
+T = TypeVar('T')
+
+
 def get(expected_type: Type[T], name) -> Optional[T]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
@@ -131,13 +192,28 @@ def get(expected_type: Type[T], name) -> Optional[T]:
         return val.copy()
     else:
         return val
-        
+
+
+def get_tex(name: str) -> str:
+    try:
+        return random.choice(TEXTURES[name])
+    except TypeError:
+        raise Exception('No texture "' + name + '"!')
+
+
+def get_all_tex(name: str) -> list:
+    try:
+        return TEXTURES[name]
+    except TypeError:
+        raise Exception('No texture "' + name + '"!')
+
 INFO_DUMP_FORMAT = """\
 ## `{id}`{default} ({type})
 {desc}
 
 """
-        
+
+
 def dump_info():
     """Create a Markdown description of all options."""
     file = io.StringIO()
@@ -492,4 +568,86 @@ DEFAULTS = [
 
         If set, no bullseye is output with this name in voicelines.
         """),
+]
+
+TEX_DEFAULTS = [
+    # TODO: remove these..
+    Tex('black', 'wall', consts.BlackPan.BLACK_1x1),
+    Tex('white', 'wall', consts.WhitePan.WHITE_2x1),
+
+
+    Tex('black', 'floor', consts.BlackPan.BLACK_FLOOR),  # 4x4
+    Tex('black', 'floor_2x2'),
+    Tex('black', 'ceiling', consts.BlackPan.BLACK_FLOOR),
+    Tex('black', '1x1', consts.BlackPan.BLACK_1x1),
+    Tex('black', '2x1', consts.BlackPan.BLACK_2x1),
+    Tex('black', '2x2', consts.BlackPan.BLACK_2x2),
+    Tex('black', '4x4', consts.BlackPan.BLACK_4x4),
+    Tex('black', 'bullseye_floor'),
+    Tex('black', 'bullseye_wall', fallback='white.bullseye_floor'),
+    Tex('black', 'bullseye_ceiling', fallback='white.bullseye_floor'),
+
+    Tex('white', 'floor', consts.WhitePan.WHITE_FLOOR),  # 4x4
+    Tex('white', 'floor_2x2'),
+    Tex('white', 'ceiling', consts.WhitePan.WHITE_4x4),
+    Tex('white', '1x1', consts.WhitePan.WHITE_1x1),
+    Tex('white', '2x1', consts.WhitePan.WHITE_2x1),
+    Tex('white', '2x2', consts.WhitePan.WHITE_2x2),
+    Tex('white', '4x4', consts.WhitePan.WHITE_4x4),
+    Tex('white', 'bullseye_floor'),
+    Tex('white', 'bullseye_wall', fallback='white.bullseye_floor'),
+    Tex('white', 'bullseye_ceiling', fallback='white.bullseye_floor'),
+
+    Tex('overlay', 'exit', consts.Signage.EXIT),
+    Tex('overlay', 'arrow', consts.Signage.ARROW),
+    Tex('overlay', 'dot', consts.Signage.SHAPE_DOT),
+    Tex('overlay', 'moon', consts.Signage.SHAPE_MOON),
+    Tex('overlay', 'triangle', consts.Signage.SHAPE_TRIANGLE),
+    Tex('overlay', 'cross', consts.Signage.SHAPE_CROSS),
+    Tex('overlay', 'square', consts.Signage.SHAPE_SQUARE),
+    Tex('overlay', 'circle', consts.Signage.SHAPE_CIRCLE),
+    Tex('overlay', 'sine', consts.Signage.SHAPE_SINE),
+    Tex('overlay', 'slash', consts.Signage.SHAPE_SLASH),
+    Tex('overlay', 'star', consts.Signage.SHAPE_STAR),
+    Tex('overlay', 'wavy', consts.Signage.SHAPE_WAVY),
+
+    # Special additional scale information...
+    Tex('overlay', 'antline', '0.25|' + consts.Antlines.STRAIGHT),
+    Tex('overlay', 'antlinecorner', '1|' + consts.Antlines.CORNER),
+
+    # This is for the P1 style, where antlines use different textures
+    # on the floor and wall.
+    # We just use the regular version if unset.
+    Tex('overlay', 'antlinecornerfloor'),
+    Tex('overlay', 'antlinefloor'),
+
+    # Broken version of antlines
+    Tex('overlay', 'antlinebroken'),
+    Tex('overlay', 'antlinebrokencorner'),
+    Tex('overlay', 'antlinebrokenfloor'),
+    Tex('overlay', 'antlinebrokenfloorcorner'),
+
+
+    Tex('special', 'behind', consts.Special.BACKPANELS_CHEAP),
+    Tex('special', 'pedestalside', consts.Special.PED_SIDE),
+    Tex('special', 'edge', consts.Special.SQUAREBEAMS),
+    Tex('special', 'edge_special', fallback='special.edge'),
+    Tex('special', 'goo', consts.Goo.REFLECTIVE),
+    Tex('special', 'goo_cheap', consts.Goo.CHEAP),
+    Tex('special', 'glass', consts.Special.GLASS),
+    Tex('special', 'grating', consts.Special.GRATING),
+    Tex('special', 'laserfield', consts.Special.LASERFIELD),
+    Tex('special', 'sky', "sky_black"),
+
+    # These replacements are deactivated when unset
+    Tex('special', 'white'),
+    Tex('special', 'black'),
+    Tex('special', 'white_wall', fallback='special.white'),
+    Tex('special', 'black_wall', fallback='special.black'),
+    Tex('special', 'white_gap', fallback='white.4x4'),
+    Tex('special', 'black_gap', fallback='black.4x4'),
+
+    Tex('special', 'goo_wall'),
+    Tex('special', 'goo_floor', fallback='special.goo_wall'),
+    Tex('special', 'fizz_border'),
 ]

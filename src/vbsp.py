@@ -82,11 +82,11 @@ TEX_DEFAULTS = [
     (consts.BlackPan.BLACK_FLOOR,    'black.ceiling'),
     (consts.WhitePan.WHITE_FLOOR,    'white.ceiling'),
     (consts.WhitePan.WHITE_1x1,     'white.wall'),
-    (consts.WhitePan.WHITE_2x1,     'white.wall'),
+    (consts.WhitePan.WHITE_2x1, 'white.wall'),
     (consts.WhitePan.WHITE_2x2,     'white.2x2'),
     (consts.WhitePan.WHITE_4x4,     'white.4x4'),
-    (consts.BlackPan.BLACK_1,  'black.wall'),
-    (consts.BlackPan.BLACK_2,  'black.wall'),
+    (consts.BlackPan.BLACK_1x1, 'black.wall'),
+    (consts.BlackPan.BLACK_2x1, 'black.wall'),
     (consts.BlackPan.BLACK_2x2,  'black.2x2'),
     (consts.BlackPan.BLACK_4x4,  'black.4x4'),
 
@@ -224,11 +224,7 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 # UTIL functions #
 ##################
 
-def get_tex(name):
-    if name in settings['textures']:
-        return random.choice(settings['textures'][name])
-    else:
-        raise Exception('No texture "' + name + '"!')
+get_tex = vbsp_options.get_tex
 
 
 def alter_mat(face, seed=None, texture_lock=True):
@@ -301,6 +297,8 @@ def load_settings():
 
     tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
 
+    vbsp_options.load_tex(conf.find_all('textures'))
+
     # Collect texture values from the config.
     # They are collected in a list for each option, allowing
     # multiple random textures for each slot.
@@ -318,7 +316,7 @@ def load_settings():
             settings['textures'][key] = value
 
     # Load in our main configs..
-    vbsp_options.load(conf.find_all('Options'))
+    vbsp_options.load_options(conf.find_all('Options'))
 
     # Load in fizzler options and textures. This works similarly to the normal
     # textures/options.
