@@ -225,7 +225,7 @@ class TileDef:
     def export(self, vmf: VMF):
         """Create the solid for this."""
         if not self.sub_tiles:
-            vmf.add_brush(make_tile(
+            return [make_tile(
                 vmf,
                 self.pos + self.normal * 64,
                 self.normal,
@@ -240,7 +240,7 @@ class TileDef:
                 bevel_umax=True,
                 bevel_vmin=True,
                 bevel_vmax=True,
-            ))
+            )]
 
 
 def make_tile(
@@ -407,5 +407,6 @@ def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map."""
     for tile in TILES.values():
-        tile.export(vmf)
+        brushes = tile.export(vmf)
+        vmf.add_brushes(brushes)
 
