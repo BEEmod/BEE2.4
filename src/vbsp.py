@@ -3229,7 +3229,7 @@ def make_packlist(map_path):
     LOGGER.info('Packlist written!')
 
 
-def make_vrad_config():
+def make_vrad_config(is_hammer: bool):
     """Generate a config file for VRAD from our configs.
 
     This way VRAD doesn't need to parse through vbsp_config, or anything else.
@@ -3237,6 +3237,8 @@ def make_vrad_config():
     LOGGER.info('Generating VRAD config...')
     conf = Property('Config', [
     ])
+    conf['is_peti'] = srctools.bool_as_int(not is_hammer)
+
     conf['force_full'] = srctools.bool_as_int(
         BEE2_config.get_bool('General', 'vrad_force_full')
     )
@@ -3499,6 +3501,10 @@ def main():
     global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
+    # Just in case we fail, overwrite the VRAD config so it doesn't use old
+    # data.
+    open('bee2/vrad_config.cfg', 'w').close()
+
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
@@ -3626,7 +3632,6 @@ def main():
         fix_worldspawn()
 
         make_packlist(path)
-        make_vrad_config()
 
         save(new_path)
         run_vbsp(
@@ -3634,6 +3639,10 @@ def main():
             path=path,
             new_path=new_path,
         )
+
+    # We always need to do this - VRAD can't easily determine if the map is
+    # a Hammer one.
+    make_vrad_config(is_hammer)
 
     LOGGER.info("BEE2 VBSP hook finished!")
 

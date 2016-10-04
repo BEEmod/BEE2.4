@@ -894,23 +894,29 @@ def main(argv):
     if not path.endswith(".bsp"):
         path += ".bsp"
 
+    # If VBSP thinks it's hammer, trust it.
+    if CONF.bool('is_hammer', False):
+        is_peti = edit_args = False
+    else:
+        is_peti = True
+        # Detect preview via knowing the bsp name. If we are in preview,
+        # check the config file to see what was specified there.
+        if os.path.basename(path) == "preview.bsp":
+            edit_args = not CONF.bool('force_full', False)
+        else:
+            # publishing - always force full lighting.
+            edit_args = False
+
     if '-force_peti' in args or '-force_hammer' in args:
-        # we have override command!
+        # we have override commands!
         if '-force_peti' in args:
             LOGGER.warning('OVERRIDE: Applying cheap lighting!')
-            is_peti = True
+            is_peti = edit_args = True
         else:
             LOGGER.warning('OVERRIDE: Preserving args!')
-            is_peti = False
-    else:
-        # If we don't get the special -force args, check for the name
-        # equalling preview to determine if we should convert
-        # If that is false, check the config file to see what was
-        # specified there.
-        is_peti = (
-            os.path.basename(path) == "preview.bsp" or
-            srctools.conv_bool(CONF['force_full'], False)
-        )
+            is_peti = edit_args = False
+
+    LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
 
     if '-no_pack' not in args:
         pack_content(path, is_peti)
@@ -920,10 +926,14 @@ def main(argv):
     if is_peti:
         mod_screenshots()
 
+    if edit_args:
         LOGGER.info("Forcing Cheap Lighting!")
         run_vrad(fast_args)
     else:
-        LOGGER.info("Hammer map detected! Not forcing cheap lighting..")
+        if is_peti:
+            LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
+        else:
+            LOGGER.info("Hammer map detected! Not forcing cheap lighting..")
         run_vrad(full_args)
 
     LOGGER.info("BEE2 VRAD hook finished!")
