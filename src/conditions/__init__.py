@@ -963,13 +963,17 @@ def load_templates():
         detail = detail_ents[temp_id]
         overlay = overlay_ents[temp_id]
         visgroup_ids = set(world).union(detail, overlay)
-        TEMPLATES[temp_id] = {
+        TEMPLATES[temp_id] = groups = {
             visgroup: (
                 world[visgroup],
                 detail[visgroup],
                 overlay[visgroup],
             ) for visgroup in visgroup_ids
         }
+        if '' not in groups:
+            # We ensure the '' group is always present.
+            # This is always exported later, so just make it empty.
+            groups[''] = ([], [], [])
 
 
 def get_template(temp_name):
