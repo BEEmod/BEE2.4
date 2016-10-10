@@ -683,6 +683,13 @@ class Game:
                     for io_prop in block:
                         comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
 
+            # Fizzlers don't work correctly with outputs. This is a signal to
+            # conditions.fizzler, but it must be removed in editoritems.
+            if item['ItemClass', ''].casefold() == 'itembarrierhazard':
+                for block in item.find_all('Exporting', 'Outputs'):
+                    if CONN_NORM in block:
+                        del block[CONN_NORM]
+
             # Record the itemClass for each item type.
             item_classes[item['type']] = item['ItemClass', 'ItemBase']
 
