@@ -182,7 +182,7 @@ def load_conf(prop_block: Property):
     global INST_SPECIAL
 
     for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.real_name] = [
+        INSTANCE_FILES[prop.name] = [
             inst.value.casefold()
             for inst in
             prop
