@@ -6,7 +6,7 @@ import vbsp
 from conditions import (
     make_result,
 )
-from srctools import Vec, Entity
+from srctools import Vec, Entity, Output
 from vbsp import TEX_FIZZLER
 
 
@@ -33,6 +33,8 @@ def res_cust_fizzler(base_inst, res):
               Origin are auto-set.
             * Thickness will change the thickness of the fizzler if set.
               By default it is 2 units thick.
+            * Outputs is a block of outputs (laid out like in VMFs). The
+              targetnames will be localised to the instance.
         * MakeLaserField generates a brush stretched across the whole
           area.
             * Name, keys and thickness are the same as the regular Brush.
@@ -112,7 +114,16 @@ def res_cust_fizzler(base_inst, res):
                     config,
                 )
 
-                if should_merge: # The first brush...
+                for out_prop in config.find_children('Outputs'):
+                    out = Output.parse(out_prop)
+                    out.comma_sep = False
+                    out.target = conditions.local_name(
+                        base_inst,
+                        out.target
+                    )
+                    new_brush.add_out(out)
+
+                if should_merge:  # The first brush...
                     FIZZ_BRUSH_ENTS[merge_key] = new_brush
 
             laserfield_conf = config.find_key('MakeLaserField', None)
