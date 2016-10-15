@@ -111,6 +111,11 @@ class Item:
                 "Palette",
                 )
             )
+        if not self.num_sub:
+            # We need at least one subtype, otherwise something's wrong
+            # with the file.
+            raise Exception('Item {} has no subtypes!'.format(item.id))
+
         self.authors = self.def_data['auth']
         self.id = item.id
         self.pak_id = item.pak_id
