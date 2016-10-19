@@ -597,7 +597,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stdout:
         stdout_loghandler = logging.StreamHandler(sys.stdout)
         stdout_loghandler.setLevel(logging.INFO)
-        stdout_loghandler.setFormatter(short_log_format)
+        stdout_loghandler.setFormatter(long_log_format)
         logger.addHandler(stdout_loghandler)
 
         if sys.stderr:
@@ -614,7 +614,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stderr:
         stderr_loghandler = logging.StreamHandler(sys.stderr)
         stderr_loghandler.setLevel(logging.WARNING)
-        stderr_loghandler.setFormatter(short_log_format)
+        stderr_loghandler.setFormatter(long_log_format)
         logger.addHandler(stderr_loghandler)
     else:
         sys.stderr = NullStream()
