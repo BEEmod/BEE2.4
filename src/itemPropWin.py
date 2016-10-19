@@ -11,7 +11,9 @@ import utils
 import srctools
 import contextWin
 
-# all editable properties in editoritems, Valve probably isn't going to
+LOGGER = utils.getLogger(__name__)
+
+# all properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
     'toplevel':                 ('pistPlat', 'Start Position'),
@@ -30,9 +32,38 @@ PROP_TYPES = {
     'oscillate':                ('railLift', 'Oscillate'),
     'paintflowtype':            ('gelType',  'Flow Type'),
     'allowstreak':              ('checkbox', 'Allow Streaks'),
+
+    # Properties that we don't allow modification of.
+    'timersound': ('none', 'Timer Sound'),
+    'angledpaneltype': ('none', 'Angled Panel Type'),
+    'itemfallstraightdown': ('none', 'Disable Cube Dropper Clips'),
+    'paintexporttype': ('none', 'Gel Export Type'),
+    'autotrigger': ('none', 'Automatically Move'),
+
+    'connectioncount': ('none', 'Connection Count'),
+    'connectioncountpolarity': ('none', 'Polarity Connection Count'),
+    'coopdoor': ('none', 'Is Coop?'),
+    'portalable': ('none', 'Flip Panel Portalability'),
+    'speed': ('none', 'Track Platform Speed'),
+    'startingposition': ('none', 'Initial Track Platform Position'),
+    'traveldirection': ('none', 'Track Platform Direction'),
+    'traveldistance': ('none', 'Track Platform Distance'),
+
+    # Controlled by bottom and top position, not set separately.
+    'startup': ('none', 'Start Up'),
+
+    # Faith Plate
+    'verticalalignment': ('none', 'Vertical Alignment'),
+    'catapultspeed': ('none', 'Faith Plate Speed'),
+    'targetname': ('none', 'Faith Target Name'),
+
+    'hazardtype': ('subType', 'Fizzler Type'),
+    'barriertype': ('subType', 'Barrier Type'),
+    'buttontype': ('subType', 'Button Type'),
+    'painttype': ('subType', 'Gel Type'),
     }
 # valid property types:
-#  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
+#  checkbox, timerDel, pistPlat, gelType, panAngle, railLift, none, subType
 
 # order of the different properties, 'special' are the larger controls
 # like sliders or dropdown boxes
@@ -73,7 +104,7 @@ PAINT_OPTS = [
     'Bomb'
     ]
 
-DEFAULTS = { # default values for this item
+DEFAULTS = {  # default values for this item
     'startup': False,
     'toplevel': 1,
     'bottomlevel': 0,
@@ -236,7 +267,7 @@ def exit_win(_=None):
 def can_edit(prop_list):
     """Determine if any of these properties are changeable."""
     for prop in prop_list:
-        if prop in PROP_TYPES:
+        if PROP_TYPES.get(prop, 'none') not in ('none', 'subType'):
             return True
     return False
 
@@ -268,7 +299,7 @@ def init(cback):
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    labels['noOptions'] = ttk.Label(frame, text='No Properties avalible!')
+    labels['noOptions'] = ttk.Label(frame, text='No Properties available!')
     widgets['saveButton'] = ttk.Button(frame, text='Close', command=exit_win)
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
@@ -381,51 +412,59 @@ def show_window(used_props, parent, item_name):
     start_up = srctools.conv_bool(used_props.get('startup', '0'))
     values['startup'] = start_up
     for prop, value in used_props.items():
-        if prop in PROP_TYPES and value is not None:
-            prop_type = PROP_TYPES[prop][0]
-            if prop_type == 'checkbox':
-                values[prop].set(srctools.conv_bool(value))
-            elif prop_type == 'railLift':
-                values[prop].set(srctools.conv_bool(value))
-                save_rail(prop)
-            elif prop_type == 'gelType':
-                values[prop].set(value)
-            elif prop_type == 'panAngle':
-                last_angle = value[5:7]
-                values[prop].set(last_angle)
-                out_values[prop] = value
-            elif prop_type == 'pistPlat':
-                values[prop] = value
-                try:
-                    top_level = int(used_props.get('toplevel', 4))
-                    bot_level = int(used_props.get('bottomlevel', 0))
-                except ValueError:
-                    pass
-                else:
-                    if ((prop == 'toplevel' and start_up) or
-                            (prop == 'bottomlevel' and not start_up)):
-                        widgets[prop].set(
-                            max(
-                                top_level,
-                                bot_level,
-                                )
-                            )
-                    if ((prop == 'toplevel' and not start_up) or
-                            (prop == 'bottomlevel' and start_up)):
-                        widgets[prop].set(
-                            min(
-                                top_level,
-                                bot_level,
-                                )
-                            )
-            elif prop_type == 'timerDel':
-                try:
-                    values[prop] = int(value)
-                    widgets[prop].set(values[prop])
-                except ValueError:
-                    pass
+        if prop not in PROP_TYPES:
+            LOGGER.info('Unknown property type {}', prop)
+            continue
+        if value is None:
+            continue
+
+        prop_type = PROP_TYPES[prop][0]
+        if prop_type == 'checkbox':
+            values[prop].set(srctools.conv_bool(value))
+        elif prop_type == 'railLift':
+            values[prop].set(srctools.conv_bool(value))
+            save_rail(prop)
+        elif prop_type == 'gelType':
+            values[prop].set(value)
+        elif prop_type == 'panAngle':
+            last_angle = value[5:7]
+            values[prop].set(last_angle)
+            out_values[prop] = value
+        elif prop_type == 'pistPlat':
+            values[prop] = value
+            try:
+                top_level = int(used_props.get('toplevel', 4))
+                bot_level = int(used_props.get('bottomlevel', 0))
+            except ValueError:
+                pass
             else:
-                values[prop] = value
+                if ((prop == 'toplevel' and start_up) or
+                        (prop == 'bottomlevel' and not start_up)):
+                    widgets[prop].set(
+                        max(
+                            top_level,
+                            bot_level,
+                            )
+                        )
+                if ((prop == 'toplevel' and not start_up) or
+                        (prop == 'bottomlevel' and start_up)):
+                    widgets[prop].set(
+                        min(
+                            top_level,
+                            bot_level,
+                            )
+                        )
+        elif prop_type == 'timerDel':
+            try:
+                values[prop] = int(value)
+                widgets[prop].set(values[prop])
+            except ValueError:
+                pass
+        elif prop_type in ('none', 'subType'):
+            # Internal or subtype properties, just pass through unchanged.
+            values[prop] = value
+        else:
+            LOGGER.error('Bad prop_type ({}) for {}', prop_type, prop)
 
     for key in PROP_POS_SPECIAL:
         if key in propList:
