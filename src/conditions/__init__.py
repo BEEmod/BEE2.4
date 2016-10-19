@@ -895,8 +895,11 @@ def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
 
 
 def resolve_value(inst: Entity, value: str):
-    """If a value starts with '$', lookup the associated var."""
-    if value.startswith('$'):
+    """If a value starts with '$', lookup the associated var.
+
+    Non-string values are passed through unchanged.
+    """
+    if isinstance(value, str) and value.startswith('$'):
         if value in inst.fixup:
             return inst.fixup[value]
         else:
