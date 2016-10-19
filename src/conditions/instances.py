@@ -225,8 +225,10 @@ def res_global_input(inst: Entity, res: Property):
     """
     name, inp_name, inp_command, output, delay, param, target = res.value
 
-    name = conditions.resolve_value(inst, name)
-    target = conditions.resolve_value(inst, target)
+    if name is not None:
+        name = conditions.resolve_value(inst, name)
+    if target is not None:
+        target = conditions.resolve_value(inst, target)
 
     try:
         glob_ent = GLOBAL_INPUT_ENTS[name]
