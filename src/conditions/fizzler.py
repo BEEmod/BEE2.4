@@ -373,7 +373,7 @@ def fizzler_out_relay(_):
             name = inst['targetname']
             fizz_by_name[inst['targetname']] = inst, fizz_bases[filename]
         elif filename in fizz_models:
-            name = inst['targetname'][:-11]
+            name = inst['targetname'][:-9]
 
         elif filename in relay_file:
             marker_inst.append(inst)
