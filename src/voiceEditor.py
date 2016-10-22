@@ -199,6 +199,7 @@ def add_tabs():
                 tab,
                 compound=RIGHT,
                 image=img.png('icons/resp_quote'),
+                #Note: 'response' tab name, should be short.
                 text=_('Resp')
                 )
         else:
@@ -300,6 +301,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             'after specific events have occurred.'
         )
     elif tab_type is TabTypes.RESPONSE:
+        # Note: 'Response' tab header, and description
         group_name = _('Responses')
         group_id = None
         group_desc = _(
@@ -403,6 +405,7 @@ def make_tab(group, config: ConfigFile, tab_type):
 
             group_id = quote.name
         else:
+            # note: default for quote names
             name = quote['name', _('No Name!')]
 
         ttk.Label(
@@ -424,6 +427,7 @@ def make_tab(group, config: ConfigFile, tab_type):
                 line_id = line['id', line['name']]
             check = ttk.Checkbutton(
                 frame,
+                # note: default voice line name next to checkbox.
                 text=line['name', _('No Name?')],
                 compound=LEFT,
                 image=badge,

@@ -354,6 +354,7 @@ class selWin:
             has_def=True,
             has_snd_sample=False,
             modal=False,
+            # i18n: 'None' item description
             none_desc=_('Do not add anything.'),
             none_attrs: dict=EmptyMapping,
             title='BEE2',
@@ -908,6 +909,7 @@ class selWin:
                 self.display['font'] = self.norm_font
 
         if self.selected == self.noneItem:
+            # i18n: 'None' item name.
             self.disp_label.set(_("<None>"))
             self.chosen_id = None
         else:
@@ -1028,6 +1030,7 @@ class selWin:
                 elif label.type is AttrTypes.COLOR:
                     label['image'] = img.color_square(val, size=16)
                     # Display the full color when hovering..
+                    # i18n: Tooltip for colour swatch.
                     label.tooltip_text = _('Color: R={r}, G={g}, B={b}').format(
                         r=int(val.x), g=int(val.y), b=int(val.z),
                     )
