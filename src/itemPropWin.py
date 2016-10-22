@@ -17,22 +17,23 @@ LOGGER = utils.getLogger(__name__)
 # all properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'angledpanelanimation':     ('panAngle', 'Panel Position'),
-    'startenabled':             ('checkbox', 'Start Enabled'),
-    'startreversed':            ('checkbox', 'Start Reversed'),
-    'startdeployed':            ('checkbox', 'Start Deployed'),
-    'startactive':              ('checkbox', 'Start Active'),
-    'startopen':                ('checkbox', 'Start Open'),
-    'startlocked':              ('checkbox', 'Start Locked'),
-    'dropperenabled':           ('checkbox', 'Dropper Enabled'),
-    'autodrop':                 ('checkbox', 'Auto Drop'),
-    'autorespawn':              ('checkbox', 'Auto Respawn'),
-    'oscillate':                ('railLift', 'Oscillate'),
-    'paintflowtype':            ('gelType',  'Flow Type'),
-    'allowstreak':              ('checkbox', 'Allow Streaks'),
     'toplevel':                 ('pistPlat', _('Start Position')),
     'bottomlevel':              ('pistPlat', _('End Position')),
     'timerdelay':               ('timerDel', _('Delay \n(0=infinite)')),
+    'angledpanelanimation':     ('panAngle', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
+    'paintflowtype':            ('gelType',  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+
+    'oscillate':                ('railLift', 'PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
+    'startenabled':             ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
+    'startreversed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
+    'startdeployed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
+    'startactive':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
+    'startopen':                ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_open'),
+    'startlocked':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
+    'dropperenabled':           ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
+    'autodrop':                 ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
+    'autorespawn':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
+    'allowstreak':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
 
     # Properties that we don't allow modification of.
     'timersound': ('none', 'Timer Sound'),
@@ -98,12 +99,19 @@ values = {}  # selected values for this items
 out_values = {}
 
 PAINT_OPTS = [
-    'Light',
-    'Medium',
-    'Heavy',
-    'Drip',
-    'Bomb'
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_medium',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_heavy',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_drip',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_bomb',
     ]
+
+PANEL_ANGLES = [
+    ('30', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30'),
+    ('45', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45'),
+    ('60', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60'),
+    ('90', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90'),
+]
 
 DEFAULTS = {  # default values for this item
     'startup': False,
@@ -310,7 +318,11 @@ def init(cback):
     widgets['div_h'] = ttk.Separator(frame, orient="horizontal")
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
-        labels[key] = ttk.Label(frame, text=prop_name+':')
+        # Translate property names from Valve's files.
+        if prop_name.startswith('PORTAL2_'):
+            prop_name = gameMan.translate(prop_name) + ':'
+
+        labels[key] = ttk.Label(frame, text=prop_name)
         if prop_type == 'checkbox':
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
@@ -341,12 +353,12 @@ def init(cback):
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = StringVar(value=DEFAULTS[key])
-            for pos, angle in enumerate(['30', '45', '60', '90']):
+            for pos, (angle, disp_angle) in enumerate(PANEL_ANGLES):
                 ttk.Radiobutton(
                     frm,
                     variable=values[key],
                     value=angle,
-                    text=angle,
+                    text=gameMan.translate(disp_angle),
                     command=func_partial(save_angle, key, angle),
                     ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
@@ -360,7 +372,7 @@ def init(cback):
                     frm,
                     variable=values[key],
                     value=pos,
-                    text=text,
+                    text=gameMan.translate(text),
                     command=func_partial(save_paint, key, pos),
                     ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
