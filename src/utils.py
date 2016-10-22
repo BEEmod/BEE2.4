@@ -451,6 +451,22 @@ def unset_readonly(file):
         stat.S_IWOTH
     )
 
+
+def setup_localisations():
+    """Setup gettext localisations."""
+    import gettext
+    import locale
+    lang = locale.getdefaultlocale()[0]
+    # Then get the translator for that.
+    trans = gettext.translation(
+        'BEE2',
+        localedir='../i18n/',
+        #fallback=True,
+        languages=[lang[:2]],
+    )
+    # Add these functions to builtins, plus _=gettext
+    trans.install(['gettext', 'ngettext'])
+
 class LogMessage:
     """Allow using str.format() in logging messages.
 

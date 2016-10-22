@@ -1,3 +1,6 @@
+"""Run the BEE2."""
+
+# First do a few things as early as possible.
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
@@ -25,11 +28,7 @@ if __name__ == '__main__':
         # it can record any errors in the initialisation of modules.
         LOGGER = utils.init_logging('../logs/BEE2.log')
 
-import gettext
-# Setup localisations
-trans = gettext.translation('BEE2', localedir='i18n/', fallback=True)
-# Add these functions to builtins, plus _=gettext
-trans.install(['gettext', 'ngettext'])
+    utils.setup_localisations()
 
 from tkinter import messagebox
 
