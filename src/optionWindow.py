@@ -34,7 +34,7 @@ def reset_all_win():
 win = Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
 win.iconbitmap('../BEE2.ico')
-win.title('BEE2 Options')
+win.title(_('BEE2 Options'))
 win.withdraw()
 
 
@@ -72,8 +72,8 @@ def clear_caches():
     import packageLoader
 
     restart_ok = messagebox.askokcancel(
-        title='Allow Restart?',
-        message='Restart the BEE2 to re-extract packages?',
+        title=_('Allow Restart?'),
+        message=_('Restart the BEE2 to re-extract packages?'),
     )
 
     if not restart_ok:
@@ -173,19 +173,19 @@ def init_widgets():
     UI['fr_general'] = fr_general = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_general, text='General')
+    nbook.add(fr_general, text=_('General'))
     init_gen_tab(fr_general)
 
     UI['fr_win'] = fr_win = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_win, text='Windows')
+    nbook.add(fr_win, text=_('Windows'))
     init_win_tab(fr_win)
 
     UI['fr_dev'] = fr_dev = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_dev, text='Development')
+    nbook.add(fr_dev, text=_('Development'))
     init_dev_tab(fr_dev)
 
     ok_cancel = ttk.Frame(
@@ -209,12 +209,12 @@ def init_widgets():
 
     UI['ok_btn'] = ok_btn = ttk.Button(
         ok_cancel,
-        text='OK',
+        text=_('OK'),
         command=ok,
     )
     UI['cancel_btn'] = cancel_btn = ttk.Button(
         ok_cancel,
-        text='Cancel',
+        text=_('Cancel'),
         command=cancel,
     )
     ok_btn.grid(row=0, column=0)

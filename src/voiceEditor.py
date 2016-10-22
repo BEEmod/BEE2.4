@@ -32,13 +32,13 @@ COOP_IMG = img.png('icons/quote_coop')
 
 # Friendly names given to certain response channels.
 RESPONSE_NAMES = {
-    'death_goo': 'Death - Toxic Goo',
-    'death_turret': 'Death - Turrets',
-    'death_crush': 'Death - Crusher',
-    'death_laserfield': 'Death - LaserField',
+    'death_goo': _('Death - Toxic Goo'),
+    'death_turret': _('Death - Turrets'),
+    'death_crush': _('Death - Crusher'),
+    'death_laserfield': _('Death - LaserField'),
 }
 
-config = config_mid = config_resp = None # type: ConfigFile
+config = config_mid = config_resp = None  # type: ConfigFile
 
 
 class TabTypes(Enum):
@@ -78,7 +78,7 @@ def init_widgets():
 
     ttk.Label(
         trans_frame,
-        text='Transcript:',
+        text=_('Transcript:'),
         ).grid(
             row=0,
             column=0,
@@ -199,7 +199,7 @@ def add_tabs():
                 tab,
                 compound=RIGHT,
                 image=img.png('icons/resp_quote'),
-                text='Resp'
+                text=_('Resp')
                 )
         else:
             notebook.tab(tab, text=tab.nb_text)
@@ -216,7 +216,7 @@ def show(quote_pack):
 
     voice_item = quote_pack
 
-    win.title('BEE2 - Configure "' + voice_item.selitem_data.name + '"')
+    win.title(_('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
     notebook = UI['tabs']
 
     quote_data = quote_pack.config
@@ -293,16 +293,16 @@ def make_tab(group, config: ConfigFile, tab_type):
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
-        group_name = 'Mid - Chamber'
+        group_name = _('Mid - Chamber')
         group_id = 'MIDCHAMBER'
-        group_desc = (
+        group_desc = _(
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
     elif tab_type is TabTypes.RESPONSE:
-        group_name = 'Responses'
+        group_name = _('Responses')
         group_id = None
-        group_desc = (
+        group_desc = _(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
@@ -403,7 +403,7 @@ def make_tab(group, config: ConfigFile, tab_type):
 
             group_id = quote.name
         else:
-            name = quote['name', 'No Name!']
+            name = quote['name', _('No Name!')]
 
         ttk.Label(
             frame,
@@ -424,7 +424,7 @@ def make_tab(group, config: ConfigFile, tab_type):
                 line_id = line['id', line['name']]
             check = ttk.Checkbutton(
                 frame,
-                text=line['name', 'No Name?'],
+                text=line['name', _('No Name?')],
                 compound=LEFT,
                 image=badge,
             )

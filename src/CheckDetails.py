@@ -220,10 +220,7 @@ class CheckDetails(ttk.Frame):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(
-            self.wid_head_check,
-            "Toggle all checkboxes."
-        )
+        add_tooltip(self.wid_head_check, _("Toggle all checkboxes."))
 
         def checkbox_enter(e):
             """When hovering over the 'all' checkbox, highlight the others."""

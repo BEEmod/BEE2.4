@@ -581,9 +581,9 @@ class Game:
                     export_screen.grab_release()
                     export_screen.reset()
                     messagebox.showerror(
-                        title='BEE2 - Export Failed!',
-                        message='Copying compiler file {file} failed.'
-                                'Ensure the {game} is not running.'.format(
+                        title=_('BEE2 - Export Failed!'),
+                        message=_('Copying compiler file {file} failed.'
+                                  'Ensure the {game} is not running.').format(
                                     file=file,
                                     game=self.name,
                                 ),
@@ -745,6 +745,16 @@ class Game:
         except FileNotFoundError:
             return
         with basemod_file:
+            if lang == 'english':
+                def filterer(file):
+                    """The English language has some unused language text.
+
+                    This needs to be skipped since it has invalid quotes."""
+                    for line in file:
+                        if line.count('"') <= 4:
+                            yield line
+                basemod_file = filterer(basemod_file)
+
             trans_prop = Property.parse(basemod_file, 'basemodui.txt')
 
         for item in trans_prop.find_key("lang", []).find_key("tokens", []):
@@ -843,14 +853,14 @@ def add_game(_=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
-        message='Select the folder where the game executable is located '
-                '(portal2' + EXE_SUFFIX + ')...',
+        message=_('Select the folder where the game executable is located '
+                  '({appname})...').format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
-        title='BEE2 - Add Game',
+        title=_('BEE2 - Add Game'),
         )
     exe_loc = filedialog.askopenfilename(
-        title='Find Game Exe',
-        filetypes=[('Executable', '.exe')],
+        title=_('Find Game Exe'),
+        filetypes=[(_('Executable'), '.exe')],
         initialdir='C:',
         )
     if exe_loc:
@@ -858,25 +868,25 @@ def add_game(_=None, refresh_menu=True):
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
             messagebox.showinfo(
-                message='This does not appear to be a valid game folder!',
+                message=_('This does not appear to be a valid game folder!'),
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
-                title='BEE2 - Add Game',
+                title=_('BEE2 - Add Game'),
                 )
             return False
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = ask_string(
-                prompt="Enter the name of this game:",
-                title='BEE2 - Add Game',
+                prompt=_("Enter the name of this game:"),
+                title=_('BEE2 - Add Game'),
                 initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='This name is already taken!',
-                    title='BEE2 - Add Game',
+                    message=_('This name is already taken!'),
+                    title=_('BEE2 - Add Game'),
                     )
             elif name is None:
                 return False
@@ -884,8 +894,8 @@ def add_game(_=None, refresh_menu=True):
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='Please enter a name for this game!',
-                    title='BEE2 - Add Game',
+                    message=_('Please enter a name for this game!'),
+                    title=_('BEE2 - Add Game'),
                     )
             else:
                 break
@@ -903,16 +913,15 @@ def remove_game(_=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
-        "\n (BEE2 will quit, this is the last game set!)"
+        _("\n (BEE2 will quit, this is the last game set!)")
         if len(all_games) == 1 else
         ""
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message='Are you sure you want to delete "'
-                + selected_game.name
-                + '"?'
-                + lastgame_mess,
+        message=_('Are you sure you want to delete "{}?"').format(
+                selected_game.name
+            ) + lastgame_mess,
         )
     if confirm:
         selected_game.edit_gameinfo(add_line=False)
@@ -975,6 +984,5 @@ if __name__ == '__main__':
     dropdown.game_pos = 0
     TK_ROOT['menu'] = test_menu
 
-    init_trans()
     load()
     add_menu_opts(dropdown, setgame_callback)

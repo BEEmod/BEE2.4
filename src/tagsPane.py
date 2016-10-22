@@ -46,9 +46,9 @@ BOLD_FONT.configure(weight='bold')
 
 class Section(Enum):
     """Sections to group tags in."""
-    TAG = 'Tags'
-    AUTH = 'Authors'
-    PACK = 'Packages'
+    TAG = _('Tags')
+    AUTH = _('Authors')
+    PACK = _('Packages')
 
     def __lt__(self, other):
         return self.index(self) < self.index(other)

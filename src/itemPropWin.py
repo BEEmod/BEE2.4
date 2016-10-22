@@ -59,6 +59,7 @@ PROP_TYPES = {
     'catapultspeed': ('none', 'Faith Plate Speed'),
     'targetname': ('none', 'Faith Target Name'),
 
+    'cubetype': ('subType', 'Cube Type'),
     'hazardtype': ('subType', 'Fizzler Type'),
     'barriertype': ('subType', 'Barrier Type'),
     'buttontype': ('subType', 'Button Type'),
@@ -138,7 +139,6 @@ last_angle = '0'
 play_sound = False
 is_open = False
 enable_tim_callback = True
-
 
 def callback(name):
     """Do nothing by default!"""

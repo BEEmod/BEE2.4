@@ -354,7 +354,7 @@ class selWin:
             has_def=True,
             has_snd_sample=False,
             modal=False,
-            none_desc='Do not add anything.',
+            none_desc=_('Do not add anything.'),
             none_attrs: dict=EmptyMapping,
             title='BEE2',
             desc='',
@@ -522,12 +522,12 @@ class selWin:
             self.sugg_lbl = ttk.Label(
                 self.pal_frame,
                 # Draw lines with box drawing characters
-                text="\u250E\u2500Suggested\u2500\u2512"
+                text="\u250E\u2500" + _("Suggested") + "\u2500\u2512",
             )
         else:
             self.sugg_lbl = ttk.LabelFrame(
                 self.pal_frame,
-                text="Suggested",
+                text=_("Suggested"),
                 labelanchor=N,
                 height=50,
             )
@@ -573,7 +573,7 @@ class selWin:
             samp_button.grid(row=0, column=1)
             add_tooltip(
                 samp_button,
-                "Play a sample of this item.",
+                _("Play a sample of this item."),
             )
 
             def set_samp_play():
@@ -631,7 +631,7 @@ class selWin:
 
         ttk.Button(
             self.prop_frm,
-            text="OK",
+            text=_("OK"),
             command=self.save,
         ).grid(
             row=6,
@@ -642,7 +642,7 @@ class selWin:
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
-                text="Reset to Default",
+                text=_("Reset to Default"),
                 command=self.sel_suggested,
             )
             self.prop_reset.grid(
@@ -653,7 +653,7 @@ class selWin:
 
         ttk.Button(
             self.prop_frm,
-            text="Cancel",
+            text=_("Cancel"),
             command=self.exit,
         ).grid(
             row=6,
@@ -678,7 +678,7 @@ class selWin:
         # The headers for the context menu
         self.context_menus = {}
 
-        # Sort alphabetically, prefering a sort key if present.
+        # Sort alphabetically, preferring a sort key if present.
         self.item_list.sort(key=lambda it: it.sort_key or it.longName)
 
         for ind, item in enumerate(self.item_list):  # type: int, Item
@@ -701,7 +701,7 @@ class selWin:
 
             if group_key not in self.group_names:
                 # If the item is groupless, use 'Other' for the header.
-                self.group_names[group_key] = item.group or 'Other'
+                self.group_names[group_key] = item.group or _('Other')
 
             if not item.group:
                 # Ungrouped items appear directly in the menu.
@@ -879,12 +879,12 @@ class selWin:
         self.disp_btn.state(new_st)
         self.display.state(new_st)
 
-    def exit(self, _=None):
+    def exit(self, event=None):
         """Quit and cancel, choosing the originally-selected item."""
         self.sel_item(self.orig_selected)
         self.save()
 
-    def save(self, _=None):
+    def save(self, event=None):
         """Save the selected item into the textbox."""
         # Stop sample sounds if they're playing
         if self.sampler:
@@ -896,7 +896,7 @@ class selWin:
         self.set_disp()
         self.do_callback()
 
-    def set_disp(self, _=None):
+    def set_disp(self, event=None):
         """Set the display textbox."""
         # Bold the text if the suggested item is selected (like the
         # context menu). We check for truthness to ensure it's actually
@@ -908,7 +908,7 @@ class selWin:
                 self.display['font'] = self.norm_font
 
         if self.selected == self.noneItem:
-            self.disp_label.set("<None>")
+            self.disp_label.set(_("<None>"))
             self.chosen_id = None
         else:
             self.disp_label.set(self.selected.context_lbl)
@@ -975,15 +975,16 @@ class selWin:
                     return True
             return False
 
-    def sel_item(self, item: Item, _=None):
+    def sel_item(self, item: Item, event=None):
 
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
-        elif len(item.authors) == 1:
-            self.prop_author['text'] = 'Author: ' + item.authors[0]
-        else:
-            self.prop_author['text'] = 'Authors: ' + ', '.join(item.authors)
+        self.prop_author['text'] = ngettext(
+            'Author: {}', 'Authors: {}', len(item.authors),
+        ).format(
+            ', '.join(item.authors)
+        )
         self.prop_icon['image'] = item.icon
 
         self.prop_desc.set_text(item.desc)
@@ -1027,7 +1028,7 @@ class selWin:
                 elif label.type is AttrTypes.COLOR:
                     label['image'] = img.color_square(val, size=16)
                     # Display the full color when hovering..
-                    label.tooltip_text = 'Color: R={r}, G={g}, B={b}'.format(
+                    label.tooltip_text = _('Color: R={r}, G={g}, B={b}').format(
                         r=int(val.x), g=int(val.y), b=int(val.z),
                     )
                 elif label.type is AttrTypes.LIST:
