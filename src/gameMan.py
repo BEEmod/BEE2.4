@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property, VPK
+from srctools import Property, NoKeyError, VPK
 import backup
 import extract_packages
 import loadScreen
