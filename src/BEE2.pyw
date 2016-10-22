@@ -133,8 +133,10 @@ if __name__ == '__main__':
             )
         LOGGER.info('Done!')
 
+        # Check games for Portal 2's basemodui.txt file, so we can translate items.
         LOGGER.info('Loading Item Translations...')
-        gameMan.init_trans()
+        for game in gameMan.all_games:
+            game.init_trans()
 
         LOGGER.info('Loading sound FX...')
         sound.load_snd()

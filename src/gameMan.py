@@ -33,7 +33,8 @@ selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
 
-trans_data = {}
+# Translated text from basemodui.txt.
+TRANS_DATA = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -161,23 +162,8 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
-def init_trans():
-    """Load a copy of basemodui, used to translate item strings.
-
-    Valve's items use special translation strings which would look ugly
-    if we didn't convert them.
-    """
-    try:
-        with open('../basemodui.txt') as trans:
-            trans_prop = Property.parse(trans, 'basemodui.txt')
-        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
-            trans_data[item.real_name] = item.value
-    except IOError:
-        pass
-
-
 def translate(string):
-    return trans_data.get(string, string)
+    return TRANS_DATA.get(string, string)
 
 
 def setgame_callback(selected_game):
@@ -723,6 +709,46 @@ class Game:
                 with open(os.path.join(mel_dest, filename), 'wb') as dest:
                     dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
                 export_screen.step('MUS')
+
+    def init_trans(self):
+        """Try and load a copy of basemodui from Portal 2 to translate.
+
+        Valve's items use special translation strings which would look ugly
+        if we didn't convert them.
+        """
+        # Already loaded
+        if TRANS_DATA:
+            return
+
+        # We need to first figure out what language is used (if not English),
+        # then load in the file. This is saved in the 'appmanifest',
+
+        try:
+            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+        except FileNotFoundError:
+            # Portal 2 isn't here...
+            return
+        with appman_file:
+            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+        try:
+            lang = appman.find_key('AppState').find_key('UserConfig')['language']
+        except NoKeyError:
+            return
+
+        basemod_loc = self.abs_path(
+            '../Portal 2/portal2_dlc2/resource/basemodui_' + lang + '.txt'
+        )
+
+        # Basemod files are encoded in UTF-16.
+        try:
+            basemod_file = open(basemod_loc, encoding='utf16')
+        except FileNotFoundError:
+            return
+        with basemod_file:
+            trans_prop = Property.parse(basemod_file, 'basemodui.txt')
+
+        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
+            TRANS_DATA[item.real_name] = item.value
 
 
 def find_steam_info(game_dir):
