@@ -10,14 +10,13 @@ import sound as snd
 import utils
 import srctools
 import contextWin
+import gameMan
 
 LOGGER = utils.getLogger(__name__)
 
 # all properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'toplevel':                 ('pistPlat', 'Start Position'),
-    'bottomlevel':              ('pistPlat', 'End Position'),
     'angledpanelanimation':     ('panAngle', 'Panel Position'),
     'startenabled':             ('checkbox', 'Start Enabled'),
     'startreversed':            ('checkbox', 'Start Reversed'),
@@ -25,13 +24,15 @@ PROP_TYPES = {
     'startactive':              ('checkbox', 'Start Active'),
     'startopen':                ('checkbox', 'Start Open'),
     'startlocked':              ('checkbox', 'Start Locked'),
-    'timerdelay':               ('timerDel', 'Delay \n(0=infinite)'),
     'dropperenabled':           ('checkbox', 'Dropper Enabled'),
     'autodrop':                 ('checkbox', 'Auto Drop'),
     'autorespawn':              ('checkbox', 'Auto Respawn'),
     'oscillate':                ('railLift', 'Oscillate'),
     'paintflowtype':            ('gelType',  'Flow Type'),
     'allowstreak':              ('checkbox', 'Allow Streaks'),
+    'toplevel':                 ('pistPlat', _('Start Position')),
+    'bottomlevel':              ('pistPlat', _('End Position')),
+    'timerdelay':               ('timerDel', _('Delay \n(0=infinite)')),
 
     # Properties that we don't allow modification of.
     'timersound': ('none', 'Timer Sound'),
@@ -299,8 +300,8 @@ def init(cback):
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    labels['noOptions'] = ttk.Label(frame, text='No Properties available!')
-    widgets['saveButton'] = ttk.Button(frame, text='Close', command=exit_win)
+    labels['noOptions'] = ttk.Label(frame, text=_('No Properties available!'))
+    widgets['saveButton'] = ttk.Button(frame, text=_('Close'), command=exit_win)
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
