@@ -25,6 +25,12 @@ if __name__ == '__main__':
         # it can record any errors in the initialisation of modules.
         LOGGER = utils.init_logging('../logs/BEE2.log')
 
+import gettext
+# Setup localisations
+trans = gettext.translation('BEE2', localedir='i18n/', fallback=True)
+# Add these functions to builtins, plus _=gettext
+trans.install(['gettext', 'ngettext'])
+
 from tkinter import messagebox
 
 import traceback
