@@ -452,17 +452,18 @@ def unset_readonly(file):
     )
 
 
-def setup_localisations():
+def setup_localisations(logger):
     """Setup gettext localisations."""
     import gettext
     import locale
     lang = locale.getdefaultlocale()[0]
     # Then get the translator for that.
+    logger.info('Language: {!r}', lang)
     trans = gettext.translation(
         'BEE2',
         localedir='../i18n/',
-        #fallback=True,
-        languages=[lang[:2]],
+        fallback=True,
+        languages=[lang],
     )
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
@@ -537,7 +538,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename: str=None) -> logging.Logger:
+def init_logging(filename: str=None, main_logger='') -> logging.Logger:
     """Setup the logger and logging handlers.
 
     If filename is set, all logs will be written to this file.
@@ -653,10 +654,13 @@ def init_logging(filename: str=None) -> logging.Logger:
 
     sys.__excepthook__ = except_handler
 
-    return LoggerAdapter(logger)
+    if main_logger:
+        return getLogger(main_logger)
+    else:
+        return LoggerAdapter(logger)
 
 
-def getLogger(name: str='', alias: str=None) -> logging.Logger:
+def getLogger(name: str='', alias: str=None) -> LoggerAdapter:
     """Get the named logger object.
 
     This puts the logger into the BEE2 namespace, and wraps it to

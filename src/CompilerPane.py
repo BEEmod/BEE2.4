@@ -8,7 +8,11 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/compiler_pane.log')
+    LOGGER = utils.init_logging('../logs/compiler_pane.log', __name__)
+    utils.setup_localisations(LOGGER)
+else:
+    LOGGER = utils.getLogger(__name__)
+
 
 from tkinter import *
 from tk_tools import TK_ROOT, FileField
@@ -483,10 +487,10 @@ def make_comp_widgets(frame: ttk.Frame):
         UI['thumb_peti'],
         _("Use the normal editor view for the map preview image.")
     )
-    custom_tooltip = (
-        _("Use a custom image for the map preview image. Click the "
-          "screenshot to select.\n"
-          "Images will be converted to JPEGs if needed.")
+    custom_tooltip = _(
+        "Use a custom image for the map preview image. Click the "
+        "screenshot to select.\n"
+        "Images will be converted to JPEGs if needed."
     )
     add_tooltip(
         UI['thumb_custom'],

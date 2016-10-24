@@ -12,8 +12,10 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/backup.log')
-    utils.setup_localisations()
+    LOGGER = utils.init_logging('../logs/backup.log', __name__)
+    utils.setup_localisations(LOGGER)
+else:
+    LOGGER = utils.getLogger(__name__)
 
 
 import tkinter as tk
@@ -42,8 +44,6 @@ from loadScreen import LoadScreen
 import img
 import tk_tools
 import gameMan
-
-LOGGER = utils.getLogger(__name__)
 
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
