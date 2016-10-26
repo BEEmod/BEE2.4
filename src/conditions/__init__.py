@@ -99,6 +99,9 @@ ItemConnections = namedtuple('ItemConnections', [
 ])
 CONNECTIONS = {}
 
+# For each class, a list of item IDs of that type.
+ITEM_CLASSES = defaultdict(list)
+
 # The special tbeam polarity input from ITEM_TBEAM. Works like above.
 TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
@@ -628,6 +631,12 @@ def build_connections_dict(prop_block: Property):
         if item_data.name == 'item_tbeam':
             TBEAM_CONN_ACT = parse(item_data, 'tbeam_activate')
             TBEAM_CONN_DEACT = parse(item_data, 'tbeam_deactivate')
+
+
+def build_itemclass_dict(prop_block: Property):
+    """Load in the dictionary mapping item classes to item ids"""
+    for prop in prop_block.find_children('ItemClasses'):
+        ITEM_CLASSES[prop.value.casefold()].append(prop.name)
 
 
 def dump_conditions():

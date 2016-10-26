@@ -182,14 +182,14 @@ def load_conf(prop_block: Property):
     global INST_SPECIAL
 
     for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.real_name] = [
+        INSTANCE_FILES[prop.name] = [
             inst.value.casefold()
             for inst in
             prop
         ]
 
     for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.real_name] = {
+        CUST_INST_FILES[prop.name] = {
             inst.name: inst.value.casefold()
             for inst in
             prop
@@ -290,6 +290,7 @@ def _resolve(path):
         path = path[1:-1]
         if ':' in path:  # We have a set of subitems to parse
             item, subitem = path.split(':')
+            item = item.casefold()
             try:
                 item_values = INSTANCE_FILES[item]
             except KeyError:
@@ -366,7 +367,7 @@ def _resolve(path):
                 # Skip "" instances
                 return [
                     inst for inst in
-                    INSTANCE_FILES[path]
+                    INSTANCE_FILES[path.casefold()]
                     if inst != ''
                     ]
             except KeyError:
@@ -395,7 +396,7 @@ def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
 
     This returns None if the given value is not present.
     """
-    return CUST_INST_FILES[item_id].get(inst.casefold(), None)
+    return CUST_INST_FILES[item_id.casefold()].get(inst.casefold(), None)
 
 
 def get_special_inst(name: str):

@@ -3,12 +3,15 @@ import conditions
 import srctools
 import utils
 import vbsp
+import instanceLocs
 from conditions import (
-    make_result,
+    make_result, meta_cond,
+    ITEM_CLASSES, CONNECTIONS
 )
-from srctools import Vec, Entity
+from srctools import Vec, Entity, Output
 from vbsp import TEX_FIZZLER
 
+from typing import List
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
@@ -33,6 +36,8 @@ def res_cust_fizzler(base_inst, res):
               Origin are auto-set.
             * Thickness will change the thickness of the fizzler if set.
               By default it is 2 units thick.
+            * Outputs is a block of outputs (laid out like in VMFs). The
+              targetnames will be localised to the instance.
         * MakeLaserField generates a brush stretched across the whole
           area.
             * Name, keys and thickness are the same as the regular Brush.
@@ -112,7 +117,16 @@ def res_cust_fizzler(base_inst, res):
                     config,
                 )
 
-                if should_merge: # The first brush...
+                for out_prop in config.find_children('Outputs'):
+                    out = Output.parse(out_prop)
+                    out.comma_sep = False
+                    out.target = conditions.local_name(
+                        base_inst,
+                        out.target
+                    )
+                    new_brush.add_out(out)
+
+                if should_merge:  # The first brush...
                     FIZZ_BRUSH_ENTS[merge_key] = new_brush
 
             laserfield_conf = config.find_key('MakeLaserField', None)
@@ -319,3 +333,83 @@ def res_fizzler_pair(begin_inst, res):
                 file=mid_file,
                 origin=new_pos.join(' '),
             )
+
+
+@meta_cond(priority=-200, only_once=True)
+def fizzler_out_relay(_):
+    """Link fizzlers with a relay item so they can be given outputs."""
+    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
+    if not relay_file:
+        # No relay item - deactivated most likely.
+        return
+
+    # instances
+    fizz_models = set()
+    # base -> connections
+    fizz_bases = {}
+
+    LOGGER.info('Item classes: {}', ITEM_CLASSES)
+
+    for fizz_id in ITEM_CLASSES['itembarrierhazard']:
+        base, model = instanceLocs.resolve(
+            '<{}: fizz_base, fizz_model>'.format(fizz_id)
+        )
+        fizz_bases[base.casefold()] = CONNECTIONS[fizz_id]
+        fizz_models.add(model.casefold())
+
+    # targetname -> base inst, connections
+    fizz_by_name = {}
+
+    # origin, normal -> targetname
+    pos_to_name = {}
+
+    marker_inst = []  # type: List[Entity]
+
+    LOGGER.info('Fizzler data: {}', locals())
+
+    for inst in vbsp.VMF.by_class['func_instance']:
+        filename = inst['file'].casefold()
+        if filename in fizz_bases:
+            name = inst['targetname']
+            fizz_by_name[inst['targetname']] = inst, fizz_bases[filename]
+        elif filename in fizz_models:
+            name = inst['targetname'][:-9]
+
+        elif filename in relay_file:
+            marker_inst.append(inst)
+            # Remove the marker, we don't need that...
+            inst.remove()
+            continue
+        else:
+            continue
+
+        pos_to_name[
+            Vec.from_str(inst['origin']).as_tuple(),
+            Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+        ] = name
+
+    for inst in marker_inst:
+        try:
+            fizz_name = pos_to_name[
+                Vec.from_str(inst['origin']).as_tuple(),
+                Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+            ]
+        except KeyError:
+            # Not placed on a fizzler...
+            continue
+        base_inst, connections = fizz_by_name[fizz_name]
+
+        # Copy over fixup values
+        for key, val in inst.fixup.items():
+            base_inst[key] = val
+
+        for out in inst.outputs:
+            new_out = out.copy()
+            if out.output == 'ON':
+                new_out.inst_out, new_out.output = connections.out_act
+            elif out.output == 'OFF':
+                new_out.inst_out, new_out.output = connections.out_deact
+            else:
+                # Not the marker's output somehow?
+                continue
+            base_inst.add_out(new_out)
