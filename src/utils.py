@@ -521,10 +521,13 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename: str=None) -> logging.Logger:
+def init_logging(filename: str=None, on_error=None) -> logging.Logger:
     """Setup the logger and logging handlers.
 
-    If filename is set, all logs will be written to this file.
+    If filename is set, all logs will be written to this file as well.
+    This also sets sys.except_hook, so uncaught exceptions are captured.
+    on_error should be a function to call when this is done
+    (taking type, value, traceback).
     """
     global short_log_format, long_log_format
     global stderr_loghandler, stdout_loghandler
@@ -621,10 +624,12 @@ def init_logging(filename: str=None) -> logging.Logger:
 
     # Use the exception hook to report uncaught exceptions, and finalise the
     # logging system.
-    old_except_handler = sys.__excepthook__
+    old_except_handler = sys.excepthook
 
     def except_handler(*exc_info):
         """Log uncaught exceptions."""
+        if on_error is not None:
+            on_error(*exc_info)
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
@@ -633,9 +638,9 @@ def init_logging(filename: str=None) -> logging.Logger:
         )
         logging.shutdown()
         # Call the original handler - that prints to the normal console.
-        old_except_handler()
+        old_except_handler(*exc_info)
 
-    sys.__excepthook__ = except_handler
+    sys.excepthook = except_handler
 
     return LoggerAdapter(logger)
 
