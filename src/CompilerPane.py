@@ -1,5 +1,7 @@
 import utils
+import tk_tools
 if __name__ == '__main__':
+    from BEE2 import on_error
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
         # Otherwise we can't find our files!
@@ -8,7 +10,10 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/compiler_pane.log')
+    utils.init_logging('../logs/compiler_pane.log', on_error=on_error)
+
+    # Run our error function if TK callbacks crash too.
+    tk_tools.hook_tk_errors(on_error)
 
 from tkinter import *
 from tk_tools import TK_ROOT, FileField

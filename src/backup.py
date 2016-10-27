@@ -3,6 +3,7 @@
 """
 import srctools
 import utils
+import tk_tools
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
@@ -12,7 +13,7 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/backup.log')
+    utils.init_logging('../logs/backup.log', on_error=tk_tools.on_error)
 
 
 import tkinter as tk

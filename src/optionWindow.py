@@ -334,15 +334,6 @@ def init_dev_tab(f):
 
     make_checkbox(
         f,
-        section='Debug',
-        item='show_errors',
-        desc="Show detailed error message",
-        tooltip='If an error occurs, show the error and traceback '
-                'before quitting.',
-    ).grid(row=0, column=1, sticky=W)
-
-    make_checkbox(
-        f,
         section='General',
         item='preserve_bee2_resource_dir',
         desc='Preserve Game Directories',
@@ -351,7 +342,7 @@ def init_dev_tab(f):
                 'Enable if you\'re'
                 ' developing new content, to ensure it is not '
                 'overwritten.',
-    ).grid(row=1, column=1, sticky=W)
+    ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
         f,
@@ -360,4 +351,4 @@ def init_dev_tab(f):
         desc='Show Log Window',
         var=SHOW_LOG_WIN,
         tooltip='Show the log file in real-time.',
-    ).grid(row=2, column=1, sticky=W)
+    ).grid(row=1, column=1, sticky=W)

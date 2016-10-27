@@ -5,7 +5,6 @@ General code used for tkinter portions.
 from tkinter import ttk
 from tkinter import font as _tk_font
 from tkinter import filedialog
-from tkinter import messagebox
 import tkinter as tk
 
 import os.path
@@ -24,14 +23,61 @@ if utils.WIN:
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
 
+# noinspection PyBroadException
+def on_error(exc_type, exc_value, exc_tb):
+    """Run when the application crashes. Display to the user, log it, and quit."""
+    # We don't want this to fail, so import everything here, and wrap in
+    # except Exception.
+    import traceback
+
+    # Close loading screens if they're visible..
+    try:
+        import loadScreen
+        loadScreen.close_all()
+    except Exception:
+        pass
+
+    err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
+
+    # Grab and release the grab so nothing else can block the error message.
+    try:
+        TK_ROOT.grab_set_global()
+        TK_ROOT.grab_release()
+
+        # Append traceback to the clipboard.
+        TK_ROOT.clipboard_append(err)
+    except Exception:
+        pass
+
+    # Put it onscreen.
+    try:
+        from tkinter import messagebox
+        messagebox.showinfo(
+            title='BEE2 Error!',
+            message='An error occurred: \n{}\n\nThis has '
+                    'been copied to the clipboard.'.format(err),
+            icon=messagebox.ERROR,
+        )
+    except Exception:
+        pass
+
+    try:
+        from BEE2_config import GEN_OPTS
+        # Try to turn on the logging window for next time..
+        GEN_OPTS.load()
+        GEN_OPTS['Debug']['show_log_win'] = '1'
+        GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
+        GEN_OPTS.save()
+    except Exception:
+        # Ignore failures...
+        pass
+
+
 def hook_tk_errors():
     """TKinter catches and swallows callback errors.
 
-     we need to hook into that to log those seperately.
+     We need to hook into that to log those seperately.
     """
-    import loadScreen
-    import traceback
-    main_logger = utils.getLogger()
 
     def tk_error(exc_type, exc_value, exc_tb):
         """Log TK errors."""
@@ -41,28 +87,9 @@ def hook_tk_errors():
         import sys
         if exc_tb.tb_next:
             exc_tb = exc_tb.tb_next
-        main_logger.error(
-            'TKinter callback exception occurred:\n{}',
-            ''.join(
-                traceback.format_exception(
-                    exc_type,
-                    exc_value,
-                    exc_tb,
-                )
-            ),
-        )
-        # Close loading screens if they're visible..
-        loadScreen.close_all()
 
-        # Release the grab, if it exists. Otherwise you can't see the error dialog.
-        TK_ROOT.grab_set_global()
-        TK_ROOT.grab_release()
+        on_error(exc_type, exc_value, exc_tb)
 
-        messagebox.showerror(
-            title='BEE2 Error:',
-            message='{}: {!r}'.format(exc_type.__name__, exc_value),
-            parent=TK_ROOT,
-        )
         # Since this isn't caught normally, it won't quit the application.
         # Quit ourselves manually. to prevent TK just freezing.
         TK_ROOT.quit()

@@ -4,60 +4,6 @@ from multiprocessing.spawn import is_forking
 import os
 import sys
 
-# If failing before loading settings, show the error.
-show_errors = True
-
-
-# noinspection PyBroadException
-def on_error(exc_type, exc_value, exc_tb):
-    """Run when the application crashes. Display to the user, log it, and quit."""
-    # We don't want this to fail, so import everything here, and wrap in
-    # except Exception.
-    import traceback
-
-    # Close loading screens if they're visible..
-    try:
-        import loadScreen
-        loadScreen.close_all()
-    except Exception:
-        pass
-
-    err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-
-    # Grab and release the grab so nothing else can block the error message.
-    try:
-        from tk_tools import TK_ROOT
-        TK_ROOT.grab_set_global()
-        TK_ROOT.grab_release()
-
-        # Append traceback to the clipboard.
-        TK_ROOT.clipboard_append(err)
-    except Exception:
-        pass
-
-    if show_errors:
-        # Put it onscreen if desired.
-        try:
-            from tkinter import messagebox
-            messagebox.showinfo(
-                title='BEE2 Error!',
-                message='An error occurred: \n{}\n\nThis has '
-                        'been copied to the clipboard.'.format(err),
-                icon=messagebox.ERROR,
-            )
-        except Exception:
-            pass
-
-    try:
-        # Try to turn on the logging window for next time..
-        GEN_OPTS.load()
-        GEN_OPTS['Debug']['show_log_win'] = '1'
-        GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
-        GEN_OPTS.save()
-    except Exception:
-        # Ignore failures...
-        pass
-
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
@@ -78,7 +24,8 @@ if __name__ == '__main__':
     else:
         # We need to initialise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
-        LOGGER = utils.init_logging('../logs/BEE2.log', on_error=on_error)
+        import tk_tools
+        LOGGER = utils.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
 
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
@@ -112,8 +59,6 @@ DEFAULT_SETTINGS = {
         'cache_pack_count': '0',
     },
     'Debug': {
-        # Show exceptions in dialog box when crash occurs
-        'show_errors': '0',
         # Log whenever items fallback to the parent style
         'log_item_fallbacks': '0',
         # Print message for items that have no match for a style
@@ -148,7 +93,6 @@ if __name__ == '__main__':
     )
 
     UI.load_settings()
-    show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
 
     gameMan.load()
     gameMan.set_game_by_name(
