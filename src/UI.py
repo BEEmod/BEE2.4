@@ -762,7 +762,7 @@ def refresh_pal_ui():
         menus['pal'].entryconfigure(1, state=NORMAL)
 
 
-def export_editoritems(_=None):
+def export_editoritems(e=None):
     """Export the selected Items and Style into the chosen game."""
 
     # Convert IntVar to boolean, and only export values in the selected style
@@ -861,7 +861,7 @@ def set_disp_name(item, e=None):
     UI['pre_disp_name'].configure(text=_('Item: {}').format(item.name))
 
 
-def clear_disp_name(_=None):
+def clear_disp_name(e=None):
     UI['pre_disp_name'].configure(text='')
 
 
@@ -1025,7 +1025,7 @@ def set_pal_radio():
     set_palette()
 
 
-def set_pal_listbox_selection(_=None):
+def set_pal_listbox_selection(e=None):
     """Select the currently chosen palette in the listbox."""
     UI['palette'].selection_clear(0, len(palettes))
     UI['palette'].selection_set(selectedPalette)
@@ -1092,12 +1092,12 @@ def pal_shuffle():
     flow_preview()
 
 
-def pal_save_as(_=None):
+def pal_save_as(e=None):
     name = ""
     while True:
         name = ask_string(
             _("BEE2 - Save Palette"),
-            -("Enter a name:"),
+            _("Enter a name:"),
         )
         if name is None:
             # Cancelled...
@@ -1124,7 +1124,7 @@ def pal_save_as(_=None):
     refresh_pal_ui()
 
 
-def pal_save(_=None):
+def pal_save(e=None):
     pal = palettes[selectedPalette]
     pal.pos = [(it.id, it.subKey) for it in pal_picked]
     pal.save(allow_overwrite=True)  # overwrite it
@@ -1171,7 +1171,7 @@ def init_palette(f):
     UI['palette'] = Listbox(f, width=10)
     UI['palette'].grid(row=1, sticky="NSEW")
 
-    def set_pal_listbox(_=None):
+    def set_pal_listbox(e=None):
         global selectedPalette
         selectedPalette = int(UI['palette'].curselection()[0])
         selectedPalette_radio.set(selectedPalette)
@@ -1443,7 +1443,7 @@ def init_picker(f):
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(_=None):
+def flow_picker(e=None):
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the

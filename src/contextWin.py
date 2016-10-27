@@ -125,7 +125,7 @@ def hide_item_props(vals):
     selected_item.set_properties(vals)
 
 
-def sub_sel(ind, _=None):
+def sub_sel(ind, e=None):
     """Change the currently-selected sub-item."""
     # Can only change the subitem on the preview window
     if selected_sub_item.is_pre:
@@ -137,7 +137,7 @@ def sub_sel(ind, _=None):
             show_prop(selected_sub_item, warp_cursor=True)
 
 
-def sub_open(ind, _=None):
+def sub_open(ind, e=None):
     """Move the context window to apply to the given item."""
     pos = SUBITEM_POS[selected_item.num_sub][ind]
     if pos != -1 and pos != selected_sub_item.subKey:
@@ -180,7 +180,7 @@ def show_prop(widget, warp_cursor=False):
     load_item_data()
 
 
-def set_item_version(_=None):
+def set_item_version(e=None):
     selected_item.change_version(version_lookup[wid['variant'].current()])
     load_item_data()
 
@@ -363,7 +363,7 @@ def load_item_data():
 
 
 
-def adjust_position(_=None):
+def adjust_position(e=None):
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside
@@ -397,7 +397,7 @@ def adjust_position(_=None):
 TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
-def hide_context(_=None):
+def hide_context(e=None):
     """Hide the properties window, if it's open."""
     global is_open, selected_item, selected_sub_item
     if is_open:

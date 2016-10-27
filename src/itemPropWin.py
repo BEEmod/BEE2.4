@@ -254,7 +254,7 @@ def paint_fx(e=None):
     sfx('config')
 
 
-def exit_win(_=None):
+def exit_win(e=None):
     """Quit and save the new settings."""
     global is_open
     win.grab_release()

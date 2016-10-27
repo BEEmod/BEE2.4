@@ -398,7 +398,7 @@ class CheckDetails(ttk.Frame):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, _=None):
+    def refresh(self, e=None):
         """Reposition the widgets.
 
         Must be called when self.items is changed,
@@ -475,7 +475,7 @@ class CheckDetails(ttk.Frame):
 
         self.wid_canvas['scrollregion'] = (0, 0, width, height)
 
-    def sort(self, index, _=None):
+    def sort(self, index, e=None):
         """Click event for headers."""
         if self.sort_ind is not None:
             self.wid_head_sort[self.sort_ind]['text'] = ''

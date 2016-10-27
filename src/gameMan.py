@@ -865,7 +865,7 @@ def load():
     selected_game = all_games[0]
 
 
-def add_game(_=None, refresh_menu=True):
+def add_game(e=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
@@ -925,7 +925,7 @@ def add_game(_=None, refresh_menu=True):
         return True
 
 
-def remove_game(_=None):
+def remove_game(e=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (

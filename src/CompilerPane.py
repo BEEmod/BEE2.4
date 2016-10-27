@@ -304,7 +304,7 @@ def set_pack_dump_enabled():
         UI['packfile_filefield'].grid_remove()
 
 
-def find_screenshot(_=None):
+def find_screenshot(e=None):
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
@@ -367,7 +367,7 @@ def set_screenshot(img=None):
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def set_model(_=None):
+def set_model(e=None):
     """Save the selected player model."""
     text = player_model_var.get()
     COMPILE_CFG['General']['player_model'] = PLAYER_MODELS_REV[text]

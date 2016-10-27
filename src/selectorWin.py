@@ -186,11 +186,11 @@ class GroupHeader(ttk.Frame):
         self.hover_start() # Update arrow icon
         self.parent.flow_items()
 
-    def toggle(self, _=None):
+    def toggle(self, e=None):
         """Toggle the header on or off."""
         self.visible = not self._visible
 
-    def hover_start(self, _=None):
+    def hover_start(self, e=None):
         """When hovered over, fill in the triangle."""
         self.arrow['text'] = (
             GRP_EXP_HOVER
@@ -198,7 +198,7 @@ class GroupHeader(ttk.Frame):
             GRP_COLL_HOVER
         )
 
-    def hover_end(self, _=None):
+    def hover_end(self, e=None):
         """When leaving, hollow the triangle."""
         self.arrow['text'] = (
             GRP_EXP
@@ -928,7 +928,7 @@ class selWin:
         self.display['font'] = self.mouseover_font
         self.disp_label.set(self.suggested.context_lbl)
 
-    def open_win(self, _=None, force_open=False):
+    def open_win(self, e=None, force_open=False):
         if self._readonly and not force_open:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
@@ -1178,7 +1178,7 @@ class selWin:
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, _=None):
+    def flow_items(self, e=None):
         """Reposition all the items to fit in the current geometry.
 
         Called on the <Configure> event.
