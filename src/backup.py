@@ -1,7 +1,6 @@
 """Backup and restore P2C maps.
 
 """
-import srctools
 import utils
 import tk_tools
 if __name__ == '__main__':
@@ -42,6 +41,7 @@ from loadScreen import LoadScreen
 import img
 import tk_tools
 import gameMan
+import srctools
 
 LOGGER = utils.getLogger(__name__)
 
