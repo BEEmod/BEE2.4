@@ -1,8 +1,14 @@
 """Results relating to item connections."""
 import srctools
 import utils
-from conditions import make_result, make_result_setup, resolve_value, local_name, CONNECTIONS
+from conditions import (
+    make_flag, make_result, make_result_setup,
+    resolve_value, local_name,
+    CONNECTIONS,
+)
 from srctools import Property, Entity, Output
+
+from typing import Optional, Dict, Tuple
 
 LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
@@ -91,3 +97,95 @@ def res_add_output(inst: Entity, res: Property):
         inst_out=resolve_value(inst, inst_out) or None,
         inst_in=resolve_value(inst, inst_in) or None,
     ))
+
+# Locking Input/Output items.
+# This makes for example pedestal buttons lock down until the target
+# item shuts itself off.
+
+# targetname -> inst, out_name, out_output, out_relay
+LOCKABLE_ITEMS = {}  # type: Dict[str, Tuple[Entity, Optional[str], str, str]]
+
+
+@make_result('MarkLocking')
+def res_locking_output(inst: Entity, res: Property):
+    """Marks an output item for locked connections.
+
+    The parameter is an `instance:name;Output` value, which is fired when the
+    item resets. This must be executed before `LockingIO`.
+
+    This only applies if `$connectioncount` is 1.
+    """
+    # Items with more than one connection have AND logic in the mix - it makes
+    # it unsafe to lock the input item.
+    if inst.fixup['$connectioncount'] != '1':
+        return
+
+    if res.has_children():
+        name, output = Output.parse_name(res['output'])
+        relay_name = res['rl_name', None]
+    else:
+        name, output = Output.parse_name(res.value)
+        relay_name = None
+
+    LOCKABLE_ITEMS[inst['targetname']] = inst, name, output, relay_name
+
+
+@make_flag('LockingIO')
+def res_locking_input(inst: Entity, res: Property) -> str:
+    """Executed on the input item, and evaluates to True if successful.
+
+    The parameter is an `instance:name;Input` value, which resets the item.
+    This must be executed after the `MarkLocking` results have run.
+    """
+    from vbsp import IND_ITEM_NAMES, IND_PANEL_NAMES, VMF
+    in_name, in_inp = Output.parse_name(res.value)
+
+    targets = {
+        out.target
+        for out in
+        inst.outputs
+        # Skip toggle or indicator panel items.
+        if out.target not in IND_ITEM_NAMES
+    }
+    # No outputs, or 2+ - we can't convert in that case
+    if len(targets) != 1:
+        return False
+
+    target, = targets
+    try:
+        targ_inst, targ_out_name, targ_out, out_relay = LOCKABLE_ITEMS[target]
+    except KeyError:
+        # Some other item...
+        return False
+
+    # Remove the indicator panel instances.
+    ind_panels = {
+        out.target
+        for out in
+        inst.outputs
+        # Skip toggle or indicator panel items.
+        if out.target in IND_PANEL_NAMES
+    }
+    for pan_inst in VMF.by_class['func_instance']:
+        if pan_inst['targetname'] in ind_panels:
+            pan_inst.remove()
+
+    # Add an output pointing in the opposite direction.
+    if out_relay is None:
+        targ_inst.add_out(Output(
+            out=targ_out,
+            inst_out=targ_out_name,
+            targ=inst['targetname'],
+            inp=in_inp,
+            inst_in=in_name,
+        ))
+    else:
+        from conditions.instances import add_global_input
+        add_global_input(
+            inst,
+            in_name,
+            in_inp,
+            rl_name=out_relay,
+            output=targ_out,
+        )
+    return True
