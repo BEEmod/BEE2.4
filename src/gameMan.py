@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property, VPK
+from srctools import Property, NoKeyError, VPK
 import backup
 import extract_packages
 import loadScreen
@@ -33,7 +33,8 @@ selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
 
-trans_data = {}
+# Translated text from basemodui.txt.
+TRANS_DATA = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -161,23 +162,8 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
-def init_trans():
-    """Load a copy of basemodui, used to translate item strings.
-
-    Valve's items use special translation strings which would look ugly
-    if we didn't convert them.
-    """
-    try:
-        with open('../basemodui.txt') as trans:
-            trans_prop = Property.parse(trans, 'basemodui.txt')
-        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
-            trans_data[item.real_name] = item.value
-    except IOError:
-        pass
-
-
 def translate(string):
-    return trans_data.get(string, string)
+    return TRANS_DATA.get(string, string)
 
 
 def setgame_callback(selected_game):
@@ -595,9 +581,9 @@ class Game:
                     export_screen.grab_release()
                     export_screen.reset()
                     messagebox.showerror(
-                        title='BEE2 - Export Failed!',
-                        message='Copying compiler file {file} failed.'
-                                'Ensure the {game} is not running.'.format(
+                        title=_('BEE2 - Export Failed!'),
+                        message=_('Copying compiler file {file} failed.'
+                                  'Ensure the {game} is not running.').format(
                                     file=file,
                                     game=self.name,
                                 ),
@@ -740,6 +726,56 @@ class Game:
                     dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
                 export_screen.step('MUS')
 
+    def init_trans(self):
+        """Try and load a copy of basemodui from Portal 2 to translate.
+
+        Valve's items use special translation strings which would look ugly
+        if we didn't convert them.
+        """
+        # Already loaded
+        if TRANS_DATA:
+            return
+
+        # We need to first figure out what language is used (if not English),
+        # then load in the file. This is saved in the 'appmanifest',
+
+        try:
+            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+        except FileNotFoundError:
+            # Portal 2 isn't here...
+            return
+        with appman_file:
+            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+        try:
+            lang = appman.find_key('AppState').find_key('UserConfig')['language']
+        except NoKeyError:
+            return
+
+        basemod_loc = self.abs_path(
+            '../Portal 2/portal2_dlc2/resource/basemodui_' + lang + '.txt'
+        )
+
+        # Basemod files are encoded in UTF-16.
+        try:
+            basemod_file = open(basemod_loc, encoding='utf16')
+        except FileNotFoundError:
+            return
+        with basemod_file:
+            if lang == 'english':
+                def filterer(file):
+                    """The English language has some unused language text.
+
+                    This needs to be skipped since it has invalid quotes."""
+                    for line in file:
+                        if line.count('"') <= 4:
+                            yield line
+                basemod_file = filterer(basemod_file)
+
+            trans_prop = Property.parse(basemod_file, 'basemodui.txt')
+
+        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
+            TRANS_DATA[item.real_name] = item.value
+
 
 def find_steam_info(game_dir):
     """Determine the steam ID and game name of this folder, if it has one.
@@ -833,14 +869,14 @@ def add_game(_=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
-        message='Select the folder where the game executable is located '
-                '(portal2' + EXE_SUFFIX + ')...',
+        message=_('Select the folder where the game executable is located '
+                  '({appname})...').format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
-        title='BEE2 - Add Game',
+        title=_('BEE2 - Add Game'),
         )
     exe_loc = filedialog.askopenfilename(
-        title='Find Game Exe',
-        filetypes=[('Executable', '.exe')],
+        title=_('Find Game Exe'),
+        filetypes=[(_('Executable'), '.exe')],
         initialdir='C:',
         )
     if exe_loc:
@@ -848,25 +884,25 @@ def add_game(_=None, refresh_menu=True):
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
             messagebox.showinfo(
-                message='This does not appear to be a valid game folder!',
+                message=_('This does not appear to be a valid game folder!'),
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
-                title='BEE2 - Add Game',
+                title=_('BEE2 - Add Game'),
                 )
             return False
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = ask_string(
-                prompt="Enter the name of this game:",
-                title='BEE2 - Add Game',
+                prompt=_("Enter the name of this game:"),
+                title=_('BEE2 - Add Game'),
                 initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='This name is already taken!',
-                    title='BEE2 - Add Game',
+                    message=_('This name is already taken!'),
+                    title=_('BEE2 - Add Game'),
                     )
             elif name is None:
                 return False
@@ -874,8 +910,8 @@ def add_game(_=None, refresh_menu=True):
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='Please enter a name for this game!',
-                    title='BEE2 - Add Game',
+                    message=_('Please enter a name for this game!'),
+                    title=_('BEE2 - Add Game'),
                     )
             else:
                 break
@@ -893,16 +929,15 @@ def remove_game(_=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
-        "\n (BEE2 will quit, this is the last game set!)"
+        _("\n (BEE2 will quit, this is the last game set!)")
         if len(all_games) == 1 else
         ""
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message='Are you sure you want to delete "'
-                + selected_game.name
-                + '"?'
-                + lastgame_mess,
+        message=_('Are you sure you want to delete "{}?"').format(
+                selected_game.name
+            ) + lastgame_mess,
         )
     if confirm:
         selected_game.edit_gameinfo(add_line=False)
@@ -965,6 +1000,5 @@ if __name__ == '__main__':
     dropdown.game_pos = 0
     TK_ROOT['menu'] = test_menu
 
-    init_trans()
     load()
     add_menu_opts(dropdown, setgame_callback)

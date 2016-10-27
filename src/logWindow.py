@@ -27,9 +27,9 @@ BOX_LEVELS = [
 ]
 
 LVL_TEXT = {
-    logging.DEBUG: 'Debug messages',
-    logging.INFO: 'Default',
-    logging.WARNING: 'Warnings Only',
+    logging.DEBUG: _('Debug messages'),
+    logging.INFO: _('Default'),
+    logging.WARNING: _('Warnings Only'),
 }
 
 window = None  # type: tk.Toplevel
@@ -155,7 +155,7 @@ def init(start_open, log_level='info'):
     window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    window.title('Logs ' + utils.BEE_VERSION)
+    window.title(_('Logs - {}').format(utils.BEE_VERSION))
     window.protocol('WM_DELETE_WINDOW', lambda: set_visible(False))
 
     text_box = tk.Text(
@@ -200,7 +200,7 @@ def init(start_open, log_level='info'):
     ttk.Button(
         button_frame,
         name='copy_btn',
-        text='Copy',
+        text=_('Copy'),
         command=btn_copy,
     ).grid(row=0, column=1)
 
@@ -212,7 +212,7 @@ def init(start_open, log_level='info'):
 
     ttk.Label(
         sel_frame,
-        text='Show:',
+        text=_('Show:'),
         anchor='e',
         justify='right',
     ).grid(row=0, column=0, sticky='E')

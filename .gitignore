@@ -70,3 +70,6 @@ config/
 
 # Logs
 BEE2.log*
+
+# Internationalisation source
+/BEE2.pot

@@ -73,7 +73,7 @@ class SubPane(Toplevel):
         )
         tooltip.add_tooltip(
             self.tool_button,
-            text='Hide/Show the "{}" window.'.format(title))
+            text=_('Hide/Show the "{}" window.').format(title))
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)

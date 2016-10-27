@@ -123,7 +123,7 @@ class tkRichText(tkinter.Text):
         def callback(e):
             if askokcancel(
                 title='BEE2 - Open URL?',
-                message='Open "{}" in the default browser?'.format(url),
+                message=_('Open "{}" in the default browser?').format(url),
                 master=self,
             ):
                 webbrowser.open(url)

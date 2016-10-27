@@ -9,7 +9,15 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/compiler_pane.log', on_error=tk_tools.on_error)
+    LOGGER = utils.init_logging(
+        '../logs/compiler_pane.log',
+        __name__,
+        on_error=tk_tools.on_error
+    )
+    utils.setup_localisations(LOGGER)
+else:
+    LOGGER = utils.getLogger(__name__)
+
 
 from tkinter import *
 from tk_tools import TK_ROOT, FileField
@@ -73,12 +81,12 @@ COMPILE_DEFAULTS = {
 }
 
 PLAYER_MODELS = {
-    'ATLAS': 'ATLAS',
-    'PBODY': 'P-Body',
-    'SP': 'Chell',
-    'PETI': 'Bendy',
+    'ATLAS': _('ATLAS'),
+    'PBODY': _('P-Body'),
+    'SP': _('Chell'),
+    'PETI': _('Bendy'),
 }
-PLAYER_MODEL_ORDER = ['Bendy', 'Chell', 'ATLAS', 'P-Body']
+PLAYER_MODEL_ORDER = ['PETI', 'SP', 'ATLAS', 'PBODY']
 PLAYER_MODELS_REV = {value: key for key, value in PLAYER_MODELS.items()}
 
 COMPILE_CFG = ConfigFile('compile.cfg')
@@ -133,23 +141,26 @@ count_overlay.should_flash = False
 COUNT_CATEGORIES = [
     (
         count_brush, 'brush', 8192,
-        "Brushes form the walls or other parts of the test chamber. If this "
-        "is high, it may help to reduce the size of the map or remove intricate"
-        " shapes."
+        # i18n: Progress bar description
+        _("Brushes form the walls or other parts of the test chamber. If this "
+          "is high, it may help to reduce the size of the map or remove "
+          "intricate shapes.")
     ),
     (
         count_entity, 'entity', 2048,
-        "Entities are the things in the map that have functionality. Removing "
-        "complex moving items will help reduce this. Items have their entity "
-        "count listed in the item description window.\n\n"
-        "This isn't totally accurate, some entity types are counted here "
-        "but don't affect the ingame limit. ",
+        # i18n: Progress bar description
+        _("Entities are the things in the map that have functionality. Removing "
+          "complex moving items will help reduce this. Items have their entity "
+          "count listed in the item description window.\n\n"
+          "This isn't totally accurate, some entity types are counted here "
+          "but don't affect the ingame limit. "),
     ),
     (
         count_overlay, 'overlay', 512,
-        "Overlays are smaller images affixed to surfaces, like signs or "
-        "indicator lights. Hiding long antlines or setting them to signage "
-        "will reduce this."
+        # i18n: Progress bar description
+        _("Overlays are smaller images affixed to surfaces, like signs or "
+          "indicator lights. Hiding long antlines or setting them to signage "
+          "will reduce this.")
     ),
 ]
 
@@ -185,7 +196,8 @@ def set_corr_values(group_name, props):
     """Set the corrdors according to the passed prop_block."""
     count = 7 if group_name == 'sp_entry' else 4
     group = CORRIDOR[group_name] = ['Random'] + [
-        str(i) + ': Corridor'
+        # Note: default corridor description
+        str(i) + ': ' + _('Corridor')
         for i in
         range(1, count + 1)
     ]
@@ -297,8 +309,9 @@ def find_screenshot(_=None):
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
         filetypes=[
-            ('Image File', '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
-                           '*.tiff *.tga *.ico *.psd'),
+            # note: File type description
+            (_('Image Files'), '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
+                              '*.tiff *.tga *.ico *.psd'),
         ],
         initialdir='C:',
     )
@@ -396,11 +409,13 @@ def make_widgets():
     nbook.enable_traversal()
 
     map_frame = ttk.Frame(nbook)
-    nbook.add(map_frame, text='Map Settings')
+    # note: Tab name
+    nbook.add(map_frame, text=_('Map Settings'))
     make_map_widgets(map_frame)
 
     comp_frame = ttk.Frame(nbook)
-    nbook.add(comp_frame, text='Compile Settings')
+    # note: Tab name
+    nbook.add(comp_frame, text=_('Compile Settings'))
     make_comp_widgets(comp_frame)
 
 
@@ -414,7 +429,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     thumb_frame = ttk.LabelFrame(
         frame,
-        text='Thumbnail',
+        text=_('Thumbnail'),
         labelanchor=N,
     )
     thumb_frame.grid(row=0, column=0, sticky=EW)
@@ -422,7 +437,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_auto'] = ttk.Radiobutton(
         thumb_frame,
-        text='Auto',
+        text=_('Auto'),
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -430,7 +445,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_peti'] = ttk.Radiobutton(
         thumb_frame,
-        text='PeTI',
+        text=_('PeTI'),
         value='PETI',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -438,7 +453,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_custom'] = ttk.Radiobutton(
         thumb_frame,
-        text='Custom:',
+        text=_('Custom:'),
         value='CUST',
         variable=chosen_thumb,
         command=set_screen_type,
@@ -456,7 +471,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     UI['thumb_cleanup'] = ttk.Checkbutton(
         thumb_frame,
-        text='Cleanup old screenshots',
+        text=_('Cleanup old screenshots'),
         variable=cleanup_screenshot,
         command=make_setter('Screenshot', 'del_old', cleanup_screenshot),
     )
@@ -467,17 +482,17 @@ def make_comp_widgets(frame: ttk.Frame):
     UI['thumb_cleanup'].grid(row=3, columnspan=2, sticky='W')
     add_tooltip(
         UI['thumb_auto'],
-        "Override the map image to use a screenshot automatically taken "
-        "from the beginning of a chamber. Press F5 to take a new "
-        "screenshot. If the map has not been previewed recently "
-        "(within the last few hours), the default PeTI screenshot "
-        "will be used instead."
+        _("Override the map image to use a screenshot automatically taken "
+          "from the beginning of a chamber. Press F5 to take a new "
+          "screenshot. If the map has not been previewed recently "
+          "(within the last few hours), the default PeTI screenshot "
+          "will be used instead.")
     )
     add_tooltip(
         UI['thumb_peti'],
-        "Use the normal editor view for the map preview image."
+        _("Use the normal editor view for the map preview image.")
     )
-    custom_tooltip = (
+    custom_tooltip = _(
         "Use a custom image for the map preview image. Click the "
         "screenshot to select.\n"
         "Images will be converted to JPEGs if needed."
@@ -494,8 +509,8 @@ def make_comp_widgets(frame: ttk.Frame):
 
     add_tooltip(
         UI['thumb_cleanup'],
-        'Automatically delete unused Automatic screenshots. '
-        'Disable if you want to keep things in "portal2/screenshots". '
+        _('Automatically delete unused Automatic screenshots. '
+          'Disable if you want to keep things in "portal2/screenshots". ')
     )
 
     if chosen_thumb.get() == 'CUST':
@@ -505,14 +520,14 @@ def make_comp_widgets(frame: ttk.Frame):
 
     vrad_frame = ttk.LabelFrame(
         frame,
-        text='Lighting:',
+        text=_('Lighting:'),
         labelanchor=N,
     )
     vrad_frame.grid(row=1, column=0, sticky=EW)
 
     UI['light_fast'] = ttk.Radiobutton(
         vrad_frame,
-        text='Fast',
+        text=_('Fast'),
         value=0,
         variable=vrad_light_type,
         command=make_setter('General', 'vrad_force_full', vrad_light_type),
@@ -520,7 +535,7 @@ def make_comp_widgets(frame: ttk.Frame):
     UI['light_fast'].grid(row=0, column=0)
     UI['light_full'] = ttk.Radiobutton(
         vrad_frame,
-        text='Full',
+        text=_('Full'),
         value=1,
         variable=vrad_light_type,
         command=make_setter('General', 'vrad_force_full', vrad_light_type),
@@ -529,21 +544,21 @@ def make_comp_widgets(frame: ttk.Frame):
 
     add_tooltip(
         UI['light_fast'],
-        "Compile with lower-quality, fast lighting. This speeds "
-        "up compile times, but does not appear as good. Some "
-        "shadows may appear wrong.\n"
-        "When publishing, this is ignored."
+        _("Compile with lower-quality, fast lighting. This speeds "
+          "up compile times, but does not appear as good. Some "
+          "shadows may appear wrong.\n"
+          "When publishing, this is ignored.")
     )
     add_tooltip(
         UI['light_full'],
-        "Compile with high-quality lighting. This looks correct, "
-        "but takes longer to compute. Use if you're arranging lights. "
-        "When publishing, this is always used."
+        _("Compile with high-quality lighting. This looks correct, "
+          "but takes longer to compute. Use if you're arranging lights. "
+          "When publishing, this is always used.")
     )
 
     packfile_enable = ttk.Checkbutton(
         frame,
-        text='Dump packed files to:',
+        text=_('Dump packed files to:'),
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
     )
@@ -568,13 +583,13 @@ def make_comp_widgets(frame: ttk.Frame):
 
     add_tooltip(
         packfile_enable,
-        "When compiling, dump all files which were packed into the map. Useful"
-        " if you're intending to edit maps in Hammer."
+        _("When compiling, dump all files which were packed into the map. Useful"
+          " if you're intending to edit maps in Hammer.")
     )
 
     count_frame = ttk.LabelFrame(
         frame,
-        text='Last Compile:',
+        text=_('Last Compile:'),
         labelanchor=N,
     )
 
@@ -584,7 +599,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     ttk.Label(
         count_frame,
-        text='Entity',
+        text=_('Entity'),
         anchor=N,
     ).grid(row=0, column=0, columnspan=3, sticky=EW)
 
@@ -604,7 +619,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     ttk.Label(
         count_frame,
-        text='Overlay',
+        text=_('Overlay'),
         anchor=CENTER,
     ).grid(row=2, column=0, sticky=EW)
     UI['count_overlay'] = ttk.Progressbar(
@@ -623,8 +638,8 @@ def make_comp_widgets(frame: ttk.Frame):
     UI['refresh_counts'].grid(row=3, column=1)
     add_tooltip(
         UI['refresh_counts'],
-        "Refresh the compile progress bars. Press after a compile has been "
-        "performed to show the new values.",
+        _("Refresh the compile progress bars. Press after a compile has been "
+          "performed to show the new values."),
     )
 
     ttk.Label(
@@ -656,28 +671,28 @@ def make_map_widgets(frame: ttk.Frame):
 
     voice_frame = ttk.LabelFrame(
         frame,
-        text='Voicelines:',
+        text=_('Voicelines:'),
         labelanchor=NW,
     )
     voice_frame.grid(row=1, column=0, sticky=EW)
 
     UI['voice_priority'] = voice_priority = ttk.Checkbutton(
         voice_frame,
-        text="Use voiceline priorities",
+        text=_("Use voiceline priorities"),
         variable=VOICE_PRIORITY_VAR,
         command=make_setter('General', 'use_voice_priority', VOICE_PRIORITY_VAR),
     )
     voice_priority.grid(row=0, column=0)
     add_tooltip(
         voice_priority,
-        "Only choose the highest-priority voicelines. This means more generic "
-        "lines will can only be chosen if few test elements are in the map. "
-        "If disabled any applicable lines will be used.",
+        _("Only choose the highest-priority voicelines. This means more "
+          "generic lines will can only be chosen if few test elements are in "
+          "the map. If disabled any applicable lines will be used."),
     )
 
     elev_frame = ttk.LabelFrame(
         frame,
-        text='Spawn at:',
+        text=_('Spawn at:'),
         labelanchor=N,
     )
 
@@ -687,7 +702,7 @@ def make_map_widgets(frame: ttk.Frame):
 
     UI['elev_preview'] = ttk.Radiobutton(
         elev_frame,
-        text='Entry Door',
+        text=_('Entry Door'),
         value=0,
         variable=start_in_elev,
         command=make_setter('General', 'spawn_elev', start_in_elev),
@@ -695,7 +710,7 @@ def make_map_widgets(frame: ttk.Frame):
 
     UI['elev_elevator'] = ttk.Radiobutton(
         elev_frame,
-        text='Elevator',
+        text=_('Elevator'),
         value=1,
         variable=start_in_elev,
         command=make_setter('General', 'spawn_elev', start_in_elev),
@@ -706,20 +721,20 @@ def make_map_widgets(frame: ttk.Frame):
 
     add_tooltip(
         UI['elev_elevator'],
-        "When previewing in SP, spawn inside the entry elevator. "
-        "This also disables the map restarts when you reach the "
-        "exit door. Use this to examine the entry and exit corridors."
+        _("When previewing in SP, spawn inside the entry elevator. "
+          "This also disables the map restarts when you reach the "
+          "exit door. Use this to examine the entry and exit corridors.")
     )
     add_tooltip(
         UI['elev_preview'],
-        "When previewing in SP, spawn just before the entry door. "
-        "When you reach the exit door, the map will restart."
+        _("When previewing in SP, spawn just before the entry door. "
+          "When you reach the exit door, the map will restart.")
     )
 
     corr_frame = ttk.LabelFrame(
         frame,
         width=18,
-        text='Corridor:',
+        text=_('Corridor:'),
         labelanchor=N,
     )
     corr_frame.grid(row=3, column=0, sticky=EW)
@@ -751,23 +766,23 @@ def make_map_widgets(frame: ttk.Frame):
     UI['corr_coop'].grid(row=2, column=1, sticky=EW)
     ttk.Label(
         corr_frame,
-        text='SP Entry:',
+        text=_('SP Entry:'),
         anchor=CENTER,
     ).grid(row=0, column=0, sticky=EW)
     ttk.Label(
         corr_frame,
-        text='SP Exit:',
+        text=_('SP Exit:'),
         anchor=CENTER,
     ).grid(row=0, column=1, sticky=EW)
     ttk.Label(
         corr_frame,
-        text='Coop:',
+        text=_('Coop:'),
         anchor=CENTER,
     ).grid(row=2, column=0, sticky=EW)
 
     model_frame = ttk.LabelFrame(
         frame,
-        text='Player Model (SP):',
+        text=_('Player Model (SP):'),
         labelanchor=N,
     )
     model_frame.grid(row=4, column=0, sticky=EW)
@@ -775,7 +790,7 @@ def make_map_widgets(frame: ttk.Frame):
         model_frame,
         exportselection=0,
         textvariable=player_model_var,
-        values=PLAYER_MODEL_ORDER,
+        values=[PLAYER_MODELS[mdl] for mdl in PLAYER_MODEL_ORDER],
         width=20,
     )
     # Users can only use the dropdown
@@ -792,7 +807,7 @@ def make_pane(tool_frame):
     window = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Compile Options',
+        title=_('Compile Options'),
         name='compiler',
         resize_x=True,
         resize_y=False,
@@ -809,7 +824,7 @@ def init_application():
     """Initialise when standalone."""
     global window
     window = TK_ROOT
-    window.title('Compiler Options - {}'.format(utils.BEE_VERSION))
+    window.title(_('Compiler Options - {}').format(utils.BEE_VERSION))
     window.resizable(True, False)
 
     window.columnconfigure(0, weight=1)

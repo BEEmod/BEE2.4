@@ -451,6 +451,24 @@ def unset_readonly(file):
         stat.S_IWOTH
     )
 
+
+def setup_localisations(logger):
+    """Setup gettext localisations."""
+    import gettext
+    import locale
+    lang = locale.getdefaultlocale()[0]
+    # Then get the translator for that.
+    logger.info('Language: {!r}', lang)
+    trans = gettext.translation(
+        'BEE2',
+        localedir='../i18n/',
+        fallback=True,
+        languages=[lang],
+    )
+    # Add these functions to builtins, plus _=gettext
+    trans.install(['gettext', 'ngettext'])
+
+
 class LogMessage:
     """Allow using str.format() in logging messages.
 
@@ -521,7 +539,7 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename: str=None, on_error=None) -> logging.Logger:
+def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.Logger:
     """Setup the logger and logging handlers.
 
     If filename is set, all logs will be written to this file as well.
@@ -642,7 +660,10 @@ def init_logging(filename: str=None, on_error=None) -> logging.Logger:
 
     sys.excepthook = except_handler
 
-    return LoggerAdapter(logger)
+    if main_logger:
+        return getLogger(main_logger)
+    else:
+        return LoggerAdapter(logger)
 
 
 def getLogger(name: str='', alias: str=None) -> logging.Logger:

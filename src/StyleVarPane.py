@@ -25,43 +25,43 @@ styleOptions = [
     # ID, Name, default value
     stylevar(
         id='MultiverseCave',
-        name='Multiverse Cave',
+        name=_('Multiverse Cave'),
         default=1,
-        desc='Play the Workshop Cave Johnson lines on map start.'
+        desc=_('Play the Workshop Cave Johnson lines on map start.')
     ),
 
     stylevar(
         id='FixFizzlerBump',
-        name='Prevent Portal Bump  (fizzler)',
+        name=_('Prevent Portal Bump (fizzler)'),
         default=0,
-        desc='Add portal bumpers to make it more difficult to portal across '
-             'fizzler edges. This can prevent placing portals in tight spaces '
-             'near fizzlers, or fizzle portals on activation.'
+        desc=_('Add portal bumpers to make it more difficult to portal across '
+               'fizzler edges. This can prevent placing portals in tight '
+               'spaces near fizzlers, or fizzle portals on activation.')
     ),
 
     stylevar(
         id='NoMidVoices',
-        name='Suppress Mid-Chamber Dialogue',
+        name=_('Suppress Mid-Chamber Dialogue'),
         default=0,
-        desc='Disable all voicelines other than entry and exit lines.'
+        desc=_('Disable all voicelines other than entry and exit lines.')
     ),
 
     stylevar(
         id='UnlockDefault',
-        name='Unlock Default Items',
+        name=_('Unlock Default Items'),
         default=0,
-        desc='Allow placing and deleting the mandatory Entry/Exit Doors and '
-             'Large Observation Room. Use with caution, this can have weird '
-             'results!'
+        desc=_('Allow placing and deleting the mandatory Entry/Exit Doors and '
+               'Large Observation Room. Use with caution, this can have weird '
+               'results!')
     ),
 
     stylevar(
         id='AllowGooMist',
-        name='Allow Adding Goo Mist',
+        name=_('Allow Adding Goo Mist'),
         default=1,
-        desc='Add mist particles above Toxic Goo in certain styles. This can '
-             'increase the entity count significantly with large, complex '
-             'goo pits, so disable if needed.'
+        desc=_('Add mist particles above Toxic Goo in certain styles. This can '
+               'increase the entity count significantly with large, complex '
+               'goo pits, so disable if needed.')
     ),
 ]
 
@@ -117,12 +117,14 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
     else:
         desc = []
 
-    desc.append('Default: {}'.format(
-        'On' if var.default else 'Off'
-    ))
+    desc.append(
+        _('Default: On')
+        if var.default else
+        _('Default: Off')
+    )
 
     if is_hardcoded or var.styles is None:
-        desc.append('Styles: Unstyled')
+        desc.append(_('Styles: Unstyled'))
     else:
         app_styles = [
             style
@@ -132,13 +134,16 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
         ]
 
         if len(app_styles) == len(STYLES):
-            desc.append('Styles: All')
+            desc.append(_('Styles: All'))
         else:
-            desc.append('Styles: ' + ', '.join(sorted(
+            style_list = sorted(
                 style.selitem_data.short_name
                 for style in
                 app_styles
-            )))
+            )
+            desc.append(
+                ngettext('Style: {}', 'Styles: {}', len(style_list)
+            ).format(', '.join(style_list)))
 
     return '\n'.join(desc)
 
@@ -192,7 +197,7 @@ def make_pane(tool_frame):
     window = SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Style Properties',
+        title=_('Style Properties'),
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
@@ -217,10 +222,10 @@ def make_pane(tool_frame):
 
     canvas_frame = ttk.Frame(UI['style_can'])
 
-    frame_all = ttk.Labelframe(canvas_frame, text="All:")
+    frame_all = ttk.Labelframe(canvas_frame, text=_("All:"))
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(canvas_frame, text="Selected Style:")
+    frm_chosen = ttk.Labelframe(canvas_frame, text=_("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(
@@ -228,18 +233,18 @@ def make_pane(tool_frame):
         orient=HORIZONTAL,
         ).grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(canvas_frame, text="Other Styles:")
+    frm_other = ttk.Labelframe(canvas_frame, text=_("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
     UI['stylevar_chosen_none'] = ttk.Label(
         frm_chosen,
-        text='No Options!',
+        text=_('No Options!'),
         font='TkMenuFont',
         justify='center',
         )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
-        text='None!',
+        text=_('None!'),
         font='TkMenuFont',
         justify='center',
         )

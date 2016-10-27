@@ -1,3 +1,6 @@
+"""Run the BEE2."""
+
+# First do a few things as early as possible.
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
@@ -26,6 +29,8 @@ if __name__ == '__main__':
         # it can record any errors in the initialisation of modules.
         import tk_tools
         LOGGER = utils.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
+
+    utils.setup_localisations(LOGGER)
 
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
@@ -123,8 +128,10 @@ if __name__ == '__main__':
         )
     LOGGER.info('Done!')
 
+    # Check games for Portal 2's basemodui.txt file, so we can translate items.
     LOGGER.info('Loading Item Translations...')
-    gameMan.init_trans()
+    for game in gameMan.all_games:
+        game.init_trans()
 
     LOGGER.info('Loading sound FX...')
     sound.load_snd()

@@ -56,7 +56,7 @@ patch_tk_dialogs()
 
 
 class LoadScreen(Toplevel):
-    def __init__(self, *stages, title_text='Loading'):
+    def __init__(self, *stages, title_text=_('Loading')):
         self.stages = list(stages)
         self.widgets = {}
         self.labels = {}
@@ -167,7 +167,7 @@ class LoadScreen(Toplevel):
 
     def skip_stage(self, stage):
         """Skip over this stage of the loading process."""
-        self.labels[stage]['text'] = 'Skipped!'
+        self.labels[stage]['text'] = _('Skipped!')
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
         if self.active:
@@ -210,10 +210,10 @@ class LoadScreen(Toplevel):
 
 
 main_loader = LoadScreen(
-    ('PAK', 'Packages'),
-    ('OBJ', 'Loading Objects'),
-    ('IMG_EX', 'Extracting Images'),
-    ('IMG', 'Loading Images'),
-    ('UI', 'Initialising UI'),
-    title_text='Loading',
+    ('PAK', _('Packages')),
+    ('OBJ', _('Loading Objects')),
+    ('IMG_EX', _('Extracting Images')),
+    ('IMG', _('Loading Images')),
+    ('UI', _('Initialising UI')),
+    title_text=_('Loading'),
 )
