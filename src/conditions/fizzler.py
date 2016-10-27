@@ -369,11 +369,12 @@ def fizzler_out_relay(_):
 
     for inst in vbsp.VMF.by_class['func_instance']:
         filename = inst['file'].casefold()
+        name = inst['targetname']
         if filename in fizz_bases:
-            name = inst['targetname']
             fizz_by_name[inst['targetname']] = inst, fizz_bases[filename]
         elif filename in fizz_models:
-            name = inst['targetname'][:-9]
+            if inst['targetname'].endswith(('_modelStart', '_modelEnd')):
+                name = inst['targetname'].rsplit('_', 1)[0]
 
         elif filename in relay_file:
             marker_inst.append(inst)
@@ -401,7 +402,7 @@ def fizzler_out_relay(_):
 
         # Copy over fixup values
         for key, val in inst.fixup.items():
-            base_inst[key] = val
+            base_inst.fixup[key] = val
 
         for out in inst.outputs:
             new_out = out.copy()
