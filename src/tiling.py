@@ -170,6 +170,7 @@ class TileDef:
         pos: Vec for the center of the side.
         normal: The direction out of the block.
         brush_faces: A list of off-grid brushes that this block uses.
+          When exporting, this contains the used brushes.
         brush_type: BrushType - what sort of brush this is.
         base_type: TileType this tile started with.
         override_tex: If set, a specific texture to use (skybox, light, backpanels etc)
@@ -183,6 +184,7 @@ class TileDef:
         'pos',
         'normal',
         'brush_type',
+        'brush_faces',
         'base_type',
         'sub_tiles',
         'override_tex',
@@ -208,6 +210,7 @@ class TileDef:
         self.pos = pos
         self.normal = normal
         self.brush_type = brush_type
+        self.brush_faces = []
         self.override_tex = override_tex
         self.base_type = base_type
         self.sub_tiles = subtiles
@@ -225,7 +228,7 @@ class TileDef:
     def export(self, vmf: VMF):
         """Create the solid for this."""
         if not self.sub_tiles:
-            return [make_tile(
+            brush, face = make_tile(
                 vmf,
                 self.pos + self.normal * 64,
                 self.normal,
@@ -240,7 +243,9 @@ class TileDef:
                 bevel_umax=True,
                 bevel_vmin=True,
                 bevel_vmax=True,
-            )]
+            )
+            self.brush_faces.append(face)
+            return [brush]
 
 
 def make_tile(
@@ -304,7 +309,7 @@ def make_tile(
         top_side, back_side,
         umin_side, umax_side,
         vmin_side, vmax_side,
-    ])
+    ]), top_side
 
 
 def gen_tile_temp():
@@ -365,16 +370,35 @@ def gen_tile_temp():
 def analyse_map(vmf_file: VMF):
     """Create TileDefs from all the brush sides."""
 
+    # Face ID -> tileDef, used to match overlays to their face targets.
+    # Invalid after we exit, since all the IDs have been freed and may be
+    # reused later.
+    face_to_tile = {}
+
     for brush in vmf_file.brushes[:]:
         bbox_min, bbox_max = brush.get_bbox()
         dim = bbox_max - bbox_min
         grid_pos = bbox_min // 128 * 128 + (64, 64, 64)
         if dim == (128, 128, 128):
-            tiledefs_from_cube(brush, grid_pos)
+            tiledefs_from_cube(face_to_tile, brush, grid_pos)
             vmf_file.remove_brush(brush)
 
+    # Parse face IDs saved in overlays - if they're matching a tiledef,
+    # remove them.
+    for over in vmf_file.by_class['info_overlay']:
+        faces = over['sides', ''].split(' ')
+        tiles = over.tiledefs = []
+        for face in faces[:]:
+            try:
+                tiles.append(face_to_tile[int(face)])
+            except (KeyError, ValueError):
+                pass
+            else:
+                faces.remove(face)
+        over['sides'] = ' '.join(faces)
 
-def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
+
+def tiledefs_from_cube(face_to_tile, brush: Solid, grid_pos: Vec):
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()
@@ -402,11 +426,26 @@ def tiledefs_from_cube(brush: Solid, grid_pos: Vec):
             override_tex=special_tex,
         )
         TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef
+        face_to_tile[face.id] = tiledef
 
 
 def generate_brushes(vmf: VMF):
-    """Generate all the brushes in the map."""
+    """Generate all the brushes in the map, then set overlay sides."""
     for tile in TILES.values():
         brushes = tile.export(vmf)
         vmf.add_brushes(brushes)
+
+    for over in vmf.by_class['info_overlay']:
+        try:
+            tiles = over.tiledefs  # type: List[TileDef]
+        except AttributeError:
+            continue
+        faces = over['sides', ''].split(' ')
+        for tile in tiles:
+            faces.extend(str(f.id) for f in tile.brush_faces)
+
+        if faces:
+            over['sides'] = ' '.join(faces)
+        else:
+            over.remove()
 
