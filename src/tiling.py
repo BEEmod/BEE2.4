@@ -242,10 +242,7 @@ class TileDef:
                 top_surf=tex,
                 width=128,
                 height=128,
-                bevel_umin=True,
-                bevel_umax=True,
-                bevel_vmin=True,
-                bevel_vmax=True,
+                bevels=(True, True, True, True),
             )
             self.brush_faces.append(face)
             return [brush]
@@ -261,10 +258,7 @@ def make_tile(
     thickness=4,
     width=16,
     height=16,
-    bevel_umin=False,
-    bevel_umax=False,
-    bevel_vmin=False,
-    bevel_vmax=False,
+    bevels=(False, False, False, False),
 ) -> Solid:
     """Generate a tile. 
     
@@ -279,7 +273,7 @@ def make_tile(
            Must be > recess_dist.
         * width: size in the U-direction. Must be > 8.
         * height: size in the V-direction. Must be > 8.
-        * bevel_min/max u/v: If that side should be 45° angled.      
+        * bevels: If that side should be 45° angled - in order, umin/max, vmin/max.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
@@ -295,6 +289,8 @@ def make_tile(
     back_side.translate(origin - thickness * normal)
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
+
+    bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
     umin_side = template[-1, 0][bevel_umin].copy(map=vmf)
     umin_side.translate(origin + Vec(**{axis_u: -width/2}))
