@@ -353,7 +353,7 @@ def gen_tile_temp():
                 # Squarebeams
                 face_norm = round(face.get_origin().norm())  # type: Vec
                 bevel_sides[face_norm.as_tuple()] = face
-                face.translate(-14 * face_norm)
+                face.translate(-16 * face_norm - 2 * norm)
 
         for face in rotated_flat:
             face_norm = round(face.get_origin().norm())  # type: Vec
