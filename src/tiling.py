@@ -10,6 +10,7 @@ from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
 from brushLoc import POS as BLOCK_POS, Block, grid_to_world, world_to_grid
 import comp_consts as consts
+from vbsp_options import get as get_opt, get_tex, get_all_tex
 import utils
 import conditions
 
@@ -243,6 +244,7 @@ class TileDef:
                 width=128,
                 height=128,
                 bevels=(True, True, True, True),
+                back_surf=consts.Special.BACKPANELS_CHEAP,
             )
             self.brush_faces.append(face)
             return [brush]
@@ -365,9 +367,11 @@ def gen_tile_temp():
             )
 
 
-
 def analyse_map(vmf_file: VMF):
-    """Create TileDefs from all the brush sides."""
+    """Create TileDefs from all the brush sides.
+
+    Once done, all wall brushes have been removed from the map.
+    """
 
     # Face ID -> tileDef, used to match overlays to their face targets.
     # Invalid after we exit, since all the IDs have been freed and may be
@@ -380,7 +384,13 @@ def analyse_map(vmf_file: VMF):
         grid_pos = bbox_min // 128 * 128 + (64, 64, 64)
         if dim == (128, 128, 128):
             tiledefs_from_cube(face_to_tile, brush, grid_pos)
-            vmf_file.remove_brush(brush)
+            continue
+
+        norm = (bbox_min + (dim / 2) - grid_pos).norm()
+        tile_size = dim.other_axes(norm.axis())
+        if tile_size == (128, 128) and dim[norm.axis()] == 4:
+            # 128x128x4 block..
+            tiledefs_from_large_tile(face_to_tile, brush, grid_pos, norm)
 
     # Parse face IDs saved in overlays - if they're matching a tiledef,
     # remove them.
@@ -426,6 +436,42 @@ def tiledefs_from_cube(face_to_tile, brush: Solid, grid_pos: Vec):
         )
         TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef
         face_to_tile[face.id] = tiledef
+    brush.map.remove_brush(brush)
+
+
+def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Vec):
+    """Generate a tiledef matching a 128x128x4 side."""
+    special_tex = None
+    for face in brush:
+        if -face.normal() != norm:
+            continue
+        front_face_id = face.id
+        if face.mat in consts.BlackPan:
+            tex_kind = TileType.BLACK
+        elif face.mat in consts.WhitePan:
+            tex_kind = TileType.WHITE
+        else:
+            tex_kind = TileType.BLACK
+            special_tex = face.mat
+        break
+    else:
+        LOGGER.warning('Malformed wall brush at {}, {}', grid_pos, norm)
+        return
+
+    neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
+
+    if neighbour_block is Block.VOID:
+        tex_kind = TileType.NODRAW
+
+    tiledef = TileDef(
+        grid_pos,
+        norm,
+        base_type=tex_kind,
+        override_tex=special_tex,
+    )
+    TILES[grid_pos.as_tuple(), norm.as_tuple()] = tiledef
+    brush.map.remove_brush(brush)
+    face_to_tile[front_face_id] = tiledef
 
 
 def generate_brushes(vmf: VMF):
