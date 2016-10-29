@@ -55,11 +55,17 @@ class Tex:
     def __init__(self, group, name, default=(), fallback=None):
         self.group = group
         self.name = name
-        if isinstance(default, str):
+        if isinstance(default, (str, consts.ConstGroup)):
             self.default = [default]
         else:
             self.default = list(default)
         self.fallback = fallback
+
+    def __repr__(self):
+        return (
+            'Tex({0.group!r}, {0.name!r}, {0.default!r}, '
+            'fallback={0.fallback!r})'.format(self)
+        )
 
 
 def load_options(opt_blocks: Iterator[Property]):
@@ -132,22 +138,21 @@ def load_tex(blocks: Iterator[Property]):
     tex_options = {tex.group + '.' + tex.name: tex for tex in TEX_DEFAULTS}
 
     for tex_opt in TEX_DEFAULTS:
-        if not tex_opt.fallback:
+        if tex_opt.fallback is None:
             continue
         fallback = tex_options[tex_opt.fallback]
-        if fallback.fallback:
+        if fallback.fallback is not None:
             raise TypeError('"{}.{}"' " can't double-fallback!".format(
                 tex_opt.group,
                 tex_opt.name,
             ))
 
     need_fallback = []
-    for tex_opt in TEX_DEFAULTS:  # type: Tex
-        pair = (tex_opt.group, tex_opt.name)
-        dotted = tex_opt.group + '.' + tex_opt.name
+    for dotted, tex_opt in tex_options.items():
         try:
-            TEXTURES[dotted] = raw_configs[pair]
-            continue
+            TEXTURES[dotted] = raw_configs[tex_opt.group, tex_opt.name]
+            if TEXTURES[dotted]:
+                continue
         except KeyError:
             pass
 
@@ -158,7 +163,7 @@ def load_tex(blocks: Iterator[Property]):
             TEXTURES[dotted] = tex_opt.default
 
     for dotted, fallback in need_fallback:
-        TEXTURES[dotted] = TEXTURES[fallback.group + '.' + fallback.name]
+        TEXTURES[dotted] = TEXTURES[fallback.group + '.' + fallback.name].copy()
 
     for name, tex in TEXTURES.items():
         if not tex or tex == ['']:
@@ -198,7 +203,9 @@ def get_tex(name: str) -> str:
     try:
         return random.choice(TEXTURES[name])
     except TypeError:
-        raise Exception('No texture "' + name + '"!')
+        raise Exception('No texture "{}"!'.format(name))
+    except IndexError:
+        raise Exception('Empty texture definition for "{}"!'.format(name))
 
 
 def get_all_tex(name: str) -> list:
