@@ -228,15 +228,18 @@ class TileDef:
     def export(self, vmf: VMF):
         """Create the solid for this."""
         if not self.sub_tiles:
+            if self.normal == (0, 0, 1):
+                surf = 'floor'
+            elif self.normal == (0, 0, -1):
+                surf = 'ceiling'
+            else:
+                surf = 'wall'
+            tex = get_tex(('black.' if self.base_type is TileType.BLACK else 'white.') + surf)
             brush, face = make_tile(
                 vmf,
                 self.pos + self.normal * 64,
                 self.normal,
-                top_surf=(
-                    consts.BlackPan.BLACK_4x4 if
-                    self.base_type is TileType.BLACK
-                    else consts.WhitePan.WHITE_4x4
-                ),
+                top_surf=tex,
                 width=128,
                 height=128,
                 bevel_umin=True,
