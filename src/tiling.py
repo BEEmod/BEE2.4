@@ -32,7 +32,16 @@ PRISM_NORMALS = {
 }
 
 NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
-NORM_ANGLES = {v.as_tuple(): v.to_angle() for v in NORMALS}
+# Specific angles, these ensure the textures align to world once done.
+# IE upright on walls, up=north for floor and ceilings.
+NORM_ANGLES = {
+    Vec(x=1).as_tuple(): Vec(0, 0, 90),
+    Vec(x=-1).as_tuple(): Vec(0, 180, 90),
+    Vec(y=1).as_tuple(): Vec(0, 90, 90),
+    Vec(y=-1).as_tuple(): Vec(0, 270, 90),
+    Vec(z=1).as_tuple(): Vec(270, 270,  0),
+    Vec(z=-1).as_tuple(): Vec(90, 90, 0),
+}
 UV_NORMALS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
 # All the tiledefs in the map.
@@ -244,8 +253,9 @@ class TileDef:
                 width=128,
                 height=128,
                 bevels=(True, True, True, True),
-                back_surf=consts.Special.BACKPANELS_CHEAP,
+                back_surf=get_tex('special.behind'),
             )
+            face.offset = 0
             self.brush_faces.append(face)
             return [brush]
 
@@ -261,7 +271,7 @@ def make_tile(
     width=16,
     height=16,
     bevels=(False, False, False, False),
-) -> Solid:
+) -> Tuple[Solid, Side]:
     """Generate a tile. 
     
     This uses UV coordinates, which equal xy, xz, or yz depending on normal.
@@ -305,6 +315,10 @@ def make_tile(
 
     vmax_side = template[0, 1][bevel_vmax].copy(map=vmf)
     vmax_side.translate(origin + Vec(**{axis_v: height/2}))
+
+    for face in [back_side, umin_side, umax_side, vmin_side, vmax_side]:
+        face.uaxis.offset %= 512
+        face.vaxis.offset %= 512
 
     return Solid(vmf, sides=[
         top_side, back_side,
