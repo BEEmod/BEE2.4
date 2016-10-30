@@ -42,7 +42,8 @@ NORM_ANGLES = {
     Vec(z=1).as_tuple(): Vec(270, 270,  0),
     Vec(z=-1).as_tuple(): Vec(90, 90, 0),
 }
-UV_NORMALS = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+# U-min, max, V-min, max in order.
+UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 # All the tiledefs in the map.
 # Maps a pos, normal -> tiledef
@@ -57,29 +58,32 @@ class TileType(Enum):
     BLACK_4x4 = 3
      
     NODRAW = 10  # Covered, so it should be set to nodraw
+
+    # Air - used for embedFace sections.
+    VOID = 11
     
     # Clean light strips which have a 3-unit recess with nodraw.
-    LIGHT_STRIP_CLEAN = 11
-    
+    LIGHT_STRIP_CLEAN = 21
+
     # 3 unit recess,  with backpanels or props/plastic behind. 
     # _BROKEN is ignored when allocating patterns - it wasn't there when the 
     #  tiles were installed. 
     # _PARTIAL is not, it's for WIP chambers.
     # If the skybox is 3D, _PARTIAL uses tools/skybox.
-    CUTOUT_TILE_BROKEN = 12
-    CUTOUT_TILE_PARTIAL = 13
+    CUTOUT_TILE_BROKEN = 22
+    CUTOUT_TILE_PARTIAL = 23
     
     @property
     def is_recess(self):
-        return self.value in (11, 12, 13)
+        return self.value in (21, 22, 23)
      
     @property   
     def is_nodraw(self):
-        return self.value in (10, 11)
+        return self.value in (10, 21)
         
     @property
     def blocks_pattern(self):
-        return self.value in (10, 11, 13)
+        return self.value in (10, 11, 21, 23)
         
     @property
     def is_tile(self):
@@ -90,13 +94,20 @@ class TileType(Enum):
         return self.value in (0, 1)
         
     @property
-    def is_black(self):
-        return self.value in (2, 3)
-        
+    def color(self):
+        if self.value in (0, 1):
+            return 'black'
+        elif self.value in (2, 3):
+            return 'white'
+        raise ValueError('No colour for ' + self.name + '!')
+
     @property
-    def is_4x4(self):
-        return self.value in (1, 3)
-        
+    def tile_size(self):
+        if self.value in (1, 3):
+            return '4x4'
+        else:
+            return '1x1'
+
 
 class BrushType(Enum):
     NORMAL = 0  # Normal surface.
@@ -235,16 +246,52 @@ class TileDef:
             self.brush_type.name,
         )
 
+    def uv_offset(self, u, v, norm):
+        """Return a u/v offset from our position.
+
+        This is used for subtile orientations:
+            norm is in the direction of the normal.
+            If norm is x, uv = yz.
+            If norm is y, uv = xz.
+            If norm is z, uv = xy.
+        """
+        pos = self.pos.copy()
+        u_ax, v_ax = Vec.INV_AXIS[self.normal.axis()]
+        pos += 128 * self.normal * norm
+        pos[u_ax] += 128 * u
+        pos[v_ax] += 128 * v
+        return pos
+
     def export(self, vmf: VMF):
         """Create the solid for this."""
+        bevels = [
+            BLOCK_POS['world': self.uv_offset(u, v, 0)].value not in (1,2)
+            for u, v in UV_NORMALS
+        ]
+
+        if self.normal == (0, 0, 1):
+            orient = 'floor'
+        elif self.normal == (0, 0, -1):
+            orient = 'ceiling'
+        else:
+            orient = 'wall'
+
         if not self.sub_tiles:
-            if self.normal == (0, 0, 1):
-                surf = 'floor'
-            elif self.normal == (0, 0, -1):
-                surf = 'ceiling'
+            full_type = self.base_type
+        elif len(set(self.sub_tiles.values())) == 1:
+            full_type = next(iter(self.sub_tiles.values()))
+        else:
+            full_type = None
+
+        if full_type is not None:
+            if full_type.is_nodraw:
+                tex = consts.Tools.NODRAW
             else:
-                surf = 'wall'
-            tex = get_tex(('black.' if self.base_type is TileType.BLACK else 'white.') + surf)
+                tex = get_tex(get_tile_tex(
+                    full_type.color,
+                    orient,
+                    full_type.tile_size,
+                ))
             brush, face = make_tile(
                 vmf,
                 self.pos + self.normal * 64,
@@ -252,13 +299,22 @@ class TileDef:
                 top_surf=tex,
                 width=128,
                 height=128,
-                bevels=(True, True, True, True),
+                bevels=bevels,
                 back_surf=get_tex('special.behind'),
             )
             face.offset = 0
             self.brush_faces.append(face)
             return [brush]
 
+    # Multiple tile types in the block - figure out the tile patterns to use.
+
+
+def get_tile_tex(color, orient, size):
+    """Get the appropriate texture name for a tile."""
+    if orient == 'wall':
+        return color + '.' + size
+    else:
+        return color + '.' + orient
 
 def make_tile(
     vmf: VMF,
@@ -369,12 +425,13 @@ def gen_tile_temp():
                 bevel_sides[face_norm.as_tuple()] = face
                 face.translate(-16 * face_norm - 2 * norm)
 
+        # Flat-side squarebeams...
         for face in rotated_flat:
             face_norm = round(face.get_origin().norm())  # type: Vec
             if face_norm[axis_norm]:
                 continue
 
-            face.translate(-16 * face_norm)
+            face.translate(-16 * face_norm - 2 * norm)
             temp_part[face_norm.other_axes(norm.axis())] = (
                 face,
                 bevel_sides[face_norm.as_tuple()],
