@@ -1068,8 +1068,16 @@ class Item(PakObject):
                         # Switch to the 'Grouped' icon and name
                         if item_data['all_name'] is not None:
                             pal_section['Tooltip'] = item_data['all_name']
+
                         if item_data['all_icon'] is not None:
-                            pal_section['Image'] = item_data['all_icon']
+                            icon = item_data['all_icon']
+                        else:
+                            icon = pal_section['Image']
+                        # Bug in Portal 2 - palette icons must end with '.png',
+                        # so force that to be the case for all icons.
+                        if icon.casefold().endswith('.vtf'):
+                            icon = icon[:-3] + 'png'
+                        pal_section['Image'] = icon
 
                     pal_section['Position'] = "{x} {y} 0".format(
                         x=palette_items[index] % 4,
