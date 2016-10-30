@@ -96,9 +96,9 @@ class TileType(Enum):
     @property
     def color(self):
         if self.value in (0, 1):
-            return 'black'
-        elif self.value in (2, 3):
             return 'white'
+        elif self.value in (2, 3):
+            return 'black'
         raise ValueError('No colour for ' + self.name + '!')
 
     @property
