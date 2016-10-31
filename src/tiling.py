@@ -87,6 +87,7 @@ class TileType(Enum):
         
     @property
     def is_tile(self):
+        """Is this a regular tile (white/black)."""
         return self.value < 10
         
     @property
@@ -126,6 +127,7 @@ TILETYPE_FROM_CHAR = {
     TILETYPE_TO_CHAR.items()
 }
 
+
 class BrushType(Enum):
     NORMAL = 0  # Normal surface.
     NODRAW = 1  # Nodraw brush, but needed to seal void and make backpanels.
@@ -150,6 +152,13 @@ def iter_uv(umin=0, umax=3, vmin=0, vmax=3):
         for v in vrange:
             yield u, v
 
+TILE_SIZES = {
+    '1x1': (4, 4),
+    '2x1': (2, 4),
+    '2x2': (2, 2),
+    '4x4': (1, 1),
+}
+
 
 class Pattern:
     """Represents a position a tile can be positioned in."""
@@ -157,9 +166,15 @@ class Pattern:
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = tiles
+        tile_u, tile_v = TILE_SIZES[tex]
+        # Do some sanity checks on values..
         for umin, vmin, umax, vmax in tiles:
-            assert 0 <= umin < umax <= 4
-            assert 0 <= vmin < vmax <= 4
+            tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
+            assert 0 <= umin < umax <= 4, tile_tex
+            assert 0 <= vmin < vmax <= 4, tile_tex
+            assert (umax - umin) % tile_u == 0, tile_tex
+            assert (vmax - vmin) % tile_v == 0, tile_tex
+
             
     def __repr__(self):
         return 'Pattern({!r}, {}{}'.format(
@@ -189,13 +204,13 @@ PATTERNS = {
         Pattern('2x2',
             # Combinations:
             (0, 0, 2, 4), (0, 0, 4, 2), (0, 2, 4, 4), (2, 0, 4, 4),
-            (1, 0, 2, 4), (0, 1, 4, 2),
+            (1, 0, 3, 4), (0, 1, 4, 3),
 
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
             (0, 1, 4, 3),  # Special case - horizontal 2x1, don't use center.
             (1, 1, 3, 3),  # Center
             (1, 0, 3, 4), (1, 2, 3, 4),  # Vertical
-            (0, 1, 2, 2), (2, 1, 4, 3),  # Horizontal
+            (0, 1, 2, 3), (2, 1, 4, 3),  # Horizontal
         ),
 
         # Combinations for 4x4, to merge adjacent blocks..
@@ -214,22 +229,15 @@ PATTERNS = {
 
     # Don't have 2x2/1x1 tiles off-grid..
     'grid_only': [
-        Pattern('1x1', (0, 0, 3, 3)),
+        Pattern('1x1', (0, 0, 4, 4)),
         Pattern('2x1', 
-            (0, 0, 1, 3), (2, 0, 3, 3),  # L/R
+            (0, 0, 2, 4), (2, 0, 4, 4),  # L/R
             wall_only=True,
         ),
         Pattern('2x2', 
-            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3),  # Corners
+            (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
         ),
     ],
-}
-
-TILE_SIZES = {
-    '1x1': (512, 512),
-    '2x1': (256, 512),
-    '2x2': (256, 256),
-    '4x4': (128, 128),
 }
 
 
@@ -396,8 +404,6 @@ class TileDef:
             for uv in iter_uv():
                 self.sub_tiles[uv] = orig_tiles.get(uv, self.base_type)
 
-            self.print_tiles()
-
             if len(set(self.sub_tiles.values())) == 1:
                 full_type = next(iter(self.sub_tiles.values()))
             else:
@@ -450,8 +456,8 @@ class TileDef:
                         umin == 0, umax == 3, vmin == 0, vmax == 3
                     ])],
                     back_surf=get_tex('special.behind'),
-                    u_align=u_size,
-                    v_align=v_size,
+                    u_align=u_size * 128,
+                    v_align=v_size * 128,
                 )
                 self.brush_faces.append(face)
                 yield brush
@@ -732,10 +738,8 @@ def tiledefs_from_embedface(
 
     u_min, u_max = u_min // 32, u_max // 32 - 1
     v_min, v_max = v_min // 32, v_max // 32 - 1
-    tile.print_tiles()
     for uv in iter_uv(u_min, u_max, v_min, v_max):
         tile.sub_tiles[uv] = tex_kind
-    tile.print_tiles()
 
 
 def find_front_face(brush, grid_pos, norm):
