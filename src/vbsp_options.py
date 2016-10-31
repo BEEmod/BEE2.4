@@ -52,19 +52,20 @@ class Opt:
 
 
 class Tex:
-    def __init__(self, group, name, default=(), fallback=None):
+    def __init__(self, group, name, default=(), fallback=None, add=()):
         self.group = group
         self.name = name
         if isinstance(default, (str, consts.ConstGroup)):
             self.default = [default]
         else:
             self.default = list(default)
+        self.additional = list(add)
         self.fallback = fallback
 
     def __repr__(self):
         return (
             'Tex({0.group!r}, {0.name!r}, {0.default!r}, '
-            'fallback={0.fallback!r})'.format(self)
+            'fallback={0.fallback!r}, add={0.additional!r})'.format(self)
         )
 
 
@@ -148,6 +149,7 @@ def load_tex(blocks: Iterator[Property]):
             ))
 
     need_fallback = []
+    need_additional = []
     for dotted, tex_opt in tex_options.items():
         try:
             TEXTURES[dotted] = raw_configs[tex_opt.group, tex_opt.name]
@@ -162,12 +164,19 @@ def load_tex(blocks: Iterator[Property]):
         else:
             TEXTURES[dotted] = tex_opt.default
 
+        if tex_opt.additional:
+            need_additional.append((dotted, tex_opt))
+
     for dotted, fallback in need_fallback:
         TEXTURES[dotted] = TEXTURES[fallback.group + '.' + fallback.name].copy()
 
     for name, tex in TEXTURES.items():
         if not tex or tex == ['']:
             TEXTURES[name] = []
+
+    for dotted, tex_opt in need_additional:
+        for add in tex_opt.additional:
+            TEXTURES[dotted].extend(TEXTURES[add])
 
 T = TypeVar('T')
 
@@ -584,9 +593,18 @@ TEX_DEFAULTS = [
 
 
     Tex('black', 'floor', consts.BlackPan.BLACK_FLOOR),  # 4x4
-    Tex('black', 'floor_2x2'),
+    Tex('black', 'floor_2x2', fallback='black.2x2'),
+    Tex('black', 'floor_1x1', fallback='black.1x1', add=[
+        'black.floor_2x2', 'black.floor',
+    ]),
     Tex('black', 'ceiling', consts.BlackPan.BLACK_FLOOR),
-    Tex('black', '1x1', consts.BlackPan.BLACK_1x1),
+    Tex('black', 'ceiling_2x2', fallback='black.2x2'),
+    Tex('black', 'ceiling_1x1', fallback='black.1x1', add=[
+        'black.ceiling_2x2', 'ceiling.floor',
+    ]),
+    Tex('black', '1x1', consts.BlackPan.BLACK_1x1, add=[
+        'black.2x1', 'black.2x2', 'black.4x4',
+    ]),
     Tex('black', '2x1', consts.BlackPan.BLACK_2x1),
     Tex('black', '2x2', consts.BlackPan.BLACK_2x2),
     Tex('black', '4x4', consts.BlackPan.BLACK_4x4),
@@ -595,9 +613,18 @@ TEX_DEFAULTS = [
     Tex('black', 'bullseye_ceiling', fallback='white.bullseye_floor'),
 
     Tex('white', 'floor', consts.WhitePan.WHITE_FLOOR),  # 4x4
-    Tex('white', 'floor_2x2'),
+    Tex('white', 'floor_2x2', fallback='white.2x2'),
+    Tex('white', 'floor_1x1', fallback='white.1x1', add=[
+        'white.floor_2x2', 'white.floor',
+    ]),
     Tex('white', 'ceiling', consts.WhitePan.WHITE_4x4),
-    Tex('white', '1x1', consts.WhitePan.WHITE_1x1),
+    Tex('white', 'ceiling_2x2', fallback='white.2x2'),
+    Tex('white', 'ceiling_1x1', fallback='white.1x1', add=[
+        'white.ceiling_2x2', 'white.ceiling',
+    ]),
+    Tex('white', '1x1', consts.WhitePan.WHITE_1x1, add=[
+        'white.2x1', 'white.2x2', 'white.4x4',
+    ]),
     Tex('white', '2x1', consts.WhitePan.WHITE_2x1),
     Tex('white', '2x2', consts.WhitePan.WHITE_2x2),
     Tex('white', '4x4', consts.WhitePan.WHITE_4x4),
