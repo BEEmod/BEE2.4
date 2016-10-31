@@ -108,6 +108,19 @@ class TileType(Enum):
         else:
             return '1x1'
 
+# Symbols for debug-printing subtiles.
+SUBTILE_PRINT = {
+    TileType.WHITE: 'W',
+    TileType.WHITE_4x4: 'w',
+    TileType.BLACK: 'B',
+    TileType.BLACK_4x4: 'b',
+    TileType.NODRAW: 'n',
+    TileType.VOID: '.',
+    TileType.LIGHT_STRIP_CLEAN: '*',
+    TileType.CUTOUT_TILE_BROKEN: 'x',
+    TileType.CUTOUT_TILE_PARTIAL: 'o',
+}
+
 
 class BrushType(Enum):
     NORMAL = 0  # Normal surface.
@@ -140,12 +153,24 @@ def bbox_intersect(b1_min, b1_max, b2_min, b2_max):
     return True
 
 
+def iter_uv(umin=0, umax=4, vmin=0, vmax=4):
+    """Iterate over points in a rectangle."""
+    urange = range(int(umin), int(umax + 1))
+    vrange = range(int(vmin), int(vmax + 1))
+    for u in urange:
+        for v in vrange:
+            yield u, v
+
+
 class Pattern:
     """Represents a position a tile can be positioned in."""
     def __init__(self, tex: str, *tiles: Tuple[int, int, int, int], wall_only=False):
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = tiles
+        for umin, vmin, umax, vmax in tiles:
+            assert 0 <= umin < umax <= 4
+            assert 0 <= vmin < vmax <= 4
             
     def __repr__(self):
         return 'Pattern({!r}, {}{}'.format(
@@ -156,17 +181,17 @@ class Pattern:
 
 PATTERNS = {
     'clean': [
-        Pattern('1x1', (0, 0, 3, 3)),
+        Pattern('1x1', (0, 0, 4, 4)),
         Pattern('2x1', 
-            (0, 0, 1, 3), (1, 0, 2, 3), (2, 0, 3, 3),  # L/M/R
+            (0, 0, 2, 4), (1, 0, 3, 4), (2, 0, 4, 4),  # L/M/R
             wall_only=True,
         ),
         Pattern('2x2', 
-            (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3),  # Corners
-            (0, 1, 3, 2),  # Special case - horizontal 2x1, don't use center.
-            (1, 1, 2, 2),  # Center
-            (1, 0, 2, 1), (1, 2, 2, 3),  # Vertical
-            (0, 1, 1, 2), (2, 1, 3, 2),  # Horizontal
+            (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
+            (0, 1, 4, 3),  # Special case - horizontal 2x1, don't use center.
+            (1, 1, 3, 3),  # Center
+            (1, 0, 3, 4), (1, 2, 3, 4),  # Vertical
+            (0, 1, 2, 2), (2, 1, 4, 3),  # Horizontal
         ),
     ],
 
@@ -246,6 +271,33 @@ class TileDef:
             self.brush_type.name,
         )
 
+    def print_tiles(self):
+        out = []
+        for v in reversed(range(4)):
+            for u in range(4):
+                out.append(SUBTILE_PRINT[self.sub_tiles[u, v]])
+            out.append('\n')
+        LOGGER.info('Subtiles: \n{}', ''.join(out))
+
+    @classmethod
+    def ensure(cls, grid_pos, norm, tile_type=TileType.VOID):
+        """Return a tiledef at a position, creating it with a type if not present."""
+        try:
+            tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
+        except KeyError:
+            tile = TILES[grid_pos.as_tuple(), norm.as_tuple()] = cls(
+                grid_pos,
+                norm,
+                tile_type,
+            )
+        if tile.sub_tiles is None:
+            tile.sub_tiles = {
+                (x, y): tile_type
+                for x in range(4) for y in range(4)
+            }
+            tile.print_tiles()
+        return tile
+
     def uv_offset(self, u, v, norm):
         """Return a u/v offset from our position.
 
@@ -262,6 +314,36 @@ class TileDef:
         pos[v_ax] += 128 * v
         return pos
 
+    def calc_patterns(self, is_wall=False):
+        """Figure out the brushes needed for a complex pattern.
+
+        This returns
+        """
+        # copy it, so we can overwrite positions with None = not a tile.
+
+        tiles = self.sub_tiles.copy()  # type: Dict[Tuple[int, int], TileType]
+
+        for pattern in PATTERNS['clean']:
+            if pattern.wall_only and not is_wall:
+                continue
+            for (umin, vmin, umax, vmax) in pattern.tiles:
+                tile_type = tiles[umin, vmin]
+                if not tile_type.is_tile:
+                    continue
+                for uv in iter_uv(umin, umax-1, vmin, vmax-1):
+                    if tiles[uv] is not tile_type:
+                        break
+                else:
+                    for uv in iter_uv(umin, umax-1, vmin, vmax-1):
+                        tiles[uv] = TileType.VOID
+                    yield umin, umax, vmin, vmax, pattern.tex, tile_type
+
+        # All unfilled spots are single 4x4 tiles.
+        for (u, v), tile_type in tiles.items():
+            if tile_type is not TileType.VOID:
+                yield u, u + 1, v, v + 1, '4x4', tile_type
+
+
     def export(self, vmf: VMF):
         """Create the solid for this."""
         bevels = [
@@ -276,12 +358,19 @@ class TileDef:
         else:
             orient = 'wall'
 
-        if not self.sub_tiles:
+        if self.sub_tiles is None:
             full_type = self.base_type
-        elif len(set(self.sub_tiles.values())) == 1:
-            full_type = next(iter(self.sub_tiles.values()))
         else:
-            full_type = None
+            for uv in iter_uv():
+                if uv not in self.sub_tiles:
+                    self.sub_tiles[uv] = self.base_type
+
+            self.print_tiles()
+
+            if len(set(self.sub_tiles.values())) == 1:
+                full_type = next(iter(self.sub_tiles.values()))
+            else:
+                full_type = None
 
         if full_type is not None:
             if full_type.is_nodraw:
@@ -304,9 +393,32 @@ class TileDef:
             )
             face.offset = 0
             self.brush_faces.append(face)
-            return [brush]
+            yield brush
+            return
 
-    # Multiple tile types in the block - figure out the tile patterns to use.
+        assert self.sub_tiles is not None
+
+        # Multiple tile types in the block - figure out the tile patterns to use.
+        patterns = list(self.calc_patterns(orient == 'wall'))
+        for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
+            if tile_type.is_tile:
+                tex = get_tex(get_tile_tex(tile_type.color, orient, grid_size))
+                brush, face = make_tile(
+                    vmf,
+                    self.uv_offset(
+                        (umin + umax) / 8 - 0.5,
+                        (vmin + vmax) / 8 - 0.5,
+                        0.5,
+                    ),
+                    self.normal,
+                    top_surf=tex,
+                    width=(umax - umin) * 32,
+                    height=(vmax - vmin) * 32,
+                    bevels=[True, True, True, True],
+                    back_surf=get_tex('special.behind'),
+                )
+                self.brush_faces.append(face)
+                yield brush
 
 
 def get_tile_tex(color, orient, size):
@@ -346,17 +458,22 @@ def make_tile(
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
 
-    assert width >=8 and height >=8, 'Tile is too small!'
+    assert width >= 8 and height >= 8, 'Tile is too small!' \
+                                       ' ({}x{})'.format(width, height)
+
+    axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
     top_side = template['front'].copy(map=vmf)  # type: Side
     top_side.mat = top_surf
     top_side.translate(origin - recess_dist * normal)
 
+    top_side.uaxis.offset %= 512 / 128 / width
+    top_side.vaxis.offset %= 512 / 128 / width
+
     back_side = template['back'].copy(map=vmf)  # type: Side
     back_side.mat = back_surf
     back_side.translate(origin - thickness * normal)
 
-    axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
@@ -457,11 +574,23 @@ def analyse_map(vmf_file: VMF):
             tiledefs_from_cube(face_to_tile, brush, grid_pos)
             continue
 
-        norm = (bbox_min + (dim / 2) - grid_pos).norm()
+        norm = Vec()
+        for axis in 'xyz':
+            if dim[axis] == 4:
+                norm[axis] = (-1 if bbox_min[axis] - grid_pos[axis] < 0 else 1)
+                break
+        else:
+            # Has no 4-unit side - not a PeTI brush?
+            LOGGER.warning('Unrecognised brush from {} to {}'.format(bbox_min, bbox_max))
+            continue
+
         tile_size = dim.other_axes(norm.axis())
-        if tile_size == (128, 128) and dim[norm.axis()] == 4:
+        if tile_size == (128, 128):
             # 128x128x4 block..
             tiledefs_from_large_tile(face_to_tile, brush, grid_pos, norm)
+        else:
+            # EmbedFace block..
+            tiledefs_from_embedface(face_to_tile, brush, grid_pos, norm)
 
     # Parse face IDs saved in overlays - if they're matching a tiledef,
     # remove them.
@@ -507,27 +636,12 @@ def tiledefs_from_cube(face_to_tile, brush: Solid, grid_pos: Vec):
         )
         TILES[grid_pos.as_tuple(), normal.as_tuple()] = tiledef
         face_to_tile[face.id] = tiledef
-    brush.map.remove_brush(brush)
+    brush.remove()
 
 
 def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Vec):
     """Generate a tiledef matching a 128x128x4 side."""
-    special_tex = None
-    for face in brush:
-        if -face.normal() != norm:
-            continue
-        front_face_id = face.id
-        if face.mat in consts.BlackPan:
-            tex_kind = TileType.BLACK
-        elif face.mat in consts.WhitePan:
-            tex_kind = TileType.WHITE
-        else:
-            tex_kind = TileType.BLACK
-            special_tex = face.mat
-        break
-    else:
-        LOGGER.warning('Malformed wall brush at {}, {}', grid_pos, norm)
-        return
+    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
 
     neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
 
@@ -542,13 +656,62 @@ def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Ve
     )
     TILES[grid_pos.as_tuple(), norm.as_tuple()] = tiledef
     brush.map.remove_brush(brush)
-    face_to_tile[front_face_id] = tiledef
+    face_to_tile[front_face.id] = tiledef
+
+
+def tiledefs_from_embedface(
+    face_to_tile,
+    brush: Solid,
+    grid_pos: Vec,
+    norm: Vec,
+):
+    """Generate a tiledef matching EmbedFace brushes."""
+
+    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
+
+    norm_axis = norm.axis()
+
+    bbox_min, bbox_max = brush.get_bbox()
+    bbox_min[norm_axis] = bbox_max[norm_axis] = 0
+    if bbox_min % 32 or bbox_max % 32 or special_tex is not None:
+        # Not aligned to grid, leave this here!
+        return
+
+    tile = TileDef.ensure(grid_pos, norm)
+    face_to_tile[front_face.id] = tile
+    brush.remove()
+
+    grid_min = grid_pos - (64, 64, 64)
+    u_min, v_min = (bbox_min - grid_min).other_axes(norm_axis)
+    u_max, v_max = (bbox_max - grid_min).other_axes(norm_axis)
+
+    u_min, u_max = u_min // 32, u_max // 32 - 1
+    v_min, v_max = v_min // 32, v_max // 32 - 1
+    tile.print_tiles()
+    for uv in iter_uv(u_min, u_max, v_min, v_max):
+        tile.sub_tiles[uv] = tex_kind
+    tile.print_tiles()
+
+
+def find_front_face(brush, grid_pos, norm):
+    """Find the tile face in a brush. Returns color, special_mat, face."""
+    for face in brush:
+        if -face.normal() != norm:
+            continue
+        if face.mat in consts.BlackPan:
+            return TileType.BLACK, None, face
+        elif face.mat in consts.WhitePan:
+            return TileType.WHITE, None, face
+        else:
+            return TileType.BLACK, face.mat, face
+    else:
+        raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
 
 
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map, then set overlay sides."""
     for tile in TILES.values():
-        brushes = tile.export(vmf)
+        brushes = list(tile.export(vmf))
         vmf.add_brushes(brushes)
 
     for over in vmf.by_class['info_overlay']:
