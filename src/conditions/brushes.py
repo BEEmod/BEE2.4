@@ -647,22 +647,39 @@ def res_set_tile(inst, res: Property):
     inv_v = norm_v != abs(norm_v)
     swap_uv = norm_u.axis() != u_axis
 
-    LOGGER.info('Code: {}', [row.value.strip() for row in res.find_all('tile')])
 
-    for v, row in enumerate(res.find_all('tile')):
-        if v > 3:
+    force_tile = res.bool('force')
+
+    for y, row in enumerate(res.find_all('tile')):
+        if y > 3:
             raise ValueError('Too many rows for tiles data!')
-        for u, val in enumerate(row.value.strip()):
-            if u > 3:
+        for x, val in enumerate(row.value.strip()):
+            if x > 3:
                 raise ValueError('Too many columns in tiles data!')
             if val == '_':
                 continue
 
-            if swap_uv:
-                v, u = u, v
+            u, v = (y, x) if swap_uv else (x, y)
+
             if inv_u:
                 u = 3 - u
             if inv_v:
                 v = 3 - v
 
-            subtiles[u, v] = tiling.TILETYPE_FROM_CHAR[val]
+            old_tile = subtiles[u, v]
+            new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
+
+            if force_tile:
+                subtiles[u, v] = new_tile
+                continue
+
+            # Don't replace void spaces with other things
+            if old_tile is tiling.TileType.VOID:
+                continue
+
+            # If nodrawed, don't revert for tiles.
+            if old_tile is tiling.TileType.NODRAW:
+                if new_tile.is_tile:
+                    continue
+
+            subtiles[u, v] = new_tile
