@@ -519,7 +519,8 @@ def res_import_template(inst: Entity, res):
         key_block,
     ) = res.value
 
-    if temp_id not in TEMPLATES:
+    temp_name, vis = conditions.parse_temp_name(temp_id)
+    if temp_name not in TEMPLATES:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
