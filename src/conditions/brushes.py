@@ -7,6 +7,7 @@ import srctools
 import utils
 import vbsp
 import vbsp_options
+import tiling
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
@@ -615,3 +616,53 @@ def res_hollow_brush(inst, res):
         group,
         remove_orig_face=srctools.conv_bool(res['RemoveFace', False])
     )
+
+
+@make_result('SetTile')
+def res_set_tile(inst, res: Property):
+    """Set 4x4 parts of a tile to the given values."""
+    origin = Vec.from_str(inst['origin'])
+
+    tile_pos = (res.vec('offset') * 128 - (0, 0, 128)).rotate_by_str(inst['angles'])
+    tile_pos += origin
+    grid_pos = tiling.round_grid(tile_pos)
+
+    norm = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    norm_axis = norm.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+    try:
+        tile = tiling.TILES[grid_pos.as_tuple(), norm.as_tuple()]
+    except KeyError:
+        LOGGER.warning('Expected tile, but none found: {}, {}', grid_pos, norm)
+        return
+
+    subtiles = tile.get_subtiles()
+
+    # Figure out the rotation needed to match the instance.
+    # First rotate two normals to find the world u and v directions.
+    # We swap to make it upright in configs.
+    norm_u = Vec(y=1).rotate_by_str(inst['angles'])
+    norm_v = Vec(x=1).rotate_by_str(inst['angles'])
+    inv_u = norm_u != abs(norm_u)
+    inv_v = norm_v != abs(norm_v)
+    swap_uv = norm_u.axis() != u_axis
+
+    LOGGER.info('Code: {}', [row.value.strip() for row in res.find_all('tile')])
+
+    for v, row in enumerate(res.find_all('tile')):
+        if v > 3:
+            raise ValueError('Too many rows for tiles data!')
+        for u, val in enumerate(row.value.strip()):
+            if u > 3:
+                raise ValueError('Too many columns in tiles data!')
+            if val == '_':
+                continue
+
+            if swap_uv:
+                v, u = u, v
+            if inv_u:
+                u = 3 - u
+            if inv_v:
+                v = 3 - v
+
+            subtiles[u, v] = tiling.TILETYPE_FROM_CHAR[val]

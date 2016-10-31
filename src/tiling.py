@@ -108,8 +108,8 @@ class TileType(Enum):
         else:
             return '1x1'
 
-# Symbols for debug-printing subtiles.
-SUBTILE_PRINT = {
+# Symbols that represent TileType values.
+TILETYPE_TO_CHAR = {
     TileType.WHITE: 'W',
     TileType.WHITE_4x4: 'w',
     TileType.BLACK: 'B',
@@ -120,7 +120,11 @@ SUBTILE_PRINT = {
     TileType.CUTOUT_TILE_BROKEN: 'x',
     TileType.CUTOUT_TILE_PARTIAL: 'o',
 }
-
+TILETYPE_FROM_CHAR = {
+    v: k
+    for k, v in
+    TILETYPE_TO_CHAR.items()
+}
 
 class BrushType(Enum):
     NORMAL = 0  # Normal surface.
@@ -131,29 +135,14 @@ class BrushType(Enum):
     TEMPLATE = 2
     ANGLED_PANEL = 3  # Angled Panel - needs special handling for static versions.
     FLIP_PANEL = 4  # Flip panels - these are double-sided.
-    
-    
-def bbox(first: Tuple[int, int], *points: Tuple[int, int]):
-    max_x, max_y = min_x, min_y = first
-    for x, y in points:
-        min_x = min(min_x, x)
-        min_y = min(min_y, y)
-        max_x = max(max_x, x)
-        max_y = max(max_y, y)
-    return min_x, min_y, max_x, max_y  
 
 
-def bbox_intersect(b1_min, b1_max, b2_min, b2_max):
-    # To check for intersect, see if it's totally outside in all
-    # directions.
-    if b1_max.x < b2_min.x or b1_max.y < b2_min.y: # b1 Left, above b2
-        return False
-    if b1_min.x > b2_max.x or b1_min.y > b2_max.y: # b1 right, below b2
-        return False
-    return True
+def round_grid(vec: Vec):
+    """Round to the center of the grid."""
+    return vec // 128 * 128 + (64, 64, 64)
 
 
-def iter_uv(umin=0, umax=4, vmin=0, vmax=4):
+def iter_uv(umin=0, umax=3, vmin=0, vmax=3):
     """Iterate over points in a rectangle."""
     urange = range(int(umin), int(umax + 1))
     vrange = range(int(vmin), int(vmax + 1))
@@ -179,20 +168,48 @@ class Pattern:
             ', wall_only=True)' if self.wall_only else ')'
         )
 
+
+def order_bbox(bbox):
+    """Used to sort 4x4 pattern positions.
+
+    The pattern order is the order that they're tried in.
+    We want to try the largest first so reverse the ordering used on max values.
+    """
+    umin, vmin, umax, vmax = bbox
+    return umin, vmin, -umax, -vmax
+
 PATTERNS = {
     'clean': [
         Pattern('1x1', (0, 0, 4, 4)),
-        Pattern('2x1', 
+        Pattern('2x1',
+            (0, 0, 4, 4),  # Combined
             (0, 0, 2, 4), (1, 0, 3, 4), (2, 0, 4, 4),  # L/M/R
             wall_only=True,
         ),
-        Pattern('2x2', 
+        Pattern('2x2',
+            # Combinations:
+            (0, 0, 2, 4), (0, 0, 4, 2), (0, 2, 4, 4), (2, 0, 4, 4),
+            (1, 0, 2, 4), (0, 1, 4, 2),
+
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
             (0, 1, 4, 3),  # Special case - horizontal 2x1, don't use center.
             (1, 1, 3, 3),  # Center
             (1, 0, 3, 4), (1, 2, 3, 4),  # Vertical
             (0, 1, 2, 2), (2, 1, 4, 3),  # Horizontal
         ),
+
+        # Combinations for 4x4, to merge adjacent blocks..
+        Pattern(
+            '4x4',
+            *sorted([vals for x in range(4) for vals in [
+                # V-direction, U-direction for each row/column.
+                (x, 0, x+1, 4), (0, x, 4, x+1),  # 0-4
+                (x, 2, x+1, 4), (2, x, 4, x+1),  # 2-4
+                (x, 0, x+1, 2), (0, x, 2, x+1),  # 0-2
+                (x, 1, x+1, 3), (1, x, 3, x+1),  # 1-3
+                ]
+            ], key=order_bbox)
+        )
     ],
 
     # Don't have 2x2/1x1 tiles off-grid..
@@ -206,6 +223,13 @@ PATTERNS = {
             (0, 0, 1, 1), (2, 0, 3, 1), (0, 2, 1, 3), (2, 2, 3, 3),  # Corners
         ),
     ],
+}
+
+TILE_SIZES = {
+    '1x1': (512, 512),
+    '2x1': (256, 512),
+    '2x2': (256, 256),
+    '4x4': (128, 128),
 }
 
 
@@ -275,7 +299,7 @@ class TileDef:
         out = []
         for v in reversed(range(4)):
             for u in range(4):
-                out.append(SUBTILE_PRINT[self.sub_tiles[u, v]])
+                out.append(TILETYPE_TO_CHAR[self.sub_tiles[u, v]])
             out.append('\n')
         LOGGER.info('Subtiles: \n{}', ''.join(out))
 
@@ -290,13 +314,17 @@ class TileDef:
                 norm,
                 tile_type,
             )
-        if tile.sub_tiles is None:
-            tile.sub_tiles = {
-                (x, y): tile_type
+        tile.get_subtiles()
+        return tile
+
+    def get_subtiles(self):
+        """Returns subtiles, creating it if not present."""
+        if self.sub_tiles is None:
+            self.sub_tiles = {
+                (x, y): self.base_type
                 for x in range(4) for y in range(4)
             }
-            tile.print_tiles()
-        return tile
+        return self.sub_tiles
 
     def uv_offset(self, u, v, norm):
         """Return a u/v offset from our position.
@@ -347,7 +375,7 @@ class TileDef:
     def export(self, vmf: VMF):
         """Create the solid for this."""
         bevels = [
-            BLOCK_POS['world': self.uv_offset(u, v, 0)].value not in (1,2)
+            BLOCK_POS['world': self.uv_offset(u, v, 0)].value not in (1, 2)
             for u, v in UV_NORMALS
         ]
 
@@ -361,9 +389,12 @@ class TileDef:
         if self.sub_tiles is None:
             full_type = self.base_type
         else:
+            # Normalise subtiles - remove values outside 0-3, and set
+            # unset positions to base_type.
+            orig_tiles = self.sub_tiles
+            self.sub_tiles = {}
             for uv in iter_uv():
-                if uv not in self.sub_tiles:
-                    self.sub_tiles[uv] = self.base_type
+                self.sub_tiles[uv] = orig_tiles.get(uv, self.base_type)
 
             self.print_tiles()
 
@@ -391,7 +422,6 @@ class TileDef:
                 bevels=bevels,
                 back_surf=get_tex('special.behind'),
             )
-            face.offset = 0
             self.brush_faces.append(face)
             yield brush
             return
@@ -402,6 +432,7 @@ class TileDef:
         patterns = list(self.calc_patterns(orient == 'wall'))
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
             if tile_type.is_tile:
+                u_size, v_size = TILE_SIZES[grid_size]
                 tex = get_tex(get_tile_tex(tile_type.color, orient, grid_size))
                 brush, face = make_tile(
                     vmf,
@@ -414,8 +445,13 @@ class TileDef:
                     top_surf=tex,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
-                    bevels=[True, True, True, True],
+                    # We bevel only the grid-edge tiles.
+                    bevels=[a and b for a, b in zip(bevels, [
+                        umin == 0, umax == 3, vmin == 0, vmax == 3
+                    ])],
                     back_surf=get_tex('special.behind'),
+                    u_align=u_size,
+                    v_align=v_size,
                 )
                 self.brush_faces.append(face)
                 yield brush
@@ -428,6 +464,7 @@ def get_tile_tex(color, orient, size):
     else:
         return color + '.' + orient
 
+
 def make_tile(
     vmf: VMF,
     origin: Vec, 
@@ -439,6 +476,8 @@ def make_tile(
     width=16,
     height=16,
     bevels=(False, False, False, False),
+    u_align=512,
+    v_align=512,
 ) -> Tuple[Solid, Side]:
     """Generate a tile. 
     
@@ -467,8 +506,14 @@ def make_tile(
     top_side.mat = top_surf
     top_side.translate(origin - recess_dist * normal)
 
-    top_side.uaxis.offset %= 512 / 128 / width
-    top_side.vaxis.offset %= 512 / 128 / width
+    block_min = round_grid(origin) - (64, 64, 64)
+
+    top_side.uaxis.offset = 4 * (
+        block_min[axis_u] - (origin[axis_u] - width/2)
+    ) % u_align
+    top_side.vaxis.offset = 4 * (
+        block_min[axis_v] - (origin[axis_v] - height/2)
+    ) % v_align
 
     back_side = template['back'].copy(map=vmf)  # type: Side
     back_side.mat = back_surf
@@ -569,7 +614,7 @@ def analyse_map(vmf_file: VMF):
     for brush in vmf_file.brushes[:]:
         bbox_min, bbox_max = brush.get_bbox()
         dim = bbox_max - bbox_min
-        grid_pos = bbox_min // 128 * 128 + (64, 64, 64)
+        grid_pos = round_grid(bbox_min)
         if dim == (128, 128, 128):
             tiledefs_from_cube(face_to_tile, brush, grid_pos)
             continue
