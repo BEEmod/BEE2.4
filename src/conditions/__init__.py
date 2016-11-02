@@ -237,19 +237,21 @@ RES_EXHAUSTED = object()
 
 
 class Condition:
-    __slots__ = ['flags', 'results', 'else_results', 'priority']
+    __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
 
     def __init__(
-            self,
-            flags=None,
-            results=None,
-            else_results=None,
-            priority=Decimal('0'),
+        self,
+        flags=None,
+        results=None,
+        else_results=None,
+        priority=Decimal('0'),
+        source=None,
     ):
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
         self.priority = priority
+        self.source = source
         self.setup()
 
     def __repr__(self):
@@ -271,11 +273,16 @@ class Condition:
         results = []
         else_results = []
         priority = Decimal('0')
+        source = None
         for prop in prop_block:
             if prop.name == 'result':
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
+            elif prop.name == '__src__':
+                # Value injected by the BEE2 export, this specifies
+                # the original source of the config.
+                source = prop.value
 
             elif prop.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
@@ -295,10 +302,11 @@ class Condition:
                 flags.append(prop)
 
         return cls(
-            flags=flags,
-            results=results,
-            else_results=else_results,
-            priority=priority,
+            flags,
+            results,
+            else_results,
+            priority,
+            source,
         )
 
     def setup(self):
@@ -311,7 +319,6 @@ class Condition:
         for res in self.else_results[:]:
             self.setup_result(self.else_results, res)
 
-
     @staticmethod
     def setup_result(res_list, result):
         """Helper method to perform result setup."""
@@ -322,17 +329,15 @@ class Condition:
                 # This result is invalid, remove it.
                 res_list.remove(result)
 
-
     @staticmethod
     def test_result(inst, res):
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            LOGGER.warning(
-                '"{name}" is not a valid condition result!',
+            raise ValueError('"{name}" is not a valid condition result!'.format(
                 name=res.real_name,
-            )
+            )) from None
         else:
             return func(inst, res)
 
@@ -348,31 +353,6 @@ class Condition:
             should_del = self.test_result(inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
-
-
-    def __lt__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority < other.priority
-        return NotImplemented
-
-    def __le__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority <= other.priority
-        return NotImplemented
-
-    def __gt__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority > other.priority
-        return NotImplemented
-
-    def __ge__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority >= other.priority
-        return NotImplemented
 
 
 def add_meta(func, priority, only_once=True):
@@ -397,6 +377,7 @@ def add_meta(func, priority, only_once=True):
     cond = Condition(
         results=[Property(name, '')],
         priority=priority,
+        source='MetaCondition {}'.format(name)
     )
 
     if only_once:
@@ -458,6 +439,7 @@ def add(prop_block):
 
 
 def init(seed, inst_list, vmf_file):
+    """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED, ALL_INST, VMF
     VMF = vmf_file
@@ -465,7 +447,8 @@ def init(seed, inst_list, vmf_file):
     ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
-    conditions.sort()
+    zero = Decimal(0)
+    conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
 
     build_solid_dict()
     load_templates()
@@ -486,6 +469,15 @@ def check_all():
                 # This is raised to immediately stop running
                 # this condition, and skip to the next condtion.
                 break
+            except:
+                # Print the source of the condition if if fails...
+                LOGGER.exception(
+                    'Error in {}:',
+                    condition.source or 'condition',
+                )
+                # Skip to next condition.
+                import sys
+                sys.exit(1)
             if not condition.results and not condition.else_results:
                 break  # Condition has run out of results, quit early
 
@@ -518,11 +510,12 @@ def check_flag(flag, inst):
     try:
         func = FLAG_LOOKUP[name]
     except KeyError:
-        LOGGER.warning('"' + name + '" is not a valid condition flag!')
-        return False
-    else:
-        res = func(inst, flag)
-        return res == desired_result
+        raise ValueError(
+            '"{}" is not a valid condition flag!'.format(name)
+        ) from None
+
+    res = func(inst, flag)
+    return res == desired_result
 
 
 def import_conditions():

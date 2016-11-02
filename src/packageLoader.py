@@ -217,6 +217,17 @@ def get_config(
         raise
 
 
+def set_cond_source(props: Property, source: str):
+    """Set metadata for Conditions in the given config blocks.
+
+    This generates '__src__' keyvalues in Condition blocks with info like
+    the source object ID and originating file, so errors can be traced back
+    to the config file creating it.
+    """
+    for cond in props.find_all('Conditions', 'Condition'):
+        cond['__src__'] = source
+
+
 def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
@@ -613,6 +624,10 @@ def parse_item_folder(folders, zip_file, pak_id):
             'editor': next(editor_iter),
             # Any extra blocks (offset catchers, extent items)
             'editor_extra': list(editor_iter),
+
+            # Add the folder the item definition comes from,
+            # so we can trace it later for debug messages.
+            'source': '<{}>/items/{}'.format(pak_id, fold),
         }
 
         if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
@@ -637,12 +652,14 @@ def parse_item_folder(folders, zip_file, pak_id):
             )
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = Property.parse(
+                folders[fold]['vbsp'] = conf = Property.parse(
                     vbsp_config,
                     pak_id + ':' + config_path,
                 )
         except KeyError:
-            folders[fold]['vbsp'] = Property(None, [])
+            folders[fold]['vbsp'] = conf = Property(None, [])
+
+        set_cond_source(conf, folders[fold]['source'])
 
 
 class Package:
@@ -741,6 +758,8 @@ class Style(PakObject):
             self.config = Property(None, [])
         else:
             self.config = config
+
+        set_cond_source(self.config, 'Style <{}>'.format(style_id))
 
     @classmethod
     def parse(cls, data):
@@ -1183,6 +1202,7 @@ class QuotePack(PakObject):
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
+        set_cond_source(config, 'QuotePack <{}>'.format(quote_id))
         self.chars = chars or ['??']
         self.studio = studio
         self.studio_actor = studio_actor
@@ -1374,6 +1394,7 @@ class Skybox(PakObject):
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
+        set_cond_source(config, 'Skybox <{}>'.format(sky_id))
         self.fog_opts = fog_opts
 
         # Extract this for selector windows to easily display
@@ -1462,6 +1483,7 @@ class Music(PakObject):
             ):
         self.id = music_id
         self.config = config or Property(None, [])
+        set_cond_source(config, 'Music <{}>'.format(music_id))
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
