@@ -2769,10 +2769,8 @@ def change_func_brush():
         edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
         edge_scale = vbsp_options.get(float, 'edge_scale_special')
 
+    # TODO: Merge nearby grating brushes
     # Clips are shared every 512 grid spaces
-    grate_clips = {}
-    # Merge nearby grating brushes
-    grating_brush = {}
 
     for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
         if brush in IGNORED_BRUSH_ENTS:
@@ -2861,14 +2859,6 @@ def change_func_brush():
             settings['has_attr']['grating'] = True
 
             brush_loc = brush.get_origin()  # type: Vec
-            brush_key = (brush_loc // 512 * 512).as_tuple()
-
-            # Merge nearby grating brush entities
-            if brush_key not in grating_brush:
-                grating_brush[brush_key] = brush
-            else:
-                grating_brush[brush_key].solids += brush.solids
-                VMF.remove_ent(brush)
 
         if is_grating and grating_clip_mat:
             grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
@@ -2878,14 +2868,11 @@ def change_func_brush():
             for face in grate_phys_clip_solid.sides:
                 face.mat = 'tools/toolstrigger'
 
-            if brush_key not in grate_clips:
-                grate_clips[brush_key] = clip_ent = VMF.create_ent(
-                    classname='func_clip_vphysics',
-                    origin=brush_loc.join(' '),
-                    filtername=vbsp_options.get(str, 'grating_filter')
-                )
-            else:
-                clip_ent = grate_clips[brush_key]
+            clip_ent = VMF.create_ent(
+                classname='func_clip_vphysics',
+                origin=brush_loc.join(' '),
+                filtername=vbsp_options.get(str, 'grating_filter')
+            )
             clip_ent.solids.append(grate_phys_clip_solid)
 
         if "-model_arms" in parent:  # is this an angled panel?:
