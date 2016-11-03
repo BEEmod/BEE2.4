@@ -6,6 +6,7 @@ from conditions import (
     resolve_value, local_name,
     CONNECTIONS,
 )
+from conditions.instances import GLOBAL_INPUT_ENTS
 from srctools import Property, Entity, Output
 
 from typing import Optional, Dict, Tuple
@@ -189,3 +190,108 @@ def res_locking_input(inst: Entity, res: Property) -> str:
             output=targ_out,
         )
     return True
+
+LINKED_CUBES = {}  # type: Dict[int, Tuple[Entity, str, Optional[str], str]]
+
+
+@make_result('_MarkLinkedCube')
+def res_linked_cube(inst: Entity, res: Property):
+    """Marks a cube to link it to a dropper.
+
+    This assumes some things about the item.
+    """
+    time = inst.fixup.int('$timer_delay')
+    if not (0 < time <= 30):
+        # Infinite - this behaviour is disabled..
+        return
+
+    if time in LINKED_CUBES:
+        raise Exception(
+            'Two cubes have the same '
+            '"linkage" value set ({})!'.format(
+                time,
+            )
+        )
+
+    resp_out_name, resp_out = Output.parse_name(res.value)
+
+    LINKED_CUBES[time] = (
+        inst,
+        inst.fixup['$cube_type'],
+        resp_out_name, resp_out,
+    )
+
+
+@make_result('LinkedCubeDropper')
+def res_linked_cube_dropper(drp_inst: Entity, res: Property):
+    """Link a cube and dropper together, to preplace the cube at a location."""
+    time = drp_inst.fixup.int('$timer_delay')
+    if not (0 < time <= 30):
+        # Infinite - this behaviour is disabled..
+        return
+
+    try:
+
+        cube_inst, cube_type, resp_out_name, resp_out = LINKED_CUBES[time]
+    except KeyError:
+        raise Exception('Unknown cube "linkage" value ({}) in dropper!'.format(
+            time,
+        ))
+
+    # Force the dropper to match the cube..
+    #  = cube_type
+
+    # Set auto-drop to False (so there isn't two cubes),
+    # and auto-respawn to True (so it actually functions).
+    drp_inst.fixup['$disable_autodrop'] = '1'
+    drp_inst.fixup['$disable_autorespawn'] = '0'
+
+    fizz_out_name, fizz_out = Output.parse_name(res['FizzleOut'])
+
+    # Output to destroy the cube when the dropper is triggered externally.
+    drp_inst.add_out(Output(
+        inst_out=fizz_out_name,
+        out=fizz_out,
+        targ=local_name(cube_inst, 'cube'),
+        inp='Dissolve',
+        only_once=True,
+    ))
+
+    # Cube items don't have proxies, so we need to use AddOutput
+    # after it's created (@relay_spawn_3's time).
+    try:
+        relay_spawn_3 = GLOBAL_INPUT_ENTS['@relay_spawn_3']
+    except KeyError:
+        relay_spawn_3 = GLOBAL_INPUT_ENTS['@relay_spawn_3'] = cube_inst.map.create_ent(
+            classname='logic_relay',
+            targetname='@relay_spawn_3',
+            origin=cube_inst['origin'],
+        )
+
+    respawn_inp = list(res.find_all('RespawnIn'))
+    # There's some voice-logic specific to companion cubes.
+    respawn_inp.extend(res.find_all(
+        'RespawnCcube' if
+        drp_inst.fixup['$cube_type'] == '1'
+        else 'RespawnCube'
+    ))
+
+    for inp in respawn_inp:
+        resp_in_name, resp_in = inp.value.split(':', 1)
+
+        out = Output(
+            out='OnFizzled',
+            targ=drp_inst,
+            inst_in=resp_in_name,
+            inp=resp_in,
+            only_once=True,
+        )
+
+        relay_spawn_3.add_out(Output(
+            out='OnTrigger',
+            targ=local_name(cube_inst, 'cube'),
+            inp='AddOutput',
+            param=out.gen_addoutput(),
+            only_once=True,
+            delay=0.01,
+        ))
