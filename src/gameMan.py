@@ -513,7 +513,7 @@ class Game:
 
         # This is the connection "heart" and "error" models.
         # These have to come last, so we need to special case it.
-        editoritems += style.editor.find_key("Renderables", [])
+        editoritems += style.editor.find_key("Renderables", []).copy()
 
         # Special-case: implement the UnlockDefault stlylevar here,
         # so all items are modified.

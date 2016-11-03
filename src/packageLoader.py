@@ -872,8 +872,8 @@ class Style(PakObject):
         # Only add the actual Item blocks,
         # Renderables is added in gameMan specially.
         # It must come last.
-        editoritems += self.editor.find_all("Item")
-        vbsp_config += self.config
+        editoritems += self.editor.copy().find_all("Item")
+        vbsp_config += self.config.copy()
 
         return editoritems, vbsp_config
 
@@ -1027,9 +1027,9 @@ class Item(PakObject):
             ) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
-            editoritems += item_block
-            editoritems += editor_parts
-            vbsp_config += config_part
+            editoritems += item_block.copy()
+            editoritems += editor_parts.copy()
+            vbsp_config += config_part.copy()
 
             # Add auxiliary configs as well.
             try:
@@ -1037,9 +1037,9 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += aux_conf.all_conf
+                vbsp_config += aux_conf.all_conf.copy()
                 try:
-                    version_data = aux_conf.versions[ver_id]
+                    version_data = aux_conf.versions[ver_id].copy()
                 except KeyError:
                     pass  # No override.
                 else:
@@ -1047,7 +1047,7 @@ class Item(PakObject):
                     # that's defined for this config
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
-                            vbsp_config += version_data[poss_style.id]
+                            vbsp_config += version_data[poss_style.id].copy()
                             break
 
     def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
@@ -1164,15 +1164,15 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
         )
 
     def add_over(self, override: 'ItemConfig'):
-        self.all_conf += override.all_conf
+        self.all_conf += override.all_conf.copy()
 
         for vers_id, styles in override.versions.items():
             our_styles = self.versions.setdefault(vers_id, {})
             for sty_id, style in styles.items():
                 if sty_id not in our_styles:
-                    our_styles[sty_id] = style
+                    our_styles[sty_id] = style.copy()
                 else:
-                    our_styles[sty_id] += style
+                    our_styles[sty_id] += style.copy()
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1309,7 +1309,7 @@ class QuotePack(PakObject):
             if prop.name == 'quotes':
                 vbsp_config.append(QuotePack.strip_quote_data(prop))
             else:
-                vbsp_config.append(prop)
+                vbsp_config.append(prop.copy())
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
@@ -1432,7 +1432,7 @@ class Skybox(PakObject):
             override.selitem_data
         )
         self.config += override.config
-        self.fog_opts += override.fog_opts
+        self.fog_opts += override.fog_opts.copy()
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
@@ -1456,7 +1456,7 @@ class Skybox(PakObject):
             skybox.material,
         )
 
-        exp_data.vbsp_conf.append(skybox.config)
+        exp_data.vbsp_conf.append(skybox.config.copy())
 
         # Styles or other items shouldn't be able to set fog settings..
         if 'fog' in exp_data.vbsp_conf:
@@ -1623,7 +1623,7 @@ class Music(PakObject):
 
         # Allow flags to detect the music that's used
         vbsp_config.set_key(('Options', 'music_ID'), music.id)
-        vbsp_config += music.config
+        vbsp_config += music.config.copy()
 
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):
@@ -2261,7 +2261,7 @@ class BrushTemplate(PakObject, has_img=False):
 
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:
-            TEMPLATE_FILE.export(temp_file)
+            TEMPLATE_FILE.export(temp_file, inc_version=False)
 
     @staticmethod
     def yield_world_detail(map: VMF) -> Iterator[Tuple[Solid, bool, set]]:
