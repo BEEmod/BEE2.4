@@ -600,7 +600,7 @@ TEX_DEFAULTS = [
     Tex('black', 'ceiling', consts.BlackPan.BLACK_FLOOR),
     Tex('black', 'ceiling_2x2', fallback='black.2x2'),
     Tex('black', 'ceiling_1x1', fallback='black.1x1', add=[
-        'black.ceiling_2x2', 'ceiling.floor',
+        'black.ceiling_2x2', 'black.ceiling',
     ]),
     Tex('black', '1x1', consts.BlackPan.BLACK_1x1, add=[
         'black.2x1', 'black.2x2', 'black.4x4',

@@ -461,6 +461,26 @@ class TileDef:
                 )
                 self.brush_faces.append(face)
                 yield brush
+            elif tile_type is TileType.NODRAW:
+                brush, face = make_tile(
+                    vmf,
+                    self.uv_offset(
+                        (umin + umax) / 8 - 0.5,
+                        (vmin + vmax) / 8 - 0.5,
+                        0.5,
+                    ),
+                    self.normal,
+                    top_surf=consts.Tools.NODRAW,
+                    width=(umax - umin) * 32,
+                    height=(vmax - vmin) * 32,
+                    # We bevel only the grid-edge tiles.
+                    bevels=[a and b for a, b in zip(bevels, [
+                        umin == 0, umax == 3, vmin == 0, vmax == 3
+                    ])],
+                    back_surf=get_tex('special.behind'),
+                )
+                self.brush_faces.append(face)
+                yield brush
 
 
 def get_tile_tex(color, orient, size):

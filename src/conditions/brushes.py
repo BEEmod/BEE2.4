@@ -647,15 +647,51 @@ def res_set_tile(inst, res: Property):
     inv_v = norm_v != abs(norm_v)
     swap_uv = norm_u.axis() != u_axis
 
-
     force_tile = res.bool('force')
 
-    for y, row in enumerate(res.find_all('tile')):
-        if y > 3:
-            raise ValueError('Too many rows for tiles data!')
-        for x, val in enumerate(row.value.strip()):
-            if x > 3:
-                raise ValueError('Too many columns in tiles data!')
+    tiles = [
+        row.value.strip()
+        for row in res.find_all('tile')
+    ]
+    col_width = max(len(row) for row in tiles)
+    if len(tiles) > 4:
+        raise ValueError('Too many rows for tiles data!')
+
+    # Handle light strip or fizzler items, which are offset in local-x.
+    if res.bool('adjustPos'):
+        x_axis = norm_v.axis()
+        x_off = (origin[x_axis] - grid_pos[x_axis] - 16 + 64) / 32
+        if x_off == 91.5:
+            # Center-fizzler. The column must be 1-wide.
+            if col_width != 1:
+                raise ValueError('Tiles data must be 1-wide for HANDLE_5_DIRECTION!')
+
+            # By default skip these spaces.
+            if not res.bool('centerStretch', True):
+                return
+            col_width = 2
+            x_off = 1
+            tiles = [row + row for row in tiles]
+
+        assert x_off == int(x_off), x_off
+        assert x_off > 0
+        assert x_off + col_width <= 4
+        x_off = int(x_off)
+
+        if inv_v if swap_uv else inv_u:
+            x_off = 3 - x_off
+    else:
+        x_off = 0
+
+    LOGGER.info((tiles, x_off, (origin - grid_pos).dot(norm_v), origin))
+
+    if col_width > 4:
+        raise ValueError('Too many columns in tiles data!')
+
+    LOGGER.info((tiles, x_off, (origin - grid_pos).dot(norm_v), origin))
+
+    for y, row in enumerate(tiles):
+        for x, val in enumerate(row):
             if val == '_':
                 continue
 
@@ -665,6 +701,13 @@ def res_set_tile(inst, res: Property):
                 u = 3 - u
             if inv_v:
                 v = 3 - v
+
+            LOGGER.info('{}: {}, {} + {}', swap_uv, u, v, x_off)
+
+            if swap_uv:
+                v += x_off
+            else:
+                u += x_off
 
             old_tile = subtiles[u, v]
             new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
