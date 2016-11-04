@@ -85,10 +85,18 @@ def hook_tk_errors():
         # We don't care about that, so try and move the traceback up
         # one level.
         import sys
+        import logging
         if exc_tb.tb_next:
             exc_tb = exc_tb.tb_next
 
         on_error(exc_type, exc_value, exc_tb)
+
+        logger = logging.getLogger('BEE2')
+        logger.error(
+            msg='Uncaught Exception:',
+            exc_info=(exc_type, exc_value, exc_tb),
+        )
+        logging.shutdown()
 
         # Since this isn't caught normally, it won't quit the application.
         # Quit ourselves manually. to prevent TK just freezing.
