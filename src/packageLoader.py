@@ -1804,12 +1804,17 @@ class StyleVPK(PakObject, has_img=False):
             if not os.path.isfile(sound_cache):
                 LOGGER.info('Copying over soundcache file for DLC3..')
                 os.makedirs(os.path.dirname(sound_cache), exist_ok=True)
-                shutil.copy(
-                    exp_data.game.abs_path(
-                        'portal2_dlc2/maps/soundcache/_master.cache',
-                    ),
-                    sound_cache,
-                )
+                try:
+                    shutil.copy(
+                        exp_data.game.abs_path(
+                            'portal2_dlc2/maps/soundcache/_master.cache',
+                        ),
+                        sound_cache,
+                    )
+                except FileNotFoundError:
+                    # It's fine, this will be regenerated automatically
+                    pass
+
         # Generate the VPK.
         vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
         if sel_vpk is not None:
