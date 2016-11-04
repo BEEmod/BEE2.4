@@ -3,7 +3,7 @@ of editoritems.
 """
 import sys
 
-from srctools import Property, Vec, VMF
+from srctools import Property, Vec, VMF, Entity
 import utils
 
 LOGGER = utils.init_logging('../logs/editoritems_gen.log')
@@ -17,7 +17,7 @@ CONNECTION_OFFSETS = {
 }
 
 
-def make_connections(props, vmf: VMF):
+def make_connections(vmf: VMF):
     """Generate ConnectionPoints blocks, the data for antlines."""
     # Note - ConnectionPoints has an inverted Y compared to the game.
 
@@ -50,14 +50,28 @@ def make_connections(props, vmf: VMF):
         if group_id:
             prop['GroupID'] = group_id
 
-    if conn_points:
-        props.append(conn_points)
+    return conn_points
 
 
-def make_embeddedvoxel(props, vmf: VMF):
+def make_embeddedvoxel(vmf: VMF):
     """Generate the embeddedvoxel blocks."""
     embed_voxel = Property('EmbeddedVoxels', [])
-
+    for ent in vmf.by_class['bee2_editor_embeddedvoxel']:  # type: Entity
+        bbox_min, bbox_max = ent.get_bbox()
+        bbox_min = (bbox_min + 64) // 128  # type: Vec
+        bbox_max = (bbox_min - 64) // 128 + 1  # type: Vec
+        # bbox_min.z -= 1
+        # bbox_max.z += 1
+        if bbox_max == bbox_min:
+            embed_voxel.append(Property('Voxel', [
+                Property('Pos', str(bbox_min)),
+            ]))
+        else:
+            embed_voxel.append(Property('Volume', [
+                Property('Pos1', str(bbox_min)),
+                Property('Pos2', str(bbox_max)),
+            ]))
+    return embed_voxel
 
 def main(filename):
     output = filename[:-3] + 'editor.txt'
@@ -70,11 +84,16 @@ def main(filename):
     for name, func in globals().items():
         if name.startswith('make_'):
             LOGGER.info('Generating "{}"', name[5:])
-            func(exp_props, vmf)
+            ret_prop = func(vmf)
+            if ret_prop:
+                exp_props.append(ret_prop)
 
     with open(output, 'w') as f:
         for line in props.export():
             f.write(line)
+
+    import subprocess
+    subprocess.call([r"C:\Program Files (x86)\Notepad++\notepad++.exe", output])
 
 if __name__ == '__main__':
     main(sys.argv[-1])
