@@ -31,6 +31,9 @@ EXCLUDES = [
     'textwrap',  # Used in zipfile.__main__
     'pkgutil',  # Used by conditions only when unfrozen
 
+    # We don't localise the compiler, but utils imports the modules.
+    'locale', 'gettext',
+
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
