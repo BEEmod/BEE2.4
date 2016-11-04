@@ -3,6 +3,7 @@ import collections
 import logging
 import os.path
 import stat
+import shutil
 from enum import Enum
 from sys import platform
 
@@ -450,6 +451,54 @@ def unset_readonly(file):
         stat.S_IWGRP |
         stat.S_IWOTH
     )
+
+
+def merge_tree(src, dst, copy_function=shutil.copy2):
+    """Recursively copy a directory tree to a destination, which may exist.
+
+    This is a modified version of shutil.copytree(), with the difference that
+    if the directory exists new files will overwrite existing ones.
+
+    If exception(s) occur, a shutil.Error is raised with a list of reasons.
+
+    The optional copy_function argument is a callable that will be used
+    to copy each file. It will be called with the source path and the
+    destination path as arguments. By default, shutil.copy2() is used, but any
+    function that supports the same signature (like shutil.copy()) can be used.
+    """
+    names = os.listdir(src)
+
+    os.makedirs(dst, exist_ok=True)
+    errors = []
+    for name in names:
+        srcname = os.path.join(src, name)
+        dstname = os.path.join(dst, name)
+        try:
+            if os.path.islink(srcname):
+                # Let the copy occur. copy2 will raise an error.
+                if os.path.isdir(srcname):
+                    merge_tree(srcname, dstname, copy_function)
+                else:
+                    copy_function(srcname, dstname)
+            elif os.path.isdir(srcname):
+                merge_tree(srcname, dstname, copy_function)
+            else:
+                # Will raise a SpecialFileError for unsupported file types
+                copy_function(srcname, dstname)
+        # catch the Error from the recursive copytree so that we can
+        # continue with other files
+        except shutil.Error as err:
+            errors.extend(err.args[0])
+        except OSError as why:
+            errors.append((srcname, dstname, str(why)))
+    try:
+        shutil.copystat(src, dst)
+    except OSError as why:
+        # Copying file access times may fail on Windows
+        if getattr(why, 'winerror', None) is None:
+            errors.append((src, dst, str(why)))
+    if errors:
+        raise shutil.Error(errors)
 
 
 def setup_localisations(logger):

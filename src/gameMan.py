@@ -379,7 +379,8 @@ class Game:
             except (IOError, shutil.Error):
                 pass
 
-            shutil.copytree(source, dest, copy_function=copy_func)
+            # This handles existing folders, without raising in os.makedirs().
+            utils.merge_tree(source, dest, copy_function=copy_func)
         LOGGER.info('Cache copied.')
         # Save the new cache modification date.
         self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
