@@ -16,7 +16,7 @@ cached_img = {}
 cached_squares = {}
 
 
-def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
+def png(path, resize_to=None, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -56,16 +56,20 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
         # If not in the main folder, load from the zip-cache
         path = cache_path
 
-    if os.path.isfile(path):
-        image = Image.open(path)
-    else:
+    try:
+        img_file = open(path, 'rb')
+    except FileNotFoundError:
         LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
         return error or img_error
+    with img_file:
+        image = Image.open(img_file)
 
-    if resize_to:
-        image = image.resize((resize_to, resize_to), algo)
+        if resize_to:
+            image = image.resize((resize_to, resize_to), algo)
 
-    img = ImageTk.PhotoImage(image=image)
+        # This also accesses the image file.
+        img = ImageTk.PhotoImage(image=image)
+
     cached_img[path, resize_to] = img
     return img
 
