@@ -1112,6 +1112,9 @@ class Item(PakObject):
         prop_overrides = prop_conf.get(self.id, {})
         for prop_section in new_editor.find_all("Editor", "Properties"):
             for item_prop in prop_section:
+                if item_prop.bool('BEE2_ignore'):
+                    continue
+
                 if item_prop.name.casefold() in prop_overrides:
                     item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
 

@@ -204,7 +204,8 @@ class Item:
         """Iterate through all properties for this item."""
         for part in self.data['editor'].find_all("Properties"):
             for prop in part:
-                yield prop.name
+                if not prop.bool('BEE2_ignore'):
+                    yield prop.name
 
     def get_properties(self):
         """Return a dictionary of properties and the current value for them.
@@ -215,7 +216,7 @@ class Item:
             for prop in part:
                 name = prop.name
 
-                if srctools.conv_bool(prop['BEE2_ignore', '']):
+                if prop.bool('BEE2_ignore'):
                     continue
 
                 # PROP_TYPES is a dict holding all the modifiable properties.
