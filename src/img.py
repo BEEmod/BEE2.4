@@ -10,10 +10,13 @@ import os.path
 from srctools import Vec
 import utils
 
+from typing import Dict, Tuple
+
 LOGGER = utils.getLogger('img')
 
-cached_img = {}
-cached_squares = {}
+cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
+# r, g, b, size -> image
+cached_squares = {}  # type: Dict[Tuple[float, float, float, int], ImageTk.PhotoImage]
 
 
 def png(path, resize_to=None, error=None, algo=Image.NEAREST):
@@ -24,13 +27,17 @@ def png(path, resize_to=None, error=None, algo=Image.NEAREST):
     zip cache.
     - If resize_to is set, the image will be resized to that size using the algo
     algorithm.
+    - This caches images, so it won't be deleted (Tk doesn't keep a reference
+      to the Python object), and subsequent calls don't touch the hard disk.
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
     orig_path = path
 
-    if (orig_path, resize_to) in cached_img:
+    try:
         return cached_img[orig_path, resize_to]
+    except KeyError:
+        pass
 
     base_path = os.path.abspath(
         os.path.join(
@@ -63,15 +70,15 @@ def png(path, resize_to=None, error=None, algo=Image.NEAREST):
         return error or img_error
     with img_file:
         image = Image.open(img_file)
+        image.load()
 
-        if resize_to:
-            image = image.resize((resize_to, resize_to), algo)
+    if resize_to:
+        image = image.resize((resize_to, resize_to), algo)
 
-        # This also accesses the image file.
-        img = ImageTk.PhotoImage(image=image)
+    tk_img = ImageTk.PhotoImage(image=image)
 
-    cached_img[path, resize_to] = img
-    return img
+    cached_img[orig_path, resize_to] = tk_img
+    return tk_img
 
 
 def spr(name, error=None):
