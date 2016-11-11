@@ -4,8 +4,8 @@ import logging
 import os.path
 import stat
 import shutil
+import sys
 from enum import Enum
-from sys import platform
 
 from typing import (
     Tuple, Iterator,
@@ -22,9 +22,9 @@ except ImportError:
 else:
     FROZEN = True
 
-WIN = platform.startswith('win')
-MAC = platform.startswith('darwin')
-LINUX = platform.startswith('linux')
+WIN = sys.platform.startswith('win')
+MAC = sys.platform.startswith('darwin')
+LINUX = sys.platform.startswith('linux')
 
 # Formatters for the logger handlers.
 short_log_format = None
@@ -410,7 +410,6 @@ def restart_app():
 
     This will not return!
     """
-    import os, sys
     # sys.executable is the program which ran us - when frozen,
     # it'll our program.
     # We need to add the program to the arguments list, since python
@@ -501,19 +500,41 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
         raise shutil.Error(errors)
 
 
-def setup_localisations(logger):
+def setup_localisations(logger: logging.LoggerAdapter):
     """Setup gettext localisations."""
     import gettext
     import locale
-    lang = locale.getdefaultlocale()[0]
-    # Then get the translator for that.
-    logger.info('Language: {!r}', lang)
-    trans = gettext.translation(
-        'BEE2',
-        localedir='../i18n/',
-        fallback=True,
-        languages=[lang],
-    )
+    # Get the 'en_US' style language code
+    lang_code = locale.getdefaultlocale()[0]
+
+    # Allow overriding through command line.
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg.casefold().startswith('lang='):
+                lang_code = arg[5:]
+                break
+
+    # Expands single code to parent categories.
+    expanded_langs = gettext._expand_lang(lang_code)
+
+    logger.info('Language: {!r}', lang_code)
+    logger.debug('Language codes: {!r}', expanded_langs)
+
+    for lang in expanded_langs:
+        try:
+            file = open('../i18n/{}.mo'.format(lang), 'rb')
+        except FileNotFoundError:
+            pass
+        else:
+            trans = gettext.GNUTranslations(file)
+            break
+    else:
+        # No translations, fallback to English.
+        logger.warning(
+            "Can't find translation for codes: {!r}!",
+            expanded_langs,
+        )
+        trans = gettext.NullTranslations()
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
 
