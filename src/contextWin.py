@@ -529,7 +529,7 @@ def init_widgets():
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, text=_("More Info>>"), command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
     tooltip.add_tooltip(wid['moreinfo'])
 

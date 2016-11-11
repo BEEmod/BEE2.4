@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"POT-Creation-Date: 2016-10-28 08:00+1000\n"
+"POT-Creation-Date: 2016-11-11 16:28+1000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -337,30 +337,30 @@ msgstr ""
 msgid "Hide/Show the \"{}\" window."
 msgstr ""
 
-#: src/UI.py:561
+#: src/UI.py:562
 msgid "Select Skyboxes"
 msgstr ""
 
-#: src/UI.py:562
+#: src/UI.py:563
 msgid ""
 "The skybox decides what the area outside the chamber is like. It chooses "
 "the colour of sky (seen in some items), the style of bottomless pit (if "
 "present), as well as color of \"fog\" (seen in larger chambers."
 msgstr ""
 
-#: src/UI.py:570
+#: src/UI.py:571
 msgid "3D Skybox"
 msgstr ""
 
-#: src/UI.py:571
+#: src/UI.py:572
 msgid "Fog Color"
 msgstr ""
 
-#: src/UI.py:578
+#: src/UI.py:579
 msgid "Select Additional Voice Lines"
 msgstr ""
 
-#: src/UI.py:579
+#: src/UI.py:580
 msgid ""
 "Voice lines choose which extra voices play as the player enters or exits "
 "a chamber. They are chosen based on which items are present in the map. "
@@ -368,46 +368,46 @@ msgid ""
 "Style Properties."
 msgstr ""
 
-#: src/UI.py:584
+#: src/UI.py:585
 msgid "Add no extra voice lines."
 msgstr ""
 
-#: src/UI.py:586
+#: src/UI.py:587
 msgid "<Multiverse Cave only>"
 msgstr ""
 
-#: src/UI.py:590
+#: src/UI.py:591
 msgid "Characters"
 msgstr ""
 
-#: src/UI.py:597
+#: src/UI.py:598
 msgid "Select Background Music"
 msgstr ""
 
-#: src/UI.py:598
+#: src/UI.py:599
 msgid ""
 "This controls the background music used for a map. Some tracks have "
 "variations which are played when interacting with certain testing "
 "elements."
 msgstr ""
 
-#: src/UI.py:603
+#: src/UI.py:604
 msgid "Add no music to the map at all."
 msgstr ""
 
-#: src/UI.py:607
+#: src/UI.py:608
 msgid "Propulsion Gel SFX"
 msgstr ""
 
-#: src/UI.py:609
+#: src/UI.py:610
 msgid "Excursion Funnel SFX"
 msgstr ""
 
-#: src/UI.py:616
+#: src/UI.py:617
 msgid "Select Style"
 msgstr ""
 
-#: src/UI.py:617
+#: src/UI.py:618
 msgid ""
 "The Style controls many aspects of the map. It decides the materials used"
 " for walls, the appearance of entrances and exits, the design for most "
@@ -416,186 +416,190 @@ msgid ""
 "The style broadly defines the time period a chamber is set in."
 msgstr ""
 
-#: src/UI.py:628
+#: src/UI.py:629
 msgid "Elevator Videos"
 msgstr ""
 
-#: src/UI.py:635
+#: src/UI.py:636
 msgid "Select Elevator Video"
 msgstr ""
 
-#: src/UI.py:636
+#: src/UI.py:637
 msgid ""
 "Set the video played on the video screens in modern Aperture elevator "
 "rooms. Not all styles feature these. If set to \"None\", a random video "
 "will be selected each time the map is played, like in the default PeTI."
 msgstr ""
 
-#: src/UI.py:640
+#: src/UI.py:641
 msgid "This style does not have a elevator video screen."
 msgstr ""
 
-#: src/UI.py:643
+#: src/UI.py:644
 msgid "Choose a random video."
 msgstr ""
 
-#: src/UI.py:647
+#: src/UI.py:648
 msgid "Multiple Orientations"
 msgstr ""
 
-#: src/UI.py:828
+#: src/UI.py:829
 msgid ""
 "Selected Items and Style successfully exported!\n"
 "Launch game?"
 msgstr ""
 
-#: src/UI.py:836
+#: src/UI.py:837
 msgid "<Last Export>"
 msgstr ""
 
-#: src/UI.py:861
+#: src/UI.py:862
 msgid "Item: {}"
 msgstr ""
 
-#: src/UI.py:1045
+#: src/UI.py:1046
 msgid "Delete Palette \"{}\""
 msgstr ""
 
-#: src/UI.py:1099
+#: src/UI.py:1100
 msgid "BEE2 - Save Palette"
 msgstr ""
 
-#: src/UI.py:1110
+#: src/UI.py:1101
+msgid "Enter a name:"
+msgstr ""
+
+#: src/UI.py:1111
 msgid "Please only use basic characters in palette names."
 msgstr ""
 
-#: src/UI.py:1118
+#: src/UI.py:1119
 msgid "This palette already exists. Overwrite?"
 msgstr ""
 
-#: src/UI.py:1140
+#: src/UI.py:1141
 msgid "Are you sure you want to delete \"{palette}\"?"
 msgstr ""
 
-#: src/UI.py:1167
+#: src/UI.py:1168
 msgid "Clear Palette"
 msgstr ""
 
-#: src/UI.py:1195 src/UI.py:1602
+#: src/UI.py:1196 src/UI.py:1603
 msgid "Delete Palette"
 msgstr ""
 
-#: src/UI.py:1215
+#: src/UI.py:1216
 msgid "Save Palette..."
 msgstr ""
 
-#: src/UI.py:1220 src/UI.py:1615
+#: src/UI.py:1221 src/UI.py:1616
 msgid "Save Palette As..."
 msgstr ""
 
-#: src/UI.py:1228
+#: src/UI.py:1229
 msgid "Export..."
 msgstr ""
 
-#: src/UI.py:1240
+#: src/UI.py:1241
 msgid "Properties"
 msgstr ""
 
-#: src/UI.py:1267
+#: src/UI.py:1268
 msgid "{arr} Use Suggested {arr}"
 msgstr ""
 
-#: src/UI.py:1280
+#: src/UI.py:1281
 msgid "Style: "
 msgstr ""
 
-#: src/UI.py:1282
+#: src/UI.py:1283
 msgid "Music: "
 msgstr ""
 
-#: src/UI.py:1283
+#: src/UI.py:1284
 msgid "Voice: "
 msgstr ""
 
-#: src/UI.py:1284
+#: src/UI.py:1285
 msgid "Skybox: "
 msgstr ""
 
-#: src/UI.py:1285
+#: src/UI.py:1286
 msgid "Elev Vid: "
 msgstr ""
 
-#: src/UI.py:1303
+#: src/UI.py:1304
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr ""
 
-#: src/UI.py:1399
+#: src/UI.py:1400
 msgid "All Items: "
 msgstr ""
 
-#: src/UI.py:1548 src/backup.py:811
+#: src/UI.py:1549 src/backup.py:811
 msgid "File"
 msgstr ""
 
-#: src/UI.py:1553
+#: src/UI.py:1554
 msgid "Export"
 msgstr ""
 
-#: src/UI.py:1562 src/backup.py:815
+#: src/UI.py:1563 src/backup.py:815
 msgid "Add Game"
 msgstr ""
 
-#: src/UI.py:1566
+#: src/UI.py:1567
 msgid "Remove Selected Game"
 msgstr ""
 
-#: src/UI.py:1570
+#: src/UI.py:1571
 msgid "Backup/Restore Puzzles..."
 msgstr ""
 
-#: src/UI.py:1574
+#: src/UI.py:1575
 msgid "Manage Packages..."
 msgstr ""
 
-#: src/UI.py:1579
+#: src/UI.py:1580
 msgid "Options"
 msgstr ""
 
-#: src/UI.py:1584
+#: src/UI.py:1585
 msgid "Quit"
 msgstr ""
 
-#: src/UI.py:1595
+#: src/UI.py:1596
 msgid "Palette"
 msgstr ""
 
-#: src/UI.py:1597
+#: src/UI.py:1598
 msgid "Clear"
 msgstr ""
 
-#: src/UI.py:1606
+#: src/UI.py:1607
 msgid "Fill Palette"
 msgstr ""
 
-#: src/UI.py:1610
+#: src/UI.py:1611
 msgid "Save Palette"
 msgstr ""
 
-#: src/UI.py:1628
+#: src/UI.py:1629
 msgid "Help"
 msgstr ""
 
-#: src/UI.py:1629
+#: src/UI.py:1630
 msgid "About"
 msgstr ""
 
-#: src/UI.py:1764
+#: src/UI.py:1765
 msgid "Export Options"
 msgstr ""
 
-#: src/UI.py:1795
+#: src/UI.py:1796
 msgid "Fill empty spots in the palette with random items."
 msgstr ""
 
@@ -856,6 +860,10 @@ msgid ""
 " clipboard instead?"
 msgstr ""
 
+#: src/contextWin.py:532
+msgid "More Info>>"
+msgstr ""
+
 #: src/contextWin.py:549
 msgid "Change Defaults..."
 msgstr ""
@@ -864,54 +872,54 @@ msgstr ""
 msgid "Change the default settings for this item when placed."
 msgstr ""
 
-#: src/gameMan.py:584
+#: src/gameMan.py:585
 msgid "BEE2 - Export Failed!"
 msgstr ""
 
-#: src/gameMan.py:585
+#: src/gameMan.py:586
 msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
 msgstr ""
 
-#: src/gameMan.py:872
+#: src/gameMan.py:871
 msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 
-#: src/gameMan.py:875 src/gameMan.py:890 src/gameMan.py:897 src/gameMan.py:905
-#: src/gameMan.py:914
+#: src/gameMan.py:874 src/gameMan.py:889 src/gameMan.py:896 src/gameMan.py:904
+#: src/gameMan.py:913
 msgid "BEE2 - Add Game"
 msgstr ""
 
-#: src/gameMan.py:878
+#: src/gameMan.py:877
 msgid "Find Game Exe"
 msgstr ""
 
-#: src/gameMan.py:879
+#: src/gameMan.py:878
 msgid "Executable"
 msgstr ""
 
-#: src/gameMan.py:887
+#: src/gameMan.py:886
 msgid "This does not appear to be a valid game folder!"
 msgstr ""
 
-#: src/gameMan.py:896
+#: src/gameMan.py:895
 msgid "Enter the name of this game:"
 msgstr ""
 
-#: src/gameMan.py:904
+#: src/gameMan.py:903
 msgid "This name is already taken!"
 msgstr ""
 
-#: src/gameMan.py:913
+#: src/gameMan.py:912
 msgid "Please enter a name for this game!"
 msgstr ""
 
-#: src/gameMan.py:932
+#: src/gameMan.py:931
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 
-#: src/gameMan.py:938
+#: src/gameMan.py:937
 msgid "Are you sure you want to delete \"{}?\""
 msgstr ""
 
@@ -1019,6 +1027,95 @@ msgstr ""
 
 #: src/optionWindow.py:217 src/packageMan.py:114 src/selectorWin.py:657
 msgid "Cancel"
+msgstr ""
+
+#: src/optionWindow.py:234 src/optionWindow.py:240
+msgid "Play Sounds"
+msgstr ""
+
+#: src/optionWindow.py:245
+msgid ""
+"Pyglet is either not installed or broken.\n"
+"Sound effects have been disabled."
+msgstr ""
+
+#: src/optionWindow.py:254
+msgid "Show WIP items"
+msgstr ""
+
+#: src/optionWindow.py:255
+msgid ""
+"Show items and item versions marked Work In Progress. These may be buggy "
+"or incomplete."
+msgstr ""
+
+#: src/optionWindow.py:262
+msgid "Reset Package Caches"
+msgstr ""
+
+#: src/optionWindow.py:268
+msgid "Force re-extracting all package resources. This requires a restart."
+msgstr ""
+
+#: src/optionWindow.py:277
+msgid "Keep windows inside screen"
+msgstr ""
+
+#: src/optionWindow.py:278
+msgid ""
+"Prevent sub-windows from moving outside the screen borders. If you have "
+"multiple monitors, disable this."
+msgstr ""
+
+#: src/optionWindow.py:286
+msgid "Reset All Window Positions"
+msgstr ""
+
+#: src/optionWindow.py:310
+msgid "Log when item doesn't have a style"
+msgstr ""
+
+#: src/optionWindow.py:311
+msgid ""
+"Log items have no applicable version for a particular style.This usually "
+"means it will look very bad."
+msgstr ""
+
+#: src/optionWindow.py:320
+msgid ""
+"Log when an item reuses a variant from a parent style (1970s using 1950s "
+"items, for example). This is usually fine, but may need to be fixed."
+msgstr ""
+
+#: src/optionWindow.py:329
+msgid "Log missing packfile resources"
+msgstr ""
+
+#: src/optionWindow.py:330
+msgid ""
+"Log when the resources a \"PackList\" refers to are not present in the "
+"zip. This may be fine (in a prerequisite zip), but it often indicates an "
+"error."
+msgstr ""
+
+#: src/optionWindow.py:339
+msgid "Preserve Game Directories"
+msgstr ""
+
+#: src/optionWindow.py:340
+msgid ""
+"When exporting, do not overwrite \n"
+"\"bee2/\" and\n"
+"\"sdk_content/maps/bee2/\".\n"
+"Enable if you're developing new content, to ensure it is not overwritten."
+msgstr ""
+
+#: src/optionWindow.py:351
+msgid "Show Log Window"
+msgstr ""
+
+#: src/optionWindow.py:353
+msgid "Show the log file in real-time."
 msgstr ""
 
 #: src/packageMan.py:62
