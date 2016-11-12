@@ -500,7 +500,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
         raise shutil.Error(errors)
 
 
-def setup_localisations(logger: logging.LoggerAdapter):
+def setup_localisations(logger: logging.Logger):
     """Setup gettext localisations."""
     import gettext
     import locale
@@ -530,10 +530,12 @@ def setup_localisations(logger: logging.LoggerAdapter):
             break
     else:
         # No translations, fallback to English.
-        logger.warning(
-            "Can't find translation for codes: {!r}!",
-            expanded_langs,
-        )
+        # That's fine if the user's language is actually English.
+        if 'en' not in expanded_langs:
+            logger.warning(
+                "Can't find translation for codes: {!r}!",
+                expanded_langs,
+            )
         trans = gettext.NullTranslations()
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
