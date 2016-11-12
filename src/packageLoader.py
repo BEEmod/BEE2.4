@@ -1064,7 +1064,7 @@ class Item(PakObject):
 
         item_data = self.versions[ver_id]['styles'][style_id]
 
-        new_editor = item_data['editor'].copy()
+        new_editor = item_data['editor'].copy()  # type: Property
 
         new_editor['type'] = self.id  # Set the item ID to match our item
         # This allows the folders to be reused for different items if needed.
@@ -1117,6 +1117,56 @@ class Item(PakObject):
 
                 if item_prop.name.casefold() in prop_overrides:
                     item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
+
+        # OccupiedVoxels does not allow specifying 'volume' regions like
+        # EmbeddedVoxel. Implement that.
+
+        # First for 32^2 cube sections.
+        for voxel_part in new_editor.find_all("Exporting", "OccupiedVoxels", "SurfaceVolume"):
+            if 'subpos1' not in voxel_part or 'subpos2' not in voxel_part:
+                LOGGER.warning(
+                    'Item {} has invalid OccupiedVoxels part '
+                    '(needs SubPos1 and SubPos2)!',
+                    self.id
+                )
+                continue
+            voxel_part.name = "Voxel"
+            bbox_min, bbox_max = Vec.bbox(
+                voxel_part.vec('subpos1'),
+                voxel_part.vec('subpos2'),
+            )
+            del voxel_part['subpos1']
+            del voxel_part['subpos2']
+            for pos in Vec.iter_grid(bbox_min, bbox_max):
+                voxel_part.append(Property(
+                    "Surface", [
+                        Property("Pos", str(pos)),
+                    ])
+                )
+
+        # Full blocks
+        for occu_voxels in new_editor.find_all("Exporting", "OccupiedVoxels"):
+            for voxel_part in list(occu_voxels.find_all("Volume")):
+                del occu_voxels['Volume']
+
+                if 'pos1' not in voxel_part or 'pos2' not in voxel_part:
+                    LOGGER.warning(
+                        'Item {} has invalid OccupiedVoxels part '
+                        '(needs Pos1 and Pos2)!',
+                        self.id
+                    )
+                    continue
+                voxel_part.name = "Voxel"
+                bbox_min, bbox_max = Vec.bbox(
+                    voxel_part.vec('pos1'),
+                    voxel_part.vec('pos2'),
+                )
+                del voxel_part['pos1']
+                del voxel_part['pos2']
+                for pos in Vec.iter_grid(bbox_min, bbox_max):
+                    new_part = voxel_part.copy()
+                    new_part['Pos'] = str(pos)
+                    occu_voxels.append(new_part)
 
         return (
             new_editor,
