@@ -354,7 +354,14 @@ class PalItem(Label):
         Call whenever the style changes, so the icons update.
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
-        self.name = gameMan.translate(self.item.names[self.subKey])
+        try:
+            self.name = gameMan.translate(self.item.names[self.subKey])
+        except IndexError:
+            LOGGER.warning(
+                'Item <{}> in <{}> style has mismatched subtype count!',
+                self.id, selected_style,
+            )
+            self.name = '??'
         self['image'] = self.img
         # Put a large D over the item if it's deprecated.
         if self.item.is_dep:
@@ -563,7 +570,7 @@ def load_packages(data):
         desc=_('The skybox decides what the area outside the chamber is like.'
                ' It chooses the colour of sky (seen in some items), the style'
                ' of bottomless pit (if present), as well as color of "fog" '
-               '(seen in larger chambers.'),
+               '(seen in larger chambers).'),
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
