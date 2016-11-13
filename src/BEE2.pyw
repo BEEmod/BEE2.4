@@ -7,6 +7,16 @@ from multiprocessing.spawn import is_forking
 import os
 import sys
 
+try:
+    # When we're imported via fork, the gettext functions won't be here.
+    _
+except NameError:
+    # Add stub versions of translation functions, needed since they
+    # are called during import.
+    import builtins
+    builtins._ = builtins.gettext = lambda x: x
+    builtins.ngettext = lambda a, b, n: a if n == 1 else b
+
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
