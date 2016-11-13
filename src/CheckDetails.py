@@ -15,7 +15,7 @@ from tooltip import add_tooltip
 import utils
 import tk_tools
 
-from typing import List
+from typing import List, Iterator
 
 
 UP_ARROW = '\u25B3'
@@ -494,6 +494,14 @@ class CheckDetails(ttk.Frame):
             reverse=self.rev_sort,
         )
         self.refresh()
+
+    def checked(self) -> Iterator[Item]:
+        """Yields enabled check items."""
+        return (item for item in self.items if item.state_var.get())
+
+    def unchecked(self) -> Iterator[Item]:
+        """Yields disabled check items."""
+        return (item for item in self.items if not item.state_var.get())
 
 
 if __name__ == '__main__':
