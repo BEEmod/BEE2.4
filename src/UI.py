@@ -1053,15 +1053,25 @@ def set_palette(e=None):
         label=_('Delete Palette "{}"').format(palettes[selectedPalette].name),
     )
     for item, sub in palettes[selectedPalette].pos:
-        if item in item_list.keys():
-            pal_picked.append(PalItem(
-                frames['preview'],
-                item_list[item],
-                sub,
-                is_pre=True
-                ))
-        else:
-            LOGGER.warning('Unknown item "{}"!', item)
+        try:
+            item_group = item_list[item]
+        except KeyError:
+            LOGGER.warning('Unknown item "{}"! for palette', item)
+            continue
+
+        if sub >= item_group.num_sub:
+            LOGGER.warning(
+                'Palette had incorrect subtype for "{}" ({} > {})!',
+                item, sub, item_group.num_sub - 1,
+            )
+            continue
+
+        pal_picked.append(PalItem(
+            frames['preview'],
+            item_list[item],
+            sub,
+            is_pre=True,
+        ))
     flow_preview()
 
 
