@@ -10,9 +10,10 @@ from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
 from brushLoc import POS as BLOCK_POS, Block, grid_to_world, world_to_grid
 import comp_consts as consts
-from vbsp_options import get as get_opt, get_tex, get_all_tex
 import utils
 import conditions
+import texturing
+from texturing import TexCat as TileSize
 
 LOGGER = utils.getLogger(__name__)
 
@@ -105,9 +106,9 @@ class TileType(Enum):
     @property
     def tile_size(self):
         if self.value in (1, 3):
-            return '4x4'
+            return TileSize.TILE_4x4
         else:
-            return '1x1'
+            return TileSize.TILE_1x1
 
 # Symbols that represent TileType values.
 TILETYPE_TO_CHAR = {
@@ -153,16 +154,16 @@ def iter_uv(umin=0, umax=3, vmin=0, vmax=3):
             yield u, v
 
 TILE_SIZES = {
-    '1x1': (4, 4),
-    '2x1': (2, 4),
-    '2x2': (2, 2),
-    '4x4': (1, 1),
+    TileSize.TILE_1x1: (4, 4),
+    TileSize.TILE_2x1: (2, 4),
+    TileSize.TILE_2x2: (2, 2),
+    TileSize.TILE_4x4: (1, 1),
 }
 
 
 class Pattern:
     """Represents a position a tile can be positioned in."""
-    def __init__(self, tex: str, *tiles: Tuple[int, int, int, int], wall_only=False):
+    def __init__(self, tex: TileSize, *tiles: Tuple[int, int, int, int], wall_only=False):
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = tiles
@@ -195,13 +196,13 @@ def order_bbox(bbox):
 
 PATTERNS = {
     'clean': [
-        Pattern('1x1', (0, 0, 4, 4)),
-        Pattern('2x1',
+        Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
+        Pattern(TileSize.TILE_2x1,
             (0, 0, 4, 4),  # Combined
             (0, 0, 2, 4), (1, 0, 3, 4), (2, 0, 4, 4),  # L/M/R
             wall_only=True,
         ),
-        Pattern('2x2',
+        Pattern(TileSize.TILE_2x2,
             # Combinations:
             (0, 0, 2, 4), (0, 0, 4, 2), (0, 2, 4, 4), (2, 0, 4, 4),
             (1, 0, 3, 4), (0, 1, 4, 3),
@@ -215,7 +216,7 @@ PATTERNS = {
 
         # Combinations for 4x4, to merge adjacent blocks..
         Pattern(
-            '4x4',
+            TileSize.TILE_4x4,
             *sorted([vals for x in range(4) for vals in [
                 # V-direction, U-direction for each row/column.
                 (x, 0, x+1, 4), (0, x, 4, x+1),  # 0-4
@@ -229,12 +230,12 @@ PATTERNS = {
 
     # Don't have 2x2/1x1 tiles off-grid..
     'grid_only': [
-        Pattern('1x1', (0, 0, 4, 4)),
-        Pattern('2x1', 
+        Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
+        Pattern(TileSize.TILE_2x1,
             (0, 0, 2, 4), (2, 0, 4, 4),  # L/R
             wall_only=True,
         ),
-        Pattern('2x2', 
+        Pattern(TileSize.TILE_2x2,
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
         ),
     ],
@@ -413,11 +414,11 @@ class TileDef:
             if full_type.is_nodraw:
                 tex = consts.Tools.NODRAW
             else:
-                tex = get_tex(get_tile_tex(
+                tex = get_tile_tex(
                     full_type.color,
                     orient,
                     full_type.tile_size,
-                ))
+                )
             brush, face = make_tile(
                 vmf,
                 self.pos + self.normal * 64,
@@ -426,7 +427,7 @@ class TileDef:
                 width=128,
                 height=128,
                 bevels=bevels,
-                back_surf=get_tex('special.behind'),
+                back_surf=texturing.special.rand('behind'),
             )
             self.brush_faces.append(face)
             yield brush
@@ -439,7 +440,7 @@ class TileDef:
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
-                tex = get_tex(get_tile_tex(tile_type.color, orient, grid_size))
+                tex = get_tile_tex(tile_type.color, orient, grid_size)
                 brush, face = make_tile(
                     vmf,
                     self.uv_offset(
@@ -455,7 +456,7 @@ class TileDef:
                     bevels=[a and b for a, b in zip(bevels, [
                         umin == 0, umax == 3, vmin == 0, vmax == 3
                     ])],
-                    back_surf=get_tex('special.behind'),
+                    back_surf=texturing.special.rand('behind'),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                 )
@@ -477,7 +478,7 @@ class TileDef:
                     bevels=[a and b for a, b in zip(bevels, [
                         umin == 0, umax == 3, vmin == 0, vmax == 3
                     ])],
-                    back_surf=get_tex('special.behind'),
+                    back_surf=texturing.special.rand('behind'),
                 )
                 self.brush_faces.append(face)
                 yield brush
@@ -485,10 +486,7 @@ class TileDef:
 
 def get_tile_tex(color, orient, size):
     """Get the appropriate texture name for a tile."""
-    if orient == 'wall':
-        return color + '.' + size
-    else:
-        return color + '.' + orient
+    return texturing.GROUPS[color, orient].rand(size)
 
 
 def make_tile(
