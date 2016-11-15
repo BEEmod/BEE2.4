@@ -9,9 +9,8 @@ import random
 from srctools import Property, Vec, parse_vec_str
 import srctools
 import utils
-import comp_consts as consts
 
-from typing import TypeVar, Type, Optional, Iterator
+from typing import T, Type, Optional, Iterator
 
 LOGGER = utils.getLogger(__name__)
 
@@ -34,6 +33,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
+
 class Opt:
     def __init__(self, id, default, doc, fallback=None):
         if isinstance(default, TYPE):
@@ -49,24 +49,6 @@ class Opt:
         self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
         if fallback is not None:
             self.doc += 'If unset, the default is read from `{}`.'.format(default)
-
-
-class Tex:
-    def __init__(self, group, name, default=(), fallback=None, add=()):
-        self.group = group
-        self.name = name
-        if isinstance(default, (str, consts.ConstGroup)):
-            self.default = [default]
-        else:
-            self.default = list(default)
-        self.additional = list(add)
-        self.fallback = fallback
-
-    def __repr__(self):
-        return (
-            'Tex({0.group!r}, {0.name!r}, {0.default!r}, '
-            'fallback={0.fallback!r}, add={0.additional!r})'.format(self)
-        )
 
 
 def load_options(opt_blocks: Iterator[Property]):
@@ -124,61 +106,6 @@ def load_options(opt_blocks: Iterator[Property]):
 
     if set_vals:
         LOGGER.warning('Extra config options: {}', set_vals)
-
-
-def load_tex(blocks: Iterator[Property]):
-    """Load in texture definitions."""
-    TEXTURES.clear()
-    raw_configs = defaultdict(list)
-
-    for block in blocks:
-        for group in block:
-            for prop in group:
-                raw_configs[group.name, prop.name].append(prop.value)
-
-    tex_options = {tex.group + '.' + tex.name: tex for tex in TEX_DEFAULTS}
-
-    for tex_opt in TEX_DEFAULTS:
-        if tex_opt.fallback is None:
-            continue
-        fallback = tex_options[tex_opt.fallback]
-        if fallback.fallback is not None:
-            raise TypeError('"{}.{}"' " can't double-fallback!".format(
-                tex_opt.group,
-                tex_opt.name,
-            ))
-
-    need_fallback = []
-    need_additional = []
-    for dotted, tex_opt in tex_options.items():
-        try:
-            TEXTURES[dotted] = raw_configs[tex_opt.group, tex_opt.name]
-            if TEXTURES[dotted]:
-                continue
-        except KeyError:
-            pass
-
-        if tex_opt.fallback:
-            fallback = tex_options[tex_opt.fallback]
-            need_fallback.append((dotted, fallback))
-        else:
-            TEXTURES[dotted] = tex_opt.default
-
-        if tex_opt.additional:
-            need_additional.append((dotted, tex_opt))
-
-    for dotted, fallback in need_fallback:
-        TEXTURES[dotted] = TEXTURES[fallback.group + '.' + fallback.name].copy()
-
-    for name, tex in TEXTURES.items():
-        if not tex or tex == ['']:
-            TEXTURES[name] = []
-
-    for dotted, tex_opt in need_additional:
-        for add in tex_opt.additional:
-            TEXTURES[dotted].extend(TEXTURES[add])
-
-T = TypeVar('T')
 
 
 def get(expected_type: Type[T], name) -> Optional[T]:
@@ -314,6 +241,11 @@ DEFAULTS = [
 
         When `False`, this disables fizzler sounds and implies
         `fizz_scanline` is also `False`.
+        """),
+    Opt('fizz_scanline', True,
+        """Should fizzlers have the 'scanline' particle effect.
+
+        These are used for modern fizzlers, but not Old Aperture ones.
         """),
 
     Opt('force_fizz_reflect', False,
@@ -586,102 +518,3 @@ DEFAULTS = [
         """),
 ]
 
-TEX_DEFAULTS = [
-    # TODO: remove these..
-    Tex('black', 'wall', consts.BlackPan.BLACK_1x1),
-    Tex('white', 'wall', consts.WhitePan.WHITE_2x1),
-
-
-    Tex('black', 'floor', consts.BlackPan.BLACK_FLOOR),  # 4x4
-    Tex('black', 'floor_2x2', fallback='black.2x2'),
-    Tex('black', 'floor_1x1', fallback='black.1x1', add=[
-        'black.floor_2x2', 'black.floor',
-    ]),
-    Tex('black', 'ceiling', consts.BlackPan.BLACK_FLOOR),
-    Tex('black', 'ceiling_2x2', fallback='black.2x2'),
-    Tex('black', 'ceiling_1x1', fallback='black.1x1', add=[
-        'black.ceiling_2x2', 'black.ceiling',
-    ]),
-    Tex('black', '1x1', consts.BlackPan.BLACK_1x1, add=[
-        'black.2x1', 'black.2x2', 'black.4x4',
-    ]),
-    Tex('black', '2x1', consts.BlackPan.BLACK_2x1),
-    Tex('black', '2x2', consts.BlackPan.BLACK_2x2),
-    Tex('black', '4x4', consts.BlackPan.BLACK_4x4),
-    Tex('black', 'bullseye_floor'),
-    Tex('black', 'bullseye_wall', fallback='white.bullseye_floor'),
-    Tex('black', 'bullseye_ceiling', fallback='white.bullseye_floor'),
-
-    Tex('white', 'floor', consts.WhitePan.WHITE_FLOOR),  # 4x4
-    Tex('white', 'floor_2x2', fallback='white.2x2'),
-    Tex('white', 'floor_1x1', fallback='white.1x1', add=[
-        'white.floor_2x2', 'white.floor',
-    ]),
-    Tex('white', 'ceiling', consts.WhitePan.WHITE_4x4),
-    Tex('white', 'ceiling_2x2', fallback='white.2x2'),
-    Tex('white', 'ceiling_1x1', fallback='white.1x1', add=[
-        'white.ceiling_2x2', 'white.ceiling',
-    ]),
-    Tex('white', '1x1', consts.WhitePan.WHITE_1x1, add=[
-        'white.2x1', 'white.2x2', 'white.4x4',
-    ]),
-    Tex('white', '2x1', consts.WhitePan.WHITE_2x1),
-    Tex('white', '2x2', consts.WhitePan.WHITE_2x2),
-    Tex('white', '4x4', consts.WhitePan.WHITE_4x4),
-    Tex('white', 'bullseye_floor'),
-    Tex('white', 'bullseye_wall', fallback='white.bullseye_floor'),
-    Tex('white', 'bullseye_ceiling', fallback='white.bullseye_floor'),
-
-    Tex('overlay', 'exit', consts.Signage.EXIT),
-    Tex('overlay', 'arrow', consts.Signage.ARROW),
-    Tex('overlay', 'dot', consts.Signage.SHAPE_DOT),
-    Tex('overlay', 'moon', consts.Signage.SHAPE_MOON),
-    Tex('overlay', 'triangle', consts.Signage.SHAPE_TRIANGLE),
-    Tex('overlay', 'cross', consts.Signage.SHAPE_CROSS),
-    Tex('overlay', 'square', consts.Signage.SHAPE_SQUARE),
-    Tex('overlay', 'circle', consts.Signage.SHAPE_CIRCLE),
-    Tex('overlay', 'sine', consts.Signage.SHAPE_SINE),
-    Tex('overlay', 'slash', consts.Signage.SHAPE_SLASH),
-    Tex('overlay', 'star', consts.Signage.SHAPE_STAR),
-    Tex('overlay', 'wavy', consts.Signage.SHAPE_WAVY),
-
-    # Special additional scale information...
-    Tex('overlay', 'antline', '0.25|' + consts.Antlines.STRAIGHT),
-    Tex('overlay', 'antlinecorner', '1|' + consts.Antlines.CORNER),
-
-    # This is for the P1 style, where antlines use different textures
-    # on the floor and wall.
-    # We just use the regular version if unset.
-    Tex('overlay', 'antlinecornerfloor'),
-    Tex('overlay', 'antlinefloor'),
-
-    # Broken version of antlines
-    Tex('overlay', 'antlinebroken'),
-    Tex('overlay', 'antlinebrokencorner'),
-    Tex('overlay', 'antlinebrokenfloor'),
-    Tex('overlay', 'antlinebrokenfloorcorner'),
-
-
-    Tex('special', 'behind', consts.Special.BACKPANELS_CHEAP),
-    Tex('special', 'pedestalside', consts.Special.PED_SIDE),
-    Tex('special', 'edge', consts.Special.SQUAREBEAMS),
-    Tex('special', 'edge_special', fallback='special.edge'),
-    Tex('special', 'goo', consts.Goo.REFLECTIVE),
-    Tex('special', 'goo_cheap', consts.Goo.CHEAP),
-    Tex('special', 'glass', consts.Special.GLASS),
-    Tex('special', 'grating', consts.Special.GRATING),
-    Tex('special', 'laserfield', consts.Special.LASERFIELD),
-    Tex('special', 'sky', "sky_black"),
-
-    # These replacements are deactivated when unset
-    Tex('special', 'white'),
-    Tex('special', 'black'),
-    Tex('special', 'white_wall', fallback='special.white'),
-    Tex('special', 'black_wall', fallback='special.black'),
-    Tex('special', 'white_gap', fallback='white.4x4'),
-    Tex('special', 'black_gap', fallback='black.4x4'),
-
-    Tex('special', 'goo_wall'),
-    Tex('special', 'goo_floor', fallback='special.goo_wall'),
-    Tex('special', 'fizz_border'),
-]
