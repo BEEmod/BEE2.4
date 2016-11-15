@@ -1,3 +1,4 @@
+import texturing
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -295,25 +296,7 @@ def load_settings():
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
-    tex_defaults = list(TEX_VALVE.items()) + TEX_DEFAULTS
-
-    vbsp_options.load_tex(conf.find_all('textures'))
-
-    # Collect texture values from the config.
-    # They are collected in a list for each option, allowing
-    # multiple random textures for each slot.
-    for item, key in tex_defaults:
-        cat, name = key.split(".")
-        value = [
-            prop.value
-            for prop in
-            conf.find_all('textures', cat, name)
-        ]
-        if len(value) == 0:
-            # If there are no values, just use the original value
-            settings['textures'][key] = [str(item)]
-        else:
-            settings['textures'][key] = value
+    texturing.load_config(conf.find_children('textures'))
 
     # Load in our main configs..
     vbsp_options.load_options(conf.find_all('Options'))
