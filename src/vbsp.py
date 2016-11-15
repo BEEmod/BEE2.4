@@ -431,8 +431,8 @@ def add_fizz_borders(_):
 
     This is used in 50s and BTS styles.
     """
-    tex = settings['textures']['special.fizz_border']
-    if tex == ['']:
+    tex = texturing.special.all('fizz_border')
+    if not tex:
         # No textures were defined!
         return
 
@@ -631,12 +631,10 @@ def find_panel_locs(_):
 
 @conditions.make_result_setup('FaithBullseye')
 def res_faith_bullseye_check(res):
-    """Do a check to ensure there are actually textures availble."""
+    """Do a check to ensure there are actually textures available."""
     for col in ('white', 'black'):
         for orient in ('wall', 'floor', 'ceiling'):
-            if settings['textures'][
-                    'special.bullseye_{}_{}'.format(col, orient)
-                                        ] != ['']:
+            if texturing.GROUPS[col, orient].all('bullseye'):
                 return res.value
     return None  # No textures!
 
@@ -721,18 +719,14 @@ def make_bullseye_face(
     if orient is ORIENT.ceil: # We use the full 'ceiling' here, instead of 'ceil'.
         orient = 'ceiling'
 
-    mat = get_tex('special.bullseye_{!s}_{!s}'.format(color, orient))
+    group = texturing.GROUPS[color, orient]
 
-    # Fallback to floor texture if using ceiling or wall
-    if orient is not ORIENT.floor and mat == '':
-        mat = get_tex('special.bullseye_{}_floor'.format(color))
-
-    if mat == '':
-        return False
-    else:
-        face.mat = mat
+    if 'bullseye' in group:
+        face.mat = group.rand('bullseye')
         IGNORED_FACES.add(face)
         return True
+    else:
+        return False
 
 FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
@@ -1949,10 +1943,10 @@ def change_brush():
         add_glass_floorbeams(floorbeam_locs)
         LOGGER.info('Done!')
 
-    if can_clump():
-        clump_walls()
-    else:
-        random_walls()
+    # if can_clump():
+    #     clump_walls()
+    # else:
+    #     random_walls()
 
 
 def can_clump():
@@ -2491,16 +2485,16 @@ def change_overlays():
 
     # Grab all the textures we're using...
 
-    tex_dict = settings['textures']
-    ant_str = tex_dict['overlay.antline']
-    ant_str_floor = tex_dict['overlay.antlinefloor']
-    ant_corn = tex_dict['overlay.antlinecorner']
-    ant_corn_floor = tex_dict['overlay.antlinecornerfloor']
+    special_group = texturing.overlay
+    ant_str = special_group.all('antline')
+    ant_str_floor = special_group.all('antlinefloor')
+    ant_corn = special_group.all('antlinecorner')
+    ant_corn_floor = special_group.all('antlinecornerfloor')
 
-    broken_ant_str = tex_dict['overlay.antlinebroken']
-    broken_ant_corn = tex_dict['overlay.antlinebrokencorner']
-    broken_ant_str_floor = tex_dict['overlay.antlinebrokenfloor']
-    broken_ant_corn_floor = tex_dict['overlay.antlinebrokenfloorcorner']
+    broken_ant_str = special_group.all('antlinebroken')
+    broken_ant_corn = special_group.all('antlinebrokencorner')
+    broken_ant_str_floor = special_group.all('antlinebrokenfloor')
+    broken_ant_corn_floor = special_group.all('antlinebrokenfloorcorner')
 
     broken_chance = vbsp_options.get(float, 'broken_antline_chance')
     broken_dist = vbsp_options.get(int, 'broken_antline_distance')
