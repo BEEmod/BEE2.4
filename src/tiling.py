@@ -395,6 +395,8 @@ class TileDef:
         else:
             orient = 'wall'
 
+        front_pos = self.pos + 64 * self.normal
+
         if self.sub_tiles is None:
             full_type = self.base_type
         else:
@@ -418,6 +420,7 @@ class TileDef:
                     full_type.color,
                     orient,
                     full_type.tile_size,
+                    front_pos,
                 )
             brush, face = make_tile(
                 vmf,
@@ -440,7 +443,7 @@ class TileDef:
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
-                tex = get_tile_tex(tile_type.color, orient, grid_size)
+                tex = get_tile_tex(tile_type.color, orient, grid_size, front_pos)
                 brush, face = make_tile(
                     vmf,
                     self.uv_offset(
@@ -484,9 +487,9 @@ class TileDef:
                 yield brush
 
 
-def get_tile_tex(color, orient, size):
+def get_tile_tex(color, orient, grid_size, pos):
     """Get the appropriate texture name for a tile."""
-    return texturing.GROUPS[color, orient].rand(size)
+    return texturing.GROUPS[color, orient].get_tex(grid_size, pos)
 
 
 def make_tile(

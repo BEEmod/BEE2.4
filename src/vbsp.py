@@ -722,7 +722,7 @@ def make_bullseye_face(
     group = texturing.GROUPS[color, orient]
 
     if 'bullseye' in group:
-        face.mat = group.rand('bullseye')
+        face.mat = group.get_tex('bullseye', face.get_origin())
         IGNORED_FACES.add(face)
         return True
     else:

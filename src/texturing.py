@@ -4,6 +4,8 @@ from enum import Enum
 import random
 
 from srctools import Property
+from srctools import Vec
+
 import comp_consts as consts
 
 from typing import Dict, List, Tuple, Union, Optional, Iterable
@@ -11,7 +13,7 @@ from typing import Dict, List, Tuple, Union, Optional, Iterable
 import utils
 
 
-GROUPS = {}  # type: Dict[Union[str, Tuple[str, str]], TextureGroup]
+GROUPS = {}  # type: Dict[Union[str, Tuple[str, str]], TileGroup]
 
 LOGGER = utils.getLogger(__name__)
 
@@ -151,13 +153,16 @@ class TileGroup(TextureGroup):
         GROUPS[color, orient] = self
 
         self.merge_tiles = True
+        self.use_clump = False
 
     def read_from_props(self, props: Property):
         """Given the property block, read in values for tiles."""
-        self.merge_tiles = props.bool('merge', True)
+        config = props.find_key('options', [])
         # Remove the prop to ensure it's not parsed as a texture
-        if 'merge' in props:
-            del props['merge']
+        if 'options' in props:
+            del props['options']
+        self.merge_tiles = config.bool('merge')
+        self.use_clump = config.bool('clump')
 
         super().read_from_props(props)
 
@@ -167,6 +172,13 @@ class TileGroup(TextureGroup):
         if self.merge_tiles:
             for frm, to in TILE_MERGE:
                 self.tex[to].extend(self.tex[frm])
+
+    def get_tex(self, name: str, pos: Vec):
+        """Return the texture for a tile. This allows clumping."""
+        if self.use_clump:
+            raise Exception
+        else:
+            return self.rand(name)
 
 
 def load_config(props: Iterable[Property]):
