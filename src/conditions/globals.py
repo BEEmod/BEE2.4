@@ -84,16 +84,6 @@ def res_cave_portrait(inst, res):
     return vbsp_options.get(int, 'cave_port_skin') is not None
 
 
-@make_flag('ifOption')
-def flag_option(_, flag):
-    bits = flag.value.split(' ', 1)
-    key = bits[0].casefold()
-    if key in OPTIONS:
-        return OPTIONS[key] == bits[1]
-    else:
-        return False
-
-
 @make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(_, flag):
     """Checks if the game mode is "SP" or "COOP".
@@ -151,16 +141,4 @@ def res_set_voice_attr(_, res):
             VOICE_ATTR[opt.name] = True
     else:
         VOICE_ATTR[res.value.casefold()] = 1
-    return RES_EXHAUSTED
-
-
-@make_result('setOption')
-def res_set_option(_, res):
-    """Set a value in the "options" part of VBSP_config.
-
-    Each child property will be set.
-    """
-    for opt in res.value:
-        if opt.name in OPTIONS:
-            OPTIONS[opt.name] = opt.value
     return RES_EXHAUSTED
