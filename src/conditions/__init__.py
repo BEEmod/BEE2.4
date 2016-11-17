@@ -1590,7 +1590,7 @@ def res_break(base_inst, res):
     raise NextInstance
 
 
-@make_result('endCondition')
+@make_result('endCondition', 'nextCondition')
 def res_end_condition(base_inst, res):
     """Skip to the next condition.
 
