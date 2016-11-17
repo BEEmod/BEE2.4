@@ -784,27 +784,29 @@ def find_steam_info(game_dir):
     This only works on Source games!
     """
     game_id = None
-    steam_id_path = os.path.join(game_dir, 'steam_appid.txt')
-    try:
-        # The file ends with '\n\0'.
-        with open(steam_id_path, 'rb') as f:
-            game_id = f.read().strip(b'\n\0').decode('ascii')
-    except FileNotFoundError:
-        pass
-    if not game_id.isdigit():
-        game_id = None
-
+    name = None
+    found_name = False
+    found_id = False
     for folder in os.listdir(game_dir):
         info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
         if os.path.isfile(info_path):
             with open(info_path) as file:
                 for line in file:
                     clean_line = srctools.clean_line(line).replace('\t', ' ')
-                    if 'game ' in clean_line.casefold():
+                    if not found_id and 'steamappid' in clean_line.casefold():
+                        raw_id = clean_line.casefold().replace(
+                            'steamappid', '').strip()
+                        if raw_id.isdigit():
+                            game_id = raw_id
+                    elif not found_name and 'game ' in clean_line.casefold():
+                        found_name = True
                         ind = clean_line.casefold().rfind('game') + 4
                         name = clean_line[ind:].strip().strip('"')
-                        return game_id, name
-    return game_id, None
+                    if found_name and found_id:
+                        break
+        if found_name and found_id:
+            break
+    return game_id, name
 
 
 def scan_music_locs():
