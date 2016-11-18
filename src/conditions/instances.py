@@ -137,7 +137,7 @@ def res_clear_outputs(inst, res):
     inst.outputs.clear()
 
 
-@make_result('removeFixup')
+@make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
 def res_rem_fixup(inst, res):
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
