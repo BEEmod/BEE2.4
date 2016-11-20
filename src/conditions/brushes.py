@@ -449,7 +449,6 @@ def res_import_template_setup(res: Property):
             """Number = percent chance for each to be added"""
             for group in groups:
                 val = random.uniform(0, 100)
-                LOGGER.info('RAND: {}', locals())
                 if val <= visgroup_mode:
                     yield group
 
