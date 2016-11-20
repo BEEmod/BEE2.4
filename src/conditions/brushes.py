@@ -362,7 +362,7 @@ def res_add_brush(inst, res):
 
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res: Property):
-    temp_id = res['id'].casefold()
+    temp_id = res['id']
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
@@ -507,7 +507,7 @@ def res_import_template(inst: Entity, res):
             is the percentage chance for each visgroup to be added.
     """
     (
-        temp_id,
+        orig_temp_id,
         replace_tex,
         force_colour,
         force_grid,
@@ -519,13 +519,24 @@ def res_import_template(inst: Entity, res):
         visgroup_func,
         key_block,
     ) = res.value
+    temp_id = conditions.resolve_value(inst, orig_temp_id)
 
     temp_name, vis = conditions.parse_temp_name(temp_id)
     if temp_name not in TEMPLATES:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        LOGGER.warning('"{}" not a valid template!', temp_id)
+        if temp_id != orig_temp_id:
+            LOGGER.warning(
+                '{} -> "{}" is not a valid template!',
+                orig_temp_id,
+                temp_name
+            )
+        else:
+            LOGGER.warning(
+                '"{}" is not a valid template!',
+                temp_name
+            )
         return
 
     if invert_var != '':
