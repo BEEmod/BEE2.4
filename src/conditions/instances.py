@@ -131,6 +131,32 @@ def res_set_inst_var(inst, res):
     inst.fixup[var_name] = conditions.resolve_value(inst, val)
 
 
+@make_result_setup('mapInstVar')
+def res_map_inst_var_setup(res: Property):
+    table = {}
+    res_iter = iter(res)
+    first_prop = next(res_iter)
+    in_name, out_name = first_prop.name, first_prop.value
+    for prop in res_iter:
+        table[prop.real_name] = prop.value
+
+    out = in_name, out_name, table
+    return out if all(out) else None
+
+
+@make_result('mapInstVar')
+def res_map_inst_var(inst: Entity, res):
+    """Set one instance var based on the value of another.
+
+    The first value is the in -> out var, and all following are values to map.
+    """
+    in_name, out_name, table = res.value  # type: str, str, dict
+    try:
+        inst.fixup[out_name] = table[inst.fixup[in_name]]
+    except KeyError:
+        pass
+
+
 @make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst, res):
     """Remove the outputs from an instance."""
