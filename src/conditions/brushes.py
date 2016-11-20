@@ -388,7 +388,7 @@ def res_import_template_setup(res: Property):
     else:
         force_grid = None
 
-    invert_var = res['invertVar', '']
+    invert_var = res['invertVar', res['colorVar', '']]
 
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
@@ -474,7 +474,8 @@ def res_import_template(inst: Entity, res):
 
     It will be placed overlapping the given instance.
     Options:
-    - ID: The ID of the template to be inserted.
+    - ID: The ID of the template to be inserted. Add visgroups to additionally
+            add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overriden. If 'invert' is
             added, white/black tiles will be swapped. If a tile size
@@ -496,11 +497,11 @@ def res_import_template(inst: Entity, res):
             these values. This overrides force world/detail.
             Specially-handled keys:
             - "origin", offset automatically.
-            - "movedir" on func_movelinear - set a normal surounded by <>,
+            - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
-    - invertVar: If this fixup value is true, tile colour will be swapped to
-            the opposite of the current force option. If it is set to
-            'white' or 'black', that colour will be forced instead.
+    - invertVar or colorVar: If this fixup value is true, tile colour will be
+            swapped to the opposite of the current force option. If it is set
+            to 'white' or 'black', that colour will be forced instead.
     - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
