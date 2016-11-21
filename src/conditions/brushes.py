@@ -87,18 +87,9 @@ def res_fix_rotation_axis(ent, res):
         res['flags', '0'].split('+')
     ))
 
-    name = res['name', '']
-    if not name.startswith('@'):
-        # If a local name is given, add it to the instance targetname.
-        # It the name given is '', set to the instance's name.
-        # If it has an @, don't change it!
-        name = ent['targetname', ''] + (('-' + name) if name else '')
+    name = conditions.local_name(ent, res['name', ''])
 
-    axis = Vec(
-        x=int(des_axis == 'x'),
-        y=int(des_axis == 'y'),
-        z=int(des_axis == 'z'),
-    ).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec(**{des_axis: 1}).rotate_by_str(ent['angles', '0 0 0'])
 
     pos = Vec.from_str(
         res['Pos', '0 0 0']
