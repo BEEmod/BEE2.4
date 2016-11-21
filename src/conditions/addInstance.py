@@ -144,6 +144,6 @@ def res_cave_portrait(inst, res):
     appropriately.
     """
     skin = vbsp_options.get(int, 'cave_port_skin')
-    if skin != '':
+    if skin is not None:
         new_inst = res_add_overlay_inst(inst, res)
         new_inst.fixup['$skin'] = skin
