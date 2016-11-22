@@ -51,6 +51,9 @@ selected_style = "BEE2_CLEAN"
 selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
+# Variable used for export button (changes to include game name)
+# This is used after resource copying is done.
+EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
 # All the stuff we've loaded in
 item_list = {}
@@ -1243,7 +1246,6 @@ def init_option(f):
         textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
     )
-    extract_packages.export_btn_text.set(_('Export...'))
     UI['export_button'].state(['disabled'])
     UI['export_button'].grid(row=2, sticky="EW", padx=5)
 
@@ -1550,6 +1552,12 @@ def set_game(game):
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
+    text = _('Export to "{}"...').format(game.name)
+    menus['file'].entryconfigure(
+        menus['file'].export_btn_index,
+        label=text,
+    )
+    EXPORT_CMD_VAR.set(text)
 
 
 def init_menu_bar(win):
@@ -1575,6 +1583,8 @@ def init_menu_bar(win):
         state=DISABLED,
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
+
+
 
     file_menu.add_command(
         label=_("Add Game"),
@@ -1926,6 +1936,7 @@ def init_windows():
         """Callback run when all resources have been extracted."""
 
         UI['export_button'].state(['!disabled'])
+        UI['export_button']['textvariable'] = EXPORT_CMD_VAR
         UI['extract_progress'].grid_remove()
         windows['opt'].update_idletasks()
         # Reload the option window's position and sizing configuration,
