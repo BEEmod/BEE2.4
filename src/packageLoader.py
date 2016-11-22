@@ -2093,6 +2093,13 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 if file.startswith('resources')
             }
             for file in files:
+                if file.startswith(('-#', 'precache_sound:')):
+                    # Used to disable stock soundscripts, and precache sounds
+                    # Not to pack - ignore.
+                    continue
+
+                file = file.lstrip('#')  # This means to put in soundscript too...
+
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
                 if file not in zip_files:
