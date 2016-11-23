@@ -269,12 +269,16 @@ class Item:
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = img.png(
-                'BEE2/blank_96',
-                error=err_icon,
-                resize_to=ICON_SIZE,
+            self.icon = img.color_square(
+                img.PETI_ITEM_BG,
+                ICON_SIZE,
             )
-            self.ico_file = 'BEE2/blank_96'
+            self.ico_file = None
+        elif icon == '<black>':
+            self.icon = img.color_square(
+                Vec(),
+                ICON_SIZE,
+            )
         else:
             self.icon = img.png(
                 icon,
@@ -547,9 +551,10 @@ class selWin:
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
-        self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = img.png('BEE2/blank_96')
-        self.prop_icon['image'] = self.prop_icon.img
+        self.prop_icon = ttk.Label(
+            self.prop_icon_frm,
+            image=img.PAL_BG_96,
+        )
         self.prop_icon.grid(row=0, column=0)
 
         name_frame = ttk.Frame(self.prop_frm)

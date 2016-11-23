@@ -1395,11 +1395,10 @@ def init_preview(f):
         borderwidth=0,
         relief="solid",
         )
-    blank = img.png('BEE2/blank')
     pal_picked_fake = [
         ttk.Label(
             frames['preview'],
-            image=blank,
+            image=img.PAL_BG_64,
             )
         for _ in range(32)
         ]
@@ -1507,12 +1506,10 @@ def flow_picker(e=None):
     )
     frmScroll['height'] = height
 
-    # this adds extra blank items on the end to finish the grid nicely.
-    blank_img = img.png('BEE2/blank')
-
+    # This adds extra blank items on the end to finish the grid nicely.
     for i in range(width):
         if i not in pal_items_fake:
-            pal_items_fake.append(ttk.Label(frmScroll, image=blank_img))
+            pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
         if (num_items % width) <= i < width:  # if this space is empty
             pal_items_fake[i].place(
                 x=((i % width)*65 + 1),
@@ -1535,7 +1532,7 @@ def init_drag_icon():
     drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = Label(
         drag_win,
-        image=img.png('BEE2/blank'),
+        image=img.PAL_BG_64,
         )
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win

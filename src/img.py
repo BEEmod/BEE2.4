@@ -10,16 +10,19 @@ import os.path
 from srctools import Vec
 import utils
 
-from typing import Dict, Tuple
+from typing import Union, Dict, Tuple
 
 LOGGER = utils.getLogger('img')
 
 cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
-cached_squares = {}  # type: Dict[Tuple[float, float, float, int], ImageTk.PhotoImage]
+cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
+
+# Colour of the palette item background
+PETI_ITEM_BG = Vec(229, 232, 233)
 
 
-def png(path, resize_to=None, error=None, algo=Image.NEAREST):
+def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -35,7 +38,7 @@ def png(path, resize_to=None, error=None, algo=Image.NEAREST):
     orig_path = path
 
     try:
-        return cached_img[orig_path, resize_to]
+        return cached_img[path, resize_to]
     except KeyError:
         pass
 
@@ -106,10 +109,30 @@ def color_square(color: Vec, size=16):
             color=(int(color.x), int(color.y), int(color.z)),
         )
         tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares[color.as_tuple(), size] = tk_img
+        cached_squares[key] = tk_img
+
+
+def invis_square(size):
+    """Create a square image of the given size, filled with 0-alpha pixels."""
+
+    try:
+        return cached_squares['alpha', size]
+    except KeyError:
+        img = Image.new(
+            mode='RGBA',
+            size=(size, size),
+            color=(0, 0, 0, 0),
+        )
+        tk_img = ImageTk.PhotoImage(image=img)
+        cached_squares['alpha', size] = tk_img
 
         return tk_img
 
+BLACK_64 = color_square(Vec(0, 0, 0), size=64)
+BLACK_96 = color_square(Vec(0, 0, 0), size=96)
+PAL_BG_64 = color_square(PETI_ITEM_BG, size=64)
+PAL_BG_96 = color_square(PETI_ITEM_BG, size=96)
 
 # If image is not readable, use this instead
-img_error = png('BEE2/error')
+# If this actually fails, use the black image.
+img_error = png('BEE2/error', error=BLACK_64)

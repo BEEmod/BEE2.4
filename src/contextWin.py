@@ -15,10 +15,9 @@ from tkinter import messagebox
 from enum import Enum
 import functools
 import webbrowser
-import itertools
 
 from richTextBox import tkRichText
-import img as png
+import img
 import sound as snd
 import itemPropWin
 import tkMarkdown
@@ -105,7 +104,7 @@ SPRITE_TOOL = {
 def set_sprite(pos, sprite):
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
-    widget['image'] = png.spr(sprite)
+    widget['image'] = img.spr(sprite)
     widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
 
 
@@ -207,7 +206,7 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem', ind]['image'] = png.png('BEE2/alpha_64')
+            wid['subitem', ind]['image'] = img.invis_square(64)
         else:
             wid['subitem', ind]['image'] = selected_item.get_icon(pos)
         wid['subitem', ind]['relief'] = 'flat'
@@ -439,7 +438,7 @@ def init_widgets():
         text="",
         anchor="e",
         compound="left",
-        image=png.spr('gear_ent'),
+        image=img.spr('gear_ent'),
     )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
     tooltip.add_tooltip(
@@ -457,7 +456,7 @@ def init_widgets():
     for i in range(5):
         wid['subitem', i] = ttk.Label(
             sub_frame,
-            image=png.png('BEE2/alpha_64'),
+            image=img.invis_square(64),
         )
         wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
@@ -485,7 +484,7 @@ def init_widgets():
     for spr_id in SPR:
         wid['sprite', spr_id] = sprite = ttk.Label(
             spr_frame,
-            image=png.spr('ap_grey'),
+            image=img.spr('ap_grey'),
             relief="raised",
         )
         sprite.grid(row=0, column=spr_id.value)
