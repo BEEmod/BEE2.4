@@ -107,7 +107,7 @@ def flag_brush_at_loc(inst, flag):
 
     brush = SOLIDS.get(pos.as_tuple(), None)
 
-    if brush is None or (norm is not None and brush.normal != norm):
+    if brush is None or (norm is not None and abs(brush.normal) != abs(norm)):
         br_type = 'none'
     else:
         br_type = str(brush.color)

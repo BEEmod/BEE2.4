@@ -1,8 +1,8 @@
 """Backup and restore P2C maps.
 
 """
-import srctools
 import utils
+import tk_tools
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
@@ -12,7 +12,10 @@ if __name__ == '__main__':
         import sys
         os.chdir(os.path.dirname(sys.argv[0]))
 
-    utils.init_logging('../logs/backup.log')
+    LOGGER = utils.init_logging('../logs/backup.log', __name__, on_error=tk_tools.on_error)
+    utils.setup_localisations(LOGGER)
+else:
+    LOGGER = utils.getLogger(__name__)
 
 
 import tkinter as tk
@@ -41,8 +44,9 @@ from loadScreen import LoadScreen
 import img
 import tk_tools
 import gameMan
+import srctools
 
-LOGGER = utils.getLogger(__name__)
+from typing import List
 
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
@@ -92,12 +96,17 @@ game_name = tk.StringVar()
 # Loadscreens used as basic progress bars
 copy_loader = LoadScreen(
     ('COPY', ''),
-    title_text='Copying maps',
+    title_text=_('Copying maps'),
 )
 
 reading_loader = LoadScreen(
     ('READ', ''),
-    title_text='Loading maps',
+    title_text=_('Loading maps'),
+)
+
+deleting_loader = LoadScreen(
+    ('DELETE', ''),
+    title_text=_('Deleting maps'),
 )
 
 
@@ -105,7 +114,7 @@ class P2C:
     """A PeTI map."""
     def __init__(
             self,
-            path,
+            filename,
             zip_file,
             create_time,
             mod_time,
@@ -113,7 +122,7 @@ class P2C:
             desc='',
             is_coop=False,
             ):
-        self.path = path
+        self.filename = filename
         self.zip_file = zip_file
         self.create_time = create_time
         self.mod_time = mod_time
@@ -150,17 +159,19 @@ class P2C:
             LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
             props = Property('portal2_puzzle', [])
             title = None
-            desc = 'Failed to parse this puzzle file. It can still be backed up.'
+            desc = _('Failed to parse this puzzle file. It can still be backed up.')
         else:
             props = props.find_key('portal2_puzzle', [])
             title = props['title', None]
-            desc = props['description', 'No description found.']
+            desc = props['description', _('No description found.')]
+
+
 
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
 
         return cls(
-            path=path,
+            filename=os.path.basename(path),
             zip_file=zip_file,
             title=title,
             desc=desc,
@@ -172,7 +183,7 @@ class P2C:
     def copy(self):
         """Copy this item."""
         return self.__class__(
-            self.path,
+            self.filename,
             create_time=self.create_time,
             zip_file=self.zip_file,
             mod_time=self.mod_time,
@@ -185,7 +196,7 @@ class P2C:
         """Make a corresponding CheckItem object."""
         chk = CheckItem(
             self.title,
-            ('Coop' if self.is_coop else 'SP'),
+            (_('Coop') if self.is_coop else _('SP')),
             self.mod_time,
             hover_text=self.desc
         )
@@ -323,7 +334,7 @@ def backup_maps(maps):
 
     # Allow removing old maps when we overwrite objects
     map_dict = {
-        p2c.path: p2c
+        p2c.filename: p2c
         for p2c in
         BACKUPS['back']
     }
@@ -332,23 +343,23 @@ def backup_maps(maps):
     # Here we'll just add entries into BACKUPS['back'].
     # Also check for overwriting
     for p2c in maps:
-        scr_path = p2c.path + '.jpg'
-        map_path = p2c.path + '.p2c'
+        scr_path = p2c.filename + '.jpg'
+        map_path = p2c.filename + '.p2c'
         if (
                 map_path in zip_names(back_zip) or
                 scr_path in zip_names(back_zip)
                 ):
             if not messagebox.askyesno(
                     title='Overwrite File?',
-                    message='This filename is already in the backup.'
-                            'Do you wish to overwrite it? '
-                            '({})'.format(p2c.title),
+                    message=_('This filename is already in the backup.'
+                              'Do you wish to overwrite it? '
+                              '({})').format(p2c.title),
                     parent=window,
                     icon=messagebox.QUESTION,
                     ):
                 continue
         new_item = p2c.copy()
-        map_dict[p2c.path] = new_item
+        map_dict[p2c.filename] = new_item
 
     BACKUPS['back'] = list(map_dict.values())
     refresh_back_details()
@@ -444,13 +455,20 @@ def save_backup():
         UI['back_details'].items
     ]
 
+    if not maps:
+        messagebox.showerror(
+            _('BEE2 Backup'),
+            _('No maps were chosen to backup!'),
+        )
+        return
+
     copy_loader.set_length('COPY', len(maps))
 
     with copy_loader:
-        for p2c in maps:
+        for p2c in maps:  # type: P2C
             old_zip = p2c.zip_file
-            map_path = p2c.path + '.p2c'
-            scr_path = p2c.path + '.jpg'
+            map_path = p2c.filename + '.p2c'
+            scr_path = p2c.filename + '.jpg'
             if scr_path in zip_names(old_zip):
                 with zip_open_bin(old_zip, scr_path) as f:
                     new_zip.writestr(scr_path, f.read())
@@ -479,16 +497,19 @@ def save_backup():
         p2c.zip_file = new_zip
 
 
-def restore_maps(maps):
+def restore_maps(maps: List[P2C]):
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
+    if game_dir is None:
+        LOGGER.warning('No game selected to restore from?')
+        return
 
     copy_loader.set_length('COPY', len(maps))
     with copy_loader:
         for p2c in maps:
             back_zip = p2c.zip_file
-            scr_path = p2c.path + '.jpg'
-            map_path = p2c.path + '.p2c'
+            scr_path = p2c.filename + '.jpg'
+            map_path = p2c.filename + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
             if (
@@ -497,9 +518,9 @@ def restore_maps(maps):
                     ):
                 if not messagebox.askyesno(
                         title='Overwrite File?',
-                        message='This map is already in the game directory.'
-                                'Do you wish to overwrite it? '
-                                '({})'.format(p2c.title),
+                        message=_('This map is already in the game directory.'
+                                  'Do you wish to overwrite it? '
+                                  '({})').format(p2c.title),
                         parent=window,
                         icon=messagebox.QUESTION,
                         ):
@@ -556,8 +577,8 @@ def show_window():
 def ui_load_backup():
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
-        title='Load Backup',
-        filetypes=[('Backup zip', '.zip')],
+        title=_('Load Backup'),
+        filetypes=[(_('Backup zip'), '.zip')],
     )
     if not file:
         return
@@ -586,7 +607,7 @@ def ui_new_backup():
     BACKUPS['back'].clear()
     BACKUPS['backup_name'] = None
     BACKUPS['backup_path'] = None
-    backup_name.set('Unsaved Backup')
+    backup_name.set(_('Unsaved Backup'))
     BACKUPS['unsaved_file'] = unsaved = BytesIO()
     BACKUPS['backup_zip'] = ZipFile(
         unsaved,
@@ -608,8 +629,8 @@ def ui_save_backup():
 def ui_save_backup_as():
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
-        title='Save Backup As',
-        filetypes=[('Backup zip', '.zip')],
+        title=_('Save Backup As'),
+        filetypes=[(_('Backup zip'), '.zip')],
     )
     if not path:
         return
@@ -666,11 +687,79 @@ def ui_restore_all():
     ])
 
 
+def ui_delete_backup():
+    """Delete the selected items in the backup."""
+    BACKUPS['back'] = [
+        item.p2c
+        for item in
+        UI['back_details'].items
+        if not item.state
+    ]
+
+    refresh_back_details()
+
+def ui_delete_game():
+    """Delete selected items in the game list."""
+    game_dir = BACKUPS['game_path']
+    if game_dir is None:
+        LOGGER.warning('No game selected to delete from?')
+        return
+
+    game_detail = UI['game_details']  # type: CheckDetails
+
+    to_delete = [
+        item.p2c
+        for item in
+        game_detail.items
+        if item.state
+    ]
+    to_keep = [
+        item.p2c
+        for item in
+        game_detail.items
+        if not item.state
+    ]
+
+    if not to_delete:
+        return
+    map_count = len(to_delete)
+    if not messagebox.askyesno(
+        _('Confirm Deletion'),
+        ngettext(
+            'Do you wish to delete {} map?\n',
+            'Do you wish to delete {} maps?\n',
+            map_count,
+        ).format(map_count) + '\n'.join([
+            '{} ({})'.format(map.title, map.filename)
+            for map in to_delete
+        ])
+    ):
+        return
+
+    deleting_loader.set_length('DELETE', len(to_delete))
+    with deleting_loader:
+        for p2c in to_delete:  # type: P2C
+            scr_path = p2c.filename + '.jpg'
+            map_path = p2c.filename + '.p2c'
+            abs_scr = os.path.join(game_dir, scr_path)
+            abs_map = os.path.join(game_dir, map_path)
+            try:
+                os.remove(abs_scr)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_scr)
+            try:
+                os.remove(abs_map)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_map)
+
+    BACKUPS['game'] = to_keep
+    refresh_game_details()
+
 def init():
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
-            ('back_', 'Restore:'),
-            ('game_', 'Backup:'),
+            ('back_', _('Restore:')),
+            ('game_', _('Backup:')),
             ]:
         UI[cat + 'frame'] = frame = ttk.Frame(
             window,
@@ -707,7 +796,7 @@ def init():
         )
         UI[cat + 'btn_sel'] = ttk.Button(
             button_frame,
-            text='Checked',
+            text=_('Checked'),
             width=8,
         )
         UI[cat + 'btn_all'].grid(row=0, column=1)
@@ -715,7 +804,7 @@ def init():
 
         UI[cat + 'btn_del'] = ttk.Button(
             button_frame,
-            text='Delete Checked',
+            text=_('Delete Checked'),
             width=14,
         )
         UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
@@ -741,9 +830,12 @@ def init():
 
     UI['game_btn_all']['command'] = ui_backup_all
     UI['game_btn_sel']['command'] = ui_backup_sel
+    UI['game_btn_del']['command'] = ui_delete_game
 
     UI['back_btn_all']['command'] = ui_restore_all
     UI['back_btn_sel']['command'] = ui_restore_sel
+    UI['back_btn_del']['command'] = ui_delete_backup
+
 
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
@@ -761,7 +853,7 @@ def init_application():
     global window
     window = TK_ROOT
     TK_ROOT.title(
-        'BEEMOD {} - Backup / Restore Puzzles'.format(utils.BEE_VERSION)
+        _('BEEMOD {} - Backup / Restore Puzzles').format(utils.BEE_VERSION)
     )
 
     init()
@@ -780,20 +872,20 @@ def init_application():
         file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
         file_menu = menus['file'] = tk.Menu(bar)
-    file_menu.add_command(label='New Backup', command=ui_new_backup)
-    file_menu.add_command(label='Open Backup', command=ui_load_backup)
-    file_menu.add_command(label='Save Backup', command=ui_save_backup)
-    file_menu.add_command(label='Save Backup As', command=ui_save_backup_as)
+    file_menu.add_command(label=_('New Backup'), command=ui_new_backup)
+    file_menu.add_command(label=_('Open Backup'), command=ui_load_backup)
+    file_menu.add_command(label=_('Save Backup'), command=ui_save_backup)
+    file_menu.add_command(label=_('Save Backup As'), command=ui_save_backup_as)
 
-    bar.add_cascade(menu=file_menu, label='File')
+    bar.add_cascade(menu=file_menu, label=_('File'))
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(label='Add Game', command=gameMan.add_game)
-    game_menu.add_command(label='Remove Game', command=gameMan.remove_game)
+    game_menu.add_command(label=_('Add Game'), command=gameMan.add_game)
+    game_menu.add_command(label=_('Remove Game'), command=gameMan.remove_game)
     game_menu.add_separator()
 
-    bar.add_cascade(menu=game_menu, label='Game')
+    bar.add_cascade(menu=game_menu, label=_('Game'))
     window['menu'] = bar
 
     gameMan.add_menu_opts(game_menu)
@@ -825,7 +917,7 @@ def init_backup_settings():
     )
     UI['auto_enable'] = enable_check = ttk.Checkbutton(
         frame,
-        text='Automatic Backup After Export',
+        text=_('Automatic Backup After Export'),
         variable=check_var,
         command=check_callback,
     )
@@ -857,7 +949,7 @@ def init_backup_settings():
     count_frame.grid(row=0, column=1)
     ttk.Label(
         count_frame,
-        text='Keep (Per Game):'
+        text=_('Keep (Per Game):'),
     ).grid(row=0, column=0)
 
     count = tk_tools.ttk_Spinbox(
@@ -875,7 +967,7 @@ def init_toplevel():
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    window.title('Backup/Restore Puzzles')
+    window.title(_('Backup/Restore Puzzles'))
 
     def quit_command():
         from BEE2_config import GEN_OPTS
@@ -894,21 +986,21 @@ def init_toplevel():
     )
     ttk.Button(
         toolbar_frame,
-        text='New Backup',
+        text=_('New Backup'),
         command=ui_new_backup,
         width=14,
     ).grid(row=0, column=0)
 
     ttk.Button(
         toolbar_frame,
-        text='Open Backup',
+        text=_('Open Backup'),
         command=ui_load_backup,
         width=13,
     ).grid(row=0, column=1)
 
     ttk.Button(
         toolbar_frame,
-        text='Save Backup',
+        text=_('Save Backup'),
         command=ui_save_backup,
         width=11,
     ).grid(row=0, column=2)

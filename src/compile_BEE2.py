@@ -155,7 +155,6 @@ def copy_resource(tree):
         for file in os.listdir(src):
             copy_resource(tree + '/' + file)
 
-copy_resource('basemodui.txt')
 copy_resource('BEE2.ico')
 copy_resource('images/BEE2')
 copy_resource('images/icons')

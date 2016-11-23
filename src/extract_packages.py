@@ -25,7 +25,7 @@ res_count = -1
 progress_var = tk.IntVar()
 zip_list = []
 currently_done = multiprocessing.Value('I')  # int value used to show status
-# in main window
+# Variable used to display progress in the export button.
 export_btn_text = tk.StringVar()
 
 

@@ -3,8 +3,9 @@ import collections
 import logging
 import os.path
 import stat
+import shutil
+import sys
 from enum import Enum
-from sys import platform
 
 from typing import (
     Tuple, Iterator,
@@ -21,9 +22,9 @@ except ImportError:
 else:
     FROZEN = True
 
-WIN = platform.startswith('win')
-MAC = platform.startswith('darwin')
-LINUX = platform.startswith('linux')
+WIN = sys.platform.startswith('win')
+MAC = sys.platform.startswith('darwin')
+LINUX = sys.platform.startswith('linux')
 
 # Formatters for the logger handlers.
 short_log_format = None
@@ -409,7 +410,6 @@ def restart_app():
 
     This will not return!
     """
-    import os, sys
     # sys.executable is the program which ran us - when frozen,
     # it'll our program.
     # We need to add the program to the arguments list, since python
@@ -450,6 +450,96 @@ def unset_readonly(file):
         stat.S_IWGRP |
         stat.S_IWOTH
     )
+
+
+def merge_tree(src, dst, copy_function=shutil.copy2):
+    """Recursively copy a directory tree to a destination, which may exist.
+
+    This is a modified version of shutil.copytree(), with the difference that
+    if the directory exists new files will overwrite existing ones.
+
+    If exception(s) occur, a shutil.Error is raised with a list of reasons.
+
+    The optional copy_function argument is a callable that will be used
+    to copy each file. It will be called with the source path and the
+    destination path as arguments. By default, shutil.copy2() is used, but any
+    function that supports the same signature (like shutil.copy()) can be used.
+    """
+    names = os.listdir(src)
+
+    os.makedirs(dst, exist_ok=True)
+    errors = []
+    for name in names:
+        srcname = os.path.join(src, name)
+        dstname = os.path.join(dst, name)
+        try:
+            if os.path.islink(srcname):
+                # Let the copy occur. copy2 will raise an error.
+                if os.path.isdir(srcname):
+                    merge_tree(srcname, dstname, copy_function)
+                else:
+                    copy_function(srcname, dstname)
+            elif os.path.isdir(srcname):
+                merge_tree(srcname, dstname, copy_function)
+            else:
+                # Will raise a SpecialFileError for unsupported file types
+                copy_function(srcname, dstname)
+        # catch the Error from the recursive copytree so that we can
+        # continue with other files
+        except shutil.Error as err:
+            errors.extend(err.args[0])
+        except OSError as why:
+            errors.append((srcname, dstname, str(why)))
+    try:
+        shutil.copystat(src, dst)
+    except OSError as why:
+        # Copying file access times may fail on Windows
+        if getattr(why, 'winerror', None) is None:
+            errors.append((src, dst, str(why)))
+    if errors:
+        raise shutil.Error(errors)
+
+
+def setup_localisations(logger: logging.Logger):
+    """Setup gettext localisations."""
+    import gettext
+    import locale
+    # Get the 'en_US' style language code
+    lang_code = locale.getdefaultlocale()[0]
+
+    # Allow overriding through command line.
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg.casefold().startswith('lang='):
+                lang_code = arg[5:]
+                break
+
+    # Expands single code to parent categories.
+    expanded_langs = gettext._expand_lang(lang_code)
+
+    logger.info('Language: {!r}', lang_code)
+    logger.debug('Language codes: {!r}', expanded_langs)
+
+    for lang in expanded_langs:
+        try:
+            file = open('../i18n/{}.mo'.format(lang), 'rb')
+        except FileNotFoundError:
+            pass
+        else:
+            trans = gettext.GNUTranslations(file)
+            break
+    else:
+        # No translations, fallback to English.
+        # That's fine if the user's language is actually English.
+        if 'en' not in expanded_langs:
+            logger.warning(
+                "Can't find translation for codes: {!r}!",
+                expanded_langs,
+            )
+        trans = gettext.NullTranslations()
+    # Add these functions to builtins, plus _=gettext
+    trans.install(['gettext', 'ngettext'])
+
 
 class LogMessage:
     """Allow using str.format() in logging messages.
@@ -520,30 +610,36 @@ class LoggerAdapter(logging.LoggerAdapter):
                 extra={'alias': self.alias},
             )
 
-class NewLogRecord(logging.getLogRecordFactory()):
-    """Allow passing an alias for log modules."""
 
-    def getMessage(self):
-        """We have to hook here to change the value of .module.
-
-        It's called just before the formatting call is made.
-        """
-        if self.alias is not None:
-            self.module = self.alias
-        return str(self.msg)
-logging.setLogRecordFactory(NewLogRecord)
-
-
-def init_logging(filename: str=None) -> logging.Logger:
+def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.Logger:
     """Setup the logger and logging handlers.
 
-    If filename is set, all logs will be written to this file.
+    If filename is set, all logs will be written to this file as well.
+    This also sets sys.except_hook, so uncaught exceptions are captured.
+    on_error should be a function to call when this is done
+    (taking type, value, traceback).
     """
     global short_log_format, long_log_format
     global stderr_loghandler, stdout_loghandler
     import logging
     from logging import handlers
     import sys, io, os
+
+    class NewLogRecord(logging.getLogRecordFactory()):
+        """Allow passing an alias for log modules."""
+        # This breaks %-formatting, so only set when init_logging() is called.
+
+        alias = None
+
+        def getMessage(self):
+            """We have to hook here to change the value of .module.
+
+            It's called just before the formatting call is made.
+            """
+            if self.alias is not None:
+                self.module = self.alias
+            return str(self.msg)
+    logging.setLogRecordFactory(NewLogRecord)
 
     logger = logging.getLogger('BEE2')
     logger.setLevel(logging.DEBUG)
@@ -594,7 +690,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stdout:
         stdout_loghandler = logging.StreamHandler(sys.stdout)
         stdout_loghandler.setLevel(logging.INFO)
-        stdout_loghandler.setFormatter(short_log_format)
+        stdout_loghandler.setFormatter(long_log_format)
         logger.addHandler(stdout_loghandler)
 
         if sys.stderr:
@@ -611,17 +707,19 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stderr:
         stderr_loghandler = logging.StreamHandler(sys.stderr)
         stderr_loghandler.setLevel(logging.WARNING)
-        stderr_loghandler.setFormatter(short_log_format)
+        stderr_loghandler.setFormatter(long_log_format)
         logger.addHandler(stderr_loghandler)
     else:
         sys.stderr = NullStream()
 
     # Use the exception hook to report uncaught exceptions, and finalise the
     # logging system.
-    old_except_handler = sys.__excepthook__
+    old_except_handler = sys.excepthook
 
     def except_handler(*exc_info):
         """Log uncaught exceptions."""
+        if on_error is not None:
+            on_error(*exc_info)
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
@@ -630,11 +728,14 @@ def init_logging(filename: str=None) -> logging.Logger:
         )
         logging.shutdown()
         # Call the original handler - that prints to the normal console.
-        old_except_handler()
+        old_except_handler(*exc_info)
 
-    sys.__excepthook__ = except_handler
+    sys.excepthook = except_handler
 
-    return LoggerAdapter(logger)
+    if main_logger:
+        return getLogger(main_logger)
+    else:
+        return LoggerAdapter(logger)
 
 
 def getLogger(name: str='', alias: str=None) -> logging.Logger:

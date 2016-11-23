@@ -70,6 +70,9 @@ class NAV_KEYS(Enum):
     HOME = 'Home'
     END = 'End'
 
+    # Space plays the current item.
+    PLAY_SOUND = 'space'
+
 
 class AttrTypes(Enum):
     """The type of labels used for selectoritem attributes."""
@@ -183,11 +186,11 @@ class GroupHeader(ttk.Frame):
         self.hover_start() # Update arrow icon
         self.parent.flow_items()
 
-    def toggle(self, _=None):
+    def toggle(self, e=None):
         """Toggle the header on or off."""
         self.visible = not self._visible
 
-    def hover_start(self, _=None):
+    def hover_start(self, e=None):
         """When hovered over, fill in the triangle."""
         self.arrow['text'] = (
             GRP_EXP_HOVER
@@ -195,7 +198,7 @@ class GroupHeader(ttk.Frame):
             GRP_COLL_HOVER
         )
 
-    def hover_end(self, _=None):
+    def hover_end(self, e=None):
         """When leaving, hollow the triangle."""
         self.arrow['text'] = (
             GRP_EXP
@@ -266,12 +269,16 @@ class Item:
         else:
             self.context_lbl = self.longName
         if icon is None:
-            self.icon = img.png(
-                'BEE2/blank_96',
-                error=err_icon,
-                resize_to=ICON_SIZE,
+            self.icon = img.color_square(
+                img.PETI_ITEM_BG,
+                ICON_SIZE,
             )
-            self.ico_file = 'BEE2/blank_96'
+            self.ico_file = None
+        elif icon == '<black>':
+            self.icon = img.color_square(
+                Vec(),
+                ICON_SIZE,
+            )
         else:
             self.icon = img.png(
                 icon,
@@ -351,7 +358,8 @@ class selWin:
             has_def=True,
             has_snd_sample=False,
             modal=False,
-            none_desc='Do not add anything.',
+            # i18n: 'None' item description
+            none_desc=_('Do not add anything.'),
             none_attrs: dict=EmptyMapping,
             title='BEE2',
             desc='',
@@ -519,12 +527,12 @@ class selWin:
             self.sugg_lbl = ttk.Label(
                 self.pal_frame,
                 # Draw lines with box drawing characters
-                text="\u250E\u2500Suggested\u2500\u2512"
+                text="\u250E\u2500" + _("Suggested") + "\u2500\u2512",
             )
         else:
             self.sugg_lbl = ttk.LabelFrame(
                 self.pal_frame,
-                text="Suggested",
+                text=_("Suggested"),
                 labelanchor=N,
                 height=50,
             )
@@ -543,9 +551,10 @@ class selWin:
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
-        self.prop_icon = ttk.Label(self.prop_icon_frm)
-        self.prop_icon.img = img.png('BEE2/blank_96')
-        self.prop_icon['image'] = self.prop_icon.img
+        self.prop_icon = ttk.Label(
+            self.prop_icon_frm,
+            image=img.PAL_BG_96,
+        )
         self.prop_icon.grid(row=0, column=0)
 
         name_frame = ttk.Frame(self.prop_frm)
@@ -570,7 +579,7 @@ class selWin:
             samp_button.grid(row=0, column=1)
             add_tooltip(
                 samp_button,
-                "Play a sample of this item.",
+                _("Play a sample of this item."),
             )
 
             def set_samp_play():
@@ -628,7 +637,7 @@ class selWin:
 
         ttk.Button(
             self.prop_frm,
-            text="OK",
+            text=_("OK"),
             command=self.save,
         ).grid(
             row=6,
@@ -639,7 +648,7 @@ class selWin:
         if self.has_def:
             self.prop_reset = ttk.Button(
                 self.prop_frm,
-                text="Reset to Default",
+                text=_("Reset to Default"),
                 command=self.sel_suggested,
             )
             self.prop_reset.grid(
@@ -650,7 +659,7 @@ class selWin:
 
         ttk.Button(
             self.prop_frm,
-            text="Cancel",
+            text=_("Cancel"),
             command=self.exit,
         ).grid(
             row=6,
@@ -675,7 +684,7 @@ class selWin:
         # The headers for the context menu
         self.context_menus = {}
 
-        # Sort alphabetically, prefering a sort key if present.
+        # Sort alphabetically, preferring a sort key if present.
         self.item_list.sort(key=lambda it: it.sort_key or it.longName)
 
         for ind, item in enumerate(self.item_list):  # type: int, Item
@@ -698,7 +707,7 @@ class selWin:
 
             if group_key not in self.group_names:
                 # If the item is groupless, use 'Other' for the header.
-                self.group_names[group_key] = item.group or 'Other'
+                self.group_names[group_key] = item.group or _('Other')
 
             if not item.group:
                 # Ungrouped items appear directly in the menu.
@@ -876,12 +885,12 @@ class selWin:
         self.disp_btn.state(new_st)
         self.display.state(new_st)
 
-    def exit(self, _=None):
+    def exit(self, event=None):
         """Quit and cancel, choosing the originally-selected item."""
         self.sel_item(self.orig_selected)
         self.save()
 
-    def save(self, _=None):
+    def save(self, event=None):
         """Save the selected item into the textbox."""
         # Stop sample sounds if they're playing
         if self.sampler:
@@ -893,7 +902,7 @@ class selWin:
         self.set_disp()
         self.do_callback()
 
-    def set_disp(self, _=None):
+    def set_disp(self, event=None):
         """Set the display textbox."""
         # Bold the text if the suggested item is selected (like the
         # context menu). We check for truthness to ensure it's actually
@@ -905,7 +914,8 @@ class selWin:
                 self.display['font'] = self.norm_font
 
         if self.selected == self.noneItem:
-            self.disp_label.set("<None>")
+            # i18n: 'None' item name.
+            self.disp_label.set(_("<None>"))
             self.chosen_id = None
         else:
             self.disp_label.set(self.selected.context_lbl)
@@ -923,7 +933,7 @@ class selWin:
         self.display['font'] = self.mouseover_font
         self.disp_label.set(self.suggested.context_lbl)
 
-    def open_win(self, _=None, force_open=False):
+    def open_win(self, e=None, force_open=False):
         if self._readonly and not force_open:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
@@ -972,15 +982,16 @@ class selWin:
                     return True
             return False
 
-    def sel_item(self, item: Item, _=None):
+    def sel_item(self, item: Item, event=None):
 
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             self.prop_author['text'] = ''
-        elif len(item.authors) == 1:
-            self.prop_author['text'] = 'Author: ' + item.authors[0]
-        else:
-            self.prop_author['text'] = 'Authors: ' + ', '.join(item.authors)
+        self.prop_author['text'] = ngettext(
+            'Author: {}', 'Authors: {}', len(item.authors),
+        ).format(
+            ', '.join(item.authors)
+        )
         self.prop_icon['image'] = item.icon
 
         self.prop_desc.set_text(item.desc)
@@ -1024,7 +1035,8 @@ class selWin:
                 elif label.type is AttrTypes.COLOR:
                     label['image'] = img.color_square(val, size=16)
                     # Display the full color when hovering..
-                    label.tooltip_text = 'Color: R={r}, G={g}, B={b}'.format(
+                    # i18n: Tooltip for colour swatch.
+                    label.tooltip_text = _('Color: R={r}, G={g}, B={b}').format(
                         r=int(val.x), g=int(val.y), b=int(val.z),
                     )
                 elif label.type is AttrTypes.LIST:
@@ -1046,10 +1058,15 @@ class selWin:
         try:
             key = NAV_KEYS(event.keysym)
         except (ValueError, AttributeError):
-            LOGGER.warning(
+            LOGGER.debug(
                 'Invalid nav-key in event: {}',
                 event.__dict__
             )
+            return
+
+        if key is NAV_KEYS.PLAY_SOUND:
+            if self.sampler is not None:
+                self.sampler.play_sample()
             return
 
         # A list of groups names, in the order that they're visible onscreen
@@ -1166,7 +1183,7 @@ class selWin:
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, _=None):
+    def flow_items(self, e=None):
         """Reposition all the items to fit in the current geometry.
 
         Called on the <Configure> event.

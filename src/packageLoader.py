@@ -20,11 +20,13 @@ from selectorWin import SelitemData
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
-    VMF, Entity,
+    VMF, Entity, Solid,
+    VPK,
 )
 
 from typing import (
-    Dict, List
+    Dict, List, Tuple,
+    Iterator
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -69,13 +71,10 @@ CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 # Check to see if the zip contains the resources referred to by the packfile.
 CHECK_PACKFILE_CORRECTNESS = False
 
-# The binary data comprising a blank VPK file.
-EMPTY_VPK = bytes([
-    52, 18, 170, 85,  # VPK identifier
-    1,  # Version 1
-    0,  # 0 bytes of directory info
-    0, 0, 1, 0, 0, 0, 0,
-])
+VPK_OVERRIDE_README = """\
+Files in this folder will be written to the VPK during every BEE2 export.
+Use to override resources as you please.
+"""
 
 # The folder we want to copy our VPKs to.
 VPK_FOLDER = {
@@ -218,6 +217,17 @@ def get_config(
         raise
 
 
+def set_cond_source(props: Property, source: str):
+    """Set metadata for Conditions in the given config blocks.
+
+    This generates '__src__' keyvalues in Condition blocks with info like
+    the source object ID and originating file, so errors can be traced back
+    to the config file creating it.
+    """
+    for cond in props.find_all('Conditions', 'Condition'):
+        cond['__src__'] = source
+
+
 def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
@@ -277,6 +287,8 @@ def load_packages(
         log_missing_styles=False,
         log_missing_ent_count=False,
         log_incorrect_packfile=False,
+        has_mel_music=False,
+        has_tag_music=False,
         ):
     """Scan and read in all packages in the specified directory."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
@@ -326,7 +338,7 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            img_count = parse_package(pack)
+            img_count = parse_package(pack, has_tag_music, has_mel_music)
             images += img_count
             loader.step("PAK")
 
@@ -413,17 +425,25 @@ def load_packages(
     return data
 
 
-def parse_package(pack: 'Package'):
+def parse_package(pack: 'Package', has_tag=False, has_mel=False):
     """Parse through the given package to find all the components."""
     for pre in Property.find_key(pack.info, 'Prerequisites', []):
-        if pre.value not in packages:
+        # Special case - disable these packages when the music isn't copied.
+        if pre.value == '<TAG_MUSIC>':
+            if not has_tag:
+                return 0
+        elif pre.value == '<MEL_MUSIC>':
+            if not has_mel:
+                return 0
+        elif pre.value not in packages:
             LOGGER.warning(
                 'Package "{pre}" required for "{id}" - '
                 'ignoring package!',
                 pre=pre.value,
                 id=pack.id,
             )
-            return False
+            return 0
+
     # First read through all the components we have, so we can match
     # overrides to the originals
     for comp_type in OBJ_TYPES:
@@ -604,6 +624,10 @@ def parse_item_folder(folders, zip_file, pak_id):
             'editor': next(editor_iter),
             # Any extra blocks (offset catchers, extent items)
             'editor_extra': list(editor_iter),
+
+            # Add the folder the item definition comes from,
+            # so we can trace it later for debug messages.
+            'source': '<{}>/items/{}'.format(pak_id, fold),
         }
 
         if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
@@ -628,12 +652,14 @@ def parse_item_folder(folders, zip_file, pak_id):
             )
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = Property.parse(
+                folders[fold]['vbsp'] = conf = Property.parse(
                     vbsp_config,
                     pak_id + ':' + config_path,
                 )
         except KeyError:
-            folders[fold]['vbsp'] = Property(None, [])
+            folders[fold]['vbsp'] = conf = Property(None, [])
+
+        set_cond_source(conf, folders[fold]['source'])
 
 
 class Package:
@@ -732,6 +758,8 @@ class Style(PakObject):
             self.config = Property(None, [])
         else:
             self.config = config
+
+        set_cond_source(self.config, 'Style <{}>'.format(style_id))
 
     @classmethod
     def parse(cls, data):
@@ -844,8 +872,8 @@ class Style(PakObject):
         # Only add the actual Item blocks,
         # Renderables is added in gameMan specially.
         # It must come last.
-        editoritems += self.editor.find_all("Item")
-        vbsp_config += self.config
+        editoritems += self.editor.copy().find_all("Item")
+        vbsp_config += self.config.copy()
 
         return editoritems, vbsp_config
 
@@ -999,9 +1027,9 @@ class Item(PakObject):
             ) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
-            editoritems += item_block
-            editoritems += editor_parts
-            vbsp_config += config_part
+            editoritems += item_block.copy()
+            editoritems += editor_parts.copy()
+            vbsp_config += config_part.copy()
 
             # Add auxiliary configs as well.
             try:
@@ -1009,9 +1037,9 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += aux_conf.all_conf
+                vbsp_config += aux_conf.all_conf.copy()
                 try:
-                    version_data = aux_conf.versions[ver_id]
+                    version_data = aux_conf.versions[ver_id].copy()
                 except KeyError:
                     pass  # No override.
                 else:
@@ -1019,7 +1047,7 @@ class Item(PakObject):
                     # that's defined for this config
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
-                            vbsp_config += version_data[poss_style.id]
+                            vbsp_config += version_data[poss_style.id].copy()
                             break
 
     def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
@@ -1036,7 +1064,7 @@ class Item(PakObject):
 
         item_data = self.versions[ver_id]['styles'][style_id]
 
-        new_editor = item_data['editor'].copy()
+        new_editor = item_data['editor'].copy()  # type: Property
 
         new_editor['type'] = self.id  # Set the item ID to match our item
         # This allows the folders to be reused for different items if needed.
@@ -1059,8 +1087,16 @@ class Item(PakObject):
                         # Switch to the 'Grouped' icon and name
                         if item_data['all_name'] is not None:
                             pal_section['Tooltip'] = item_data['all_name']
+
                         if item_data['all_icon'] is not None:
-                            pal_section['Image'] = item_data['all_icon']
+                            icon = item_data['all_icon']
+                        else:
+                            icon = pal_section['Image']
+                        # Bug in Portal 2 - palette icons must end with '.png',
+                        # so force that to be the case for all icons.
+                        if icon.casefold().endswith('.vtf'):
+                            icon = icon[:-3] + 'png'
+                        pal_section['Image'] = icon
 
                     pal_section['Position'] = "{x} {y} 0".format(
                         x=palette_items[index] % 4,
@@ -1076,8 +1112,61 @@ class Item(PakObject):
         prop_overrides = prop_conf.get(self.id, {})
         for prop_section in new_editor.find_all("Editor", "Properties"):
             for item_prop in prop_section:
+                if item_prop.bool('BEE2_ignore'):
+                    continue
+
                 if item_prop.name.casefold() in prop_overrides:
                     item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
+
+        # OccupiedVoxels does not allow specifying 'volume' regions like
+        # EmbeddedVoxel. Implement that.
+
+        # First for 32^2 cube sections.
+        for voxel_part in new_editor.find_all("Exporting", "OccupiedVoxels", "SurfaceVolume"):
+            if 'subpos1' not in voxel_part or 'subpos2' not in voxel_part:
+                LOGGER.warning(
+                    'Item {} has invalid OccupiedVoxels part '
+                    '(needs SubPos1 and SubPos2)!',
+                    self.id
+                )
+                continue
+            voxel_part.name = "Voxel"
+            bbox_min, bbox_max = Vec.bbox(
+                voxel_part.vec('subpos1'),
+                voxel_part.vec('subpos2'),
+            )
+            del voxel_part['subpos1']
+            del voxel_part['subpos2']
+            for pos in Vec.iter_grid(bbox_min, bbox_max):
+                voxel_part.append(Property(
+                    "Surface", [
+                        Property("Pos", str(pos)),
+                    ])
+                )
+
+        # Full blocks
+        for occu_voxels in new_editor.find_all("Exporting", "OccupiedVoxels"):
+            for voxel_part in list(occu_voxels.find_all("Volume")):
+                del occu_voxels['Volume']
+
+                if 'pos1' not in voxel_part or 'pos2' not in voxel_part:
+                    LOGGER.warning(
+                        'Item {} has invalid OccupiedVoxels part '
+                        '(needs Pos1 and Pos2)!',
+                        self.id
+                    )
+                    continue
+                voxel_part.name = "Voxel"
+                bbox_min, bbox_max = Vec.bbox(
+                    voxel_part.vec('pos1'),
+                    voxel_part.vec('pos2'),
+                )
+                del voxel_part['pos1']
+                del voxel_part['pos2']
+                for pos in Vec.iter_grid(bbox_min, bbox_max):
+                    new_part = voxel_part.copy()
+                    new_part['Pos'] = str(pos)
+                    occu_voxels.append(new_part)
 
         return (
             new_editor,
@@ -1115,7 +1204,6 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
-                    LOGGER.info(locals())
                     with data.zip_file.open(file_loc) as f:
                         styles[style.real_name] = Property.parse(
                             f,
@@ -1129,15 +1217,15 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
         )
 
     def add_over(self, override: 'ItemConfig'):
-        self.all_conf += override.all_conf
+        self.all_conf += override.all_conf.copy()
 
         for vers_id, styles in override.versions.items():
             our_styles = self.versions.setdefault(vers_id, {})
             for sty_id, style in styles.items():
                 if sty_id not in our_styles:
-                    our_styles[sty_id] = style
+                    our_styles[sty_id] = style.copy()
                 else:
-                    our_styles[sty_id] += style
+                    our_styles[sty_id] += style.copy()
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1167,6 +1255,7 @@ class QuotePack(PakObject):
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
+        set_cond_source(config, 'QuotePack <{}>'.format(quote_id))
         self.chars = chars or ['??']
         self.studio = studio
         self.studio_actor = studio_actor
@@ -1273,7 +1362,7 @@ class QuotePack(PakObject):
             if prop.name == 'quotes':
                 vbsp_config.append(QuotePack.strip_quote_data(prop))
             else:
-                vbsp_config.append(prop)
+                vbsp_config.append(prop.copy())
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
@@ -1358,6 +1447,7 @@ class Skybox(PakObject):
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
+        set_cond_source(config, 'Skybox <{}>'.format(sky_id))
         self.fog_opts = fog_opts
 
         # Extract this for selector windows to easily display
@@ -1395,7 +1485,7 @@ class Skybox(PakObject):
             override.selitem_data
         )
         self.config += override.config
-        self.fog_opts += override.fog_opts
+        self.fog_opts += override.fog_opts.copy()
 
     def __repr__(self):
         return '<Skybox ' + self.id + '>'
@@ -1419,7 +1509,7 @@ class Skybox(PakObject):
             skybox.material,
         )
 
-        exp_data.vbsp_conf.append(skybox.config)
+        exp_data.vbsp_conf.append(skybox.config.copy())
 
         # Styles or other items shouldn't be able to set fog settings..
         if 'fog' in exp_data.vbsp_conf:
@@ -1446,6 +1536,7 @@ class Music(PakObject):
             ):
         self.id = music_id
         self.config = config or Property(None, [])
+        set_cond_source(config, 'Music <{}>'.format(music_id))
         self.inst = inst
         self.sound = sound
         self.packfiles = list(pack)
@@ -1585,7 +1676,7 @@ class Music(PakObject):
 
         # Allow flags to detect the music that's used
         vbsp_config.set_key(('Options', 'music_ID'), music.id)
-        vbsp_config += music.config
+        vbsp_config += music.config.copy()
 
 
 class StyleVar(PakObject, allow_mult=True, has_img=False):
@@ -1703,12 +1794,8 @@ class StyleVPK(PakObject, has_img=False):
     textures.
     """
     def __init__(self, vpk_id, file_count=0):
-        """Initialise a StyleVPK object.
-
-        The file_count is the number of VPK files - 0 = just pak01_dir.
-        """
+        """Initialise a StyleVPK object."""
         self.id = vpk_id
-        self.file_count = file_count
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1720,27 +1807,26 @@ class StyleVPK(PakObject, has_img=False):
         zip_file = data.zip_file  # type: ZipFile
 
         has_files = False
-        file_count = 0
+        source_folder = os.path.normpath('vpk/' + vpk_name)
 
-        for file_count, name in enumerate(cls.iter_vpk_names()):
-            src = 'vpk/' + vpk_name + name
-            dest = os.path.join(dest_folder, 'pak01' + name)
-            try:
-                src_file = zip_open_bin(zip_file, src)
-            except KeyError:
-                # This VPK filename isn't present, we've found them all..
-                break
-            else:
-                with src_file, open(dest, 'wb') as dest_file:
-                    shutil.copyfileobj(src_file, dest_file)
+        for filename in zip_names(zip_file):
+            if os.path.normpath(filename).startswith(source_folder):
+                dest_loc = os.path.join(
+                    dest_folder,
+                    os.path.relpath(filename, source_folder)
+                )
+                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
+                with zip_open_bin(zip_file, filename) as fsrc:
+                    with open(dest_loc, 'wb') as fdest:
+                        shutil.copyfileobj(fsrc, fdest)
                 has_files = True
 
         if not has_files:
             raise Exception(
-                'VPK object "{}" has no associated VPK files!'.format(data.id)
+                'VPK object "{}" has no associated files!'.format(data.id)
             )
 
-        return cls(data.id, file_count)
+        return cls(data.id)
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -1771,33 +1857,44 @@ class StyleVPK(PakObject, has_img=False):
             if not os.path.isfile(sound_cache):
                 LOGGER.info('Copying over soundcache file for DLC3..')
                 os.makedirs(os.path.dirname(sound_cache), exist_ok=True)
-                shutil.copy(
-                    exp_data.game.abs_path(
-                        'portal2_dlc2/maps/soundcache/_master.cache',
-                    ),
-                    sound_cache,
-                )
+                try:
+                    shutil.copy(
+                        exp_data.game.abs_path(
+                            'portal2_dlc2/maps/soundcache/_master.cache',
+                        ),
+                        sound_cache,
+                    )
+                except FileNotFoundError:
+                    # It's fine, this will be regenerated automatically
+                    pass
 
-        if sel_vpk is None:
-            # Write a blank VPK file.
-            with open(os.path.join(dest_folder, 'pak01_dir.vpk'), 'wb') as f:
-                f.write(EMPTY_VPK)
-            LOGGER.info('Written empty VPK to "{}"', dest_folder)
-        else:
-            src_folder = os.path.join('../vpk_cache', sel_vpk.id.casefold())
-            for index, suffix in zip(
-                    range(sel_vpk.file_count),  # Limit to the number of files
-                    sel_vpk.iter_vpk_names()):
-                shutil.copy(
-                    os.path.join(src_folder, 'pak01' + suffix),
-                    os.path.join(dest_folder, 'pak01' + suffix),
-                )
-            LOGGER.info(
-                'Written {} VPK{} to "{}"',
-                sel_vpk.file_count,
-                '' if sel_vpk.file_count == 1 else 's',
-                dest_folder,
-            )
+        # Generate the VPK.
+        vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
+        if sel_vpk is not None:
+            src_folder = os.path.abspath(
+                os.path.join(
+                    '../vpk_cache',
+                    sel_vpk.id.casefold()
+                ))
+            vpk_file.add_folder(src_folder)
+
+        # Additionally, pack in game/vpk_override/ into the vpk - this allows
+        # users to easily override resources in general.
+
+        override_folder = exp_data.game.abs_path('vpk_override')
+        os.makedirs(override_folder, exist_ok=True)
+
+        # Also write a file to explain what it's for..
+        with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
+            f.write(VPK_OVERRIDE_README)
+
+        vpk_file.add_folder(override_folder)
+        del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
+
+        vpk_file.write_dirfile()
+
+        LOGGER.info('Written {} files to VPK!', len(vpk_file))
+
 
     @staticmethod
     def iter_vpk_names():
@@ -1996,6 +2093,13 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 if file.startswith('resources')
             }
             for file in files:
+                if file.startswith(('-#', 'precache_sound:')):
+                    # Used to disable stock soundscripts, and precache sounds
+                    # Not to pack - ignore.
+                    continue
+
+                file = file.lstrip('#')  # This means to put in soundscript too...
+
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
                 if file not in zip_files:
@@ -2113,74 +2217,81 @@ class BrushTemplate(PakObject, has_img=False):
         # We don't actually store the solids here - put them in
         # the TEMPLATE_FILE VMF. That way the original VMF object can vanish.
 
-        # If we have overlays, we need to ensure the IDs crossover correctly
-        id_mapping = {}
+        self.temp_world = {}
+        self.temp_detail = {}
 
-        self.temp_world = TEMPLATE_FILE.create_ent(
-            classname='bee2_template_world',
-            template_id=temp_id,
-        )
-        self.temp_detail = TEMPLATE_FILE.create_ent(
-            classname='bee2_template_detail',
-            template_id=temp_id,
-        )
+        visgroup_names = {
+            vis.id: vis.name
+            for vis in
+            vmf_file.vis_tree
+        }
 
-        # Check to see if any func_details have associated solids..
-        has_detail = any(
-            e.is_brush()
-            for e in
-            vmf_file.by_class['func_detail']
-        )
+        # For each template, give them a visgroup to match - that
+        # makes it easier to swap between them.
+        temp_visgroup_id = TEMPLATE_FILE.create_visgroup(temp_id).id
 
-        # Copy world brushes
-        if keep_brushes and vmf_file.brushes:
-            self.temp_world.solids = [
-                solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
-                for solid in
-                vmf_file.brushes
-            ]
+        if force.casefold() == 'detail':
+            force_is_detail = True
+        elif force.casefold() == 'world':
+            force_is_detail = False
+        else:
+            force_is_detail = None
 
-        # Copy detail brushes
-        if keep_brushes and has_detail:
-            for ent in vmf_file.by_class['func_detail']:
-                self.temp_detail.solids.extend(
-                    solid.copy(map=TEMPLATE_FILE, side_mapping=id_mapping)
-                    for solid in
-                    ent.solids
+        if keep_brushes:
+            for brush, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+                if force_is_detail is not None:
+                    is_detail = force_is_detail
+                if len(vis_ids) > 1:
+                    raise ValueError('Template "{}" has brush with two'
+                                     ' visgroups!'.format(
+                        temp_id
+                    ))
+                visgroups = [
+                    visgroup_names[id]
+                    for id in
+                    vis_ids
+                ]
+                # No visgroup = ''
+                visgroup = visgroups[0] if visgroups else ''
+                targ_dict = self.temp_detail if is_detail else self.temp_world
+                try:
+                    ent = targ_dict[temp_id, visgroup]
+                except KeyError:
+                    ent = targ_dict[temp_id, visgroup] = TEMPLATE_FILE.create_ent(
+                        classname=(
+                            'bee2_template_detail' if
+                            is_detail
+                            else 'bee2_template_world'
+                        ),
+                        template_id=temp_id,
+                        visgroup=visgroup,
+                    )
+                ent.visgroup_ids.add(temp_visgroup_id)
+                ent.solids.append(
+                    brush.copy(map=TEMPLATE_FILE, keep_vis=False)
                 )
-
-        # Allow switching world brushes to detail or vice-versa.
-        if force.casefold == 'world':
-            self.temp_world.solids.extend(self.temp_detail.solids)
-            del self.temp_detail.solids[:]
-
-        if force.casefold == 'detail':
-            self.temp_detail.solids.extend(self.temp_world.solids)
-            del self.temp_world.solids[:]
-
-        # Destroy the entity object if it's unused.
-        if not self.temp_detail.solids:
-            self.temp_detail.remove()
-            self.temp_detail = None
-        if not self.temp_world.solids:
-            self.temp_world.remove()
-            self.temp_world = None
 
         self.temp_overlays = []
 
-        # Look for overlays, and translate their IDS.
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
+            visgroups = [
+                visgroup_names[id]
+                for id in
+                overlay.visgroup_ids
+                ]
+            if len(visgroups) > 1:
+                raise ValueError('Template "{}" has overlay with two'
+                                 ' visgroups!'.format(
+                    self.id,
+                ))
             new_overlay = overlay.copy(
                 map=TEMPLATE_FILE,
+                keep_vis=False
             )
-            new_overlay['template_id'] = temp_id
+            new_overlay.visgroup_ids.add(temp_visgroup_id)
+            new_overlay['template_id'] = self.id
+            new_overlay['visgroup_id'] = visgroups[0] if visgroups else ''
             new_overlay['classname'] = 'bee2_template_overlay'
-            sides = overlay['sides'].split()
-            new_overlay['sides'] = ' '.join(
-                id_mapping[side]
-                for side in sides
-                if side in id_mapping
-            )
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
@@ -2210,9 +2321,25 @@ class BrushTemplate(PakObject, has_img=False):
     @staticmethod
     def export(exp_data: ExportData):
         """Write the template VMF file."""
+        # Sort the visgroup list by name, to make it easier to search through.
+        TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
+
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:
-            TEMPLATE_FILE.export(temp_file)
+            TEMPLATE_FILE.export(temp_file, inc_version=False)
+
+    @staticmethod
+    def yield_world_detail(map: VMF) -> Iterator[Tuple[Solid, bool, set]]:
+        """Yield all world/detail solids in the map.
+
+        This also indicates if it's a func_detail, and the visgroup IDs.
+        (Those are stored in the ent for detail, and the solid for world.)
+        """
+        for brush in map.brushes:
+            yield brush, False, brush.visgroup_ids
+        for ent in map.by_class['func_detail']:
+            for brush in ent.solids:
+                yield brush, True, ent.visgroup_ids
 
 
 def desc_parse(info, id=''):

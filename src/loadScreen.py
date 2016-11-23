@@ -56,7 +56,13 @@ patch_tk_dialogs()
 
 
 class LoadScreen(Toplevel):
-    def __init__(self, *stages, title_text='Loading'):
+    """LoadScreens show a loading screen for items.
+
+    stages should be (id, title) pairs for each screen stage.
+    Each stage can be stepped independently, referenced by the given ID.
+    The title can be blank.
+    """
+    def __init__(self, *stages, title_text=_('Loading')):
         self.stages = list(stages)
         self.widgets = {}
         self.labels = {}
@@ -153,17 +159,21 @@ class LoadScreen(Toplevel):
             self.widgets[stage].update()
 
     def set_nums(self, stage):
-        self.bar_var[stage].set(
-            1000 * self.bar_val[stage] / self.maxes[stage]
-        )
+        max_val = self.maxes[stage]
+        if max_val == 0:  # 0/0 sections are skipped automatically.
+            self.bar_var[stage].set(1000)
+        else:
+            self.bar_var[stage].set(
+                1000 * self.bar_val[stage] / max_val
+            )
         self.labels[stage]['text'] = '{!s}/{!s}'.format(
             self.bar_val[stage],
-            self.maxes[stage],
+            max_val,
         )
 
     def skip_stage(self, stage):
         """Skip over this stage of the loading process."""
-        self.labels[stage]['text'] = 'Skipped!'
+        self.labels[stage]['text'] = _('Skipped!')
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
         if self.active:
@@ -206,10 +216,10 @@ class LoadScreen(Toplevel):
 
 
 main_loader = LoadScreen(
-    ('PAK', 'Packages'),
-    ('OBJ', 'Loading Objects'),
-    ('IMG_EX', 'Extracting Images'),
-    ('IMG', 'Loading Images'),
-    ('UI', 'Initialising UI'),
-    title_text='Loading',
+    ('PAK', _('Packages')),
+    ('OBJ', _('Loading Objects')),
+    ('IMG_EX', _('Extracting Images')),
+    ('IMG', _('Loading Images')),
+    ('UI', _('Initialising UI')),
+    title_text=_('Loading'),
 )

@@ -73,7 +73,7 @@ class SubPane(Toplevel):
         )
         tooltip.add_tooltip(
             self.tool_button,
-            text='Hide/Show the "{}" window.'.format(title))
+            text=_('Hide/Show the "{}" window.').format(title))
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
@@ -137,10 +137,10 @@ class SubPane(Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, _=None):
+    def enable_snap(self, e=None):
         self.allow_snap = True
 
-    def snap_win(self, _=None):
+    def snap_win(self, e=None):
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
@@ -151,7 +151,7 @@ class SubPane(Toplevel):
             self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, _=None):
+    def follow_main(self, e=None):
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = utils.adjust_inside_screen(

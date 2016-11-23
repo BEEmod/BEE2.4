@@ -4,6 +4,7 @@
 import conditions
 import srctools
 import vbsp
+import vbsp_options
 from conditions import (
     make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
@@ -142,8 +143,7 @@ def res_cave_portrait(inst, res):
     Otherwise, this overlays an instance, setting the $skin variable
     appropriately.
     """
-    import vbsp
-    skin = vbsp.get_opt('cave_port_skin')
-    if skin != '':
+    skin = vbsp_options.get(int, 'cave_port_skin')
+    if skin is not None:
         new_inst = res_add_overlay_inst(inst, res)
         new_inst.fixup['$skin'] = skin

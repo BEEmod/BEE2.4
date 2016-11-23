@@ -6,6 +6,7 @@ import conditions
 import srctools
 import utils
 import vbsp
+import vbsp_options
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
@@ -86,18 +87,9 @@ def res_fix_rotation_axis(ent, res):
         res['flags', '0'].split('+')
     ))
 
-    name = res['name', '']
-    if not name.startswith('@'):
-        # If a local name is given, add it to the instance targetname.
-        # It the name given is '', set to the instance's name.
-        # If it has an @, don't change it!
-        name = ent['targetname', ''] + (('-' + name) if name else '')
+    name = conditions.local_name(ent, res['name', ''])
 
-    axis = Vec(
-        x=int(des_axis == 'x'),
-        y=int(des_axis == 'y'),
-        z=int(des_axis == 'z'),
-    ).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec(**{des_axis: 1}).rotate_by_str(ent['angles', '0 0 0'])
 
     pos = Vec.from_str(
         res['Pos', '0 0 0']
@@ -235,7 +227,7 @@ def res_set_texture(inst, res):
             vbsp.alter_mat(
                 brush.face,
                 vbsp.face_seed(brush.face),
-                vbsp.get_bool_opt('tile_texture_lock', True),
+                vbsp_options.get(bool, 'tile_texture_lock'),
             )
 
         if tex == 'special':
@@ -361,7 +353,7 @@ def res_add_brush(inst, res):
 
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res: Property):
-    temp_id = res['id'].casefold()
+    temp_id = res['id']
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
@@ -387,7 +379,7 @@ def res_import_template_setup(res: Property):
     else:
         force_grid = None
 
-    invert_var = res['invertVar', '']
+    invert_var = res['invertVar', res['colorVar', '']]
 
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
@@ -428,6 +420,28 @@ def res_import_template_setup(res: Property):
         force_type = TEMP_TYPES.detail
     else:
         keys = None
+    visgroup_mode = res['visgroup', 'none'].casefold()
+    if visgroup_mode not in ('none', 'choose'):
+        visgroup_mode = srctools.conv_float(visgroup_mode.rstrip('%'), 0.00)
+        if visgroup_mode == 0:
+            visgroup_mode = 'none'
+
+    # Generate the function which picks which visgroups to add to the map.
+    if visgroup_mode == 'none':
+        def visgroup_func(_):
+            """none = don't add any visgroups."""
+            return ()
+    elif visgroup_mode == 'choose':
+        def visgroup_func(groups):
+            """choose = add one random group."""
+            return [random.choice(groups)]
+    else:
+        def visgroup_func(groups):
+            """Number = percent chance for each to be added"""
+            for group in groups:
+                val = random.uniform(0, 100)
+                if val <= visgroup_mode:
+                    yield group
 
     return (
         temp_id,
@@ -439,6 +453,7 @@ def res_import_template_setup(res: Property):
         rem_replace_brush,
         additional_ids,
         invert_var,
+        visgroup_func,
         keys,
     )
 
@@ -449,7 +464,8 @@ def res_import_template(inst: Entity, res):
 
     It will be placed overlapping the given instance.
     Options:
-    - ID: The ID of the template to be inserted.
+    - ID: The ID of the template to be inserted. Add visgroups to additionally
+            add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overriden. If 'invert' is
             added, white/black tiles will be swapped. If a tile size
@@ -471,14 +487,17 @@ def res_import_template(inst: Entity, res):
             these values. This overrides force world/detail.
             Specially-handled keys:
             - "origin", offset automatically.
-            - "movedir" on func_movelinear - set a normal surounded by <>,
+            - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
-    - invertVar: If this fixup value is true, tile colour will be swapped to
-            the opposite of the current force option. If it is set to
-            'white' or 'black', that colour will be forced instead.
+    - invertVar or colorVar: If this fixup value is true, tile colour will be
+            swapped to the opposite of the current force option. If it is set
+            to 'white' or 'black', that colour will be forced instead.
+    - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
+            they are ignored. If 'choose', one is chosen. If a number, that
+            is the percentage chance for each visgroup to be added.
     """
     (
-        temp_id,
+        orig_temp_id,
         replace_tex,
         force_colour,
         force_grid,
@@ -487,14 +506,27 @@ def res_import_template(inst: Entity, res):
         rem_replace_brush,
         additional_replace_ids,
         invert_var,
+        visgroup_func,
         key_block,
     ) = res.value
+    temp_id = conditions.resolve_value(inst, orig_temp_id)
 
-    if temp_id not in TEMPLATES:
+    temp_name, vis = conditions.parse_temp_name(temp_id)
+    if temp_name not in TEMPLATES:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        LOGGER.warning('"{}" not a valid template!', temp_id)
+        if temp_id != orig_temp_id:
+            LOGGER.warning(
+                '{} -> "{}" is not a valid template!',
+                orig_temp_id,
+                temp_name
+            )
+        else:
+            LOGGER.warning(
+                '"{}" is not a valid template!',
+                temp_name
+            )
         return
 
     if invert_var != '':
@@ -515,6 +547,7 @@ def res_import_template(inst: Entity, res):
         angles,
         targetname=inst['targetname', ''],
         force_type=force_type,
+        visgroup_choose=visgroup_func,
     )
 
     if key_block is not None:

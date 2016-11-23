@@ -10,13 +10,19 @@ import os.path
 from srctools import Vec
 import utils
 
+from typing import Union, Dict, Tuple
+
 LOGGER = utils.getLogger('img')
 
-cached_img = {}
-cached_squares = {}
+cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
+# r, g, b, size -> image
+cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
+
+# Colour of the palette item background
+PETI_ITEM_BG = Vec(229, 232, 233)
 
 
-def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
+def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -24,13 +30,17 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     zip cache.
     - If resize_to is set, the image will be resized to that size using the algo
     algorithm.
+    - This caches images, so it won't be deleted (Tk doesn't keep a reference
+      to the Python object), and subsequent calls don't touch the hard disk.
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
     orig_path = path
 
-    if (orig_path, resize_to) in cached_img:
-        return cached_img[orig_path, resize_to]
+    try:
+        return cached_img[path, resize_to]
+    except KeyError:
+        pass
 
     base_path = os.path.abspath(
         os.path.join(
@@ -56,18 +66,22 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
         # If not in the main folder, load from the zip-cache
         path = cache_path
 
-    if os.path.isfile(path):
-        image = Image.open(path)
-    else:
+    try:
+        img_file = open(path, 'rb')
+    except FileNotFoundError:
         LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
         return error or img_error
+    with img_file:
+        image = Image.open(img_file)
+        image.load()
 
     if resize_to:
         image = image.resize((resize_to, resize_to), algo)
 
-    img = ImageTk.PhotoImage(image=image)
-    cached_img[path, resize_to] = img
-    return img
+    tk_img = ImageTk.PhotoImage(image=image)
+
+    cached_img[orig_path, resize_to] = tk_img
+    return tk_img
 
 
 def spr(name, error=None):
@@ -95,10 +109,30 @@ def color_square(color: Vec, size=16):
             color=(int(color.x), int(color.y), int(color.z)),
         )
         tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares[color.as_tuple(), size] = tk_img
+        cached_squares[key] = tk_img
+
+
+def invis_square(size):
+    """Create a square image of the given size, filled with 0-alpha pixels."""
+
+    try:
+        return cached_squares['alpha', size]
+    except KeyError:
+        img = Image.new(
+            mode='RGBA',
+            size=(size, size),
+            color=(0, 0, 0, 0),
+        )
+        tk_img = ImageTk.PhotoImage(image=img)
+        cached_squares['alpha', size] = tk_img
 
         return tk_img
 
+BLACK_64 = color_square(Vec(0, 0, 0), size=64)
+BLACK_96 = color_square(Vec(0, 0, 0), size=96)
+PAL_BG_64 = color_square(PETI_ITEM_BG, size=64)
+PAL_BG_96 = color_square(PETI_ITEM_BG, size=96)
 
 # If image is not readable, use this instead
-img_error = png('BEE2/error')
+# If this actually fails, use the black image.
+img_error = png('BEE2/error', error=BLACK_64)

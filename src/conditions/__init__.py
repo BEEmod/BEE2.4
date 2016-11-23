@@ -8,11 +8,13 @@ from enum import Enum
 
 from typing import (
     Callable, Any, Iterable,
-    Dict, List, Tuple, NamedTuple,
+    Dict, List, Tuple, NamedTuple, Set,
 )
 
 import srctools
 import utils
+import vbsp_options
+import comp_consts as consts
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property,
@@ -43,7 +45,7 @@ GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
 # A VMF containing template brushes, which will be loaded in and retextured
 # The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Tuple[List[Solid], Entity, List[Entity]]]
+TEMPLATES = {}  # type: Dict[str, Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
@@ -96,6 +98,9 @@ ItemConnections = namedtuple('ItemConnections', [
     'in_act', 'in_deact', 'out_act', 'out_deact',
 ])
 CONNECTIONS = {}
+
+# For each class, a list of item IDs of that type.
+ITEM_CLASSES = defaultdict(list)
 
 # The special tbeam polarity input from ITEM_TBEAM. Works like above.
 TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
@@ -192,12 +197,12 @@ TEMPLATE_RETEXTURE = {
     'tile/white_wall_tile004j': (W, 'special'),
     'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
 
-    'anim_wp/framework/backpanels': 'special.behind',
-    'anim_wp/framework/squarebeams': 'special.edge',
-    'glass/glasswindow007a_less_shiny': 'special.glass',
-    'metal/metalgrate018': 'special.grating',
+    consts.Special.BACKPANELS: 'special.behind',
+    consts.Special.SQUAREBEAMS: 'special.edge',
+    consts.Special.GLASS: 'special.glass',
+    consts.Special.GRATING: 'special.grating',
 
-    'nature/toxicslime_puzzlemaker_cheap': 'special.goo_cheap',
+    consts.Goo.CHEAP: 'special.goo_cheap',
 }
 del B, W
 
@@ -232,19 +237,21 @@ RES_EXHAUSTED = object()
 
 
 class Condition:
-    __slots__ = ['flags', 'results', 'else_results', 'priority']
+    __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
 
     def __init__(
-            self,
-            flags=None,
-            results=None,
-            else_results=None,
-            priority=Decimal('0'),
+        self,
+        flags=None,
+        results=None,
+        else_results=None,
+        priority=Decimal('0'),
+        source=None,
     ):
         self.flags = flags or []
         self.results = results or []
         self.else_results = else_results or []
         self.priority = priority
+        self.source = source
         self.setup()
 
     def __repr__(self):
@@ -266,11 +273,16 @@ class Condition:
         results = []
         else_results = []
         priority = Decimal('0')
+        source = None
         for prop in prop_block:
             if prop.name == 'result':
                 results.extend(prop.value)  # join multiple ones together
             elif prop.name == 'else':
                 else_results.extend(prop.value)
+            elif prop.name == '__src__':
+                # Value injected by the BEE2 export, this specifies
+                # the original source of the config.
+                source = prop.value
 
             elif prop.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
@@ -290,10 +302,11 @@ class Condition:
                 flags.append(prop)
 
         return cls(
-            flags=flags,
-            results=results,
-            else_results=else_results,
-            priority=priority,
+            flags,
+            results,
+            else_results,
+            priority,
+            source,
         )
 
     def setup(self):
@@ -306,7 +319,6 @@ class Condition:
         for res in self.else_results[:]:
             self.setup_result(self.else_results, res)
 
-
     @staticmethod
     def setup_result(res_list, result):
         """Helper method to perform result setup."""
@@ -317,17 +329,15 @@ class Condition:
                 # This result is invalid, remove it.
                 res_list.remove(result)
 
-
     @staticmethod
     def test_result(inst, res):
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            LOGGER.warning(
-                '"{name}" is not a valid condition result!',
+            raise ValueError('"{name}" is not a valid condition result!'.format(
                 name=res.real_name,
-            )
+            )) from None
         else:
             return func(inst, res)
 
@@ -343,31 +353,6 @@ class Condition:
             should_del = self.test_result(inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
-
-
-    def __lt__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority < other.priority
-        return NotImplemented
-
-    def __le__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority <= other.priority
-        return NotImplemented
-
-    def __gt__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority > other.priority
-        return NotImplemented
-
-    def __ge__(self, other):
-        """Condition items sort by priority."""
-        if hasattr(other, 'priority'):
-            return self.priority >= other.priority
-        return NotImplemented
 
 
 def add_meta(func, priority, only_once=True):
@@ -392,6 +377,7 @@ def add_meta(func, priority, only_once=True):
     cond = Condition(
         results=[Property(name, '')],
         priority=priority,
+        source='MetaCondition {}'.format(name)
     )
 
     if only_once:
@@ -453,6 +439,7 @@ def add(prop_block):
 
 
 def init(seed, inst_list, vmf_file):
+    """Initialise the Conditions system."""
     # Get a bunch of values from VBSP
     global MAP_RAND_SEED, ALL_INST, VMF
     VMF = vmf_file
@@ -460,7 +447,8 @@ def init(seed, inst_list, vmf_file):
     ALL_INST.update(inst_list)
 
     # Sort by priority, where higher = done later
-    conditions.sort()
+    zero = Decimal(0)
+    conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
 
     build_solid_dict()
     load_templates()
@@ -481,6 +469,15 @@ def check_all():
                 # This is raised to immediately stop running
                 # this condition, and skip to the next condtion.
                 break
+            except:
+                # Print the source of the condition if if fails...
+                LOGGER.exception(
+                    'Error in {}:',
+                    condition.source or 'condition',
+                )
+                # Skip to next condition.
+                import sys
+                sys.exit(1)
             if not condition.results and not condition.else_results:
                 break  # Condition has run out of results, quit early
 
@@ -513,11 +510,12 @@ def check_flag(flag, inst):
     try:
         func = FLAG_LOOKUP[name]
     except KeyError:
-        LOGGER.warning('"' + name + '" is not a valid condition flag!')
-        return False
-    else:
-        res = func(inst, flag)
-        return res == desired_result
+        raise ValueError(
+            '"{}" is not a valid condition flag!'.format(name)
+        ) from None
+
+    res = func(inst, flag)
+    return res == desired_result
 
 
 def import_conditions():
@@ -565,9 +563,7 @@ def build_solid_dict():
 
     for solid in VMF.brushes:
         for face in solid:
-            if face.mat.casefold() in (
-                    'nature/toxicslime_a2_bridge_intro',
-                    'nature/toxicslime_puzzlemaker_cheap'):
+            if face.mat.casefold in consts.Goo:
                 # Record all locations containing goo.
                 bbox_min, bbox_max = solid.get_bbox()
                 x = bbox_min.x + 64
@@ -593,8 +589,8 @@ def build_solid_dict():
                     # The only time two textures will be in the same
                     # place is if they are covering each other -
                     # nodraw them both and ignore them
-                    SOLIDS.pop(origin).face.mat = 'tools/toolsnodraw'
-                    face.mat = 'tools/toolsnodraw'
+                    SOLIDS.pop(origin).face.mat = consts.Tools.NODRAW
+                    face.mat = consts.Tools.NODRAW
                     continue
 
                 SOLIDS[origin] = solidGroup(
@@ -628,6 +624,12 @@ def build_connections_dict(prop_block: Property):
         if item_data.name == 'item_tbeam':
             TBEAM_CONN_ACT = parse(item_data, 'tbeam_activate')
             TBEAM_CONN_DEACT = parse(item_data, 'tbeam_deactivate')
+
+
+def build_itemclass_dict(prop_block: Property):
+    """Load in the dictionary mapping item classes to item ids"""
+    for prop in prop_block.find_children('ItemClasses'):
+        ITEM_CLASSES[prop.value.casefold()].append(prop.name)
 
 
 def dump_conditions():
@@ -895,8 +897,11 @@ def set_ent_keys(ent, inst, prop_block, block_name='Keys'):
 
 
 def resolve_value(inst: Entity, value: str):
-    """If a value starts with '$', lookup the associated var."""
-    if value.startswith('$'):
+    """If a value starts with '$', lookup the associated var.
+
+    Non-string values are passed through unchanged.
+    """
+    if isinstance(value, str) and value.startswith('$'):
         if value in inst.fixup:
             return inst.fixup[value]
         else:
@@ -912,34 +917,75 @@ def resolve_value(inst: Entity, value: str):
         return value
 
 
+def parse_temp_name(name) -> Tuple[str, Set[str]]:
+    if ':' in name:
+        temp_name, visgroups = name.rsplit(':', 1)
+        return temp_name.casefold(), {
+            vis.strip().casefold()
+            for vis in
+            visgroups.split(',')
+        }
+    else:
+        return name.casefold(), set()
+
+
 def load_templates():
     """Load in the template file, used for import_template()."""
     with open(TEMPLATE_LOCATION) as file:
         props = Property.parse(file, TEMPLATE_LOCATION)
     vmf = srctools.VMF.parse(props, preserve_ids=True)
-    detail_ents = defaultdict(list)
-    world_ents = defaultdict(list)
-    overlay_ents = defaultdict(list)
+
+    def make_subdict():
+        return defaultdict(list)
+    # detail_ents[temp_id][visgroup]
+    detail_ents = defaultdict(make_subdict)
+    world_ents = defaultdict(make_subdict)
+    overlay_ents = defaultdict(make_subdict)
+
     for ent in vmf.by_class['bee2_template_world']:
-        world_ents[ent['template_id'].casefold()].extend(ent.solids)
+        world_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold()
+        ].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[ent['template_id'].casefold()].extend(ent.solids)
+        detail_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold()
+        ].extend(ent.solids)
 
     for ent in vmf.by_class['bee2_template_overlay']:
-        overlay_ents[ent['template_id'].casefold()].append(ent)
+        overlay_ents[
+            ent['template_id'].casefold()
+        ][
+            ent['visgroup'].casefold()
+        ].append(ent)
 
-    for temp_id in set(detail_ents.keys()
-            ).union(world_ents.keys(), overlay_ents.keys()):
-        TEMPLATES[temp_id] = (
-            world_ents[temp_id],
-            detail_ents[temp_id],
-            overlay_ents[temp_id]
-        )
+    for temp_id in set(detail_ents).union(world_ents, overlay_ents):
+        world = world_ents[temp_id]
+        detail = detail_ents[temp_id]
+        overlay = overlay_ents[temp_id]
+        visgroup_ids = set(world).union(detail, overlay)
+        TEMPLATES[temp_id] = groups = {
+            visgroup: (
+                world[visgroup],
+                detail[visgroup],
+                overlay[visgroup],
+            ) for visgroup in visgroup_ids
+        }
+        if '' not in groups:
+            # We ensure the '' group is always present.
+            # This is always exported later, so just make it empty.
+            groups[''] = ([], [], [])
 
 
 def get_template(temp_name):
-    """Get the data associated with a given template."""
+    """Get the data associated with a given template.
+
+    This is a dictionary mapping visgroups -> (world, detail, over) tuples.
+    """
     try:
         return TEMPLATES[temp_name.casefold()]
     except KeyError as err:
@@ -963,6 +1009,7 @@ def import_template(
         targetname='',
         force_type=TEMP_TYPES.default,
         add_to_map=True,
+        visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     ) -> Template:
     """Import the given template at a location.
 
@@ -973,35 +1020,54 @@ def import_template(
 
     If targetname is set, it will be used to localise overlay names.
     add_to_map sets whether to add the brushes and func_detail to the map.
+    visgroup_choose is a callback used to determine if visgroups should be
+    added - it's passed a list of names, and should return a list of ones to use.
     """
     import vbsp
-    orig_world, orig_detail, orig_over = get_template(temp_name)
+    temp_name, visgroup_ids = parse_temp_name(temp_name)
+    visgroups = get_template(temp_name)
+    orig_world = []  # type: List[List[Solid]]
+    orig_detail = []  # type: List[List[Solid]]
+    orig_over = []  # type: List[Entity]
 
-    new_world = []
-    new_detail = []
-    new_over = []
+    chosen_groups = visgroup_ids.union(visgroup_choose(
+        # Skip the '' visgroup in the callback.
+        filter(None, visgroups.keys()),
+    ), ('', ))  # '' = no visgroup, always used.
+
+    for group in chosen_groups:
+        world, detail, over = visgroups[group]
+        orig_world.append(world)
+        orig_detail.append(detail)
+        orig_over.extend(over)
+
+    new_world = []  # type: List[Solid]
+    new_detail = []  # type: List[Solid]
+    new_over = []  # type: List[Entity]
 
     id_mapping = {}  # A map of the original -> new face IDs.
 
-    for orig_list, new_list in [
+    for orig_lists, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
-        for old_brush in orig_list:
-            brush = old_brush.copy(map=VMF, side_mapping=id_mapping)
-            brush.localise(origin, angles)
-            new_list.append(brush)
+        for orig_list in orig_lists:
+            for old_brush in orig_list:
+                brush = old_brush.copy(map=VMF, side_mapping=id_mapping, keep_vis=False)
+                brush.localise(origin, angles)
+                new_list.append(brush)
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(
             map=VMF,
+            keep_vis=False,
         )
         del new_overlay['template_id']  # Remove this, it's not part of overlays
         new_overlay['classname'] = 'info_overlay'
 
         sides = overlay['sides'].split()
         new_overlay['sides'] = ' '.join(
-            str(id_mapping[side])
+            str(id_mapping[int(side)])
             for side in sides
             if int(side) in id_mapping
         )
@@ -1057,18 +1123,21 @@ def import_template(
 
 
 def get_scaling_template(
-        temp_id,
+        temp_id: str,
     ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
     """Get the scaling data from a template.
 
     This is a dictionary mapping normals to the U,V and rotation data.
     """
-    world, detail, over = get_template(temp_id)
+    if ':' in temp_id:
+        temp_name, over_name = temp_id.split(':', 1)
+    else:
+        temp_name = temp_id
+        over_name = ''
+    world, detail, over = get_template(temp_name)[over_name]
 
     if detail:
-        world = world + detail.solids # Don't mutate the lists
-    else:
-        world = list(world)
+        world = world + detail  # Don't mutate the lists
 
     uvs = {}
 
@@ -1180,12 +1249,12 @@ def retexture_template(
                         face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=vbsp_options.get(float, 'goo_scale'),
                         )
                         face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=srctools.conv_float(vbsp.get_opt('goo_scale'), 1),
+                            scale=vbsp_options.get(float, 'goo_scale'),
                         )
                 continue
             # It's a regular wall type!
@@ -1521,7 +1590,7 @@ def res_break(base_inst, res):
     raise NextInstance
 
 
-@make_result('endCondition')
+@make_result('endCondition', 'nextCondition')
 def res_end_condition(base_inst, res):
     """Skip to the next condition.
 
@@ -1831,8 +1900,7 @@ def res_find_potential_tag_fizzlers(inst):
 
     This is used for Aperture Tag paint fizzlers.
     """
-    import vbsp
-    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
     if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
@@ -1893,7 +1961,7 @@ def res_make_tag_fizzler(inst, res):
     MUST be priority -100 so it runs before fizzlers!
     """
     import vbsp
-    if vbsp.get_opt('game_id') != utils.STEAM_IDS['TAG']:
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         inst.remove()
         return

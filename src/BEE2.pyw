@@ -1,8 +1,22 @@
+"""Run the BEE2."""
+
+# First do a few things as early as possible.
 import utils
 from multiprocessing import freeze_support
 from multiprocessing.spawn import is_forking
 import os
 import sys
+
+try:
+    # When we're imported via fork, the gettext functions won't be here.
+    _
+except NameError:
+    # Add stub versions of translation functions, needed since they
+    # are called during import.
+    import builtins
+    builtins._ = builtins.gettext = lambda x: x
+    builtins.ngettext = lambda a, b, n: a if n == 1 else b
+
 if __name__ == '__main__':
     if utils.MAC or utils.LINUX:
         # Change directory to the location of the executable
@@ -21,13 +35,12 @@ if __name__ == '__main__':
         # the whole application.
         freeze_support()
     else:
-        # We need to initiallise logging as early as possible - that way
+        # We need to initialise logging as early as possible - that way
         # it can record any errors in the initialisation of modules.
-        LOGGER = utils.init_logging('../logs/BEE2.log')
+        import tk_tools
+        LOGGER = utils.init_logging('../logs/BEE2.log', on_error=tk_tools.on_error)
 
-from tkinter import messagebox
-
-import traceback
+    utils.setup_localisations(LOGGER)
 
 # BEE2_config creates this config file to allow easy cross-module access
 from BEE2_config import GEN_OPTS
@@ -61,8 +74,6 @@ DEFAULT_SETTINGS = {
         'cache_pack_count': '0',
     },
     'Debug': {
-        # Show exceptions in dialog box when crash occurs
-        'show_errors': '0',
         # Log whenever items fallback to the parent style
         'log_item_fallbacks': '0',
         # Print message for items that have no match for a style
@@ -96,88 +107,55 @@ if __name__ == '__main__':
         GEN_OPTS['Debug']['window_log_level']
     )
 
-    show_errors = False
+    UI.load_settings()
 
-    # Main application - intercept and log all errors
-    try:
-        UI.load_settings()
-
-        show_errors = GEN_OPTS.get_bool('Debug', 'show_errors')
-
-        gameMan.load()
-        gameMan.set_game_by_name(
-            GEN_OPTS.get_val('Last_Selected', 'Game', ''),
-            )
-
-        LOGGER.info('Loading Packages...')
-        pack_data = packageLoader.load_packages(
-            GEN_OPTS['Directories']['package'],
-            log_item_fallbacks=GEN_OPTS.get_bool(
-                'Debug', 'log_item_fallbacks'),
-            log_missing_styles=GEN_OPTS.get_bool(
-                'Debug', 'log_missing_styles'),
-            log_missing_ent_count=GEN_OPTS.get_bool(
-                'Debug', 'log_missing_ent_count'),
-            log_incorrect_packfile=GEN_OPTS.get_bool(
-                'Debug', 'log_incorrect_packfile'),
+    gameMan.load()
+    gameMan.set_game_by_name(
+        GEN_OPTS.get_val('Last_Selected', 'Game', ''),
         )
-        UI.load_packages(pack_data)
-        LOGGER.info('Done!')
+    gameMan.scan_music_locs()
 
-        LOGGER.info('Loading Palettes...')
-        UI.load_palette(
-            paletteLoader.load_palettes(GEN_OPTS['Directories']['palette']),
-            )
-        LOGGER.info('Done!')
+    LOGGER.info('Loading Packages...')
+    pack_data = packageLoader.load_packages(
+        GEN_OPTS['Directories']['package'],
+        log_item_fallbacks=GEN_OPTS.get_bool(
+            'Debug', 'log_item_fallbacks'),
+        log_missing_styles=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_styles'),
+        log_missing_ent_count=GEN_OPTS.get_bool(
+            'Debug', 'log_missing_ent_count'),
+        log_incorrect_packfile=GEN_OPTS.get_bool(
+            'Debug', 'log_incorrect_packfile'),
+        has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
+        has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
+    )
+    UI.load_packages(pack_data)
+    LOGGER.info('Done!')
 
-        LOGGER.info('Loading Item Translations...')
-        gameMan.init_trans()
+    LOGGER.info('Loading Palettes...')
+    UI.load_palette(
+        paletteLoader.load_palettes(GEN_OPTS['Directories']['palette']),
+        )
+    LOGGER.info('Done!')
 
-        LOGGER.info('Loading sound FX...')
-        sound.load_snd()
-        loadScreen.main_loader.step('UI')
+    # Check games for Portal 2's basemodui.txt file, so we can translate items.
+    LOGGER.info('Loading Item Translations...')
+    for game in gameMan.all_games:
+        game.init_trans()
 
-        LOGGER.info('Initialising UI...')
-        UI.init_windows()  # create all windows
-        LOGGER.info('UI initialised!')
+    LOGGER.info('Loading sound FX...')
+    sound.load_snd()
+    loadScreen.main_loader.step('UI')
 
-        loadScreen.main_loader.destroy()
+    LOGGER.info('Initialising UI...')
+    UI.init_windows()  # create all windows
+    LOGGER.info('UI initialised!')
 
-        if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
-            extract_packages.done_callback()
-        else:
-            extract_packages.check_cache(pack_data['zips'])
+    loadScreen.main_loader.destroy()
 
-        TK_ROOT.mainloop()
+    if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
+        extract_packages.done_callback()
+    else:
+        extract_packages.check_cache(pack_data['zips'])
 
-    except Exception as e:
-        # Close loading screens if they're visible..
-        loadScreen.close_all()
-
-        # Grab and release the grab so nothing else can block the error message.
-        TK_ROOT.grab_set_global()
-        TK_ROOT.grab_release()
-
-        err = traceback.format_exc()
-        if show_errors:
-            # Put it onscreen if desired.
-            messagebox.showinfo(
-                title='BEE2 Error!',
-                message='{cls}: {msg}!'.format(
-                    cls=e.__class__.__name__,
-                    msg=str(e).rstrip('.'),
-                ),
-                icon=messagebox.ERROR,
-            )
-
-        try:
-            # Try to turn on the logging window for next time..
-            GEN_OPTS['Debug']['show_log_win'] = '1'
-            GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
-            GEN_OPTS.save()
-        except Exception:
-            # Ignore failures...
-            pass
-
-        # We still want to crash!
-        raise
+    TK_ROOT.mainloop()

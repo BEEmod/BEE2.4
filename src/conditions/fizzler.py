@@ -3,15 +3,20 @@ import conditions
 import srctools
 import utils
 import vbsp
+import instanceLocs
 from conditions import (
-    make_result,
+    make_result, meta_cond,
+    ITEM_CLASSES, CONNECTIONS
 )
-from srctools import Vec, Entity
+from srctools import Vec, Entity, Output
 from vbsp import TEX_FIZZLER
 
+from typing import List
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
+FIZZ_BRUSH_ENTS = {} # The brush entities we generated, used when merging.
+# Key = (conf id, targetname)
 
 @make_result('custFizzler')
 def res_cust_fizzler(base_inst, res):
@@ -31,6 +36,8 @@ def res_cust_fizzler(base_inst, res):
               Origin are auto-set.
             * Thickness will change the thickness of the fizzler if set.
               By default it is 2 units thick.
+            * Outputs is a block of outputs (laid out like in VMFs). The
+              targetnames will be localised to the instance.
         * MakeLaserField generates a brush stretched across the whole
           area.
             * Name, keys and thickness are the same as the regular Brush.
@@ -81,25 +88,46 @@ def res_cust_fizzler(base_inst, res):
             vbsp.VMF.by_target[fizz_name + '_brush']):
         orig_brush.remove()
         for config in new_brush_config:
+
             new_brush = orig_brush.copy()
-            vbsp.VMF.add_ent(new_brush)
-            # Don't allow restyling it
-            vbsp.IGNORED_BRUSH_ENTS.add(new_brush)
+            # Unique to the particular config property & fizzler name
+            merge_key = (id(config), fizz_name)
+            should_merge = config.bool('MergeBrushes')
+            if should_merge and merge_key in FIZZ_BRUSH_ENTS:
+                # These are shared by both ents, but new_brush won't be added to
+                # the map. (We need it though for the widening code to work).
+                FIZZ_BRUSH_ENTS[merge_key].solids.extend(new_brush.solids)
+            else:
+                vbsp.VMF.add_ent(new_brush)
+                # Don't allow restyling it
+                vbsp.IGNORED_BRUSH_ENTS.add(new_brush)
 
-            new_brush.clear_keys()  # Wipe the original keyvalues
-            new_brush['origin'] = orig_brush['origin']
-            new_brush['targetname'] = (
-                fizz_name +
-                '-' +
-                config['name', 'brush']
-            )
-            # All ents must have a classname!
-            new_brush['classname'] = 'trigger_portal_cleanser'
+                new_brush.clear_keys()  # Wipe the original keyvalues
+                new_brush['origin'] = orig_brush['origin']
+                new_brush['targetname'] = (
+                    fizz_name +
+                    '-' +
+                    config['name', 'brush']
+                )
+                # All ents must have a classname!
+                new_brush['classname'] = 'trigger_portal_cleanser'
 
-            conditions.set_ent_keys(
-                new_brush, base_inst,
-                config,
-            )
+                conditions.set_ent_keys(
+                    new_brush, base_inst,
+                    config,
+                )
+
+                for out_prop in config.find_children('Outputs'):
+                    out = Output.parse(out_prop)
+                    out.comma_sep = False
+                    out.target = conditions.local_name(
+                        base_inst,
+                        out.target
+                    )
+                    new_brush.add_out(out)
+
+                if should_merge:  # The first brush...
+                    FIZZ_BRUSH_ENTS[merge_key] = new_brush
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
@@ -108,9 +136,7 @@ def res_cust_fizzler(base_inst, res):
                 # skip the resizing since it's already correct.
                 laser_tex = laserfield_conf['texture', 'effects/laserplane']
                 nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
-                tex_width = srctools.conv_int(
-                    laserfield_conf['texwidth', '512'], 512
-                )
+                tex_width = laserfield_conf.int('texwidth', 512)
                 is_short = False
                 for side in new_brush.sides():
                     if side.mat.casefold() == 'effects/fizzler':
@@ -145,7 +171,7 @@ def res_cust_fizzler(base_inst, res):
                         # If we fail, just use the original textures
                         pass
 
-            widen_amount = srctools.conv_float(config['thickness', '2'], 2.0)
+            widen_amount = config.float('thickness', 2.0)
             if widen_amount != 2:
                 for brush in new_brush.solids:
                     conditions.widen_fizz_brush(
@@ -273,6 +299,9 @@ def res_fizzler_pair(begin_inst, res):
         if end_inst['targetname', ''] != end_name:
             # Only examine this barrier hazard's instances!
             continue
+        if end_inst['file'] != orig_file:
+            # Allow adding overlays or other instances at the ends.
+            continue
         end_pos = Vec.from_str(end_inst['origin'])
         if (
                 begin_pos[axis_1] == end_pos[axis_1] and
@@ -304,3 +333,84 @@ def res_fizzler_pair(begin_inst, res):
                 file=mid_file,
                 origin=new_pos.join(' '),
             )
+
+
+@meta_cond(priority=-200, only_once=True)
+def fizzler_out_relay(_):
+    """Link fizzlers with a relay item so they can be given outputs."""
+    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
+    if not relay_file:
+        # No relay item - deactivated most likely.
+        return
+
+    # instances
+    fizz_models = set()
+    # base -> connections
+    fizz_bases = {}
+
+    LOGGER.info('Item classes: {}', ITEM_CLASSES)
+
+    for fizz_id in ITEM_CLASSES['itembarrierhazard']:
+        base, model = instanceLocs.resolve(
+            '<{}: fizz_base, fizz_model>'.format(fizz_id)
+        )
+        fizz_bases[base.casefold()] = CONNECTIONS[fizz_id]
+        fizz_models.add(model.casefold())
+
+    # targetname -> base inst, connections
+    fizz_by_name = {}
+
+    # origin, normal -> targetname
+    pos_to_name = {}
+
+    marker_inst = []  # type: List[Entity]
+
+    LOGGER.info('Fizzler data: {}', locals())
+
+    for inst in vbsp.VMF.by_class['func_instance']:
+        filename = inst['file'].casefold()
+        name = inst['targetname']
+        if filename in fizz_bases:
+            fizz_by_name[inst['targetname']] = inst, fizz_bases[filename]
+        elif filename in fizz_models:
+            if inst['targetname'].endswith(('_modelStart', '_modelEnd')):
+                name = inst['targetname'].rsplit('_', 1)[0]
+
+        elif filename in relay_file:
+            marker_inst.append(inst)
+            # Remove the marker, we don't need that...
+            inst.remove()
+            continue
+        else:
+            continue
+
+        pos_to_name[
+            Vec.from_str(inst['origin']).as_tuple(),
+            Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+        ] = name
+
+    for inst in marker_inst:
+        try:
+            fizz_name = pos_to_name[
+                Vec.from_str(inst['origin']).as_tuple(),
+                Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+            ]
+        except KeyError:
+            # Not placed on a fizzler...
+            continue
+        base_inst, connections = fizz_by_name[fizz_name]
+
+        # Copy over fixup values
+        for key, val in inst.fixup.items():
+            base_inst.fixup[key] = val
+
+        for out in inst.outputs:
+            new_out = out.copy()
+            if out.output == 'ON':
+                new_out.inst_out, new_out.output = connections.out_act
+            elif out.output == 'OFF':
+                new_out.inst_out, new_out.output = connections.out_deact
+            else:
+                # Not the marker's output somehow?
+                continue
+            base_inst.add_out(new_out)

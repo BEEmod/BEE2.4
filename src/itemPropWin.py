@@ -10,29 +10,63 @@ import sound as snd
 import utils
 import srctools
 import contextWin
+import gameMan
 
-# all editable properties in editoritems, Valve probably isn't going to
+LOGGER = utils.getLogger(__name__)
+
+# all properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'toplevel':                 ('pistPlat', 'Start Position'),
-    'bottomlevel':              ('pistPlat', 'End Position'),
-    'angledpanelanimation':     ('panAngle', 'Panel Position'),
-    'startenabled':             ('checkbox', 'Start Enabled'),
-    'startreversed':            ('checkbox', 'Start Reversed'),
-    'startdeployed':            ('checkbox', 'Start Deployed'),
-    'startactive':              ('checkbox', 'Start Active'),
-    'startopen':                ('checkbox', 'Start Open'),
-    'startlocked':              ('checkbox', 'Start Locked'),
-    'timerdelay':               ('timerDel', 'Delay \n(0=infinite)'),
-    'dropperenabled':           ('checkbox', 'Dropper Enabled'),
-    'autodrop':                 ('checkbox', 'Auto Drop'),
-    'autorespawn':              ('checkbox', 'Auto Respawn'),
-    'oscillate':                ('railLift', 'Oscillate'),
-    'paintflowtype':            ('gelType',  'Flow Type'),
-    'allowstreak':              ('checkbox', 'Allow Streaks'),
+    'toplevel':                 ('pistPlat', _('Start Position')),
+    'bottomlevel':              ('pistPlat', _('End Position')),
+    'timerdelay':               ('timerDel', _('Delay \n(0=infinite)')),
+    'angledpanelanimation':     ('panAngle', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
+    'paintflowtype':            ('gelType',  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+
+    'oscillate':                ('railLift', 'PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
+    'startenabled':             ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
+    'startreversed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
+    'startdeployed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
+    'startactive':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
+    'startopen':                ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_open'),
+    'startlocked':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
+    'dropperenabled':           ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
+    'autodrop':                 ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
+    'autorespawn':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
+    'allowstreak':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
+
+    # Properties that we don't allow modification of.
+    'timersound': ('none', 'Timer Sound'),
+    'angledpaneltype': ('none', 'Angled Panel Type'),
+    'itemfallstraightdown': ('none', 'Disable Cube Dropper Clips'),
+    'paintexporttype': ('none', 'Gel Export Type'),
+    'autotrigger': ('none', 'Automatically Move'),
+
+    'connectioncount': ('none', 'Connection Count'),
+    'connectioncountpolarity': ('none', 'Polarity Connection Count'),
+    'coopdoor': ('none', 'Is Coop?'),
+    'portalable': ('none', 'Flip Panel Portalability'),
+    'speed': ('none', 'Track Platform Speed'),
+    'startingposition': ('none', 'Initial Track Platform Position'),
+    'traveldirection': ('none', 'Track Platform Direction'),
+    'traveldistance': ('none', 'Track Platform Distance'),
+
+    # Controlled by bottom and top position, not set separately.
+    'startup': ('none', 'Start Up'),
+
+    # Faith Plate
+    'verticalalignment': ('none', 'Vertical Alignment'),
+    'catapultspeed': ('none', 'Faith Plate Speed'),
+    'targetname': ('none', 'Faith Target Name'),
+
+    'cubetype': ('subType', 'Cube Type'),
+    'hazardtype': ('subType', 'Fizzler Type'),
+    'barriertype': ('subType', 'Barrier Type'),
+    'buttontype': ('subType', 'Button Type'),
+    'painttype': ('subType', 'Gel Type'),
     }
 # valid property types:
-#  checkbox, timerDel, pistPlat, gelType, panAngle, railLift
+#  checkbox, timerDel, pistPlat, gelType, panAngle, railLift, none, subType
 
 # order of the different properties, 'special' are the larger controls
 # like sliders or dropdown boxes
@@ -66,14 +100,21 @@ values = {}  # selected values for this items
 out_values = {}
 
 PAINT_OPTS = [
-    'Light',
-    'Medium',
-    'Heavy',
-    'Drip',
-    'Bomb'
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_medium',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_heavy',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_drip',
+    'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_bomb',
     ]
 
-DEFAULTS = { # default values for this item
+PANEL_ANGLES = [
+    ('30', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_30'),
+    ('45', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_45'),
+    ('60', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_60'),
+    ('90', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type_90'),
+]
+
+DEFAULTS = {  # default values for this item
     'startup': False,
     'toplevel': 1,
     'bottomlevel': 0,
@@ -98,7 +139,6 @@ last_angle = '0'
 play_sound = False
 is_open = False
 enable_tim_callback = True
-
 
 def callback(name):
     """Do nothing by default!"""
@@ -214,7 +254,7 @@ def paint_fx(e=None):
     sfx('config')
 
 
-def exit_win(_=None):
+def exit_win(e=None):
     """Quit and save the new settings."""
     global is_open
     win.grab_release()
@@ -236,7 +276,7 @@ def exit_win(_=None):
 def can_edit(prop_list):
     """Determine if any of these properties are changeable."""
     for prop in prop_list:
-        if prop in PROP_TYPES:
+        if PROP_TYPES.get(prop, 'none') not in ('none', 'subType'):
             return True
     return False
 
@@ -268,8 +308,8 @@ def init(cback):
     frame.rowconfigure(0, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    labels['noOptions'] = ttk.Label(frame, text='No Properties avalible!')
-    widgets['saveButton'] = ttk.Button(frame, text='Close', command=exit_win)
+    labels['noOptions'] = ttk.Label(frame, text=_('No Properties available!'))
+    widgets['saveButton'] = ttk.Button(frame, text=_('Close'), command=exit_win)
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
@@ -278,7 +318,11 @@ def init(cback):
     widgets['div_h'] = ttk.Separator(frame, orient="horizontal")
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
-        labels[key] = ttk.Label(frame, text=prop_name+':')
+        # Translate property names from Valve's files.
+        if prop_name.startswith('PORTAL2_'):
+            prop_name = gameMan.translate(prop_name) + ':'
+
+        labels[key] = ttk.Label(frame, text=prop_name)
         if prop_type == 'checkbox':
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
@@ -309,12 +353,12 @@ def init(cback):
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = StringVar(value=DEFAULTS[key])
-            for pos, angle in enumerate(['30', '45', '60', '90']):
+            for pos, (angle, disp_angle) in enumerate(PANEL_ANGLES):
                 ttk.Radiobutton(
                     frm,
                     variable=values[key],
                     value=angle,
-                    text=angle,
+                    text=gameMan.translate(disp_angle),
                     command=func_partial(save_angle, key, angle),
                     ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
@@ -328,7 +372,7 @@ def init(cback):
                     frm,
                     variable=values[key],
                     value=pos,
-                    text=text,
+                    text=gameMan.translate(text),
                     command=func_partial(save_paint, key, pos),
                     ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
@@ -381,51 +425,59 @@ def show_window(used_props, parent, item_name):
     start_up = srctools.conv_bool(used_props.get('startup', '0'))
     values['startup'] = start_up
     for prop, value in used_props.items():
-        if prop in PROP_TYPES and value is not None:
-            prop_type = PROP_TYPES[prop][0]
-            if prop_type == 'checkbox':
-                values[prop].set(srctools.conv_bool(value))
-            elif prop_type == 'railLift':
-                values[prop].set(srctools.conv_bool(value))
-                save_rail(prop)
-            elif prop_type == 'gelType':
-                values[prop].set(value)
-            elif prop_type == 'panAngle':
-                last_angle = value[5:7]
-                values[prop].set(last_angle)
-                out_values[prop] = value
-            elif prop_type == 'pistPlat':
-                values[prop] = value
-                try:
-                    top_level = int(used_props.get('toplevel', 4))
-                    bot_level = int(used_props.get('bottomlevel', 0))
-                except ValueError:
-                    pass
-                else:
-                    if ((prop == 'toplevel' and start_up) or
-                            (prop == 'bottomlevel' and not start_up)):
-                        widgets[prop].set(
-                            max(
-                                top_level,
-                                bot_level,
-                                )
-                            )
-                    if ((prop == 'toplevel' and not start_up) or
-                            (prop == 'bottomlevel' and start_up)):
-                        widgets[prop].set(
-                            min(
-                                top_level,
-                                bot_level,
-                                )
-                            )
-            elif prop_type == 'timerDel':
-                try:
-                    values[prop] = int(value)
-                    widgets[prop].set(values[prop])
-                except ValueError:
-                    pass
+        if prop not in PROP_TYPES:
+            LOGGER.info('Unknown property type {}', prop)
+            continue
+        if value is None:
+            continue
+
+        prop_type = PROP_TYPES[prop][0]
+        if prop_type == 'checkbox':
+            values[prop].set(srctools.conv_bool(value))
+        elif prop_type == 'railLift':
+            values[prop].set(srctools.conv_bool(value))
+            save_rail(prop)
+        elif prop_type == 'gelType':
+            values[prop].set(value)
+        elif prop_type == 'panAngle':
+            last_angle = value[5:7]
+            values[prop].set(last_angle)
+            out_values[prop] = value
+        elif prop_type == 'pistPlat':
+            values[prop] = value
+            try:
+                top_level = int(used_props.get('toplevel', 4))
+                bot_level = int(used_props.get('bottomlevel', 0))
+            except ValueError:
+                pass
             else:
-                values[prop] = value
+                if ((prop == 'toplevel' and start_up) or
+                        (prop == 'bottomlevel' and not start_up)):
+                    widgets[prop].set(
+                        max(
+                            top_level,
+                            bot_level,
+                            )
+                        )
+                if ((prop == 'toplevel' and not start_up) or
+                        (prop == 'bottomlevel' and start_up)):
+                    widgets[prop].set(
+                        min(
+                            top_level,
+                            bot_level,
+                            )
+                        )
+        elif prop_type == 'timerDel':
+            try:
+                values[prop] = int(value)
+                widgets[prop].set(values[prop])
+            except ValueError:
+                pass
+        elif prop_type in ('none', 'subType'):
+            # Internal or subtype properties, just pass through unchanged.
+            values[prop] = value
+        else:
+            LOGGER.error('Bad prop_type ({}) for {}', prop_type, prop)
 
     for key in PROP_POS_SPECIAL:
         if key in propList:

@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property
+from srctools import Property, NoKeyError, VPK
 import backup
 import extract_packages
 import loadScreen
@@ -24,15 +24,17 @@ import packageLoader
 import utils
 import srctools
 
+from typing import List, Optional
 
 LOGGER = utils.getLogger(__name__)
 
-all_games = []
+all_games = [] # type: List[Game]
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
 
-trans_data = {}
+# Translated text from basemodui.txt.
+TRANS_DATA = {}
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -77,6 +79,7 @@ export_screen = loadScreen.LoadScreen(
     ('EXP', 'Export Configuration'),
     ('COMP', 'Copy Compiler'),
     ('RES', 'Copy Resources'),
+    ('MUS', 'Copy Music'),
     title_text='Exporting',
 )
 
@@ -87,24 +90,80 @@ EXE_SUFFIX = (
     ''
 )
 
+# We search for Tag and Mel's music files, and copy them to games on export.
+# That way they can use the files.
+MUSIC_MEL_VPK = None  # type: VPK
+MUSIC_TAG_LOC = None  # type: str
 
-def init_trans():
-    """Load a copy of basemodui, used to translate item strings.
+# The folder with the file...
+MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
+MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
 
-    Valve's items use special translation strings which would look ugly
-    if we didn't convert them.
-    """
-    try:
-        with open('../basemodui.txt') as trans:
-            trans_prop = Property.parse(trans, 'basemodui.txt')
-        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
-            trans_data[item.real_name] = item.value
-    except IOError:
-        pass
+# All the PS:Mel track names - all the resources are in the VPK,
+# this allows us to skip looking through all the other files..
+MEL_MUSIC_NAMES = """\
+portal2_background01.wav
+sp_a1_garden.wav
+sp_a1_lift.wav
+sp_a1_mel_intro.wav
+sp_a1_tramride.wav
+sp_a2_dont_meet_virgil.wav
+sp_a2_firestorm_exploration.wav
+sp_a2_firestorm_explosion.wav
+sp_a2_firestorm_openvault.wav
+sp_a2_garden_destroyed_01.wav
+sp_a2_garden_destroyed_02.wav
+sp_a2_garden_destroyed_portalgun.wav
+sp_a2_garden_destroyed_vault.wav
+sp_a2_once_upon.wav
+sp_a2_past_power_01.wav
+sp_a2_past_power_02.wav
+sp_a2_underbounce.wav
+sp_a3_concepts.wav
+sp_a3_concepts_funnel.wav
+sp_a3_faith_plate.wav
+sp_a3_faith_plate_funnel.wav
+sp_a3_junkyard.wav
+sp_a3_junkyard_offices.wav
+sp_a3_paint_fling.wav
+sp_a3_paint_fling_funnel.wav
+sp_a3_transition.wav
+sp_a3_transition_funnel.wav
+sp_a4_destroyed.wav
+sp_a4_destroyed_funnel.wav
+sp_a4_factory.wav
+sp_a4_factory_radio.wav
+sp_a4_overgrown.wav
+sp_a4_overgrown_funnel.wav
+sp_a4_tb_over_goo.wav
+sp_a4_tb_over_goo_funnel.wav
+sp_a4_two_of_a_kind.wav
+sp_a4_two_of_a_kind_funnel.wav
+sp_a5_finale01_01.wav
+sp_a5_finale01_02.wav
+sp_a5_finale01_03.wav
+sp_a5_finale01_funnel.wav
+sp_a5_finale02_aegis_revealed.wav
+sp_a5_finale02_lastserver.wav
+sp_a5_finale02_room01.wav
+sp_a5_finale02_room02.wav
+sp_a5_finale02_room02_serious.wav
+sp_a5_finale02_stage_00.wav
+sp_a5_finale02_stage_01.wav
+sp_a5_finale02_stage_02.wav
+sp_a5_finale02_stage_end.wav\
+""".split()
+# Not used...
+# sp_a1_garden_jukebox01.wav
+# sp_a1_jazz.wav
+# sp_a1_jazz_enterstation.wav
+# sp_a1_jazz_tramride.wav
+# still_alive_gutair_cover.wav
+# want_you_gone_guitar_cover.wav
 
 
 def translate(string):
-    return trans_data.get(string, string)
+    return TRANS_DATA.get(string, string)
 
 
 def setgame_callback(selected_game):
@@ -320,7 +379,8 @@ class Game:
             except (IOError, shutil.Error):
                 pass
 
-            shutil.copytree(source, dest, copy_function=copy_func)
+            # This handles existing folders, without raising in os.makedirs().
+            utils.merge_tree(source, dest, copy_function=copy_func)
         LOGGER.info('Cache copied.')
         # Save the new cache modification date.
         self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
@@ -386,6 +446,7 @@ class Game:
             export_screen.set_length('RES', extract_packages.res_count)
         else:
             export_screen.skip_stage('RES')
+            export_screen.skip_stage('MUS')
 
         # The items, plus editoritems, vbsp_config and the instance list.
         export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
@@ -453,7 +514,7 @@ class Game:
 
         # This is the connection "heart" and "error" models.
         # These have to come last, so we need to special case it.
-        editoritems += style.editor.find_key("Renderables", [])
+        editoritems += style.editor.find_key("Renderables", []).copy()
 
         # Special-case: implement the UnlockDefault stlylevar here,
         # so all items are modified.
@@ -521,9 +582,9 @@ class Game:
                     export_screen.grab_release()
                     export_screen.reset()
                     messagebox.showerror(
-                        title='BEE2 - Export Failed!',
-                        message='Copying compiler file {file} failed.'
-                                'Ensure the {game} is not running.'.format(
+                        title=_('BEE2 - Export Failed!'),
+                        message=_('Copying compiler file {file} failed.'
+                                  'Ensure the {game} is not running.').format(
                                     file=file,
                                     game=self.name,
                                 ),
@@ -535,6 +596,8 @@ class Game:
         if should_refresh:
             LOGGER.info('Copying Resources!')
             self.refresh_cache()
+
+            self.copy_mod_music()
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
@@ -552,7 +615,13 @@ class Game:
         instance_locs = Property("AllInstances", [])
         cust_inst = Property("CustInstances", [])
         commands = Property("Connections", [])
-        root_block = Property(None, [instance_locs, cust_inst, commands])
+        item_classes = Property("ItemClasses", [])
+        root_block = Property(None, [
+            instance_locs,
+            item_classes,
+            cust_inst,
+            commands,
+        ])
 
         for item in editoritems.find_all("Item"):
             instance_block = Property(item['Type'], [])
@@ -601,6 +670,16 @@ class Game:
                     for io_prop in block:
                         comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
 
+            # Fizzlers don't work correctly with outputs. This is a signal to
+            # conditions.fizzler, but it must be removed in editoritems.
+            if item['ItemClass', ''].casefold() == 'itembarrierhazard':
+                for block in item.find_all('Exporting', 'Outputs'):
+                    if CONN_NORM in block:
+                        del block[CONN_NORM]
+
+            # Record the itemClass for each item type.
+            item_classes[item['type']] = item['ItemClass', 'ItemBase']
+
             # Only add the block if the item actually has IO.
             if comm_block.value:
                 commands.append(comm_block)
@@ -612,6 +691,91 @@ class Game:
         import webbrowser
         url = 'steam://rungameid/' + str(self.steamID)
         webbrowser.open(url)
+
+    def copy_mod_music(self):
+        """Copy music files from Tag and PS:Mel."""
+        tag_dest = self.abs_path('bee2/sound/music/')
+        # Mel's music has similar names to P2's, so put it in a subdir
+        # to avoid confusion.
+        mel_dest = self.abs_path('bee2/sound/music/mel/')
+        # Obviously Tag has its music already...
+        copy_tag = (
+            self.steamID != utils.STEAM_IDS['APERTURE TAG'] and
+            MUSIC_TAG_LOC is not None
+        )
+
+        file_count = 0
+        if copy_tag:
+            file_count += len(os.listdir(MUSIC_TAG_LOC))
+        if MUSIC_MEL_VPK is not None:
+            file_count += len(MEL_MUSIC_NAMES)
+
+        export_screen.set_length('MUS', file_count)
+
+        if copy_tag:
+            os.makedirs(tag_dest, exist_ok=True)
+            for filename in os.listdir(MUSIC_TAG_LOC):
+                src_loc = os.path.join(MUSIC_TAG_LOC, filename)
+                if os.path.isfile(src_loc):
+                    shutil.copy(src_loc, tag_dest)
+                    export_screen.step('MUS')
+
+        if MUSIC_MEL_VPK is not None:
+            os.makedirs(mel_dest, exist_ok=True)
+            for filename in MEL_MUSIC_NAMES:
+                with open(os.path.join(mel_dest, filename), 'wb') as dest:
+                    dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
+                export_screen.step('MUS')
+
+    def init_trans(self):
+        """Try and load a copy of basemodui from Portal 2 to translate.
+
+        Valve's items use special translation strings which would look ugly
+        if we didn't convert them.
+        """
+        # Already loaded
+        if TRANS_DATA:
+            return
+
+        # We need to first figure out what language is used (if not English),
+        # then load in the file. This is saved in the 'appmanifest',
+
+        try:
+            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+        except FileNotFoundError:
+            # Portal 2 isn't here...
+            return
+        with appman_file:
+            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+        try:
+            lang = appman.find_key('AppState').find_key('UserConfig')['language']
+        except NoKeyError:
+            return
+
+        basemod_loc = self.abs_path(
+            '../Portal 2/portal2_dlc2/resource/basemodui_' + lang + '.txt'
+        )
+
+        # Basemod files are encoded in UTF-16.
+        try:
+            basemod_file = open(basemod_loc, encoding='utf16')
+        except FileNotFoundError:
+            return
+        with basemod_file:
+            if lang == 'english':
+                def filterer(file):
+                    """The English language has some unused language text.
+
+                    This needs to be skipped since it has invalid quotes."""
+                    for line in file:
+                        if line.count('"') <= 4:
+                            yield line
+                basemod_file = filterer(basemod_file)
+
+            trans_prop = Property.parse(basemod_file, 'basemodui.txt')
+
+        for item in trans_prop.find_key("lang", []).find_key("tokens", []):
+            TRANS_DATA[item.real_name] = item.value
 
 
 def find_steam_info(game_dir):
@@ -643,6 +807,31 @@ def find_steam_info(game_dir):
         if found_name and found_id:
             break
     return game_id, name
+
+
+def scan_music_locs():
+    """Try and determine the location of Aperture Tag and PS:Mel.
+
+    If successful we can export the music to games.
+    """
+    global MUSIC_TAG_LOC, MUSIC_MEL_VPK
+    steamapp_locs = set()
+    for gm in all_games:
+        steamapp_locs.add(os.path.normpath(gm.abs_path('../')))
+
+    for loc in steamapp_locs:
+        tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
+        mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
+        if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
+            MUSIC_TAG_LOC = tag_loc
+            LOGGER.info('Ap-Tag dir: {}', tag_loc)
+
+        if os.path.exists(mel_loc) and MUSIC_MEL_VPK is None:
+            MUSIC_MEL_VPK = VPK(mel_loc)
+            LOGGER.info('PS-Mel dir: {}', mel_loc)
+
+        if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
+            break
 
 
 def save():
@@ -677,18 +866,18 @@ def load():
     selected_game = all_games[0]
 
 
-def add_game(_=None, refresh_menu=True):
+def add_game(e=None, refresh_menu=True):
     """Ask for, and load in a game to export to."""
 
     messagebox.showinfo(
-        message='Select the folder where the game executable is located '
-                '(portal2' + EXE_SUFFIX + ')...',
+        message=_('Select the folder where the game executable is located '
+                  '({appname})...').format(appname='portal2' + EXE_SUFFIX),
         parent=TK_ROOT,
-        title='BEE2 - Add Game',
+        title=_('BEE2 - Add Game'),
         )
     exe_loc = filedialog.askopenfilename(
-        title='Find Game Exe',
-        filetypes=[('Executable', '.exe')],
+        title=_('Find Game Exe'),
+        filetypes=[(_('Executable'), '.exe')],
         initialdir='C:',
         )
     if exe_loc:
@@ -696,25 +885,25 @@ def add_game(_=None, refresh_menu=True):
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
             messagebox.showinfo(
-                message='This does not appear to be a valid game folder!',
+                message=_('This does not appear to be a valid game folder!'),
                 parent=TK_ROOT,
                 icon=messagebox.ERROR,
-                title='BEE2 - Add Game',
+                title=_('BEE2 - Add Game'),
                 )
             return False
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = ask_string(
-                prompt="Enter the name of this game:",
-                title='BEE2 - Add Game',
+                prompt=_("Enter the name of this game:"),
+                title=_('BEE2 - Add Game'),
                 initialvalue=name,
                 )
             if name in invalid_names:
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='This name is already taken!',
-                    title='BEE2 - Add Game',
+                    message=_('This name is already taken!'),
+                    title=_('BEE2 - Add Game'),
                     )
             elif name is None:
                 return False
@@ -722,8 +911,8 @@ def add_game(_=None, refresh_menu=True):
                 messagebox.showinfo(
                     icon=messagebox.ERROR,
                     parent=TK_ROOT,
-                    message='Please enter a name for this game!',
-                    title='BEE2 - Add Game',
+                    message=_('Please enter a name for this game!'),
+                    title=_('BEE2 - Add Game'),
                     )
             else:
                 break
@@ -737,20 +926,19 @@ def add_game(_=None, refresh_menu=True):
         return True
 
 
-def remove_game(_=None):
+def remove_game(e=None):
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
-        "\n (BEE2 will quit, this is the last game set!)"
+        _("\n (BEE2 will quit, this is the last game set!)")
         if len(all_games) == 1 else
         ""
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message='Are you sure you want to delete "'
-                + selected_game.name
-                + '"?'
-                + lastgame_mess,
+        message=_('Are you sure you want to delete "{}?"').format(
+                selected_game.name
+            ) + lastgame_mess,
         )
     if confirm:
         selected_game.edit_gameinfo(add_line=False)
@@ -813,6 +1001,5 @@ if __name__ == '__main__':
     dropdown.game_pos = 0
     TK_ROOT['menu'] = test_menu
 
-    init_trans()
     load()
     add_menu_opts(dropdown, setgame_callback)

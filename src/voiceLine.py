@@ -9,6 +9,7 @@ import conditions.monitor
 import srctools
 import utils
 import vbsp
+import vbsp_options
 from BEE2_config import ConfigFile
 from srctools import Property, Vec, VMF, Output
 
@@ -430,7 +431,7 @@ def add_voice(
     # Either box in with nodraw, or place the voiceline studio.
     has_studio = conditions.monitor.make_voice_studio(vmf_file, quote_loc)
 
-    bullsye_actor = vbsp.get_opt('voice_studio_actor')
+    bullsye_actor = vbsp_options.get(str, 'voice_studio_actor')
     if bullsye_actor and has_studio:
         ADDED_BULLSEYES.add(bullsye_actor)
 

@@ -15,10 +15,9 @@ from tkinter import messagebox
 from enum import Enum
 import functools
 import webbrowser
-import itertools
 
 from richTextBox import tkRichText
-import img as png
+import img
 import sound as snd
 import itemPropWin
 import tkMarkdown
@@ -71,41 +70,41 @@ class SPR(Enum):
 
 SPRITE_TOOL = {
     # The tooltips associated with each sprite.
-    'rot_0': 'This item may not be rotated.',
-    'rot_4': 'This item can be pointed in 4 directions.',
-    'rot_5': 'This item can be positioned on the sides and center.',
-    'rot_6': 'This item can be centered in two directions, plus on the sides.',
-    'rot_8': 'This item can be placed like light strips.',
-    'rot_36': 'This item can be rotated on the floor to face 360 degrees.',
-    'rot_catapult': 'This item is positioned using a catapult trajectory.',
-    'rot_paint': 'This item positions the dropper to hit target locations.',
+    'rot_0': _('This item may not be rotated.'),
+    'rot_4': _('This item can be pointed in 4 directions.'),
+    'rot_5': _('This item can be positioned on the sides and center.'),
+    'rot_6': _('This item can be centered in two directions, plus on the sides.'),
+    'rot_8': _('This item can be placed like light strips.'),
+    'rot_36': _('This item can be rotated on the floor to face 360 degrees.'),
+    'rot_catapult': _('This item is positioned using a catapult trajectory.'),
+    'rot_paint': _('This item positions the dropper to hit target locations.'),
 
-    'in_none': 'This item does not accept any inputs.',
-    'in_norm': 'This item accepts inputs.',
-    'in_polarity': 'Excursion Funnels accept a on/off input and a directional input.',
+    'in_none': _('This item does not accept any inputs.'),
+    'in_norm': _('This item accepts inputs.'),
+    'in_polarity': _('Excursion Funnels accept a on/off input and a directional input.'),
 
-    'out_none': 'This item does not output.',
-    'out_norm': 'This item has an output.',
-    'out_tim': 'This item has a timed output.',
+    'out_none': _('This item does not output.'),
+    'out_norm': _('This item has an output.'),
+    'out_tim': _('This item has a timed output.'),
 
-    'space_none': 'This item does not take up any space inside walls.',
-    'space_embed': 'This item takes space inside the wall.',
+    'space_none': _('This item does not take up any space inside walls.'),
+    'space_embed': _('This item takes space inside the wall.'),
 
-    'surf_none': 'This item cannot be placed anywhere...',
-    'surf_ceil': 'This item can only be attached to ceilings.',
-    'surf_floor': 'This item can only be placed on the floor.',
-    'surf_floor_ceil': 'This item can be placed on floors and ceilings.',
-    'surf_wall': 'This item can be placed on walls only.',
-    'surf_wall_ceil': 'This item can be attached to walls and ceilings.',
-    'surf_wall_floor': 'This item can be placed on floors and walls.',
-    'surf_wall_floor_ceil': 'This item can be placed in any orientation.',
+    'surf_none': _('This item cannot be placed anywhere...'),
+    'surf_ceil': _('This item can only be attached to ceilings.'),
+    'surf_floor': _('This item can only be placed on the floor.'),
+    'surf_floor_ceil': _('This item can be placed on floors and ceilings.'),
+    'surf_wall': _('This item can be placed on walls only.'),
+    'surf_wall_ceil': _('This item can be attached to walls and ceilings.'),
+    'surf_wall_floor': _('This item can be placed on floors and walls.'),
+    'surf_wall_floor_ceil': _('This item can be placed in any orientation.'),
 }
 
 
 def set_sprite(pos, sprite):
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
-    widget['image'] = png.spr(sprite)
+    widget['image'] = img.spr(sprite)
     widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
 
 
@@ -125,7 +124,7 @@ def hide_item_props(vals):
     selected_item.set_properties(vals)
 
 
-def sub_sel(ind, _=None):
+def sub_sel(ind, e=None):
     """Change the currently-selected sub-item."""
     # Can only change the subitem on the preview window
     if selected_sub_item.is_pre:
@@ -137,7 +136,7 @@ def sub_sel(ind, _=None):
             show_prop(selected_sub_item, warp_cursor=True)
 
 
-def sub_open(ind, _=None):
+def sub_open(ind, e=None):
     """Move the context window to apply to the given item."""
     pos = SUBITEM_POS[selected_item.num_sub][ind]
     if pos != -1 and pos != selected_sub_item.subKey:
@@ -180,7 +179,7 @@ def show_prop(widget, warp_cursor=False):
     load_item_data()
 
 
-def set_item_version(_=None):
+def set_item_version(e=None):
     selected_item.change_version(version_lookup[wid['variant'].current()])
     load_item_data()
 
@@ -207,7 +206,7 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem', ind]['image'] = png.png('BEE2/alpha_64')
+            wid['subitem', ind]['image'] = img.invis_square(64)
         else:
             wid['subitem', ind]['image'] = selected_item.get_icon(pos)
         wid['subitem', ind]['relief'] = 'flat'
@@ -232,11 +231,11 @@ def load_item_data():
         wid['changedefaults'].state(['disabled'])
 
     if selected_item.is_wip and selected_item.is_dep:
-        wid['wip_dep']['text'] = 'WIP, Deprecated Item!'
+        wid['wip_dep']['text'] = _('WIP, Deprecated Item!')
     elif selected_item.is_wip:
-        wid['wip_dep']['text'] = 'WIP Item!'
+        wid['wip_dep']['text'] = _('WIP Item!')
     elif selected_item.is_dep:
-        wid['wip_dep']['text'] = 'Deprecated Item!'
+        wid['wip_dep']['text'] = _('Deprecated Item!')
     else:
         wid['wip_dep']['text'] = ''
 
@@ -246,13 +245,13 @@ def load_item_data():
         wid['variant'].state(['disabled'])
         # We want to display WIP / Dep tags still, so users know.
         if selected_item.is_wip and selected_item.is_dep:
-            wid['variant']['values'] = ['[WIP] [DEP] No Alts!']
+            wid['variant']['values'] = [_('[WIP] [DEP] No Alts!')]
         elif selected_item.is_wip:
-            wid['variant']['values'] = ['[WIP] No Alt Versions!']
+            wid['variant']['values'] = [_('[WIP] No Alt Versions!')]
         elif selected_item.is_dep:
-            wid['variant']['values'] = ['[DEP] No Alt Versions!']
+            wid['variant']['values'] = [_('[DEP] No Alt Versions!')]
         else:
-            wid['variant']['values'] = ['No Alternate Versions!']
+            wid['variant']['values'] = [_('No Alternate Versions!')]
         wid['variant'].current(0)
     else:
         wid['variant'].state(['!disabled'])
@@ -347,7 +346,7 @@ def load_item_data():
         set_sprite(SPR.COLLISION, 'space_embed')
         set_sprite(SPR.OUTPUT, 'out_none')
         set_sprite(SPR.ROTATION, 'rot_36')
-        wid['sprite', SPR.ROTATION].tooltip_text += '\n(Reflection Cube only)'
+        wid['sprite', SPR.ROTATION].tooltip_text += _('\n(Reflection Cube only)')
 
     item_class = editor_data['ItemClass', ''].casefold()
     if item_class == "itempaintsplat":
@@ -363,7 +362,7 @@ def load_item_data():
 
 
 
-def adjust_position(_=None):
+def adjust_position(e=None):
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside
@@ -397,7 +396,7 @@ def adjust_position(_=None):
 TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
-def hide_context(_=None):
+def hide_context(e=None):
     """Hide the properties window, if it's open."""
     global is_open, selected_item, selected_sub_item
     if is_open:
@@ -439,14 +438,14 @@ def init_widgets():
         text="",
         anchor="e",
         compound="left",
-        image=png.spr('gear_ent'),
+        image=img.spr('gear_ent'),
     )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
     tooltip.add_tooltip(
         wid['ent_count'],
-        'The number of entities used for this item. The Source engine limits '
-        'this to 2048 in total. This provides a guide to how many of these '
-        'items can be placed in a map at once.'
+        _('The number of entities used for this item. The Source engine '
+          'limits this to 2048 in total. This provides a guide to how many of '
+          'these items can be placed in a map at once.')
     )
 
     wid['author'] = ttk.Label(f, text="", anchor="center", relief="sunken")
@@ -457,7 +456,7 @@ def init_widgets():
     for i in range(5):
         wid['subitem', i] = ttk.Label(
             sub_frame,
-            image=png.png('BEE2/alpha_64'),
+            image=img.invis_square(64),
         )
         wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
@@ -472,7 +471,7 @@ def init_widgets():
     wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
     wid['wip_dep'].grid(row=4, column=0, sticky="NW")
 
-    ttk.Label(f, text="Description:", anchor="sw").grid(
+    ttk.Label(f, text=_("Description:"), anchor="sw").grid(
         row=4,
         column=0,
         sticky="SW",
@@ -485,7 +484,7 @@ def init_widgets():
     for spr_id in SPR:
         wid['sprite', spr_id] = sprite = ttk.Label(
             spr_frame,
-            image=png.spr('ap_grey'),
+            image=img.spr('ap_grey'),
             relief="raised",
         )
         sprite.grid(row=0, column=spr_id.value)
@@ -515,9 +514,9 @@ def init_widgets():
                 if messagebox.askyesno(
                         icon="error",
                         title="BEE2 - Error",
-                        message='Failed to open a web browser. Do you wish for '
-                                'the URL to be copied to the clipboard '
-                                'instead?',
+                        message=_('Failed to open a web browser. Do you wish '
+                                  'for the URL to be copied to the clipboard '
+                                  'instead?'),
                         detail='"{!s}"'.format(url),
                         parent=prop_window
                         ):
@@ -529,7 +528,7 @@ def init_widgets():
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, text=_("More Info>>"), command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
     tooltip.add_tooltip(wid['moreinfo'])
 
@@ -546,13 +545,13 @@ def init_widgets():
 
     wid['changedefaults'] = ttk.Button(
         f,
-        text="Change Defaults...",
+        text=_("Change Defaults..."),
         command=show_item_props,
         )
     wid['changedefaults'].grid(row=6, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],
-        'Change the default settings for this item when placed.'
+        _('Change the default settings for this item when placed.')
     )
 
     wid['variant'] = ttk.Combobox(
