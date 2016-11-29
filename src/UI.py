@@ -426,7 +426,7 @@ def quit_application():
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
     # Destroy the TK windows
-    TK_ROOT.destroy()
+    TK_ROOT.quit()
     sys.exit(0)
 
 gameMan.quit_application = quit_application
