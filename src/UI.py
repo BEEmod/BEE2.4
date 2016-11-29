@@ -307,22 +307,47 @@ class PalItem(Label):
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
 
-        utils.bind_rightclick(self, contextWin.open_event)
         self.bind(utils.EVENTS['LEFT'], drag_start)
         self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
+        self.info_btn = Label(
+            self,
+            image=img.png('icons/item_info.png'),
+            relief='ridge',
+        )
+
+        click_func = contextWin.open_event(self)
+        utils.bind_rightclick(self, click_func)
+
+        @utils.bind_leftclick(self.info_btn)
+        def info_button_click(e):
+            click_func(e)
+            # Cancel the event sequence, so it doesn't travel up to the main
+            # window and hide the window again.
+            return 'break'
+
+        # Rightclick does the same as the icon.
+        utils.bind_rightclick(self.info_btn, click_func)
+
     def rollover(self, _):
-        """Show the name of a subitem when moused over."""
+        """Show the name of a subitem and info button when moused over."""
         set_disp_name(self)
         self.lift()
         self['relief'] = 'ridge'
+        padding = 2 if utils.WIN else 0
+        self.info_btn.place(
+            x=self.winfo_width() - padding,
+            y=self.winfo_height() - padding,
+            anchor=SE,
+        )
 
     def rollout(self, _):
-        """Reset the item name display when the mouse leaves."""
+        """Reset the item name display and hide the info button when the mouse leaves."""
         clear_disp_name()
         self['relief'] = 'flat'
+        self.info_btn.place_forget()
 
     def change_subtype(self, ind):
         """Change the subtype of this icon.

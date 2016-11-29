@@ -144,10 +144,12 @@ def sub_open(ind, e=None):
         selected_sub_item.open_menu_at_sub(pos)
 
 
-def open_event(e):
-    """Read data from the event, and show the window."""
-    snd.fx('expand')
-    show_prop(e.widget)
+def open_event(item):
+    """Show the window for a particular PalItem."""
+    def func(e):
+        snd.fx('expand')
+        show_prop(item)
+    return func
 
 
 def show_prop(widget, warp_cursor=False):
