@@ -2419,8 +2419,8 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
     ) = over_data
 
     return SelitemData(
-        our_name if over_name == '???' else over_name,
-        our_short_name if over_short_name == '???' else over_short_name,
+        our_name,
+        our_short_name,
         our_auth + over_auth,
         over_icon if our_icon is None else our_icon,
         over_large_icon if our_large_icon is None else our_large_icon,
