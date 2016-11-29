@@ -30,11 +30,13 @@ from typing import Callable, Union
 LOGGER = utils.getLogger(__name__)
 
 ICON_SIZE = 96  # Size of the selector win icons
+ICON_SIZE_LRG = (256, 192)  # Size of the larger icon shown in description.
 ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = ICON_SIZE + 51
 
-# The larger error icon used if an image is not found
+# The larger error icons used if an image is not found
 err_icon = img.png('BEE2/error_96', resize_to=ICON_SIZE)
+err_icon_lrg = img.png('BEE2/error_96', resize_to=ICON_SIZE_LRG)
 
 # The two icons used for boolean item attributes
 ICON_CHECK = img.png('icons/check')
@@ -125,7 +127,7 @@ def {l_name}(cls, id: str, desc='', default=None):
 
 SelitemData = namedtuple(
     'SelitemData',
-    'name, short_name, auth, icon, desc, group, sort_key',
+    'name, short_name, auth, icon, large_icon, desc, group, sort_key',
 )
 
 
@@ -207,6 +209,21 @@ class GroupHeader(ttk.Frame):
         )
 
 
+def get_icon(icon, size, err_icon):
+    if icon is None:
+        # Unset.
+        return None
+    elif icon == '<black>':
+        return img.color_square(Vec(), size)
+    else:
+        return img.png(
+            icon,
+            error=err_icon,
+            resize_to=size,
+            algo=img.Image.LANCZOS,
+        )
+
+
 class Item:
     """An item on the panel.
 
@@ -219,6 +236,7 @@ class Item:
       the short or long name, depending on the size of the long name.
     - icon: The image object for the item icon. The icon should be 96x96
       pixels large.
+    - large_icon: If set, a different file to use for the 192x192 icon.
     - ico_file: The file path for the image.
     - desc: A list of tuples, following the richTextBox text format.
     - authors: A list of the item's authors.
@@ -232,6 +250,7 @@ class Item:
         'shortName',
         'longName',
         'icon',
+        'large_icon',
         'desc',
         'authors',
         'group',
@@ -252,6 +271,7 @@ class Item:
             short_name: str,
             long_name: str=None,
             icon=None,
+            large_icon=None,
             authors: list=None,
             desc: Union[tkMarkdown.MarkdownData, str]='',
             group: str=None,
@@ -268,28 +288,18 @@ class Item:
             self.context_lbl = self.shortName
         else:
             self.context_lbl = self.longName
-        if icon is None:
-            self.icon = img.color_square(
-                img.PETI_ITEM_BG,
-                ICON_SIZE,
-            )
-            self.ico_file = None
-        elif icon == '<black>':
-            self.icon = img.color_square(
-                Vec(),
-                ICON_SIZE,
-            )
+
+        if icon is not None:
+            self.icon = get_icon(icon, ICON_SIZE, err_icon)
         else:
-            self.icon = img.png(
-                icon,
-                error=err_icon,
-                resize_to=ICON_SIZE,
-            )
-            self.ico_file = icon
+            self.icon = img.color_square(img.PETI_ITEM_BG, ICON_SIZE)
+        self.large_icon = get_icon(large_icon, ICON_SIZE_LRG, err_icon_lrg)
+
         if isinstance(desc, str):
             self.desc = tkMarkdown.convert(desc)
         else:
             self.desc = desc
+
         self.snd_sample = snd_sample
         self.authors = authors or []
         self.attrs = attributes or {}
@@ -310,6 +320,7 @@ class Item:
             short_name=data.short_name,
             long_name=data.name,
             icon=data.icon,
+            large_icon=data.large_icon,
             authors=data.auth,
             desc=data.desc,
             group=data.group,
@@ -402,12 +413,12 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            'NONE',
-            '',
+            name='NONE',
+            short_name='',
+            icon='BEE2/none_96.png',
             desc=tkMarkdown.convert(none_desc),
             attributes=dict(none_attrs),
         )
-        self.noneItem.icon = img.png('BEE2/none_96')
 
         # The textbox on the parent window.
         self.display = None  # type: tk_tools.ReadOnlyEntry
@@ -542,18 +553,19 @@ class selWin:
         self.prop_frm.columnconfigure(1, weight=1)
 
         # Border around the selected item icon.
+        width, height = img.tuple_size(ICON_SIZE_LRG)
         self.prop_icon_frm = ttk.Frame(
             self.prop_frm,
             borderwidth=4,
             relief='raised',
-            width=ICON_SIZE,
-            height=ICON_SIZE,
+            width=width,
+            height=height,
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(
             self.prop_icon_frm,
-            image=img.PAL_BG_96,
+            image=img.color_square(img.PETI_ITEM_BG, ICON_SIZE_LRG),
         )
         self.prop_icon.grid(row=0, column=0)
 
@@ -992,7 +1004,15 @@ class selWin:
         ).format(
             ', '.join(item.authors)
         )
-        self.prop_icon['image'] = item.icon
+        if item.large_icon is not None:
+            # We have a large icon, use it.
+            self.prop_icon['image'] = item.large_icon
+            width, height = img.tuple_size(ICON_SIZE_LRG)
+        else:
+            # Small icon, shrink the preview.
+            self.prop_icon['image'] = item.icon
+            width, height = img.tuple_size(ICON_SIZE)
+        self.prop_icon_frm.configure(width=width, height=height)
 
         self.prop_desc.set_text(item.desc)
 

@@ -22,6 +22,13 @@ cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[s
 PETI_ITEM_BG = Vec(229, 232, 233)
 
 
+def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
+    """Return an xy tuple given a size or tuple."""
+    if isinstance(size, tuple):
+        return size
+    return size, size
+
+
 def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
@@ -76,7 +83,7 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
         image.load()
 
     if resize_to:
-        image = image.resize((resize_to, resize_to), algo)
+        image = image.resize(tuple_size(resize_to), algo)
 
     tk_img = ImageTk.PhotoImage(image=image)
 
@@ -105,7 +112,7 @@ def color_square(color: Vec, size=16):
     except KeyError:
         img = Image.new(
             mode='RGB',
-            size=(size, size),
+            size=tuple_size(size),
             color=(int(color.x), int(color.y), int(color.z)),
         )
         tk_img = ImageTk.PhotoImage(image=img)
@@ -120,7 +127,7 @@ def invis_square(size):
     except KeyError:
         img = Image.new(
             mode='RGBA',
-            size=(size, size),
+            size=tuple_size(size),
             color=(0, 0, 0, 0),
         )
         tk_img = ImageTk.PhotoImage(image=img)

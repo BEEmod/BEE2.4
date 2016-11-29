@@ -542,10 +542,9 @@ def load_packages(data):
                 data[name],
                 key=operator.attrgetter('selitem_data.name'),
                 ):
-            selitem_data = obj.selitem_data
             sel_list.append(selWinItem.from_data(
                 obj.id,
-                selitem_data,
+                obj.selitem_data,
                 attrs={
                     key: func(obj)
                     for key, func in

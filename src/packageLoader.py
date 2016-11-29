@@ -728,17 +728,17 @@ class Package:
 
 class Style(PakObject):
     def __init__(
-            self,
-            style_id,
-            selitem_data: 'SelitemData',
-            editor,
-            config=None,
-            base_style=None,
-            suggested=None,
-            has_video=True,
-            vpk_name='',
-            corridor_names=EmptyMapping,
-        ):
+        self,
+        style_id,
+        selitem_data: 'SelitemData',
+        editor,
+        config=None,
+        base_style=None,
+        suggested=None,
+        has_video=True,
+        vpk_name='',
+        corridor_names=EmptyMapping,
+    ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
@@ -2368,7 +2368,8 @@ def get_selitem_data(info):
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
     name = info['name']
-    icon = info['icon', '_blank']
+    icon = info['icon', None]
+    large_icon = info['iconlarge', None]
     group = info['group', '']
     sort_key = info['sort_key', '']
     desc = desc_parse(info, id=info['id'])
@@ -2382,6 +2383,7 @@ def get_selitem_data(info):
         short_name,
         auth,
         icon,
+        large_icon,
         desc,
         group,
         sort_key,
@@ -2399,6 +2401,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         our_short_name,
         our_auth,
         our_icon,
+        our_large_icon,
         our_desc,
         our_group,
         our_sort_key,
@@ -2409,6 +2412,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         over_short_name,
         over_auth,
         over_icon,
+        over_large_icon,
         over_desc,
         over_group,
         over_sort_key,
@@ -2418,7 +2422,8 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         our_name if over_name == '???' else over_name,
         our_short_name if over_short_name == '???' else over_short_name,
         our_auth + over_auth,
-        our_icon if over_icon == '_blank' else our_icon,
+        over_icon if over_icon is None else our_icon,
+        over_large_icon if over_large_icon is None else our_large_icon,
         tkMarkdown.join(our_desc, over_desc),
         over_group or our_group,
         over_sort_key or our_sort_key,
