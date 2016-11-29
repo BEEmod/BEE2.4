@@ -639,8 +639,8 @@ def load_packages(data):
         callback=win_callback,
         callback_params=['Music'],
         attributes=[
-            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX'),
-            SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX')),
+            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
+            SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
             SelAttr.bool('TBEAM', _('Excursion Funnel SFX')),
         ],
     )
