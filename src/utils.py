@@ -1,5 +1,6 @@
 # coding=utf-8
 import collections
+import functools
 import logging
 import os.path
 import stat
@@ -221,8 +222,29 @@ elif LINUX:
             frame.bind('<Button-4>', scroll_up, add='+')
             frame.bind('<Button-5>', scroll_down, add='+')
 
+
+def bind_event_handler(bind_func):
+    """Decorator for the bind_click functions.
+
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid, func=None, add='+'):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(deco, bind_func)
+
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -235,6 +257,7 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -246,19 +269,23 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
-    def bind_rightclick(wid, func):
+    @bind_event_handler
+    def bind_rightclick(wid, func, add='+'):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
-        wid.bind(EVENTS['RIGHT'], func)
-        wid.bind(EVENTS['LEFT_CTRL'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
+    @bind_event_handler
     def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
