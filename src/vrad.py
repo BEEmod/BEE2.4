@@ -101,13 +101,13 @@ MUSIC_BASE = """\
 \t\t{
 \t\t"import_stack" "update_music_stereo"
 \t\t"volume_fade_in"
-\t\t\t{{
+\t\t\t{
 \t\t\t"input_max" "0.5"
-\t\t\t}}
+\t\t\t}
 \t\t"volume_fade_out"
-\t\t\t{{
+\t\t\t{
 \t\t\t"input_max" "1.5"
-\t\t\t}}
+\t\t\t}
 """
 
 # We need to stop the sub-tracks after the main track stops...
