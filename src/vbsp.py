@@ -3231,7 +3231,7 @@ def make_packlist(map_path):
     LOGGER.info('Packlist written!')
 
 
-def make_vrad_config(is_hammer: bool):
+def make_vrad_config(is_peti: bool):
     """Generate a config file for VRAD from our configs.
 
     This way VRAD doesn't need to parse through vbsp_config, or anything else.
@@ -3239,45 +3239,46 @@ def make_vrad_config(is_hammer: bool):
     LOGGER.info('Generating VRAD config...')
     conf = Property('Config', [
     ])
-    conf['is_peti'] = srctools.bool_as_int(not is_hammer)
+    conf['is_peti'] = srctools.bool_as_int(is_peti)
 
-    conf['force_full'] = srctools.bool_as_int(
-        BEE2_config.get_bool('General', 'vrad_force_full')
-    )
-    conf['screenshot'] = BEE2_config.get_val(
-        'Screenshot', 'loc', ''
-    )
-    conf['screenshot_type'] = BEE2_config.get_val(
-        'Screenshot', 'type', 'PETI'
-    ).upper()
-    conf['clean_screenshots'] = srctools.bool_as_int(
-        BEE2_config.get_bool('Screenshot', 'del_old')
-    )
-    conf['is_preview'] = srctools.bool_as_int(
-        IS_PREVIEW
-    )
-    conf['game_id'] = vbsp_options.get(str, 'game_id')
+    if is_peti:
+        conf['force_full'] = srctools.bool_as_int(
+            BEE2_config.get_bool('General', 'vrad_force_full')
+        )
+        conf['screenshot'] = BEE2_config.get_val(
+            'Screenshot', 'loc', ''
+        )
+        conf['screenshot_type'] = BEE2_config.get_val(
+            'Screenshot', 'type', 'PETI'
+        ).upper()
+        conf['clean_screenshots'] = srctools.bool_as_int(
+            BEE2_config.get_bool('Screenshot', 'del_old')
+        )
+        conf['is_preview'] = srctools.bool_as_int(
+            IS_PREVIEW
+        )
+        conf['game_id'] = vbsp_options.get(str, 'game_id')
 
-    if BEE2_config.get_bool('General', 'packfile_dump_enable'):
-        conf['packfile_dump'] = BEE2_config.get_val(
-            'General',
-            'packfile_dump_dir',
-            ''
+        if BEE2_config.get_bool('General', 'packfile_dump_enable'):
+            conf['packfile_dump'] = BEE2_config.get_val(
+                'General',
+                'packfile_dump_dir',
+                ''
+            )
+
+        # Copy over the voice attributes
+        conf['VoiceAttr'] = ';'.join(
+            key
+            for key, value in
+            settings['has_attr'].items()
+            if value
         )
 
-    # Copy over the voice attributes
-    conf['VoiceAttr'] = ';'.join(
-        key
-        for key, value in
-        settings['has_attr'].items()
-        if value
-    )
-
-    # Copy over music soundscript data so VRAD can generate it..
-    if settings['music_conf']:
-        # It's a list of prop objects, so it'll become a proper
-        # block when written.
-        conf['MusicScript'] = settings['music_conf']
+        # Copy over music soundscript data so VRAD can generate it..
+        if settings['music_conf']:
+            # It's a list of prop objects, so it'll become a proper
+            # block when written.
+            conf['MusicScript'] = settings['music_conf']
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():
@@ -3644,8 +3645,7 @@ def main():
 
     # We always need to do this - VRAD can't easily determine if the map is
     # a Hammer one.
-    make_vrad_config(is_hammer)
-
+    make_vrad_config(is_peti=not is_hammer)
     LOGGER.info("BEE2 VBSP hook finished!")
 
 
