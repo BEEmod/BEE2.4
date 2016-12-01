@@ -3,6 +3,10 @@ from conditions import make_result_setup, make_result, RES_EXHAUSTED
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, Solid
 
+import utils
+
+LOGGER = utils.getLogger(__name__)
+
 BREAKABLE_GLASS_CONF = {}
 
 
@@ -46,6 +50,27 @@ def res_breakable_glass(inst: Entity, res: Property):
             assert group_conf is conf, '"{}" has multiple configs!'.format(targ)
         inst['classname'] = 'info_null'
 
-    print('Glass: ', BREAKABLE_GLASS_CONF, glass_items)
+    for targ, (bbox_min, bbox_max, norm, conf) in glass_items.items():
+        LOGGER.info('Making glass "{}"', targ)
+        norm_axis = norm.axis()
+        uaxis, vaxis = Vec.INV_AXIS[norm_axis]
+        solid_min = bbox_min.copy()
+        solid_max = bbox_max.copy()
+        solid_min[uaxis] -= 64
+        solid_min[vaxis] -= 64
+        solid_max[uaxis] += 64
+        solid_max[vaxis] += 64
+
+        # This doesn't choose min/max correctly, but that's fine.
+        solid_min -= 1 * norm
+        solid_max -= 0.5 * norm
+
+        solid = vmf.make_prism(
+            solid_min, solid_max
+        )
+        breakable_surf = vmf.create_ent(
+            classname='func_breakable_surf',
+            origin=bbox_min,
+        )
 
     return RES_EXHAUSTED
