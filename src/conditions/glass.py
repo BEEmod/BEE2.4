@@ -4,6 +4,7 @@ from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
 import utils
+import comp_consts as const
 
 from typing import Iterator, Any, Tuple, Dict, List
 
@@ -245,7 +246,7 @@ def res_breakable_glass(inst: Entity, res: Property):
             targetname=targ + '-surf',
             spawnflags=3,  # 'Physics damage decals, and take damage from held
             drawinfastreflection=1,
-            propdata=24,  # Glass.Window
+            # propdata=24,  # Glass.Window
             health=20,
             performancemode=2,  # Full gibs on all platforms
             surfacetype=0,  # Glass
@@ -254,44 +255,33 @@ def res_breakable_glass(inst: Entity, res: Property):
             error=0,  # Our corners are fine..
         )
         breakable_surf.solids.append(surf_solid)
+        solid_min += norm
+        solid_max -= norm
 
-        # A func_breakable, for collisions and proper behaviour with
-        # various p2 things.
+        # func_breakable_surf allows several P2 things to pass through.
+        # Place a thin func_brush inside the surf to block collisions.
+        # Since it's inside, the breakable will recieve physics impacts to
+        # destroy it.
         clip_min = bbox_min.copy()
         clip_max = bbox_max.copy()
         clip_min[uaxis] -= 64
         clip_min[vaxis] -= 64
         clip_max[uaxis] += 64
         clip_max[vaxis] += 64
-        clip_max[norm_axis] += norm[norm_axis] * conf['thickness']
-        breakable_solid = vmf.make_prism(
-            clip_min,
-            clip_max,
-            mat='tools/toolsnodraw',
-        ).solid
-        breakable = vmf.create_ent(
-            classname='func_breakable',
-            targetname=targ + '-breakable',
-            origin=solid_min,
-            rendermode=10,
-            spawnflags=2052,
-            propdata=24,  # Glass.Window
-            health=1,
-            material=0,  # Glass
-            performancemode=1,  # No gibs
+        clip_min += (conf['offset'] + 0.3) * norm
+        clip_max += (conf['offset'] + 0.6) * norm
 
-            disablereceiveshadows=1,
-            disableshadowdepth=1,
-            disableshadows=1,
-            disableflashlight=1,
+        clip = vmf.create_ent(classname='func_brush', origin=bbox_min, spawnflags=0, targetname=targ + '-clip')
+        clip.solids.append(
+            vmf.make_prism(
+                clip_min,
+                clip_max,
+                mat=const.Tools.NODRAW,
+            ).solid
         )
-        breakable.solids.append(breakable_solid)
 
-        breakable.add_out(
-            Output('OnBreak', targ + '-surf', 'Shatter', param='0.5 0.5 0', only_once=True),
-        )
         breakable_surf.add_out(
-            Output('OnBreak', targ + '-breakable', 'Kill', only_once=True),
+            Output('OnBreak', targ + '-clip', 'Kill', only_once=True),
         )
 
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner
