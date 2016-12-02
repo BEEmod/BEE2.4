@@ -1,7 +1,7 @@
 """Adds breakable glass."""
 from conditions import make_result_setup, make_result, RES_EXHAUSTED
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, Vec, Entity, Solid, Side, VMF
+from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
 import utils
 
@@ -52,8 +52,14 @@ CORNER_POINTS = {
     ]
 }  # type: Dict[Tuple[float, float, float], List[Tuple[Any, Any, Any]]]
 
-def glass_item_setup(conf, item_id, config_dict):
+
+def glass_item_setup(conf: dict, item_id, config_dict):
     [base_inst] = resolve_inst('<{}:0>'.format(item_id))
+
+    conf.update({
+        'frame_' + name: resolve_inst('<{}:bee2_frame_{}>'.format(item_id, name))[0]
+        for name in ['edge', 'single', 'ubend', 'corner']
+    })
     config_dict[base_inst.casefold()] = conf
 
 
@@ -66,8 +72,8 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         except KeyError:
             continue
         targ = inst['targetname']
-        norm = Vec(x=-1).rotate_by_str(inst['angles'])
-        origin = Vec.from_str(inst['origin']) + 64 * norm
+        norm = Vec(x=1).rotate_by_str(inst['angles'])
+        origin = Vec.from_str(inst['origin']) - 64 * norm
         try:
             bbox_min, bbox_max, group_norm, group_conf = glass_items[targ]
         except KeyError:
@@ -86,18 +92,112 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         yield targ, bbox_min, bbox_max, norm, conf
 
 
+def make_frames(vmf: VMF, targ: str, conf: dict, bbox_min: Vec, bbox_max: Vec, norm: Vec):
+    """Generate frames for a rectangular glass item."""
+    def make_frame(frame_type, loc, angles):
+        """Make a frame instance."""
+        vmf.create_ent(
+            classname='func_instance',
+            targetname=targ,
+            file=conf['frame_' + frame_type],
+            # Position at the center of the block, instead of at the glass.
+            origin=loc - norm * 64,
+            angles=angles,
+        )
+
+    if bbox_min == bbox_max:
+        # 1x1 glass..
+        make_frame('single', bbox_min, norm.to_angle())
+        return
+
+    norm_axis = norm.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+
+    u_norm = Vec()
+    v_norm = Vec()
+    u_norm[u_axis] = 1
+    v_norm[v_axis] = 1
+
+    single_u = bbox_min[u_axis] == bbox_max[u_axis]
+    single_v = bbox_min[v_axis] == bbox_max[v_axis]
+
+    # If single in either direction, it needs a u-bend.
+    if single_u:
+        ubend_axis = v_axis
+    elif single_v:
+        ubend_axis = u_axis
+    else:
+        ubend_axis = None
+    if ubend_axis is not None:
+        for bend_mag, bbox in [(1, bbox_min), (-1, bbox_max)]:
+            make_frame(
+                'ubend',
+                bbox,
+                norm.to_angle_roll(Vec.with_axes(ubend_axis, bend_mag)),
+            )
+    else:
+        # Make 4 corners.
+        make_frame(
+            'corner',
+            bbox_min,
+            norm.to_angle_roll(Vec.with_axes(v_axis, 1)),
+        )
+        make_frame(
+            'corner',
+            bbox_max,
+            norm.to_angle_roll(Vec.with_axes(v_axis, -1)),
+        )
+        make_frame(
+            'corner',
+            Vec.with_axes(u_axis, bbox_min, v_axis, bbox_max, norm_axis, bbox_min),
+            norm.to_angle_roll(Vec.with_axes(u_axis, 1)),
+        )
+        make_frame(
+            'corner',
+            Vec.with_axes(u_axis, bbox_max, v_axis, bbox_min, norm_axis, bbox_min),
+            norm.to_angle_roll(Vec.with_axes(u_axis, -1)),
+        )
+
+    # Make straight sections.
+    straight_u_pos = norm.to_angle_roll(v_norm)
+    straight_u_neg = norm.to_angle_roll(-v_norm)
+    straight_v_pos = norm.to_angle_roll(u_norm)
+    straight_v_neg = norm.to_angle_roll(-u_norm)
+    for u_pos in range(int(bbox_min[u_axis] + 128), int(bbox_max[u_axis]), 128):
+        make_frame(
+            'edge',
+            Vec.with_axes(u_axis, u_pos, v_axis, bbox_min, norm_axis, bbox_min),
+            straight_u_pos,
+        )
+        make_frame(
+            'edge',
+            Vec.with_axes(u_axis, u_pos, v_axis, bbox_max, norm_axis, bbox_min),
+            straight_u_neg,
+        )
+    for v_pos in range(int(bbox_min[v_axis] + 128), int(bbox_max[v_axis]), 128):
+        make_frame(
+            'edge',
+            Vec.with_axes(v_axis, v_pos, u_axis, bbox_min, norm_axis, bbox_min),
+            straight_v_pos,
+        )
+        make_frame(
+            'edge',
+            Vec.with_axes(v_axis, v_pos, u_axis, bbox_max, norm_axis, bbox_min),
+            straight_v_neg,
+        )
+
+
 
 @make_result_setup('BreakableGlass')
 def res_breakable_glass_setup(res: Property):
     item_id = res['item']
     conf = {
-        name: resolve_inst('<{}:bee2_frame_{}>'.format(item_id, name))[0]
-        for name in ['edge', 'single', 'ubend', 'corner', 'double']
-    }
-    conf['material'] = res['material']
-    conf['offset'] = abs(res.float('offset', 0.5))
-    # Distance inward from the frames the glass should span.
-    conf['border_size'] = abs(res.float('border_size', 0))
+        'material': res['material'],
+        'offset': res.float('offset', 0.5),
+        # Distance inward from the frames the glass should span.
+        'border_size': res.float('border_size', 0),
+        'thickness': res.float('thickness', 4),
+        }
 
     glass_item_setup(conf, item_id, BREAKABLE_GLASS_CONF)
 
@@ -106,6 +206,15 @@ def res_breakable_glass_setup(res: Property):
 
 @make_result('BreakableGlass')
 def res_breakable_glass(inst: Entity, res: Property):
+    """Adds breakable glass to the map.
+
+    Paramters:
+        * thickness: Thickness of the collision brushes.
+        * offset: Distance into the block to place the surface.
+        * border_size: Distance on borders to inset by (so the shatter effects
+          appear.)
+        * material: Name of the func_breakable_surf material.
+    """
     vmf = inst.map
 
     glass_items = find_glass_items(BREAKABLE_GLASS_CONF, vmf)
@@ -123,28 +232,67 @@ def res_breakable_glass(inst: Entity, res: Property):
         solid_max[vaxis] += uv_off
 
         # This doesn't choose min/max correctly, but that's fine.
-        solid_min -= 1 * norm
-        solid_max -= 0.5 * norm
+        solid_min += conf['offset'] * norm
+        solid_max += (conf['offset'] + 1) * norm
 
-        solid = vmf.make_prism(  # type: Solid
-            solid_min, solid_max,
-        ).solid
-        for face in solid:  # type: Side
+        surf_solid = vmf.make_prism(solid_min, solid_max).solid
+        for face in surf_solid:  # type: Side
             if face.normal() == norm:
                 face.mat = conf['material']
 
         breakable_surf = vmf.create_ent(
             classname='func_breakable_surf',
-            targetname=targ,
+            targetname=targ + '-surf',
             spawnflags=3,  # 'Physics damage decals, and take damage from held
             drawinfastreflection=1,
             propdata=24,  # Glass.Window
+            health=20,
             performancemode=2,  # Full gibs on all platforms
             surfacetype=0,  # Glass
-            fragility=100,  # Amount of damage  shattered fragments can take.
-            health=1,
+            fragility=30,  # Lower fragility, so less shatters with collisions.
+
+            error=0,  # Our corners are fine..
         )
-        breakable_surf.solids = [solid]
+        breakable_surf.solids.append(surf_solid)
+
+        # A func_breakable, for collisions and proper behaviour with
+        # various p2 things.
+        clip_min = bbox_min.copy()
+        clip_max = bbox_max.copy()
+        clip_min[uaxis] -= 64
+        clip_min[vaxis] -= 64
+        clip_max[uaxis] += 64
+        clip_max[vaxis] += 64
+        clip_max[norm_axis] += norm[norm_axis] * conf['thickness']
+        breakable_solid = vmf.make_prism(
+            clip_min,
+            clip_max,
+            mat='tools/toolsnodraw',
+        ).solid
+        breakable = vmf.create_ent(
+            classname='func_breakable',
+            targetname=targ + '-breakable',
+            origin=solid_min,
+            rendermode=10,
+            spawnflags=2052,
+            propdata=24,  # Glass.Window
+            health=1,
+            material=0,  # Glass
+            performancemode=1,  # No gibs
+
+            disablereceiveshadows=1,
+            disableshadowdepth=1,
+            disableshadows=1,
+            disableflashlight=1,
+        )
+        breakable.solids.append(breakable_solid)
+
+        breakable.add_out(
+            Output('OnBreak', targ + '-surf', 'Shatter', param='0.5 0.5 0', only_once=True),
+        )
+        breakable_surf.add_out(
+            Output('OnBreak', targ + '-breakable', 'Kill', only_once=True),
+        )
 
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner
         # locations.
@@ -159,5 +307,7 @@ def res_breakable_glass(inst: Entity, res: Property):
                 elif axis_type is min:
                     corner[axis] = solid_min[axis]
             breakable_surf[name] = corner
+
+        make_frames(vmf, targ, conf, bbox_min, bbox_max, -norm)
 
     return RES_EXHAUSTED
