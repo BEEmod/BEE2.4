@@ -72,6 +72,8 @@ class NAV_KEYS(Enum):
     HOME = 'Home'
     END = 'End'
 
+    ENTER = 'Return'
+
     # Space plays the current item.
     PLAY_SOUND = 'space'
 
@@ -740,14 +742,17 @@ class selWin:
             )
 
             item.win = self.win
-            utils.bind_leftclick(
-                item.button,
-                functools.partial(self.sel_item, item),
-            )
-            utils.bind_leftclick_double(
-                item.button,
-                self.save,
-            )
+
+            @utils.bind_leftclick(item.button)
+            def click_item(event=None):
+                """Handle clicking on the item.
+
+                If it's already selected, save and close the window.
+                """
+                if item is self.selected:
+                    self.save()
+                else:
+                    self.sel_item(item)
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
@@ -1087,6 +1092,9 @@ class selWin:
         if key is NAV_KEYS.PLAY_SOUND:
             if self.sampler is not None:
                 self.sampler.play_sample()
+            return
+        elif key is NAV_KEYS.ENTER:
+            self.save()
             return
 
         # A list of groups names, in the order that they're visible onscreen
