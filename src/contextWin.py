@@ -232,28 +232,11 @@ def load_item_data():
     else:
         wid['changedefaults'].state(['disabled'])
 
-    if selected_item.is_wip and selected_item.is_dep:
-        wid['wip_dep']['text'] = _('WIP, Deprecated Item!')
-    elif selected_item.is_wip:
-        wid['wip_dep']['text'] = _('WIP Item!')
-    elif selected_item.is_dep:
-        wid['wip_dep']['text'] = _('Deprecated Item!')
-    else:
-        wid['wip_dep']['text'] = ''
-
     version_lookup, version_names = selected_item.get_version_names()
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         wid['variant'].state(['disabled'])
-        # We want to display WIP / Dep tags still, so users know.
-        if selected_item.is_wip and selected_item.is_dep:
-            wid['variant']['values'] = [_('[WIP] [DEP] No Alts!')]
-        elif selected_item.is_wip:
-            wid['variant']['values'] = [_('[WIP] No Alt Versions!')]
-        elif selected_item.is_dep:
-            wid['variant']['values'] = [_('[DEP] No Alt Versions!')]
-        else:
-            wid['variant']['values'] = [_('No Alternate Versions!')]
+        wid['variant']['values'] = [_('No Alternate Versions!')]
         wid['variant'].current(0)
     else:
         wid['variant'].state(['!disabled'])
@@ -469,9 +452,6 @@ def init_widgets():
             wid['subitem', i],
             functools.partial(sub_open, i),
         )
-
-    wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
-    wid['wip_dep'].grid(row=4, column=0, sticky="NW")
 
     ttk.Label(f, text=_("Description:"), anchor="sw").grid(
         row=4,

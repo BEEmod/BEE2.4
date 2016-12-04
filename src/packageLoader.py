@@ -925,8 +925,6 @@ class Item(PakObject):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_wip': srctools.conv_bool(ver['wip', '0']),
-                'is_dep':  srctools.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,
                 }

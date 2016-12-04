@@ -86,8 +86,6 @@ class Item:
         'pak_id',
         'pak_name',
         'names',
-        'is_dep',
-        'is_wip',
         'url',
         'can_group',
         ]
@@ -142,8 +140,6 @@ class Item:
             self.data['editor'].find_all("Editor", "Subtype")
             if prop['Palette', None] is not None
         ]
-        self.is_dep = version['is_dep']
-        self.is_wip = version['is_wip']
         self.url = self.data['url']
 
         # This checks to see if all the data is present to enable
@@ -270,33 +266,28 @@ class Item:
 
     def get_version_names(self):
         """Get a list of the names and corresponding IDs for the item."""
-        vers = []
-        for ver_id in self.ver_list:
-            ver = self.item.versions[ver_id]
-            name = ver['name']
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.item.versions[ver_id]['styles'][selected_style])
+            for ver_id in self.ver_list
+        }
+        versions = self.ver_list
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = self.ver_list[:1]
 
-            if ver['is_dep']:
-                name = '[DEP] ' + name
-
-            if ver['is_wip']:
-                # We always display the currently selected version, so
-                # it's possible to deselect it.
-                if ver_id != self.selected_ver and not optionWindow.SHOW_WIP.get():
-                    continue
-                name = '[WIP] ' + name
-            vers.append(name)
-        return self.ver_list, vers
+        return versions, [
+            self.item.versions[ver_id]['name']
+            for ver_id in versions
+        ]
 
 
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item, sub, is_pre):
         """Create a label to show an item onscreen."""
-        super().__init__(
-            frame,
-            font=("Courier", 24, "bold"),
-            foreground='red',
-            )
+        super().__init__(frame)
         self.item = item
         self.subKey = sub
         self.id = item.id
@@ -391,13 +382,6 @@ class PalItem(Label):
             )
             self.name = '??'
         self['image'] = self.img
-        # Put a large D over the item if it's deprecated.
-        if self.item.is_dep:
-            self['text'] = 'OLD'
-            self['compound'] = 'center'
-        else:
-            self['compound'] = 'none'
-            self['text'] = None
 
     def clear(self):
         """Remove any items matching ourselves from the palette.
