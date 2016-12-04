@@ -27,9 +27,9 @@ MATS = defaultdict(list)
 # We want to force tiles with these overlay materials to appear!
 FORCE_TILE_MATS = {
     mat
-    for mat, key in
+    for mat, (group, name) in
     vbsp.TEX_VALVE.items()
-    if key.startswith('overlay.')
+    if group == 'overlay'
 }
 
 FORCE_LOCATIONS = set()
