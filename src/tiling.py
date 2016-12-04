@@ -447,24 +447,26 @@ class TileDef:
         # Multiple tile types in the block - figure out the tile patterns to use.
         patterns = list(self.calc_patterns(orient == 'wall'))
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
+            # We bevel only the grid-edge tiles.
+            bevels = [a and b for a, b in zip(bevels, [
+                umin == 0, umax == 3, vmin == 0, vmax == 3
+            ])]
+            tile_center = self.uv_offset(
+                (umin + umax) / 8 - 0.5,
+                (vmin + vmax) / 8 - 0.5,
+                0.5,
+            )
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
                 tex = get_tile_tex(tile_type.color, orient, grid_size, front_pos)
                 brush, face = make_tile(
                     vmf,
-                    self.uv_offset(
-                        (umin + umax) / 8 - 0.5,
-                        (vmin + vmax) / 8 - 0.5,
-                        0.5,
-                    ),
+                    tile_center,
                     self.normal,
                     top_surf=tex,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
-                    # We bevel only the grid-edge tiles.
-                    bevels=[a and b for a, b in zip(bevels, [
-                        umin == 0, umax == 3, vmin == 0, vmax == 3
-                    ])],
+                    bevels=bevels,
                     back_surf=texturing.special.rand('behind'),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
@@ -474,19 +476,26 @@ class TileDef:
             elif tile_type is TileType.NODRAW:
                 brush, face = make_tile(
                     vmf,
-                    self.uv_offset(
-                        (umin + umax) / 8 - 0.5,
-                        (vmin + vmax) / 8 - 0.5,
-                        0.5,
-                    ),
+                    tile_center,
                     self.normal,
                     top_surf=consts.Tools.NODRAW,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
-                    # We bevel only the grid-edge tiles.
-                    bevels=[a and b for a, b in zip(bevels, [
-                        umin == 0, umax == 3, vmin == 0, vmax == 3
-                    ])],
+                    bevels=bevels,
+                    back_surf=texturing.special.rand('behind'),
+                )
+                self.brush_faces.append(face)
+                yield brush
+            elif tile_type is TileType.LIGHT_STRIP_CLEAN:
+                brush, face = make_tile(
+                    vmf,
+                    tile_center,
+                    self.normal,
+                    top_surf=consts.Tools.NODRAW,
+                    recess_dist=0,  # TODO: Should be 3, but leaks.
+                    width=(umax - umin) * 32,
+                    height=(vmax - vmin) * 32,
+                    bevels=bevels,
                     back_surf=texturing.special.rand('behind'),
                 )
                 self.brush_faces.append(face)
@@ -551,7 +560,7 @@ def make_tile(
     back_side = template['back'].copy(map=vmf)  # type: Side
     back_side.mat = back_surf
     back_side.translate(origin - thickness * normal)
-
+    back_side.offset = 0 # Todo: calc offset and scale to fit bevels.
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
