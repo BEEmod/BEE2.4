@@ -161,7 +161,7 @@ class TileGroup(TextureGroup):
         # Remove the prop to ensure it's not parsed as a texture
         if 'options' in props:
             del props['options']
-        self.merge_tiles = config.bool('merge')
+        self.merge_tiles = config.bool('merge', True)
         self.use_clump = config.bool('clump')
 
         super().read_from_props(props)
