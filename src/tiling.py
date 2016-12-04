@@ -4,7 +4,7 @@ It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
 from enum import Enum
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
@@ -292,7 +292,7 @@ class TileDef:
         self.brush_faces = []
         self.override_tex = override_tex
         self.base_type = base_type
-        self.sub_tiles = subtiles
+        self.sub_tiles = subtiles  # type: Optional[Dict[Tuple[int, int], TileType]]
         self.is_bullseye = is_bullseye
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent

@@ -1,4 +1,3 @@
-import texturing
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -24,6 +23,7 @@ import brushLoc
 import bottomlessPit
 import conditions
 import tiling
+import texturing
 import comp_consts as consts
 
 from typing import (
@@ -49,27 +49,27 @@ settings = {
 TEX_VALVE = {
     # all the non-wall textures produced by the Puzzlemaker, and their
     # replacement keys:
-    consts.Signage.EXIT: "overlay.exit",
-    consts.Signage.ARROW: "overlay.arrow",
-    consts.Signage.SHAPE_DOT: "overlay.dot",
-    consts.Signage.SHAPE_MOON: "overlay.moon",
-    consts.Signage.SHAPE_TRIANGLE: "overlay.triangle",
-    consts.Signage.SHAPE_CROSS: "overlay.cross",
-    consts.Signage.SHAPE_SQUARE: "overlay.square",
-    consts.Signage.SHAPE_CIRCLE: "overlay.circle",
-    consts.Signage.SHAPE_SINE: "overlay.sine",
-    consts.Signage.SHAPE_SLASH: "overlay.slash",
-    consts.Signage.SHAPE_STAR: "overlay.star",
-    consts.Signage.SHAPE_WAVY: "overlay.wavy",
-    consts.Special.BACKPANELS_CHEAP: "special.behind",
-    consts.Special.PED_SIDE: "special.pedestalside",
-    consts.Special.SQUAREBEAMS: "special.edge",
-    consts.Goo.REFLECTIVE: "special.goo",
-    consts.Goo.CHEAP: "special.goo_cheap",
-    consts.Special.GLASS: "special.glass",
-    consts.Special.GRATING: "special.grating",
-    consts.Special.LASERFIELD: "special.laserfield",
-    "sky_black": "special.sky",
+    consts.Signage.EXIT: ('overlay', 'exit'),
+    consts.Signage.ARROW: ('overlay', 'arrow'),
+    consts.Signage.SHAPE_DOT: ('overlay', 'dot'),
+    consts.Signage.SHAPE_MOON: ('overlay', 'moon'),
+    consts.Signage.SHAPE_TRIANGLE: ('overlay', 'triangle'),
+    consts.Signage.SHAPE_CROSS: ('overlay', 'cross'),
+    consts.Signage.SHAPE_SQUARE: ('overlay', 'square'),
+    consts.Signage.SHAPE_CIRCLE: ('overlay', 'circle'),
+    consts.Signage.SHAPE_SINE: ('overlay', 'sine'),
+    consts.Signage.SHAPE_SLASH: ('overlay', 'slash'),
+    consts.Signage.SHAPE_STAR: ('overlay', 'star'),
+    consts.Signage.SHAPE_WAVY: ('overlay', 'wavy'),
+    consts.Special.BACKPANELS_CHEAP: ('special', 'behind'),
+    consts.Special.PED_SIDE: ('special', 'pedestalside'),
+    consts.Special.SQUAREBEAMS: ('special', 'edge'),
+    consts.Goo.REFLECTIVE: ('special', 'goo'),
+    consts.Goo.CHEAP: ('special', 'goo_cheap'),
+    consts.Special.GLASS: ('special', 'glass'),
+    consts.Special.GRATING: ('special', 'grating'),
+    consts.Special.LASERFIELD: ('special', 'laserfield'),
+    "sky_black": ('special', 'sky'),
 }
 
 
@@ -243,7 +243,8 @@ def alter_mat(face, seed=None, texture_lock=True):
         random.seed(seed)
 
     if mat in TEX_VALVE:  # should we convert it?
-        face.mat = get_tex(TEX_VALVE[mat])
+        group, name = TEX_VALVE[mat]
+        face.mat = texturing.GROUPS[group].rand(name)
         return True
     elif mat in consts.BlackPan or mat in consts.WhitePan:
         orient = get_face_orient(face)
@@ -254,7 +255,7 @@ def alter_mat(face, seed=None, texture_lock=True):
 
         return True
     elif mat in TEX_FIZZLER:
-        face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
+        face.mat = texturing.fizzler.rand(TEX_FIZZLER[mat])
     else:
         return False
 
@@ -2478,10 +2479,10 @@ def change_overlays():
     sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size =  vbsp_options.get(int, 'signSize') / 2
+    sign_size = vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack =  vbsp_options.get(str, 'signPack')
+    sign_inst_pack = vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
@@ -2520,7 +2521,7 @@ def change_overlays():
         case_mat = over['material'].casefold()
 
         if case_mat in consts.Signage:
-            sign_type = TEX_VALVE[case_mat]
+            sign_type = TEX_VALVE[case_mat][1]
             if sign_inst is not None:
                 new_inst = VMF.create_ent(
                     classname='func_instance',
@@ -2530,13 +2531,13 @@ def change_overlays():
                 )
                 if sign_inst_pack:
                     TO_PACK.add(sign_inst_pack.casefold())
-                new_inst.fixup['mat'] = sign_type.replace('overlay.', '')
+                new_inst.fixup['mat'] = sign_type
             # Delete the overlay's targetname - signs aren't ever dynamic
             # This also means items set to signage only won't get toggle
             # instances.
             del over['targetname']
 
-            over['material'] = get_tex(sign_type)
+            over['material'] = texturing.overlay.rand(sign_type)
             if sign_size != 16:
                 # Resize the signage overlays
                 # These are the 4 vertex locations
@@ -2696,6 +2697,7 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     LOGGER.info("Editing Brush Entities...")
+    return
     grating_clip_mat = vbsp_options.get(str, "grating_clip")
     grating_scale = vbsp_options.get(float, "grating_scale")
 
