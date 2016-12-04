@@ -163,7 +163,12 @@ TILE_SIZES = {
 
 class Pattern:
     """Represents a position a tile can be positioned in."""
-    def __init__(self, tex: TileSize, *tiles: Tuple[int, int, int, int], wall_only=False):
+    def __init__(
+        self,
+        tex: TileSize,
+        *tiles: Tuple[Tuple[int, int, int, int], ...],
+        wall_only=False
+    ):
         self.tex = tex
         self.wall_only = wall_only
         self.tiles = tiles
@@ -199,7 +204,8 @@ PATTERNS = {
         Pattern(TileSize.TILE_1x1, (0, 0, 4, 4)),
         Pattern(TileSize.TILE_2x1,
             (0, 0, 4, 4),  # Combined
-            (0, 0, 2, 4), (1, 0, 3, 4), (2, 0, 4, 4),  # L/M/R
+            (0, 0, 2, 4), (2, 0, 4, 4),  # L/R
+            (1, 0, 3, 4),  # Middle - only if no left or right.
             wall_only=True,
         ),
         Pattern(TileSize.TILE_2x2,
