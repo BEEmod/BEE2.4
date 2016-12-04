@@ -192,6 +192,8 @@ def res_set_texture(inst, res):
     These are composed of a group and texture, separated by '.'. 'white.wall'
     are the white wall textures; 'special.goo' is the goo texture.
     """
+    # TODO: reimplement & replace
+    return
     import vbsp
     pos = Vec.from_str(res['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
@@ -622,30 +624,14 @@ def res_hollow_brush(inst, res):
 def res_set_tile(inst, res: Property):
     """Set 4x4 parts of a tile to the given values."""
     origin = Vec.from_str(inst['origin'])
+    angles = Vec.from_str(inst['angles'])
 
-    tile_pos = (res.vec('offset') * 128 - (0, 0, 128)).rotate_by_str(inst['angles'])
-    tile_pos += origin
-    grid_pos = tiling.round_grid(tile_pos)
+    offset = (res.vec('offset', -48, 48) - (0, 0, 64)).rotate(*angles)
+    offset += origin
 
-    norm = Vec(0, 0, 1).rotate_by_str(inst['angles'])
+    norm = Vec(0, 0, 1).rotate(*angles)
     norm_axis = norm.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-    try:
-        tile = tiling.TILES[grid_pos.as_tuple(), norm.as_tuple()]
-    except KeyError:
-        LOGGER.warning('Expected tile, but none found: {}, {}', grid_pos, norm)
-        return
-
-    subtiles = tile.get_subtiles()
-
-    # Figure out the rotation needed to match the instance.
-    # First rotate two normals to find the world u and v directions.
-    # We swap to make it upright in configs.
-    norm_u = Vec(y=1).rotate_by_str(inst['angles'])
-    norm_v = Vec(x=1).rotate_by_str(inst['angles'])
-    inv_u = norm_u != abs(norm_u)
-    inv_v = norm_v != abs(norm_v)
-    swap_uv = norm_u.axis() != u_axis
 
     force_tile = res.bool('force')
 
@@ -653,61 +639,30 @@ def res_set_tile(inst, res: Property):
         row.value.strip()
         for row in res.find_all('tile')
     ]
-    col_width = max(len(row) for row in tiles)
-    if len(tiles) > 4:
-        raise ValueError('Too many rows for tiles data!')
-
-    # Handle light strip or fizzler items, which are offset in local-x.
-    if res.bool('adjustPos'):
-        x_axis = norm_v.axis()
-        x_off = (origin[x_axis] - grid_pos[x_axis] - 16 + 64) / 32
-        if x_off == 91.5:
-            # Center-fizzler. The column must be 1-wide.
-            if col_width != 1:
-                raise ValueError('Tiles data must be 1-wide for HANDLE_5_DIRECTION!')
-
-            # By default skip these spaces.
-            if not res.bool('centerStretch', True):
-                return
-            col_width = 2
-            x_off = 1
-            tiles = [row + row for row in tiles]
-
-        assert x_off == int(x_off), x_off
-        assert x_off > 0
-        assert x_off + col_width <= 4
-        x_off = int(x_off)
-
-        if inv_v if swap_uv else inv_u:
-            x_off = 3 - x_off
-    else:
-        x_off = 0
-
-    LOGGER.info((tiles, x_off, (origin - grid_pos).dot(norm_v), origin))
-
-    if col_width > 4:
-        raise ValueError('Too many columns in tiles data!')
-
-    LOGGER.info((tiles, x_off, (origin - grid_pos).dot(norm_v), origin))
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
             if val == '_':
                 continue
 
-            u, v = (y, x) if swap_uv else (x, y)
+            pos = Vec(32 * x, -32 * y, 0).rotate(*angles) + offset
 
-            if inv_u:
-                u = 3 - u
-            if inv_v:
-                v = 3 - v
+            grid_pos = tiling.round_grid(pos - norm)
 
-            LOGGER.info('{}: {}, {} + {}', swap_uv, u, v, x_off)
+            uv_pos = (pos - grid_pos + 64 - 16)
+            u = uv_pos[u_axis] // 32 % 4
+            v = uv_pos[v_axis] // 32 % 4
 
-            if swap_uv:
-                v += x_off
-            else:
-                u += x_off
+            if u != round(u) or v != round(v):
+                continue
+
+            try:
+                tile = tiling.TILES[grid_pos.as_tuple(), norm.as_tuple()]
+            except KeyError:
+                LOGGER.warning('Expected tile, but none found: {}, {}', pos, norm)
+                continue
+
+            subtiles = tile.get_subtiles()
 
             old_tile = subtiles[u, v]
             new_tile = tiling.TILETYPE_FROM_CHAR[val]  # type: tiling.TileType
