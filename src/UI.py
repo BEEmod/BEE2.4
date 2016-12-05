@@ -500,6 +500,8 @@ def load_packages(data):
         }),
         (voice_list, voices, 'QuotePack', {
             'CHAR': 'chars',
+            'MONITOR': 'studio',
+            'TURRET': 'turret_hate',
         }),
         (style_list, styles, 'Style', {
             'VID': 'has_video',
@@ -607,6 +609,8 @@ def load_packages(data):
         callback=voice_callback,
         attributes=[
             SelAttr.list('CHAR', _('Characters'), ['??']),
+            SelAttr.bool('TURRET', _('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', _('Monitor Visuals'), False),
         ],
     )
 

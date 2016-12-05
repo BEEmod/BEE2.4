@@ -1245,6 +1245,7 @@ class QuotePack(PakObject):
             studio: str=None,
             studio_actor='',
             cam_loc: Vec=None,
+            turret_hate=False,
             interrupt=0.0,
             cam_pitch=0.0,
             cam_yaw=0.0,
@@ -1261,6 +1262,7 @@ class QuotePack(PakObject):
         self.inter_chance = interrupt
         self.cam_pitch = cam_pitch
         self.cam_yaw = cam_yaw
+        self.turret_hate = turret_hate
 
     @classmethod
     def parse(cls, data):
@@ -1282,13 +1284,15 @@ class QuotePack(PakObject):
         if monitor_data.value is not None:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
-            mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
-            mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
+            mon_interrupt = monitor_data.float('interrupt_chance', 0)
+            mon_cam_loc = monitor_data.vec('Cam_loc')
+            mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
+            turret_hate = monitor_data.bool('TurretShoot')
         else:
             mon_studio = mon_cam_loc = None
             mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
             mon_studio_actor = ''
+            turret_hate = False
 
         config = get_config(
             data.info,
@@ -1310,6 +1314,7 @@ class QuotePack(PakObject):
             cam_loc=mon_cam_loc,
             cam_pitch=mon_cam_pitch,
             cam_yaw=mon_cam_yaw,
+            turret_hate=turret_hate,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -1333,6 +1338,7 @@ class QuotePack(PakObject):
             self.inter_chance = override.inter_chance
             self.cam_pitch = override.cam_pitch
             self.cam_yaw = override.cam_yaw
+            self.turret_hate = override.turret_hate
 
 
     def __repr__(self):
@@ -1380,6 +1386,7 @@ class QuotePack(PakObject):
             options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
+            options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
 
         # Copy the config files for this voiceline..
         for prefix, pretty in [

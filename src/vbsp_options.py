@@ -8,7 +8,7 @@ from srctools import Property, Vec, parse_vec_str
 import srctools
 import utils
 
-from typing import TypeVar, Type, Optional, Iterator
+from typing import T, Type, Optional, Iterator
 
 LOGGER = utils.getLogger(__name__)
 
@@ -103,8 +103,7 @@ def load(opt_blocks: Iterator[Property]):
 
     if set_vals:
         LOGGER.warning('Extra config options: {}', set_vals)
- 
-T = TypeVar('T')           
+
                                               
 def get(expected_type: Type[T], name) -> Optional[T]:
     """Get the given option. 
@@ -491,5 +490,8 @@ DEFAULTS = [
         """Indicates that an actor is in the instance.
 
         If set, no bullseye is output with this name in voicelines.
+        """),
+    Opt('voice_studio_should_shoot', False,
+        """Should turrets shoot at this character when shown?
         """),
 ]
