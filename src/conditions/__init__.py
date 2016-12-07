@@ -771,9 +771,9 @@ def widen_fizz_brush(brush, thickness, bounds=None):
     origin = (bound_max + bound_min) / 2  # type: Vec
     size = bound_max - bound_min
     for axis in 'xyz':
-        # One of the directions will be thinner than 128, that's the fizzler
+        # One of the directions will be thinner than 32, that's the fizzler
         # direction.
-        if size[axis] < 128:
+        if size[axis] < 32:
             bound_min[axis] -= offset
             bound_max[axis] += offset
 
