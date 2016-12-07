@@ -15,7 +15,7 @@ from typing import List
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
-FIZZ_BRUSH_ENTS = {} # The brush entities we generated, used when merging.
+FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
 
 @make_result('custFizzler')
@@ -38,6 +38,14 @@ def res_cust_fizzler(base_inst, res):
               By default it is 2 units thick.
             * Outputs is a block of outputs (laid out like in VMFs). The
               targetnames will be localised to the instance.
+            * MergeBrushes, if true will merge this brush set into one
+              entity for each fizzler. This is useful for non-fizzlers to
+              reduce the entity count.
+            * MaterialModify generates material_modify_controls to control
+              the brush. One is generated for each texture used in the brush.
+              This has subkeys 'name' and 'var' - the entity name and shader
+              variable to be modified. MergeBrushes must be enabled if this
+              is present.
         * MakeLaserField generates a brush stretched across the whole
           area.
             * Name, keys and thickness are the same as the regular Brush.
@@ -80,8 +88,12 @@ def res_cust_fizzler(base_inst, res):
 
     if is_laser:
         # This is a laserfield! We can't edit those brushes!
-        LOGGER.warning('CustFizzler excecuted on LaserField!')
+        LOGGER.warning('CustFizzler executed on LaserField!')
         return
+
+    # Record which materialmodify controls are used, so we can add if needed.
+    # Conf id -> (brush_name, conf, [textures])
+    modify_controls = {}
 
     for orig_brush in (
             vbsp.VMF.by_class['trigger_portal_cleanser'] &
@@ -91,12 +103,12 @@ def res_cust_fizzler(base_inst, res):
 
             new_brush = orig_brush.copy()
             # Unique to the particular config property & fizzler name
-            merge_key = (id(config), fizz_name)
+            conf_key = (id(config), fizz_name)
             should_merge = config.bool('MergeBrushes')
-            if should_merge and merge_key in FIZZ_BRUSH_ENTS:
+            if should_merge and conf_key in FIZZ_BRUSH_ENTS:
                 # These are shared by both ents, but new_brush won't be added to
                 # the map. (We need it though for the widening code to work).
-                FIZZ_BRUSH_ENTS[merge_key].solids.extend(new_brush.solids)
+                FIZZ_BRUSH_ENTS[conf_key].solids.extend(new_brush.solids)
             else:
                 vbsp.VMF.add_ent(new_brush)
                 # Don't allow restyling it
@@ -104,10 +116,9 @@ def res_cust_fizzler(base_inst, res):
 
                 new_brush.clear_keys()  # Wipe the original keyvalues
                 new_brush['origin'] = orig_brush['origin']
-                new_brush['targetname'] = (
-                    fizz_name +
-                    '-' +
-                    config['name', 'brush']
+                new_brush['targetname'] = conditions.local_name(
+                    base_inst,
+                    config['name'],
                 )
                 # All ents must have a classname!
                 new_brush['classname'] = 'trigger_portal_cleanser'
@@ -127,7 +138,27 @@ def res_cust_fizzler(base_inst, res):
                     new_brush.add_out(out)
 
                 if should_merge:  # The first brush...
-                    FIZZ_BRUSH_ENTS[merge_key] = new_brush
+                    FIZZ_BRUSH_ENTS[conf_key] = new_brush
+
+            mat_mod_conf = config.find_key('MaterialModify', [])
+            if mat_mod_conf:
+                try:
+                    used_materials = modify_controls[id(mat_mod_conf)][2]
+                except KeyError:
+                    used_materials = set()
+                    modify_controls[id(mat_mod_conf)] = (
+                        new_brush['targetname'],
+                        mat_mod_conf,
+                        used_materials
+                    )
+                # It can only parent to one brush, so it can't attach
+                # to them all properly.
+                if not should_merge:
+                    raise Exception(
+                        "MaterialModify won't work without MergeBrushes!"
+                    )
+            else:
+                used_materials = None
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
@@ -160,16 +191,20 @@ def res_cust_fizzler(base_inst, res):
                         nodraw_tex,
                         tex_width,
                     )
+                if used_materials is not None:
+                    used_materials.add(laser_tex.casefold())
             else:
                 # Just change the textures
                 for side in new_brush.sides():
                     try:
-                        side.mat = config[
-                            TEX_FIZZLER[side.mat.casefold()]
-                        ]
+                        tex_cat = TEX_FIZZLER[side.mat.casefold()]
+                        side.mat = config[tex_cat]
                     except (KeyError, IndexError):
                         # If we fail, just use the original textures
                         pass
+                    else:
+                        if used_materials is not None and tex_cat != 'nodraw':
+                            used_materials.add(side.mat.casefold())
 
             widen_amount = config.float('thickness', 2.0)
             if widen_amount != 2:
@@ -178,6 +213,25 @@ def res_cust_fizzler(base_inst, res):
                         brush,
                         thickness=widen_amount,
                     )
+
+    for brush_name, config, textures in modify_controls.values():
+        skip_if_static = config.bool('dynamicOnly', True)
+        if skip_if_static and base_inst.fixup['$connectioncount'] == '0':
+            continue
+        mat_mod_name = config['name', 'modify']
+        var = config['var', '$outputintensity']
+        if not var.startswith('$'):
+            var = '$' + var
+        for tex in textures:
+            vbsp.VMF.create_ent(
+                classname='material_modify_control',
+                origin=base_inst['origin'],
+                targetname=conditions.local_name(base_inst, mat_mod_name),
+                materialName='materials/' + tex + '.vmt',
+                materialVar=var,
+                parentname=brush_name,
+            )
+
 
 
 def convert_to_laserfield(
