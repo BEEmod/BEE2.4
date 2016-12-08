@@ -305,8 +305,10 @@ class PalItem(Label):
 
         self.info_btn = Label(
             self,
-            image=img.png('icons/item_info.png'),
+            image=img.png('icons/gear'),
             relief='ridge',
+            width=12,
+            height=12,
         )
 
         click_func = contextWin.open_event(self)
