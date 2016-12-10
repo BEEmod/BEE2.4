@@ -3,8 +3,6 @@ import itertools
 import math
 import random
 import inspect
-from functools import lru_cache
-from types import FunctionType
 from collections import namedtuple, defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -383,8 +381,8 @@ def annotation_caller(func, *parms):
             raise ValueError('Unknown parameter {}'.format(ann))
         type_to_parm[ann] = parm.name
     inputs = []
-    outputs = []
-    # Parameter -> index in func signature
+    outputs = ['_'] * len(sig.parameters)
+    # Parameter -> letter in func signature
     parm_order = {
         parm.name: ind
         for ind, parm in
@@ -395,7 +393,9 @@ def annotation_caller(func, *parms):
         inputs.append(var_name)
         out_name = type_to_parm[parm]
         if out_name is not None:
-            outputs.append(letters[parm_order[out_name]])
+            outputs[parm_order[out_name]] = var_name
+
+    assert '_' not in outputs
 
     if inputs == outputs:
         # Matches already, don't need to do anything.
@@ -457,7 +457,7 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func: Callable[[Entity, Property], bool]):
-        wrapper = annotation_caller(func, Property, Entity)
+        wrapper = annotation_caller(func, Entity, Property)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
@@ -471,7 +471,7 @@ def make_flag(orig_name, *aliases):
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
     def x(func: Callable[[Entity, Property], Any]):
-        wrapper = annotation_caller(func, Property, Entity)
+        wrapper = annotation_caller(func, Entity, Property)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
