@@ -213,7 +213,7 @@ def mon_remove_bullseyes(inst: Entity):
 
 
 @meta_cond(priority=150, only_once=True)
-def mon_camera_link(_):
+def mon_camera_link():
     """Link cameras to monitors."""
     import vbsp
     LOGGER.info('Bullseye {}', BULLSYE_LOCS)

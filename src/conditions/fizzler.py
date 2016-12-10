@@ -8,7 +8,7 @@ from conditions import (
     make_result, meta_cond,
     ITEM_CLASSES, CONNECTIONS
 )
-from srctools import Vec, Entity, Output
+from srctools import Vec, Property, Entity, Output
 from vbsp import TEX_FIZZLER
 
 from typing import List
@@ -19,7 +19,7 @@ FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
 
 @make_result('custFizzler')
-def res_cust_fizzler(base_inst, res):
+def res_cust_fizzler(base_inst: Entity, res: Property):
     """Customises the various components of a custom fizzler item.
 
     This should be executed on the base instance. Brush and MakeLaserField
@@ -54,7 +54,7 @@ def res_cust_fizzler(base_inst, res):
               scale it correctly.
     """
     model_name = res['modelname', None]
-    make_unique = srctools.conv_bool(res['UniqueModel', '0'])
+    make_unique = res.bool('UniqueModel')
     fizz_name = base_inst['targetname', '']
 
     # search for the model instances
@@ -311,7 +311,7 @@ PAIR_AXES = {
 
 
 @make_result('fizzlerModelPair')
-def res_fizzler_pair(begin_inst, res):
+def res_fizzler_pair(begin_inst: Entity, res: Property):
     """Modify the instance of a fizzler to link with its pair.
 
     Each pair will be given a name along the lines of "fizz_name-model1334".
@@ -390,7 +390,7 @@ def res_fizzler_pair(begin_inst, res):
 
 
 @meta_cond(priority=-200, only_once=True)
-def fizzler_out_relay(_):
+def fizzler_out_relay():
     """Link fizzlers with a relay item so they can be given outputs."""
     relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
     if not relay_file:

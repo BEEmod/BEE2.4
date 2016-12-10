@@ -9,7 +9,7 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, Iterator,
+    Tuple, List, Iterator,
 )
 
 
@@ -495,7 +495,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
     names = os.listdir(src)
 
     os.makedirs(dst, exist_ok=True)
-    errors = []
+    errors = []  # type: List[Tuple[str, str, str]]
     for name in names:
         srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
@@ -614,7 +614,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger, alias=None):
+    def __init__(self, logger: logging.Logger, alias=None) -> None:
         # Alias is a replacement module name for log messages.
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
@@ -656,7 +656,7 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         """Allow passing an alias for log modules."""
         # This breaks %-formatting, so only set when init_logging() is called.
 
-        alias = None
+        alias = None  # type: str
 
         def getMessage(self):
             """We have to hook here to change the value of .module.

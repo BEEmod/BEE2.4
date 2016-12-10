@@ -9,7 +9,7 @@ import vbsp
 import comp_consts as consts
 from instanceLocs import resolve as resolve_inst
 from perlin import SimplexNoise
-from srctools import Vec_tuple, Vec, Side, UVAxis
+from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis
 
 LOGGER = utils.getLogger(__name__, alias='cond.cutoutTile')
 
@@ -49,7 +49,7 @@ FLOOR_DEPTH = 8  # Distance we drop the floor
 
 
 @conditions.meta_cond(priority=-1000, only_once=False)
-def find_indicator_panels(inst):
+def find_indicator_panels(inst: Entity):
     """We need to locate indicator panels, so they aren't overwritten.
     """
     if inst['file'].casefold() not in resolve_inst('[indpan]'):
@@ -68,7 +68,7 @@ def find_indicator_panels(inst):
 
 
 @conditions.make_result('CutOutTile')
-def res_cutout_tile(inst, res):
+def res_cutout_tile(res: Property):
     """Generate random quarter tiles, like in Destroyed or Retro maps.
 
     - "MarkerItem" is the instance to look for.

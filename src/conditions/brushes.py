@@ -51,7 +51,7 @@ FLAG_ROTATING = {
 
 
 @make_result('GenRotatingEnt')
-def res_fix_rotation_axis(ent, res):
+def res_fix_rotation_axis(ent: Entity, res: Property):
     """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
 
     This uses the orientation of the instance to detemine the correct
@@ -157,7 +157,7 @@ def res_fix_rotation_axis(ent, res):
 
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
-def res_set_texture(inst, res):
+def res_set_texture(inst: Entity, res: Property):
     """Set the brush face at a location to a particular texture.
 
     pos is the position, relative to the instance
@@ -262,7 +262,7 @@ def res_set_texture(inst, res):
 
 
 @make_result('AddBrush')
-def res_add_brush(inst, res):
+def res_add_brush(inst: Entity, res: Property):
     """Spawn in a brush at the indicated points.
 
     - point1 and point2 are locations local to the instance, with '0 0 0'
@@ -459,7 +459,7 @@ def res_import_template_setup(res: Property):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: Entity, res):
+def res_import_template(inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientatation.
 
     It will be placed overlapping the given instance.
@@ -598,7 +598,7 @@ def res_import_template(inst: Entity, res):
 
 
 @make_result('HollowBrush')
-def res_hollow_brush(inst, res):
+def res_hollow_brush(inst: Entity, res: Property):
     """Hollow out the attached brush, as if EmbeddedVoxel was set.
 
     This just removes the surface if it's already an embeddedVoxel. This allows

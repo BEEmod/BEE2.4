@@ -148,7 +148,7 @@ DIRECTIONS = {
     'w': xn,
     'west': xn,
 
-    'wall': 'WALL',  # Special case, not wall/ceiling
+    'wall': 'WALL',  # Special case, not floor/ceiling
     'walls': 'WALL',
 }
 
@@ -270,7 +270,7 @@ class Condition:
         )
 
     @classmethod
-    def parse(cls, prop_block):
+    def parse(cls, prop_block: Property):
         """Create a condition from a Property block."""
         flags = []
         results = []
@@ -485,6 +485,7 @@ def make_result(orig_name, *aliases):
 def make_result_setup(*names):
     """Decorator to do setup for this result."""
     def x(func: Callable[[Property], Any]):
+        wrapper = annotation_caller(func, Property)
         for name in names:
             RESULT_SETUP[name.casefold()] = wrapper
         return func
@@ -1515,7 +1516,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
 
 @make_flag('debug')
 @make_result('debug')
-def debug_flag(inst, props):
+def debug_flag(inst: Entity, props: Property):
     """Displays text when executed, for debugging conditions.
 
     If the text ends with an '=', the instance will also be displayed.
@@ -1537,13 +1538,13 @@ def debug_flag(inst, props):
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst, props):
+def dummy_result(inst: Entity, props: Property):
     """Dummy result that doesn't do anything."""
     pass
 
 
 @meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst):
+def remove_blank_inst(inst: Entity):
     """Remove instances with a blank file keyvalue.
 
     This allows conditions to strip the instances when requested.
@@ -1555,7 +1556,7 @@ def remove_blank_inst(inst):
 
 
 @meta_cond(priority=0, only_once=True)
-def fix_catapult_targets(inst):
+def fix_catapult_targets(inst: Entity):
     """Set faith plate targets to transmit to clients.
 
     This fixes some console spam in coop, and might improve trajectories
@@ -1566,7 +1567,7 @@ def fix_catapult_targets(inst):
 
 
 @make_result_setup('timedRelay')
-def res_timed_relay_setup(res):
+def res_timed_relay_setup(res: Property):
     var = res['variable', '$timer_delay']
     name = res['targetname']
     disabled = res['disabled', '0']
@@ -1592,7 +1593,7 @@ def res_timed_relay_setup(res):
 
 
 @make_result('timedRelay')
-def res_timed_relay(inst: Entity, res):
+def res_timed_relay(inst: Entity, res: Property):
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
@@ -1635,14 +1636,14 @@ def res_timed_relay(inst: Entity, res):
 
 
 @make_result('condition')
-def res_sub_condition(base_inst, res):
+def res_sub_condition(base_inst: Entity, res: Property):
     """Check a different condition if the outer block is true."""
     res.value.test(base_inst)
 make_result_setup('condition')(Condition.parse)
 
 
 @make_result('nextInstance')
-def res_break(base_inst, res):
+def res_break():
     """Skip to the next instance.
 
     The value will be ignored.
@@ -1651,7 +1652,7 @@ def res_break(base_inst, res):
 
 
 @make_result('endCondition', 'nextCondition')
-def res_end_condition(base_inst, res):
+def res_end_condition():
     """Skip to the next condition.
 
     The value will be ignored.
@@ -1660,7 +1661,7 @@ def res_end_condition(base_inst, res):
 
 
 @make_result_setup('switch')
-def res_switch_setup(res):
+def res_switch_setup(res: Property):
     flag = None
     method = SWITCH_TYPE.FIRST
     cases = []
@@ -1692,7 +1693,7 @@ def res_switch_setup(res):
 
 
 @make_result('switch')
-def res_switch(inst, res):
+def res_switch(inst: Entity, res: Property):
     """Run the same flag multiple times with different arguments.
 
     'method' is the way the search is done - first, last, random, or all.
@@ -1721,7 +1722,7 @@ def res_switch(inst, res):
 
 
 @make_result_setup('staticPiston')
-def make_static_pist_setup(res):
+def make_static_pist_setup(res: Property):
     return {
         name: resolve_inst(res[name, ''])[0]
         for name in
@@ -1734,7 +1735,7 @@ def make_static_pist_setup(res):
 
 
 @make_result('staticPiston')
-def make_static_pist(ent, res):
+def make_static_pist(ent: Entity, res: Property):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1780,7 +1781,7 @@ def make_static_pist(ent, res):
 
 
 @make_result('GooDebris')
-def res_goo_debris(_, res: Property):
+def res_goo_debris(res: Property):
     """Add random instances to goo squares.
 
     Options:
@@ -1879,7 +1880,7 @@ tag_fizzler_locs = {}
 
 
 @meta_cond(priority=-110, only_once=False)
-def res_find_potential_tag_fizzlers(inst):
+def res_find_potential_tag_fizzlers(inst: Entity):
     """We need to know which items are 'real' fizzlers.
 
     This is used for Aperture Tag paint fizzlers.
@@ -1936,9 +1937,8 @@ def res_find_potential_tag_fizzlers(inst):
             )
 
 
-
 @make_result('TagFizzler')
-def res_make_tag_fizzler(inst, res):
+def res_make_tag_fizzler(inst: Entity, res: Property):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.

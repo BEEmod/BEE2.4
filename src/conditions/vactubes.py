@@ -13,7 +13,7 @@ from conditions import (
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Vec, Vec_tuple,
-    Entity,
+    Property, Entity,
 )
 
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
@@ -101,7 +101,7 @@ VAC_CONFIGS = {}
 
 
 @make_result_setup('CustVactube')
-def res_vactube_setup(res):
+def res_vactube_setup(res: Property):
     group = res['group', 'DEFAULT_GROUP']
 
     if group not in VAC_CONFIGS:
@@ -152,7 +152,7 @@ def res_vactube_setup(res):
 
 
 @make_result('CustVactube')
-def res_make_vactubes(_, res):
+def res_make_vactubes(res: Property):
     """Speciallised result to generate vactubes from markers.
 
     Only runs once, and then quits the condition list.

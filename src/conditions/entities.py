@@ -16,7 +16,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
 
 
 @make_result_setup('TemplateOverlay')
-def res_import_template_setup(res):
+def res_import_template_setup(res: Property):
     temp_id = res['id'].casefold()
 
     face = Vec.from_str(res['face_pos', '0 0 -64'])

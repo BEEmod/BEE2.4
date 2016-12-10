@@ -13,7 +13,7 @@ import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
 
-from srctools import Property, Vec, AtomicWriter
+from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
 import srctools.vmf as VLib
 import srctools
@@ -438,7 +438,7 @@ def load_map(map_path):
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(_):
+def add_voice():
     """Add voice lines to the map."""
     voiceLine.add_voice(
         has_items=settings['has_attr'],
@@ -450,7 +450,7 @@ def add_voice(_):
 
 
 @conditions.meta_cond(priority=-250)
-def add_fizz_borders(_):
+def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
     This is used in 50s and BTS styles.
@@ -563,7 +563,7 @@ def add_fizz_borders(_):
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst):
+def fix_fizz_models(inst: Entity):
     """Fix some bugs with fizzler model instances.
     This removes extra numbers from model instances, which prevents
     inputs from being read correctly.
@@ -594,7 +594,7 @@ def fix_fizz_models(inst):
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
-def static_pan(inst):
+def static_pan(inst: Entity):
     """Switches glass angled panels to static instances, if needed."""
     if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
@@ -609,7 +609,7 @@ PANEL_FAITH_TARGETS = defaultdict(list)
 
 
 @conditions.meta_cond(-1000)
-def find_panel_locs(_):
+def find_panel_locs():
     """Find the locations of panels, used for FaithBullseye."""
 
     non_panel_mats = {
@@ -654,7 +654,7 @@ def find_panel_locs(_):
 
 
 @conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res):
+def res_faith_bullseye_check(res: Property):
     """Do a check to ensure there are actually textures availble."""
     for col in ('white', 'black'):
         for orient in ('wall', 'floor', 'ceiling'):
@@ -666,7 +666,7 @@ def res_faith_bullseye_check(res):
 
 
 @conditions.make_result('FaithBullseye')
-def res_faith_bullseye(inst, res):
+def res_faith_bullseye(inst: Entity, res: Property):
     """Replace the bullseye instances with textures instead."""
 
     pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
@@ -763,7 +763,7 @@ FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def anti_fizz_bump(inst):
+def anti_fizz_bump():
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
@@ -855,7 +855,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(_):
+def set_player_model():
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -942,7 +942,7 @@ def set_player_model(_):
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(inst):
+def set_player_portalgun():
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -1025,7 +1025,7 @@ def set_player_portalgun(inst):
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(inst):
+def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -1040,7 +1040,7 @@ def add_screenshot_logic(inst):
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(_):
+def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
     VMF.create_ent(
@@ -1142,7 +1142,7 @@ def add_fog_ents(_):
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(_):
+def set_elev_videos():
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -1190,7 +1190,7 @@ def set_elev_videos(_):
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(_):
+def ap_tag_modifications():
     """Perform modifications for Aperture Tag.
 
     * All fizzlers will be combined with a trigger_paint_cleanser
@@ -1796,7 +1796,7 @@ def remove_static_ind_toggles():
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(_):
+def set_barrier_frame_type():
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -2155,7 +2155,7 @@ Clump = namedtuple('Clump', [
 
 
 @conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res):
+def cond_force_clump_setup(res: Property):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
@@ -2187,7 +2187,7 @@ def cond_force_clump_setup(res):
 
 
 @conditions.make_result('SetAreaTex')
-def cond_force_clump(inst, res):
+def cond_force_clump(inst: Entity, res: Property):
     """Force an area to use certain textures.
 
     This only works in styles using the clumping texture algorithm.
@@ -3155,7 +3155,7 @@ def fix_worldspawn():
 
 
 @conditions.make_result('Pack')
-def packlist_cond(_, res):
+def packlist_cond(res: Property):
     """Add the files in the given packlist to the map."""
     TO_PACK.add(res.value.casefold())
 
@@ -3163,7 +3163,7 @@ def packlist_cond(_, res):
 
 
 @conditions.make_result('PackRename')
-def packlist_cond_rename(_, res):
+def packlist_cond_rename(res: Property):
     """Add a file to the packlist, saved under a new name."""
     PACK_RENAME[res['dest']] = res['file']
     return conditions.RES_EXHAUSTED

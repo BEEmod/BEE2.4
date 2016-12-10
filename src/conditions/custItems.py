@@ -27,7 +27,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.custItems')
 
 
 @make_result_setup('custOutput')
-def res_cust_output_setup(res):
+def res_cust_output_setup(res: Property):
     conds = [
         Condition.parse(sub_res)
         for sub_res in res
@@ -49,7 +49,7 @@ def res_cust_output_setup(res):
 
 
 @make_result('custOutput')
-def res_cust_output(inst, res):
+def res_cust_output(inst: Entity, res: Property):
     """Add an additional output to the instance with any values.
 
     Always points to the targeted item.
@@ -84,7 +84,7 @@ def res_cust_output(inst, res):
 
     # These all require us to search through the instances.
     if force_sign_type or dec_con_count or targ_conditions:
-        for con_inst in vbsp.VMF.by_class['func_instance']:  # type: VLib.Entity
+        for con_inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
             if con_inst['targetname'] not in targets:
                 # Not our instance
                 continue
@@ -213,7 +213,7 @@ def res_cust_antline_setup(res: Property):
 
 
 @make_result('custAntline')
-def res_cust_antline(inst, res):
+def res_cust_antline(inst: Entity, res: Property):
     """Customise the output antline texture, toggle instances.
 
     This allows adding extra outputs between the instance and the toggle.
@@ -267,7 +267,7 @@ def res_cust_antline(inst, res):
 
 
 @make_result_setup('changeOutputs')
-def res_change_outputs_setup(res):
+def res_change_outputs_setup(res: Property):
     return [
         (
             Output.parse_name(prop.real_name),
@@ -279,13 +279,13 @@ def res_change_outputs_setup(res):
 
 
 @make_result('changeOutputs')
-def res_change_outputs(inst: Entity, res):
+def res_change_outputs(inst: Entity, res: Property):
     """Switch the outputs on an instance.
 
     Each child is a original -> replace value. These match the values
     in editoritems.txt. Use a blank value to indicate it should be deleted.
     """
-    for output in inst.outputs[:]:  # type: VLib.Output
+    for output in inst.outputs[:]:  # type: Output
         for (orig_name, orig_comm), rep in res.value:
             if output.inst_out == orig_name and output.output == orig_comm:
                 if rep == (None, ''):
@@ -313,7 +313,7 @@ def res_change_inputs_setup(res: Property):
 
 
 @make_result('changeInputs')
-def res_change_inputs(inst: Entity, res):
+def res_change_inputs(inst: Entity, res: Property):
     """Switch the inputs for an instance.
 
     Each child is an input to replace. The name is the original input, matching
@@ -331,7 +331,7 @@ def res_change_inputs(inst: Entity, res):
 
     # ReplaceInstance might make some not instances anymore..
     for inst in vbsp.VMF.entities:
-        for out in inst.outputs[:]:  # type: VLib.Output
+        for out in inst.outputs[:]:  # type: Output
             if out.target.casefold() != name:
                 continue
 

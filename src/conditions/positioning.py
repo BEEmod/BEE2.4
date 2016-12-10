@@ -4,7 +4,7 @@ from conditions import (
     make_flag, make_result,
     DIRECTIONS, SOLIDS, GOO_LOCS,
 )
-from srctools import Vec
+from srctools import Vec, Entity, Property
 import srctools
 
 
@@ -17,7 +17,7 @@ import srctools
     'dir',
     'direction',
 )
-def flag_angles(inst, flag):
+def flag_angles(inst: Entity, flag: Property):
     """Check that a instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
@@ -61,7 +61,7 @@ def flag_angles(inst, flag):
 
 
 @make_flag('posIsSolid')
-def flag_brush_at_loc(inst, flag):
+def flag_brush_at_loc(inst: Entity, flag: Property):
     """Checks to see if a wall is present at the given location.
 
     - Pos is the position of the brush, where `0 0 0` is the floor-position
@@ -126,7 +126,7 @@ def flag_brush_at_loc(inst, flag):
 
 
 @make_flag('PosIsGoo')
-def flag_goo_at_loc(inst, flag):
+def flag_goo_at_loc(inst: Entity, flag: Property):
     """Check to see if a given location is submerged in goo.
 
     0 0 0 is the origin of the instance, values are in 128 increments.
@@ -142,7 +142,7 @@ def flag_goo_at_loc(inst, flag):
 
 
 @make_result('forceUpright')
-def res_force_upright(inst, _):
+def res_force_upright(inst: Entity):
     """Position an instance to orient upwards while keeping the normal.
 
     The result angle will have pitch and roll set to 0. Vertical
@@ -156,13 +156,13 @@ def res_force_upright(inst, _):
 
 
 @make_result('setAngles')
-def res_set_angles(inst, res):
+def res_set_angles(inst: Entity, res: Property):
     """Set the orientation of an instance to a certain angle."""
     inst['angles'] = res.value
 
 
 @make_result('OffsetInst', 'offsetinstance')
-def res_translate_inst(inst, res):
+def res_translate_inst(inst: Entity, res: Property):
     """Translate the instance locally by the given amount.
 
     The special values <piston>, <piston_bottom> and <piston_top> can be
