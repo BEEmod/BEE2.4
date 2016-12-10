@@ -143,3 +143,37 @@ def res_set_voice_attr(res: Property):
     else:
         VOICE_ATTR[res.value.casefold()] = 1
     return RES_EXHAUSTED
+
+CACHED_MODELS = set()
+
+
+@make_result('PreCacheModel')
+def res_pre_cache_model(res: Property):
+    """Precache the given model for switching.
+
+    This places it as a prop_dynamic_override.
+    """
+    mdl_name = res.value.casefold()
+    if not mdl_name.startswith('models/'):
+        mdl_name = 'models/' + mdl_name
+    if not mdl_name.endswith('.mdl'):
+        mdl_name += '.mdl'
+
+    if mdl_name in CACHED_MODELS:
+        return
+    CACHED_MODELS.add(mdl_name)
+    vbsp.VMF.create_ent(
+        classname='prop_dynamic_override',
+        targetname='@precache',
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+        model=mdl_name,
+
+        # Disable shadows and similar things, it shouldn't ever be in
+        # PVS but we might as well.
+        rendermode=10,
+        disableshadowdepth=1,
+        disableshadows=1,
+        solid=0,
+        shadowdepthnocache=2,
+        spawnflags=256,  # Start with collision off.
+    )
