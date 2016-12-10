@@ -2,6 +2,9 @@
 import itertools
 import math
 import random
+import inspect
+from functools import lru_cache
+from types import FunctionType
 from collections import namedtuple, defaultdict
 from decimal import Decimal
 from enum import Enum
