@@ -355,6 +355,61 @@ class Condition:
                 results.remove(res)
 
 
+def annotation_caller(func, *parms):
+    """Reorders callback arguments to the requirements of the callback.
+
+    parms should be the unique types of arguments in the order they will be
+    called with. func's arguments should be positional, and be annotated
+    with the same types. A wrapper will be returned which can be called
+    with the parms arguments, but delegates to func. (This could be the
+    function itself).
+    """
+    allowed_kinds = [inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    type_to_parm = dict.fromkeys(parms, None)
+    sig = inspect.signature(func)
+    for parm in sig.parameters.values():
+        ann = parm.annotation
+        if parm.kind not in allowed_kinds:
+            raise ValueError('Parameter kind "{}" is not allowed!'.format(parm.kind))
+        if ann is inspect.Parameter.empty:
+            raise ValueError('Parameters must have value!')
+        try:
+            if type_to_parm[ann] is not None:
+                raise ValueError('Parameter {} used twice!'.format(ann))
+        except KeyError:
+            raise ValueError('Unknown parameter {}'.format(ann))
+        type_to_parm[ann] = parm.name
+    inputs = []
+    outputs = []
+    # Parameter -> index in func signature
+    parm_order = {
+        parm.name: ind
+        for ind, parm in
+        enumerate(sig.parameters.values())
+    }
+    letters = 'abcdefghijklmnopqrstuvwxyz'
+    for var_name, parm in zip(letters, parms):
+        inputs.append(var_name)
+        out_name = type_to_parm[parm]
+        if out_name is not None:
+            outputs.append(letters[parm_order[out_name]])
+
+    if inputs == outputs:
+        # Matches already, don't need to do anything.
+        return func
+
+    # Double function to make a closure, to allow reference to the function
+    # more directly.
+    # Lambdas are expressions, so we can return the result directly.
+    return eval(
+        '(lambda func: lambda {}: func({}))(func)'.format(
+            ', '.join(inputs),
+            ', '.join(outputs),
+        ),
+        {'func': func},
+    )
+
+
 def add_meta(func, priority, only_once=True):
     """Add a metacondtion, which executes a function at a priority level.
 
@@ -372,7 +427,7 @@ def add_meta(func, priority, only_once=True):
 
     # Don't pass the prop_block onto the function,
     # it doesn't contain any useful data.
-    RESULT_LOOKUP[name] = lambda inst, val: func(inst)
+    RESULT_LOOKUP[name] = annotation_caller(func, Entity, Property)
 
     cond = Condition(
         results=[Property(name, '')],
@@ -399,12 +454,13 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func: Callable[[Entity, Property], bool]):
+        wrapper = annotation_caller(func, Property, Entity)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
-        FLAG_LOOKUP[orig_name.casefold()] = func
+        FLAG_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            FLAG_LOOKUP[name.casefold()] = func
+            FLAG_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
@@ -412,12 +468,13 @@ def make_flag(orig_name, *aliases):
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
     def x(func: Callable[[Entity, Property], Any]):
+        wrapper = annotation_caller(func, Property, Entity)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
-        RESULT_LOOKUP[orig_name.casefold()] = func
+        RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            RESULT_LOOKUP[name.casefold()] = func
+            RESULT_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
@@ -426,7 +483,7 @@ def make_result_setup(*names):
     """Decorator to do setup for this result."""
     def x(func: Callable[[Property], Any]):
         for name in names:
-            RESULT_SETUP[name.casefold()] = func
+            RESULT_SETUP[name.casefold()] = wrapper
         return func
     return x
 
