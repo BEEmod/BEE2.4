@@ -920,6 +920,9 @@ class Item(PakObject):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<Item {} all_conf>'.format(
+            data.id,
+        ))
 
         needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
 
@@ -1197,6 +1200,9 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<ItemConfig {}:{} all_conf>'.format(
+            data.pak_id, data.id,
+        ))
 
         for ver in data.info.find_all('Version'):  # type: Property
             ver_id = ver['ID', 'VER_DEFAULT']
@@ -1205,10 +1211,13 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
                     with data.zip_file.open(file_loc) as f:
-                        styles[style.real_name] = Property.parse(
+                        styles[style.real_name] = conf = Property.parse(
                             f,
                             data.pak_id + ':' + file_loc,
                         )
+                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                        data.pak_id, data.id, style.real_name,
+                    ))
 
         return cls(
             data.id,
