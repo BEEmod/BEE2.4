@@ -49,7 +49,7 @@ COLOR_POS = {}
 
 
 @make_result('_CubeColoriser')
-def res_cube_coloriser(inst: Entity, res: Property):
+def res_cube_coloriser(inst: Entity):
     """Allows recoloring cubes placed at a position."""
     origin = Vec.from_str(inst['origin'])
     timer_delay = inst.fixup.int('$timer_delay')
