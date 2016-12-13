@@ -18,9 +18,8 @@ COLORS = [
     (H, L, H),
     (L, H, H),
 
-    (64, 64, 64),
+    (L, L, L),
     (M, M, M),
-    (192, 192, 192),
     (H, H, H),
 
     (L, L, M),
@@ -42,6 +41,7 @@ COLORS = [
     (H, M, M),
     (H, M, H),
     (H, H, M),
+    (32, 192, 32),
 ]
 del L, M, H
 
@@ -54,7 +54,7 @@ def res_cube_coloriser(inst: Entity):
     origin = Vec.from_str(inst['origin'])
     timer_delay = inst.fixup.int('$timer_delay')
     if 3 <= timer_delay <= 30:
-        COLOR_POS[origin.as_tuple()] = COLORS[timer_delay]
+        COLOR_POS[origin.as_tuple()] = COLORS[timer_delay - 3]
     else:
         LOGGER.warning('Unknown timer value "{}"!', timer_delay)
     inst.remove()
