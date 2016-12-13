@@ -463,6 +463,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                     obj_override[comp_type][obj_id].append(
                         ParseData(pack.zip, obj_id, obj, pack.id, True)
                     )
+                    # Don't continue to parse and overwrite
+                    continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
