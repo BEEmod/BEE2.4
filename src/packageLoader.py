@@ -26,7 +26,8 @@ from srctools import (
 
 from typing import (
     Dict, List, Tuple,
-    Iterator
+    Iterator, Type,
+    TypeVar,
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -86,6 +87,8 @@ VPK_FOLDER = {
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
 
+PakObjectVar = TypeVar('PakObjectVar', bound='PakObject')
+
 
 class _PakObjectMeta(type):
     def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
@@ -100,6 +103,9 @@ class _PakObjectMeta(type):
         # PakObject isn't created yet so we can't directly check that.
         if bases:
             OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+
+        # Maps object IDs to the object.
+        cls._id_to_obj = {}
 
         return cls
 
@@ -149,9 +155,14 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def get_objects(cls):
+    def all(cls: Type[PakObjectVar]) -> Iterator[PakObjectVar]:
         """Get the list of objects parsed."""
-        return OBJ_TYPES[cls.__name__]
+        return cls._id_to_obj.values()
+
+    @classmethod
+    def by_id(cls: Type[PakObjectVar], object_id: str) -> PakObjectVar:
+        """Return the object with a given ID."""
+        return cls._id_to_obj[object_id.casefold()]
 
 
 def reraise_keyerror(err, obj_id):
@@ -367,9 +378,10 @@ def load_packages(
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
+                obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
                 # parse through the object and return the resultant class
                 try:
-                    object_ = OBJ_TYPES[obj_type].cls.parse(
+                    object_ = obj_class.parse(
                         ParseData(
                             obj_data.zip_file,
                             obj_id,
@@ -380,6 +392,13 @@ def load_packages(
                     )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
+
+                if not hasattr(object_, 'id'):
+                    raise ValueError(
+                        '"{}" object {} has no ID!'.format(obj_type, object_)
+                    )
+
+                obj_class._id_to_obj[object_.id.casefold()] = object_
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
@@ -417,8 +436,8 @@ def load_packages(
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
-        data['Item'],
-        data['Style'],
+        Item.all(),
+        Style.all(),
         log_item_fallbacks,
         log_missing_styles,
     )
@@ -486,8 +505,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
 
 
 def setup_style_tree(
-    item_data,
-    style_data,
+    item_data: List['Item'],
+    style_data: List['Style'],
     log_fallbacks,
     log_missing_styles,
 ):
@@ -1017,10 +1036,10 @@ class Item(PakObject):
 
         aux_item_configs = {
             conf.id: conf
-            for conf in data['ItemConfig']
+            for conf in ItemConfig.all()
         }
 
-        for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+        for item in sorted(Item.all(), key=operator.attrgetter('id')):  # type: Item
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
             (
@@ -1361,13 +1380,12 @@ class QuotePack(PakObject):
         if exp_data.selected is None:
             return  # No quote pack!
 
-        for voice in data['QuotePack']:  # type: QuotePack
-            if voice.id == exp_data.selected:
-                break
-        else:
+        try:
+            voice = QuotePack.by_id(exp_data.selected)  # type: QuotePack
+        except KeyError:
             raise Exception(
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf  # type: Property
 
@@ -1512,10 +1530,9 @@ class Skybox(PakObject):
         if exp_data.selected is None:
             return  # No skybox..
 
-        for skybox in data['Skybox']:  # type: Skybox
-            if skybox.id == exp_data.selected:
-                break
-        else:
+        try:
+            skybox = Skybox.by_id(exp_data.selected)  # type: Skybox
+        except KeyError:
             raise Exception(
                 "Selected skybox ({}) doesn't exist?".format(exp_data.selected)
             )
@@ -1646,13 +1663,12 @@ class Music(PakObject):
         if exp_data.selected is None:
             return  # No music..
 
-        for music in data['Music']:  # type: Music
-            if music.id == exp_data.selected:
-                break
-        else:
+        try:
+            music = Music.by_id(exp_data.selected)  # type: Music
+        except KeyError:
             raise Exception(
                 "Selected music ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf
 
@@ -1793,7 +1809,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         if self.styles is None:
             return True
 
-        for style in data['Style']:
+        for style in Style.all():
             if not self.applies_to_style(style):
                 return False
         return True
@@ -1859,7 +1875,7 @@ class StyleVPK(PakObject, has_img=False):
         sel_vpk = exp_data.selected_style.vpk_name  # type: Style
 
         if sel_vpk:
-            for vpk in data['StyleVPK']:  # type: StyleVPK
+            for vpk in StyleVPK.all():  # type: StyleVPK
                 if vpk.id.casefold() == sel_vpk:
                     sel_vpk = vpk
                     break
@@ -2017,14 +2033,13 @@ class Elevator(PakObject):
         if exp_data.selected is None:
             elevator = None
         else:
-            for elevator in data['Elevator']:
-                if elevator.id == exp_data.selected:
-                    break
-            else:
+            try:
+                elevator = Elevator.by_id(exp_data.selected)  # type: Elevator
+            except KeyError:
                 raise Exception(
                     "Selected elevator ({}) "
                     "doesn't exist?".format(exp_data.selected)
-                )
+                ) from None
 
         if style.has_video:
             if elevator is None:
@@ -2160,7 +2175,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         # A list of materials which will casue a specific packlist to be used.
         pack_triggers = Property('PackTriggers', [])
 
-        for pack in data['PackList']:  # type: PackList
+        for pack in PackList.all():  # type: PackList
             # Build a
             # "Pack_id"
             # {
@@ -2221,7 +2236,7 @@ class EditorSound(PakObject, has_img=False):
         """Export EditorSound objects."""
         # Just command the game to do the writing.
         exp_data.game.add_editor_sounds(
-            data['EditorSound']
+            EditorSound.all()
         )
 
 
