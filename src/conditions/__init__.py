@@ -598,7 +598,6 @@ def import_conditions():
             for loader, module, is_package in
             pkgutil.iter_modules(['conditions'])
         ]
-        cond_modules = ''
 
     for module in modules:
         # Import the module, then discard it. The module will run add_flag
@@ -743,27 +742,30 @@ def weighted_random(count: int, weights: str):
     This produces a list intended to be fed to random.choice(), with
     repeated indexes corresponding to the comma-separated weight values.
     """
-    if weights == '' or ',' not in weights:
+    if weights == '':
+        # Empty = equal weighting.
+        return list(range(count))
+    if ',' not in weights:
         LOGGER.warning('Invalid weight! ({})', weights)
+        return list(range(count))
+
+    # Parse the weight
+    vals = weights.split(',')
+    weight = []
+    if len(vals) == count:
+        for i, val in enumerate(vals):
+            val = val.strip()
+            if val.isdecimal():
+                # repeat the index the correct number of times
+                weight.extend(
+                    [i] * int(val)
+                )
+            else:
+                # Abandon parsing
+                break
+    if len(weight) == 0:
+        LOGGER.warning('Failed parsing weight! ({!s})',weight)
         weight = list(range(count))
-    else:
-        # Parse the weight
-        vals = weights.split(',')
-        weight = []
-        if len(vals) == count:
-            for i, val in enumerate(vals):
-                val = val.strip()
-                if val.isdecimal():
-                    # repeat the index the correct number of times
-                    weight.extend(
-                        [i] * int(val)
-                    )
-                else:
-                    # Abandon parsing
-                    break
-        if len(weight) == 0:
-            LOGGER.warning('Failed parsing weight! ({!s})',weight)
-            weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
     return weight
