@@ -1788,6 +1788,16 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             style.bases
         )
 
+    def applies_to_all(self):
+        """Check if this applies to all styles."""
+        if self.styles is None:
+            return True
+
+        for style in data['Style']:
+            if not self.applies_to_style(style):
+                return False
+        return True
+
     @staticmethod
     def export(exp_data: ExportData):
         """Export style var selections into the config.

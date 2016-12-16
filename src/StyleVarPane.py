@@ -156,7 +156,7 @@ def refresh(selected_style):
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
-        if var.styles is None:
+        if var.applies_to_all():
             continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
@@ -276,7 +276,7 @@ def make_pane(tool_frame):
             'command': functools.partial(set_stylevar, var.id)
             }
         desc = make_desc(var)
-        if var.styles is None:
+        if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
             all_pos += 1
 
