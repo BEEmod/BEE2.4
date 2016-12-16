@@ -1282,14 +1282,14 @@ def get_map_info():
 
     # These have multiple instances, so 'in' must be used.
     # If both frames are set to "", get_special returns None so fix that.
-    file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
-    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
-    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
-    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp') or ()
-    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop') or ()
+    file_coop_corr = instanceLocs.get_special_inst('coopCorr')
+    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr')
+    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
+    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
+    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
-    file_ind_panel = instanceLocs.get_special_inst('indpan') or ()
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle') or ()
+    file_ind_panel = instanceLocs.get_special_inst('indpan')
+    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')

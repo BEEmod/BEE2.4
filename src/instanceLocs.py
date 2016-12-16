@@ -188,6 +188,12 @@ SUBITEMS = {
     'fizz_model': 1,
 }
 
+SPECIAL_INST_FOLDED = {
+    key.casefold(): value
+    for key, value in
+    SPECIAL_INST.items()
+}
+
 
 def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
@@ -414,11 +420,13 @@ def get_special_inst(name: str):
         raise KeyError("Invalid special instance name! ({})".format(name))
 
     # The number you'll get is fixed, so it's fine if we return different
-    # types - unpack single instances, since that's what you want most of the
-    # time.
-    if len(inst) == 1:
+    # types.
+    # Unpack single instances, since that's what you want most of the
+    # time. We only do that if there's no ',' in the <> lookup, so it doesn't
+    # affect
+    if len(inst) == 1 and ',' not in SPECIAL_INST_FOLDED[name.casefold()]:
         return inst[0]
     elif len(inst) == 0:
-        return None  # No value
+        return ()
     else:
         return inst
