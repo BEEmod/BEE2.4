@@ -23,7 +23,8 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
     """Customises the various components of a custom fizzler item.
 
     This should be executed on the base instance. Brush and MakeLaserField
-    are ignored on laserfield barriers.
+    are not permitted on laserfield barriers.
+    When executed, the $is_laser variable will be set on the base.
     Options:
         * ModelName: sets the targetname given to the model instances.
         * UniqueModel: If true, each model instance will get a suffix to
@@ -64,7 +65,7 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
         )
     is_laser = False
     for inst in vbsp.VMF.by_class['func_instance']:
-        if inst['targetname', ''] in model_targetnames:
+        if inst['targetname'] in model_targetnames:
             if inst.fixup['skin', '0'] == '2':
                 is_laser = True
             if model_name is not None:
@@ -81,6 +82,8 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
 
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
+
+    base_inst.fixup['$is_laser'] = is_laser
 
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) == 0:
