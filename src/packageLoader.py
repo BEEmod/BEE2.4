@@ -2250,7 +2250,7 @@ class BrushTemplate(PakObject, has_img=False):
     def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
-        This copies the solids out of vmf_file and into TEMPLATE_FILE.
+        This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
         If force is set to 'world' or 'detail', the other type will be converted.
         If keep_brushes is false brushes will be skipped (for TemplateOverlay).
         """

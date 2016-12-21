@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property, NoKeyError, VPK
+from srctools import Vec, Property, NoKeyError, VPK, VMF
 import backup
 import extract_packages
 import loadScreen
@@ -94,10 +94,15 @@ EXE_SUFFIX = (
 # That way they can use the files.
 MUSIC_MEL_VPK = None  # type: VPK
 MUSIC_TAG_LOC = None  # type: str
+TAG_COOP_INST_VMF = None  # type: VMF
 
 # The folder with the file...
 MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
 MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
+
+# Location of coop instance for Tag gun
+TAG_GUN_COOP_INST = ('aperture tag/sdk_content/maps/'
+                     'instances/alatag/lp_paintgun_instance_coop.vmf')
 
 # All the PS:Mel track names - all the resources are in the VPK,
 # this allows us to skip looking through all the other files..
@@ -431,6 +436,10 @@ class Game:
         except FileNotFoundError:
             num_compiler_files = 0
 
+        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            # Coop paint gun instance
+            num_compiler_files += 1
+
         if num_compiler_files == 0:
             LOGGER.warning('No compiler files!')
             export_screen.skip_stage('COMP')
@@ -593,11 +602,16 @@ class Game:
                     return False
                 export_screen.step('COMP')
 
+
         if should_refresh:
             LOGGER.info('Copying Resources!')
             self.refresh_cache()
 
             self.copy_mod_music()
+
+        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
+                TAG_COOP_INST_VMF.export(f)
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
@@ -823,6 +837,7 @@ def scan_music_locs():
         tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
         mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
         if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
+            make_tag_coop_inst(loc)
             MUSIC_TAG_LOC = tag_loc
             LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
@@ -832,6 +847,31 @@ def scan_music_locs():
 
         if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
             break
+
+
+def make_tag_coop_inst(tag_loc: str):
+    """Make the coop version of the tag instances.
+
+    This needs to be shrunk, so all the logic entities are not spread
+    out so much (coop tubes are small).
+
+    This way we avoid distributing the logic.
+    """
+    global TAG_COOP_INST_VMF
+    TAG_COOP_INST_VMF = VMF.parse(
+        os.path.join(tag_loc, TAG_GUN_COOP_INST)
+    )
+    # Move all entities that don't care about position to the base of the player
+    for ent in TAG_COOP_INST_VMF.entities:
+        if ent['classname'].startswith('info_'):
+            # info_target, info_coop_spawn, info_paint_sprayer.
+            # These all need to keep their location.
+            # they're offset up 16 units though.
+            origin = Vec.from_str(ent['origin'])
+            origin.z -= 16
+            ent['origin'] = origin
+        else:
+            ent['origin'] = '0 0 64'
 
 
 def save():

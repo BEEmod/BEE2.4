@@ -340,7 +340,7 @@ class Condition:
                 name=res.real_name,
             )) from None
         else:
-            return func(inst, res)
+            return func(VMF, inst, res)
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -428,9 +428,7 @@ def add_meta(func, priority, only_once=True):
         priority,
     )
 
-    # Don't pass the prop_block onto the function,
-    # it doesn't contain any useful data.
-    RESULT_LOOKUP[name] = annotation_caller(func, Entity, Property)
+    RESULT_LOOKUP[name] = annotation_caller(func, srctools.VMF, Entity, Property)
 
     cond = Condition(
         results=[Property(name, '')],
@@ -457,7 +455,7 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func: Callable[[Entity, Property], bool]):
-        wrapper = annotation_caller(func, Entity, Property)
+        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
@@ -470,8 +468,8 @@ def make_flag(orig_name, *aliases):
 
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
-    def x(func: Callable[[Entity, Property], Any]):
-        wrapper = annotation_caller(func, Entity, Property)
+    def x(func: Callable[..., Any]):
+        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
@@ -484,8 +482,8 @@ def make_result(orig_name, *aliases):
 
 def make_result_setup(*names):
     """Decorator to do setup for this result."""
-    def x(func: Callable[[Property], Any]):
-        wrapper = annotation_caller(func, Property)
+    def x(func: Callable[..., Any]):
+        wrapper = annotation_caller(func, srctools.VMF, Property)
         for name in names:
             RESULT_SETUP[name.casefold()] = wrapper
         return func
@@ -554,7 +552,7 @@ def check_all():
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(flag, inst):
+def check_flag(flag: Property, inst: Entity):
     LOGGER.debug(
         'Checking {} ({!s}) on {}',
         flag.real_name,
@@ -575,7 +573,7 @@ def check_flag(flag, inst):
             '"{}" is not a valid condition flag!'.format(name)
         ) from None
 
-    res = func(inst, flag)
+    res = func(VMF, inst, flag)
     return res == desired_result
 
 
