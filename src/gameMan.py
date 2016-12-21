@@ -16,7 +16,7 @@ import shutil
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Vec, Property, NoKeyError, VPK, VMF
+from srctools import Vec, Property, NoKeyError, VPK, VMF, Output
 import backup
 import extract_packages
 import loadScreen
@@ -858,20 +858,41 @@ def make_tag_coop_inst(tag_loc: str):
     This way we avoid distributing the logic.
     """
     global TAG_COOP_INST_VMF
-    TAG_COOP_INST_VMF = VMF.parse(
+    TAG_COOP_INST_VMF = vmf = VMF.parse(
         os.path.join(tag_loc, TAG_GUN_COOP_INST)
     )
     # Move all entities that don't care about position to the base of the player
     for ent in TAG_COOP_INST_VMF.entities:
-        if ent['classname'].startswith('info_'):
-            # info_target, info_coop_spawn, info_paint_sprayer.
-            # These all need to keep their location.
+        if ent['classname'] == 'info_coop_spawn':
+            # Remove the original spawn point from the instance.
+            # That way it can overlay over other dropper instances.
+            ent.remove()
+        elif ent['classname'].startswith('info_'):
+            # info_target or info_paint_sprayer.
+            # These need to keep their location.
             # they're offset up 16 units though.
             origin = Vec.from_str(ent['origin'])
             origin.z -= 16
             ent['origin'] = origin
         else:
             ent['origin'] = '0 0 64'
+    trig_brush = vmf.make_prism(
+        Vec(-32, -32, 0),
+        Vec(32, 32, 16),
+        mat='tools/toolstrigger',
+    ).solid
+    start_trig = vmf.create_ent(
+        classname='trigger_playerteam',
+        target_team=3,  # ATLAS
+        spawnflags=1,  # Clients only
+        origin='0 0 8',
+    )
+    start_trig.solids = [trig_brush]
+    start_trig.add_out(
+        Output('OnStartTouchBluePlayer', '@gel_ui', 'Activate', delay=0),
+        Output('OnStartTouchBluePlayer', '@blueisenabled', 'SetValue', 0, delay=0.1),
+        Output('OnStartTouchBluePlayer', '@orangeisenabled', 'SetValue', 0, delay=0.1),
+    )
 
 
 def save():
