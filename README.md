@@ -1,18 +1,18 @@
 [![Join the chat at https://gitter.im/BenVlodgi/BEE2.4](https://badges.gitter.im/BenVlodgi/BEE2.4.svg)]  (https://gitter.im/BenVlodgi/BEE2.4?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)  
 
-![BEE2 Icon](https://raw.githubusercontent.com/BenVlodgi/BEE2.4/master/bee2.ico)
+![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/bee2.ico)
 # Better Extended Editor 2 version 4 #
 ##Portal 2  Mod Tool
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
 different eras, and configure many other aspects. All vanilla items have been upgraded with additional
 bugfixes and improvments.
 
-The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/TeamSpen210/BEE2-items) repository.
+The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
 ## Download and Use
 Download the latest releases of the BEE2.4 and items from the following pages:
-- [Application](https://github.com/BenVlodgi/BEE2.4/releases)
-- [Item Packages](https://github.com/TeamSpen210/BEE2-items/releases)
+- [Application](https://github.com/BEEmod/BEE2.4/releases)
+- [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
 - Extract the contents of the Application release anywhere you like. _e.g. C:\BEE2.4_
 - Place extracted package folder in the root BEE2 folder. _e.g. C:\BEE2.4\packages_
 - To run, locate the BEE2.exe in the bin folder and execute it. _e.g. C:\BEE2.4\bin\BEE2.exe_
