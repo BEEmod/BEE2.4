@@ -325,7 +325,7 @@ class Condition:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
-            result.value = func(result)
+            result.value = func(VMF, result)
             if result.value is None:
                 # This result is invalid, remove it.
                 res_list.remove(result)
@@ -378,7 +378,7 @@ def annotation_caller(func, *parms):
             if type_to_parm[ann] is not None:
                 raise ValueError('Parameter {} used twice!'.format(ann))
         except KeyError:
-            raise ValueError('Unknown parameter {}'.format(ann))
+            raise ValueError('Unknown potential type {!r}'.format(ann))
         type_to_parm[ann] = parm.name
     inputs = []
     outputs = ['_'] * len(sig.parameters)
