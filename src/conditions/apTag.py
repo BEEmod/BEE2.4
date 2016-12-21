@@ -11,9 +11,9 @@ from conditions import (
     PETI_INST_ANGLE, RES_EXHAUSTED
 )
 from instanceLocs import resolve as resolve_inst, get_special_inst
-from srctools import Vec, Property, Entity, Output
+from srctools import Vec, Property, VMF, Entity, Output
 
-from vbsp import settings, GAME_MODE, VMF as VMF_FILE
+from vbsp import settings, GAME_MODE
 
 LOGGER = utils.getLogger(__name__)
 
@@ -28,7 +28,7 @@ tag_fizzler_locs = {}
 
 
 @meta_cond(priority=200, only_once=True)
-def ap_tag_modifications():
+def ap_tag_modifications(vmf: VMF, inst: Entity):
     """Perform modifications for Aperture Tag.
 
     * All fizzlers will be combined with a trigger_paint_cleanser
@@ -51,10 +51,10 @@ def ap_tag_modifications():
     has['spawn_single'] = False
     has['spawn_nogun'] = True
 
-    for fizz in VMF_FILE.by_class['trigger_portal_cleanser']:
+    for fizz in vmf.by_class['trigger_portal_cleanser']:
         p_fizz = fizz.copy()
         p_fizz['classname'] = 'trigger_paint_cleanser'
-        VMF_FILE.add_ent(p_fizz)
+        vmf.add_ent(p_fizz)
 
         if p_fizz['targetname'].endswith('_brush'):
             p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
@@ -68,7 +68,7 @@ def ap_tag_modifications():
             side.scale = 0.25
 
     if GAME_MODE == 'COOP':
-        VMF_FILE.create_ent(
+        vmf.create_ent(
             classname='info_target',
             targetname='supress_blue_portalgun_spawn',
             origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
@@ -76,7 +76,7 @@ def ap_tag_modifications():
         )
 
     transition_ents = get_special_inst('transitionents')
-    for inst in VMF_FILE.by_class['func_instance']:
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue
         inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
@@ -101,7 +101,7 @@ def ap_tag_modifications():
 
 
 @meta_cond(priority=-110, only_once=False)
-def res_find_potential_tag_fizzlers(inst: Entity):
+def res_find_potential_tag_fizzlers(vmf: VMF, inst: Entity):
     """We need to know which items are 'real' fizzlers.
 
     This is used for Aperture Tag paint fizzlers.
@@ -120,7 +120,7 @@ def res_find_potential_tag_fizzlers(inst: Entity):
 
     # Determine the origins by first finding the bounding box of the brushes,
     # then averaging.
-    for fizz in VMF_FILE.by_class['trigger_portal_cleanser']:
+    for fizz in vmf.by_class['trigger_portal_cleanser']:
         name = fizz['targetname'][:-6]  # Strip off '_brush'
         bbox_min, bbox_max = fizz.get_bbox()
         if name in tag_fizzler_locs:
@@ -159,7 +159,7 @@ def res_find_potential_tag_fizzlers(inst: Entity):
 
 
 @make_result('TagFizzler')
-def res_make_tag_fizzler(inst: Entity, res: Property):
+def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
@@ -183,7 +183,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
         else:
             # It's an indicator toggle, remove it and the antline to clean up.
             LOGGER.warning('Toggle: {}', targetname)
-            for ent in VMF_FILE.by_target[targetname]:
+            for ent in vmf.by_target[targetname]:
                 remove_ant_toggle(ent)
     inst.outputs.clear()  # Remove the outptuts now, they're not valid anyway.
 
@@ -254,7 +254,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
                 # Compare to the closest side. Use ** to swap x/y arguments
                 # appropriately. The closest side is the one with the
                 # smallest magnitude.
-                VMF_FILE.create_ent(
+                vmf.create_ent(
                     classname='info_null',
                     targetname=inst['targetname'] + '_min',
                     origin=sign_floor_loc - Vec(**{
@@ -262,7 +262,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
                         other_axis: normal,
                     }),
                 )
-                VMF_FILE.create_ent(
+                vmf.create_ent(
                     classname='info_null',
                     targetname=inst['targetname'] + '_max',
                     origin=sign_floor_loc - Vec(**{
@@ -305,7 +305,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
 
     if blue_enabled:
-        VMF_FILE.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             file=res['blue_sign', ''],
             targetname=inst['targetname'],
@@ -314,7 +314,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
         )
 
     if oran_enabled:
-        VMF_FILE.create_ent(
+        vmf.create_ent(
             classname='func_instance',
             file=res['oran_sign', ''],
             targetname=inst['targetname'],
@@ -325,8 +325,8 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
     # Now modify the fizzler...
 
     fizz_brushes = list(
-        VMF_FILE.by_class['trigger_portal_cleanser'] &
-        VMF_FILE.by_target[fizz_name + '_brush']
+        vmf.by_class['trigger_portal_cleanser'] &
+        vmf.by_target[fizz_name + '_brush']
     )
 
     if 'base_inst' in res:
@@ -343,7 +343,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
 
     if 'model_inst' in res:
         model_inst = resolve_inst(res['model_inst'])[0]
-        for mdl_inst in VMF_FILE.by_class['func_instance']:
+        for mdl_inst in vmf.by_class['func_instance']:
             if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
                 mdl_inst['file'] = model_inst
 
@@ -397,18 +397,18 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
 
     if vbsp.GAME_MODE == 'COOP':
         # We need ATLAS-specific triggers
-        pos_trig = VMF_FILE.create_ent(
+        pos_trig = vmf.create_ent(
             classname='trigger_playerteam',
         )
-        neg_trig = VMF_FILE.create_ent(
+        neg_trig = vmf.create_ent(
             classname='trigger_playerteam',
         )
         output = 'OnStartTouchBluePlayer'
     else:
-        pos_trig = VMF_FILE.create_ent(
+        pos_trig = vmf.create_ent(
             classname='trigger_multiple',
         )
-        neg_trig = VMF_FILE.create_ent(
+        neg_trig = vmf.create_ent(
             classname='trigger_multiple',
             spawnflags='1',
         )
@@ -490,7 +490,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
         # If both are disabled, we must shutdown the gun when touching
         # either side - use neg_trig for that purpose!
         # We want to get rid of pos_trig to save ents
-        VMF_FILE.remove_ent(pos_trig)
+        vmf.remove_ent(pos_trig)
         neg_trig['targetname'] = fizz_name + '-trig'
         neg_trig.outputs.clear()
         neg_trig.add_out(Output(
@@ -556,14 +556,14 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
 
         if blue_enabled or oran_enabled:
             neg_trig.solids.append(
-                VMF_FILE.make_prism(
+                vmf.make_prism(
                     neg_min,
                     neg_max,
                     mat='tools/toolstrigger',
                 ).solid,
             )
             pos_trig.solids.append(
-                VMF_FILE.make_prism(
+                vmf.make_prism(
                     pos_min,
                     pos_max,
                     mat='tools/toolstrigger',
@@ -572,7 +572,7 @@ def res_make_tag_fizzler(inst: Entity, res: Property):
         else:
             # If neither enabled, use one trigger
             neg_trig.solids.append(
-                VMF_FILE.make_prism(
+                vmf.make_prism(
                     neg_min,
                     pos_max,
                     mat='tools/toolstrigger',
