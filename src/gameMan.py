@@ -13,6 +13,7 @@ from tk_tools import TK_ROOT
 import os
 import os.path
 import shutil
+import math
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
@@ -861,21 +862,27 @@ def make_tag_coop_inst(tag_loc: str):
     TAG_COOP_INST_VMF = vmf = VMF.parse(
         os.path.join(tag_loc, TAG_GUN_COOP_INST)
     )
+
+    def logic_pos():
+        """Put the entities in a nice circle..."""
+        while True:
+            for ang in range(0, 44):
+                ang *= 360/44
+                yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)
+    pos = logic_pos()
     # Move all entities that don't care about position to the base of the player
-    for ent in TAG_COOP_INST_VMF.entities:
+    for ent in TAG_COOP_INST_VMF.iter_ents():
         if ent['classname'] == 'info_coop_spawn':
             # Remove the original spawn point from the instance.
             # That way it can overlay over other dropper instances.
             ent.remove()
-        elif ent['classname'].startswith('info_'):
-            # info_target or info_paint_sprayer.
-            # These need to keep their location.
-            # they're offset up 16 units though.
-            origin = Vec.from_str(ent['origin'])
-            origin.z -= 16
-            ent['origin'] = origin
+        elif ent['classname'] in ('info_target', 'info_paint_sprayer'):
+            pass
         else:
-            ent['origin'] = '0 0 64'
+            ent['origin'] = next(pos)
+
+    # Add in a trigger to start the gel gun, and reset the activated
+    # gel whenever the player spawns.
     trig_brush = vmf.make_prism(
         Vec(-32, -32, 0),
         Vec(32, 32, 16),
@@ -889,7 +896,9 @@ def make_tag_coop_inst(tag_loc: str):
     )
     start_trig.solids = [trig_brush]
     start_trig.add_out(
-        Output('OnStartTouchBluePlayer', '@gel_ui', 'Activate', delay=0),
+        # This uses the !activator as the target player so it must be via trigger.
+        Output('OnStartTouchBluePlayer', '@gel_ui', 'Activate', delay=0, only_once=True),
+        # Reset the gun to fire nothing.
         Output('OnStartTouchBluePlayer', '@blueisenabled', 'SetValue', 0, delay=0.1),
         Output('OnStartTouchBluePlayer', '@orangeisenabled', 'SetValue', 0, delay=0.1),
     )
