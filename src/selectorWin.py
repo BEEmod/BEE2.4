@@ -577,6 +577,7 @@ class selWin:
             name_frame,
             text="Item",
             justify=CENTER,
+            width=-10,
             font=("Helvetica", 12, "bold"),
         )
         name_frame.grid(row=1, column=0, columnspan=4)
@@ -744,15 +745,17 @@ class selWin:
             item.win = self.win
 
             @utils.bind_leftclick(item.button)
-            def click_item(event=None):
+            def click_item(event=None, *, _item=item):
                 """Handle clicking on the item.
 
                 If it's already selected, save and close the window.
                 """
-                if item is self.selected:
+                # We need to capture the item in a default, since it's
+                # the same variable in different iterations
+                if _item is self.selected:
                     self.save()
                 else:
-                    self.sel_item(item)
+                    self.sel_item(_item)
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
