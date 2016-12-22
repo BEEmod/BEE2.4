@@ -881,6 +881,12 @@ def make_tag_coop_inst(tag_loc: str):
         else:
             ent['origin'] = next(pos)
 
+            # These originally use the coop spawn point, but this doesn't
+            # always work. Switch to the name of the player, which is much
+            # more reliable.
+            if ent['classname'] == 'logic_measure_movement':
+                ent['measuretarget'] = '!player_blue'
+
     # Add in a trigger to start the gel gun, and reset the activated
     # gel whenever the player spawns.
     trig_brush = vmf.make_prism(
