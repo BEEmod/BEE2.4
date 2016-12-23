@@ -18,7 +18,7 @@ LOGGER = utils.getLogger(__name__)
 # The list of instance each item uses.
 INSTANCE_FILES = {}
 
-_RE_DEFS = re.compile(r'((?: \[ [^]]+ \] ) | (?: < [^>]+ > )) \s* ,? ', re.VERBOSE)
+_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
     \s*<
     \s*([^:]+)
@@ -325,11 +325,11 @@ def _resolve(path):
                     out.extend(item_inst)
 
             elif group[0] == '[':
-                path = path[1:-1].casefold()
+                special_name = group[1:-1].casefold()
                 try:
-                    out.extend(INST_SPECIAL[path])
+                    out.extend(INST_SPECIAL[special_name])
                 except KeyError:
-                    LOGGER.warning('"{}" not a valid instance category!', path)
+                    LOGGER.warning('"{}" not a valid instance category!', special_name)
                     continue
             else:
                 raise Exception(group)
