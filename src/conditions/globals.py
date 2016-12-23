@@ -44,7 +44,7 @@ def flag_music(flag: Property):
 def flag_game(flag: Property):
     """Checks which game is being modded.
 
-    Accepts the ffollowing aliases instead of a Steam ID:
+    Accepts the following aliases instead of a Steam ID:
      - PORTAL2
      - APTAG
      - ALATAG
