@@ -255,8 +255,17 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     # Now deal with the visual aspect:
     # Blue signs should be on top.
 
-    blue_enabled = srctools.conv_bool(inst.fixup['$start_enabled'])
-    oran_enabled = srctools.conv_bool(inst.fixup['$start_reversed'])
+    blue_enabled = inst.fixup.bool('$start_enabled')
+    oran_enabled = inst.fixup.bool('$start_reversed')
+    # If True, single-color signs will also turn off the other color.
+    # This also means we always show both signs.
+    # If both are enabled or disabled, this has no effect.
+    disable_other = (
+        not inst.fixup.bool('$disable_autorespawn', True) and
+        blue_enabled != oran_enabled
+    )
+    # Delete fixups now, they aren't useful.
+    inst.fixup.clear()
 
     if not blue_enabled and not oran_enabled:
         # Hide the sign in this case!
@@ -267,13 +276,18 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
     loc = Vec.from_str(inst['origin'])
 
-    if blue_enabled and oran_enabled:
+    if disable_other or (blue_enabled and oran_enabled):
         inst['file'] = res['frame_double']
         # On a wall, and pointing vertically
-        if inst_normal.z != 0 and Vec(0, 1, 0).rotate(*inst_angle).z != 0:
+        if inst_normal.z == 0 and Vec(y=1).rotate(*inst_angle).z:
             # They're vertical, make sure blue's on top!
             blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
             oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
+            # If orange is enabled, with two frames put that on top
+            # instead since it's more important
+            if disable_other and oran_enabled:
+                blue_loc, oran_loc = oran_loc, blue_loc
+
         else:
             offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
             blue_loc = loc + offset
@@ -355,19 +369,23 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         # On a wall, face upright
         sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
 
-    if blue_enabled:
+    # If disable_other, we show off signs. Otherwise we don't use that sign.
+    blue_sign = 'blue_sign' if blue_enabled else 'blue_off_sign' if disable_other else None
+    oran_sign = 'oran_sign' if oran_enabled else 'oran_off_sign' if disable_other else None
+
+    if blue_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res['blue_sign', ''],
+            file=res[blue_sign, ''],
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=blue_loc.join(' '),
         )
 
-    if oran_enabled:
+    if oran_sign:
         vmf.create_ent(
             classname='func_instance',
-            file=res['oran_sign', ''],
+            file=res[oran_sign, ''],
             targetname=inst['targetname'],
             angles=sign_angle,
             origin=oran_loc.join(' '),
@@ -499,7 +517,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
 
     voice_attr = vbsp.settings['has_attr']
 
-    if blue_enabled:
+    if blue_enabled or disable_other:
         # If this is blue/oran only, don't affect the other color
         neg_trig.outputs.append(Output(
             output,
@@ -513,13 +531,14 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
             'SetValue',
             param=srctools.bool_as_int(pos_blue),
         ))
-        # Add voice attributes - we have the gun and gel!
-        voice_attr['bluegelgun'] = True
-        voice_attr['bluegel'] = True
-        voice_attr['bouncegun'] = True
-        voice_attr['bouncegel'] = True
+        if blue_enabled:
+            # Add voice attributes - we have the gun and gel!
+            voice_attr['bluegelgun'] = True
+            voice_attr['bluegel'] = True
+            voice_attr['bouncegun'] = True
+            voice_attr['bouncegel'] = True
 
-    if oran_enabled:
+    if oran_enabled or disable_other:
         neg_trig.outputs.append(Output(
             output,
             '@OrangeIsEnabled',
@@ -532,10 +551,11 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
             'SetValue',
             param=srctools.bool_as_int(pos_oran),
         ))
-        voice_attr['orangegelgun'] = True
-        voice_attr['orangegel'] = True
-        voice_attr['speedgelgun'] = True
-        voice_attr['speedgel'] = True
+        if oran_enabled:
+            voice_attr['orangegelgun'] = True
+            voice_attr['orangegel'] = True
+            voice_attr['speedgelgun'] = True
+            voice_attr['speedgel'] = True
 
     if not oran_enabled and not blue_enabled:
         # If both are disabled, we must shutdown the gun when touching
