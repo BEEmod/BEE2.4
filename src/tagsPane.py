@@ -60,7 +60,6 @@ Section.index = [Section[key] for key in Section.__members__.keys()].index
 
 def filter_items():
     """Update items based on selected tags."""
-    show_wip = optionWindow.SHOW_WIP.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
 
     # any() or all()
@@ -76,9 +75,6 @@ def filter_items():
 
     for item in UI.pal_items:
         if item.needs_unlock and not style_unlocked:
-            item.visible = False
-            continue
-        if item.item.is_wip and not show_wip:
             item.visible = False
             continue
 

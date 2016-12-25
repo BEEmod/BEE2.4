@@ -51,6 +51,9 @@ selected_style = "BEE2_CLEAN"
 selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
+# Variable used for export button (changes to include game name)
+# This is used after resource copying is done.
+EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
 # All the stuff we've loaded in
 item_list = {}
@@ -83,8 +86,6 @@ class Item:
         'pak_id',
         'pak_name',
         'names',
-        'is_dep',
-        'is_wip',
         'url',
         'can_group',
         ]
@@ -139,8 +140,6 @@ class Item:
             self.data['editor'].find_all("Editor", "Subtype")
             if prop['Palette', None] is not None
         ]
-        self.is_dep = version['is_dep']
-        self.is_wip = version['is_wip']
         self.url = self.data['url']
 
         # This checks to see if all the data is present to enable
@@ -267,33 +266,28 @@ class Item:
 
     def get_version_names(self):
         """Get a list of the names and corresponding IDs for the item."""
-        vers = []
-        for ver_id in self.ver_list:
-            ver = self.item.versions[ver_id]
-            name = ver['name']
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.item.versions[ver_id]['styles'][selected_style])
+            for ver_id in self.ver_list
+        }
+        versions = self.ver_list
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = self.ver_list[:1]
 
-            if ver['is_dep']:
-                name = '[DEP] ' + name
-
-            if ver['is_wip']:
-                # We always display the currently selected version, so
-                # it's possible to deselect it.
-                if ver_id != self.selected_ver and not optionWindow.SHOW_WIP.get():
-                    continue
-                name = '[WIP] ' + name
-            vers.append(name)
-        return self.ver_list, vers
+        return versions, [
+            self.item.versions[ver_id]['name']
+            for ver_id in versions
+        ]
 
 
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item, sub, is_pre):
         """Create a label to show an item onscreen."""
-        super().__init__(
-            frame,
-            font=("Courier", 24, "bold"),
-            foreground='red',
-            )
+        super().__init__(frame)
         self.item = item
         self.subKey = sub
         self.id = item.id
@@ -304,22 +298,49 @@ class PalItem(Label):
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
 
-        utils.bind_rightclick(self, contextWin.open_event)
         self.bind(utils.EVENTS['LEFT'], drag_start)
         self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
+        self.info_btn = Label(
+            self,
+            image=img.png('icons/gear'),
+            relief='ridge',
+            width=12,
+            height=12,
+        )
+
+        click_func = contextWin.open_event(self)
+        utils.bind_rightclick(self, click_func)
+
+        @utils.bind_leftclick(self.info_btn)
+        def info_button_click(e):
+            click_func(e)
+            # Cancel the event sequence, so it doesn't travel up to the main
+            # window and hide the window again.
+            return 'break'
+
+        # Rightclick does the same as the icon.
+        utils.bind_rightclick(self.info_btn, click_func)
+
     def rollover(self, _):
-        """Show the name of a subitem when moused over."""
+        """Show the name of a subitem and info button when moused over."""
         set_disp_name(self)
         self.lift()
         self['relief'] = 'ridge'
+        padding = 2 if utils.WIN else 0
+        self.info_btn.place(
+            x=self.winfo_width() - padding,
+            y=self.winfo_height() - padding,
+            anchor=SE,
+        )
 
     def rollout(self, _):
-        """Reset the item name display when the mouse leaves."""
+        """Reset the item name display and hide the info button when the mouse leaves."""
         clear_disp_name()
         self['relief'] = 'flat'
+        self.info_btn.place_forget()
 
     def change_subtype(self, ind):
         """Change the subtype of this icon.
@@ -354,15 +375,15 @@ class PalItem(Label):
         Call whenever the style changes, so the icons update.
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
-        self.name = gameMan.translate(self.item.names[self.subKey])
+        try:
+            self.name = gameMan.translate(self.item.names[self.subKey])
+        except IndexError:
+            LOGGER.warning(
+                'Item <{}> in <{}> style has mismatched subtype count!',
+                self.id, selected_style,
+            )
+            self.name = '??'
         self['image'] = self.img
-        # Put a large D over the item if it's deprecated.
-        if self.item.is_dep:
-            self['text'] = 'OLD'
-            self['compound'] = 'center'
-        else:
-            self['compound'] = 'none'
-            self['text'] = None
 
     def clear(self):
         """Remove any items matching ourselves from the palette.
@@ -416,7 +437,7 @@ def quit_application():
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
     # Destroy the TK windows
-    TK_ROOT.destroy()
+    TK_ROOT.quit()
     sys.exit(0)
 
 gameMan.quit_application = quit_application
@@ -481,6 +502,8 @@ def load_packages(data):
         }),
         (voice_list, voices, 'QuotePack', {
             'CHAR': 'chars',
+            'MONITOR': 'studio',
+            'TURRET': 'turret_hate',
         }),
         (style_list, styles, 'Style', {
             'VID': 'has_video',
@@ -507,10 +530,9 @@ def load_packages(data):
                 data[name],
                 key=operator.attrgetter('selitem_data.name'),
                 ):
-            selitem_data = obj.selitem_data
             sel_list.append(selWinItem.from_data(
                 obj.id,
-                selitem_data,
+                obj.selitem_data,
                 attrs={
                     key: func(obj)
                     for key, func in
@@ -563,7 +585,7 @@ def load_packages(data):
         desc=_('The skybox decides what the area outside the chamber is like.'
                ' It chooses the colour of sky (seen in some items), the style'
                ' of bottomless pit (if present), as well as color of "fog" '
-               '(seen in larger chambers.'),
+               '(seen in larger chambers).'),
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
@@ -589,6 +611,8 @@ def load_packages(data):
         callback=voice_callback,
         attributes=[
             SelAttr.list('CHAR', _('Characters'), ['??']),
+            SelAttr.bool('TURRET', _('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', _('Monitor Visuals'), False),
         ],
     )
 
@@ -605,8 +629,8 @@ def load_packages(data):
         callback=win_callback,
         callback_params=['Music'],
         attributes=[
-            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX'),
-            SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX')),
+            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
+            SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
             SelAttr.bool('TBEAM', _('Excursion Funnel SFX')),
         ],
     )
@@ -1046,15 +1070,25 @@ def set_palette(e=None):
         label=_('Delete Palette "{}"').format(palettes[selectedPalette].name),
     )
     for item, sub in palettes[selectedPalette].pos:
-        if item in item_list.keys():
-            pal_picked.append(PalItem(
-                frames['preview'],
-                item_list[item],
-                sub,
-                is_pre=True
-                ))
-        else:
-            LOGGER.warning('Unknown item "{}"!', item)
+        try:
+            item_group = item_list[item]
+        except KeyError:
+            LOGGER.warning('Unknown item "{}"! for palette', item)
+            continue
+
+        if sub >= item_group.num_sub:
+            LOGGER.warning(
+                'Palette had incorrect subtype for "{}" ({} > {})!',
+                item, sub, item_group.num_sub - 1,
+            )
+            continue
+
+        pal_picked.append(PalItem(
+            frames['preview'],
+            item_list[item],
+            sub,
+            is_pre=True,
+        ))
     flow_preview()
 
 
@@ -1226,7 +1260,6 @@ def init_option(f):
         textvariable=extract_packages.export_btn_text,
         command=export_editoritems,
     )
-    extract_packages.export_btn_text.set(_('Export...'))
     UI['export_button'].state(['disabled'])
     UI['export_button'].grid(row=2, sticky="EW", padx=5)
 
@@ -1376,11 +1409,10 @@ def init_preview(f):
         borderwidth=0,
         relief="solid",
         )
-    blank = img.png('BEE2/blank')
     pal_picked_fake = [
         ttk.Label(
             frames['preview'],
-            image=blank,
+            image=img.PAL_BG_64,
             )
         for _ in range(32)
         ]
@@ -1488,12 +1520,10 @@ def flow_picker(e=None):
     )
     frmScroll['height'] = height
 
-    # this adds extra blank items on the end to finish the grid nicely.
-    blank_img = img.png('BEE2/blank')
-
+    # This adds extra blank items on the end to finish the grid nicely.
     for i in range(width):
         if i not in pal_items_fake:
-            pal_items_fake.append(ttk.Label(frmScroll, image=blank_img))
+            pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
         if (num_items % width) <= i < width:  # if this space is empty
             pal_items_fake[i].place(
                 x=((i % width)*65 + 1),
@@ -1516,7 +1546,7 @@ def init_drag_icon():
     drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = Label(
         drag_win,
-        image=img.png('BEE2/blank'),
+        image=img.PAL_BG_64,
         )
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
@@ -1533,6 +1563,12 @@ def set_game(game):
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
+    text = _('Export to "{}"...').format(game.name)
+    menus['file'].entryconfigure(
+        menus['file'].export_btn_index,
+        label=text,
+    )
+    EXPORT_CMD_VAR.set(text)
 
 
 def init_menu_bar(win):
@@ -1558,6 +1594,8 @@ def init_menu_bar(win):
         state=DISABLED,
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
+
+
 
     file_menu.add_command(
         label=_("Add Game"),
@@ -1909,6 +1947,7 @@ def init_windows():
         """Callback run when all resources have been extracted."""
 
         UI['export_button'].state(['!disabled'])
+        UI['export_button']['textvariable'] = EXPORT_CMD_VAR
         UI['extract_progress'].grid_remove()
         windows['opt'].update_idletasks()
         # Reload the option window's position and sizing configuration,

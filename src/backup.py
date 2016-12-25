@@ -46,6 +46,8 @@ import tk_tools
 import gameMan
 import srctools
 
+from typing import List
+
 # The backup window - either a toplevel, or TK_ROOT.
 window = None  # type: tk.Toplevel
 
@@ -102,12 +104,17 @@ reading_loader = LoadScreen(
     title_text=_('Loading maps'),
 )
 
+deleting_loader = LoadScreen(
+    ('DELETE', ''),
+    title_text=_('Deleting maps'),
+)
+
 
 class P2C:
     """A PeTI map."""
     def __init__(
             self,
-            path,
+            filename,
             zip_file,
             create_time,
             mod_time,
@@ -115,7 +122,7 @@ class P2C:
             desc='',
             is_coop=False,
             ):
-        self.path = path
+        self.filename = filename
         self.zip_file = zip_file
         self.create_time = create_time
         self.mod_time = mod_time
@@ -158,11 +165,13 @@ class P2C:
             title = props['title', None]
             desc = props['description', _('No description found.')]
 
+
+
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
 
         return cls(
-            path=path,
+            filename=os.path.basename(path),
             zip_file=zip_file,
             title=title,
             desc=desc,
@@ -174,7 +183,7 @@ class P2C:
     def copy(self):
         """Copy this item."""
         return self.__class__(
-            self.path,
+            self.filename,
             create_time=self.create_time,
             zip_file=self.zip_file,
             mod_time=self.mod_time,
@@ -325,7 +334,7 @@ def backup_maps(maps):
 
     # Allow removing old maps when we overwrite objects
     map_dict = {
-        p2c.path: p2c
+        p2c.filename: p2c
         for p2c in
         BACKUPS['back']
     }
@@ -334,8 +343,8 @@ def backup_maps(maps):
     # Here we'll just add entries into BACKUPS['back'].
     # Also check for overwriting
     for p2c in maps:
-        scr_path = p2c.path + '.jpg'
-        map_path = p2c.path + '.p2c'
+        scr_path = p2c.filename + '.jpg'
+        map_path = p2c.filename + '.p2c'
         if (
                 map_path in zip_names(back_zip) or
                 scr_path in zip_names(back_zip)
@@ -350,7 +359,7 @@ def backup_maps(maps):
                     ):
                 continue
         new_item = p2c.copy()
-        map_dict[p2c.path] = new_item
+        map_dict[p2c.filename] = new_item
 
     BACKUPS['back'] = list(map_dict.values())
     refresh_back_details()
@@ -456,10 +465,10 @@ def save_backup():
     copy_loader.set_length('COPY', len(maps))
 
     with copy_loader:
-        for p2c in maps:
+        for p2c in maps:  # type: P2C
             old_zip = p2c.zip_file
-            map_path = p2c.path + '.p2c'
-            scr_path = p2c.path + '.jpg'
+            map_path = p2c.filename + '.p2c'
+            scr_path = p2c.filename + '.jpg'
             if scr_path in zip_names(old_zip):
                 with zip_open_bin(old_zip, scr_path) as f:
                     new_zip.writestr(scr_path, f.read())
@@ -488,16 +497,19 @@ def save_backup():
         p2c.zip_file = new_zip
 
 
-def restore_maps(maps):
+def restore_maps(maps: List[P2C]):
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
+    if game_dir is None:
+        LOGGER.warning('No game selected to restore from?')
+        return
 
     copy_loader.set_length('COPY', len(maps))
     with copy_loader:
         for p2c in maps:
             back_zip = p2c.zip_file
-            scr_path = p2c.path + '.jpg'
-            map_path = p2c.path + '.p2c'
+            scr_path = p2c.filename + '.jpg'
+            map_path = p2c.filename + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
             if (
@@ -674,6 +686,7 @@ def ui_restore_all():
         UI['back_details'].items
     ])
 
+
 def ui_delete_backup():
     """Delete the selected items in the backup."""
     BACKUPS['back'] = [
@@ -685,6 +698,62 @@ def ui_delete_backup():
 
     refresh_back_details()
 
+def ui_delete_game():
+    """Delete selected items in the game list."""
+    game_dir = BACKUPS['game_path']
+    if game_dir is None:
+        LOGGER.warning('No game selected to delete from?')
+        return
+
+    game_detail = UI['game_details']  # type: CheckDetails
+
+    to_delete = [
+        item.p2c
+        for item in
+        game_detail.items
+        if item.state
+    ]
+    to_keep = [
+        item.p2c
+        for item in
+        game_detail.items
+        if not item.state
+    ]
+
+    if not to_delete:
+        return
+    map_count = len(to_delete)
+    if not messagebox.askyesno(
+        _('Confirm Deletion'),
+        ngettext(
+            'Do you wish to delete {} map?\n',
+            'Do you wish to delete {} maps?\n',
+            map_count,
+        ).format(map_count) + '\n'.join([
+            '{} ({})'.format(map.title, map.filename)
+            for map in to_delete
+        ])
+    ):
+        return
+
+    deleting_loader.set_length('DELETE', len(to_delete))
+    with deleting_loader:
+        for p2c in to_delete:  # type: P2C
+            scr_path = p2c.filename + '.jpg'
+            map_path = p2c.filename + '.p2c'
+            abs_scr = os.path.join(game_dir, scr_path)
+            abs_map = os.path.join(game_dir, map_path)
+            try:
+                os.remove(abs_scr)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_scr)
+            try:
+                os.remove(abs_map)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_map)
+
+    BACKUPS['game'] = to_keep
+    refresh_game_details()
 
 def init():
     """Initialise all widgets in the given window."""
@@ -761,7 +830,7 @@ def init():
 
     UI['game_btn_all']['command'] = ui_backup_all
     UI['game_btn_sel']['command'] = ui_backup_sel
-    UI['game_btn_del'].state(['disabled'])
+    UI['game_btn_del']['command'] = ui_delete_game
 
     UI['back_btn_all']['command'] = ui_restore_all
     UI['back_btn_sel']['command'] = ui_restore_sel

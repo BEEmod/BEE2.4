@@ -7,14 +7,14 @@ from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec, Entity, Output
+from srctools import Property, Vec, Entity, Output
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 
 
 @make_result('ResizeableTrigger')
-def res_resizeable_trigger(inst: Entity, res):
+def res_resizeable_trigger(res: Property):
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.

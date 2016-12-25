@@ -15,7 +15,6 @@ import logWindow
 
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
-SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 
@@ -40,7 +39,7 @@ win.withdraw()
 
 def show():
     win.deiconify()
-    contextWin.hide_context() # Ensure this closes
+    contextWin.hide_context()  # Ensure this closes
     utils.center_win(win)
 
 
@@ -231,41 +230,31 @@ def init_gen_tab(f):
             f,
             section='General',
             item='play_sounds',
-            desc='Play Sounds',
+            desc=_('Play Sounds'),
             var=PLAY_SOUND,
         )
     else:
         UI['mute'] = mute = ttk.Checkbutton(
             f,
-            text='Play Sounds',
+            text=_('Play Sounds'),
             state='disabled',
         )
         add_tooltip(
             UI['mute'],
-            'PyGame is either not installed or broken.\n'
-            'Sound effects have been disabled.'
+            _('Pyglet is either not installed or broken.\n'
+              'Sound effects have been disabled.')
         )
     mute.grid(row=0, column=0, sticky=W)
 
-    make_checkbox(
-        f,
-        section='General',
-        item='show_wip_items',
-        desc='Show WIP items',
-        tooltip='Show items and item versions marked Work In Progress. '
-                'These may be buggy or incomplete.',
-        var=SHOW_WIP,
-    ).grid(row=1, column=0, sticky=W)
-
     UI['reset_cache'] = reset_cache = ttk.Button(
         f,
-        text='Reset Package Caches',
+        text=_('Reset Package Caches'),
         command=clear_caches,
     )
     reset_cache.grid(row=2, column=0, columnspan=2, sticky='SEW')
     add_tooltip(
         reset_cache,
-        'Force re-extracting all package resources. This requires a restart.'
+        _('Force re-extracting all package resources. This requires a restart.'),
     )
 
 
@@ -274,16 +263,16 @@ def init_win_tab(f):
         f,
         section='General',
         item='keep_win_inside',
-        desc='Keep windows inside screen',
-        tooltip='Prevent sub-windows from moving outside the screen borders. '
-                'If you have multiple monitors, disable this.',
+        desc=_('Keep windows inside screen'),
+        tooltip=_('Prevent sub-windows from moving outside the screen borders. '
+                  'If you have multiple monitors, disable this.'),
         var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=W)
 
     UI['reset_win'] = reset_win = ttk.Button(
         f,
-        text='Reset All Window Positions',
+        text=_('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
     )
@@ -307,9 +296,9 @@ def init_dev_tab(f):
         f,
         section='Debug',
         item='log_missing_styles',
-        desc="Log when item doesn't have a style",
-        tooltip='Log items have no applicable version for a particular style.'
-                'This usually means it will look very bad.',
+        desc=_("Log when item doesn't have a style"),
+        tooltip=_('Log items have no applicable version for a particular style.'
+                  'This usually means it will look very bad.'),
     ).grid(row=1, column=0, sticky=W)
 
     make_checkbox(
@@ -317,38 +306,38 @@ def init_dev_tab(f):
         section='Debug',
         item='log_item_fallbacks',
         desc="Log when item uses parent's style",
-        tooltip='Log when an item reuses a variant from a parent style '
-                '(1970s using 1950s items, for example). This is usually '
-                'fine, but may need to be fixed.',
+        tooltip=_('Log when an item reuses a variant from a parent style '
+                  '(1970s using 1950s items, for example). This is usually '
+                  'fine, but may need to be fixed.'),
     ).grid(row=3, column=0, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_incorrect_packfile',
-        desc="Log missing packfile resources",
-        tooltip='Log when the resources a PackFile object refers to are not '
-                'present in the zip. This may be fine (in a prerequisite zip),'
-                ' but it often indicates an error.',
+        desc=_("Log missing packfile resources"),
+        tooltip=_('Log when the resources a "PackList" refers to are not '
+                  'present in the zip. This may be fine (in a prerequisite zip),'
+                  ' but it often indicates an error.'),
     ).grid(row=4, column=0, sticky=W)
 
     make_checkbox(
         f,
         section='General',
         item='preserve_bee2_resource_dir',
-        desc='Preserve Game Directories',
-        tooltip='When exporting, do not overwrite \n"bee2/" and'
-                '\n"sdk_content/maps/bee2/".\n'
-                'Enable if you\'re'
-                ' developing new content, to ensure it is not '
-                'overwritten.',
+        desc=_('Preserve Game Directories'),
+        tooltip=_('When exporting, do not overwrite \n"bee2/" and'
+                  '\n"sdk_content/maps/bee2/".\n'
+                  "Enable if you're"
+                  ' developing new content, to ensure it is not '
+                  'overwritten.'),
     ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='show_log_win',
-        desc='Show Log Window',
+        desc=_('Show Log Window'),
         var=SHOW_LOG_WIN,
-        tooltip='Show the log file in real-time.',
+        tooltip=_('Show the log file in real-time.'),
     ).grid(row=1, column=1, sticky=W)

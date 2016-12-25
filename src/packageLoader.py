@@ -26,7 +26,8 @@ from srctools import (
 
 from typing import (
     Dict, List, Tuple,
-    Iterator
+    Iterator, Type,
+    TypeVar,
 )
 
 LOGGER = utils.getLogger(__name__)
@@ -86,6 +87,8 @@ VPK_FOLDER = {
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
 
+PakObjectVar = TypeVar('PakObjectVar', bound='PakObject')
+
 
 class _PakObjectMeta(type):
     def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
@@ -100,6 +103,9 @@ class _PakObjectMeta(type):
         # PakObject isn't created yet so we can't directly check that.
         if bases:
             OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+
+        # Maps object IDs to the object.
+        cls._id_to_obj = {}
 
         return cls
 
@@ -149,9 +155,14 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def get_objects(cls):
+    def all(cls: Type[PakObjectVar]) -> Iterator[PakObjectVar]:
         """Get the list of objects parsed."""
-        return OBJ_TYPES[cls.__name__]
+        return cls._id_to_obj.values()
+
+    @classmethod
+    def by_id(cls: Type[PakObjectVar], object_id: str) -> PakObjectVar:
+        """Return the object with a given ID."""
+        return cls._id_to_obj[object_id.casefold()]
 
 
 def reraise_keyerror(err, obj_id):
@@ -367,9 +378,10 @@ def load_packages(
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
+                obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
                 # parse through the object and return the resultant class
                 try:
-                    object_ = OBJ_TYPES[obj_type].cls.parse(
+                    object_ = obj_class.parse(
                         ParseData(
                             obj_data.zip_file,
                             obj_id,
@@ -380,6 +392,13 @@ def load_packages(
                     )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
+
+                if not hasattr(object_, 'id'):
+                    raise ValueError(
+                        '"{}" object {} has no ID!'.format(obj_type, object_)
+                    )
+
+                obj_class._id_to_obj[object_.id.casefold()] = object_
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
@@ -417,8 +436,8 @@ def load_packages(
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
-        data['Item'],
-        data['Style'],
+        Item.all(),
+        Style.all(),
         log_item_fallbacks,
         log_missing_styles,
     )
@@ -463,6 +482,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                     obj_override[comp_type][obj_id].append(
                         ParseData(pack.zip, obj_id, obj, pack.id, True)
                     )
+                    # Don't continue to parse and overwrite
+                    continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
@@ -484,8 +505,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
 
 
 def setup_style_tree(
-    item_data,
-    style_data,
+    item_data: List['Item'],
+    style_data: List['Style'],
     log_fallbacks,
     log_missing_styles,
 ):
@@ -728,17 +749,17 @@ class Package:
 
 class Style(PakObject):
     def __init__(
-            self,
-            style_id,
-            selitem_data: 'SelitemData',
-            editor,
-            config=None,
-            base_style=None,
-            suggested=None,
-            has_video=True,
-            vpk_name='',
-            corridor_names=EmptyMapping,
-        ):
+        self,
+        style_id,
+        selitem_data: 'SelitemData',
+        editor,
+        config=None,
+        base_style=None,
+        suggested=None,
+        has_video=True,
+        vpk_name='',
+        corridor_names=EmptyMapping,
+    ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
@@ -918,6 +939,9 @@ class Item(PakObject):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<Item {} all_conf>'.format(
+            data.id,
+        ))
 
         needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
 
@@ -925,8 +949,6 @@ class Item(PakObject):
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_wip': srctools.conv_bool(ver['wip', '0']),
-                'is_dep':  srctools.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,
                 }
@@ -1014,10 +1036,10 @@ class Item(PakObject):
 
         aux_item_configs = {
             conf.id: conf
-            for conf in data['ItemConfig']
+            for conf in ItemConfig.all()
         }
 
-        for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+        for item in sorted(Item.all(), key=operator.attrgetter('id')):  # type: Item
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
             (
@@ -1064,7 +1086,7 @@ class Item(PakObject):
 
         item_data = self.versions[ver_id]['styles'][style_id]
 
-        new_editor = item_data['editor'].copy()
+        new_editor = item_data['editor'].copy()  # type: Property
 
         new_editor['type'] = self.id  # Set the item ID to match our item
         # This allows the folders to be reused for different items if needed.
@@ -1118,6 +1140,56 @@ class Item(PakObject):
                 if item_prop.name.casefold() in prop_overrides:
                     item_prop['DefaultValue'] = prop_overrides[item_prop.name.casefold()]
 
+        # OccupiedVoxels does not allow specifying 'volume' regions like
+        # EmbeddedVoxel. Implement that.
+
+        # First for 32^2 cube sections.
+        for voxel_part in new_editor.find_all("Exporting", "OccupiedVoxels", "SurfaceVolume"):
+            if 'subpos1' not in voxel_part or 'subpos2' not in voxel_part:
+                LOGGER.warning(
+                    'Item {} has invalid OccupiedVoxels part '
+                    '(needs SubPos1 and SubPos2)!',
+                    self.id
+                )
+                continue
+            voxel_part.name = "Voxel"
+            bbox_min, bbox_max = Vec.bbox(
+                voxel_part.vec('subpos1'),
+                voxel_part.vec('subpos2'),
+            )
+            del voxel_part['subpos1']
+            del voxel_part['subpos2']
+            for pos in Vec.iter_grid(bbox_min, bbox_max):
+                voxel_part.append(Property(
+                    "Surface", [
+                        Property("Pos", str(pos)),
+                    ])
+                )
+
+        # Full blocks
+        for occu_voxels in new_editor.find_all("Exporting", "OccupiedVoxels"):
+            for voxel_part in list(occu_voxels.find_all("Volume")):
+                del occu_voxels['Volume']
+
+                if 'pos1' not in voxel_part or 'pos2' not in voxel_part:
+                    LOGGER.warning(
+                        'Item {} has invalid OccupiedVoxels part '
+                        '(needs Pos1 and Pos2)!',
+                        self.id
+                    )
+                    continue
+                voxel_part.name = "Voxel"
+                bbox_min, bbox_max = Vec.bbox(
+                    voxel_part.vec('pos1'),
+                    voxel_part.vec('pos2'),
+                )
+                del voxel_part['pos1']
+                del voxel_part['pos2']
+                for pos in Vec.iter_grid(bbox_min, bbox_max):
+                    new_part = voxel_part.copy()
+                    new_part['Pos'] = str(pos)
+                    occu_voxels.append(new_part)
+
         return (
             new_editor,
             item_data['editor_extra'],
@@ -1147,6 +1219,9 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<ItemConfig {}:{} all_conf>'.format(
+            data.pak_id, data.id,
+        ))
 
         for ver in data.info.find_all('Version'):  # type: Property
             ver_id = ver['ID', 'VER_DEFAULT']
@@ -1155,10 +1230,13 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
                     with data.zip_file.open(file_loc) as f:
-                        styles[style.real_name] = Property.parse(
+                        styles[style.real_name] = conf = Property.parse(
                             f,
                             data.pak_id + ':' + file_loc,
                         )
+                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                        data.pak_id, data.id, style.real_name,
+                    ))
 
         return cls(
             data.id,
@@ -1197,6 +1275,7 @@ class QuotePack(PakObject):
             studio: str=None,
             studio_actor='',
             cam_loc: Vec=None,
+            turret_hate=False,
             interrupt=0.0,
             cam_pitch=0.0,
             cam_yaw=0.0,
@@ -1213,6 +1292,7 @@ class QuotePack(PakObject):
         self.inter_chance = interrupt
         self.cam_pitch = cam_pitch
         self.cam_yaw = cam_yaw
+        self.turret_hate = turret_hate
 
     @classmethod
     def parse(cls, data):
@@ -1234,13 +1314,15 @@ class QuotePack(PakObject):
         if monitor_data.value is not None:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
-            mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
-            mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
+            mon_interrupt = monitor_data.float('interrupt_chance', 0)
+            mon_cam_loc = monitor_data.vec('Cam_loc')
+            mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
+            turret_hate = monitor_data.bool('TurretShoot')
         else:
             mon_studio = mon_cam_loc = None
             mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
             mon_studio_actor = ''
+            turret_hate = False
 
         config = get_config(
             data.info,
@@ -1262,6 +1344,7 @@ class QuotePack(PakObject):
             cam_loc=mon_cam_loc,
             cam_pitch=mon_cam_pitch,
             cam_yaw=mon_cam_yaw,
+            turret_hate=turret_hate,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -1285,6 +1368,7 @@ class QuotePack(PakObject):
             self.inter_chance = override.inter_chance
             self.cam_pitch = override.cam_pitch
             self.cam_yaw = override.cam_yaw
+            self.turret_hate = override.turret_hate
 
 
     def __repr__(self):
@@ -1296,13 +1380,12 @@ class QuotePack(PakObject):
         if exp_data.selected is None:
             return  # No quote pack!
 
-        for voice in data['QuotePack']:  # type: QuotePack
-            if voice.id == exp_data.selected:
-                break
-        else:
+        try:
+            voice = QuotePack.by_id(exp_data.selected)  # type: QuotePack
+        except KeyError:
             raise Exception(
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf  # type: Property
 
@@ -1332,6 +1415,7 @@ class QuotePack(PakObject):
             options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
+            options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
 
         # Copy the config files for this voiceline..
         for prefix, pretty in [
@@ -1446,10 +1530,9 @@ class Skybox(PakObject):
         if exp_data.selected is None:
             return  # No skybox..
 
-        for skybox in data['Skybox']:  # type: Skybox
-            if skybox.id == exp_data.selected:
-                break
-        else:
+        try:
+            skybox = Skybox.by_id(exp_data.selected)  # type: Skybox
+        except KeyError:
             raise Exception(
                 "Selected skybox ({}) doesn't exist?".format(exp_data.selected)
             )
@@ -1580,13 +1663,12 @@ class Music(PakObject):
         if exp_data.selected is None:
             return  # No music..
 
-        for music in data['Music']:  # type: Music
-            if music.id == exp_data.selected:
-                break
-        else:
+        try:
+            music = Music.by_id(exp_data.selected)  # type: Music
+        except KeyError:
             raise Exception(
                 "Selected music ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf
 
@@ -1722,6 +1804,16 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             style.bases
         )
 
+    def applies_to_all(self):
+        """Check if this applies to all styles."""
+        if self.styles is None:
+            return True
+
+        for style in Style.all():
+            if not self.applies_to_style(style):
+                return False
+        return True
+
     @staticmethod
     def export(exp_data: ExportData):
         """Export style var selections into the config.
@@ -1783,7 +1875,7 @@ class StyleVPK(PakObject, has_img=False):
         sel_vpk = exp_data.selected_style.vpk_name  # type: Style
 
         if sel_vpk:
-            for vpk in data['StyleVPK']:  # type: StyleVPK
+            for vpk in StyleVPK.all():  # type: StyleVPK
                 if vpk.id.casefold() == sel_vpk:
                     sel_vpk = vpk
                     break
@@ -1941,14 +2033,13 @@ class Elevator(PakObject):
         if exp_data.selected is None:
             elevator = None
         else:
-            for elevator in data['Elevator']:
-                if elevator.id == exp_data.selected:
-                    break
-            else:
+            try:
+                elevator = Elevator.by_id(exp_data.selected)  # type: Elevator
+            except KeyError:
                 raise Exception(
                     "Selected elevator ({}) "
                     "doesn't exist?".format(exp_data.selected)
-                )
+                ) from None
 
         if style.has_video:
             if elevator is None:
@@ -2043,6 +2134,13 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 if file.startswith('resources')
             }
             for file in files:
+                if file.startswith(('-#', 'precache_sound:')):
+                    # Used to disable stock soundscripts, and precache sounds
+                    # Not to pack - ignore.
+                    continue
+
+                file = file.lstrip('#')  # This means to put in soundscript too...
+
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
                 if file not in zip_files:
@@ -2077,7 +2175,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         # A list of materials which will casue a specific packlist to be used.
         pack_triggers = Property('PackTriggers', [])
 
-        for pack in data['PackList']:  # type: PackList
+        for pack in PackList.all():  # type: PackList
             # Build a
             # "Pack_id"
             # {
@@ -2138,7 +2236,7 @@ class EditorSound(PakObject, has_img=False):
         """Export EditorSound objects."""
         # Just command the game to do the writing.
         exp_data.game.add_editor_sounds(
-            data['EditorSound']
+            EditorSound.all()
         )
 
 
@@ -2152,7 +2250,7 @@ class BrushTemplate(PakObject, has_img=False):
     def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
-        This copies the solids out of vmf_file and into TEMPLATE_FILE.
+        This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
         If force is set to 'world' or 'detail', the other type will be converted.
         If keep_brushes is false brushes will be skipped (for TemplateOverlay).
         """
@@ -2311,7 +2409,8 @@ def get_selitem_data(info):
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
     name = info['name']
-    icon = info['icon', '_blank']
+    icon = info['icon', None]
+    large_icon = info['iconlarge', None]
     group = info['group', '']
     sort_key = info['sort_key', '']
     desc = desc_parse(info, id=info['id'])
@@ -2325,6 +2424,7 @@ def get_selitem_data(info):
         short_name,
         auth,
         icon,
+        large_icon,
         desc,
         group,
         sort_key,
@@ -2342,6 +2442,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         our_short_name,
         our_auth,
         our_icon,
+        our_large_icon,
         our_desc,
         our_group,
         our_sort_key,
@@ -2352,16 +2453,18 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         over_short_name,
         over_auth,
         over_icon,
+        over_large_icon,
         over_desc,
         over_group,
         over_sort_key,
     ) = over_data
 
     return SelitemData(
-        our_name if over_name == '???' else over_name,
-        our_short_name if over_short_name == '???' else over_short_name,
+        our_name,
+        our_short_name,
         our_auth + over_auth,
-        our_icon if over_icon == '_blank' else our_icon,
+        over_icon if our_icon is None else our_icon,
+        over_large_icon if our_large_icon is None else our_large_icon,
         tkMarkdown.join(our_desc, over_desc),
         over_group or our_group,
         over_sort_key or our_sort_key,

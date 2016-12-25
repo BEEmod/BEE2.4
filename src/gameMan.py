@@ -13,10 +13,11 @@ from tk_tools import TK_ROOT
 import os
 import os.path
 import shutil
+import math
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Property, NoKeyError, VPK
+from srctools import Vec, Property, NoKeyError, VPK, VMF, Output
 import backup
 import extract_packages
 import loadScreen
@@ -94,10 +95,15 @@ EXE_SUFFIX = (
 # That way they can use the files.
 MUSIC_MEL_VPK = None  # type: VPK
 MUSIC_TAG_LOC = None  # type: str
+TAG_COOP_INST_VMF = None  # type: VMF
 
 # The folder with the file...
 MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
 MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
+
+# Location of coop instance for Tag gun
+TAG_GUN_COOP_INST = ('aperture tag/sdk_content/maps/'
+                     'instances/alatag/lp_paintgun_instance_coop.vmf')
 
 # All the PS:Mel track names - all the resources are in the VPK,
 # this allows us to skip looking through all the other files..
@@ -431,6 +437,10 @@ class Game:
         except FileNotFoundError:
             num_compiler_files = 0
 
+        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            # Coop paint gun instance
+            num_compiler_files += 1
+
         if num_compiler_files == 0:
             LOGGER.warning('No compiler files!')
             export_screen.skip_stage('COMP')
@@ -593,11 +603,16 @@ class Game:
                     return False
                 export_screen.step('COMP')
 
+
         if should_refresh:
             LOGGER.info('Copying Resources!')
             self.refresh_cache()
 
             self.copy_mod_music()
+
+        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
+                TAG_COOP_INST_VMF.export(f)
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
@@ -784,27 +799,29 @@ def find_steam_info(game_dir):
     This only works on Source games!
     """
     game_id = None
-    steam_id_path = os.path.join(game_dir, 'steam_appid.txt')
-    try:
-        # The file ends with '\n\0'.
-        with open(steam_id_path, 'rb') as f:
-            game_id = f.read().strip(b'\n\0').decode('ascii')
-    except FileNotFoundError:
-        pass
-    if not game_id.isdigit():
-        game_id = None
-
+    name = None
+    found_name = False
+    found_id = False
     for folder in os.listdir(game_dir):
         info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
         if os.path.isfile(info_path):
             with open(info_path) as file:
                 for line in file:
                     clean_line = srctools.clean_line(line).replace('\t', ' ')
-                    if 'game ' in clean_line.casefold():
+                    if not found_id and 'steamappid' in clean_line.casefold():
+                        raw_id = clean_line.casefold().replace(
+                            'steamappid', '').strip()
+                        if raw_id.isdigit():
+                            game_id = raw_id
+                    elif not found_name and 'game ' in clean_line.casefold():
+                        found_name = True
                         ind = clean_line.casefold().rfind('game') + 4
                         name = clean_line[ind:].strip().strip('"')
-                        return game_id, name
-    return game_id, None
+                    if found_name and found_id:
+                        break
+        if found_name and found_id:
+            break
+    return game_id, name
 
 
 def scan_music_locs():
@@ -821,6 +838,7 @@ def scan_music_locs():
         tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
         mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
         if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
+            make_tag_coop_inst(loc)
             MUSIC_TAG_LOC = tag_loc
             LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
@@ -830,6 +848,66 @@ def scan_music_locs():
 
         if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
             break
+
+
+def make_tag_coop_inst(tag_loc: str):
+    """Make the coop version of the tag instances.
+
+    This needs to be shrunk, so all the logic entities are not spread
+    out so much (coop tubes are small).
+
+    This way we avoid distributing the logic.
+    """
+    global TAG_COOP_INST_VMF
+    TAG_COOP_INST_VMF = vmf = VMF.parse(
+        os.path.join(tag_loc, TAG_GUN_COOP_INST)
+    )
+
+    def logic_pos():
+        """Put the entities in a nice circle..."""
+        while True:
+            for ang in range(0, 44):
+                ang *= 360/44
+                yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)
+    pos = logic_pos()
+    # Move all entities that don't care about position to the base of the player
+    for ent in TAG_COOP_INST_VMF.iter_ents():
+        if ent['classname'] == 'info_coop_spawn':
+            # Remove the original spawn point from the instance.
+            # That way it can overlay over other dropper instances.
+            ent.remove()
+        elif ent['classname'] in ('info_target', 'info_paint_sprayer'):
+            pass
+        else:
+            ent['origin'] = next(pos)
+
+            # These originally use the coop spawn point, but this doesn't
+            # always work. Switch to the name of the player, which is much
+            # more reliable.
+            if ent['classname'] == 'logic_measure_movement':
+                ent['measuretarget'] = '!player_blue'
+
+    # Add in a trigger to start the gel gun, and reset the activated
+    # gel whenever the player spawns.
+    trig_brush = vmf.make_prism(
+        Vec(-32, -32, 0),
+        Vec(32, 32, 16),
+        mat='tools/toolstrigger',
+    ).solid
+    start_trig = vmf.create_ent(
+        classname='trigger_playerteam',
+        target_team=3,  # ATLAS
+        spawnflags=1,  # Clients only
+        origin='0 0 8',
+    )
+    start_trig.solids = [trig_brush]
+    start_trig.add_out(
+        # This uses the !activator as the target player so it must be via trigger.
+        Output('OnStartTouchBluePlayer', '@gel_ui', 'Activate', delay=0, only_once=True),
+        # Reset the gun to fire nothing.
+        Output('OnStartTouchBluePlayer', '@blueisenabled', 'SetValue', 0, delay=0.1),
+        Output('OnStartTouchBluePlayer', '@orangeisenabled', 'SetValue', 0, delay=0.1),
+    )
 
 
 def save():

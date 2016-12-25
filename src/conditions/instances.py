@@ -16,19 +16,19 @@ from srctools import Property, Vec, Entity, Output
 
 
 @make_flag('instance')
-def flag_file_equal(inst, flag):
+def flag_file_equal(inst: Entity, flag: Property):
     """Evaluates True if the instance matches the given file."""
     return inst['file'].casefold() in resolve_inst(flag.value)
 
 
 @make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst, flag):
+def flag_file_cont(inst: Entity, flag: Property):
     """Evaluates True if the instance contains the given portion."""
     return flag.value in inst['file'].casefold()
 
 
 @make_flag('hasInst')
-def flag_has_inst(_, flag):
+def flag_has_inst(flag: Property):
     """Checks if the given instance is present anywhere in the map."""
     flags = resolve_inst(flag.value)
     return any(
@@ -56,7 +56,7 @@ INSTVAR_COMP = {
 
 
 @make_flag('instVar')
-def flag_instvar(inst, flag):
+def flag_instvar(inst: Entity, flag: Property):
     """Checks if the $replace value matches the given value.
 
     The flag value follows the form "$start_enabled == 1", with or without
@@ -80,19 +80,19 @@ def flag_instvar(inst, flag):
 
 
 @make_result('rename', 'changeInstance')
-def res_change_instance(inst, res):
+def res_change_instance(inst: Entity, res: Property):
     """Set the file to a value."""
     inst['file'] = resolve_inst(res.value)[0]
 
 
 @make_result('suffix', 'instSuffix')
-def res_add_suffix(inst, res):
+def res_add_suffix(inst: Entity, res: Property):
     """Add the specified suffix to the filename."""
     conditions.add_suffix(inst, '_' + res.value)
 
 
 @make_result('setKey')
-def res_set_key(inst, res):
+def res_set_key(inst: Entity, res: Property):
     """Set a keyvalue to the given value.
 
     The name and value should be separated by a space.
@@ -102,7 +102,7 @@ def res_set_key(inst, res):
 
 
 @make_result('instVar', 'instVarSuffix')
-def res_add_inst_var(inst, res):
+def res_add_inst_var(inst: Entity, res: Property):
     """Append the value of an instance variable to the filename.
 
     Pass either the variable name, or a set of value->suffix pairs for a
@@ -121,7 +121,7 @@ def res_add_inst_var(inst, res):
 
 
 @make_result('setInstVar')
-def res_set_inst_var(inst, res):
+def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
     Values follow the format "$start_enabled 1", with or without the $.
@@ -131,20 +131,46 @@ def res_set_inst_var(inst, res):
     inst.fixup[var_name] = conditions.resolve_value(inst, val)
 
 
+@make_result_setup('mapInstVar')
+def res_map_inst_var_setup(res: Property):
+    table = {}
+    res_iter = iter(res)
+    first_prop = next(res_iter)
+    in_name, out_name = first_prop.name, first_prop.value
+    for prop in res_iter:
+        table[prop.real_name] = prop.value
+
+    out = in_name, out_name, table
+    return out if all(out) else None
+
+
+@make_result('mapInstVar')
+def res_map_inst_var(inst: Entity, res: Property):
+    """Set one instance var based on the value of another.
+
+    The first value is the in -> out var, and all following are values to map.
+    """
+    in_name, out_name, table = res.value  # type: str, str, dict
+    try:
+        inst.fixup[out_name] = table[inst.fixup[in_name]]
+    except KeyError:
+        pass
+
+
 @make_result('clearOutputs', 'clearOutput')
-def res_clear_outputs(inst, res):
+def res_clear_outputs(inst: Entity):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
-@make_result('removeFixup')
-def res_rem_fixup(inst, res):
+@make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
+def res_rem_fixup(inst: Entity, res: Property):
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
 @make_result('localTarget')
-def res_local_targetname(inst, res):
+def res_local_targetname(inst: Entity, res: Property):
     """Generate a instvar with an instance-local name.
 
     Useful with AddOutput commands, or other values which use
@@ -160,7 +186,7 @@ def res_local_targetname(inst, res):
 
 
 @make_result('replaceInstance')
-def res_replace_instance(inst: Entity, res):
+def res_replace_instance(inst: Entity, res: Property):
     """Replace an instance with another entity.
 
     'keys' and 'localkeys' defines the new keyvalues used.
@@ -198,7 +224,7 @@ GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
 
 
 @make_result_setup('GlobalInput')
-def res_global_input_setup(res):
+def res_global_input_setup(res: Property):
     target = res['target', ''] or None
     name = res['name', ''] or None
     output = res['output', 'OnTrigger']

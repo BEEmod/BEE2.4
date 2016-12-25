@@ -13,7 +13,7 @@ import itertools
 from enum import Enum
 from collections import defaultdict, namedtuple
 
-from srctools import Property, Vec, AtomicWriter
+from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
 import srctools.vmf as VLib
 import srctools
@@ -438,7 +438,7 @@ def load_map(map_path):
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(_):
+def add_voice():
     """Add voice lines to the map."""
     voiceLine.add_voice(
         has_items=settings['has_attr'],
@@ -450,7 +450,7 @@ def add_voice(_):
 
 
 @conditions.meta_cond(priority=-250)
-def add_fizz_borders(_):
+def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
     This is used in 50s and BTS styles.
@@ -563,7 +563,7 @@ def add_fizz_borders(_):
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst):
+def fix_fizz_models(inst: Entity):
     """Fix some bugs with fizzler model instances.
     This removes extra numbers from model instances, which prevents
     inputs from being read correctly.
@@ -594,7 +594,7 @@ def fix_fizz_models(inst):
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
-def static_pan(inst):
+def static_pan(inst: Entity):
     """Switches glass angled panels to static instances, if needed."""
     if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
@@ -609,7 +609,7 @@ PANEL_FAITH_TARGETS = defaultdict(list)
 
 
 @conditions.meta_cond(-1000)
-def find_panel_locs(_):
+def find_panel_locs():
     """Find the locations of panels, used for FaithBullseye."""
 
     non_panel_mats = {
@@ -654,7 +654,7 @@ def find_panel_locs(_):
 
 
 @conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res):
+def res_faith_bullseye_check(res: Property):
     """Do a check to ensure there are actually textures availble."""
     for col in ('white', 'black'):
         for orient in ('wall', 'floor', 'ceiling'):
@@ -666,7 +666,7 @@ def res_faith_bullseye_check(res):
 
 
 @conditions.make_result('FaithBullseye')
-def res_faith_bullseye(inst, res):
+def res_faith_bullseye(inst: Entity, res: Property):
     """Replace the bullseye instances with textures instead."""
 
     pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
@@ -763,7 +763,7 @@ FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def anti_fizz_bump(inst):
+def anti_fizz_bump():
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
@@ -855,7 +855,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(_):
+def set_player_model():
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -942,7 +942,7 @@ def set_player_model(_):
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(inst):
+def set_player_portalgun():
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -1025,7 +1025,7 @@ def set_player_portalgun(inst):
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(inst):
+def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -1040,7 +1040,7 @@ def add_screenshot_logic(inst):
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(_):
+def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
     VMF.create_ent(
@@ -1142,7 +1142,7 @@ def add_fog_ents(_):
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(_):
+def set_elev_videos():
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -1189,79 +1189,6 @@ def set_elev_videos(_):
     PACK_FILES.add('scripts/vscripts/' + script)
 
 
-@conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(_):
-    """Perform modifications for Aperture Tag.
-
-    * All fizzlers will be combined with a trigger_paint_cleanser
-    * Paint is always present in every map!
-    * Suppress ATLAS's Portalgun in coop
-    * Override the transition ent instance to have the Gel Gun
-    * Create subdirectories with the user's steam ID
-    """
-    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
-        return  # Wrong game!
-
-    LOGGER.info('Performing Aperture Tag modifications...')
-
-    has = settings['has_attr']
-    # This will enable the PaintInMap property.
-    has['Gel'] = True
-
-    # Set as if the player spawned with no pgun
-    has['spawn_dual'] = False
-    has['spawn_single'] = False
-    has['spawn_nogun'] = True
-
-    for fizz in VMF.by_class['trigger_portal_cleanser']:
-        p_fizz = fizz.copy()
-        p_fizz['classname'] = 'trigger_paint_cleanser'
-        VMF.add_ent(p_fizz)
-
-        if p_fizz['targetname'].endswith('_brush'):
-            p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
-
-        del p_fizz['drawinfastreflection']
-        del p_fizz['visible']
-        del p_fizz['useScanline']
-
-        for side in p_fizz.sides():
-            side.mat = 'tools/toolstrigger'
-            side.scale = 0.25
-
-    if GAME_MODE == 'COOP':
-        VMF.create_ent(
-            classname='info_target',
-            targetname='supress_blue_portalgun_spawn',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            angles='0 0 0'
-        )
-
-    transition_ents = instanceLocs.get_special_inst('transitionents')
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() not in transition_ents:
-            continue
-        inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
-
-    # Because of a bug in P2, these folders aren't created automatically.
-    # We need a folder with the user's ID in portal2/maps/puzzlemaker.
-    try:
-        puzz_folders = os.listdir('../aperturetag/puzzles')
-    except FileNotFoundError:
-        LOGGER.warning("Aperturetag/puzzles/ doesn't exist??")
-    else:
-        for puzz_folder in puzz_folders:
-            new_folder = os.path.abspath(os.path.join(
-                '../portal2/maps/puzzlemaker',
-                puzz_folder,
-            ))
-            LOGGER.info('Creating', new_folder)
-            os.makedirs(
-                new_folder,
-                exist_ok=True,
-            )
-
-
 def get_map_info():
     """Determine various attributes about the map.
 
@@ -1282,14 +1209,14 @@ def get_map_info():
 
     # These have multiple instances, so 'in' must be used.
     # If both frames are set to "", get_special returns None so fix that.
-    file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
-    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
-    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
-    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp') or ()
-    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop') or ()
+    file_coop_corr = instanceLocs.get_special_inst('coopCorr')
+    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr')
+    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
+    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
+    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
-    file_ind_panel = instanceLocs.get_special_inst('indpan') or ()
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle') or ()
+    file_ind_panel = instanceLocs.get_special_inst('indpan')
+    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1796,7 +1723,7 @@ def remove_static_ind_toggles():
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(_):
+def set_barrier_frame_type():
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -2155,7 +2082,7 @@ Clump = namedtuple('Clump', [
 
 
 @conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res):
+def cond_force_clump_setup(res: Property):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
@@ -2187,7 +2114,7 @@ def cond_force_clump_setup(res):
 
 
 @conditions.make_result('SetAreaTex')
-def cond_force_clump(inst, res):
+def cond_force_clump(inst: Entity, res: Property):
     """Force an area to use certain textures.
 
     This only works in styles using the clumping texture algorithm.
@@ -3155,7 +3082,7 @@ def fix_worldspawn():
 
 
 @conditions.make_result('Pack')
-def packlist_cond(_, res):
+def packlist_cond(res: Property):
     """Add the files in the given packlist to the map."""
     TO_PACK.add(res.value.casefold())
 
@@ -3163,7 +3090,7 @@ def packlist_cond(_, res):
 
 
 @conditions.make_result('PackRename')
-def packlist_cond_rename(_, res):
+def packlist_cond_rename(res: Property):
     """Add a file to the packlist, saved under a new name."""
     PACK_RENAME[res['dest']] = res['file']
     return conditions.RES_EXHAUSTED
@@ -3231,7 +3158,7 @@ def make_packlist(map_path):
     LOGGER.info('Packlist written!')
 
 
-def make_vrad_config(is_hammer: bool):
+def make_vrad_config(is_peti: bool):
     """Generate a config file for VRAD from our configs.
 
     This way VRAD doesn't need to parse through vbsp_config, or anything else.
@@ -3239,45 +3166,46 @@ def make_vrad_config(is_hammer: bool):
     LOGGER.info('Generating VRAD config...')
     conf = Property('Config', [
     ])
-    conf['is_peti'] = srctools.bool_as_int(not is_hammer)
+    conf['is_peti'] = srctools.bool_as_int(is_peti)
 
-    conf['force_full'] = srctools.bool_as_int(
-        BEE2_config.get_bool('General', 'vrad_force_full')
-    )
-    conf['screenshot'] = BEE2_config.get_val(
-        'Screenshot', 'loc', ''
-    )
-    conf['screenshot_type'] = BEE2_config.get_val(
-        'Screenshot', 'type', 'PETI'
-    ).upper()
-    conf['clean_screenshots'] = srctools.bool_as_int(
-        BEE2_config.get_bool('Screenshot', 'del_old')
-    )
-    conf['is_preview'] = srctools.bool_as_int(
-        IS_PREVIEW
-    )
-    conf['game_id'] = vbsp_options.get(str, 'game_id')
+    if is_peti:
+        conf['force_full'] = srctools.bool_as_int(
+            BEE2_config.get_bool('General', 'vrad_force_full')
+        )
+        conf['screenshot'] = BEE2_config.get_val(
+            'Screenshot', 'loc', ''
+        )
+        conf['screenshot_type'] = BEE2_config.get_val(
+            'Screenshot', 'type', 'PETI'
+        ).upper()
+        conf['clean_screenshots'] = srctools.bool_as_int(
+            BEE2_config.get_bool('Screenshot', 'del_old')
+        )
+        conf['is_preview'] = srctools.bool_as_int(
+            IS_PREVIEW
+        )
+        conf['game_id'] = vbsp_options.get(str, 'game_id')
 
-    if BEE2_config.get_bool('General', 'packfile_dump_enable'):
-        conf['packfile_dump'] = BEE2_config.get_val(
-            'General',
-            'packfile_dump_dir',
-            ''
+        if BEE2_config.get_bool('General', 'packfile_dump_enable'):
+            conf['packfile_dump'] = BEE2_config.get_val(
+                'General',
+                'packfile_dump_dir',
+                ''
+            )
+
+        # Copy over the voice attributes
+        conf['VoiceAttr'] = ';'.join(
+            key
+            for key, value in
+            settings['has_attr'].items()
+            if value
         )
 
-    # Copy over the voice attributes
-    conf['VoiceAttr'] = ';'.join(
-        key
-        for key, value in
-        settings['has_attr'].items()
-        if value
-    )
-
-    # Copy over music soundscript data so VRAD can generate it..
-    if settings['music_conf']:
-        # It's a list of prop objects, so it'll become a proper
-        # block when written.
-        conf['MusicScript'] = settings['music_conf']
+        # Copy over music soundscript data so VRAD can generate it..
+        if settings['music_conf']:
+            # It's a list of prop objects, so it'll become a proper
+            # block when written.
+            conf['MusicScript'] = settings['music_conf']
 
     with open('bee2/vrad_config.cfg', 'w') as f:
         for line in conf.export():
@@ -3644,8 +3572,7 @@ def main():
 
     # We always need to do this - VRAD can't easily determine if the map is
     # a Hammer one.
-    make_vrad_config(is_hammer)
-
+    make_vrad_config(is_peti=not is_hammer)
     LOGGER.info("BEE2 VBSP hook finished!")
 
 

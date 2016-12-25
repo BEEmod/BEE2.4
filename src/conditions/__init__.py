@@ -2,6 +2,7 @@
 import itertools
 import math
 import random
+import inspect
 from collections import namedtuple, defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -145,7 +146,7 @@ DIRECTIONS = {
     'w': xn,
     'west': xn,
 
-    'wall': 'WALL',  # Special case, not wall/ceiling
+    'wall': 'WALL',  # Special case, not floor/ceiling
     'walls': 'WALL',
 }
 
@@ -267,7 +268,7 @@ class Condition:
         )
 
     @classmethod
-    def parse(cls, prop_block):
+    def parse(cls, prop_block: Property):
         """Create a condition from a Property block."""
         flags = []
         results = []
@@ -324,7 +325,7 @@ class Condition:
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
-            result.value = func(result)
+            result.value = func(VMF, result)
             if result.value is None:
                 # This result is invalid, remove it.
                 res_list.remove(result)
@@ -339,7 +340,7 @@ class Condition:
                 name=res.real_name,
             )) from None
         else:
-            return func(inst, res)
+            return func(VMF, inst, res)
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -353,6 +354,63 @@ class Condition:
             should_del = self.test_result(inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
+
+
+def annotation_caller(func, *parms):
+    """Reorders callback arguments to the requirements of the callback.
+
+    parms should be the unique types of arguments in the order they will be
+    called with. func's arguments should be positional, and be annotated
+    with the same types. A wrapper will be returned which can be called
+    with the parms arguments, but delegates to func. (This could be the
+    function itself).
+    """
+    allowed_kinds = [inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD]
+    type_to_parm = dict.fromkeys(parms, None)
+    sig = inspect.signature(func)
+    for parm in sig.parameters.values():
+        ann = parm.annotation
+        if parm.kind not in allowed_kinds:
+            raise ValueError('Parameter kind "{}" is not allowed!'.format(parm.kind))
+        if ann is inspect.Parameter.empty:
+            raise ValueError('Parameters must have value!')
+        try:
+            if type_to_parm[ann] is not None:
+                raise ValueError('Parameter {} used twice!'.format(ann))
+        except KeyError:
+            raise ValueError('Unknown potential type {!r}'.format(ann))
+        type_to_parm[ann] = parm.name
+    inputs = []
+    outputs = ['_'] * len(sig.parameters)
+    # Parameter -> letter in func signature
+    parm_order = {
+        parm.name: ind
+        for ind, parm in
+        enumerate(sig.parameters.values())
+    }
+    letters = 'abcdefghijklmnopqrstuvwxyz'
+    for var_name, parm in zip(letters, parms):
+        inputs.append(var_name)
+        out_name = type_to_parm[parm]
+        if out_name is not None:
+            outputs[parm_order[out_name]] = var_name
+
+    assert '_' not in outputs
+
+    if inputs == outputs:
+        # Matches already, don't need to do anything.
+        return func
+
+    # Double function to make a closure, to allow reference to the function
+    # more directly.
+    # Lambdas are expressions, so we can return the result directly.
+    return eval(
+        '(lambda func: lambda {}: func({}))(func)'.format(
+            ', '.join(inputs),
+            ', '.join(outputs),
+        ),
+        {'func': func},
+    )
 
 
 def add_meta(func, priority, only_once=True):
@@ -370,9 +428,7 @@ def add_meta(func, priority, only_once=True):
         priority,
     )
 
-    # Don't pass the prop_block onto the function,
-    # it doesn't contain any useful data.
-    RESULT_LOOKUP[name] = lambda inst, val: func(inst)
+    RESULT_LOOKUP[name] = annotation_caller(func, srctools.VMF, Entity, Property)
 
     cond = Condition(
         results=[Property(name, '')],
@@ -399,34 +455,37 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func: Callable[[Entity, Property], bool]):
+        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
         )
-        FLAG_LOOKUP[orig_name.casefold()] = func
+        FLAG_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            FLAG_LOOKUP[name.casefold()] = func
+            FLAG_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
 
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
-    def x(func: Callable[[Entity, Property], Any]):
+    def x(func: Callable[..., Any]):
+        wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
         )
-        RESULT_LOOKUP[orig_name.casefold()] = func
+        RESULT_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            RESULT_LOOKUP[name.casefold()] = func
+            RESULT_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
 
 def make_result_setup(*names):
     """Decorator to do setup for this result."""
-    def x(func: Callable[[Property], Any]):
+    def x(func: Callable[..., Any]):
+        wrapper = annotation_caller(func, srctools.VMF, Property)
         for name in names:
-            RESULT_SETUP[name.casefold()] = func
+            RESULT_SETUP[name.casefold()] = wrapper
         return func
     return x
 
@@ -493,7 +552,7 @@ def check_all():
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(flag, inst):
+def check_flag(flag: Property, inst: Entity):
     LOGGER.debug(
         'Checking {} ({!s}) on {}',
         flag.real_name,
@@ -514,7 +573,7 @@ def check_flag(flag, inst):
             '"{}" is not a valid condition flag!'.format(name)
         ) from None
 
-    res = func(inst, flag)
+    res = func(VMF, inst, flag)
     return res == desired_result
 
 
@@ -537,7 +596,6 @@ def import_conditions():
             for loader, module, is_package in
             pkgutil.iter_modules(['conditions'])
         ]
-        cond_modules = ''
 
     for module in modules:
         # Import the module, then discard it. The module will run add_flag
@@ -682,27 +740,30 @@ def weighted_random(count: int, weights: str):
     This produces a list intended to be fed to random.choice(), with
     repeated indexes corresponding to the comma-separated weight values.
     """
-    if weights == '' or ',' not in weights:
+    if weights == '':
+        # Empty = equal weighting.
+        return list(range(count))
+    if ',' not in weights:
         LOGGER.warning('Invalid weight! ({})', weights)
+        return list(range(count))
+
+    # Parse the weight
+    vals = weights.split(',')
+    weight = []
+    if len(vals) == count:
+        for i, val in enumerate(vals):
+            val = val.strip()
+            if val.isdecimal():
+                # repeat the index the correct number of times
+                weight.extend(
+                    [i] * int(val)
+                )
+            else:
+                # Abandon parsing
+                break
+    if len(weight) == 0:
+        LOGGER.warning('Failed parsing weight! ({!s})',weight)
         weight = list(range(count))
-    else:
-        # Parse the weight
-        vals = weights.split(',')
-        weight = []
-        if len(vals) == count:
-            for i, val in enumerate(vals):
-                val = val.strip()
-                if val.isdecimal():
-                    # repeat the index the correct number of times
-                    weight.extend(
-                        [i] * int(val)
-                    )
-                else:
-                    # Abandon parsing
-                    break
-        if len(weight) == 0:
-            LOGGER.warning('Failed parsing weight! ({!s})',weight)
-            weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
     return weight
@@ -771,9 +832,9 @@ def widen_fizz_brush(brush, thickness, bounds=None):
     origin = (bound_max + bound_min) / 2  # type: Vec
     size = bound_max - bound_min
     for axis in 'xyz':
-        # One of the directions will be thinner than 128, that's the fizzler
+        # One of the directions will be thinner than 32, that's the fizzler
         # direction.
-        if size[axis] < 128:
+        if size[axis] < 32:
             bound_min[axis] -= offset
             bound_max[axis] += offset
 
@@ -1455,7 +1516,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
 
 @make_flag('debug')
 @make_result('debug')
-def debug_flag(inst, props):
+def debug_flag(inst: Entity, props: Property):
     """Displays text when executed, for debugging conditions.
 
     If the text ends with an '=', the instance will also be displayed.
@@ -1477,13 +1538,13 @@ def debug_flag(inst, props):
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst, props):
+def dummy_result(inst: Entity, props: Property):
     """Dummy result that doesn't do anything."""
     pass
 
 
 @meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst):
+def remove_blank_inst(inst: Entity):
     """Remove instances with a blank file keyvalue.
 
     This allows conditions to strip the instances when requested.
@@ -1495,7 +1556,7 @@ def remove_blank_inst(inst):
 
 
 @meta_cond(priority=0, only_once=True)
-def fix_catapult_targets(inst):
+def fix_catapult_targets(inst: Entity):
     """Set faith plate targets to transmit to clients.
 
     This fixes some console spam in coop, and might improve trajectories
@@ -1506,7 +1567,7 @@ def fix_catapult_targets(inst):
 
 
 @make_result_setup('timedRelay')
-def res_timed_relay_setup(res):
+def res_timed_relay_setup(res: Property):
     var = res['variable', '$timer_delay']
     name = res['targetname']
     disabled = res['disabled', '0']
@@ -1532,7 +1593,7 @@ def res_timed_relay_setup(res):
 
 
 @make_result('timedRelay')
-def res_timed_relay(inst: Entity, res):
+def res_timed_relay(inst: Entity, res: Property):
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
@@ -1575,14 +1636,14 @@ def res_timed_relay(inst: Entity, res):
 
 
 @make_result('condition')
-def res_sub_condition(base_inst, res):
+def res_sub_condition(base_inst: Entity, res: Property):
     """Check a different condition if the outer block is true."""
     res.value.test(base_inst)
 make_result_setup('condition')(Condition.parse)
 
 
 @make_result('nextInstance')
-def res_break(base_inst, res):
+def res_break():
     """Skip to the next instance.
 
     The value will be ignored.
@@ -1590,8 +1651,8 @@ def res_break(base_inst, res):
     raise NextInstance
 
 
-@make_result('endCondition')
-def res_end_condition(base_inst, res):
+@make_result('endCondition', 'nextCondition')
+def res_end_condition():
     """Skip to the next condition.
 
     The value will be ignored.
@@ -1600,7 +1661,7 @@ def res_end_condition(base_inst, res):
 
 
 @make_result_setup('switch')
-def res_switch_setup(res):
+def res_switch_setup(res: Property):
     flag = None
     method = SWITCH_TYPE.FIRST
     cases = []
@@ -1632,7 +1693,7 @@ def res_switch_setup(res):
 
 
 @make_result('switch')
-def res_switch(inst, res):
+def res_switch(inst: Entity, res: Property):
     """Run the same flag multiple times with different arguments.
 
     'method' is the way the search is done - first, last, random, or all.
@@ -1661,7 +1722,7 @@ def res_switch(inst, res):
 
 
 @make_result_setup('staticPiston')
-def make_static_pist_setup(res):
+def make_static_pist_setup(res: Property):
     return {
         name: resolve_inst(res[name, ''])[0]
         for name in
@@ -1674,7 +1735,7 @@ def make_static_pist_setup(res):
 
 
 @make_result('staticPiston')
-def make_static_pist(ent, res):
+def make_static_pist(ent: Entity, res: Property):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1720,7 +1781,7 @@ def make_static_pist(ent, res):
 
 
 @make_result('GooDebris')
-def res_goo_debris(_, res: Property):
+def res_goo_debris(res: Property):
     """Add random instances to goo squares.
 
     Options:
@@ -1808,568 +1869,9 @@ def res_goo_debris(_, res: Property):
 
     return RES_EXHAUSTED
 
-WP_STRIP_COL_COUNT = 8  # Number of strip instances placed per row
-WP_LIMIT = 30  # Limit to this many portal instances
 
 
-@make_result_setup('WPLightstrip')
-def res_portal_lightstrip_setup(res):
-    do_offset = res.bool('doOffset')
-    hole_inst = res['HoleInst']
-    fallback = res['FallbackInst']
-    location = res.vec('location', 0, 8192, 0)
-    strip_name = res['strip_name']
-    hole_name = res['hole_name']
-    return [
-        do_offset,
-        hole_inst,
-        location,
-        fallback,
-        strip_name,
-        hole_name,
-        0,
-    ]
 
 
-@make_result('WPLightstrip')
-def res_portal_lightstrip(inst, res):
-    """Special result used for P1 light strips."""
-    (
-        do_offset,
-        hole_inst,
-        location,
-        fallback,
-        strip_name,
-        hole_name,
-        count,
-    ) = res.value
 
-    if do_offset:
-        random.seed('random_case_{}:{}_{}_{}'.format(
-            'WP_LightStrip',
-            inst['targetname', ''],
-            inst['origin'],
-            inst['angles'],
-        ))
 
-        off = Vec(
-            y=random.choice((-48, -16, 16, 48))
-        ).rotate_by_str(inst['angles'])
-        inst['origin'] = (Vec.from_str(inst['origin']) + off).join(' ')
-
-    if count > WP_LIMIT:
-        inst['file'] = fallback
-        return
-
-    disp_inst = VMF.create_ent(
-        classname='func_instance',
-        angles='0 0 0',
-        origin=(location + Vec(
-            x=128 * (count % WP_STRIP_COL_COUNT),
-            y=128 * (count // WP_STRIP_COL_COUNT),
-        )).join(' '),
-        file=hole_inst,
-    )
-    if '{}' in strip_name:
-        strip_name = strip_name.replace('{}', str(count))
-    else:
-        strip_name += str(count)
-
-    if '{}' in hole_name:
-        hole_name = hole_name.replace('{}', str(count))
-    else:
-        hole_name += str(count)
-
-    disp_inst.fixup['port_name'] = inst.fixup['link_name'] = strip_name
-    inst.fixup['port_name'] = disp_inst.fixup['link_name'] = hole_name
-
-    res.value[-1] = count + 1
-
-# A mapping of fizzler targetnames to the base instance
-tag_fizzlers = {}
-# Maps fizzler targetnames to a set of values. This is used to orient
-# floor-attached signs.
-tag_fizzler_locs = {}
-# The value is a tuple of either ('z', x, y, z),
-# ('x', x1, x2, y) or ('y', y1, y2, x).
-
-
-@meta_cond(priority=-110, only_once=False)
-def res_find_potential_tag_fizzlers(inst):
-    """We need to know which items are 'real' fizzlers.
-
-    This is used for Aperture Tag paint fizzlers.
-    """
-    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
-        return RES_EXHAUSTED
-
-    if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
-        return
-
-    # The key list in the dict will be a set of all fizzler items!
-    tag_fizzlers[inst['targetname']] = inst
-
-    if tag_fizzler_locs:  # Only loop through fizzlers once.
-        return
-
-    # Determine the origins by first finding the bounding box of the brushes,
-    # then averaging.
-    for fizz in VMF.by_class['trigger_portal_cleanser']:
-        name = fizz['targetname'][:-6]  # Strip off '_brush'
-        bbox_min, bbox_max = fizz.get_bbox()
-        if name in tag_fizzler_locs:
-            orig_min, orig_max = tag_fizzler_locs[name]
-            orig_min.min(bbox_min)
-            orig_max.max(bbox_max)
-        else:
-            tag_fizzler_locs[name] = bbox_min, bbox_max
-
-    for name, (s, l) in tag_fizzler_locs.items():
-        # Figure out how to compare for this brush.
-        # If it's horizontal, signs should point to the center:
-        if abs(s.z - l.z) == 2:
-            tag_fizzler_locs[name] =(
-                'z',
-                s.x + l.x / 2,
-                s.y + l.y / 2,
-                s.z + 1,
-            )
-            continue
-        # For the vertical directions, we want to compare based on the line segment.
-        if abs(s.x - l.x) == 2:  # Y direction
-            tag_fizzler_locs[name] = (
-                'y',
-                s.y,
-                l.y,
-                s.x + 1,
-            )
-        else:  # Extends in X direction
-            tag_fizzler_locs[name] = (
-                'x',
-                s.x,
-                l.x,
-                s.y + 1,
-            )
-
-
-
-@make_result('TagFizzler')
-def res_make_tag_fizzler(inst, res):
-    """Add an Aperture Tag Paint Gun activation fizzler.
-
-    These fizzlers are created via signs, and work very specially.
-    MUST be priority -100 so it runs before fizzlers!
-    """
-    import vbsp
-    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
-        # Abort - TAG fizzlers shouldn't appear in any other game!
-        inst.remove()
-        return
-
-    fizz_base = fizz_name = None
-
-    # Look for the fizzler instance we want to replace
-    for targetname in inst.output_targets():
-        if targetname in tag_fizzlers:
-            fizz_name = targetname
-            fizz_base = tag_fizzlers[targetname]
-            del tag_fizzlers[targetname]  # Don't let other signs mod this one!
-            continue
-        else:
-            # It's an indicator toggle, remove it and the antline to clean up.
-            LOGGER.warning('Toggle: {}', targetname)
-            for ent in VMF.by_target[targetname]:
-                remove_ant_toggle(ent)
-    inst.outputs.clear()  # Remove the outptuts now, they're not valid anyway.
-
-    if fizz_base is None:
-        # No fizzler - remove this sign
-        inst.remove()
-        return
-
-    # The distance from origin the double signs are seperated by.
-    sign_offset = res.int('signoffset', 16)
-
-    sign_loc = (
-        # The actual location of the sign - on the wall
-        Vec.from_str(inst['origin']) +
-        Vec(0, 0, -64).rotate_by_str(inst['angles'])
-    )
-
-    # Now deal with the visual aspect:
-    # Blue signs should be on top.
-
-    blue_enabled = srctools.conv_bool(inst.fixup['$start_enabled'])
-    oran_enabled = srctools.conv_bool(inst.fixup['$start_reversed'])
-
-    if not blue_enabled and not oran_enabled:
-        # Hide the sign in this case!
-        inst.remove()
-
-    inst_angle = srctools.parse_vec_str(inst['angles'])
-
-    inst_normal = Vec(0, 0, 1).rotate(*inst_angle)
-    loc = Vec.from_str(inst['origin'])
-
-    if blue_enabled and oran_enabled:
-        inst['file'] = res['frame_double']
-        # On a wall, and pointing vertically
-        if inst_normal.z != 0 and Vec(0, 1, 0).rotate(*inst_angle).z != 0:
-            # They're vertical, make sure blue's on top!
-            blue_loc = Vec(loc.x, loc.y, loc.z + sign_offset)
-            oran_loc = Vec(loc.x, loc.y, loc.z - sign_offset)
-        else:
-            offset = Vec(0, sign_offset, 0).rotate(*inst_angle)
-            blue_loc = loc + offset
-            oran_loc = loc - offset
-    else:
-        inst['file'] = res['frame_single']
-        # They're always centered
-        blue_loc = loc
-        oran_loc = loc
-
-    if inst_normal.z != 0:
-        # If on floors/ceilings, rotate to point at the fizzler!
-        sign_floor_loc = sign_loc.copy()
-        sign_floor_loc.z = 0  # We don't care about z-positions.
-
-        # Grab the data saved earlier in res_find_potential_tag_fizzlers()
-        axis, side_min, side_max, normal = tag_fizzler_locs[fizz_name]
-
-        # The Z-axis fizzler (horizontal) must be treated differently.
-        if axis == 'z':
-            # For z-axis, just compare to the center point.
-            # The values are really x, y, z, not what they're named.
-            sign_dir = sign_floor_loc - (side_min, side_max, normal)
-        else:
-            # For the other two, we compare to the line,
-            # or compare to the closest side (in line with the fizz)
-            other_axis = 'x' if axis == 'y' else 'y'
-            if abs(sign_floor_loc[other_axis] - normal) < 32:
-                # Compare to the closest side. Use ** to swap x/y arguments
-                # appropriately. The closest side is the one with the
-                # smallest magnitude.
-                VMF.create_ent(
-                    classname='info_null',
-                    targetname=inst['targetname'] + '_min',
-                    origin=sign_floor_loc - Vec(**{
-                        axis: side_min,
-                        other_axis: normal,
-                    }),
-                )
-                VMF.create_ent(
-                    classname='info_null',
-                    targetname=inst['targetname'] + '_max',
-                    origin=sign_floor_loc - Vec(**{
-                        axis: side_max,
-                        other_axis: normal,
-                    }),
-                )
-                sign_dir = min(
-                    sign_floor_loc - Vec(**{
-                        axis: side_min,
-                        other_axis: normal,
-                    }),
-                    sign_floor_loc - Vec(**{
-                        axis: side_max,
-                        other_axis: normal,
-                    }),
-                    key=Vec.mag,
-                )
-            else:
-                # Align just based on whether we're in front or behind.
-                sign_dir = Vec()
-                sign_dir[other_axis] = sign_floor_loc[other_axis] - normal
-
-        sign_angle = math.degrees(
-            math.atan2(sign_dir.y, sign_dir.x)
-        )
-        # Round to nearest 90 degrees
-        # Add 45 so the switchover point is at the diagonals
-        sign_angle = (sign_angle + 45) // 90 * 90
-
-        # Rotate to fit the instances - south is down
-        sign_angle = int(sign_angle + 90) % 360
-        if inst_normal.z > 0:
-            sign_angle = '0 {} 0'.format(sign_angle)
-        elif inst_normal.z < 0:
-            # Flip upside-down for ceilings
-            sign_angle = '0 {} 180'.format(sign_angle)
-    else:
-        # On a wall, face upright
-        sign_angle = PETI_INST_ANGLE[inst_normal.as_tuple()]
-
-    if blue_enabled:
-        VMF.create_ent(
-            classname='func_instance',
-            file=res['blue_sign', ''],
-            targetname=inst['targetname'],
-            angles=sign_angle,
-            origin=blue_loc.join(' '),
-        )
-
-    if oran_enabled:
-        VMF.create_ent(
-            classname='func_instance',
-            file=res['oran_sign', ''],
-            targetname=inst['targetname'],
-            angles=sign_angle,
-            origin=oran_loc.join(' '),
-        )
-
-    # Now modify the fizzler...
-
-    fizz_brushes = list(
-        VMF.by_class['trigger_portal_cleanser'] &
-        VMF.by_target[fizz_name + '_brush']
-    )
-
-    if 'base_inst' in res:
-        fizz_base['file'] = resolve_inst(res['base_inst'])[0]
-    fizz_base.outputs.clear()  # Remove outputs, otherwise they break
-    # branch_toggle entities
-
-    # Subtract the sign from the list of connections, but don't go below
-    # zero
-    fizz_base.fixup['$connectioncount'] = str(max(
-        0,
-        srctools.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
-    ))
-
-    if 'model_inst' in res:
-        model_inst = resolve_inst(res['model_inst'])[0]
-        for mdl_inst in VMF.by_class['func_instance']:
-            if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
-                mdl_inst['file'] = model_inst
-
-    # Find the direction the fizzler front/back points - z=floor fizz
-    # Signs will associate with the given side!
-    bbox_min, bbox_max = fizz_brushes[0].get_bbox()
-    for axis, val in zip('xyz', bbox_max-bbox_min):
-        if val == 2:
-            fizz_axis = axis
-            sign_center = (bbox_min[axis] + bbox_max[axis]) / 2
-            break
-    else:
-        # A fizzler that's not 128*x*2?
-        raise Exception('Invalid fizzler brush ({})!'.format(fizz_name))
-
-    # Figure out what the sides will set values to...
-    pos_blue = False
-    pos_oran = False
-    neg_blue = False
-    neg_oran = False
-    if sign_loc[fizz_axis] < sign_center:
-        pos_blue = blue_enabled
-        pos_oran = oran_enabled
-    else:
-        neg_blue = blue_enabled
-        neg_oran = oran_enabled
-
-    fizz_off_tex = {
-        'left': res['off_left'],
-        'center': res['off_center'],
-        'right': res['off_right'],
-        'short': res['off_short'],
-    }
-    fizz_on_tex = {
-        'left': res['on_left'],
-        'center': res['on_center'],
-        'right': res['on_right'],
-        'short': res['on_short'],
-    }
-
-    # If it activates the paint gun, use different textures
-    if pos_blue or pos_oran:
-        pos_tex = fizz_on_tex
-    else:
-        pos_tex = fizz_off_tex
-
-    if neg_blue or neg_oran:
-        neg_tex = fizz_on_tex
-    else:
-        neg_tex = fizz_off_tex
-
-    if vbsp.GAME_MODE == 'COOP':
-        # We need ATLAS-specific triggers
-        pos_trig = VMF.create_ent(
-            classname='trigger_playerteam',
-        )
-        neg_trig = VMF.create_ent(
-            classname='trigger_playerteam',
-        )
-        output = 'OnStartTouchBluePlayer'
-    else:
-        pos_trig = VMF.create_ent(
-            classname='trigger_multiple',
-        )
-        neg_trig = VMF.create_ent(
-            classname='trigger_multiple',
-            spawnflags='1',
-        )
-        output = 'OnStartTouch'
-
-    pos_trig['origin'] = neg_trig['origin'] = fizz_base['origin']
-    pos_trig['spawnflags'] = neg_trig['spawnflags'] = '1'  # Clients Only
-
-    pos_trig['targetname'] = fizz_name + '-trig_pos'
-    neg_trig['targetname'] = fizz_name + '-trig_neg'
-
-    pos_trig.outputs = [
-        Output(
-            output,
-            fizz_name + '-trig_neg',
-            'Enable',
-        ),
-        Output(
-            output,
-            fizz_name + '-trig_pos',
-            'Disable',
-        ),
-    ]
-
-    neg_trig.outputs = [
-        Output(
-            output,
-            fizz_name + '-trig_pos',
-            'Enable',
-        ),
-        Output(
-            output,
-            fizz_name + '-trig_neg',
-            'Disable',
-        ),
-    ]
-
-    voice_attr = vbsp.settings['has_attr']
-
-    if blue_enabled:
-        # If this is blue/oran only, don't affect the other color
-        neg_trig.outputs.append(Output(
-            output,
-            '@BlueIsEnabled',
-            'SetValue',
-            param=srctools.bool_as_int(neg_blue),
-        ))
-        pos_trig.outputs.append(Output(
-            output,
-            '@BlueIsEnabled',
-            'SetValue',
-            param=srctools.bool_as_int(pos_blue),
-        ))
-        # Add voice attributes - we have the gun and gel!
-        voice_attr['bluegelgun'] = True
-        voice_attr['bluegel'] = True
-        voice_attr['bouncegun'] = True
-        voice_attr['bouncegel'] = True
-
-    if oran_enabled:
-        neg_trig.outputs.append(Output(
-            output,
-            '@OrangeIsEnabled',
-            'SetValue',
-            param=srctools.bool_as_int(neg_oran),
-        ))
-        pos_trig.outputs.append(Output(
-            output,
-            '@OrangeIsEnabled',
-            'SetValue',
-            param=srctools.bool_as_int(pos_oran),
-        ))
-        voice_attr['orangegelgun'] = True
-        voice_attr['orangegel'] = True
-        voice_attr['speedgelgun'] = True
-        voice_attr['speedgel'] = True
-
-    if not oran_enabled and not blue_enabled:
-        # If both are disabled, we must shutdown the gun when touching
-        # either side - use neg_trig for that purpose!
-        # We want to get rid of pos_trig to save ents
-        VMF.remove_ent(pos_trig)
-        neg_trig['targetname'] = fizz_name + '-trig'
-        neg_trig.outputs.clear()
-        neg_trig.add_out(Output(
-            output,
-            '@BlueIsEnabled',
-            'SetValue',
-            param='0'
-        ))
-        neg_trig.add_out(Output(
-            output,
-            '@OrangeIsEnabled',
-            'SetValue',
-            param='0'
-        ))
-
-    for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
-        # Modify fizzler textures
-        bbox_min, bbox_max = fizz_brush.get_bbox()
-        for side in fizz_brush.sides():
-            norm = side.normal()
-            if norm[fizz_axis] == 0:
-                # Not the front/back: force nodraw
-                # Otherwise the top/bottom will have the odd stripes
-                # which won't match the sides
-                side.mat = 'tools/toolsnodraw'
-                continue
-            if norm[fizz_axis] == 1:
-                side.mat = pos_tex[
-                    vbsp.TEX_FIZZLER[
-                        side.mat.casefold()
-                    ]
-                ]
-            else:
-                side.mat = neg_tex[
-                    vbsp.TEX_FIZZLER[
-                        side.mat.casefold()
-                    ]
-                ]
-        # The fizzler shouldn't kill cubes
-        fizz_brush['spawnflags'] = '1'
-
-        fizz_brush.outputs.append(Output(
-            output,
-            '@shake_global',
-            'StartShake',
-        ))
-
-        fizz_brush.outputs.append(Output(
-            output,
-            '@shake_global_sound',
-            'PlaySound',
-        ))
-
-        # The triggers are 8 units thick, 24 from the center
-        # (-1 because fizzlers are 2 thick on each side).
-        neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
-        neg_min[fizz_axis] -= 23
-        neg_max[fizz_axis] -= 17
-
-        pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
-        pos_min[fizz_axis] += 17
-        pos_max[fizz_axis] += 23
-
-        if blue_enabled or oran_enabled:
-            neg_trig.solids.append(
-                VMF.make_prism(
-                    neg_min,
-                    neg_max,
-                    mat='tools/toolstrigger',
-                ).solid,
-            )
-            pos_trig.solids.append(
-                VMF.make_prism(
-                    pos_min,
-                    pos_max,
-                    mat='tools/toolstrigger',
-                ).solid,
-            )
-        else:
-            # If neither enabled, use one trigger
-            neg_trig.solids.append(
-                VMF.make_prism(
-                    neg_min,
-                    pos_max,
-                    mat='tools/toolstrigger',
-                ).solid,
-            )

@@ -51,7 +51,7 @@ FLAG_ROTATING = {
 
 
 @make_result('GenRotatingEnt')
-def res_fix_rotation_axis(ent, res):
+def res_fix_rotation_axis(ent: Entity, res: Property):
     """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
 
     This uses the orientation of the instance to detemine the correct
@@ -87,18 +87,9 @@ def res_fix_rotation_axis(ent, res):
         res['flags', '0'].split('+')
     ))
 
-    name = res['name', '']
-    if not name.startswith('@'):
-        # If a local name is given, add it to the instance targetname.
-        # It the name given is '', set to the instance's name.
-        # If it has an @, don't change it!
-        name = ent['targetname', ''] + (('-' + name) if name else '')
+    name = conditions.local_name(ent, res['name', ''])
 
-    axis = Vec(
-        x=int(des_axis == 'x'),
-        y=int(des_axis == 'y'),
-        z=int(des_axis == 'z'),
-    ).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec(**{des_axis: 1}).rotate_by_str(ent['angles', '0 0 0'])
 
     pos = Vec.from_str(
         res['Pos', '0 0 0']
@@ -166,7 +157,7 @@ def res_fix_rotation_axis(ent, res):
 
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
-def res_set_texture(inst, res):
+def res_set_texture(inst: Entity, res: Property):
     """Set the brush face at a location to a particular texture.
 
     pos is the position, relative to the instance
@@ -271,7 +262,7 @@ def res_set_texture(inst, res):
 
 
 @make_result('AddBrush')
-def res_add_brush(inst, res):
+def res_add_brush(inst: Entity, res: Property):
     """Spawn in a brush at the indicated points.
 
     - point1 and point2 are locations local to the instance, with '0 0 0'
@@ -362,7 +353,7 @@ def res_add_brush(inst, res):
 
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res: Property):
-    temp_id = res['id'].casefold()
+    temp_id = res['id']
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
@@ -388,7 +379,7 @@ def res_import_template_setup(res: Property):
     else:
         force_grid = None
 
-    invert_var = res['invertVar', '']
+    invert_var = res['invertVar', res['colorVar', '']]
 
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
@@ -449,7 +440,6 @@ def res_import_template_setup(res: Property):
             """Number = percent chance for each to be added"""
             for group in groups:
                 val = random.uniform(0, 100)
-                LOGGER.info('RAND: {}', locals())
                 if val <= visgroup_mode:
                     yield group
 
@@ -469,12 +459,13 @@ def res_import_template_setup(res: Property):
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: Entity, res):
+def res_import_template(inst: Entity, res: Property):
     """Import a template VMF file, retexturing it to match orientatation.
 
     It will be placed overlapping the given instance.
     Options:
-    - ID: The ID of the template to be inserted.
+    - ID: The ID of the template to be inserted. Add visgroups to additionally
+            add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
              present, the colour of tiles will be overriden. If 'invert' is
             added, white/black tiles will be swapped. If a tile size
@@ -496,17 +487,17 @@ def res_import_template(inst: Entity, res):
             these values. This overrides force world/detail.
             Specially-handled keys:
             - "origin", offset automatically.
-            - "movedir" on func_movelinear - set a normal surounded by <>,
+            - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
-    - invertVar: If this fixup value is true, tile colour will be swapped to
-            the opposite of the current force option. If it is set to
-            'white' or 'black', that colour will be forced instead.
+    - invertVar or colorVar: If this fixup value is true, tile colour will be
+            swapped to the opposite of the current force option. If it is set
+            to 'white' or 'black', that colour will be forced instead.
     - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
     """
     (
-        temp_id,
+        orig_temp_id,
         replace_tex,
         force_colour,
         force_grid,
@@ -518,13 +509,24 @@ def res_import_template(inst: Entity, res):
         visgroup_func,
         key_block,
     ) = res.value
+    temp_id = conditions.resolve_value(inst, orig_temp_id)
 
     temp_name, vis = conditions.parse_temp_name(temp_id)
     if temp_name not in TEMPLATES:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        LOGGER.warning('"{}" not a valid template!', temp_id)
+        if temp_id != orig_temp_id:
+            LOGGER.warning(
+                '{} -> "{}" is not a valid template!',
+                orig_temp_id,
+                temp_name
+            )
+        else:
+            LOGGER.warning(
+                '"{}" is not a valid template!',
+                temp_name
+            )
         return
 
     if invert_var != '':
@@ -596,7 +598,7 @@ def res_import_template(inst: Entity, res):
 
 
 @make_result('HollowBrush')
-def res_hollow_brush(inst, res):
+def res_hollow_brush(inst: Entity, res: Property):
     """Hollow out the attached brush, as if EmbeddedVoxel was set.
 
     This just removes the surface if it's already an embeddedVoxel. This allows

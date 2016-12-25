@@ -15,7 +15,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
 
 @make_result_setup('AddOutput')
-def res_add_output_setup(res):
+def res_add_output_setup(res: Property):
     output = res['output']
     input_name = res['input']
     inst_in = res['inst_in', '']

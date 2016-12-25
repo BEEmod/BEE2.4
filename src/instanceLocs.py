@@ -4,6 +4,7 @@ This way VBSP_config files can generically refer to items, and work in
 multiple styles.
 """
 import logging
+import re
 from collections import defaultdict
 from functools import lru_cache
 
@@ -16,6 +17,17 @@ LOGGER = utils.getLogger(__name__)
 
 # The list of instance each item uses.
 INSTANCE_FILES = {}
+
+_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
+_RE_SUBITEMS = re.compile(r'''
+    \s*<
+    \s*([^:]+)
+    \s*(?:
+    : \s*
+    ([\w,\s]+)
+    )?
+    \s*>\s*
+''', re.VERBOSE)
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
@@ -176,6 +188,12 @@ SUBITEMS = {
     'fizz_model': 1,
 }
 
+SPECIAL_INST_FOLDED = {
+    key.casefold(): value
+    for key, value in
+    SPECIAL_INST.items()
+}
+
 
 def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
@@ -285,106 +303,101 @@ def _resolve(path):
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
     """
-
-    if path.startswith('<') and path.endswith('>'):
-        path = path[1:-1]
-        if ':' in path:  # We have a set of subitems to parse
-            item, subitem = path.split(':')
-            item = item.casefold()
-            try:
-                item_values = INSTANCE_FILES[item]
-            except KeyError:
-                LOGGER.warning(
-                    '"{}" not a valid item!',
-                    item,
-                )
-                return []
-            cust_item_vals = CUST_INST_FILES[item]
-            out = []
-            if not subitem:
-                # <ITEM_ID:> gives all items + subitems...
-                return [
-                    inst for inst in
-                    item_values
-                    if inst != ''
-                ] + list(CUST_INST_FILES[item].values())
-            for val in subitem.split(','):
-                folded_value = val.strip().casefold()
-                if folded_value.startswith('bee2_'):
-                    # A custom value...
-                    try:
-                        out.append(cust_item_vals[folded_value[5:]])
-                        continue
-                    except KeyError:
-                        LOGGER.warning(
-                            'Invalid custom instance name - "{}" for '
-                            '<{}> (Valid: {!r})',
-                            folded_value[5:],
-                            item,
-                            cust_item_vals,
-                        )
-                        return []
-
-                ind = SUBITEMS.get(folded_value, None)
-
-                if ind is None:
-                    try:
-                        ind = int(folded_value)
-                    except ValueError:
-                        LOGGER.info('--------\nValid subitems:')
-                        LOGGER.info('\n'.join(
-                            ('> ' + k + ' = ' + str(v))
-                            for k, v in
-                            SUBITEMS.items()
-                        ))
-                        LOGGER.info('--------')
-                        raise Exception(
-                            '"' + val + '" is not a valid instance'
-                            ' subtype or index!'
-                        )
-                # SUBITEMS has tuple values, which represent multiple subitems.
-                if isinstance(ind, tuple):
-                    out.extend(ind)
+    groups = _RE_DEFS.findall(path)
+    if groups:
+        out = []
+        for group in groups:
+            if group[0] == '<':
+                item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                item_id = item_id.casefold()
+                try:
+                    item_inst = INSTANCE_FILES[item_id]
+                except KeyError:
+                    LOGGER.warning(
+                        '"{}" not a valid item!',
+                        item_id,
+                    )
+                    return []
+                if subitems:
+                    out.extend(get_subitems(subitems, item_inst, item_id))
                 else:
-                    out.append(ind)
+                    # It's just the <item_id>, return all the values
+                    out.extend(item_inst)
 
-            # Convert to instance lists
-            inst_out = []
-            for ind in out:
-                if isinstance(ind, str):
-                    inst_out.append(ind)
+            elif group[0] == '[':
+                special_name = group[1:-1].casefold()
+                try:
+                    out.extend(INST_SPECIAL[special_name])
+                except KeyError:
+                    LOGGER.warning('"{}" not a valid instance category!', special_name)
                     continue
+            else:
+                raise Exception(group)
+        # Remove "" from the output.
+        return list(filter(None, out))
+    else:
+        return [path.casefold()]
 
-                # Only use if it's actually in range
-                if 0 <= ind < len(item_values):
-                    # Skip "" instance blocks
-                    if item_values[ind] != '':
-                        inst_out.append(item_values[ind])
-            return inst_out
-        else:
-            # It's just the <item_id>, return all the values
+
+def get_subitems(comma_list, item_inst, item_id) -> List[str]:
+    """Pick out the subitems from a list."""
+    output = []
+    for val in comma_list.split(','):
+        folded_value = val.strip().casefold()
+        if folded_value.startswith('bee2_'):
+            # A custom value...
+            bee_inst = CUST_INST_FILES[item_id]
             try:
-                # Skip "" instances
-                return [
-                    inst for inst in
-                    INSTANCE_FILES[path.casefold()]
-                    if inst != ''
-                    ]
+                output.append(bee_inst[folded_value[5:]])
+                continue
             except KeyError:
                 LOGGER.warning(
-                    '"{}" not a valid item!',
-                    path,
+                    'Invalid custom instance name - "{}" for '
+                    '<{}> (Valid: {!r})',
+                    folded_value[5:],
+                    item_id,
+                    bee_inst,
                 )
                 return []
-    elif path.startswith('[') and path.endswith(']'):
-        path = path[1:-1].casefold()
-        try:
-            return INST_SPECIAL[path]
-        except KeyError:
-            LOGGER.warning('"{}" not a valid instance category!', path)
-            return []
-    else:  # Just a normal path
-        return [path.casefold()]
+
+        ind = SUBITEMS.get(folded_value, None)
+
+        if ind is None:
+            try:
+                ind = int(folded_value)
+            except ValueError:
+                LOGGER.info('--------\nValid subitems:')
+                LOGGER.info('\n'.join(
+                    ('> ' + k + ' = ' + str(v))
+                    for k, v in
+                    SUBITEMS.items()
+                ))
+                LOGGER.info('--------')
+                raise Exception(
+                    '"' + val + '" is not a valid instance'
+                                ' subtype or index!'
+                )
+        # SUBITEMS has tuple values, which represent multiple subitems.
+        if isinstance(ind, tuple):
+            output.extend(ind)
+        else:
+            output.append(ind)
+
+    # Convert to instance lists
+    inst_out = []
+    for ind in output:
+        # bee_ instance, already evaluated
+        if isinstance(ind, str):
+            inst_out.append(ind)
+            continue
+
+        # Only use if it's actually in range
+        if 0 <= ind < len(item_inst):
+            # Skip "" instance blocks
+            if item_inst[ind] != '':
+                inst_out.append(item_inst[ind])
+    return inst_out
+
 
 # Copy over the lru_cache() functions to make them easily acessable.
 resolve.cache_info = _resolve.cache_info
@@ -407,11 +420,13 @@ def get_special_inst(name: str):
         raise KeyError("Invalid special instance name! ({})".format(name))
 
     # The number you'll get is fixed, so it's fine if we return different
-    # types - unpack single instances, since that's what you want most of the
-    # time.
-    if len(inst) == 1:
+    # types.
+    # Unpack single instances, since that's what you want most of the
+    # time. We only do that if there's no ',' in the <> lookup, so it doesn't
+    # affect
+    if len(inst) == 1 and ',' not in SPECIAL_INST_FOLDED[name.casefold()]:
         return inst[0]
     elif len(inst) == 0:
-        return None  # No value
+        return ()
     else:
         return inst

@@ -4,7 +4,7 @@ from conditions import (
     INST_ANGLE,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec
+from srctools import Vec, Property
 import conditions
 import utils
 import vbsp
@@ -92,7 +92,7 @@ def place_catwalk_connections(instances, point_a, point_b):
 
 
 @make_result('makeCatwalk')
-def res_make_catwalk(_, res):
+def res_make_catwalk(res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.

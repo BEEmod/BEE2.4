@@ -1,14 +1,15 @@
 # coding=utf-8
 import collections
+import functools
 import logging
 import os.path
 import stat
 import shutil
+import sys
 from enum import Enum
-from sys import platform
 
 from typing import (
-    Tuple, Iterator,
+    Tuple, List, Iterator,
 )
 
 
@@ -22,9 +23,9 @@ except ImportError:
 else:
     FROZEN = True
 
-WIN = platform.startswith('win')
-MAC = platform.startswith('darwin')
-LINUX = platform.startswith('linux')
+WIN = sys.platform.startswith('win')
+MAC = sys.platform.startswith('darwin')
+LINUX = sys.platform.startswith('linux')
 
 # Formatters for the logger handlers.
 short_log_format = None
@@ -221,8 +222,29 @@ elif LINUX:
             frame.bind('<Button-4>', scroll_up, add='+')
             frame.bind('<Button-5>', scroll_down, add='+')
 
+
+def bind_event_handler(bind_func):
+    """Decorator for the bind_click functions.
+
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid, func=None, add='+'):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(deco, bind_func)
+
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -235,6 +257,7 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -246,19 +269,23 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
-    def bind_rightclick(wid, func):
+    @bind_event_handler
+    def bind_rightclick(wid, func, add='+'):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
-        wid.bind(EVENTS['RIGHT'], func)
-        wid.bind(EVENTS['LEFT_CTRL'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
+    @bind_event_handler
     def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
@@ -410,7 +437,6 @@ def restart_app():
 
     This will not return!
     """
-    import os, sys
     # sys.executable is the program which ran us - when frozen,
     # it'll our program.
     # We need to add the program to the arguments list, since python
@@ -469,7 +495,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
     names = os.listdir(src)
 
     os.makedirs(dst, exist_ok=True)
-    errors = []
+    errors = []  # type: List[Tuple[str, str, str]]
     for name in names:
         srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
@@ -501,19 +527,43 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
         raise shutil.Error(errors)
 
 
-def setup_localisations(logger):
+def setup_localisations(logger: logging.Logger):
     """Setup gettext localisations."""
     import gettext
     import locale
-    lang = locale.getdefaultlocale()[0]
-    # Then get the translator for that.
-    logger.info('Language: {!r}', lang)
-    trans = gettext.translation(
-        'BEE2',
-        localedir='../i18n/',
-        fallback=True,
-        languages=[lang],
-    )
+    # Get the 'en_US' style language code
+    lang_code = locale.getdefaultlocale()[0]
+
+    # Allow overriding through command line.
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg.casefold().startswith('lang='):
+                lang_code = arg[5:]
+                break
+
+    # Expands single code to parent categories.
+    expanded_langs = gettext._expand_lang(lang_code)
+
+    logger.info('Language: {!r}', lang_code)
+    logger.debug('Language codes: {!r}', expanded_langs)
+
+    for lang in expanded_langs:
+        try:
+            file = open('../i18n/{}.mo'.format(lang), 'rb')
+        except FileNotFoundError:
+            pass
+        else:
+            trans = gettext.GNUTranslations(file)
+            break
+    else:
+        # No translations, fallback to English.
+        # That's fine if the user's language is actually English.
+        if 'en' not in expanded_langs:
+            logger.warning(
+                "Can't find translation for codes: {!r}!",
+                expanded_langs,
+            )
+        trans = gettext.NullTranslations()
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
 
@@ -564,7 +614,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger, alias=None):
+    def __init__(self, logger: logging.Logger, alias=None) -> None:
         # Alias is a replacement module name for log messages.
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
@@ -606,7 +656,7 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         """Allow passing an alias for log modules."""
         # This breaks %-formatting, so only set when init_logging() is called.
 
-        alias = None
+        alias = None  # type: str
 
         def getMessage(self):
             """We have to hook here to change the value of .module.

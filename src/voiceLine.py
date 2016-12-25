@@ -111,7 +111,7 @@ def mode_quotes(prop_block):
 
 
 @conditions.make_result('QuoteEvent')
-def res_quote_event(inst, res):
+def res_quote_event(res: Property):
     """Enable a quote event. The given file is the default instance."""
     QUOTE_EVENTS[res['id'].casefold()] = res['file']
 

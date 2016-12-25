@@ -15,10 +15,9 @@ from tkinter import messagebox
 from enum import Enum
 import functools
 import webbrowser
-import itertools
 
 from richTextBox import tkRichText
-import img as png
+import img
 import sound as snd
 import itemPropWin
 import tkMarkdown
@@ -105,7 +104,7 @@ SPRITE_TOOL = {
 def set_sprite(pos, sprite):
     """Set one of the property sprites to a value."""
     widget = wid['sprite', pos]
-    widget['image'] = png.spr(sprite)
+    widget['image'] = img.spr(sprite)
     widget.tooltip_text = SPRITE_TOOL.get(sprite, '')
 
 
@@ -145,10 +144,12 @@ def sub_open(ind, e=None):
         selected_sub_item.open_menu_at_sub(pos)
 
 
-def open_event(e):
-    """Read data from the event, and show the window."""
-    snd.fx('expand')
-    show_prop(e.widget)
+def open_event(item):
+    """Show the window for a particular PalItem."""
+    def func(e):
+        snd.fx('expand')
+        show_prop(item)
+    return func
 
 
 def show_prop(widget, warp_cursor=False):
@@ -207,7 +208,7 @@ def load_item_data():
 
     for ind, pos in enumerate(SUBITEM_POS[selected_item.num_sub]):
         if pos == -1:
-            wid['subitem', ind]['image'] = png.png('BEE2/alpha_64')
+            wid['subitem', ind]['image'] = img.invis_square(64)
         else:
             wid['subitem', ind]['image'] = selected_item.get_icon(pos)
         wid['subitem', ind]['relief'] = 'flat'
@@ -231,28 +232,11 @@ def load_item_data():
     else:
         wid['changedefaults'].state(['disabled'])
 
-    if selected_item.is_wip and selected_item.is_dep:
-        wid['wip_dep']['text'] = _('WIP, Deprecated Item!')
-    elif selected_item.is_wip:
-        wid['wip_dep']['text'] = _('WIP Item!')
-    elif selected_item.is_dep:
-        wid['wip_dep']['text'] = _('Deprecated Item!')
-    else:
-        wid['wip_dep']['text'] = ''
-
     version_lookup, version_names = selected_item.get_version_names()
     if len(version_names) <= 1:
         # There aren't any alternates to choose from, disable the box
         wid['variant'].state(['disabled'])
-        # We want to display WIP / Dep tags still, so users know.
-        if selected_item.is_wip and selected_item.is_dep:
-            wid['variant']['values'] = [_('[WIP] [DEP] No Alts!')]
-        elif selected_item.is_wip:
-            wid['variant']['values'] = [_('[WIP] No Alt Versions!')]
-        elif selected_item.is_dep:
-            wid['variant']['values'] = [_('[DEP] No Alt Versions!')]
-        else:
-            wid['variant']['values'] = [_('No Alternate Versions!')]
+        wid['variant']['values'] = [_('No Alternate Versions!')]
         wid['variant'].current(0)
     else:
         wid['variant'].state(['!disabled'])
@@ -439,7 +423,7 @@ def init_widgets():
         text="",
         anchor="e",
         compound="left",
-        image=png.spr('gear_ent'),
+        image=img.spr('gear_ent'),
     )
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky=E)
     tooltip.add_tooltip(
@@ -457,7 +441,7 @@ def init_widgets():
     for i in range(5):
         wid['subitem', i] = ttk.Label(
             sub_frame,
-            image=png.png('BEE2/alpha_64'),
+            image=img.invis_square(64),
         )
         wid['subitem', i].grid(row=0, column=i)
         utils.bind_leftclick(
@@ -468,9 +452,6 @@ def init_widgets():
             wid['subitem', i],
             functools.partial(sub_open, i),
         )
-
-    wid['wip_dep'] = ttk.Label(f, text='', anchor="nw")
-    wid['wip_dep'].grid(row=4, column=0, sticky="NW")
 
     ttk.Label(f, text=_("Description:"), anchor="sw").grid(
         row=4,
@@ -485,7 +466,7 @@ def init_widgets():
     for spr_id in SPR:
         wid['sprite', spr_id] = sprite = ttk.Label(
             spr_frame,
-            image=png.spr('ap_grey'),
+            image=img.spr('ap_grey'),
             relief="raised",
         )
         sprite.grid(row=0, column=spr_id.value)
@@ -529,7 +510,7 @@ def init_widgets():
             # so it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, text="More Info>>", command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, text=_("More Info>>"), command=show_more_info)
     wid['moreinfo'].grid(row=6, column=2, sticky=E)
     tooltip.add_tooltip(wid['moreinfo'])
 

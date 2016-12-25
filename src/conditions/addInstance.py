@@ -10,11 +10,11 @@ from conditions import (
     GLOBAL_INSTANCES,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec, Entity
+from srctools import Vec, Entity, Property
 
 
 @make_result('addGlobal')
-def res_add_global_inst(_, res):
+def res_add_global_inst(res: Property):
     """Add one instance in a location.
 
     Options:
@@ -53,7 +53,7 @@ def res_add_global_inst(_, res):
 
 
 @make_result('addOverlay', 'overlayinst')
-def res_add_overlay_inst(inst, res):
+def res_add_overlay_inst(inst: Entity, res: Property):
     """Add another instance on top of this one.
 
     Values:
@@ -136,7 +136,7 @@ def res_add_overlay_inst(inst, res):
 
 
 @make_result('addCavePortrait')
-def res_cave_portrait(inst, res):
+def res_cave_portrait(inst: Entity, res: Property):
     """A variant of AddOverlay for adding Cave Portraits.
 
     If the set quote pack is not Cave Johnson, this does nothing.
@@ -144,6 +144,6 @@ def res_cave_portrait(inst, res):
     appropriately.
     """
     skin = vbsp_options.get(int, 'cave_port_skin')
-    if skin != '':
+    if skin is not None:
         new_inst = res_add_overlay_inst(inst, res)
         new_inst.fixup['$skin'] = skin

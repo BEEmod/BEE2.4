@@ -56,6 +56,12 @@ patch_tk_dialogs()
 
 
 class LoadScreen(Toplevel):
+    """LoadScreens show a loading screen for items.
+
+    stages should be (id, title) pairs for each screen stage.
+    Each stage can be stepped independently, referenced by the given ID.
+    The title can be blank.
+    """
     def __init__(self, *stages, title_text=_('Loading')):
         self.stages = list(stages)
         self.widgets = {}
