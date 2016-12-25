@@ -5,7 +5,7 @@ from srctools import VMF
 from typing import Set
 
 CLASS_ATTRS = {
-    'itembuttonfloor': [
+    ItemClass.FLOOR_BUTTON: [
         {'white', 'weighted', 'floor_button'},
         {'black', 'weighted', 'floor_button'},
         {'white', 'btn_cube', 'floor_button'},
@@ -13,23 +13,23 @@ CLASS_ATTRS = {
         {'white', 'btn_ball', 'floor_button'},
         {'black', 'btn_ball', 'floor_button'},
     ],
-    'itemtbeam': [
+    ItemClass.FUNNEL: [
         {'tbeam_emitter'},
         {'white', 'tbeam_frame'},
         {'black', 'tbeam_frame'},
     ],
-    'itemcube': [
+    ItemClass.CUBE: [
         {'dropperless', 'cube_standard'},
         {'dropperless', 'cube_companion'},
         {'dropperless', 'cube_reflect'},
         {'dropperless', 'cube_ball'},
         {'dropperless', 'cube_franken'},
     ],
-    'itembarrierhazard': [
+    ItemClass.FIZZLER: [
         {'fizzler', 'fizzler_base'},
         {'fizzler', 'fizzler_model'},
     ],
-    'itemrailplatform': [
+    ItemClass.TRACK_PLATFORM: [
         {'track_platform', 'plat_bottom_grate'},
         {'track_platform', 'plat_bottom'},
         {'track_platform', 'plat_middle'},
@@ -38,7 +38,7 @@ CLASS_ATTRS = {
         {'track_platform', 'plat_osc'},
         {'track_platform', 'plat_single'},
     ],
-    'itembarrier': [
+    ItemClass.GLASS: [
         {'barrier', 'barrier_128'},
         {'barrier', 'barrier_frame', 'frame_left', 'frame_corner'},
         {'barrier', 'barrier_frame', 'frame_left', 'frame_straight'},
@@ -49,7 +49,7 @@ CLASS_ATTRS = {
         {'barrier', 'barrier_frame', 'frame_right', 'frame_short'},
         {'barrier', 'barrier_frame', 'frame_right', 'frame_convex_corner'},
     ],
-    'itementrancedoor': [
+    ItemClass.DOOR_ENTRY_SP: [
         {'corridor_1', 'entry_corridor', 'sp_corridor'},
         {'corridor_2', 'entry_corridor', 'sp_corridor'},
         {'corridor_3', 'entry_corridor', 'sp_corridor'},
@@ -63,7 +63,7 @@ CLASS_ATTRS = {
         {'exit_elevator', 'elevator', 'sp_corridor'},
         {'arrival_departure_transition'},
     ],
-    'itemexitdoor': [
+    ItemClass.DOOR_EXIT_SP: [
         {'corridor_1', 'exit_corridor', 'sp_corridor'},
         {'corridor_2', 'exit_corridor', 'sp_corridor'},
         {'corridor_3', 'exit_corridor', 'sp_corridor'},
@@ -71,14 +71,14 @@ CLASS_ATTRS = {
         {'corridor_frame', 'exit_corridor', 'sp_corridor', 'white'},
         {'corridor_frame', 'exit_corridor', 'sp_corridor', 'black'},
     ],
-    'itemcoopentrancedoor': [
+    ItemClass.DOOR_ENTRY_COOP: [
         {'entry_corridor', 'coop_corridor'},
-        {},
-        {},
+        set(),
+        set(),
         {'exit_elevator', 'elevator', 'coop_corridor'},
         {'arrival_departure_transition'},
     ],
-    'itemcoopexitdoor': [
+    ItemClass.DOOR_EXIT_COOP: [
         {'corridor_1', 'exit_corridor', 'coop_corridor'},
         {'corridor_2', 'exit_corridor', 'coop_corridor'},
         {'corridor_3', 'exit_corridor', 'coop_corridor'},
@@ -87,30 +87,15 @@ CLASS_ATTRS = {
         {'corridor_frame', 'exit_corridor', 'coop_corridor', 'black'},
     ],
 
-    'itempaintdropper': [
+    ItemClass.PAINT_DROPPER: [
         {'paint_dropper', 'paint_dropper_sprayer'},
         {'paint_dropper', 'paint_dropper_bomb'},
     ],
 
-    # Single instance
-    'itempistonplatform': [],
-    'itemlaseremitter': [],
-    'itemstairs': [],
-    'itemlightstrip': [],
-    'itempedestalbutton': [],
-    'itempanelflip': [],
-    'itemangledpanel': [],
-    'itemcatapulttarget': [],
-    'itemcatapult': [],
-    'itempaintsplat': [],
-    'itemturret': [],
-    'itemlightbridge': [],
-
-    # No instances...
-    'itembarrierhazardextent': [],
-    'itembarrierextent': [],
-    'itemrailplatformextent': [],
-    'itemgoo': [],
+    ItemClass.PANEL_ANGLED: [
+        {'panel_angled'},
+    ],
+    # Other classes have no traits - single or no instances.
 }
 
 

@@ -3,6 +3,7 @@ from enum import Enum, EnumMeta
 
 
 class ConstGroupMeta(EnumMeta):
+    """Metaclass for ConstGroup."""
     @classmethod
     def __prepare__(mcs, cls, bases):
         """Override Enum class-dict type.
@@ -51,6 +52,53 @@ class ConstGroup(str, Enum, metaclass=ConstGroupMeta):
     def __hash__(self):
         """Allow hashing ConstGroup values."""
         return hash(self.value)
+
+
+class ItemClass(ConstGroup):
+    """PeTI item classes."""
+    # Default
+    UNCLASSED = 'ItemBase'
+
+    FLOOR_BUTTON = 'ItemButtonFloor'
+    PEDESTAL_BUTTON = 'ItemPedestalButton'
+
+    PANEL_STAIR = 'ItemStairs'
+    PANEL_FLIP = 'ItemPanelFlip'
+    PANEL_ANGLED = 'ItemAngledPanel'  # Both items
+    PISTON_PLATFORM = 'ItemPistonPlatform'
+    TRACK_PLATFORM = 'ItemRailPlatform'
+
+    CUBE = 'ItemCube'
+    GEL = PAINT = 'ItemPaintSplat'
+    FAITH_PLATE = 'ItemCatapult'
+
+    CUBE_DROPPER = 'ItemCubeDropper'
+    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper'
+    FAITH_TARGET = 'ItemCatapultTarget'
+
+    # Input-less items
+    GLASS = 'ItemBarrier'
+    TURRET = 'ItemTurret'
+    LIGHT_STRIP = 'ItemLightStrip'
+    GOO = 'ItemGoo'
+
+    # Items with inputs
+    LASER_EMITTER = 'ItemLaserEmitter'
+    FUNNEL = 'ItemTBeam'
+    FIZZLER = 'ItemBarrierHazard'
+    LIGHT_BRIDGE = 'ItemLightBridge'
+
+    # Extent/handle pseudo-items
+    HANDLE_FIZZLER = 'ItemBarrierHazardExtent'
+    HANDLE_GLASS = 'ItemBarrierExtent'
+    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent'
+    HANDLE_TRACK_PLATFORM = 'ItemRailPlatformExtent'
+
+    # Entry/Exit corridors
+    DOOR_ENTRY_SP = 'ItemEntranceDoor'
+    DOOR_ENTRY_COOP = 'ItemCoopEntranceDoor'
+    DOOR_EXIT_SP = 'ItemExitDoor'
+    DOOR_EXIT_COOP = 'ItemCoopExitDoor'
 
 
 class WhitePan(ConstGroup):

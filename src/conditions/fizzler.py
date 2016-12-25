@@ -4,9 +4,10 @@ import srctools
 import utils
 import vbsp
 import instanceLocs
+from comp_consts import ItemClass
 from conditions import (
     make_result, meta_cond,
-    ITEM_CLASSES, CONNECTIONS
+    ITEMS_WITH_CLASS, CONNECTIONS
 )
 from srctools import Vec, Property, Entity, Output
 from vbsp import TEX_FIZZLER
@@ -405,9 +406,7 @@ def fizzler_out_relay():
     # base -> connections
     fizz_bases = {}
 
-    LOGGER.info('Item classes: {}', ITEM_CLASSES)
-
-    for fizz_id in ITEM_CLASSES['itembarrierhazard']:
+    for fizz_id in ITEMS_WITH_CLASS[ItemClass.FIZZLER]:
         base, model = instanceLocs.resolve(
             '<{}: fizz_base, fizz_model>'.format(fizz_id)
         )
