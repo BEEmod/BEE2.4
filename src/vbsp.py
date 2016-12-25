@@ -23,6 +23,7 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import instance_traits
 import comp_consts as consts
 
 from typing import (
@@ -3532,6 +3533,7 @@ def main():
         load_settings()
 
         load_map(path)
+        instance_traits.set_traits(VMF)
 
         MAP_RAND_SEED = calc_rand_seed()
 

@@ -1,8 +1,40 @@
 """Adds various traits to instances, based on item classes."""
 from srctools import Entity
 from srctools import VMF
+from comp_consts import ItemClass
+from conditions import CLASS_FOR_ITEM
+from instanceLocs import ITEM_FOR_FILE
 
-from typing import Set
+import utils
+
+from typing import Optional, Set
+
+LOGGER = utils.getLogger(__name__)
+
+# Special case - specific attributes..
+ID_ATTRS = {
+    'ITEM_PLACEMENT_HELPER': [
+        {'placement_helper'},
+    ],
+    'ITEM_INDICATOR_TOGGLE': [
+        {'antline', 'toggle'},
+    ],
+    'ITEM_INDICATOR_PANEL': [
+        {'antline', 'checkmark'},
+    ],
+    'ITEM_INDICATOR_PANEL_TIMER': [
+        {'antline', 'timer'},
+    ],
+    'ITEM_POINT_LIGHT': [
+        {'ambient_light'},
+    ],
+    'ITEM_PANEL_ANGLED': [
+        {'panel_brush'},
+    ],
+    'ITEM_PANEL_CLEAR': [
+        {'panel_glass'},
+    ],
+}
 
 CLASS_ATTRS = {
     ItemClass.FLOOR_BUTTON: [
@@ -100,13 +132,59 @@ CLASS_ATTRS = {
 
 
 def get(inst: Entity) -> Set[str]:
-    """Return the traits for an instance."""
+    """Return the traits for an instance.
+
+    Modify to set values.
+    """
     try:
         return inst.traits
     except AttributeError:
         inst.traits = set()
         return inst.traits
 
+
+def get_class(inst: Entity) -> Optional[ItemClass]:
+    """If known, return the item class for this instance.
+
+    It must be the original entity placed by the PeTI.
+    """
+    return getattr(inst, 'peti_class', None)
+
+
 def set_traits(vmf: VMF):
     """Scan through the map, and apply traits to instances."""
-    pass
+    for inst in vmf.by_class['func_instance']:
+        inst_file = inst['file'].casefold()
+        if not inst_file:
+            continue
+        try:
+            item_id, item_ind = ITEM_FOR_FILE[inst_file]
+        except KeyError:
+            LOGGER.warning('Unknown instance "{}"!', inst['file'])
+            continue
+
+        # BEE2_xxx special instance, shouldn't be in the original map...
+        if isinstance(item_ind, str):
+            LOGGER.warning('<{}:bee2_{}> found in original map?', item_id, item_ind)
+
+        try:
+            item_class = ItemClass(CLASS_FOR_ITEM[item_id.casefold()])
+        except KeyError:  # dict fail
+            LOGGER.warning('Unknown item ID <{}>', item_id)
+            item_class = ItemClass.UNCLASSED
+        except ValueError:  # ItemClass() fail
+            LOGGER.warning('Unknown item class for id <{}>', item_id)
+            item_class = ItemClass.UNCLASSED
+
+        inst.peti_class = item_class
+        traits = get(inst)
+        try:
+            traits.update(ID_ATTRS[item_id.upper()][item_ind])
+        except (IndexError, KeyError):
+            pass
+        try:
+            traits.update(CLASS_ATTRS[item_class][item_ind])
+        except (IndexError, KeyError):
+            pass
+
+        LOGGER.info('"{}": {}', inst_file, ', '.join(sorted(traits)))
