@@ -186,5 +186,3 @@ def set_traits(vmf: VMF):
             traits.update(CLASS_ATTRS[item_class][item_ind])
         except (IndexError, KeyError):
             pass
-
-        LOGGER.info('"{}": {}', inst_file, ', '.join(sorted(traits)))
