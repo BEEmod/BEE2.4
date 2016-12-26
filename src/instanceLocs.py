@@ -24,7 +24,7 @@ _RE_SUBITEMS = re.compile(r'''
     \s*([^:]+)
     \s*(?:
     : \s*
-    ([\w,\s]+)
+    ([^>:]+)
     )?
     \s*>\s*
 ''', re.VERBOSE)
