@@ -68,7 +68,6 @@ def res_colored_cube(inst: Entity):
     color. The flag value is True if the cube is coloured.
     """
     origin = Vec.from_str(inst['origin'])
-    LOGGER.info('Pos: {}\n\n, {}->{}', COLOR_POS, origin, COLOR_POS.get(origin.as_tuple()))
     try:
         color = COLOR_POS[origin.as_tuple()]
     except KeyError:
