@@ -4,6 +4,7 @@ import srctools
 import utils
 import vbsp
 import instanceLocs
+import comp_consts as const
 from conditions import (
     make_result, meta_cond,
     ITEM_CLASSES, CONNECTIONS
@@ -18,7 +19,8 @@ LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
 
-@make_result('custFizzler')
+
+@make_result('custFizzler', 'custFizz', 'customFizzler', 'customFizz')
 def res_cust_fizzler(base_inst: Entity, res: Property):
     """Customises the various components of a custom fizzler item.
 
@@ -30,7 +32,7 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
         * UniqueModel: If true, each model instance will get a suffix to
             allow unique targetnames.
         * Brush: A brush entity that will be generated (the original is
-         deleted.)
+         deleted.) This cannot be used on laserfields.
             * Name is the instance name for the brush
             * Left/Right/Center/Short/Nodraw are the textures used
             * Keys are a block of keyvalues to be set. Targetname and
@@ -42,6 +44,8 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
             * MergeBrushes, if true will merge this brush set into one
               entity for each fizzler. This is useful for non-fizzlers to
               reduce the entity count.
+            * SimplifyBrush, if true will merge the three parts into one brush.
+              All sides will receive the "nodraw" texture at 0.25 scale.
             * MaterialModify generates material_modify_controls to control
               the brush. One is generated for each texture used in the brush.
               This has subkeys 'name' and 'var' - the entity name and shader
@@ -107,6 +111,15 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
             new_brush = orig_brush.copy()
             # Unique to the particular config property & fizzler name
             conf_key = (id(config), fizz_name)
+
+            if config.bool('SimplifyBrush'):
+                # Replace the brush with a simple one of the same size.
+                bbox_min, bbox_max = new_brush.get_bbox()
+                new_brush.solids = [vbsp.VMF.make_prism(
+                    bbox_min, bbox_max,
+                    mat=const.Tools.NODRAW,
+                ).solid]
+
             should_merge = config.bool('MergeBrushes')
             if should_merge and conf_key in FIZZ_BRUSH_ENTS:
                 # These are shared by both ents, but new_brush won't be added to
@@ -168,18 +181,18 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
                 # Resize the brush into a laserfield format, without
                 # the 128*64 parts. If the brush is 128x128, we can
                 # skip the resizing since it's already correct.
-                laser_tex = laserfield_conf['texture', 'effects/laserplane']
-                nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
+                laser_tex = laserfield_conf['texture', const.Special.LASERFIELD]
+                nodraw_tex = laserfield_conf['nodraw', const.Tools.NODRAW]
                 tex_width = laserfield_conf.int('texwidth', 512)
                 is_short = False
                 for side in new_brush.sides():
-                    if side.mat.casefold() == 'effects/fizzler':
+                    if side == const.Fizzler.SHORT:
                         is_short = True
                         break
 
                 if is_short:
                     for side in new_brush.sides():
-                        if side.mat.casefold() == 'effects/fizzler':
+                        if side == const.Fizzler.SHORT:
                             side.mat = laser_tex
 
                             side.uaxis.offset = 0
