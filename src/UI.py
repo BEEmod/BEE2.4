@@ -869,8 +869,10 @@ def export_editoritems(e=None):
         _('<Last Export>'),
         pal_data,
         )
-    new_pal.prevent_overwrite = True
     new_pal.filename = export_filename
+    new_pal.prevent_overwrite = True
+    palettes.append(new_pal)
+    new_pal.save(ignore_readonly=True)
 
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
@@ -878,9 +880,6 @@ def export_editoritems(e=None):
 
     # Update corridor configs for standalone mode..
     CompilerPane.save_corridors()
-
-    palettes.append(new_pal)
-    new_pal.save()
     refresh_pal_ui()
 
     if launch_game:

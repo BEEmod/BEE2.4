@@ -51,7 +51,7 @@ class Palette:
         pal.filename = os.path.basename(path)
         return pal
 
-    def save(self):
+    def save(self, ignore_readonly=False):
         """Save the palette file into the specified location."""
         LOGGER.info('Saving "{}"!', self.name)
         props = Property(None, [
@@ -63,11 +63,11 @@ class Palette:
             ])
         ])
 
-        # Determine a valid path.
+        # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)
         # If a conflict occurs, add ' ' and hash again to get a different
         # value.
-        if self.filename is None or self.prevent_overwrite:
+        if self.filename is None or (self.prevent_overwrite and not ignore_readonly):
             hash_src = self.name
             while True:
                 hash_filename = str(abs(hash(hash_src))) + PAL_EXT
