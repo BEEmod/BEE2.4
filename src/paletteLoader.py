@@ -151,6 +151,8 @@ def load_palettes(pal_dir):
             pal.save()
             shutil.rmtree(path)
 
+    # Ensure the list has a defined order..
+    pal_list.sort(key=str)
     return pal_list
 
 
