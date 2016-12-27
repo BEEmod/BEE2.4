@@ -53,7 +53,7 @@ class Palette:
 
     def save(self):
         """Save the palette file into the specified location."""
-        LOGGER.info('Saving "' + self.name + '"!')
+        LOGGER.info('Saving "{}"!', self.name)
         props = Property(None, [
             Property('Name', self.name),
             Property('ReadOnly', srctools.bool_as_int(self.prevent_overwrite)),
@@ -140,12 +140,15 @@ def load_palettes(pal_dir):
             if prop_file:
                 prop_file.close()
 
-        LOGGER.warning('"{}" is a legacy palette - resaving!')
+        LOGGER.warning('"{}" is a legacy palette - resaving!', name)
         # Resave with the new format, then delete originals.
-        pal.save()
         if name.endswith('.zip'):
+            pal.save()
             os.remove(path)
         else:
+            # Folders can't be overwritten...
+            pal.prevent_overwrite = True
+            pal.save()
             shutil.rmtree(path)
 
     return pal_list
@@ -183,13 +186,12 @@ def parse_legacy(posfile, propfile, path):
 
 def save_pal(items, name):
     """Save a palette under the specified name."""
-    pos = [(it.id, it.subKey) for it in items]
     for pal in pal_list:
         if pal.name == name and not pal.prevent_overwrite:
-            pal.pos = pos
+            pal.pos = list(items)
             break
     else:
-        pal = Palette(name, pos)
+        pal = Palette(name, list(items))
         pal_list.append(pal)
 
     pal.save()
