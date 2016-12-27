@@ -762,9 +762,14 @@ def suggested_refresh():
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
     palettes.sort(key=str)  # sort by name
-    UI['palette'].delete(0, END)
+    listbox = UI['palette']  # type: Listbox
+    listbox.delete(0, END)
     for i, pal in enumerate(palettes):
-        UI['palette'].insert(i, pal.name)
+        listbox.insert(i, pal.name)
+        if pal.prevent_overwrite:
+            listbox.itemconfig(i, foreground='grey', background='white')
+        else:
+            listbox.itemconfig(i, foreground='black', background='white')
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -854,15 +859,18 @@ def export_editoritems(e=None):
                   'Launch game?'),
     )
 
+    export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
+
     for pal in palettes[:]:
-        if pal.name == '<Last Export>':
+        if pal.filename == export_filename:
             palettes.remove(pal)
+
     new_pal = paletteLoader.Palette(
         _('<Last Export>'),
         pal_data,
-        options={},
-        filename='LAST_EXPORT.zip',
         )
+    new_pal.prevent_overwrite = True
+    new_pal.filename = export_filename
 
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
@@ -874,7 +882,7 @@ def export_editoritems(e=None):
     # Since last_export is a zip, users won't be able to overwrite it
     # normally!
     palettes.append(new_pal)
-    new_pal.save(allow_overwrite=True)
+    new_pal.save()
     refresh_pal_ui()
 
     if launch_game:
