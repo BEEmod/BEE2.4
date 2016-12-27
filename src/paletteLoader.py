@@ -25,7 +25,7 @@ class Palette:
         # Name of the palette
         self.name = name
         # If loaded from a file, the path to use.
-        # None determines a filename from PAL_DIR
+        # None determines a filename automatically.
         self.filename = None  # type: Optional[str]
         # List of id, index tuples.
         self.pos = pos
@@ -48,7 +48,7 @@ class Palette:
 
         pal = Palette(name, items)
         pal.prevent_overwrite = props.bool('readonly')
-        pal.filename = path
+        pal.filename = os.path.basename(path)
         return pal
 
     def save(self):
@@ -70,33 +70,24 @@ class Palette:
         if self.filename is None or self.prevent_overwrite:
             hash_src = self.name
             while True:
-                hash_filename = os.path.join(
-                    PAL_DIR,
-                    str(abs(hash(hash_src))) + PAL_EXT
-                )
+                hash_filename = str(abs(hash(hash_src))) + PAL_EXT
                 if os.path.isfile(hash_filename):
                     # Add a random character to iterate the hash.
                     hash_src += chr(random.randrange(0x10ffff))
                 else:
-                    file = open(hash_filename, 'w')
-                    self.filename = hash_filename
+                    file = open(os.path.join(PAL_DIR, hash_filename), 'w')
+                    self.filename = os.path.join(PAL_DIR, hash_filename)
                     break
         else:
-            file = open(self.filename, 'w')
+            file = open(os.path.join(PAL_DIR, self.filename), 'w')
         with file:
             for line in props.export():
                 file.write(line)
 
-    def delete_from_disk(self, name=None):
+    def delete_from_disk(self):
         """Delete this palette from disk."""
-        if name is None:
-            name = self.filename
-        is_zip = name.endswith('.zip')
-        path = os.path.join(PAL_DIR, name)
-        if is_zip:
-            os.remove(path)
-        else:
-            shutil.rmtree(path)
+        if self.filename is not None:
+            os.remove(os.path.join(PAL_DIR, self.filename))
 
 
 def load_palettes(pal_dir):
@@ -159,13 +150,7 @@ def load_palettes(pal_dir):
 def parse_legacy(posfile, propfile, path):
     """Parse the original BEE2.2 palette format."""
     props = Property.parse(propfile, path + ':properties.txt')
-    name = "Unnamed"
-    opts = {}
-    for option in props:
-        if option.name == "name":
-            name = option.value
-        else:
-            opts[option.name.casefold()] = option.value
+    name = props['name', 'Unnamed']
     pos = []
     for dirty_line in posfile:
         line = srctools.clean_line(dirty_line)
@@ -183,7 +168,7 @@ def parse_legacy(posfile, propfile, path):
                 else:
                     LOGGER.warning('Malformed row "{}"!', line)
                     return None
-    return Palette(name, pos, opts)
+    return Palette(name, pos)
 
 
 def save_pal(items, name):

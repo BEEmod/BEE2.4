@@ -879,8 +879,6 @@ def export_editoritems(e=None):
     # Update corridor configs for standalone mode..
     CompilerPane.save_corridors()
 
-    # Since last_export is a zip, users won't be able to overwrite it
-    # normally!
     palettes.append(new_pal)
     new_pal.save()
     refresh_pal_ui()
