@@ -762,9 +762,14 @@ def suggested_refresh():
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
     palettes.sort(key=str)  # sort by name
-    UI['palette'].delete(0, END)
+    listbox = UI['palette']  # type: Listbox
+    listbox.delete(0, END)
     for i, pal in enumerate(palettes):
-        UI['palette'].insert(i, pal.name)
+        listbox.insert(i, pal.name)
+        if pal.prevent_overwrite:
+            listbox.itemconfig(i, foreground='grey', background='white')
+        else:
+            listbox.itemconfig(i, foreground='black', background='white')
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -854,15 +859,18 @@ def export_editoritems(e=None):
                   'Launch game?'),
     )
 
+    export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
+
     for pal in palettes[:]:
-        if pal.name == '<Last Export>':
+        if pal.filename == export_filename:
             palettes.remove(pal)
+
     new_pal = paletteLoader.Palette(
         _('<Last Export>'),
         pal_data,
-        options={},
-        filename='LAST_EXPORT.zip',
         )
+    new_pal.prevent_overwrite = True
+    new_pal.filename = export_filename
 
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
@@ -874,7 +882,7 @@ def export_editoritems(e=None):
     # Since last_export is a zip, users won't be able to overwrite it
     # normally!
     palettes.append(new_pal)
-    new_pal.save(allow_overwrite=True)
+    new_pal.save()
     refresh_pal_ui()
 
     if launch_game:
@@ -1137,15 +1145,6 @@ def pal_save_as(e=None):
         if name is None:
             # Cancelled...
             return False
-        # Check for non-basic characters to ensure the filename is valid..
-        elif not srctools.is_plain_text(name):
-            messagebox.showinfo(
-                icon=messagebox.ERROR,
-                title='BEE2',
-                message=_('Please only use basic characters in palette '
-                        'names.'),
-                parent=TK_ROOT,
-            )
         elif paletteLoader.check_exists(name):
             if messagebox.askyesno(
                 icon=messagebox.QUESTION,
@@ -1155,14 +1154,19 @@ def pal_save_as(e=None):
                 break
         else:
             break
-    paletteLoader.save_pal(pal_picked, name)
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        name,
+    )
     refresh_pal_ui()
 
 
 def pal_save(e=None):
     pal = palettes[selectedPalette]
-    pal.pos = [(it.id, it.subKey) for it in pal_picked]
-    pal.save(allow_overwrite=True)  # overwrite it
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        pal.name,
+    )
     refresh_pal_ui()
 
 
