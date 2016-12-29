@@ -2300,7 +2300,7 @@ class BrushTemplate(PakObject, has_img=False):
         if is_scaling:
             raise NotImplementedError()  # TODO
         elif keep_brushes:
-            for brush, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+            for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
                 if force_is_detail is not None:
                     export_detail = force_is_detail
                 else:
@@ -2326,9 +2326,9 @@ class BrushTemplate(PakObject, has_img=False):
 
                 targ_dict = self.temp_detail if export_detail else self.temp_world
                 try:
-                    ent = targ_dict[temp_id, visgroup]
+                    ent = targ_dict[temp_id, visgroup, export_detail]
                 except KeyError:
-                    ent = targ_dict[temp_id, visgroup] = TEMPLATE_FILE.create_ent(
+                    ent = targ_dict[temp_id, visgroup, export_detail] = TEMPLATE_FILE.create_ent(
                         classname=(
                             'bee2_template_detail' if
                             export_detail
@@ -2338,9 +2338,10 @@ class BrushTemplate(PakObject, has_img=False):
                         visgroup=visgroup,
                     )
                 ent.visgroup_ids.add(temp_visgroup_id)
-                ent.solids.append(
-                    brush.copy(map=TEMPLATE_FILE, keep_vis=False)
-                )
+                for brush in brushes:
+                    ent.solids.append(
+                        brush.copy(map=TEMPLATE_FILE, keep_vis=False)
+                    )
 
         self.temp_overlays = []
 
@@ -2400,17 +2401,16 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.export(temp_file, inc_version=False)
 
     @staticmethod
-    def yield_world_detail(map: VMF) -> Iterator[Tuple[Solid, bool, set]]:
+    def yield_world_detail(map: VMF) -> Iterator[Tuple[List[Solid], bool, set]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
         (Those are stored in the ent for detail, and the solid for world.)
         """
         for brush in map.brushes:
-            yield brush, False, brush.visgroup_ids
+            yield [brush], False, brush.visgroup_ids
         for ent in map.by_class['func_detail']:
-            for brush in ent.solids:
-                yield brush, True, ent.visgroup_ids
+            yield ent.solids.copy(), True, ent.visgroup_ids
 
 
 def desc_parse(info, id=''):
