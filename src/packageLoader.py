@@ -2278,10 +2278,33 @@ class BrushTemplate(PakObject, has_img=False):
         else:
             force_is_detail = None
 
-        if keep_brushes:
+        # Parse through a config entity in the template file.
+        conf_ents = list(vmf_file.by_class['bee2_template_conf'])
+        if len(conf_ents) > 1:
+            raise ValueError(
+                'Template "{}" has multiple configuration entities!'.format(temp_id)
+            )
+        elif len(conf_ents) == 1:
+            config = conf_ents[0]
+            conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
+            if srctools.conv_bool(config['discard_brushes']):
+                keep_brushes = False
+            is_scaling = srctools.conv_bool(config['is_scaling'])
+            if config['temp_type'] == 'detail':
+                force_is_detail = True
+            elif config['temp_type'] == 'world':
+                force_is_detail = False
+        else:
+            conf_auto_visgroup = is_scaling = False
+
+        if is_scaling:
+            raise NotImplementedError()  # TODO
+        elif keep_brushes:
             for brush, is_detail, vis_ids in self.yield_world_detail(vmf_file):
                 if force_is_detail is not None:
-                    is_detail = force_is_detail
+                    export_detail = force_is_detail
+                else:
+                    export_detail = is_detail
                 if len(vis_ids) > 1:
                     raise ValueError('Template "{}" has brush with two'
                                      ' visgroups!'.format(
@@ -2294,14 +2317,21 @@ class BrushTemplate(PakObject, has_img=False):
                 ]
                 # No visgroup = ''
                 visgroup = visgroups[0] if visgroups else ''
-                targ_dict = self.temp_detail if is_detail else self.temp_world
+
+                # Auto-visgroup puts func_detail ents in unique visgroups.
+                if is_detail and not visgroup and conf_auto_visgroup:
+                    visgroup = '__auto_group_{}__'.format(conf_auto_visgroup)
+                    # Reuse as the unique index, >0 are True too..
+                    conf_auto_visgroup += 1
+
+                targ_dict = self.temp_detail if export_detail else self.temp_world
                 try:
                     ent = targ_dict[temp_id, visgroup]
                 except KeyError:
                     ent = targ_dict[temp_id, visgroup] = TEMPLATE_FILE.create_ent(
                         classname=(
                             'bee2_template_detail' if
-                            is_detail
+                            export_detail
                             else 'bee2_template_world'
                         ),
                         template_id=temp_id,
@@ -2331,14 +2361,14 @@ class BrushTemplate(PakObject, has_img=False):
             )
             new_overlay.visgroup_ids.add(temp_visgroup_id)
             new_overlay['template_id'] = self.id
-            new_overlay['visgroup_id'] = visgroups[0] if visgroups else ''
+            new_overlay['visgroup'] = visgroups[0] if visgroups else ''
             new_overlay['classname'] = 'bee2_template_overlay'
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
 
         if self.temp_detail is None and self.temp_world is None:
-            if not self.temp_overlays:
+            if not self.temp_overlays and not is_scaling:
                 LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
 
     @classmethod
