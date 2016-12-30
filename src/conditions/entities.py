@@ -252,3 +252,57 @@ def res_water_splash(inst: Entity, res: Property):
     )
 
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/water_splash.nut')
+
+
+@make_result('FunnelLight')
+def res_make_funnel_light(inst: Entity):
+    """Place a light for Funnel items."""
+    oran_on = inst.fixup.bool('$start_reversed')
+    need_blue = need_oran = False
+    name = ''
+    if inst.fixup['$connectioncount_polarity'] != '0':
+        import vbsp
+        if not vbsp.settings['style_vars']['funnelallowswitchedlights']:
+            # Allow disabling adding switchable lights.
+            return
+        name = conditions.local_name(inst, 'light')
+        need_blue = need_oran = True
+    else:
+        if oran_on:
+            need_oran = True
+        else:
+            need_blue = True
+
+    loc = Vec(0, 0, -56)
+    loc.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
+
+    if need_blue:
+        inst.map.create_ent(
+            classname='light',
+            targetname=name + '_b' if name else '',
+            spawnflags=int(oran_on),  # 1 = Initially Dark
+            origin=loc,
+            _light='50 120 250 50',
+            _lightHDR='-1 -1 -1 1',
+            _lightscaleHDR=2,
+            _fifty_percent_distance=48,
+            _zero_percent_distance=96,
+            _hardfalloff=1,
+            _distance=0,
+            style=0,
+        )
+    if need_oran:
+        inst.map.create_ent(
+            classname='light',
+            targetname=name + '_o' if name else '',
+            spawnflags=int(not oran_on),
+            origin=loc,
+            _light='250 120 50 50',
+            _lightHDR='-1 -1 -1 1',
+            _lightscaleHDR=2,
+            _fifty_percent_distance=48,
+            _zero_percent_distance=96,
+            _hardfalloff=1,
+            _distance=0,
+            style=0,
+        )
