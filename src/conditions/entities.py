@@ -140,7 +140,6 @@ def res_water_splash(inst: Entity, res: Property):
         - type: Use certain fixup values to calculate pos2 instead:
            'piston_1/2/3/4': Use $bottom_level and $top_level as offsets.
            'track_platform': Use $travel_direction, $travel_distance, etc.
-          moves in.
         - fast_check: Check faster for movement. Needed for items which
           move quickly.
     """
@@ -214,7 +213,7 @@ def res_water_splash(inst: Entity, res: Property):
             continue
         break
     else:
-        return # Not in goo at all
+        return  # Not in goo at all
 
     if pos1.z == pos2.z:
         # Flat - this won't do anything...
@@ -242,7 +241,7 @@ def res_water_splash(inst: Entity, res: Property):
 
     conditions.VMF.create_ent(
         classname='env_splash',
-        targetname=conditions.local_name(inst, name + enc_data),
+        targetname=conditions.local_name(inst, name) + enc_data,
         parentname=conditions.local_name(inst, parent),
         origin=splash_pos + (0, 0, 16),
         scale=scale,
