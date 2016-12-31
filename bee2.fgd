@@ -56,9 +56,11 @@
 	= bee2_template_conf:
 	"Defines configuration options for a template."
 	[
-	template_id(target_source): "Template ID" : "" : "The ID given to this template. If set this will be loaded automatically."
+	template_id(string): "Template ID" : "" : "The ID given to this template. If set this will be loaded automatically."
 	
-	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world."
+	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world." +
+	"This should be used on axis-aligned tile surfaces, to make texturing match in different templates. " +
+	"The faces must be axis-aligned."
 	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
 	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
 	
