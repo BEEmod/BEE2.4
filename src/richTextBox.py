@@ -30,6 +30,18 @@ class tkRichText(tkinter.Text):
             wrap="word",
             font=self.font,
         )
+
+        self.heading_font = {}
+        cur_size = self.font['size']
+        for size in range(6, 0, -1):
+            self.heading_font[size] = font = self.font.copy()
+            cur_size /= 0.8735
+            font.configure(weight='bold', size=round(cur_size))
+            self.tag_config(
+                'heading_{}'.format(size),
+                font=font,
+            )
+
         self.tag_config(
             "underline",
             underline=1,
