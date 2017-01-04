@@ -967,6 +967,17 @@ def add_game(e=None, refresh_menu=True):
                 title=_('BEE2 - Add Game'),
                 )
             return False
+
+        # Mel doesn't use PeTI, so that won't make much sense...
+        if gm_id == utils.STEAM_IDS['MEL']:
+            messagebox.showinfo(
+                message=_("Portal Stories: Mel doesn't have an editor!"),
+                parent=TK_ROOT,
+                icon=messagebox.ERROR,
+                title=_('BEE2 - Add Game'),
+            )
+            return False
+
         invalid_names = [gm.name for gm in all_games]
         while True:
             name = ask_string(

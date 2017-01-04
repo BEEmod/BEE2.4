@@ -48,12 +48,13 @@ STEAM_IDS = {
     'TWTM': '286080',
     'THINKING WITH TIME MACHINE': '286080',
 
+    'MEL': '317400',  # Note - no workshop
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational
     # 247120: Sixense
     # 211480: 'In Motion'
-    # 317400: PS Mel - No workshop
 }
 
 if WIN:
