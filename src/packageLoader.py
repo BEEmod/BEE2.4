@@ -1309,9 +1309,9 @@ class QuotePack(PakObject):
         # portrait.
         port_skin = srctools.conv_int(data.info['caveSkin', None], None)
 
-        monitor_data = data.info.find_key('monitor', None)
+        monitor_data = data.info.find_key('monitor', [])
 
-        if monitor_data.value is not None:
+        if monitor_data:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
             mon_interrupt = monitor_data.float('interrupt_chance', 0)
@@ -1674,7 +1674,9 @@ class Music(PakObject):
 
         if isinstance(music.sound, Property):
             # We want to generate the soundscript - copy over the configs.
-            vbsp_config.append(Property('MusicScript', music.sound.value))
+            conf = music.config.copy()
+            conf.name = 'MusicScript'
+            vbsp_config.append(conf)
             script = 'music.BEE2'
         else:
             script = music.sound
@@ -2202,8 +2204,8 @@ class PackList(PakObject, allow_mult=True, has_img=False):
                 )
 
         # Only add packtriggers if there's actually a value
-        if pack_triggers.value:
-            exp_data.vbsp_conf.append(pack_triggers)
+        if pack_triggers:
+            exp_data.vbsp_conf.append(pack_triggers.copy())
 
         LOGGER.info('Writing packing list!')
         with open(exp_data.game.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:

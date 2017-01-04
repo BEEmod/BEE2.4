@@ -337,7 +337,7 @@ def load_settings():
 
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
-        voiceLine.QUOTE_DATA += quote_block.value
+        voiceLine.QUOTE_DATA += quote_block.copy()
 
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):

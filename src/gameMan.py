@@ -645,7 +645,7 @@ class Game:
             comm_block = Property(item['Type'], [])
 
             for inst_block in item.find_all("Exporting", "instances"):
-                for inst in inst_block.value[:]:  # type: Property
+                for inst in list(inst_block):  # type: Property
                     if inst.name.isdigit():
                         # Direct Portal 2 value
                         instance_block.append(
@@ -653,7 +653,7 @@ class Game:
                         )
                     else:
                         # It's a custom definition, remove from editoritems
-                        inst_block.value.remove(inst)
+                        inst_block.remove(inst)
 
                         # Allow the name to start with 'bee2_' also to match
                         # the <> definitions - it's ignored though.
@@ -696,7 +696,7 @@ class Game:
             item_classes[item['type']] = item['ItemClass', 'ItemBase']
 
             # Only add the block if the item actually has IO.
-            if comm_block.value:
+            if comm_block:
                 commands.append(comm_block)
 
         return root_block.export()
