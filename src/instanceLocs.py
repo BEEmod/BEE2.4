@@ -97,7 +97,7 @@ SPECIAL_INST = {
     # for toggle/timer panels:
     'indPanCheck':  '<ITEM_INDICATOR_PANEL>',
     'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
-    # 'indpan' is defined below from these two
+    'indPan': '<ITEM_INDICATOR_PANEL>, <ITEM_INDICATOR_PANEL_TIMER>',
 
     # The values in ITEM_EXIT_DOOR aren't actually used!
     'door_frame_sp': '<ITEM_ENTRY_DOOR:7,8>',
@@ -108,6 +108,20 @@ SPECIAL_INST = {
     'door_frame_coop': '<ITEM_COOP_EXIT_DOOR:4,5>',
     'white_frame_coop': '<ITEM_COOP_EXIT_DOOR:4>',
     'black_frame_coop': '<ITEM_COOP_EXIT_DOOR:5>',
+
+    # Combinations of above
+    'door_frame': '<ITEM_ENTRY_DOOR:7,8>, <ITEM_COOP_EXIT_DOOR:4,5>',
+    'white_frame': '<ITEM_ENTRY_DOOR:7>, <ITEM_COOP_EXIT_DOOR:4>',
+    'black_frame': '<ITEM_ENTRY_DOOR:8>, <ITEM_COOP_EXIT_DOOR:5>',
+
+    # Arrival_departure_ents is set in both entry doors - it's usually the same
+    # though.
+    'transitionents': '<ITEM_ENTRY_DOOR:11>, <ITEM_COOP_ENTRY_DOOR:4>',
+
+    # Convenience, both parts of laser items:
+    'laserEmitter': '<ITEM_LASER_EMITTER_CENTER>, <ITEM_LASER_EMITTER_OFFSET>',
+    'laserCatcher': '<ITEM_LASER_CATCHER_CENTER>, <ITEM_LASER_CATCHER_OFFSET>',
+    'laserRelay': '<ITEM_LASER_RELAY_CENTER>, <ITEM_LASER_CATCHER_OFFSET>',
 }
 
 # The resolved versions of SPECIAL_INST
@@ -219,52 +233,6 @@ def load_conf(prop_block: Property):
         SPECIAL_INST.items()
     }
 
-    # Several special items which use multiple item types!
-
-    # Checkmark and Timer indicator panels:
-    INST_SPECIAL['indpan'] = (
-        INST_SPECIAL['indpancheck'] +
-        INST_SPECIAL['indpantimer']
-    )
-
-    INST_SPECIAL['door_frame'] = (
-        INST_SPECIAL['door_frame_sp'] +
-        INST_SPECIAL['door_frame_coop']
-    )
-
-    INST_SPECIAL['white_frame'] = (
-        INST_SPECIAL['white_frame_sp'] +
-        INST_SPECIAL['white_frame_coop']
-    )
-
-    INST_SPECIAL['black_frame'] = (
-        INST_SPECIAL['black_frame_sp'] +
-        INST_SPECIAL['black_frame_coop']
-    )
-
-    # Arrival_departure_ents is set in both entry doors - it's usually the same
-    # though.
-    INST_SPECIAL['transitionents'] = (
-        resolve('<ITEM_ENTRY_DOOR:11>') +
-        resolve('<ITEM_COOP_ENTRY_DOOR:4>')
-    )
-
-    # Laser items have the offset and centered item versions.
-    INST_SPECIAL['lasercatcher'] = (
-        resolve('<ITEM_LASER_CATCHER_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_CATCHER_OFFSET>', silent=True)
-    )
-
-    INST_SPECIAL['laseremitter'] = (
-        resolve('<ITEM_LASER_EMITTER_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_EMITTER_OFFSET>', silent=True)
-    )
-
-    INST_SPECIAL['laserrelay'] = (
-        resolve('<ITEM_LASER_RELAY_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
-    )
-
 
 def resolve(path, silent=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
@@ -283,6 +251,8 @@ def resolve(path, silent=False) -> List[str]:
     if it's invalid. Incorrect [] will raise an exception (since these are
     hardcoded).
     When using <> values, "" filenames will be skipped.
+    Multiple paths can be used in the same string (other than raw paths):
+    "<ITEM_ID>, [spExitCorridor], <ITEM_2:0>"...
 
     If silent is True, no error messages will be output (for use with hardcoded
     names).
