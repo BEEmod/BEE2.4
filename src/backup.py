@@ -886,6 +886,11 @@ def init_application():
     game_menu.add_separator()
 
     bar.add_cascade(menu=game_menu, label=_('Game'))
+
+    import helpMenu
+    # Add the 'Help' menu here too.
+    helpMenu.make_help_menu(bar)
+
     window['menu'] = bar
 
     gameMan.add_menu_opts(game_menu)

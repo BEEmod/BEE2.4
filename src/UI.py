@@ -28,6 +28,7 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
+import helpMenu
 import backup as backup_win
 import tooltip
 
@@ -1664,9 +1665,7 @@ def init_menu_bar(win):
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
 
-    menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
-    bar.add_cascade(menu=menus['help'], label=_('Help'))
-    menus['help'].add_command(label=_('About'))  # Authors etc
+    helpMenu.make_help_menu(bar)
 
 
 def init_windows():
