@@ -236,6 +236,10 @@ class EndCondition(Exception):
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
 
+# The result of a condition after setup.
+# Similar to properties, but contains any value.
+CondResult = namedtuple('CondResult', 'name real_name conf')
+
 
 class Condition:
     __slots__ = ['flags', 'results', 'else_results', 'priority', 'source']
@@ -249,11 +253,10 @@ class Condition:
         source=None,
     ):
         self.flags = flags or []
-        self.results = results or []
-        self.else_results = else_results or []
+        self.results = self.setup_results(results or [])
+        self.else_results = self.setup_results(else_results or [])
         self.priority = priority
         self.source = source
-        self.setup()
 
     def __repr__(self):
         return (
@@ -277,9 +280,9 @@ class Condition:
         source = None
         for prop in prop_block:
             if prop.name == 'result':
-                results.extend(prop.value)  # join multiple ones together
+                results.extend(prop)  # join multiple ones together
             elif prop.name == 'else':
-                else_results.extend(prop.value)
+                else_results.extend(prop)
             elif prop.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
@@ -310,28 +313,31 @@ class Condition:
             source,
         )
 
-    def setup(self):
-        """Some results need some pre-processing before they can be used.
+    @staticmethod
+    def setup_results(res_list: Iterable[Property]):
+        """Helper method to perform result setup.
 
+        This allows pre-processing a result to prevent parsing it each
+        time.
         """
-        for res in self.results[:]:
-            self.setup_result(self.results, res)
-
-        for res in self.else_results[:]:
-            self.setup_result(self.else_results, res)
+        output = []
+        for result in res_list:
+            func = RESULT_SETUP.get(result.name)
+            if func:
+                conf = func(VMF, result)
+                if conf is None:
+                    # This result is invalid, remove it.
+                    continue
+                if isinstance(conf, list) and all(a is b for a,b in zip(conf, result)):
+                    LOGGER.warning('Setup for "{}" returns config..'.format(result.real_name))
+                    conf = result
+            else:
+                conf = result
+            output.append(CondResult(result.name, result.real_name, conf))
+        return output
 
     @staticmethod
-    def setup_result(res_list, result):
-        """Helper method to perform result setup."""
-        func = RESULT_SETUP.get(result.name)
-        if func:
-            result.value = func(VMF, result)
-            if result.value is None:
-                # This result is invalid, remove it.
-                res_list.remove(result)
-
-    @staticmethod
-    def test_result(inst, res):
+    def test_result(inst, res: CondResult):
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
@@ -340,7 +346,7 @@ class Condition:
                 name=res.real_name,
             )) from None
         else:
-            return func(VMF, inst, res)
+            return func(VMF, inst, res.conf)
 
     def test(self, inst):
         """Try to satisfy this condition on the given instance."""
@@ -438,8 +444,9 @@ def add_meta(func, priority, only_once=True):
 
     if only_once:
         cond.results.append(
-            Property('endCondition', '')
+            CondResult('endcondition', 'EndCondition', None)
         )
+
     conditions.append(cond)
     ALL_META.append((name, priority, func))
 
@@ -554,9 +561,8 @@ def check_all():
 
 def check_flag(flag: Property, inst: Entity):
     LOGGER.debug(
-        'Checking {} ({!s}) on {}',
+        'Checking {} on {}',
         flag.real_name,
-        flag.value,
         inst['file'],
     )
     name = flag.name
@@ -1679,8 +1685,7 @@ def res_switch_setup(res: Property):
                     pass
 
     for prop in cases:
-        for result in prop.value:
-            Condition.setup_result(prop.value, result)
+        Condition.setup_results(prop)
 
     if method is SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
