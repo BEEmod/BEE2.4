@@ -121,7 +121,7 @@ SPECIAL_INST = {
     # Convenience, both parts of laser items:
     'laserEmitter': '<ITEM_LASER_EMITTER_CENTER>, <ITEM_LASER_EMITTER_OFFSET>',
     'laserCatcher': '<ITEM_LASER_CATCHER_CENTER>, <ITEM_LASER_CATCHER_OFFSET>',
-    'laserRelay': '<ITEM_LASER_RELAY_CENTER>, <ITEM_LASER_CATCHER_OFFSET>',
+    'laserRelay': '<ITEM_LASER_RELAY_CENTER>, <ITEM_LASER_RELAY_OFFSET>',
 }
 
 # The resolved versions of SPECIAL_INST
@@ -328,7 +328,7 @@ def get_subitems(comma_list, item_inst, item_id) -> List[str]:
                     item_id,
                     bee_inst,
                 )
-                return []
+                continue
 
         ind = SUBITEMS.get(folded_value, None)
 
