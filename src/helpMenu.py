@@ -22,14 +22,29 @@ class ResIcon(Enum):
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
 
+    PORTAL2 = 'menu_p2'
+    TAG = 'menu_tag'
+    TWTM = 'menu_twtm'
+    MEL = 'menu_mel'
+
 SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
 
+
+def steam_url(name):
+    """Return the URL to open the given game in Steam."""
+    return 'steam://store/' + utils.STEAM_IDS[name]
+
 Res = WebResource = namedtuple('WebResource', ['name', 'url', 'icon'])
 WEB_RESOURCES = [
     Res(_('Wiki...'), BEE2_ITEMS_REPO + 'wiki/', ResIcon.BEE2),
+    Res(
+        _('Original Items...'),
+        'https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker',
+        ResIcon.PORTAL2,
+    ),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
     Res(_('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
@@ -37,8 +52,12 @@ WEB_RESOURCES = [
     Res(_('Submit Application Bugs...'), BEE2_REPO + 'issues/new', ResIcon.BUGS),
     Res(_('Submit Item Bugs...'), BEE2_ITEMS_REPO + 'issues/new', ResIcon.BUGS),
     SEPERATOR,
+    Res(_('Portal 2'), steam_url('PORTAL2'), ResIcon.PORTAL2),
+    Res(_('Aperture Tag'), steam_url('TAG'), ResIcon.TAG),
+    Res(_('Portal Stories: Mel'), steam_url('MEL'), ResIcon.MEL),
+    Res(_('Thinking With Time Machine'), steam_url('TWTM'), ResIcon.TWTM),
 ]
-del Res
+del Res, steam_url
 
 # language=Markdown
 CREDITS_TEXT = '''\
@@ -210,7 +229,6 @@ def make_help_menu(parent: tk.Menu):
     parent.add_cascade(menu=help, label=_('Help'))
 
     invis_icon = img.invis_square(16)
-
     icons = {
         icon: img.png('icons/' + icon.value, resize_to=16, error=invis_icon)
         for icon in ResIcon
@@ -234,6 +252,7 @@ def make_help_menu(parent: tk.Menu):
                 image=icons[res.icon],
             )
 
+    help.add_separator()
     help.add_command(
         label=_('Credits...'),
         command=credits.show,
