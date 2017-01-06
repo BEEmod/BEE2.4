@@ -479,8 +479,6 @@ class Game:
             LOGGER.info('Exporting "{}"', obj_name)
             selected = selected_objects.get(obj_name, None)
 
-            LOGGER.debug('Name: {}, selected: {}', obj_name, selected)
-
             obj_data.cls.export(packageLoader.ExportData(
                 game=self,
                 selected=selected,
