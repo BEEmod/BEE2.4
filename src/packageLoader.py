@@ -314,7 +314,7 @@ def load_packages(
             title='BEE2 - Invalid Packages Directory!',
             message='The given packages directory is not present!\n'
                     'Get the packages from '
-                    '"http://github.com/TeamSpen210/BEE2-items" '
+                    '"http://github.com/BEEmod/BEE2-items" '
                     'and place them in "' + pak_dir +
                     os.path.sep + '".',
                     # Add slash to the end to indicate it's a folder.
