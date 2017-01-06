@@ -1933,6 +1933,26 @@ class StyleVPK(PakObject, has_img=False):
         vpk_file.add_folder(override_folder)
         del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
 
+        # Fix Valve's fail with the cubemap file - if we have the resource,
+        # override the original via DLC3.
+        try:
+            cave_cubemap_file = open(
+                '../cache/resources/materials/BEE2/cubemap_cave01.vtf',
+                'rb'
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            with cave_cubemap_file:
+                try:
+                    vpk_file.add_file(
+                        ('materials/cubemaps/', 'cubemap_cave01', 'vtf'),
+                        cave_cubemap_file.read(),
+                    )
+                except FileExistsError:
+                    # The user might have added it to the vpk_override/ folder.
+                    pass
+
         vpk_file.write_dirfile()
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
