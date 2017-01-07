@@ -1584,9 +1584,11 @@ class Music(PakObject):
         if isinstance(sound, Property):
             for chan in sound_channels:
                 setattr(self, 'has_' + chan, bool(sound[chan, '']))
+            self.has_synced_tbeam = self.has_tbeam and sound.bool('sync_funnel')
         else:
             for chan in sound_channels:
                 setattr(self, 'has_' + chan, False)
+            self.has_synced_tbeam = False
 
     @classmethod
     def parse(cls, data: ParseData):

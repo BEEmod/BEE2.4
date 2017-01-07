@@ -210,8 +210,8 @@ MUSIC_GEL_STACK = """\
 }}
 """
 
-# The funnel operator stack makes it start randomly offset into the music..
-MUSIC_FUNNEL_STACK = """\
+# This funnel stack makes it start randomly offset into the music.
+MUSIC_FUNNEL_RAND_STACK = """\
 
 "soundentry_version" "2"
 "operator_stacks"
@@ -238,6 +238,34 @@ MUSIC_FUNNEL_STACK = """\
 \t\t\t"output" "delay"
 \t\t\t}
 \t\t}
+"""
+
+# This funnel stack makes it synchronise with the main track.
+MUSIC_FUNNEL_SYNC_STACK = """\
+
+"soundentry_version" "2"
+"operator_stacks"
+\t{
+\t"start_stack"
+\t\t{
+\t\t"import_stack" "start_sync_to_entry"
+\t\t"elapsed_time"
+\t\t\t{
+\t\t\t"entry" "music.BEE2"
+\t\t\t}
+\t\t"duration_div"
+\t\t\t{
+\t\t\t"input2" "1"
+\t\t\t}
+\t\t"div_mult"
+\t\t\t{
+\t\t\t"input1" "1.0"
+\t\t\t}
+\t\t}
+"""
+
+# Both funnel versions share the same update stack.
+MUSIC_FUNNEL_UPDATE_STACK = """\
 \t"update_stack"
 \t\t{
 \t\t"import_stack" "update_music_stereo"
@@ -507,7 +535,14 @@ def generate_music_script(data: Property, pack_list):
             file.write('\n')
             file.write(MUSIC_START.format(name='_funnel', vol='1'))
             write_sound(file, funnel, pack_list, snd_prefix='*')
-            file.write(MUSIC_FUNNEL_STACK)
+            # Some tracks want the funnel music to sync with the normal
+            # track, others randomly choose a start.
+            file.write(
+                MUSIC_FUNNEL_SYNC_STACK
+                if data.bool('sync_funnel') else
+                MUSIC_FUNNEL_RAND_STACK
+            )
+            file.write(MUSIC_FUNNEL_UPDATE_STACK)
 
         if has_bounce:
             file.write('\n')

@@ -511,6 +511,7 @@ def load_packages(data):
         }),
         (music_list, musics, 'Music', {
             'TBEAM': 'has_tbeam',
+            'TBEAM_SYNC': 'has_synced_tbeam',
             'GEL_BOUNCE': 'has_bouncegel',
             'GEL_SPEED': 'has_speedgel',
         }),
@@ -632,7 +633,8 @@ def load_packages(data):
         attributes=[
             SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
             SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', _('Excursion Funnel SFX')),
+            SelAttr.bool('TBEAM', _('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
         ],
     )
 
