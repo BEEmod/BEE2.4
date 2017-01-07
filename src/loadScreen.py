@@ -1,5 +1,6 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
+from tkinter.font import Font
 from tk_tools import TK_ROOT
 from tkinter import ttk
 
@@ -272,17 +273,26 @@ class SplashScreen(BaseLoadScreen):
             anchor='nw',
             image=img.png('BEE2/splash_logo'),
         )
+
+        self.disp_font = font = Font(
+            family='Times',  # Generic special case
+            size=-18,  # negative = in pixels
+            weight='bold',
+        )
+
         canvas.create_text(
             10, 125,
             anchor='nw',
             text=_('Better Extended Editor for Portal 2'),
             fill='white',
+            font=font,
         )
         canvas.create_text(
             10, 145,
             anchor='nw',
             text=_('Version: ') + utils.BEE_VERSION,
             fill='white',
+            font=font,
         )
 
         for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
