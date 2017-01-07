@@ -275,6 +275,12 @@ class SplashScreen(BaseLoadScreen):
         canvas.create_text(
             10, 125,
             anchor='nw',
+            text=_('Better Extended Editor for Portal 2'),
+            fill='white',
+        )
+        canvas.create_text(
+            10, 145,
+            anchor='nw',
             text=_('Version: ') + utils.BEE_VERSION,
             fill='white',
         )
