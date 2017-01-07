@@ -291,24 +291,24 @@ class SplashScreen(BaseLoadScreen):
             self.stage_names[st_id] = stage_name
             self.bars[st_id] = canvas.create_rectangle(
                 20,
-                height - (ind+1) * 20,
+                height - (ind + 0.5) * 20,
                 20,
-                height - ind * 20,
+                height - (ind - 0.5) * 20,
                 fill='#00785A',  # 0, 120, 90
                 width=0,
             )
             # Border
             canvas.create_rectangle(
                 20,
-                height - (ind+1) * 20,
+                height - (ind + 0.5) * 20,
                 width - 20,
-                height - ind * 20,
+                height - (ind - 0.5) * 20,
                 outline='#00785A',
                 width=2,
             )
             self.widgets[st_id] = canvas.create_text(
                 25,
-                height - ind * 20 - 10,
+                height - ind * 20,
                 anchor='w',
                 text=stage_name + ': (0/??)',
             )
