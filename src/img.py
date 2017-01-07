@@ -107,6 +107,7 @@ def get_splash_screen(max_width, max_height, base_height):
     """Return a random file from the splash_screens directory."""
     import random
     folder = os.path.join('..', 'images', 'splash_screen')
+    path = '<nothing>'
     try:
         path = random.choice(os.listdir(folder))
         with open(os.path.join(folder, path), 'rb') as img_file:
@@ -114,6 +115,7 @@ def get_splash_screen(max_width, max_height, base_height):
             image.load()
     except (FileNotFoundError, IndexError, IOError):
         # Not found, substitute a gray block.
+        LOGGER.warning('No splash screen found (tried "{}")', path)
         image = Image.new(
             mode='RGB',
             size=(round(max_width), round(max_height)),
