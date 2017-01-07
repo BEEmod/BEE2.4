@@ -354,6 +354,17 @@ class SplashScreen(BaseLoadScreen):
         )
         self.canvas.update()
 
+    def destroy(self):
+        """Delete all parts of the loading screen."""
+        if self.active:
+            super().destroy()
+            del self.widgets
+            del self.bars
+            del self.maxes
+            del self.splash
+            del self.bar_val
+            self.active = False
+            _ALL_SCREENS.discard(self)
 
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
