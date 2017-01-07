@@ -145,6 +145,7 @@ def get_splash_screen(max_width, max_height, base_height):
          ),
         fill=(0, 150, 120, 64),
     )
+    # Add a gradient above the rectangle..
     for y in range(40):
         draw.rectangle(
             (
@@ -153,7 +154,7 @@ def get_splash_screen(max_width, max_height, base_height):
                 image.width,
                 image.height,
             ),
-            fill=(0, 150, 120, int(y * 255/40)),
+            fill=(0, 150, 120, int(y * 128/40)),
         )
 
     tk_img = ImageTk.PhotoImage(image=image)

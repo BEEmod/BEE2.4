@@ -124,10 +124,12 @@ class BaseLoadScreen(Toplevel):
 
     @abstractmethod
     def skip_stage(self, stage: str):
+        """Skip over this stage of the loading process."""
         pass
 
     @abstractmethod
     def reset(self):
+        """Hide the loading screen and reset all the progress bars."""
         pass
 
 
@@ -209,7 +211,6 @@ class LoadScreen(BaseLoadScreen):
         )
 
     def skip_stage(self, stage):
-        """Skip over this stage of the loading process."""
         self.labels[stage]['text'] = _('Skipped!')
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
@@ -217,7 +218,6 @@ class LoadScreen(BaseLoadScreen):
             self.widgets[stage].update()
 
     def reset(self):
-        """Hide the loading screen and reset all the progress bars."""
         self.withdraw()
         self.active = False
         for stage, _ in self.stages:
@@ -310,7 +310,7 @@ class SplashScreen(BaseLoadScreen):
                 25,
                 height - ind * 20 - 10,
                 anchor='w',
-                text=stage_name + ': ',
+                text=stage_name + ': (0/??)',
             )
 
     def step(self, stage):
@@ -329,16 +329,8 @@ class SplashScreen(BaseLoadScreen):
                 max_val,
             )
         )
-        x1, y1, x2, y2 = self.canvas.coords(self.bars[stage])
-        self.canvas.coords(
-            self.bars[stage],
-            20,
-            y1,
-            20 + round(self.bar_val[stage] / max_val * (self.width-40)),
-            y2,
-        )
+        self.bar_length(stage, self.bar_val[stage] / max_val)
         self.canvas.update()
-
 
     def skip_stage(self, stage: str):
         self.bar_val[stage] = 0
@@ -347,12 +339,19 @@ class SplashScreen(BaseLoadScreen):
             self.widgets[stage],
             text=self.stage_names[stage] + ': ' + _('Skipped!'),
         )
+        self.bar_length(stage, 1)
+        self.canvas.update()
+
+    def bar_length(self, stage, fraction):
+        """Set a progress bar to this fractional length."""
         x1, y1, x2, y2 = self.canvas.coords(self.bars[stage])
         self.canvas.coords(
             self.bars[stage],
-            20, y1, self.width-20, y2,
+            20,
+            y1,
+            20 + round(fraction * (self.width-40)),
+            y2,
         )
-        self.canvas.update()
 
     def destroy(self):
         """Delete all parts of the loading screen."""
@@ -365,6 +364,16 @@ class SplashScreen(BaseLoadScreen):
             del self.bar_val
             self.active = False
             _ALL_SCREENS.discard(self)
+
+    def reset(self):
+        self.withdraw()
+        self.active = False
+        for stage, stage_name in self.stages:
+            self.maxes[stage] = 10
+            self.bar_val[stage] = 0
+            self.bar_length(stage, 0)
+            self.canvas.itemconfig(self.labels[stage], stage_name + ': (0/??)')
+            self.set_nums(stage)
 
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
