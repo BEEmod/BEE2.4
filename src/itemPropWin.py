@@ -3,6 +3,7 @@ from tkinter import *  # ui library
 from tk_tools import TK_ROOT
 from tkinter import ttk  # themed ui components that match the OS
 from functools import partial as func_partial
+from enum import Enum
 import math
 import random
 
@@ -14,50 +15,66 @@ import gameMan
 
 LOGGER = utils.getLogger(__name__)
 
+
+class PropTypes(Enum):
+    NONE = 'none'
+    CHECKBOX = 'checkbox'
+    SUB_TYPE = 'subtype'
+
+    PISTON = 'pist'
+    TIMER = 'timer'
+    PANEL = 'panel'
+    GELS = 'gelType'
+    OSCILLATE = 'track'
+    
+    @property
+    def is_editable(self):
+        return self.value not in ('none', 'subtype')
+
 # all properties in editoritems, Valve probably isn't going to
 # release a major update so it's fine to hardcode this.
 PROP_TYPES = {
-    'toplevel':                 ('pistPlat', _('Start Position')),
-    'bottomlevel':              ('pistPlat', _('End Position')),
-    'timerdelay':               ('timerDel', _('Delay \n(0=infinite)')),
-    'angledpanelanimation':     ('panAngle', 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
-    'paintflowtype':            ('gelType',  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+    'toplevel':                 (PropTypes.PISTON, _('Start Position')),
+    'bottomlevel':              (PropTypes.PISTON, _('End Position')),
+    'timerdelay':               (PropTypes.TIMER, _('Delay \n(0=infinite)')),
+    'angledpanelanimation':     (PropTypes.PANEL, 'PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
+    'paintflowtype':            (PropTypes.GELS,  'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 
-    'oscillate':                ('railLift', 'PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
-    'startenabled':             ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
-    'startreversed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
-    'startdeployed':            ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
-    'startactive':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
-    'startopen':                ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_start_open'),
-    'startlocked':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
-    'dropperenabled':           ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
-    'autodrop':                 ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
-    'autorespawn':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
-    'allowstreak':              ('checkbox', 'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
+    'oscillate':                (PropTypes.OSCILLATE, 'PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
+    'startenabled':             (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
+    'startreversed':            (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
+    'startdeployed':            (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
+    'startactive':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
+    'startopen':                (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_start_open'),
+    'startlocked':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
+    'dropperenabled':           (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
+    'autodrop':                 (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
+    'autorespawn':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
+    'allowstreak':              (PropTypes.CHECKBOX,  'PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
 
     # Properties that we don't allow modification of.
-    'timersound': ('none', 'Timer Sound'),
-    'angledpaneltype': ('none', 'Angled Panel Type'),
-    'itemfallstraightdown': ('none', 'Disable Cube Dropper Clips'),
-    'paintexporttype': ('none', 'Gel Export Type'),
-    'autotrigger': ('none', 'Automatically Move'),
+    'timersound': (PropTypes.NONE, 'Timer Sound'),
+    'angledpaneltype': (PropTypes.NONE, 'Angled Panel Type'),
+    'itemfallstraightdown': (PropTypes.NONE, 'Disable Cube Dropper Clips'),
+    'paintexporttype': (PropTypes.NONE, 'Gel Export Type'),
+    'autotrigger': (PropTypes.NONE, 'Automatically Move'),
 
-    'connectioncount': ('none', 'Connection Count'),
-    'connectioncountpolarity': ('none', 'Polarity Connection Count'),
-    'coopdoor': ('none', 'Is Coop?'),
-    'portalable': ('none', 'Flip Panel Portalability'),
-    'speed': ('none', 'Track Platform Speed'),
-    'startingposition': ('none', 'Initial Track Platform Position'),
-    'traveldirection': ('none', 'Track Platform Direction'),
-    'traveldistance': ('none', 'Track Platform Distance'),
+    'connectioncount': (PropTypes.NONE, 'Connection Count'),
+    'connectioncountpolarity': (PropTypes.NONE, 'Polarity Connection Count'),
+    'coopdoor': (PropTypes.NONE, 'Is Coop?'),
+    'portalable': (PropTypes.NONE, 'Flip Panel Portalability'),
+    'speed': (PropTypes.NONE, 'Track Platform Speed'),
+    'startingposition': (PropTypes.NONE, 'Initial Track Platform Position'),
+    'traveldirection': (PropTypes.NONE, 'Track Platform Direction'),
+    'traveldistance': (PropTypes.NONE, 'Track Platform Distance'),
 
     # Controlled by bottom and top position, not set separately.
-    'startup': ('none', 'Start Up'),
+    'startup': (PropTypes.NONE, 'Start Up'),
 
     # Faith Plate
-    'verticalalignment': ('none', 'Vertical Alignment'),
-    'catapultspeed': ('none', 'Faith Plate Speed'),
-    'targetname': ('none', 'Faith Target Name'),
+    'verticalalignment': (PropTypes.NONE, 'Vertical Alignment'),
+    'catapultspeed': (PropTypes.NONE, 'Faith Plate Speed'),
+    'targetname': (PropTypes.NONE, 'Faith Target Name'),
 
     'cubetype': ('subType', 'Cube Type'),
     'hazardtype': ('subType', 'Fizzler Type'),
@@ -276,7 +293,8 @@ def exit_win(e=None):
 def can_edit(prop_list):
     """Determine if any of these properties are changeable."""
     for prop in prop_list:
-        if PROP_TYPES.get(prop, 'none') not in ('none', 'subType'):
+        prop_type, prop_name = PROP_TYPES.get(prop, (PropTypes.NONE, ''))
+        if prop_type.is_editable:
             return True
     return False
 
@@ -323,7 +341,7 @@ def init(cback):
             prop_name = gameMan.translate(prop_name) + ':'
 
         labels[key] = ttk.Label(frame, text=prop_name)
-        if prop_type == 'checkbox':
+        if prop_type is PropTypes.CHECKBOX:
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
@@ -340,7 +358,7 @@ def init(cback):
                     )
                 )
 
-        elif prop_type == 'railLift':
+        elif prop_type is PropTypes.OSCILLATE:
             values[key] = IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
             widgets[key] = ttk.Checkbutton(
@@ -349,7 +367,7 @@ def init(cback):
                 command=func_partial(save_rail, key),
                 )
 
-        elif prop_type == 'panAngle':
+        elif prop_type is PropTypes.PANEL:
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = StringVar(value=DEFAULTS[key])
@@ -363,7 +381,7 @@ def init(cback):
                     ).grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
 
-        elif prop_type == 'gelType':
+        elif prop_type is PropTypes.GELS:
             frm = ttk.Frame(frame)
             widgets[key] = frm
             values[key] = IntVar(value=DEFAULTS[key])
@@ -378,7 +396,7 @@ def init(cback):
                 frm.columnconfigure(pos, weight=1)
             out_values[key] = str(DEFAULTS[key])
 
-        elif prop_type == 'pistPlat':
+        elif prop_type is PropTypes.PISTON:
             widgets[key] = Scale(
                 frame,
                 from_=0,
@@ -401,7 +419,7 @@ def init(cback):
                     DEFAULTS['toplevel'],
                     DEFAULTS['bottomlevel']))
 
-        elif prop_type == 'timerDel':
+        elif prop_type is PropTypes.TIMER:
             widgets[key] = ttk.Scale(
                 frame,
                 from_=0,
@@ -411,8 +429,6 @@ def init(cback):
                 )
             values[key] = DEFAULTS[key]
 
-        elif prop_type == 'railPlat':
-            widgets[key] = ttk.Checkbutton(frame)
     values['startup'] = DEFAULTS['startup']
 
 
@@ -432,18 +448,18 @@ def show_window(used_props, parent, item_name):
             continue
 
         prop_type = PROP_TYPES[prop][0]
-        if prop_type == 'checkbox':
+        if prop_type is PropTypes.CHECKBOX:
             values[prop].set(srctools.conv_bool(value))
-        elif prop_type == 'railLift':
+        elif prop_type is PropTypes.OSCILLATE:
             values[prop].set(srctools.conv_bool(value))
             save_rail(prop)
-        elif prop_type == 'gelType':
+        elif prop_type is PropTypes.GELS:
             values[prop].set(value)
-        elif prop_type == 'panAngle':
+        elif prop_type is PropTypes.PANEL:
             last_angle = value[5:7]
             values[prop].set(last_angle)
             out_values[prop] = value
-        elif prop_type == 'pistPlat':
+        elif prop_type is PropTypes.PISTON:
             values[prop] = value
             try:
                 top_level = int(used_props.get('toplevel', 4))
@@ -467,13 +483,13 @@ def show_window(used_props, parent, item_name):
                             bot_level,
                             )
                         )
-        elif prop_type == 'timerDel':
+        elif prop_type is PropTypes.TIMER:
             try:
                 values[prop] = int(value)
                 widgets[prop].set(values[prop])
             except ValueError:
                 pass
-        elif prop_type in ('none', 'subType'):
+        elif not prop_type.is_editable:
             # Internal or subtype properties, just pass through unchanged.
             values[prop] = value
         else:
