@@ -102,6 +102,11 @@ def res_insert_overlay(inst: Entity, res: Property):
         ))
         if mat[:1] == '$':
             mat = inst.fixup[mat]
+        if mat.startswith('<') or mat.endswith('>'):
+            # Lookup in the style data.
+            import vbsp
+            LOGGER.info('Tex: {}', vbsp.settings['textures'].keys())
+            mat = vbsp.get_tex(mat[1:-1])
         over['material'] = mat
         over['sides'] = str(face_id)
 

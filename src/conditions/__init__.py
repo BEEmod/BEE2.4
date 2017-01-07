@@ -1286,6 +1286,9 @@ def retexture_template(
                 LOGGER.info('Mat: {}, replacement: {}', folded_mat, mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
+                if mat.startswith('<') or mat.endswith('>'):
+                    # Lookup in the style data.
+                    mat = vbsp.get_tex(mat[1:-1])
                 face.mat = mat
                 continue
 
@@ -1420,6 +1423,9 @@ def retexture_template(
             mat = random.choice(replace_tex[mat])
             if mat[:1] == '$':
                 mat = fixup[mat]
+            if mat.startswith('<') or mat.endswith('>'):
+                # Lookup in the style data.
+                mat = vbsp.get_tex(mat[1:-1])
         elif mat in vbsp.TEX_VALVE:
             mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
         else:
