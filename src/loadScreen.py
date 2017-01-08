@@ -1,12 +1,15 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
 from tkinter import *  # ui library
+from tkinter.font import Font
 from tk_tools import TK_ROOT
 from tkinter import ttk
 
 from weakref import WeakSet
+from abc import abstractmethod
 import contextlib
 
 import utils
+import img
 
 # Keep a reference to all loading screens, so we can close them globally.
 _ALL_SCREENS = WeakSet()
@@ -55,21 +58,14 @@ def patch_tk_dialogs():
 patch_tk_dialogs()
 
 
-class LoadScreen(Toplevel):
-    """LoadScreens show a loading screen for items.
-
-    stages should be (id, title) pairs for each screen stage.
-    Each stage can be stepped independently, referenced by the given ID.
-    The title can be blank.
-    """
-    def __init__(self, *stages, title_text=_('Loading')):
+class BaseLoadScreen(Toplevel):
+    """Code common to both loading screen types."""
+    def __init__(self, stages):
         self.stages = list(stages)
         self.widgets = {}
         self.labels = {}
-        self.bar_var = {}
         self.bar_val = {}
         self.maxes = {}
-        self.num_images = 0
 
         self.active = False
         # active determines whether the screen is on, and if False stops most
@@ -89,6 +85,65 @@ class LoadScreen(Toplevel):
         self.overrideredirect(1)
         self.resizable(False, False)
         self.attributes('-topmost', 1)
+
+    def show(self):
+        """Display this loading screen."""
+        self.active = True
+        self.deiconify()
+        self.update()  # Force an update so the reqwidth is correct
+        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
+        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
+        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
+        self.update()  # Force an update of the window to position it
+
+    def set_length(self, stage, num):
+        """Set the number of items in a stage."""
+        self.maxes[stage] = num
+        self.set_nums(stage)
+
+    def __enter__(self):
+        """LoadScreen can be used as a context manager.
+
+        Inside the block, the screen will be visible.
+        """
+        self.show()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Hide the loading screen, and passthrough execptions.
+        """
+        self.reset()
+
+    # Methods the subclasses must implement.
+    @abstractmethod
+    def set_nums(self, stage: str):
+        pass
+
+    @abstractmethod
+    def step(self, stage: str):
+        pass
+
+    @abstractmethod
+    def skip_stage(self, stage: str):
+        """Skip over this stage of the loading process."""
+        pass
+
+    @abstractmethod
+    def reset(self):
+        """Hide the loading screen and reset all the progress bars."""
+        pass
+
+
+class LoadScreen(BaseLoadScreen):
+    """LoadScreens show a loading screen for items.
+
+    stages should be (id, title) pairs for each screen stage.
+    Each stage can be stepped independently, referenced by the given ID.
+    The title can be blank.
+    """
+    def __init__(self, *stages, title_text):
+        super().__init__(stages)
+        self.bar_var = {}
 
         self.frame = ttk.Frame(self, cursor=utils.CURSORS['wait'])
         self.frame.grid(row=0, column=0)
@@ -136,21 +191,6 @@ class LoadScreen(Toplevel):
             self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
 
-    def show(self):
-        """Display this loading screen."""
-        self.active = True
-        self.deiconify()
-        self.update()  # Force an update so the reqwidth is correct
-        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
-        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
-        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
-        self.update()  # Force an update of the window to position it
-
-    def set_length(self, stage, num):
-        """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.set_nums(stage)
-
     def step(self, stage):
         """Increment a step by one."""
         self.bar_val[stage] += 1
@@ -172,7 +212,6 @@ class LoadScreen(Toplevel):
         )
 
     def skip_stage(self, stage):
-        """Skip over this stage of the loading process."""
         self.labels[stage]['text'] = _('Skipped!')
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
@@ -180,7 +219,6 @@ class LoadScreen(Toplevel):
             self.widgets[stage].update()
 
     def reset(self):
-        """Hide the loading screen and reset all the progress bars."""
         self.withdraw()
         self.active = False
         for stage, _ in self.stages:
@@ -201,25 +239,156 @@ class LoadScreen(Toplevel):
             self.active = False
             _ALL_SCREENS.discard(self)
 
-    def __enter__(self):
-        """LoadScreen can be used as a context manager.
 
-        Inside the block, the screen will be visible.
-        """
-        self.show()
-        return self
+class SplashScreen(BaseLoadScreen):
+    """The screen show for the main loading screen."""
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Hide the loading screen, and passthrough execptions.
-        """
-        self.reset()
+    def __init__(self, *stages):
+        super().__init__(stages)
+        self.stage_names = {}
+        self.bars = {}
 
+        self.splash, width, height = img.get_splash_screen(
+            self.winfo_screenwidth() * 0.6,
+            self.winfo_screenheight() * 0.6,
+            base_height=len(self.stages) * 20,
+        )
+        self.height = height
+        self.width = width
 
-main_loader = LoadScreen(
+        self.canvas = canvas = Canvas(
+            self,
+            width=width,
+            height=height
+        )
+        canvas.grid(row=0, column=0)
+        # Splash screen...
+        canvas.create_image(
+            0, 0,
+            anchor='nw',
+            image=self.splash,
+        )
+        canvas.create_image(
+            10, 10,
+            anchor='nw',
+            image=img.png('BEE2/splash_logo'),
+        )
+
+        self.disp_font = font = Font(
+            family='Times',  # Generic special case
+            size=-18,  # negative = in pixels
+            weight='bold',
+        )
+
+        canvas.create_text(
+            10, 125,
+            anchor='nw',
+            text=_('Better Extended Editor for Portal 2'),
+            fill='white',
+            font=font,
+        )
+        canvas.create_text(
+            10, 145,
+            anchor='nw',
+            text=_('Version: ') + utils.BEE_VERSION,
+            fill='white',
+            font=font,
+        )
+
+        for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
+            self.bar_val[st_id] = 0
+            self.maxes[st_id] = 10
+            self.stage_names[st_id] = stage_name
+            self.bars[st_id] = canvas.create_rectangle(
+                20,
+                height - (ind + 0.5) * 20,
+                20,
+                height - (ind - 0.5) * 20,
+                fill='#00785A',  # 0, 120, 90
+                width=0,
+            )
+            # Border
+            canvas.create_rectangle(
+                20,
+                height - (ind + 0.5) * 20,
+                width - 20,
+                height - (ind - 0.5) * 20,
+                outline='#00785A',
+                width=2,
+            )
+            self.widgets[st_id] = canvas.create_text(
+                25,
+                height - ind * 20,
+                anchor='w',
+                text=stage_name + ': (0/??)',
+            )
+
+    def step(self, stage):
+        """Increment a step by one."""
+        self.bar_val[stage] += 1
+        self.set_nums(stage)
+        self.canvas.update()
+
+    def set_nums(self, stage: str):
+        max_val = self.maxes[stage]
+        self.canvas.itemconfig(
+            self.widgets[stage],
+            text='{}: {}/{}'.format(
+                self.stage_names[stage],
+                self.bar_val[stage],
+                max_val,
+            )
+        )
+        self.bar_length(stage, self.bar_val[stage] / max_val)
+        self.canvas.update()
+
+    def skip_stage(self, stage: str):
+        self.bar_val[stage] = 0
+        self.maxes[stage] = 0
+        self.canvas.itemconfig(
+            self.widgets[stage],
+            text=self.stage_names[stage] + ': ' + _('Skipped!'),
+        )
+        self.bar_length(stage, 1)
+        self.canvas.update()
+
+    def bar_length(self, stage, fraction):
+        """Set a progress bar to this fractional length."""
+        x1, y1, x2, y2 = self.canvas.coords(self.bars[stage])
+        self.canvas.coords(
+            self.bars[stage],
+            20,
+            y1,
+            20 + round(fraction * (self.width-40)),
+            y2,
+        )
+
+    def destroy(self):
+        """Delete all parts of the loading screen."""
+        if self.active:
+            super().destroy()
+            del self.widgets
+            del self.bars
+            del self.maxes
+            del self.splash
+            del self.bar_val
+            self.active = False
+            _ALL_SCREENS.discard(self)
+
+    def reset(self):
+        self.withdraw()
+        self.active = False
+        for stage, stage_name in self.stages:
+            self.maxes[stage] = 10
+            self.bar_val[stage] = 0
+            self.bar_length(stage, 0)
+            self.canvas.itemconfig(self.labels[stage], stage_name + ': (0/??)')
+            self.set_nums(stage)
+
+main_loader = SplashScreen(
     ('PAK', _('Packages')),
     ('OBJ', _('Loading Objects')),
     ('IMG_EX', _('Extracting Images')),
     ('IMG', _('Loading Images')),
     ('UI', _('Initialising UI')),
-    title_text=_('Loading'),
 )
