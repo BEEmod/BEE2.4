@@ -58,6 +58,7 @@ packages/
 palettes/*.bee2_palette
 
 # But not the default ones
+!palettes/ap_tag.bee2_palette
 !palettes/beemod.bee2_palette
 !palettes/blank.bee2_palette
 !palettes/collapsed.bee2_palette

@@ -32,6 +32,8 @@ DEFAULT_PALETTES = {
 
     # i18n: Original Palette
     'PORTAL2': _('Portal 2'),
+    # i18n: Aperture Tag's palette
+    'APTAG': _('Aperture Tag'),
 }
 
 class Palette:
