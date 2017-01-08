@@ -764,7 +764,11 @@ def suggested_refresh():
 
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
+    global selectedPalette
+    cur_palette = palettes[selectedPalette]
     palettes.sort(key=str)  # sort by name
+    selectedPalette = palettes.index(cur_palette)
+
     listbox = UI['palette']  # type: Listbox
     listbox.delete(0, END)
     for i, pal in enumerate(palettes):
@@ -787,12 +791,7 @@ def refresh_pal_ui():
             value=val,
             command=set_pal_radio,
             )
-    if len(palettes) < 2:
-        UI['pal_remove'].state(('disabled',))
-        menus['pal'].entryconfigure(1, state=DISABLED)
-    else:
-        UI['pal_remove'].state(('!disabled',))
-        menus['pal'].entryconfigure(1, state=NORMAL)
+    selectedPalette_radio.set(selectedPalette)
 
 
 def export_editoritems(e=None):
@@ -1097,6 +1096,14 @@ def set_palette(e=None):
             sub,
             is_pre=True,
         ))
+
+    if len(palettes) < 2 or palettes[selectedPalette].prevent_overwrite:
+        UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
+    else:
+        UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
+
     flow_preview()
 
 
