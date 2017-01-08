@@ -90,6 +90,7 @@ class BaseLoadScreen(Toplevel):
         """Display this loading screen."""
         self.active = True
         self.deiconify()
+        self.lift()
         self.update()  # Force an update so the reqwidth is correct
         loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
         loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
@@ -249,8 +250,8 @@ class SplashScreen(BaseLoadScreen):
         self.bars = {}
 
         self.splash, width, height = img.get_splash_screen(
-            self.winfo_screenwidth() * 0.6,
-            self.winfo_screenheight() * 0.6,
+            max(self.winfo_screenwidth() * 0.6, 500),
+            max(self.winfo_screenheight() * 0.6, 500),
             base_height=len(self.stages) * 20,
         )
         self.height = height
@@ -259,7 +260,7 @@ class SplashScreen(BaseLoadScreen):
         self.canvas = canvas = Canvas(
             self,
             width=width,
-            height=height
+            height=height,
         )
         canvas.grid(row=0, column=0)
         # Splash screen...
