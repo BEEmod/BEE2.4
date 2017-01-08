@@ -76,11 +76,11 @@ PROP_TYPES = {
     'catapultspeed': (PropTypes.NONE, 'Faith Plate Speed'),
     'targetname': (PropTypes.NONE, 'Faith Target Name'),
 
-    'cubetype': ('subType', 'Cube Type'),
-    'hazardtype': ('subType', 'Fizzler Type'),
-    'barriertype': ('subType', 'Barrier Type'),
-    'buttontype': ('subType', 'Button Type'),
-    'painttype': ('subType', 'Gel Type'),
+    'cubetype': (PropTypes.SUB_TYPE, 'Cube Type'),
+    'hazardtype': (PropTypes.SUB_TYPE, 'Fizzler Type'),
+    'barriertype': (PropTypes.SUB_TYPE, 'Barrier Type'),
+    'buttontype': (PropTypes.SUB_TYPE, 'Button Type'),
+    'painttype': (PropTypes.SUB_TYPE, 'Gel Type'),
     }
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift, none, subType
