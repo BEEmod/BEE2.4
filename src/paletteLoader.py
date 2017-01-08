@@ -18,20 +18,49 @@ PAL_EXT = '.bee2_palette'
 
 pal_list = []  # type: List[Palette]
 
+# Allow translating the names of the built-in palettes
+DEFAULT_PALETTES = {
+    # i18n: Last exported items
+    'LAST_EXPORT': _('<Last Export>'),
+    # i18n: Empty palette name
+    'EMPTY': _('Blank'),
+
+    # i18n: BEEmod 1 palette.
+    'BEEMOD': _('BEEMod'),
+    # i18n: Default items merged together
+    'P2_COLLAPSED': _('Portal 2 Collapsed'),
+
+    # i18n: Original Palette
+    'PORTAL2': _('Portal 2'),
+}
+
 class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
-    def __init__(self, name, pos: List[Tuple[str, int]], options=None):
-        self.opt = {} if options is None else options
+    def __init__(
+        self,
+        name,
+        pos: List[Tuple[str, int]],
+        trans_name='',
+        prevent_overwrite=False,
+        filename: str=None,
+    ):
         # Name of the palette
         self.name = name
+        self.trans_name = trans_name
+        if trans_name:
+            try:
+                self.name = DEFAULT_PALETTES[trans_name.upper()]
+            except KeyError:
+                LOGGER.warning('Unknown translated palette "{}', trans_name)
+
         # If loaded from a file, the path to use.
         # None determines a filename automatically.
-        self.filename = None  # type: Optional[str]
+        self.filename = filename
         # List of id, index tuples.
         self.pos = pos
         # If true, prevent overwriting the original file
         # (premade palettes or <LAST EXPORT>)
-        self.prevent_overwrite = False
+        self.prevent_overwrite = prevent_overwrite
 
     def __str__(self):
         return self.name
@@ -41,27 +70,43 @@ class Palette:
     def parse(cls, path: str):
         with open(path) as f:
             props = Property.parse(f, path)
-        name = props['Name']
+        name = props['Name', '??']
         items = []
         for item in props.find_children('Items'):
             items.append((item.real_name, int(item.value)))
 
-        pal = Palette(name, items)
-        pal.prevent_overwrite = props.bool('readonly')
-        pal.filename = os.path.basename(path)
-        return pal
+        trans_name = props['TransName', '']
+
+        return Palette(
+            name,
+            items,
+            trans_name=trans_name,
+            prevent_overwrite=props.bool('readonly'),
+            filename=os.path.basename(path),
+        )
 
     def save(self, ignore_readonly=False):
         """Save the palette file into the specified location."""
         LOGGER.info('Saving "{}"!', self.name)
         props = Property(None, [
             Property('Name', self.name),
+            Property('TransName', self.trans_name),
             Property('ReadOnly', srctools.bool_as_int(self.prevent_overwrite)),
             Property('Items', [
                 Property(item_id, str(subitem))
                 for item_id, subitem in self.pos
             ])
         ])
+        # If default, don't include in the palette file.
+        # Remove the translated name, in case it's not going to write
+        # properly to the file.
+        if self.trans_name:
+            props['Name'] = ''
+        else:
+            del props['TransName']
+
+        if not self.prevent_overwrite:
+            del props['ReadOnly']
 
         # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)

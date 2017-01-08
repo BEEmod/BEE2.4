@@ -1,5 +1,5 @@
-"Name" "BEEMod"
-"ReadOnly" "1"
+"ReadOnly"  "1"
+"TransName" "BEEMOD"
 "Items"
 	{
 	"ITEM_BUTTON_PEDESTAL" "0"

@@ -1,5 +1,5 @@
-"Name" "Portal 2 Collapsed"
-"ReadOnly" "0"
+"ReadOnly"  "1"
+"TransName" "P2_COLLAPSED"
 "Items"
 	{
 	"ITEM_BUTTON_PEDESTAL" "0"

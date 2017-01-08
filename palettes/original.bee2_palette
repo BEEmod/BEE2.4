@@ -1,5 +1,5 @@
-"Name" "Portal 2"
-"ReadOnly" "1"
+"ReadOnly"  "1"
+"TransName" "PORTAL2"
 "Items"
 	{
 	"ITEM_BUTTON_PEDESTAL" "0"
