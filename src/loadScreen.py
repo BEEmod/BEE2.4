@@ -320,7 +320,8 @@ class SplashScreen(BaseLoadScreen):
                 25,
                 height - ind * 20,
                 anchor='w',
-                text=stage_name + ': (0/??)',
+                text=stage_name + ': (0/???)',
+                fill='white',
             )
 
     def step(self, stage):
@@ -333,7 +334,7 @@ class SplashScreen(BaseLoadScreen):
         max_val = self.maxes[stage]
         self.canvas.itemconfig(
             self.widgets[stage],
-            text='{}: {}/{}'.format(
+            text='{}: ({}/{})'.format(
                 self.stage_names[stage],
                 self.bar_val[stage],
                 max_val,
@@ -382,7 +383,7 @@ class SplashScreen(BaseLoadScreen):
             self.maxes[stage] = 10
             self.bar_val[stage] = 0
             self.bar_length(stage, 0)
-            self.canvas.itemconfig(self.labels[stage], stage_name + ': (0/??)')
+            self.canvas.itemconfig(self.labels[stage], stage_name + ': (0/???)')
             self.set_nums(stage)
 
 main_loader = SplashScreen(
