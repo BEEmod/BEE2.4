@@ -5,7 +5,7 @@ import operator
 import os
 import os.path
 import shutil
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from contextlib import ExitStack
 from zipfile import ZipFile
 
@@ -25,10 +25,13 @@ from srctools import (
 )
 
 from typing import (
-    Dict, List, Tuple,
+    Dict, List, Tuple, NamedTuple,
     Iterator, Iterable, Type,
-    TypeVar,
+    TypeVar, Union, TYPE_CHECKING
 )
+
+if TYPE_CHECKING:
+    from gameMan import Game
 
 LOGGER = utils.getLogger(__name__)
 
@@ -52,18 +55,33 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 
 # Tempory data stored when parsing info.txt, but before .parse() is called.
 # This allows us to parse all packages before loading objects.
-ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
+ObjData = NamedTuple('ObjData', [
+    ('zip_file', Union[ZipFile, FakeZip]),
+    ('info_block', Property),
+    ('pak_id', str),
+    ('disp_name', str),
+])
 # The arguments for pak_object.parse().
-ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id, is_override')
+ParseData = NamedTuple('ParseData', [
+    ('zip_file', Union[ZipFile, FakeZip]),
+    ('id', str),
+    ('info', Property),
+    ('pak_id', str),
+    ('is_override', bool),
+])
 # The values stored for OBJ_TYPES
-ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+ObjType = NamedTuple('ObjType', [
+    ('cls', Type['PakObject']),
+    ('allow_mult', bool),
+    ('has_img', bool),
+])
 # The arguments to pak_object.export().
-ExportData = namedtuple('ExportData', [
-    'selected',
-    'selected_style',  # Some items need to know which style is selected
-    'editoritems',
-    'vbsp_conf',
-    'game',
+ExportData = NamedTuple('ExportData', [
+    ('selected', str),
+    ('selected_style', 'Style'),  # Some items need to know which style is selected
+    ('editoritems', Property),
+    ('vbsp_conf', Property),
+    ('game', 'Game'),
 ])
 
 # This package contains necessary components, and must be available.
@@ -86,8 +104,6 @@ VPK_FOLDER = {
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
-
-PakObjectVar = TypeVar('PakObjectVar', bound='PakObject')
 
 
 class _PakObjectMeta(type):
@@ -155,12 +171,12 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def all(cls: Type[PakObjectVar]) -> Iterator[PakObjectVar]:
+    def all(cls: _PakObjectMeta) -> Iterable['PakObject']:
         """Get the list of objects parsed."""
         return cls._id_to_obj.values()
 
     @classmethod
-    def by_id(cls: Type[PakObjectVar], object_id: str) -> PakObjectVar:
+    def by_id(cls: _PakObjectMeta, object_id: str) -> 'PakObject':
         """Return the object with a given ID."""
         return cls._id_to_obj[object_id.casefold()]
 
@@ -505,8 +521,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
 
 
 def setup_style_tree(
-    item_data: List['Item'],
-    style_data: List['Style'],
+    item_data: Iterable['Item'],
+    style_data: Iterable['Style'],
     log_fallbacks,
     log_missing_styles,
 ):
@@ -1001,10 +1017,10 @@ class Item(PakObject):
         versions = {}
         def_version = None
         folders = {}
-        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
+        unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
-        desc_last = srctools.conv_bool(data.info['AllDescLast', '0'])
+        desc_last = data.info.bool('AllDescLast')
 
         all_config = get_config(
             data.info,
@@ -1017,7 +1033,7 @@ class Item(PakObject):
             data.id,
         ))
 
-        needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
+        needs_unlock = data.info.bool('needsUnlock')
 
         for ver in data.info.find_all('version'):
             vals = {
