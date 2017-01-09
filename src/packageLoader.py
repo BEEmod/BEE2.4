@@ -26,7 +26,7 @@ from srctools import (
 
 from typing import (
     Dict, List, Tuple,
-    Iterator, Type,
+    Iterator, Iterable, Type,
     TypeVar,
 )
 
@@ -630,29 +630,34 @@ def parse_item_folder(folders, zip_file, pak_id):
             ) from err
 
         editor_iter = Property.find_all(editor, 'Item')
-        folders[fold] = {
-            'auth':     sep_values(props['authors', '']),
-            'tags':     sep_values(props['tags', '']),
-            'desc':     desc_parse(props, pak_id + ':' + prop_path),
-            'ent':      props['ent_count', '??'],
-            'url':      props['infoURL', None],
-            'icons':    {p.name: p.value for p in props['icon', []]},
-            'all_name': props['all_name', None],
-            'all_icon': props['all_icon', None],
-            'vbsp':     Property(None, []),
-
+        folders[fold] = ItemVariant(
             # The first Item block found
-            'editor': next(editor_iter),
+            editoritems=next(editor_iter),
             # Any extra blocks (offset catchers, extent items)
-            'editor_extra': list(editor_iter),
+            editor_extra=editor_iter,
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
-            'source': '<{}>/items/{}'.format(pak_id, fold),
-        }
+            source='<{}>/items/{}'.format(pak_id, fold),
+            vbsp_config=Property(None, []),
 
-        if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
-            LOGGER.warning('"{id}:{path}" has missing entity count!',
+            authors=sep_values(props['authors', '']),
+            tags=sep_values(props['tags', '']),
+            desc=desc_parse(props, pak_id + ':' + prop_path),
+            ent_count=props['ent_count', ''],
+            url=props['infoURL', None],
+            icons={
+                p.name: p.value
+                for p in
+                props['icon', []]
+            },
+            all_name=props['all_name', None],
+            all_icon=props['all_icon', None],
+        )
+
+        if LOG_ENT_COUNT and not folders[fold].ent_count:
+            LOGGER.warning(
+                '"{id}:{path}" has missing entity count!',
                 id=pak_id,
                 path=prop_path,
             )
@@ -660,9 +665,9 @@ def parse_item_folder(folders, zip_file, pak_id):
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
         num_group_parts = (
-            (folders[fold]['all_name'] is not None)
-            + (folders[fold]['all_icon'] is not None)
-            + ('all' in folders[fold]['icons'])
+            (folders[fold].all_name is not None)
+            + (folders[fold].all_icon is not None)
+            + ('all' in folders[fold].icons)
         )
         if 0 < num_group_parts < 3:
             LOGGER.warning(
@@ -673,14 +678,82 @@ def parse_item_folder(folders, zip_file, pak_id):
             )
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = conf = Property.parse(
+                folders[fold].vbsp_config = conf = Property.parse(
                     vbsp_config,
                     pak_id + ':' + config_path,
                 )
         except KeyError:
-            folders[fold]['vbsp'] = conf = Property(None, [])
+            folders[fold].vbsp_config = conf = Property(None, [])
 
-        set_cond_source(conf, folders[fold]['source'])
+        set_cond_source(conf, folders[fold].source)
+
+
+class ItemVariant:
+    """Data required for an item in a particular style."""
+
+    def __init__(
+            self,
+            editoritems: Property,
+            vbsp_config: Property,
+            editor_extra: Iterable[Property],
+            authors: List[str],
+            tags: List[str],
+            desc: tkMarkdown.MarkdownData,
+            icons: Dict[str, str],
+            ent_count: str='',
+            url: str = None,
+            all_name: str=None,
+            all_icon: str=None,
+            source: str='',
+    ):
+        self.editor = editoritems
+        self.editor_extra = Property(None, list(editor_extra))
+        self.vbsp_config = vbsp_config
+        self.source = source  # Original location of configs
+
+        self.authors = authors
+        self.tags = tags
+        self.desc = desc
+        self.icons = icons
+        self.ent_count = ent_count
+        self.url = url
+
+        # The name and VTF for grouped items
+        self.all_name = all_name
+        self.all_icon = all_icon
+        # 'auth': sep_values(props['authors', '']),
+        # 'tags': sep_values(props['tags', '']),
+        # 'desc': desc_parse(props, pak_id + ':' + prop_path),
+        # 'ent': props['ent_count', '??'],
+        # 'url': props['infoURL', None],
+        # 'icons': {p.name: p.value for p in props['icon', []]},
+        # 'all_name': props['all_name', None],
+        # 'all_icon': props['all_icon', None],
+        # 'vbsp': Property(None, []),
+        #
+        # # The first Item block found
+        # 'editor': next(editor_iter),
+        # # Any extra blocks (offset catchers, extent items)
+        # 'editor_extra': list(editor_iter),
+        #
+        # # Add the folder the item definition comes from,
+        # # so we can trace it later for debug messages.
+        # 'source': '<{}>/items/{}'.format(pak_id, fold),
+
+    def can_group(self):
+        """Does this variant have the data needed to group?"""
+        return (
+            'all' in self.icons and
+            self.all_icon is not None and
+            self.all_name is not None
+        )
+
+    def override_from_folder(self, other: 'ItemVariant'):
+        """Perform the override from another item folder."""
+        self.authors.extend(other.authors)
+        self.tags.extend(self.tags)
+        self.vbsp_config += other.vbsp_config
+        self.desc = tkMarkdown.join(self.desc, other.desc)
 
 
 class Package:
@@ -900,6 +973,7 @@ class Style(PakObject):
 
 
 class Item(PakObject):
+    """An item in the editor..."""
     def __init__(
             self,
             item_id,
@@ -1002,17 +1076,14 @@ class Item(PakObject):
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
-                        our_style = our_ver[sty_id]
+                        our_style = our_ver[sty_id]  # type: ItemVariant
                         # We both have a matching folder, merge the
                         # definitions. We don't override editoritems!
 
                         if isinstance(our_style, str) or isinstance(style, str):
                             raise Exception("Can't override with a <STYLE> def.")
 
-                        our_style['auth'].extend(style['auth'])
-                        our_style['desc'].extend(style['desc'])
-                        our_style['tags'].extend(style['tags'])
-                        our_style['vbsp'] += style['vbsp']
+                        our_style.override_from_folder(style)
 
     def __repr__(self):
         return '<Item:' + self.id + '>'
@@ -1072,7 +1143,13 @@ class Item(PakObject):
                             vbsp_config += version_data[poss_style.id].copy()
                             break
 
-    def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
+    def _get_export_data(
+        self,
+        pal_list,
+        ver_id,
+        style_id,
+        prop_conf: Dict[str, Dict[str, str]],
+    ) -> Tuple[Property, Property, Property]:
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -1084,9 +1161,9 @@ class Item(PakObject):
             if item == self.id
         }
 
-        item_data = self.versions[ver_id]['styles'][style_id]
+        item_data = self.versions[ver_id]['styles'][style_id]  # type: ItemVariant
 
-        new_editor = item_data['editor'].copy()  # type: Property
+        new_editor = item_data.editor.copy()
 
         new_editor['type'] = self.id  # Set the item ID to match our item
         # This allows the folders to be reused for different items if needed.
@@ -1107,11 +1184,11 @@ class Item(PakObject):
                 if index in palette_items:
                     if len(palette_items) == 1:
                         # Switch to the 'Grouped' icon and name
-                        if item_data['all_name'] is not None:
-                            pal_section['Tooltip'] = item_data['all_name']
+                        if item_data.all_name is not None:
+                            pal_section['Tooltip'] = item_data.all_icon
 
-                        if item_data['all_icon'] is not None:
-                            icon = item_data['all_icon']
+                        if item_data.all_icon is not None:
+                            icon = item_data.all_icon
                         else:
                             icon = pal_section['Image']
                         # Bug in Portal 2 - palette icons must end with '.png',
@@ -1192,9 +1269,9 @@ class Item(PakObject):
 
         return (
             new_editor,
-            item_data['editor_extra'],
+            item_data.editor_extra,
             # Add all_conf first so it's conditions run first by default
-            self.all_conf + item_data['vbsp'],
+            self.all_conf + item_data.vbsp_config,
         )
 
 
