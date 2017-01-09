@@ -62,7 +62,6 @@ class BaseLoadScreen(Toplevel):
     """Code common to both loading screen types."""
     def __init__(self, stages):
         self.stages = list(stages)
-        self.widgets = {}
         self.labels = {}
         self.bar_val = {}
         self.maxes = {}
@@ -145,6 +144,7 @@ class LoadScreen(BaseLoadScreen):
     def __init__(self, *stages, title_text):
         super().__init__(stages)
         self.bar_var = {}
+        self.widgets = {}
 
         self.frame = ttk.Frame(self, cursor=utils.CURSORS['wait'])
         self.frame.grid(row=0, column=0)
@@ -193,7 +193,7 @@ class LoadScreen(BaseLoadScreen):
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
 
     def step(self, stage):
-        """Increment a step by one."""
+        """Increment a stage by one."""
         self.bar_val[stage] += 1
         self.set_nums(stage)
         if self.active:
@@ -213,6 +213,7 @@ class LoadScreen(BaseLoadScreen):
         )
 
     def skip_stage(self, stage):
+        """Skip over this stage of the loading process."""
         self.labels[stage]['text'] = _('Skipped!')
         self.bar_var[stage].set(1000)  # Make sure it fills to max
 
@@ -220,6 +221,7 @@ class LoadScreen(BaseLoadScreen):
             self.widgets[stage].update()
 
     def reset(self):
+        """Hide the loading screen, and reset stages to zero."""
         self.withdraw()
         self.active = False
         for stage, _ in self.stages:
@@ -247,7 +249,6 @@ class SplashScreen(BaseLoadScreen):
     def __init__(self, *stages):
         super().__init__(stages)
         self.stage_names = {}
-        self.bars = {}
 
         self.splash, width, height = img.get_splash_screen(
             max(self.winfo_screenwidth() * 0.6, 500),
@@ -300,13 +301,14 @@ class SplashScreen(BaseLoadScreen):
             self.bar_val[st_id] = 0
             self.maxes[st_id] = 10
             self.stage_names[st_id] = stage_name
-            self.bars[st_id] = canvas.create_rectangle(
+            canvas.create_rectangle(
                 20,
                 height - (ind + 0.5) * 20,
                 20,
                 height - (ind - 0.5) * 20,
                 fill='#00785A',  # 0, 120, 90
                 width=0,
+                tags='bar_' + st_id,
             )
             # Border
             canvas.create_rectangle(
@@ -317,12 +319,13 @@ class SplashScreen(BaseLoadScreen):
                 outline='#00785A',
                 width=2,
             )
-            self.widgets[st_id] = canvas.create_text(
+            canvas.create_text(
                 25,
                 height - ind * 20,
                 anchor='w',
                 text=stage_name + ': (0/???)',
                 fill='white',
+                tags='text_' + st_id,
             )
 
     def step(self, stage):
@@ -334,7 +337,7 @@ class SplashScreen(BaseLoadScreen):
     def set_nums(self, stage: str):
         max_val = self.maxes[stage]
         self.canvas.itemconfig(
-            self.widgets[stage],
+            'text_' + stage,
             text='{}: ({}/{})'.format(
                 self.stage_names[stage],
                 self.bar_val[stage],
@@ -344,21 +347,51 @@ class SplashScreen(BaseLoadScreen):
         self.bar_length(stage, self.bar_val[stage] / max_val)
         self.canvas.update()
 
+
+    def set_length(self, stage, num):
+        """Set the number of items in a stage."""
+        super().set_length(stage, num)
+
+        self.canvas.delete('tick_' + stage)
+
+        if num == 0:
+            return  # No ticks
+
+        # Draw the ticks in...
+        _, y1, _, y2 = self.canvas.coords('bar_' + stage)
+
+        dist = (self.width-40) / num
+        if round(dist) <= 1:
+            # Don't have ticks if they're right next to each other
+            return
+        tag = 'tick_' + stage
+        for i in range(num):
+            pos = int(20 + dist*i)
+            self.canvas.create_line(
+                pos, y1, pos, y2,
+                fill='#00785A',
+                tags=tag,
+            )
+        self.canvas.tag_lower('tick_' + stage, 'bar_' + stage)
+
+
     def skip_stage(self, stage: str):
+        """Skip over this stage of the loading process."""
         self.bar_val[stage] = 0
         self.maxes[stage] = 0
         self.canvas.itemconfig(
-            self.widgets[stage],
+            'text_' + stage,
             text=self.stage_names[stage] + ': ' + _('Skipped!'),
         )
         self.bar_length(stage, 1)
+        self.canvas.delete('tick_' + stage)
         self.canvas.update()
 
     def bar_length(self, stage, fraction):
         """Set a progress bar to this fractional length."""
-        x1, y1, x2, y2 = self.canvas.coords(self.bars[stage])
+        x1, y1, x2, y2 = self.canvas.coords('bar_' + stage)
         self.canvas.coords(
-            self.bars[stage],
+            'bar_' + stage,
             20,
             y1,
             20 + round(fraction * (self.width-40)),
@@ -369,8 +402,6 @@ class SplashScreen(BaseLoadScreen):
         """Delete all parts of the loading screen."""
         if self.active:
             super().destroy()
-            del self.widgets
-            del self.bars
             del self.maxes
             del self.splash
             del self.bar_val
@@ -378,14 +409,17 @@ class SplashScreen(BaseLoadScreen):
             _ALL_SCREENS.discard(self)
 
     def reset(self):
+        """Hide the loading screen, and reset stages to zero."""
         self.withdraw()
         self.active = False
         for stage, stage_name in self.stages:
             self.maxes[stage] = 10
             self.bar_val[stage] = 0
             self.bar_length(stage, 0)
-            self.canvas.itemconfig(self.labels[stage], stage_name + ': (0/???)')
+            self.canvas.itemconfig('text_' + stage, stage_name + ': (0/???)')
             self.set_nums(stage)
+
+            self.canvas.delete('tick_' + stage)
 
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
