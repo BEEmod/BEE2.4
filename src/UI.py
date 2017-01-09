@@ -868,11 +868,16 @@ def export_editoritems(e=None):
             palettes.remove(pal)
 
     new_pal = paletteLoader.Palette(
-        _('<Last Export>'),
+        '??',
         pal_data,
+        # This makes it lookup the translated name
+        # instead of using a configured one.
+        trans_name='LAST_EXPORT',
+        # Use a specific filename - this replaces existing files.
+        filename=export_filename,
+        # And prevent overwrite
+        prevent_overwrite=True,
         )
-    new_pal.filename = export_filename
-    new_pal.prevent_overwrite = True
     palettes.append(new_pal)
     new_pal.save(ignore_readonly=True)
 

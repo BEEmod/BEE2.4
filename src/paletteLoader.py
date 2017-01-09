@@ -88,7 +88,12 @@ class Palette:
         )
 
     def save(self, ignore_readonly=False):
-        """Save the palette file into the specified location."""
+        """Save the palette file into the specified location.
+
+        If ignore_readonly is true, this will ignore the `prevent_overwrite`
+        property of the palette (allowing resaving those properties over old
+        versions). Otherwise those palettes always create a new file.
+        """
         LOGGER.info('Saving "{}"!', self.name)
         props = Property(None, [
             Property('Name', self.name),
