@@ -25,9 +25,9 @@ from srctools import (
 )
 
 from typing import (
-    Dict, List, Tuple, NamedTuple,
+    Union, Optional, Any, TYPE_CHECKING,
     Iterator, Iterable, Type,
-    TypeVar, Union, TYPE_CHECKING
+    Dict, List, Tuple, NamedTuple,
 )
 
 if TYPE_CHECKING:
@@ -537,7 +537,7 @@ def setup_style_tree(
     - First version's style
     - First style of first version
     """
-    all_styles = {}
+    all_styles = {}  # type: Dict[str, Style]
 
     for style in style_data:
         all_styles[style.id] = style
@@ -547,6 +547,10 @@ def setup_style_tree(
         b_style = style
         while b_style is not None:
             # Recursively find all the base styles for this one
+
+            if b_style in base:
+                # Already hit this!
+                raise Exception('Loop in bases for "{}"!'.format(b_style.id))
             base.append(b_style)
             b_style = all_styles.get(b_style.base_style, None)
             # Just append the style.base_style to the list,
@@ -559,7 +563,7 @@ def setup_style_tree(
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver = list(item.versions.values())  # type: List[Dict[str, Dict[str, Style]]]
+        all_ver = list(item.versions.values())  # type: List[Dict[str, Union[Dict[str, Style], str]]]
         # Move default version to the beginning, so it's read first
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
@@ -584,7 +588,7 @@ def setup_style_tree(
                     # For the base version, use the first style if
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
-                        vers['styles'][sty_id] = vers['def_style']
+                        vers['styles'][sty_id] = vers['styles'][vers['def_style']]
                         if log_missing_styles and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using '
@@ -597,35 +601,63 @@ def setup_style_tree(
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
-            # Evaluate style references.
-            for sty_id, value in vers['styles'].items():
-                if not isinstance(value, str):
+            style_lookups = {}
+
+            # Evaluate style lookups and modifications
+            for sty_id, props in vers['styles'].items():
+                if not isinstance(props, Property):
                     continue  # Normal value
+                if props.name is None:
+                    # Style lookup
+                    style_lookups[sty_id] = props.value
+                    continue
                 # It's a reference to another style.
+                base = props['base', '']
+                if not base:
+                    raise Exception('No base for "{}", in "{}" style.'.format(
+                        item.id, sty_id,
+                    ))
+
                 try:
-                    vers['styles'][sty_id] = vers['styles'][value[1:-1]]
+                    base_variant = vers['styles'][base]  # type: ItemVariant
+                except KeyError:
+                    raise Exception(
+                        'Invalid style base '
+                        '("{}") for "{}", in "{}" style.'.format(
+                            base, item.id, sty_id,
+                        )
+                    )
+
+                vers['styles'][sty_id] = base_variant.modify(
+                    props,
+                    '<{}:{}.{}>'.format(item.id, vers['id'], sty_id)
+                )
+
+            for to_id, from_id in style_lookups.items():
+                LOGGER.warning('REF "{}": {} -> {}', item.id, from_id, to_id)
+                try:
+                    vers['styles'][to_id] = vers['styles'][from_id]
                 except KeyError:
                     raise Exception(
                         'Invalid style reference '
                         '("{}") for "{}", in "{}" style.'.format(
-                            value, item.id, sty_id,
+                            from_id, item.id, to_id,
                         )
                     )
 
-            if isinstance(vers['def_style'], str):
-                # The default style is a value reference, fix it up.
-                # If it's an invalid value the above loop will catch it.
-                vers['def_style'] = vers['styles'][vers['def_style'][1:-1]]
+            # The default style is a value reference, fix it up.
+            # If it's an invalid value the above loop will have caught
+            # that, since it already read the value.
+            vers['def_style'] = vers['styles'][vers['def_style']]
 
 
-def parse_item_folder(folders, zip_file, pak_id):
+def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
+    """Parse through the data in item/ folders.
+
+    folders is a dict, with the keys set to the folder names we want.
+    The values will be filled in with itemVariant values
+    """
     for fold in folders:
-        if fold.startswith('<') and fold.endswith('>'):
-            # A reference for another style - skip it now, we'll copy the
-            # real value in setup_style_tree()
-            folders[fold] = fold
-            continue
-
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -737,24 +769,6 @@ class ItemVariant:
         # The name and VTF for grouped items
         self.all_name = all_name
         self.all_icon = all_icon
-        # 'auth': sep_values(props['authors', '']),
-        # 'tags': sep_values(props['tags', '']),
-        # 'desc': desc_parse(props, pak_id + ':' + prop_path),
-        # 'ent': props['ent_count', '??'],
-        # 'url': props['infoURL', None],
-        # 'icons': {p.name: p.value for p in props['icon', []]},
-        # 'all_name': props['all_name', None],
-        # 'all_icon': props['all_icon', None],
-        # 'vbsp': Property(None, []),
-        #
-        # # The first Item block found
-        # 'editor': next(editor_iter),
-        # # Any extra blocks (offset catchers, extent items)
-        # 'editor_extra': list(editor_iter),
-        #
-        # # Add the folder the item definition comes from,
-        # # so we can trace it later for debug messages.
-        # 'source': '<{}>/items/{}'.format(pak_id, fold),
 
     def can_group(self):
         """Does this variant have the data needed to group?"""
@@ -770,6 +784,65 @@ class ItemVariant:
         self.tags.extend(self.tags)
         self.vbsp_config += other.vbsp_config
         self.desc = tkMarkdown.join(self.desc, other.desc)
+
+    def modify(self, props: Property, source: str) -> 'ItemVariant':
+        """Apply a config to this item variant.
+
+        This produces a copy with various modifications - switching
+        out palette or instance values, changing the config, etc.
+        """
+        if 'config' in props:
+            # Item.parse() has resolved this to the actual config.
+            vbsp_config = props.find_key('config')
+        else:
+            vbsp_config = self.vbsp_config.copy()
+
+        if 'description' in props:
+            desc = desc_parse(props, source)
+        else:
+            desc = self.desc.copy()
+
+        variant = ItemVariant(
+            self.editor.copy(),
+            vbsp_config,
+            self.editor_extra.copy(),
+            authors=list(self.authors),
+            tags=self.tags.copy(),
+            desc=desc,
+            icons=self.icons.copy(),
+            ent_count=props['ent_count', self.ent_count],
+            url=props['url', self.url],
+            all_name=self.all_name,
+            all_icon=self.all_icon,
+            source='{} from {}'.format(source, self.source),
+        )
+        subtypes = list(variant.editor.find_all('Item', 'Editor', 'Subtype'))
+        # Implement overriding palette items
+        for item in props.find_children('Palette'):
+            pal_icon = item['palette']
+            pal_name = item['pal_name']  # Name for the palette icon
+            bee2_icon = item['icon']
+            if item.name == 'all':
+                variant.all_icon = pal_icon
+                variant.all_name = pal_name
+                variant.icons['all'] = bee2_icon
+                continue
+
+
+            try:
+                subtype = subtypes[int(item.name)]
+            except (KeyError, ValueError, TypeError):
+                raise Exception(
+                    'Invalid index "{}" when modifying '
+                    'editoritems for {}'.format(item.name, source)
+                )
+            subtype['name'] = item['name']  # Name for the subtype
+            self.icons[item.name] = bee2_icon
+            palette = subtype.ensure_exists('Palette')
+            palette['Tooltip'] = pal_name
+            palette['Image'] = pal_icon
+
+        return variant
 
 
 class Package:
@@ -855,7 +928,7 @@ class Style(PakObject):
         self.base_style = base_style
         # Set by setup_style_tree() after all objects are read..
         # this is a list of this style, plus parents in order.
-        self.bases = []
+        self.bases = []  # type: List[Style]
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -1016,7 +1089,10 @@ class Item(PakObject):
         """Parse an item definition."""
         versions = {}
         def_version = None
-        folders = {}
+        # The folders we parse for this - we don't want to parse the same
+        # one twice. First they're set to True if we need to read them,
+        # then parse_item_folder() replaces that with the actual values
+        folders = {}  # type: Dict[str, Optional[ItemVariant]
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
@@ -1035,32 +1111,56 @@ class Item(PakObject):
 
         needs_unlock = data.info.bool('needsUnlock')
 
-        for ver in data.info.find_all('version'):
+        for ver in data.info.find_all('version'):  # type: Property
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
                 'styles':  {},
                 'def_style': None,
                 }
-            for sty_list in ver.find_all('styles'):
-                for sty in sty_list:
-                    # The first style is considered the 'default', and is used
-                    # if not otherwise present.
-                    if vals['def_style'] is None:
-                        vals['def_style'] = sty.value
-                    vals['styles'][sty.real_name] = sty.value
-                    folders[sty.value] = True
+            for style in ver.find_children('styles'):
+                if style.has_children():
+                    # It's a modification to another folder, keep the property.
+                    folder = style
+                    # Read in the vbsp_config data if specified.
+                    # We need to do this here, since the other functions
+                    # don't have access to the zip file.
+                    if 'config' in folder:
+                        folder['config'] = get_config(
+                            folder,
+                            data.zip_file,
+                            data.pak_id,
+                        )
+                elif style.value.startswith('<') and style.value.endswith('>'):
+                    # Reusing another style unaltered using <>.
+                    # None signals this should be calculated after the other
+                    # modifications
+                    folder = Property(None, style.value[1:-1])
+                else:
+                    # Reference to the actual folder...
+                    folder = style.value
+                    folders[folder] = None
+
+                # The first style is considered the 'default', and is used
+                # if not otherwise present.
+                # We set it to the name, then lookup later in setup_style_tree()
+                if vals['def_style'] is None:
+                    vals['def_style'] = style.real_name
+                vals['styles'][style.real_name] = folder
             versions[vals['id']] = vals
             if def_version is None:
                 def_version = vals
 
+        # Fill out the folders dict with the actual data
         parse_item_folder(folders, data.zip_file, data.pak_id)
 
+        # Then copy over to the styles values
         for ver in versions.values():
             if ver['def_style'] in folders:
                 ver['def_style'] = folders[ver['def_style']]
             for sty, fold in ver['styles'].items():
-                ver['styles'][sty] = folders[fold]
+                if isinstance(fold, str):
+                    ver['styles'][sty] = folders[fold]
 
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
@@ -1492,8 +1592,7 @@ class QuotePack(PakObject):
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
-        vbsp_config.ensure_exists('Options')
-        options = vbsp_config.find_key('Options')
+        options = vbsp_config.ensure_exists('Options')
 
         options['voice_pack'] = voice.id
         options['voice_char'] = ','.join(voice.chars)
@@ -1904,7 +2003,7 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
         if self.styles is None:
             return True
 
-        for style in Style.all():
+        for style in Style.all():  # type: Style
             if not self.applies_to_style(style):
                 return False
         return True
