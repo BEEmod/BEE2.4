@@ -6,7 +6,6 @@ import itertools
 import operator
 import random
 
-import srctools
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -14,6 +13,7 @@ from BEE2_config import ConfigFile, GEN_OPTS
 import sound as snd
 from loadScreen import main_loader as loader
 import paletteLoader
+import packageLoader
 import img
 import utils
 import tk_tools
@@ -88,7 +88,6 @@ class Item:
         'pak_name',
         'names',
         'url',
-        'can_group',
         ]
 
     def __init__(self, item):
@@ -103,11 +102,11 @@ class Item:
             self.selected_ver = self.item.def_ver['id']
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']
+        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
-            self.def_data['editor'].find_all(
+            self.def_data.editor.find_all(
                 "Editor",
                 "Subtype",
                 "Palette",
@@ -118,7 +117,7 @@ class Item:
             # with the file.
             raise Exception('Item {} has no subtypes!'.format(item.id))
 
-        self.authors = self.def_data['auth']
+        self.authors = self.def_data.authors
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
@@ -134,20 +133,14 @@ class Item:
         self.data = version['styles'].get(
             selected_style,
             self.def_data,
-            )
+            )  # type: packageLoader.ItemVariant
         self.names = [
             gameMan.translate(prop['name', ''])
             for prop in
-            self.data['editor'].find_all("Editor", "Subtype")
+            self.data.editor.find_all("Editor", "Subtype")
             if prop['Palette', None] is not None
         ]
-        self.url = self.data['url']
-
-        # This checks to see if all the data is present to enable
-        # grouped items
-        self.can_group = ('all' in self.data['icons'] and
-                          self.data['all_name'] is not None and
-                          self.data['all_icon'] is not None)
+        self.url = self.data.url
 
         # attributes used for filtering (tags, authors, packages...)
         self.filter_tags = set()
@@ -155,11 +148,11 @@ class Item:
         # The custom tags set for this item
         self.tags = set()
 
-        for tag in self.data['tags']:
+        for tag in self.data.tags:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.TAG, tag, pretty=tag)
             )
-        for auth in self.data['auth']:
+        for auth in self.data.authors:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
             )
@@ -175,13 +168,13 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
-        icons = self.data['icons']
+        icons = self.data.icons
         num_picked = sum(
             1 for item in
             pal_picked if
             item.id == self.id
             )
-        if allow_single and self.can_group and num_picked <= single_num:
+        if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
             img_key = 'all'
@@ -202,7 +195,7 @@ class Item:
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
                 if not prop.bool('BEE2_ignore'):
                     yield prop.name
@@ -212,7 +205,7 @@ class Item:
 
         """
         result = {}
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
                 name = prop.name
 

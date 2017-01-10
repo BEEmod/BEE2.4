@@ -54,6 +54,12 @@ class MarkdownData:
         """Empty data is false."""
         return bool(self.tags)
 
+    def copy(self) -> 'MarkdownData':
+        """Create and return a duplicate of this object."""
+        return MarkdownData(self.tags, self.links.copy())
+
+    __copy__ = copy
+
 
 def iter_elemtext(elem: etree.Element, parent_path=()):
     """Flatten out an elementTree into the text parts.
