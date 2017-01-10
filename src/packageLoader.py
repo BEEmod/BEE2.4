@@ -816,31 +816,75 @@ class ItemVariant:
             all_icon=self.all_icon,
             source='{} from {}'.format(source, self.source),
         )
-        subtypes = list(variant.editor.find_all('Item', 'Editor', 'Subtype'))
+        subtypes = list(variant.editor.find_all('Editor', 'SubType'))
         # Implement overriding palette items
         for item in props.find_children('Palette'):
-            pal_icon = item['palette']
-            pal_name = item['pal_name']  # Name for the palette icon
-            bee2_icon = item['icon']
+            pal_icon = item['palette', None]
+            pal_name = item['pal_name', None]  # Name for the palette icon
+            bee2_icon = item['icon', None]
             if item.name == 'all':
                 variant.all_icon = pal_icon
                 variant.all_name = pal_name
-                variant.icons['all'] = bee2_icon
+                if bee2_icon:
+                    variant.icons['all'] = bee2_icon
                 continue
 
 
             try:
                 subtype = subtypes[int(item.name)]
-            except (KeyError, ValueError, TypeError):
+            except (IndexError, ValueError, TypeError):
                 raise Exception(
                     'Invalid index "{}" when modifying '
                     'editoritems for {}'.format(item.name, source)
                 )
-            subtype['name'] = item['name']  # Name for the subtype
-            self.icons[item.name] = bee2_icon
-            palette = subtype.ensure_exists('Palette')
-            palette['Tooltip'] = pal_name
-            palette['Image'] = pal_icon
+
+            # Overriding model data
+            try:
+                try:
+                    model_prop = item.find_key('Models')
+                except NoKeyError:
+                    model_prop = item.find_key('Model')
+            except NoKeyError:
+                pass
+            else:
+                while 'model' in subtype:
+                    del subtype['model']
+                if model_prop.has_children():
+                    models = [prop.value for prop in model_prop]
+                else:
+                    models = [model_prop.value]
+                for model in models:
+                    subtype.append(Property('Model', [
+                        Property('ModelName', model),
+                    ]))
+
+            if item['name', None]:
+                subtype['name'] = item['name']  # Name for the subtype
+
+            if bee2_icon:
+                self.icons[item.name] = bee2_icon
+
+            if pal_name or pal_icon:
+                palette = subtype.ensure_exists('Palette')
+                if pal_name:
+                    palette['Tooltip'] = pal_name
+                if pal_icon:
+                    palette['Image'] = pal_icon
+
+        # Allow overriding the instance blocks.
+        instances = variant.editor.ensure_exists('Exporting').ensure_exists('Instances')
+        for inst in props.find_children('Instances'):
+            try:
+                del instances[inst.real_name]
+            except IndexError:
+                pass
+            if inst.has_children() or not inst.name.isdecimal():
+                instances.append(inst.copy())
+            else:
+                # Shortcut to just create the property
+                instances += Property(inst.real_name, [
+                    Property('Name', inst.value),
+                ])
 
         return variant
 
