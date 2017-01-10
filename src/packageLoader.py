@@ -202,9 +202,9 @@ def reraise_keyerror(err, obj_id):
 
 
 def get_config(
-        prop_block,
+        prop_block: Property,
         zip_file,
-        folder,
+        folder: str,
         pak_id='',
         prop_name='config',
         extension='.cfg',
@@ -793,7 +793,10 @@ class ItemVariant:
         """
         if 'config' in props:
             # Item.parse() has resolved this to the actual config.
-            vbsp_config = props.find_key('config')
+            vbsp_config = props.find_key('config').copy()
+            # Specify this is a collection of blocks, not a "config"
+            # block.
+            vbsp_config.name = None
         else:
             vbsp_config = self.vbsp_config.copy()
 
@@ -802,12 +805,22 @@ class ItemVariant:
         else:
             desc = self.desc.copy()
 
+        if 'authors' in props:
+            authors = sep_values(props['authors', ''])
+        else:
+            authors = self.authors
+
+        if 'tags' in props:
+            tags = sep_values(props['tags', ''])
+        else:
+            tags = self.tags.copy()
+
         variant = ItemVariant(
             self.editor.copy(),
             vbsp_config,
             self.editor_extra.copy(),
-            authors=list(self.authors),
-            tags=self.tags.copy(),
+            authors=authors,
+            tags=tags,
             desc=desc,
             icons=self.icons.copy(),
             ent_count=props['ent_count', self.ent_count],
@@ -819,16 +832,15 @@ class ItemVariant:
         subtypes = list(variant.editor.find_all('Editor', 'SubType'))
         # Implement overriding palette items
         for item in props.find_children('Palette'):
-            pal_icon = item['palette', None]
+            pal_icon = item['icon', None]
             pal_name = item['pal_name', None]  # Name for the palette icon
-            bee2_icon = item['icon', None]
+            bee2_icon = item['bee2', None]
             if item.name == 'all':
                 variant.all_icon = pal_icon
                 variant.all_name = pal_name
                 if bee2_icon:
                     variant.icons['all'] = bee2_icon
                 continue
-
 
             try:
                 subtype = subtypes[int(item.name)]
@@ -862,7 +874,8 @@ class ItemVariant:
                 subtype['name'] = item['name']  # Name for the subtype
 
             if bee2_icon:
-                self.icons[item.name] = bee2_icon
+                print(item.name, variant.icons)
+                variant.icons[item.name] = bee2_icon
 
             if pal_name or pal_icon:
                 palette = subtype.ensure_exists('Palette')
@@ -1173,8 +1186,10 @@ class Item(PakObject):
                         folder['config'] = get_config(
                             folder,
                             data.zip_file,
+                            'items',
                             data.pak_id,
                         )
+
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
                     # None signals this should be calculated after the other
