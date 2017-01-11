@@ -874,6 +874,11 @@ def export_editoritems(e=None):
     palettes.append(new_pal)
     new_pal.save(ignore_readonly=True)
 
+    # Select the last_export palette, so reloading loads this item selection.
+    palettes.sort(key=str)
+    selectedPalette_radio.set(palettes.index(new_pal))
+    set_pal_radio()
+
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
     item_opts.save_check()
