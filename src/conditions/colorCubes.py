@@ -68,10 +68,10 @@ def res_cube_coloriser(inst: Entity):
     # If pointing up, copy the value to the ceiling, so droppers
     # can find a coloriser placed on the illusory cube item under them.
     if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
-        pos = brushLoc.g2w(brushLoc.POS.raycast(
-            brushLoc.w2g(origin),
+        pos = brushLoc.POS.raycast_world(
+            origin,
             direction=(0, 0, 1),
-        ))
+        )
         COLOR_SEC_POS[pos.as_tuple()] = COLORS[timer_delay - 3]
 
 

@@ -162,6 +162,15 @@ class Grid(Dict[_grid_keys, Block]):
         else:
             raise ValueError('Moved too far! (> 90)')
 
+    def raycast_world(
+        self,
+        pos: Vec,
+        direction: Vec,
+        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM}),
+    ) -> Vec:
+        """Like raycast(), but accepts and returns world positions instead."""
+        return g2w(self.raycast(w2g(pos), direction, collide))
+
     def __getitem__(self, pos: _grid_keys):
         return super().get(self._conv_key(pos), Block.VOID)
 
