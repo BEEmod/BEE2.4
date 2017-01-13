@@ -654,6 +654,12 @@ def res_checkpoint_trigger(inst: Entity, res: Property):
 
     """
 
+    if vbsp.GAME_MODE == 'SP':
+        # We can't have a respawn dropper in singleplayer.
+        # Not generating the trigger means it's not going to
+        # do anything.
+        return
+
     pos = brushLoc.POS.raycast_world(
         Vec.from_str(inst['origin']),
         direction=(0, 0, -1),
