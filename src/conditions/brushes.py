@@ -2,16 +2,19 @@
 import random
 from collections import defaultdict
 
+import brushLoc
 import conditions
 import srctools
 import utils
 import vbsp
 import vbsp_options
+import comp_consts as const
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, conv_bool
 
+from typing import Dict, Tuple
 
 LOGGER = utils.getLogger(__name__)
 
@@ -618,3 +621,71 @@ def res_hollow_brush(inst: Entity, res: Property):
         group,
         remove_orig_face=srctools.conv_bool(res['RemoveFace', False])
     )
+
+# Position -> entity
+# We merge ones within 3 blocks of our item.
+CHECKPOINT_TRIG = {}  # type: Dict[Tuple[float, float, float], Entity]
+
+# Approximately a 3-distance from
+# the center.
+#   x
+#  xxx
+# xx xx
+#  xxx
+#   x
+CHECKPOINT_NEIGHBOURS = list(Vec.iter_grid(
+    Vec(-128, -128, 0),
+    Vec(128, 128, 0),
+    stride=128,
+))
+CHECKPOINT_NEIGHBOURS.extend([
+    Vec(-256, 0, 0),
+    Vec(256, 0, 0),
+    Vec(0, -256, 0),
+    Vec(0, 256, 0),
+])
+# Don't include ourself..
+CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
+
+
+@make_result('CheckpointTrigger')
+def res_checkpoint_trigger(inst: Entity, res: Property):
+    """Generate a trigger underneath coop checkpoint items
+
+    """
+
+    pos = brushLoc.POS.raycast_world(
+        Vec.from_str(inst['origin']),
+        direction=(0, 0, -1),
+    )
+    bbox_min = pos - (192, 192, 64)
+    bbox_max = pos + (192, 192, 64)
+
+    # Find triggers already placed next to ours, and
+    # merge with them if that's the case
+    for offset in CHECKPOINT_NEIGHBOURS:
+        near_pos = pos + offset
+        try:
+            trig = CHECKPOINT_TRIG[near_pos.as_tuple()]
+            break
+        except KeyError:
+            pass
+    else:
+        # None found, make one.
+        trig = inst.map.create_ent(
+            classname='trigger_playerteam',
+            origin=pos,
+        )
+        trig.solids = []
+        CHECKPOINT_TRIG[pos.as_tuple()] = trig
+
+    trig.solids.append(inst.map.make_prism(
+        bbox_min,
+        bbox_max,
+        mat=const.Tools.TRIGGER,
+    ).solid)
+
+    for prop in res:
+        out = Output.parse(prop)
+        out.target = conditions.local_name(inst, out.target)
+        trig.add_out(out)
