@@ -468,7 +468,7 @@ class selWin:
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
 
-        self.win.iconbitmap('../BEE2.ico')
+        tk_tools.set_window_icon(self.win)
 
         # Run our quit command when the exit button is pressed, or Escape
         # on the keyboard.

@@ -9,6 +9,7 @@ from tooltip import add_tooltip
 
 import sound
 import utils
+import tk_tools
 import srctools
 import contextWin
 import logWindow
@@ -32,7 +33,7 @@ def reset_all_win():
 
 win = Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
-win.iconbitmap('../BEE2.ico')
+tk_tools.set_window_icon(win)
 win.title(_('BEE2 Options'))
 win.withdraw()
 

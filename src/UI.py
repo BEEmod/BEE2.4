@@ -1690,7 +1690,6 @@ def init_windows():
         height=TK_ROOT.winfo_screenheight(),
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
 
     if utils.MAC:
         # OS X has a special quit menu item.

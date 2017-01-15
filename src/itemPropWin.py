@@ -12,6 +12,7 @@ import utils
 import srctools
 import contextWin
 import gameMan
+import tk_tools
 
 LOGGER = utils.getLogger(__name__)
 
@@ -306,7 +307,7 @@ def init(cback):
     win = Toplevel(TK_ROOT)
     win.title("BEE2")
     win.resizable(False, False)
-    win.iconbitmap('../BEE2.ico')
+    tk_tools.set_window_icon(win)
     win.protocol("WM_DELETE_WINDOW", exit_win)
     win.transient(TK_ROOT)
     win.withdraw()

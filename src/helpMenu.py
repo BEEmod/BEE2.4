@@ -12,6 +12,7 @@ from tk_tools import TK_ROOT, HidingScroll
 import tkMarkdown
 import img
 import utils
+import tk_tools
 
 
 class ResIcon(Enum):
@@ -178,7 +179,7 @@ class Dialog(tk.Toplevel):
         self.title(title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
-        self.iconbitmap('../BEE2.ico')
+        tk_tools.set_window_icon(self)
 
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
