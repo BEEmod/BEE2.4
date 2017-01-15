@@ -1360,7 +1360,7 @@ class Item(PakObject):
                     if len(palette_items) == 1:
                         # Switch to the 'Grouped' icon and name
                         if item_data.all_name is not None:
-                            pal_section['Tooltip'] = item_data.all_icon
+                            pal_section['Tooltip'] = item_data.all_name
 
                         if item_data.all_icon is not None:
                             icon = item_data.all_icon
