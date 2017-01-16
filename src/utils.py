@@ -199,20 +199,20 @@ elif LINUX:
         'KEY_SAVE': '<Control-Shift-s>',
     }
     KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+        'KEY_EXPORT': 'Ctrl+E',
+        'KEY_SAVE': 'Ctrl+S',
+        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'hand1',
         'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
         'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
+        'invalid_drag': 'circle',
     }
 
     def add_mousewheel(target, *frames, orient='y'):
