@@ -57,6 +57,19 @@ STEAM_IDS = {
     # 211480: 'In Motion'
 }
 
+if MAC or LINUX:
+    def fix_cur_directory():
+        """Change directory to the location of the executable.
+
+        Otherwise we can't find our files!
+        The Windows executable does this automatically.
+        """
+        os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
+else:
+    def fix_cur_directory():
+        """No-op on Windows."""
+
+
 if WIN:
     # Some events differ on different systems, so define them here.
     EVENTS = {
