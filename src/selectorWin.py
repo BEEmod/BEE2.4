@@ -454,7 +454,15 @@ class selWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]  # type: Item
+        try:
+            self.selected = self.item_list[0]  # type: Item
+        except IndexError:
+            LOGGER.error('No items for window "{}"!', title)
+            # We crash without items, forcefully add the None item in so at
+            # least this works.
+            self.item_list = [self.noneItem]
+            self.selected = self.noneItem
+            
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
