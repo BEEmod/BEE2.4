@@ -25,9 +25,12 @@ if utils.WIN:
         """Set the window icon."""
         window.wm_iconbitmap('../BEE2.ico')
 else:
+    import img
+    app_icon = img.get_app_icon()
+
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""
-        # TODO: Other systems
+        window.wm_iconphoto(app_icon)
 
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 

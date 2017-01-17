@@ -103,6 +103,14 @@ def icon(name, error=None):
     return png(os.path.join("items", name), error=error, resize_to=64)
 
 
+def get_app_icon():
+    """On non-Windows, retrieve the application icon."""
+    with open('../BEE2.ico', 'rb') as f:
+        app_img = Image.open(f)
+        app_img.load()
+    return ImageTk.PhotoImage(app_img)
+
+
 def get_splash_screen(max_width, max_height, base_height):
     """Return a random file from the splash_screens directory."""
     import random
