@@ -211,7 +211,7 @@ elif LINUX:
         'stretch_vert': 'bottom_side',
         'stretch_horiz': 'right_side',
         'move_item': 'crosshair',
-        'destroy_item': 'x_cursor',
+        'destroy_item': 'X_cursor',
         'invalid_drag': 'circle',
     }
 
