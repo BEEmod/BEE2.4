@@ -30,7 +30,8 @@ else:
 
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""
-        window.wm_iconphoto(app_icon)
+        # Weird argument order for default=True...
+        window.wm_iconphoto(True, app_icon)
 
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 

@@ -105,7 +105,7 @@ def icon(name, error=None):
 
 def get_app_icon():
     """On non-Windows, retrieve the application icon."""
-    with open('../BEE2.ico', 'rb') as f:
+    with open('../bee2.ico', 'rb') as f:
         app_img = Image.open(f)
         app_img.load()
     return ImageTk.PhotoImage(app_img)
