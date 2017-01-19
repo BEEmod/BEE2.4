@@ -12,7 +12,7 @@ import comp_consts as const
 from conditions import (
     make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
 )
-from srctools import Property, NoKeyError, Vec, Output, Entity, conv_bool
+from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
 from typing import Dict, Tuple
 
@@ -184,6 +184,10 @@ def res_set_texture(inst: Entity, res: Property):
     If tex begins and ends with '[]', it is an option in the 'Textures' list.
     These are composed of a group and texture, separated by '.'. 'white.wall'
     are the white wall textures; 'special.goo' is the goo texture.
+
+    If 'template' is set, the template should be an axis aligned cube. This
+    will be rotated by the instance angles, and then the face with the same
+    orientation will be applied to the face (with the rotation and texture).
     """
     import vbsp
     pos = Vec.from_str(res['pos', '0 0 0'])
@@ -212,31 +216,57 @@ def res_set_texture(inst: Entity, res: Property):
     if not brush or brush.normal != norm:
         return
 
+    face_to_mod = brush.face  # type: Side
+
+    # Don't allow this to get overwritten later.
+    vbsp.IGNORED_FACES.add(face_to_mod)
+
+    temp = res['template', None]
+    if temp:
+        temp = conditions.get_template(temp)
+        # No visgroup, world brush, first of them
+        try:
+            temp_brush = temp[''][0][0].copy()
+        except LookupError:
+            raise ValueError('Template must be one world brush!')
+        temp_brush.localise(
+            Vec.from_str(inst['origin']),
+            Vec.from_str(inst['angles']),
+        )
+        for face in temp_brush:
+            if face.normal() == brush.normal:
+                face_to_mod.mat = face.mat
+                # It's OK to reuse this axis, the original is
+                # going away when we go out of scope.
+                face_to_mod.uaxis = face.uaxis
+                face_to_mod.vaxis = face.vaxis
+        return
+
     tex = res['tex']
 
     if tex.startswith('[') and tex.endswith(']'):
-        brush.face.mat = vbsp.get_tex(tex[1:-1])
+        face_to_mod.mat = vbsp.get_tex(tex[1:-1])
     elif tex.startswith('<') and tex.endswith('>'):
         # Special texture names!
         tex = tex[1:-1].casefold()
         if tex == 'white':
-            brush.face.mat = 'tile/white_wall_tile003a'
+            face_to_mod.mat = 'tile/white_wall_tile003a'
         elif tex == 'black':
-            brush.face.mat = 'metal/black_wall_metal_002c'
+            face_to_mod.mat = 'metal/black_wall_metal_002c'
 
         if tex == 'black' or tex == 'white':
             # For these two, run the regular logic to apply textures
             # correctly.
             vbsp.alter_mat(
-                brush.face,
-                vbsp.face_seed(brush.face),
+                face_to_mod,
+                vbsp.face_seed(face_to_mod),
                 vbsp_options.get(bool, 'tile_texture_lock'),
             )
 
         if tex == 'special':
-            vbsp.set_special_mat(brush.face, str(brush.color))
+            vbsp.set_special_mat(face_to_mod, str(brush.color))
         elif tex == 'special-white':
-            vbsp.set_special_mat(brush.face, 'white')
+            vbsp.set_special_mat(face_to_mod, 'white')
             return
         elif tex == 'special-black':
             vbsp.set_special_mat(brush.face, 'black')
@@ -248,20 +278,17 @@ def res_set_texture(inst: Entity, res: Property):
             color = tex[:5]
         if tex.endswith('2x2') or tex.endswith('4x4'):
             # 4x4 and 2x2 instructions are ignored on floors and ceilings.
-            orient = vbsp.get_face_orient(brush.face)
+            orient = vbsp.get_face_orient(face_to_mod)
             if orient == vbsp.ORIENT.wall:
-                brush.face.mat = vbsp.get_tex(
+                face_to_mod.mat = vbsp.get_tex(
                     color + '.' + tex[-3:]
                 )
             else:
-                brush.face.mat = vbsp.get_tex(
+                face_to_mod.mat = vbsp.get_tex(
                     color + '.' + str(orient)
                 )
     else:
-        brush.face.mat = tex
-
-    # Don't allow this to get overwritten later.
-    vbsp.IGNORED_FACES.add(brush.face)
+        face_to_mod.mat = tex
 
 
 @make_result('AddBrush')
