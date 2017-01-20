@@ -8,7 +8,7 @@ from decimal import Decimal
 from enum import Enum
 
 from typing import (
-    Callable, Any, Iterable,
+    Callable, Any, Iterable, Optional,
     Dict, List, Tuple, NamedTuple, Set,
 )
 
@@ -864,7 +864,7 @@ def remove_ant_toggle(toggle_ent):
             ent.remove()
 
 
-def reallocate_overlays(mapping: Dict[str, List[str]]):
+def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
     """Replace one side ID with others in all overlays.
 
     The IDs should be strings.
@@ -872,10 +872,13 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
     for overlay in VMF.by_class['info_overlay']:  # type: Entity
         sides = overlay['sides', ''].split(' ')
         for side in sides[:]:
-            if side not in mapping:
+            try:
+                new_ids = mapping[side]
+            except KeyError:
                 continue
             sides.remove(side)
-            sides.extend(mapping[side])
+            if new_ids is not None:
+                sides.extend(new_ids)
         if not sides:
             # The overlay doesn't have any sides at all!
             VMF.remove_ent(overlay)
@@ -888,6 +891,7 @@ def steal_from_brush(
     brush_group: 'solidGroup',
     rem_brush=True,
     additional: Iterable[int]=(),
+    transfer_overlays=True,
 ):
     """Copy IDs from a brush to a template."""
     LOGGER.info('Steal: {}', locals())
@@ -925,11 +929,9 @@ def steal_from_brush(
             elif face.id in additional:
                 new_ids.append(str(face.id))
 
-    LOGGER.info('New IDS: {}', {
-            str(brush_group.face.id): new_ids,
-        })
-
     if new_ids:
+        if not transfer_overlays:
+            new_ids = None
         reallocate_overlays({
             str(brush_group.face.id): new_ids,
         })

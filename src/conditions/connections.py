@@ -132,7 +132,7 @@ def res_locking_output(inst: Entity, res: Property):
 
 
 @make_flag('LockingIO')
-def res_locking_input(inst: Entity, res: Property) -> str:
+def res_locking_input(inst: Entity, res: Property):
     """Executed on the input item, and evaluates to True if successful.
 
     The parameter is an `instance:name;Input` value, which resets the item.

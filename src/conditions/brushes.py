@@ -417,6 +417,7 @@ def res_import_template_setup(res: Property):
 
     rem_replace_brush = True
     additional_ids = ()
+    transfer_overlays = '1'
     try:
         replace_brush = res.find_key('replaceBrush')
     except NoKeyError:
@@ -428,7 +429,8 @@ def res_import_template_setup(res: Property):
                 srctools.conv_int,
                 replace_brush['additionalIDs', ''].split(),
             ))
-            rem_replace_brush = conv_bool(replace_brush['removeBrush', None], True)
+            rem_replace_brush = replace_brush.bool('removeBrush', True)
+            transfer_overlays = replace_brush['transferOverlay', '1']
         else:
             replace_brush_pos = replace_brush.value  # type: str
 
@@ -481,6 +483,7 @@ def res_import_template_setup(res: Property):
         force_type,
         replace_brush_pos,
         rem_replace_brush,
+        transfer_overlays,
         additional_ids,
         invert_var,
         visgroup_func,
@@ -513,6 +516,8 @@ def res_import_template(inst: Entity, res: Property):
               to also fix for overlays. The surface should have close to a
               vertical normal, to prevent rescaling the overlay.
             - removeBrush: If true, the original brush will not be removed.
+            - transferOverlay: Allow disabling transferring overlays to this
+              template. The IDs will be removed instead. (This can be an instvar).
     - keys/localkeys: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
@@ -534,6 +539,7 @@ def res_import_template(inst: Entity, res: Property):
         force_type,
         replace_brush_pos,
         rem_replace_brush,
+        transfer_overlays,
         additional_replace_ids,
         invert_var,
         visgroup_func,
@@ -615,6 +621,7 @@ def res_import_template(inst: Entity, res: Property):
             brush_group,
             rem_replace_brush,
             additional_replace_ids,
+            conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
         )
 
     conditions.retexture_template(
