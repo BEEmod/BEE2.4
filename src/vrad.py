@@ -36,11 +36,13 @@ GAME_FOLDER = {
     utils.STEAM_IDS['PORTAL2']: 'portal2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
+    utils.STEAM_IDS['DEST_AP']: 'portal2',
 }
 
 SOUND_MAN_FOLDER = {
     # The folder where game_sounds_manifest is found
     utils.STEAM_IDS['PORTAL2']: 'portal2_dlc2',
+    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }

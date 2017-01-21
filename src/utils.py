@@ -50,6 +50,9 @@ STEAM_IDS = {
 
     'MEL': '317400',  # Note - no workshop
 
+    'DEST_AP': '433970',
+    'DESTROYED_APERTURE': '433970',
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational

@@ -52,6 +52,8 @@ def flag_game(flag: Property):
      - Aperture Tag
      - TWTM,
      - Thinking With Time Machine
+     - DEST_AP
+     - Destroyed Aperture
     """
     return vbsp_options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),

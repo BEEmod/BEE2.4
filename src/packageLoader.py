@@ -100,6 +100,7 @@ VPK_FOLDER = {
     # The last DLC released by Valve - this is the one that we
     # overwrite with a VPK file.
     utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
+    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc3',
 
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
