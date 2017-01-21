@@ -1843,6 +1843,9 @@ def change_brush():
     if vbsp_options.get(bool, 'remove_pedestal_plat'):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
+            if ent in IGNORED_BRUSH_ENTS:
+                continue
+
             for side in ent.sides():
                 if side.mat.casefold() == 'plastic/plasticwall004a':
                     VMF.remove_ent(ent)

@@ -1087,16 +1087,17 @@ def import_template(
     added - it's passed a list of names, and should return a list of ones to use.
     """
     import vbsp
-    temp_name, visgroup_ids = parse_temp_name(temp_name)
+    temp_name, chosen_groups = parse_temp_name(temp_name)
     visgroups = get_template(temp_name)
     orig_world = []  # type: List[List[Solid]]
     orig_detail = []  # type: List[List[Solid]]
     orig_over = []  # type: List[Entity]
 
-    chosen_groups = visgroup_ids.union(visgroup_choose(
+    chosen_groups.update(visgroup_choose(
         # Skip the '' visgroup in the callback.
         filter(None, visgroups.keys()),
-    ), ('', ))  # '' = no visgroup, always used.
+    ))
+    chosen_groups.add('')  # '' = no visgroup, always used.
 
     for group in chosen_groups:
         world, detail, over = visgroups[group]
@@ -1116,7 +1117,11 @@ def import_template(
         ]:
         for orig_list in orig_lists:
             for old_brush in orig_list:
-                brush = old_brush.copy(map=VMF, side_mapping=id_mapping, keep_vis=False)
+                brush = old_brush.copy(
+                    map=VMF,
+                    side_mapping=id_mapping,
+                    keep_vis=False,
+                )
                 brush.localise(origin, angles)
                 new_list.append(brush)
 
@@ -1149,11 +1154,6 @@ def import_template(
         # Don't let the overlays get retextured too!
         vbsp.IGNORED_OVERLAYS.add(new_overlay)
 
-    # Don't let these get retextured normally - that should be
-    # done by retexture_template(), if at all!
-    for brush in new_world + new_detail:
-        vbsp.IGNORED_FACES.update(brush.sides)
-
     if force_type is TEMP_TYPES.detail:
         new_detail.extend(new_world)
         new_world.clear()
@@ -1168,6 +1168,8 @@ def import_template(
         detail_ent = VMF.create_ent(
             classname='func_detail'
         )
+        # Don't let this be touched later..
+        vbsp.IGNORED_BRUSH_ENTS.add(detail_ent)
         detail_ent.solids = new_detail
         if not add_to_map:
             detail_ent.remove()
