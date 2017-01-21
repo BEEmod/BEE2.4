@@ -16,7 +16,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
 
 
 @make_result_setup('TemplateOverlay')
-def res_import_template_setup(res):
+def res_import_template_setup(res: Property):
     temp_id = res['id'].casefold()
 
     face = Vec.from_str(res['face_pos', '0 0 -64'])
@@ -102,6 +102,11 @@ def res_insert_overlay(inst: Entity, res: Property):
         ))
         if mat[:1] == '$':
             mat = inst.fixup[mat]
+        if mat.startswith('<') or mat.endswith('>'):
+            # Lookup in the style data.
+            import vbsp
+            LOGGER.info('Tex: {}', vbsp.settings['textures'].keys())
+            mat = vbsp.get_tex(mat[1:-1])
         over['material'] = mat
         over['sides'] = str(face_id)
 
@@ -140,7 +145,6 @@ def res_water_splash(inst: Entity, res: Property):
         - type: Use certain fixup values to calculate pos2 instead:
            'piston_1/2/3/4': Use $bottom_level and $top_level as offsets.
            'track_platform': Use $travel_direction, $travel_distance, etc.
-          moves in.
         - fast_check: Check faster for movement. Needed for items which
           move quickly.
     """
@@ -214,7 +218,7 @@ def res_water_splash(inst: Entity, res: Property):
             continue
         break
     else:
-        return # Not in goo at all
+        return  # Not in goo at all
 
     if pos1.z == pos2.z:
         # Flat - this won't do anything...
@@ -242,7 +246,7 @@ def res_water_splash(inst: Entity, res: Property):
 
     conditions.VMF.create_ent(
         classname='env_splash',
-        targetname=conditions.local_name(inst, name + enc_data),
+        targetname=conditions.local_name(inst, name) + enc_data,
         parentname=conditions.local_name(inst, parent),
         origin=splash_pos + (0, 0, 16),
         scale=scale,
@@ -252,3 +256,57 @@ def res_water_splash(inst: Entity, res: Property):
     )
 
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/water_splash.nut')
+
+
+@make_result('FunnelLight')
+def res_make_funnel_light(inst: Entity):
+    """Place a light for Funnel items."""
+    oran_on = inst.fixup.bool('$start_reversed')
+    need_blue = need_oran = False
+    name = ''
+    if inst.fixup['$connectioncount_polarity'] != '0':
+        import vbsp
+        if not vbsp.settings['style_vars']['funnelallowswitchedlights']:
+            # Allow disabling adding switchable lights.
+            return
+        name = conditions.local_name(inst, 'light')
+        need_blue = need_oran = True
+    else:
+        if oran_on:
+            need_oran = True
+        else:
+            need_blue = True
+
+    loc = Vec(0, 0, -56)
+    loc.localise(Vec.from_str(inst['origin']), Vec.from_str(inst['angles']))
+
+    if need_blue:
+        inst.map.create_ent(
+            classname='light',
+            targetname=name + '_b' if name else '',
+            spawnflags=int(oran_on),  # 1 = Initially Dark
+            origin=loc,
+            _light='50 120 250 50',
+            _lightHDR='-1 -1 -1 1',
+            _lightscaleHDR=2,
+            _fifty_percent_distance=48,
+            _zero_percent_distance=96,
+            _hardfalloff=1,
+            _distance=0,
+            style=0,
+        )
+    if need_oran:
+        inst.map.create_ent(
+            classname='light',
+            targetname=name + '_o' if name else '',
+            spawnflags=int(not oran_on),
+            origin=loc,
+            _light='250 120 50 50',
+            _lightHDR='-1 -1 -1 1',
+            _lightscaleHDR=2,
+            _fifty_percent_distance=48,
+            _zero_percent_distance=96,
+            _hardfalloff=1,
+            _distance=0,
+            style=0,
+        )

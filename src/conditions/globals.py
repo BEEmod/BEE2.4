@@ -1,19 +1,20 @@
 """Flags related to global properties - stylevars, music, which game, etc."""
-import srctools
 import utils
 import vbsp_options
 
+from srctools import Vec, Property, conv_bool
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
 )
 import vbsp
+
 
 STYLE_VARS = vbsp.settings['style_vars']
 VOICE_ATTR = vbsp.settings['has_attr']
 
 
 @make_flag('styleVar')
-def flag_stylevar(_, flag):
+def flag_stylevar(flag: Property):
     """Checks if the given Style Var is true.
 
     Use the NOT flag to invert if needed.
@@ -22,7 +23,7 @@ def flag_stylevar(_, flag):
 
 
 @make_flag('has')
-def flag_voice_has(_, flag):
+def flag_voice_has(flag: Property):
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
@@ -31,7 +32,7 @@ def flag_voice_has(_, flag):
 
 
 @make_flag('has_music')
-def flag_music(_, flag):
+def flag_music(flag: Property):
     """Checks the selected music ID.
 
     Use "<NONE>" for no music.
@@ -40,10 +41,10 @@ def flag_music(_, flag):
 
 
 @make_flag('Game')
-def flag_game(_, flag):
+def flag_game(flag: Property):
     """Checks which game is being modded.
 
-    Accepts the ffollowing aliases instead of a Steam ID:
+    Accepts the following aliases instead of a Steam ID:
      - PORTAL2
      - APTAG
      - ALATAG
@@ -51,6 +52,8 @@ def flag_game(_, flag):
      - Aperture Tag
      - TWTM,
      - Thinking With Time Machine
+     - DEST_AP
+     - Destroyed Aperture
     """
     return vbsp_options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),
@@ -59,7 +62,7 @@ def flag_game(_, flag):
 
 
 @make_flag('has_char')
-def flag_voice_char(_, flag):
+def flag_voice_char(flag: Property):
     """Checks to see if the given charcter is present in the voice pack.
 
     "<NONE>" means no voice pack is chosen.
@@ -76,7 +79,7 @@ def flag_voice_char(_, flag):
 
 
 @make_flag('HasCavePortrait')
-def res_cave_portrait(inst, res):
+def res_cave_portrait():
     """Checks to see if the Cave Portrait option is set for the given
 
     skin pack.
@@ -85,7 +88,7 @@ def res_cave_portrait(inst, res):
 
 
 @make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(_, flag):
+def flag_game_mode(flag: Property):
     """Checks if the game mode is "SP" or "COOP".
     """
     import vbsp
@@ -93,7 +96,7 @@ def flag_game_mode(_, flag):
 
 
 @make_flag('ifPreview', 'preview')
-def flag_is_preview(_, flag):
+def flag_is_preview(flag: Property):
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -103,11 +106,11 @@ def flag_is_preview(_, flag):
     Preview mode is always False when publishing.
     """
     import vbsp
-    return vbsp.IS_PREVIEW == srctools.conv_bool(flag.value, False)
+    return vbsp.IS_PREVIEW == conv_bool(flag.value, False)
 
 
 @make_flag('hasExitSignage')
-def flag_has_exit_signage(inst, flag):
+def flag_has_exit_signage():
     """Check to see if either exit sign is present."""
     for over in vbsp.VMF.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
@@ -116,7 +119,7 @@ def flag_has_exit_signage(inst, flag):
 
 
 @make_result('styleVar')
-def res_set_style_var(_, res):
+def res_set_style_var(res: Property):
     """Set Style Vars.
 
     The value should be set of "SetTrue" and "SetFalse" keyvalues.
@@ -130,7 +133,7 @@ def res_set_style_var(_, res):
 
 
 @make_result('has')
-def res_set_voice_attr(_, res):
+def res_set_voice_attr(res: Property):
     """Sets a number of Voice Attributes.
 
         Each child property will be set. The value is ignored, but must
@@ -142,3 +145,37 @@ def res_set_voice_attr(_, res):
     else:
         VOICE_ATTR[res.value.casefold()] = 1
     return RES_EXHAUSTED
+
+CACHED_MODELS = set()
+
+
+@make_result('PreCacheModel')
+def res_pre_cache_model(res: Property):
+    """Precache the given model for switching.
+
+    This places it as a prop_dynamic_override.
+    """
+    mdl_name = res.value.casefold()
+    if not mdl_name.startswith('models/'):
+        mdl_name = 'models/' + mdl_name
+    if not mdl_name.endswith('.mdl'):
+        mdl_name += '.mdl'
+
+    if mdl_name in CACHED_MODELS:
+        return
+    CACHED_MODELS.add(mdl_name)
+    vbsp.VMF.create_ent(
+        classname='prop_dynamic_override',
+        targetname='@precache',
+        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+        model=mdl_name,
+
+        # Disable shadows and similar things, it shouldn't ever be in
+        # PVS but we might as well.
+        rendermode=10,
+        disableshadowdepth=1,
+        disableshadows=1,
+        solid=0,
+        shadowdepthnocache=2,
+        spawnflags=256,  # Start with collision off.
+    )

@@ -7,14 +7,14 @@ from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec, Entity
+from srctools import Vec, Property, Entity
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.trackPlat')
 
 
 @make_result('trackPlatform')
-def res_track_plat(_, res):
+def res_track_plat(res: Property):
     """Logic specific to Track Platforms.
 
     This allows switching the instances used depending on if the track

@@ -4,14 +4,7 @@
 import utils
 import tk_tools
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        import os
-        import sys
-        os.chdir(os.path.dirname(sys.argv[0]))
-
+    utils.fix_cur_directory()
     LOGGER = utils.init_logging('../logs/backup.log', __name__, on_error=tk_tools.on_error)
     utils.setup_localisations(LOGGER)
 else:
@@ -886,6 +879,11 @@ def init_application():
     game_menu.add_separator()
 
     bar.add_cascade(menu=game_menu, label=_('Game'))
+
+    import helpMenu
+    # Add the 'Help' menu here too.
+    helpMenu.make_help_menu(bar)
+
     window['menu'] = bar
 
     gameMan.add_menu_opts(game_menu)

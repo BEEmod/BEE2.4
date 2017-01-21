@@ -115,6 +115,10 @@ setup(
             # These values are added to the generated BUILD_CONSTANTS module.
             'constants': 'BEE_VERSION=' + repr(bee_version),
             'include_files': INCLUDE_LIBS,
+
+            # Include all modules in the zip..
+            'zip_include_packages': '*',
+            'zip_exclude_packages': '',
         },
     },
     executables=[
@@ -122,20 +126,17 @@ setup(
             'BEE2.pyw',
             base=base,
             icon=ico_path,
-            compress=True,
         ),
         Executable(
             'backup.py',
             base=base,
             icon=ico_path,
-            compress=True,
             targetName='backup_tool' + ('.exe' if utils.WIN else ''),
         ),
         Executable(
             'CompilerPane.py',
             base=base,
             icon=ico_path,
-            compress=True,
             targetName='compiler_options' + ('.exe' if utils.WIN else ''),
         )
     ],

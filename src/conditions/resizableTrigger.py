@@ -3,18 +3,19 @@ import conditions
 import srctools
 import utils
 import vbsp
+import comp_consts as const
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
 from instanceLocs import resolve as resolve_inst
-from srctools import Vec, Entity, Output
+from srctools import Property, Vec, Entity, Output
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 
 
 @make_result('ResizeableTrigger')
-def res_resizeable_trigger(inst: Entity, res):
+def res_resizeable_trigger(res: Property):
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.
@@ -34,8 +35,13 @@ def res_resizeable_trigger(inst: Entity, res):
     'triggerActivate, triggerDeactivate': The outputs used when the trigger
         turns on or off.
 
-    'triggermat': The texture to assign to the trigger brush (toolstrigger by
-        default.)
+    'coopVar': The instance variable which enables detecting both Coop players.
+        The trigger will be a trigger_playerteam.
+
+    'coopActivate, coopDeactivate': The outputs used when coopVar is enabled.
+        These should be suitable for a logic_coop_manager.
+    'coopOnce': If true, kill the manager after it first activates.
+
     'keys': A block of keyvalues for the trigger brush. Origin and targetname
         will be set automatically.
     'localkeys': The same as above, except values will be changed to use
@@ -51,9 +57,13 @@ def res_resizeable_trigger(inst: Entity, res):
     if not markers:  # No markers in the map - abort
         return RES_EXHAUSTED
 
-    trigger_mat = res['triggermat', 'tools/toolstrigger']
     trig_act = res['triggerActivate', 'OnStartTouchAll']
-    trig_deact = res['triggerDeactivate', 'OnEndTouchAll']
+    trig_deact = res['triggerDeactivate','OnEndTouchAll']
+
+    coop_var = res['coopVar', None]
+    coop_act = res['coopActivate', 'OnChangeToAllTrue']
+    coop_deact = res['coopDeactivate', 'OnChangeToAnyFalse']
+    coop_only_once = res.bool('coopOnce')
 
     marker_connection = conditions.CONNECTIONS[res['markerItem'].casefold()]
     mark_act_name, mark_act_out = marker_connection.out_act
@@ -100,6 +110,11 @@ def res_resizeable_trigger(inst: Entity, res):
             # Only do once if inst == other
             ent.remove()
 
+        is_coop = vbsp.GAME_MODE == 'COOP' and (
+            inst.fixup.bool(coop_var) or
+            other.fixup.bool(coop_var)
+        )
+
         bbox_min, bbox_max = Vec.bbox(
             Vec.from_str(inst['origin']),
             Vec.from_str(other['origin'])
@@ -109,8 +124,8 @@ def res_resizeable_trigger(inst: Entity, res):
         bbox_min -= 64
         bbox_max += 64
 
-        trig_ent = vbsp.VMF.create_ent(
-            classname='trigger_multiple', # Default
+        out_ent = trig_ent = vbsp.VMF.create_ent(
+            classname='trigger_multiple',  # Default
             # Use the 1st instance's name - that way other inputs control the
             # trigger itself.
             targetname=targ,
@@ -121,11 +136,40 @@ def res_resizeable_trigger(inst: Entity, res):
             vbsp.VMF.make_prism(
                 bbox_min,
                 bbox_max,
-                mat=trigger_mat,
+                mat=const.Tools.TRIGGER,
             ).solid,
         ]
+
         # Use 'keys' and 'localkeys' blocks to set all the other keyvalues.
         conditions.set_ent_keys(trig_ent, inst, res)
+
+        if is_coop:
+            trig_ent['spawnflags'] = '1'  # Clients
+            trig_ent['classname'] = 'trigger_playerteam'
+
+            out_ent_name = conditions.local_name(inst, 'man')
+            out_ent = vbsp.VMF.create_ent(
+                classname='logic_coop_manager',
+                targetname=out_ent_name,
+                origin=inst['origin']
+            )
+            if coop_only_once:
+                # Kill all the ents when both players are present.
+                out_ent.add_out(
+                    Output('OnChangeToAllTrue', out_ent_name, 'Kill'),
+                    Output('OnChangeToAllTrue', targ, 'Kill'),
+                )
+            trig_ent.add_out(
+                Output('OnStartTouchBluePlayer', out_ent_name, 'SetStateATrue'),
+                Output('OnStartTouchOrangePlayer', out_ent_name, 'SetStateBTrue'),
+                Output('OnEndTouchBluePlayer', out_ent_name, 'SetStateAFalse'),
+                Output('OnEndTouchOrangePlayer', out_ent_name, 'SetStateBFalse'),
+            )
+            act_out = coop_act
+            deact_out = coop_deact
+        else:
+            act_out = trig_act
+            deact_out = trig_deact
 
         if preview_mat:
             preview_brush = vbsp.VMF.create_ent(
@@ -154,7 +198,7 @@ def res_resizeable_trigger(inst: Entity, res):
                 face.scale = preview_scale
 
         if preview_inst_file:
-            preview_inst_ent = vbsp.VMF.create_ent(
+            vbsp.VMF.create_ent(
                 classname='func_instance',
                 targetname=targ + '_preview',
                 file=preview_inst_file,
@@ -163,15 +207,15 @@ def res_resizeable_trigger(inst: Entity, res):
                 origin=other['origin'],
             )
 
-            if pre_act_name:
-                trig_ent.outputs.append(Output(
+            if pre_act_name and trig_act:
+                out_ent.add_out(Output(
                     trig_act,
                     targ + '_preview',
                     inst_in=pre_act_name,
                     inp=pre_act_inp,
                 ))
-            if pre_deact_name:
-                trig_ent.outputs.append(Output(
+            if pre_deact_name and trig_deact:
+                out_ent.add_out(Output(
                     trig_deact,
                     targ + '_preview',
                     inst_in=pre_deact_name,
@@ -185,17 +229,17 @@ def res_resizeable_trigger(inst: Entity, res):
                 continue
 
             if out.inst_out == mark_act_name and out.output == mark_act_out:
-                trig_out = trig_act
+                ent_out = act_out
             elif out.inst_out == mark_deact_name and out.output == mark_deact_out:
-                trig_out = trig_deact
+                ent_out = deact_out
             else:
                 continue  # Skip this output - it's somehow invalid for this item.
 
-            if trig_out == "":
+            if not ent_out:
                 continue  # Allow setting the output to "" to skip
 
-            trig_ent.outputs.append(Output(
-                trig_out,
+            out_ent.add_out(Output(
+                ent_out,
                 out.target,
                 inst_in=out.inst_in,
                 inp=out.input,

@@ -36,11 +36,13 @@ GAME_FOLDER = {
     utils.STEAM_IDS['PORTAL2']: 'portal2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
+    utils.STEAM_IDS['DEST_AP']: 'portal2',
 }
 
 SOUND_MAN_FOLDER = {
     # The folder where game_sounds_manifest is found
     utils.STEAM_IDS['PORTAL2']: 'portal2_dlc2',
+    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc2',
     utils.STEAM_IDS['TWTM']: 'twtm',
     utils.STEAM_IDS['APTAG']: 'aperturetag',
 }
@@ -100,6 +102,14 @@ MUSIC_BASE = """\
 \t"update_stack"
 \t\t{
 \t\t"import_stack" "update_music_stereo"
+\t\t"volume_fade_in"
+\t\t\t{
+\t\t\t"input_max" "0.5"
+\t\t\t}
+\t\t"volume_fade_out"
+\t\t\t{
+\t\t\t"input_max" "1.5"
+\t\t\t}
 """
 
 # We need to stop the sub-tracks after the main track stops...
@@ -139,7 +149,7 @@ MUSIC_GEL_SPEED_MAIN = """\
 \t\t"import_stack" "p2_update_music_play_speed_gel"
 \t\t"speed_velocity_trigger"
 \t\t\t{
-\t\t\t"input2" "300"
+\t\t\t"input2" "250"
 \t\t\t}
 \t\t"speed_play_entry"
 \t\t\t{
@@ -169,41 +179,41 @@ MUSIC_GEL_STACK = """\
 
 "soundentry_version" "2"
 "operator_stacks"
-\t{
+\t{{
 \t"start_stack"
-\t\t{
+\t\t{{
 \t\t"import_stack" "start_sync_to_entry"
 \t\t"elapsed_time"
-\t\t\t{
+\t\t\t{{
 \t\t\t"entry" "music.BEE2"
-\t\t\t}
+\t\t\t}}
 \t\t"duration_div"
-\t\t\t{
+\t\t\t{{
 \t\t\t"input2" "1"
-\t\t\t}
+\t\t\t}}
 \t\t"div_mult"
-\t\t\t{
+\t\t\t{{
 \t\t\t"input1" "1.0"
-\t\t\t}
-\t\t}
+\t\t\t}}
+\t\t}}
 \t"update_stack"
-\t\t{
+\t\t{{
 \t\t"import_stack" "update_music_stereo"
 \t\t"volume_fade_in"
-\t\t\t{
-\t\t\t"input_max" "0.25"
-\t\t\t}
+\t\t\t{{
+\t\t\t"input_max" "{fadein}"
+\t\t\t}}
 \t\t"volume_fade_out"
-\t\t\t{
-\t\t\t"input_max" "1.0"
-\t\t\t}
-\t\t}
-\t}
-}
+\t\t\t{{
+\t\t\t"input_max" "{fadeout}"
+\t\t\t}}
+\t\t}}
+\t}}
+}}
 """
 
-# The funnel operator stack makes it start randomly offset into the music..
-MUSIC_FUNNEL_STACK = """\
+# This funnel stack makes it start randomly offset into the music.
+MUSIC_FUNNEL_RAND_STACK = """\
 
 "soundentry_version" "2"
 "operator_stacks"
@@ -230,6 +240,34 @@ MUSIC_FUNNEL_STACK = """\
 \t\t\t"output" "delay"
 \t\t\t}
 \t\t}
+"""
+
+# This funnel stack makes it synchronise with the main track.
+MUSIC_FUNNEL_SYNC_STACK = """\
+
+"soundentry_version" "2"
+"operator_stacks"
+\t{
+\t"start_stack"
+\t\t{
+\t\t"import_stack" "start_sync_to_entry"
+\t\t"elapsed_time"
+\t\t\t{
+\t\t\t"entry" "music.BEE2"
+\t\t\t}
+\t\t"duration_div"
+\t\t\t{
+\t\t\t"input2" "1"
+\t\t\t}
+\t\t"div_mult"
+\t\t\t{
+\t\t\t"input1" "1.0"
+\t\t\t}
+\t\t}
+"""
+
+# Both funnel versions share the same update stack.
+MUSIC_FUNNEL_UPDATE_STACK = """\
 \t"update_stack"
 \t\t{
 \t\t"import_stack" "update_music_stereo"
@@ -499,19 +537,31 @@ def generate_music_script(data: Property, pack_list):
             file.write('\n')
             file.write(MUSIC_START.format(name='_funnel', vol='1'))
             write_sound(file, funnel, pack_list, snd_prefix='*')
-            file.write(MUSIC_FUNNEL_STACK)
+            # Some tracks want the funnel music to sync with the normal
+            # track, others randomly choose a start.
+            file.write(
+                MUSIC_FUNNEL_SYNC_STACK
+                if data.bool('sync_funnel') else
+                MUSIC_FUNNEL_RAND_STACK
+            )
+            file.write(MUSIC_FUNNEL_UPDATE_STACK)
 
         if has_bounce:
             file.write('\n')
             file.write(MUSIC_START.format(name='_gel_bounce', vol='0.5'))
             write_sound(file, bounce, pack_list, snd_prefix='*')
-            file.write(MUSIC_GEL_STACK)
+            # Fade in fast (we never get false positives, but fade out slow
+            # since this disables when falling back..
+            file.write(MUSIC_GEL_STACK.format(fadein=0.25, fadeout=1.5))
 
         if speed.value:
             file.write('\n')
             file.write(MUSIC_START.format(name='_gel_speed', vol='0.5'))
             write_sound(file, speed, pack_list, snd_prefix='*')
-            file.write(MUSIC_GEL_STACK)
+            # We need to shut off the sound fast, so portals don't confuse it.
+            # Fade in slow so it doesn't make much sound (and also as we get
+            # up to speed). We stop almost immediately on gel too.
+            file.write(MUSIC_GEL_STACK.format(fadein=0.5, fadeout=0.1))
 
 
 def write_sound(file, snds: Property, pack_list, snd_prefix='*'):

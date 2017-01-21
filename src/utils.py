@@ -1,5 +1,6 @@
 # coding=utf-8
 import collections
+import functools
 import logging
 import os.path
 import stat
@@ -8,7 +9,7 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, Iterator,
+    Tuple, List, Iterator,
 )
 
 
@@ -47,13 +48,30 @@ STEAM_IDS = {
     'TWTM': '286080',
     'THINKING WITH TIME MACHINE': '286080',
 
+    'MEL': '317400',  # Note - no workshop
+
+    'DEST_AP': '433970',
+    'DESTROYED_APERTURE': '433970',
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational
     # 247120: Sixense
     # 211480: 'In Motion'
-    # 317400: PS Mel - No workshop
 }
+
+if MAC or LINUX:
+    def fix_cur_directory():
+        """Change directory to the location of the executable.
+
+        Otherwise we can't find our files!
+        The Windows executable does this automatically.
+        """
+        os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
+else:
+    def fix_cur_directory():
+        """No-op on Windows."""
+
 
 if WIN:
     # Some events differ on different systems, so define them here.
@@ -184,20 +202,20 @@ elif LINUX:
         'KEY_SAVE': '<Control-Shift-s>',
     }
     KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+        'KEY_EXPORT': 'Ctrl+E',
+        'KEY_SAVE': 'Ctrl+S',
+        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'hand1',
         'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
+        'destroy_item': 'X_cursor',
+        'invalid_drag': 'circle',
     }
 
     def add_mousewheel(target, *frames, orient='y'):
@@ -221,8 +239,29 @@ elif LINUX:
             frame.bind('<Button-4>', scroll_up, add='+')
             frame.bind('<Button-5>', scroll_down, add='+')
 
+
+def bind_event_handler(bind_func):
+    """Decorator for the bind_click functions.
+
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid, func=None, add='+'):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(deco, bind_func)
+
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -235,6 +274,7 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -246,19 +286,23 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
-    def bind_rightclick(wid, func):
+    @bind_event_handler
+    def bind_rightclick(wid, func, add='+'):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
-        wid.bind(EVENTS['RIGHT'], func)
-        wid.bind(EVENTS['LEFT_CTRL'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
+    @bind_event_handler
     def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
@@ -468,7 +512,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
     names = os.listdir(src)
 
     os.makedirs(dst, exist_ok=True)
-    errors = []
+    errors = []  # type: List[Tuple[str, str, str]]
     for name in names:
         srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
@@ -587,7 +631,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger, alias=None):
+    def __init__(self, logger: logging.Logger, alias=None) -> None:
         # Alias is a replacement module name for log messages.
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
@@ -629,7 +673,7 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         """Allow passing an alias for log modules."""
         # This breaks %-formatting, so only set when init_logging() is called.
 
-        alias = None
+        alias = None  # type: str
 
         def getMessage(self):
             """We have to hook here to change the value of .module.

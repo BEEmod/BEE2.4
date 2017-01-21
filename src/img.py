@@ -4,7 +4,7 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageDraw
 import os.path
 
 from srctools import Vec
@@ -20,6 +20,13 @@ cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[s
 
 # Colour of the palette item background
 PETI_ITEM_BG = Vec(229, 232, 233)
+
+
+def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
+    """Return an xy tuple given a size or tuple."""
+    if isinstance(size, tuple):
+        return size
+    return size, size
 
 
 def png(path, resize_to=0, error=None, algo=Image.NEAREST):
@@ -76,7 +83,7 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
         image.load()
 
     if resize_to:
-        image = image.resize((resize_to, resize_to), algo)
+        image = image.resize(tuple_size(resize_to), algo)
 
     tk_img = ImageTk.PhotoImage(image=image)
 
@@ -96,6 +103,70 @@ def icon(name, error=None):
     return png(os.path.join("items", name), error=error, resize_to=64)
 
 
+def get_app_icon():
+    """On non-Windows, retrieve the application icon."""
+    with open('../bee2.ico', 'rb') as f:
+        return ImageTk.PhotoImage(Image.open(f))
+
+
+def get_splash_screen(max_width, max_height, base_height):
+    """Return a random file from the splash_screens directory."""
+    import random
+    folder = os.path.join('..', 'images', 'splash_screen')
+    path = '<nothing>'
+    try:
+        path = random.choice(os.listdir(folder))
+        with open(os.path.join(folder, path), 'rb') as img_file:
+            image = Image.open(img_file)
+            image.load()
+    except (FileNotFoundError, IndexError, IOError):
+        # Not found, substitute a gray block.
+        LOGGER.warning('No splash screen found (tried "{}")', path)
+        image = Image.new(
+            mode='RGB',
+            size=(round(max_width), round(max_height)),
+            color=(128, 128, 128),
+        )
+    else:
+        if image.height > max_height:
+            image = image.resize((
+                round(image.width / image.height * max_height),
+                round(max_height),
+            ))
+        if image.width > max_width:
+            image = image.resize((
+                round(max_width),
+                round(image.height / image.width * max_width),
+            ))
+
+    draw = ImageDraw.Draw(image, 'RGBA')
+
+    rect_top = image.height - base_height - 40
+    draw.rectangle(
+        (
+            0,
+            rect_top + 40,
+            image.width,
+            image.height,
+         ),
+        fill=(0, 150, 120, 64),
+    )
+    # Add a gradient above the rectangle..
+    for y in range(40):
+        draw.rectangle(
+            (
+                0,
+                rect_top + y,
+                image.width,
+                image.height,
+            ),
+            fill=(0, 150, 120, int(y * 128/40)),
+        )
+
+    tk_img = ImageTk.PhotoImage(image=image)
+    return tk_img, image.width, image.height
+
+
 def color_square(color: Vec, size=16):
     """Create a square image of the given size, with the given color."""
     key = color.x, color.y, color.z, size
@@ -105,7 +176,7 @@ def color_square(color: Vec, size=16):
     except KeyError:
         img = Image.new(
             mode='RGB',
-            size=(size, size),
+            size=tuple_size(size),
             color=(int(color.x), int(color.y), int(color.z)),
         )
         tk_img = ImageTk.PhotoImage(image=img)
@@ -120,7 +191,7 @@ def invis_square(size):
     except KeyError:
         img = Image.new(
             mode='RGBA',
-            size=(size, size),
+            size=tuple_size(size),
             color=(0, 0, 0, 0),
         )
         tk_img = ImageTk.PhotoImage(image=img)

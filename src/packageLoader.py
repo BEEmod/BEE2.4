@@ -5,7 +5,7 @@ import operator
 import os
 import os.path
 import shutil
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from contextlib import ExitStack
 from zipfile import ZipFile
 
@@ -25,9 +25,13 @@ from srctools import (
 )
 
 from typing import (
-    Dict, List, Tuple,
-    Iterator
+    Union, Optional, Any, TYPE_CHECKING,
+    Iterator, Iterable, Type,
+    Dict, List, Tuple, NamedTuple,
 )
+
+if TYPE_CHECKING:
+    from gameMan import Game
 
 LOGGER = utils.getLogger(__name__)
 
@@ -51,18 +55,33 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 
 # Tempory data stored when parsing info.txt, but before .parse() is called.
 # This allows us to parse all packages before loading objects.
-ObjData = namedtuple('ObjData', 'zip_file, info_block, pak_id, disp_name')
+ObjData = NamedTuple('ObjData', [
+    ('zip_file', Union[ZipFile, FakeZip]),
+    ('info_block', Property),
+    ('pak_id', str),
+    ('disp_name', str),
+])
 # The arguments for pak_object.parse().
-ParseData = namedtuple('ParseData', 'zip_file, id, info, pak_id, is_override')
+ParseData = NamedTuple('ParseData', [
+    ('zip_file', Union[ZipFile, FakeZip]),
+    ('id', str),
+    ('info', Property),
+    ('pak_id', str),
+    ('is_override', bool),
+])
 # The values stored for OBJ_TYPES
-ObjType = namedtuple('ObjType', 'cls, allow_mult, has_img')
+ObjType = NamedTuple('ObjType', [
+    ('cls', Type['PakObject']),
+    ('allow_mult', bool),
+    ('has_img', bool),
+])
 # The arguments to pak_object.export().
-ExportData = namedtuple('ExportData', [
-    'selected',
-    'selected_style',  # Some items need to know which style is selected
-    'editoritems',
-    'vbsp_conf',
-    'game',
+ExportData = NamedTuple('ExportData', [
+    ('selected', str),
+    ('selected_style', 'Style'),  # Some items need to know which style is selected
+    ('editoritems', Property),
+    ('vbsp_conf', Property),
+    ('game', 'Game'),
 ])
 
 # This package contains necessary components, and must be available.
@@ -81,6 +100,7 @@ VPK_FOLDER = {
     # The last DLC released by Valve - this is the one that we
     # overwrite with a VPK file.
     utils.STEAM_IDS['PORTAL2']: 'portal2_dlc3',
+    utils.STEAM_IDS['DEST_AP']: 'portal2_dlc3',
 
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
@@ -100,6 +120,9 @@ class _PakObjectMeta(type):
         # PakObject isn't created yet so we can't directly check that.
         if bases:
             OBJ_TYPES[name] = ObjType(cls, allow_mult, has_img)
+
+        # Maps object IDs to the object.
+        cls._id_to_obj = {}
 
         return cls
 
@@ -149,9 +172,14 @@ class PakObject(metaclass=_PakObjectMeta):
         raise NotImplementedError
 
     @classmethod
-    def get_objects(cls):
+    def all(cls: _PakObjectMeta) -> Iterable['PakObject']:
         """Get the list of objects parsed."""
-        return OBJ_TYPES[cls.__name__]
+        return cls._id_to_obj.values()
+
+    @classmethod
+    def by_id(cls: _PakObjectMeta, object_id: str) -> 'PakObject':
+        """Return the object with a given ID."""
+        return cls._id_to_obj[object_id.casefold()]
 
 
 def reraise_keyerror(err, obj_id):
@@ -175,9 +203,9 @@ def reraise_keyerror(err, obj_id):
 
 
 def get_config(
-        prop_block,
+        prop_block: Property,
         zip_file,
-        folder,
+        folder: str,
         pak_id='',
         prop_name='config',
         extension='.cfg',
@@ -303,7 +331,7 @@ def load_packages(
             title='BEE2 - Invalid Packages Directory!',
             message='The given packages directory is not present!\n'
                     'Get the packages from '
-                    '"http://github.com/TeamSpen210/BEE2-items" '
+                    '"http://github.com/BEEmod/BEE2-items" '
                     'and place them in "' + pak_dir +
                     os.path.sep + '".',
                     # Add slash to the end to indicate it's a folder.
@@ -367,9 +395,10 @@ def load_packages(
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
                 LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
+                obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
                 # parse through the object and return the resultant class
                 try:
-                    object_ = OBJ_TYPES[obj_type].cls.parse(
+                    object_ = obj_class.parse(
                         ParseData(
                             obj_data.zip_file,
                             obj_id,
@@ -380,6 +409,13 @@ def load_packages(
                     )
                 except (NoKeyError, IndexError) as e:
                     reraise_keyerror(e, obj_id)
+
+                if not hasattr(object_, 'id'):
+                    raise ValueError(
+                        '"{}" object {} has no ID!'.format(obj_type, object_)
+                    )
+
+                obj_class._id_to_obj[object_.id.casefold()] = object_
 
                 object_.pak_id = obj_data.pak_id
                 object_.pak_name = obj_data.disp_name
@@ -417,8 +453,8 @@ def load_packages(
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
-        data['Item'],
-        data['Style'],
+        Item.all(),
+        Style.all(),
         log_item_fallbacks,
         log_missing_styles,
     )
@@ -463,6 +499,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                     obj_override[comp_type][obj_id].append(
                         ParseData(pack.zip, obj_id, obj, pack.id, True)
                     )
+                    # Don't continue to parse and overwrite
+                    continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
@@ -484,8 +522,8 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
 
 
 def setup_style_tree(
-    item_data,
-    style_data,
+    item_data: Iterable['Item'],
+    style_data: Iterable['Style'],
     log_fallbacks,
     log_missing_styles,
 ):
@@ -500,7 +538,7 @@ def setup_style_tree(
     - First version's style
     - First style of first version
     """
-    all_styles = {}
+    all_styles = {}  # type: Dict[str, Style]
 
     for style in style_data:
         all_styles[style.id] = style
@@ -510,6 +548,10 @@ def setup_style_tree(
         b_style = style
         while b_style is not None:
             # Recursively find all the base styles for this one
+
+            if b_style in base:
+                # Already hit this!
+                raise Exception('Loop in bases for "{}"!'.format(b_style.id))
             base.append(b_style)
             b_style = all_styles.get(b_style.base_style, None)
             # Just append the style.base_style to the list,
@@ -522,7 +564,7 @@ def setup_style_tree(
     # To do inheritance, we simply copy the data to ensure all items
     # have data defined for every used style.
     for item in item_data:
-        all_ver = list(item.versions.values())  # type: List[Dict[str, Dict[str, Style]]]
+        all_ver = list(item.versions.values())  # type: List[Dict[str, Union[Dict[str, Style], str]]]
         # Move default version to the beginning, so it's read first
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
@@ -547,7 +589,7 @@ def setup_style_tree(
                     # For the base version, use the first style if
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
-                        vers['styles'][sty_id] = vers['def_style']
+                        vers['styles'][sty_id] = vers['styles'][vers['def_style']]
                         if log_missing_styles and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using '
@@ -560,35 +602,63 @@ def setup_style_tree(
                         # the base version's definition
                         vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
 
-            # Evaluate style references.
-            for sty_id, value in vers['styles'].items():
-                if not isinstance(value, str):
+            style_lookups = {}
+
+            # Evaluate style lookups and modifications
+            for sty_id, props in vers['styles'].items():
+                if not isinstance(props, Property):
                     continue  # Normal value
+                if props.name is None:
+                    # Style lookup
+                    style_lookups[sty_id] = props.value
+                    continue
                 # It's a reference to another style.
+                base = props['base', '']
+                if not base:
+                    raise Exception('No base for "{}", in "{}" style.'.format(
+                        item.id, sty_id,
+                    ))
+
                 try:
-                    vers['styles'][sty_id] = vers['styles'][value[1:-1]]
+                    base_variant = vers['styles'][base]  # type: ItemVariant
+                except KeyError:
+                    raise Exception(
+                        'Invalid style base '
+                        '("{}") for "{}", in "{}" style.'.format(
+                            base, item.id, sty_id,
+                        )
+                    )
+
+                vers['styles'][sty_id] = base_variant.modify(
+                    props,
+                    '<{}:{}.{}>'.format(item.id, vers['id'], sty_id)
+                )
+
+            for to_id, from_id in style_lookups.items():
+                LOGGER.warning('REF "{}": {} -> {}', item.id, from_id, to_id)
+                try:
+                    vers['styles'][to_id] = vers['styles'][from_id]
                 except KeyError:
                     raise Exception(
                         'Invalid style reference '
                         '("{}") for "{}", in "{}" style.'.format(
-                            value, item.id, sty_id,
+                            from_id, item.id, to_id,
                         )
                     )
 
-            if isinstance(vers['def_style'], str):
-                # The default style is a value reference, fix it up.
-                # If it's an invalid value the above loop will catch it.
-                vers['def_style'] = vers['styles'][vers['def_style'][1:-1]]
+            # The default style is a value reference, fix it up.
+            # If it's an invalid value the above loop will have caught
+            # that, since it already read the value.
+            vers['def_style'] = vers['styles'][vers['def_style']]
 
 
-def parse_item_folder(folders, zip_file, pak_id):
+def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
+    """Parse through the data in item/ folders.
+
+    folders is a dict, with the keys set to the folder names we want.
+    The values will be filled in with itemVariant values
+    """
     for fold in folders:
-        if fold.startswith('<') and fold.endswith('>'):
-            # A reference for another style - skip it now, we'll copy the
-            # real value in setup_style_tree()
-            folders[fold] = fold
-            continue
-
         prop_path = 'items/' + fold + '/properties.txt'
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
@@ -609,29 +679,34 @@ def parse_item_folder(folders, zip_file, pak_id):
             ) from err
 
         editor_iter = Property.find_all(editor, 'Item')
-        folders[fold] = {
-            'auth':     sep_values(props['authors', '']),
-            'tags':     sep_values(props['tags', '']),
-            'desc':     desc_parse(props, pak_id + ':' + prop_path),
-            'ent':      props['ent_count', '??'],
-            'url':      props['infoURL', None],
-            'icons':    {p.name: p.value for p in props['icon', []]},
-            'all_name': props['all_name', None],
-            'all_icon': props['all_icon', None],
-            'vbsp':     Property(None, []),
-
+        folders[fold] = ItemVariant(
             # The first Item block found
-            'editor': next(editor_iter),
+            editoritems=next(editor_iter),
             # Any extra blocks (offset catchers, extent items)
-            'editor_extra': list(editor_iter),
+            editor_extra=editor_iter,
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
-            'source': '<{}>/items/{}'.format(pak_id, fold),
-        }
+            source='<{}>/items/{}'.format(pak_id, fold),
+            vbsp_config=Property(None, []),
 
-        if LOG_ENT_COUNT and folders[fold]['ent'] == '??':
-            LOGGER.warning('"{id}:{path}" has missing entity count!',
+            authors=sep_values(props['authors', '']),
+            tags=sep_values(props['tags', '']),
+            desc=desc_parse(props, pak_id + ':' + prop_path),
+            ent_count=props['ent_count', ''],
+            url=props['infoURL', None],
+            icons={
+                p.name: p.value
+                for p in
+                props['icon', []]
+            },
+            all_name=props['all_name', None],
+            all_icon=props['all_icon', None],
+        )
+
+        if LOG_ENT_COUNT and not folders[fold].ent_count:
+            LOGGER.warning(
+                '"{id}:{path}" has missing entity count!',
                 id=pak_id,
                 path=prop_path,
             )
@@ -639,9 +714,9 @@ def parse_item_folder(folders, zip_file, pak_id):
         # If we have at least 1, but not all of the grouping icon
         # definitions then notify the author.
         num_group_parts = (
-            (folders[fold]['all_name'] is not None)
-            + (folders[fold]['all_icon'] is not None)
-            + ('all' in folders[fold]['icons'])
+            (folders[fold].all_name is not None)
+            + (folders[fold].all_icon is not None)
+            + ('all' in folders[fold].icons)
         )
         if 0 < num_group_parts < 3:
             LOGGER.warning(
@@ -652,14 +727,180 @@ def parse_item_folder(folders, zip_file, pak_id):
             )
         try:
             with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold]['vbsp'] = conf = Property.parse(
+                folders[fold].vbsp_config = conf = Property.parse(
                     vbsp_config,
                     pak_id + ':' + config_path,
                 )
         except KeyError:
-            folders[fold]['vbsp'] = conf = Property(None, [])
+            folders[fold].vbsp_config = conf = Property(None, [])
 
-        set_cond_source(conf, folders[fold]['source'])
+        set_cond_source(conf, folders[fold].source)
+
+
+class ItemVariant:
+    """Data required for an item in a particular style."""
+
+    def __init__(
+            self,
+            editoritems: Property,
+            vbsp_config: Property,
+            editor_extra: Iterable[Property],
+            authors: List[str],
+            tags: List[str],
+            desc: tkMarkdown.MarkdownData,
+            icons: Dict[str, str],
+            ent_count: str='',
+            url: str = None,
+            all_name: str=None,
+            all_icon: str=None,
+            source: str='',
+    ):
+        self.editor = editoritems
+        self.editor_extra = Property(None, list(editor_extra))
+        self.vbsp_config = vbsp_config
+        self.source = source  # Original location of configs
+
+        self.authors = authors
+        self.tags = tags
+        self.desc = desc
+        self.icons = icons
+        self.ent_count = ent_count
+        self.url = url
+
+        # The name and VTF for grouped items
+        self.all_name = all_name
+        self.all_icon = all_icon
+
+    def can_group(self):
+        """Does this variant have the data needed to group?"""
+        return (
+            'all' in self.icons and
+            self.all_icon is not None and
+            self.all_name is not None
+        )
+
+    def override_from_folder(self, other: 'ItemVariant'):
+        """Perform the override from another item folder."""
+        self.authors.extend(other.authors)
+        self.tags.extend(self.tags)
+        self.vbsp_config += other.vbsp_config
+        self.desc = tkMarkdown.join(self.desc, other.desc)
+
+    def modify(self, props: Property, source: str) -> 'ItemVariant':
+        """Apply a config to this item variant.
+
+        This produces a copy with various modifications - switching
+        out palette or instance values, changing the config, etc.
+        """
+        if 'config' in props:
+            # Item.parse() has resolved this to the actual config.
+            vbsp_config = props.find_key('config').copy()
+            # Specify this is a collection of blocks, not a "config"
+            # block.
+            vbsp_config.name = None
+        else:
+            vbsp_config = self.vbsp_config.copy()
+
+        if 'description' in props:
+            desc = desc_parse(props, source)
+        else:
+            desc = self.desc.copy()
+
+        if 'authors' in props:
+            authors = sep_values(props['authors', ''])
+        else:
+            authors = self.authors
+
+        if 'tags' in props:
+            tags = sep_values(props['tags', ''])
+        else:
+            tags = self.tags.copy()
+
+        variant = ItemVariant(
+            self.editor.copy(),
+            vbsp_config,
+            self.editor_extra.copy(),
+            authors=authors,
+            tags=tags,
+            desc=desc,
+            icons=self.icons.copy(),
+            ent_count=props['ent_count', self.ent_count],
+            url=props['url', self.url],
+            all_name=self.all_name,
+            all_icon=self.all_icon,
+            source='{} from {}'.format(source, self.source),
+        )
+        subtypes = list(variant.editor.find_all('Editor', 'SubType'))
+        # Implement overriding palette items
+        for item in props.find_children('Palette'):
+            pal_icon = item['icon', None]
+            pal_name = item['pal_name', None]  # Name for the palette icon
+            bee2_icon = item['bee2', None]
+            if item.name == 'all':
+                variant.all_icon = pal_icon
+                variant.all_name = pal_name
+                if bee2_icon:
+                    variant.icons['all'] = bee2_icon
+                continue
+
+            try:
+                subtype = subtypes[int(item.name)]
+            except (IndexError, ValueError, TypeError):
+                raise Exception(
+                    'Invalid index "{}" when modifying '
+                    'editoritems for {}'.format(item.name, source)
+                )
+
+            # Overriding model data
+            try:
+                try:
+                    model_prop = item.find_key('Models')
+                except NoKeyError:
+                    model_prop = item.find_key('Model')
+            except NoKeyError:
+                pass
+            else:
+                while 'model' in subtype:
+                    del subtype['model']
+                if model_prop.has_children():
+                    models = [prop.value for prop in model_prop]
+                else:
+                    models = [model_prop.value]
+                for model in models:
+                    subtype.append(Property('Model', [
+                        Property('ModelName', model),
+                    ]))
+
+            if item['name', None]:
+                subtype['name'] = item['name']  # Name for the subtype
+
+            if bee2_icon:
+                print(item.name, variant.icons)
+                variant.icons[item.name] = bee2_icon
+
+            if pal_name or pal_icon:
+                palette = subtype.ensure_exists('Palette')
+                if pal_name:
+                    palette['Tooltip'] = pal_name
+                if pal_icon:
+                    palette['Image'] = pal_icon
+
+        # Allow overriding the instance blocks.
+        instances = variant.editor.ensure_exists('Exporting').ensure_exists('Instances')
+        for inst in props.find_children('Instances'):
+            try:
+                del instances[inst.real_name]
+            except IndexError:
+                pass
+            if inst.has_children() or not inst.name.isdecimal():
+                instances.append(inst.copy())
+            else:
+                # Shortcut to just create the property
+                instances += Property(inst.real_name, [
+                    Property('Name', inst.value),
+                ])
+
+        return variant
 
 
 class Package:
@@ -728,24 +969,24 @@ class Package:
 
 class Style(PakObject):
     def __init__(
-            self,
-            style_id,
-            selitem_data: 'SelitemData',
-            editor,
-            config=None,
-            base_style=None,
-            suggested=None,
-            has_video=True,
-            vpk_name='',
-            corridor_names=EmptyMapping,
-        ):
+        self,
+        style_id,
+        selitem_data: 'SelitemData',
+        editor,
+        config=None,
+        base_style=None,
+        suggested=None,
+        has_video=True,
+        vpk_name='',
+        corridor_names=EmptyMapping,
+    ):
         self.id = style_id
         self.selitem_data = selitem_data
         self.editor = editor
         self.base_style = base_style
         # Set by setup_style_tree() after all objects are read..
         # this is a list of this style, plus parents in order.
-        self.bases = []
+        self.bases = []  # type: List[Style]
         self.suggested = suggested or {}
         self.has_video = has_video
         self.vpk_name = vpk_name
@@ -879,6 +1120,7 @@ class Style(PakObject):
 
 
 class Item(PakObject):
+    """An item in the editor..."""
     def __init__(
             self,
             item_id,
@@ -905,11 +1147,14 @@ class Item(PakObject):
         """Parse an item definition."""
         versions = {}
         def_version = None
-        folders = {}
-        unstyled = srctools.conv_bool(data.info['unstyled', '0'])
+        # The folders we parse for this - we don't want to parse the same
+        # one twice. First they're set to True if we need to read them,
+        # then parse_item_folder() replaces that with the actual values
+        folders = {}  # type: Dict[str, Optional[ItemVariant]
+        unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
-        desc_last = srctools.conv_bool(data.info['AllDescLast', '0'])
+        desc_last = data.info.bool('AllDescLast')
 
         all_config = get_config(
             data.info,
@@ -918,37 +1163,64 @@ class Item(PakObject):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<Item {} all_conf>'.format(
+            data.id,
+        ))
 
-        needs_unlock = srctools.conv_bool(data.info['needsUnlock', '0'])
+        needs_unlock = data.info.bool('needsUnlock')
 
-        for ver in data.info.find_all('version'):
+        for ver in data.info.find_all('version'):  # type: Property
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
-                'is_wip': srctools.conv_bool(ver['wip', '0']),
-                'is_dep':  srctools.conv_bool(ver['deprecated', '0']),
                 'styles':  {},
                 'def_style': None,
                 }
-            for sty_list in ver.find_all('styles'):
-                for sty in sty_list:
-                    # The first style is considered the 'default', and is used
-                    # if not otherwise present.
-                    if vals['def_style'] is None:
-                        vals['def_style'] = sty.value
-                    vals['styles'][sty.real_name] = sty.value
-                    folders[sty.value] = True
+            for style in ver.find_children('styles'):
+                if style.has_children():
+                    # It's a modification to another folder, keep the property.
+                    folder = style
+                    # Read in the vbsp_config data if specified.
+                    # We need to do this here, since the other functions
+                    # don't have access to the zip file.
+                    if 'config' in folder:
+                        folder['config'] = get_config(
+                            folder,
+                            data.zip_file,
+                            'items',
+                            data.pak_id,
+                        )
+
+                elif style.value.startswith('<') and style.value.endswith('>'):
+                    # Reusing another style unaltered using <>.
+                    # None signals this should be calculated after the other
+                    # modifications
+                    folder = Property(None, style.value[1:-1])
+                else:
+                    # Reference to the actual folder...
+                    folder = style.value
+                    folders[folder] = None
+
+                # The first style is considered the 'default', and is used
+                # if not otherwise present.
+                # We set it to the name, then lookup later in setup_style_tree()
+                if vals['def_style'] is None:
+                    vals['def_style'] = style.real_name
+                vals['styles'][style.real_name] = folder
             versions[vals['id']] = vals
             if def_version is None:
                 def_version = vals
 
+        # Fill out the folders dict with the actual data
         parse_item_folder(folders, data.zip_file, data.pak_id)
 
+        # Then copy over to the styles values
         for ver in versions.values():
             if ver['def_style'] in folders:
                 ver['def_style'] = folders[ver['def_style']]
             for sty, fold in ver['styles'].items():
-                ver['styles'][sty] = folders[fold]
+                if isinstance(fold, str):
+                    ver['styles'][sty] = folders[fold]
 
         if not versions:
             raise ValueError('Item "' + data.id + '" has no versions!')
@@ -980,17 +1252,14 @@ class Item(PakObject):
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
-                        our_style = our_ver[sty_id]
+                        our_style = our_ver[sty_id]  # type: ItemVariant
                         # We both have a matching folder, merge the
                         # definitions. We don't override editoritems!
 
                         if isinstance(our_style, str) or isinstance(style, str):
                             raise Exception("Can't override with a <STYLE> def.")
 
-                        our_style['auth'].extend(style['auth'])
-                        our_style['desc'].extend(style['desc'])
-                        our_style['tags'].extend(style['tags'])
-                        our_style['vbsp'] += style['vbsp']
+                        our_style.override_from_folder(style)
 
     def __repr__(self):
         return '<Item:' + self.id + '>'
@@ -1014,10 +1283,10 @@ class Item(PakObject):
 
         aux_item_configs = {
             conf.id: conf
-            for conf in data['ItemConfig']
+            for conf in ItemConfig.all()
         }
 
-        for item in sorted(data['Item'], key=operator.attrgetter('id')):  # type: Item
+        for item in sorted(Item.all(), key=operator.attrgetter('id')):  # type: Item
             ver_id = versions.get(item.id, 'VER_DEFAULT')
 
             (
@@ -1050,7 +1319,13 @@ class Item(PakObject):
                             vbsp_config += version_data[poss_style.id].copy()
                             break
 
-    def _get_export_data(self, pal_list, ver_id, style_id, prop_conf: Dict[str, Dict[str, str]]):
+    def _get_export_data(
+        self,
+        pal_list,
+        ver_id,
+        style_id,
+        prop_conf: Dict[str, Dict[str, str]],
+    ) -> Tuple[Property, Property, Property]:
         """Get the data for an exported item."""
 
         # Build a dictionary of this item's palette positions,
@@ -1062,9 +1337,9 @@ class Item(PakObject):
             if item == self.id
         }
 
-        item_data = self.versions[ver_id]['styles'][style_id]
+        item_data = self.versions[ver_id]['styles'][style_id]  # type: ItemVariant
 
-        new_editor = item_data['editor'].copy()  # type: Property
+        new_editor = item_data.editor.copy()
 
         new_editor['type'] = self.id  # Set the item ID to match our item
         # This allows the folders to be reused for different items if needed.
@@ -1085,11 +1360,11 @@ class Item(PakObject):
                 if index in palette_items:
                     if len(palette_items) == 1:
                         # Switch to the 'Grouped' icon and name
-                        if item_data['all_name'] is not None:
-                            pal_section['Tooltip'] = item_data['all_name']
+                        if item_data.all_name is not None:
+                            pal_section['Tooltip'] = item_data.all_name
 
-                        if item_data['all_icon'] is not None:
-                            icon = item_data['all_icon']
+                        if item_data.all_icon is not None:
+                            icon = item_data.all_icon
                         else:
                             icon = pal_section['Image']
                         # Bug in Portal 2 - palette icons must end with '.png',
@@ -1170,9 +1445,9 @@ class Item(PakObject):
 
         return (
             new_editor,
-            item_data['editor_extra'],
+            item_data.editor_extra,
             # Add all_conf first so it's conditions run first by default
-            self.all_conf + item_data['vbsp'],
+            self.all_conf + item_data.vbsp_config,
         )
 
 
@@ -1197,6 +1472,9 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             pak_id=data.pak_id,
             prop_name='all_conf',
         )
+        set_cond_source(all_config, '<ItemConfig {}:{} all_conf>'.format(
+            data.pak_id, data.id,
+        ))
 
         for ver in data.info.find_all('Version'):  # type: Property
             ver_id = ver['ID', 'VER_DEFAULT']
@@ -1205,10 +1483,13 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
                     with data.zip_file.open(file_loc) as f:
-                        styles[style.real_name] = Property.parse(
+                        styles[style.real_name] = conf = Property.parse(
                             f,
                             data.pak_id + ':' + file_loc,
                         )
+                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                        data.pak_id, data.id, style.real_name,
+                    ))
 
         return cls(
             data.id,
@@ -1247,6 +1528,7 @@ class QuotePack(PakObject):
             studio: str=None,
             studio_actor='',
             cam_loc: Vec=None,
+            turret_hate=False,
             interrupt=0.0,
             cam_pitch=0.0,
             cam_yaw=0.0,
@@ -1263,6 +1545,7 @@ class QuotePack(PakObject):
         self.inter_chance = interrupt
         self.cam_pitch = cam_pitch
         self.cam_yaw = cam_yaw
+        self.turret_hate = turret_hate
 
     @classmethod
     def parse(cls, data):
@@ -1284,13 +1567,15 @@ class QuotePack(PakObject):
         if monitor_data.value is not None:
             mon_studio = monitor_data['studio']
             mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = srctools.conv_int(monitor_data['interrupt_chance', 0])
-            mon_cam_loc = Vec.from_str(monitor_data['Cam_loc'])
-            mon_cam_pitch, mon_cam_yaw, _ = srctools.parse_vec_str(monitor_data['Cam_angles'])
+            mon_interrupt = monitor_data.float('interrupt_chance', 0)
+            mon_cam_loc = monitor_data.vec('Cam_loc')
+            mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
+            turret_hate = monitor_data.bool('TurretShoot')
         else:
             mon_studio = mon_cam_loc = None
             mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0
             mon_studio_actor = ''
+            turret_hate = False
 
         config = get_config(
             data.info,
@@ -1312,6 +1597,7 @@ class QuotePack(PakObject):
             cam_loc=mon_cam_loc,
             cam_pitch=mon_cam_pitch,
             cam_yaw=mon_cam_yaw,
+            turret_hate=turret_hate,
             )
 
     def add_over(self, override: 'QuotePack'):
@@ -1335,6 +1621,7 @@ class QuotePack(PakObject):
             self.inter_chance = override.inter_chance
             self.cam_pitch = override.cam_pitch
             self.cam_yaw = override.cam_yaw
+            self.turret_hate = override.turret_hate
 
 
     def __repr__(self):
@@ -1346,13 +1633,12 @@ class QuotePack(PakObject):
         if exp_data.selected is None:
             return  # No quote pack!
 
-        for voice in data['QuotePack']:  # type: QuotePack
-            if voice.id == exp_data.selected:
-                break
-        else:
+        try:
+            voice = QuotePack.by_id(exp_data.selected)  # type: QuotePack
+        except KeyError:
             raise Exception(
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf  # type: Property
 
@@ -1366,8 +1652,7 @@ class QuotePack(PakObject):
 
         # Set values in vbsp_config, so flags can determine which voiceline
         # is selected.
-        vbsp_config.ensure_exists('Options')
-        options = vbsp_config.find_key('Options')
+        options = vbsp_config.ensure_exists('Options')
 
         options['voice_pack'] = voice.id
         options['voice_char'] = ','.join(voice.chars)
@@ -1382,6 +1667,7 @@ class QuotePack(PakObject):
             options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
+            options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
 
         # Copy the config files for this voiceline..
         for prefix, pretty in [
@@ -1496,10 +1782,9 @@ class Skybox(PakObject):
         if exp_data.selected is None:
             return  # No skybox..
 
-        for skybox in data['Skybox']:  # type: Skybox
-            if skybox.id == exp_data.selected:
-                break
-        else:
+        try:
+            skybox = Skybox.by_id(exp_data.selected)  # type: Skybox
+        except KeyError:
             raise Exception(
                 "Selected skybox ({}) doesn't exist?".format(exp_data.selected)
             )
@@ -1551,9 +1836,11 @@ class Music(PakObject):
         if isinstance(sound, Property):
             for chan in sound_channels:
                 setattr(self, 'has_' + chan, bool(sound[chan, '']))
+            self.has_synced_tbeam = self.has_tbeam and sound.bool('sync_funnel')
         else:
             for chan in sound_channels:
                 setattr(self, 'has_' + chan, False)
+            self.has_synced_tbeam = False
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1630,13 +1917,12 @@ class Music(PakObject):
         if exp_data.selected is None:
             return  # No music..
 
-        for music in data['Music']:  # type: Music
-            if music.id == exp_data.selected:
-                break
-        else:
+        try:
+            music = Music.by_id(exp_data.selected)  # type: Music
+        except KeyError:
             raise Exception(
                 "Selected music ({}) doesn't exist?".format(exp_data.selected)
-            )
+            ) from None
 
         vbsp_config = exp_data.vbsp_conf
 
@@ -1772,6 +2058,16 @@ class StyleVar(PakObject, allow_mult=True, has_img=False):
             style.bases
         )
 
+    def applies_to_all(self):
+        """Check if this applies to all styles."""
+        if self.styles is None:
+            return True
+
+        for style in Style.all():  # type: Style
+            if not self.applies_to_style(style):
+                return False
+        return True
+
     @staticmethod
     def export(exp_data: ExportData):
         """Export style var selections into the config.
@@ -1833,7 +2129,7 @@ class StyleVPK(PakObject, has_img=False):
         sel_vpk = exp_data.selected_style.vpk_name  # type: Style
 
         if sel_vpk:
-            for vpk in data['StyleVPK']:  # type: StyleVPK
+            for vpk in StyleVPK.all():  # type: StyleVPK
                 if vpk.id.casefold() == sel_vpk:
                     sel_vpk = vpk
                     break
@@ -1890,6 +2186,26 @@ class StyleVPK(PakObject, has_img=False):
 
         vpk_file.add_folder(override_folder)
         del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
+
+        # Fix Valve's fail with the cubemap file - if we have the resource,
+        # override the original via DLC3.
+        try:
+            cave_cubemap_file = open(
+                '../cache/resources/materials/BEE2/cubemap_cave01.vtf',
+                'rb'
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            with cave_cubemap_file:
+                try:
+                    vpk_file.add_file(
+                        ('materials/cubemaps/', 'cubemap_cave01', 'vtf'),
+                        cave_cubemap_file.read(),
+                    )
+                except FileExistsError:
+                    # The user might have added it to the vpk_override/ folder.
+                    pass
 
         vpk_file.write_dirfile()
 
@@ -1991,14 +2307,13 @@ class Elevator(PakObject):
         if exp_data.selected is None:
             elevator = None
         else:
-            for elevator in data['Elevator']:
-                if elevator.id == exp_data.selected:
-                    break
-            else:
+            try:
+                elevator = Elevator.by_id(exp_data.selected)  # type: Elevator
+            except KeyError:
                 raise Exception(
                     "Selected elevator ({}) "
                     "doesn't exist?".format(exp_data.selected)
-                )
+                ) from None
 
         if style.has_video:
             if elevator is None:
@@ -2134,7 +2449,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         # A list of materials which will casue a specific packlist to be used.
         pack_triggers = Property('PackTriggers', [])
 
-        for pack in data['PackList']:  # type: PackList
+        for pack in PackList.all():  # type: PackList
             # Build a
             # "Pack_id"
             # {
@@ -2195,7 +2510,7 @@ class EditorSound(PakObject, has_img=False):
         """Export EditorSound objects."""
         # Just command the game to do the writing.
         exp_data.game.add_editor_sounds(
-            data['EditorSound']
+            EditorSound.all()
         )
 
 
@@ -2209,7 +2524,7 @@ class BrushTemplate(PakObject, has_img=False):
     def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
-        This copies the solids out of vmf_file and into TEMPLATE_FILE.
+        This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
         If force is set to 'world' or 'detail', the other type will be converted.
         If keep_brushes is false brushes will be skipped (for TemplateOverlay).
         """
@@ -2237,10 +2552,33 @@ class BrushTemplate(PakObject, has_img=False):
         else:
             force_is_detail = None
 
-        if keep_brushes:
-            for brush, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+        # Parse through a config entity in the template file.
+        conf_ents = list(vmf_file.by_class['bee2_template_conf'])
+        if len(conf_ents) > 1:
+            raise ValueError(
+                'Template "{}" has multiple configuration entities!'.format(temp_id)
+            )
+        elif len(conf_ents) == 1:
+            config = conf_ents[0]
+            conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
+            if srctools.conv_bool(config['discard_brushes']):
+                keep_brushes = False
+            is_scaling = srctools.conv_bool(config['is_scaling'])
+            if config['temp_type'] == 'detail':
+                force_is_detail = True
+            elif config['temp_type'] == 'world':
+                force_is_detail = False
+        else:
+            conf_auto_visgroup = is_scaling = False
+
+        if is_scaling:
+            raise NotImplementedError()  # TODO
+        elif keep_brushes:
+            for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
                 if force_is_detail is not None:
-                    is_detail = force_is_detail
+                    export_detail = force_is_detail
+                else:
+                    export_detail = is_detail
                 if len(vis_ids) > 1:
                     raise ValueError('Template "{}" has brush with two'
                                      ' visgroups!'.format(
@@ -2253,23 +2591,31 @@ class BrushTemplate(PakObject, has_img=False):
                 ]
                 # No visgroup = ''
                 visgroup = visgroups[0] if visgroups else ''
-                targ_dict = self.temp_detail if is_detail else self.temp_world
+
+                # Auto-visgroup puts func_detail ents in unique visgroups.
+                if is_detail and not visgroup and conf_auto_visgroup:
+                    visgroup = '__auto_group_{}__'.format(conf_auto_visgroup)
+                    # Reuse as the unique index, >0 are True too..
+                    conf_auto_visgroup += 1
+
+                targ_dict = self.temp_detail if export_detail else self.temp_world
                 try:
-                    ent = targ_dict[temp_id, visgroup]
+                    ent = targ_dict[temp_id, visgroup, export_detail]
                 except KeyError:
-                    ent = targ_dict[temp_id, visgroup] = TEMPLATE_FILE.create_ent(
+                    ent = targ_dict[temp_id, visgroup, export_detail] = TEMPLATE_FILE.create_ent(
                         classname=(
                             'bee2_template_detail' if
-                            is_detail
+                            export_detail
                             else 'bee2_template_world'
                         ),
                         template_id=temp_id,
                         visgroup=visgroup,
                     )
                 ent.visgroup_ids.add(temp_visgroup_id)
-                ent.solids.append(
-                    brush.copy(map=TEMPLATE_FILE, keep_vis=False)
-                )
+                for brush in brushes:
+                    ent.solids.append(
+                        brush.copy(map=TEMPLATE_FILE, keep_vis=False)
+                    )
 
         self.temp_overlays = []
 
@@ -2290,14 +2636,14 @@ class BrushTemplate(PakObject, has_img=False):
             )
             new_overlay.visgroup_ids.add(temp_visgroup_id)
             new_overlay['template_id'] = self.id
-            new_overlay['visgroup_id'] = visgroups[0] if visgroups else ''
+            new_overlay['visgroup'] = visgroups[0] if visgroups else ''
             new_overlay['classname'] = 'bee2_template_overlay'
             TEMPLATE_FILE.add_ent(new_overlay)
 
             self.temp_overlays.append(new_overlay)
 
         if self.temp_detail is None and self.temp_world is None:
-            if not self.temp_overlays:
+            if not self.temp_overlays and not is_scaling:
                 LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
 
     @classmethod
@@ -2329,17 +2675,16 @@ class BrushTemplate(PakObject, has_img=False):
             TEMPLATE_FILE.export(temp_file, inc_version=False)
 
     @staticmethod
-    def yield_world_detail(map: VMF) -> Iterator[Tuple[Solid, bool, set]]:
+    def yield_world_detail(map: VMF) -> Iterator[Tuple[List[Solid], bool, set]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
         (Those are stored in the ent for detail, and the solid for world.)
         """
         for brush in map.brushes:
-            yield brush, False, brush.visgroup_ids
+            yield [brush], False, brush.visgroup_ids
         for ent in map.by_class['func_detail']:
-            for brush in ent.solids:
-                yield brush, True, ent.visgroup_ids
+            yield ent.solids.copy(), True, ent.visgroup_ids
 
 
 def desc_parse(info, id=''):
@@ -2368,7 +2713,8 @@ def get_selitem_data(info):
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
     name = info['name']
-    icon = info['icon', '_blank']
+    icon = info['icon', None]
+    large_icon = info['iconlarge', None]
     group = info['group', '']
     sort_key = info['sort_key', '']
     desc = desc_parse(info, id=info['id'])
@@ -2382,6 +2728,7 @@ def get_selitem_data(info):
         short_name,
         auth,
         icon,
+        large_icon,
         desc,
         group,
         sort_key,
@@ -2399,6 +2746,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         our_short_name,
         our_auth,
         our_icon,
+        our_large_icon,
         our_desc,
         our_group,
         our_sort_key,
@@ -2409,16 +2757,18 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
         over_short_name,
         over_auth,
         over_icon,
+        over_large_icon,
         over_desc,
         over_group,
         over_sort_key,
     ) = over_data
 
     return SelitemData(
-        our_name if over_name == '???' else over_name,
-        our_short_name if over_short_name == '???' else over_short_name,
+        our_name,
+        our_short_name,
         our_auth + over_auth,
-        our_icon if over_icon == '_blank' else our_icon,
+        over_icon if our_icon is None else our_icon,
+        over_large_icon if our_large_icon is None else our_large_icon,
         tkMarkdown.join(our_desc, over_desc),
         over_group or our_group,
         over_sort_key or our_sort_key,

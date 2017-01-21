@@ -3,7 +3,8 @@ import os
 import math
 
 from conditions import (
-    make_result, make_result_setup, meta_cond, RES_EXHAUSTED
+    make_result, make_result_setup, meta_cond, RES_EXHAUSTED,
+    local_name
 )
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, VMF
@@ -11,10 +12,12 @@ import srctools
 import vbsp_options
 import utils
 
+from typing import List
+
 LOGGER = utils.getLogger(__name__, 'cond.monitor')
 
-ALL_MONITORS = []
-ALL_CAMERAS = []
+ALL_MONITORS = []  # type: List[Monitor]
+ALL_CAMERAS = []  # type: List[Camera]
 
 # Keep a counter of the number of monitor bullseyes at a pos.
 # This allows us to ensure we don't remove catapults also aiming here,
@@ -24,7 +27,10 @@ BULLSYE_LOCS = defaultdict(int)
 MON_ARGS_SCRIPT = os.path.join('BEE2', 'inject', 'monitor_args.nut')
 
 Camera = namedtuple('Camera', 'inst config cam_pos cam_angles')
-Monitor = namedtuple('Monitor', 'inst config')
+Monitor = namedtuple('Monitor', 'inst')
+
+# Are there monitors that should be shot?
+NEEDS_TURRET = False
 
 # The location of the voiceline room, used to position the camera.
 VOICELINE_LOC = Vec()
@@ -32,7 +38,12 @@ VOICELINE_LOC = Vec()
 
 @make_result_setup('Monitor')
 def res_monitor_setup(res: Property):
-    return {}
+    return (
+        res['breakInst', None],
+        res['bullseye_name', ''],
+        res.vec('bullseye_loc'),
+        res['bullseye_parent', ''],
+    )
 
 
 @make_result('Monitor')
@@ -40,7 +51,53 @@ def res_monitor(inst: Entity, res: Property):
     """Result for the monitor component.
 
     """
-    ALL_MONITORS.append(Monitor(inst, res.value))
+    global NEEDS_TURRET
+    import vbsp
+
+    (
+        break_inst,
+        bullseye_name,
+        bullseye_loc,
+        bullseye_parent,
+    ) = res.value
+
+    ALL_MONITORS.append(Monitor(inst))
+
+    has_laser = vbsp.settings['style_vars'].get('haslaser', False)
+    # Allow turrets if the monitor is setup to allow it, and the actor should
+    # be shot.
+    needs_turret = bullseye_name and vbsp_options.get(bool, 'voice_studio_should_shoot')
+
+    inst.fixup['$is_breakable'] = has_laser or needs_turret
+
+    # We need to generate an ai_relationship, which makes turrets hate
+    # a bullseye.
+    if needs_turret:
+        loc = Vec(bullseye_loc)
+        loc.localise(
+            Vec.from_str(inst['origin']),
+            Vec.from_str(inst['angles']),
+        )
+        bullseye_name = local_name(inst, bullseye_name)
+        inst.map.create_ent(
+            classname='npc_bullseye',
+            targetname=bullseye_name,
+            parentname=local_name(inst, bullseye_parent),
+            spawnflags=221186,  # Non-solid, invisible, etc..
+            origin=loc,
+        )
+        inst.map.create_ent(
+            classname='ai_relationship',
+            targetname='@monitor_turr_hate',
+            spawnflags=2,  # Notify turrets about monitor locations
+            disposition=1,  # Hate
+            origin=loc,
+            subject='npc_portal_turret_floor',
+            target=bullseye_name,
+        )
+
+        NEEDS_TURRET = True
+
 
 
 @make_result_setup('Camera')
@@ -56,7 +113,6 @@ def res_camera_setup(res: Property):
 
         'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
         'pitch_range': srctools.conv_int(res['YawRange', ''], 90),
-
     }
 
 
@@ -157,7 +213,7 @@ def mon_remove_bullseyes(inst: Entity):
 
 
 @meta_cond(priority=150, only_once=True)
-def mon_camera_link(_):
+def mon_camera_link():
     """Link cameras to monitors."""
     import vbsp
     LOGGER.info('Bullseye {}', BULLSYE_LOCS)
@@ -222,7 +278,7 @@ def mon_camera_link(_):
     )
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/mon_camera.nut')
 
-
+    # Write out a script containing the arguments to the camera.
     with open(MON_ARGS_SCRIPT, 'w') as scr:
         scr.write('CAM_NUM <- {};\n'.format(len(ALL_CAMERAS)))
         scr.write('CAM_ACTIVE_NUM <- {};\n'.format(sum(active_counts)))
@@ -249,14 +305,19 @@ def mon_camera_link(_):
             scr.write(
                 'CAM_STUDIO_CHANCE <- {chance};\n'
                 'CAM_STUDIO_PITCH <- {pitch};\n'
-                'CAM_STUDIO_YAW <- {yaw};\n'.format(
+                'CAM_STUDIO_YAW <- {yaw};\n'
+                'CAM_STUDIO_TURRET <- {turret!r};\n'.format(
                     chance=vbsp_options.get(float, 'voice_studio_inter_chance'),
                     pitch=vbsp_options.get(float, 'voice_studio_cam_pitch'),
                     yaw=vbsp_options.get(float, 'voice_studio_cam_yaw'),
+                    turret=int(NEEDS_TURRET),
                 )
             )
         else:
-            scr.write('CAM_STUDIO_CHANCE <- -1;\n')
+            scr.write(
+                'CAM_STUDIO_CHANCE <- -1;\n'
+                'CAM_STUDIO_TURRET <- 0;\n'
+            )
 
 
 def make_voice_studio(vmf: VMF, loc: Vec):

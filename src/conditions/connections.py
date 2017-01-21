@@ -15,7 +15,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
 
 @make_result_setup('AddOutput')
-def res_add_output_setup(res):
+def res_add_output_setup(res: Property):
     output = res['output']
     input_name = res['input']
     inst_in = res['inst_in', '']
@@ -132,7 +132,7 @@ def res_locking_output(inst: Entity, res: Property):
 
 
 @make_flag('LockingIO')
-def res_locking_input(inst: Entity, res: Property) -> str:
+def res_locking_input(inst: Entity, res: Property):
     """Executed on the input item, and evaluates to True if successful.
 
     The parameter is an `instance:name;Input` value, which resets the item.
@@ -201,8 +201,9 @@ def res_linked_cube(inst: Entity, res: Property):
     This assumes some things about the item.
     """
     time = inst.fixup.int('$timer_delay')
-    if not (0 < time <= 30):
-        # Infinite - this behaviour is disabled..
+    # Portal 2 bug - when loading existing maps, timers are set to 3...
+    if not (3 < time <= 30):
+        # Infinite or 3-second - this behaviour is disabled..
         return
 
     if time in LINKED_CUBES:
@@ -226,8 +227,9 @@ def res_linked_cube(inst: Entity, res: Property):
 def res_linked_cube_dropper(drp_inst: Entity, res: Property):
     """Link a cube and dropper together, to preplace the cube at a location."""
     time = drp_inst.fixup.int('$timer_delay')
-    if not (0 < time <= 30):
-        # Infinite - this behaviour is disabled..
+    # Portal 2 bug - when loading existing maps, timers are set to 3...
+    if not (3 < time <= 30):
+        # Infinite or 3-second - this behaviour is disabled..
         return
 
     try:

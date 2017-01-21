@@ -9,13 +9,13 @@ from tooltip import add_tooltip
 
 import sound
 import utils
+import tk_tools
 import srctools
 import contextWin
 import logWindow
 
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
-SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
 
@@ -33,7 +33,7 @@ def reset_all_win():
 
 win = Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
-win.iconbitmap('../BEE2.ico')
+tk_tools.set_window_icon(win)
 win.title(_('BEE2 Options'))
 win.withdraw()
 
@@ -246,16 +246,6 @@ def init_gen_tab(f):
               'Sound effects have been disabled.')
         )
     mute.grid(row=0, column=0, sticky=W)
-
-    make_checkbox(
-        f,
-        section='General',
-        item='show_wip_items',
-        desc=_('Show WIP items'),
-        tooltip=_('Show items and item versions marked Work In Progress. '
-                  'These may be buggy or incomplete.'),
-        var=SHOW_WIP,
-    ).grid(row=1, column=0, sticky=W)
 
     UI['reset_cache'] = reset_cache = ttk.Button(
         f,

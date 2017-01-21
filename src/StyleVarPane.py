@@ -63,6 +63,16 @@ styleOptions = [
                'increase the entity count significantly with large, complex '
                'goo pits, so disable if needed.')
     ),
+
+    stylevar(
+        id='FunnelAllowSwitchedLights',
+        name=_('Light Reversible Excursion Funnels'),
+        default=1,
+        desc=_('Funnels emit a small amount of light. However, if multiple funnels'
+               'are near each other and can reverse polarity, this can cause '
+               'lighting issues. Disable this to prevent that by disabling '
+               'lights. Non-reversible Funnels do not have this issue.'),
+    )
 ]
 
 checkbox_all = {}
@@ -156,7 +166,7 @@ def refresh(selected_style):
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
-        if var.styles is None:
+        if var.applies_to_all():
             continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
@@ -276,7 +286,7 @@ def make_pane(tool_frame):
             'command': functools.partial(set_stylevar, var.id)
             }
         desc = make_desc(var)
-        if var.styles is None:
+        if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
             all_pos += 1
 
