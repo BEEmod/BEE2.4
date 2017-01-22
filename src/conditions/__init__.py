@@ -18,6 +18,7 @@ import template_brush
 import utils
 import vbsp_options
 from instanceLocs import resolve as resolve_inst
+from template_brush import MAT_TYPES
 from srctools import (
     Property,
     Vec_tuple, Vec,
@@ -54,16 +55,13 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
 
-class MAT_TYPES(Enum):
-    """The values saved in the solidGroup.color attribute."""
-    black = 0
-    white = 1
+class SWITCH_TYPE(Enum):
+    """The methods useable for switch options."""
+    FIRST = 'first'  # choose the first match
+    LAST = 'last'  # choose the last match
+    RANDOM = 'random'  # Randomly choose
+    ALL = 'all'  # Run all matching commands
 
-    def __str__(self):
-        if self is MAT_TYPES.black:
-            return 'black'
-        if self is MAT_TYPES.white:
-            return 'white'
 
 # A dictionary mapping origins to their brushes
 solidGroup = NamedTuple('solidGroup', [
@@ -156,39 +154,6 @@ PETI_INST_ANGLE = {
 }
 
 del xp, xn, yp, yn, zp, zn
-
-B = MAT_TYPES.black
-W = MAT_TYPES.white
-TEMPLATE_RETEXTURE = {
-    # textures map -> surface types for template brushes.
-    # It's mainly for grid size and colour - floor/ceiling textures
-    # will be used instead at those orientations
-
-    'metal/black_wall_metal_002c': (B, 'wall'),
-    'metal/black_wall_metal_002a': (B, '2x2'),
-    'metal/black_wall_metal_002b': (B, '4x4'),
-
-    'tile/white_wall_tile001a': (W, 'wall'),
-    'tile/white_wall_tile003a': (W, 'wall'),
-    'tile/white_wall_tile003b': (W, 'wall'),
-    'tile/white_wall_tile003c': (W, '2x2'),
-    'tile/white_wall_tile003h': (W, 'wall'),
-    'tile/white_wall_state': (W, '2x2'),
-    'tile/white_wall_tile003f': (W, '4x4'),
-
-    # No black portal-placement texture, so use the bullseye instead
-    'metal/black_floor_metal_bullseye_001': (B, 'special'),
-    'tile/white_wall_tile004j': (W, 'special'),
-    'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
-
-    consts.Special.BACKPANELS: 'special.behind',
-    consts.Special.SQUAREBEAMS: 'special.edge',
-    consts.Special.GLASS: 'special.glass',
-    consts.Special.GRATING: 'special.grating',
-
-    consts.Goo.CHEAP: 'special.goo_cheap',
-}
-del B, W
 
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
@@ -1211,14 +1176,6 @@ def get_scaling_template(
     return uvs
 
 
-# 'Opposite' values for retexture_template(force_colour)
-TEMP_COLOUR_INVERT = {
-    MAT_TYPES.white: MAT_TYPES.black,
-    MAT_TYPES.black: MAT_TYPES.white,
-    None: 'INVERT',
-    'INVERT': None,
-}
-
 
 def retexture_template(
         template_data: template_brush.ExportedTemplate,
@@ -1290,7 +1247,7 @@ def retexture_template(
                 face.mat = mat
                 continue
 
-            tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
+            tex_type = template_brush.TEMPLATE_RETEXTURE.get(folded_mat)
 
             if tex_type is None:
                 continue  # It's nodraw, or something we shouldn't change
@@ -1667,7 +1624,7 @@ def res_end_condition():
 @make_result_setup('switch')
 def res_switch_setup(res: Property):
     flag = None
-    method = template_brush.SWITCH_TYPE.FIRST
+    method = SWITCH_TYPE.FIRST
     cases = []
     for prop in res:
         if prop.has_children():
@@ -1678,7 +1635,7 @@ def res_switch_setup(res: Property):
                 continue
             if prop.name == 'method':
                 try:
-                    method = template_brush.SWITCH_TYPE(prop.value.casefold())
+                    method = SWITCH_TYPE(prop.value.casefold())
                 except ValueError:
                     pass
 
@@ -1686,7 +1643,7 @@ def res_switch_setup(res: Property):
         for result in prop.value:
             Condition.setup_result(prop.value, result)
 
-    if method is template_brush.SWITCH_TYPE.LAST:
+    if method is SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
 
     return (
@@ -1709,7 +1666,7 @@ def res_switch(inst: Entity, res: Property):
     """
     flag_name, cases, method = res.value
 
-    if method is template_brush.SWITCH_TYPE.RANDOM:
+    if method is SWITCH_TYPE.RANDOM:
         cases = cases[:]
         random.shuffle(cases)
 
@@ -1720,7 +1677,7 @@ def res_switch(inst: Entity, res: Property):
                 continue
         for res in case:
             Condition.test_result(inst, res)
-        if method is not template_brush.SWITCH_TYPE.ALL:
+        if method is not SWITCH_TYPE.ALL:
             # All does them all, otherwise we quit now.
             break
 
