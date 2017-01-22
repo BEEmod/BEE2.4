@@ -307,7 +307,7 @@ def load_config():
     global CONF
     LOGGER.info('Loading Settings...')
     try:
-        with open("bee2/vrad_config.cfg") as config:
+        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
             CONF = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
                 'Config', []
             )

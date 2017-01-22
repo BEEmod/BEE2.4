@@ -260,7 +260,7 @@ class Game:
                 'game_sounds_editor.txt'
             ))
             if os.path.isfile(file):
-                break # We found it
+                break  # We found it
         else:
             # Assume it's in dlc2
             file = self.abs_path(os.path.join(
@@ -269,7 +269,7 @@ class Game:
                 'game_sounds_editor.txt',
             ))
         try:
-            with open(file) as f:
+            with open(file, encoding='utf8') as f:
                 file_data = list(f)
         except FileNotFoundError:
             # If the file doesn't exist, we'll just write our stuff in.
@@ -280,7 +280,7 @@ class Game:
                 del file_data[i:]
 
         # Then add our stuff!
-        with open(file, 'w') as f:
+        with open(file, 'w', encoding='utf8') as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -297,7 +297,7 @@ class Game:
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
-                with open(info_path) as file:
+                with open(info_path, encoding='utf8') as file:
                     data = list(file)
 
                 for line_num, line in reversed(list(enumerate(data))):
@@ -543,7 +543,7 @@ class Game:
         self.edit_gameinfo(True)
 
         LOGGER.info('Writing instance list!')
-        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
+        with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
             for line in self.build_instance_data(editoritems):
                 inst_file.write(line)
         export_screen.step('EXP')
@@ -559,7 +559,7 @@ class Game:
 
         LOGGER.info('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
-        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
+        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
         export_screen.step('EXP')

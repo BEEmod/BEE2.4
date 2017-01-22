@@ -296,7 +296,7 @@ def load_settings():
     """Load in all our settings from vbsp_config."""
     global BEE2_config
     try:
-        with open("bee2/vbsp_config.cfg") as config:
+        with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
     except FileNotFoundError:
         LOGGER.warning('Error: No vbsp_config file!')
@@ -3210,7 +3210,7 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
-    with open('bee2/vrad_config.cfg', 'w') as f:
+    with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
             f.write(line)
 

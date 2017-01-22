@@ -70,7 +70,7 @@ class Palette:
 
     @classmethod
     def parse(cls, path: str):
-        with open(path) as f:
+        with open(path, encoding='utf8') as f:
             props = Property.parse(f, path)
         name = props['Name', '??']
         items = []
@@ -127,11 +127,11 @@ class Palette:
                     # Add a random character to iterate the hash.
                     hash_src += chr(random.randrange(0x10ffff))
                 else:
-                    file = open(os.path.join(PAL_DIR, hash_filename), 'w')
+                    file = open(os.path.join(PAL_DIR, hash_filename), 'w', encoding='utf8')
                     self.filename = os.path.join(PAL_DIR, hash_filename)
                     break
         else:
-            file = open(os.path.join(PAL_DIR, self.filename), 'w')
+            file = open(os.path.join(PAL_DIR, self.filename), 'w', encoding='utf8')
         with file:
             for line in props.export():
                 file.write(line)
