@@ -6,7 +6,7 @@ from srctools import Entity, Solid, Side
 import conditions
 
 from typing import (
-    Iterable,
+    Iterable, NamedTuple,
     Dict, List, Set,
 )
 
@@ -28,6 +28,12 @@ class TEMP_TYPES(Enum):
     world = 1  # Import and add to world
     detail = 2  # Import as a func_detail
 
+ExportedTemplate = NamedTuple('ExportedTemplate', [
+    ('world', List[Solid]),
+    ('detail', List[Solid]),
+    ('overlay', List[Entity]),
+    ('orig_ids', Dict[str, str]),
+])
 
 class Template:
     def __init__(

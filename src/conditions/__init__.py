@@ -53,8 +53,6 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
-Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
-
 
 class MAT_TYPES(Enum):
     """The values saved in the solidGroup.color attribute."""
@@ -71,7 +69,7 @@ class MAT_TYPES(Enum):
 solidGroup = NamedTuple('solidGroup', [
     ('face', Side),
     ('solid', Solid),
-    ('normal', Vec), # The normal of the face.
+    ('normal', Vec),  # The normal of the face.
     ('color', MAT_TYPES),
 ])
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
@@ -872,7 +870,7 @@ def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
 
 
 def steal_from_brush(
-    temp_data: Template,
+    temp_data: template_brush.ExportedTemplate,
     brush_group: 'solidGroup',
     rem_brush=True,
     additional: Iterable[int]=(),
@@ -1058,7 +1056,7 @@ def import_template(
         force_type=template_brush.TEMP_TYPES.default,
         add_to_map=True,
         visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
-    ) -> Template:
+    ) -> template_brush.ExportedTemplate:
     """Import the given template at a location.
 
     If force_type is set to 'detail' or 'world', all brushes will be converted
@@ -1175,7 +1173,12 @@ def import_template(
     for solid in new_detail:
         vbsp.IGNORED_FACES.update(solid.sides)
 
-    return Template(new_world, detail_ent, new_over, id_mapping)
+    return template_brush.ExportedTemplate(
+        new_world,
+        detail_ent,
+        new_over,
+        id_mapping,
+    )
 
 
 def get_scaling_template(
@@ -1218,7 +1221,7 @@ TEMP_COLOUR_INVERT = {
 
 
 def retexture_template(
-        template_data: Template,
+        template_data: template_brush.ExportedTemplate,
         origin: Vec,
         fixup: srctools.vmf.EntityFixup=None,
         replace_tex: dict= srctools.EmptyMapping,
