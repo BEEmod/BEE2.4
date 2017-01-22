@@ -3,6 +3,7 @@
 from srctools import Property, Vec, Entity, Output
 
 import conditions
+import template_brush
 import srctools
 
 
@@ -125,7 +126,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
                 rail_template,
                 pos,
                 angles,
-                force_type=conditions.TEMP_TYPES.world,
+                force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
             )
             rail_temp_solids.extend(temp.world)

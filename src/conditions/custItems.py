@@ -5,6 +5,7 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import template_brush
 import utils
 import vbsp
 import vbsp_options
@@ -403,7 +404,7 @@ def res_faith_mods(inst: Entity, res: Property):
                 temp_name=trig_temp,
                 origin=trig_origin,
                 angles=Vec.from_str(inst['angles']),
-                force_type=conditions.TEMP_TYPES.world,
+                force_type=template_brush.TEMP_TYPES.world,
             ).world
             # Remove the trigger solids from worldspawn..
             for solid in trig.solids:

@@ -8,8 +8,9 @@ import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
     import_template, remove_ant_toggle,
-    TEMP_TYPES, GOO_LOCS, SOLIDS
+    GOO_LOCS, SOLIDS
 )
+from template_brush import TEMP_TYPES
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Vec, Vec_tuple,

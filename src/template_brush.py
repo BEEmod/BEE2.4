@@ -13,6 +13,22 @@ from typing import (
 TEMPLATES = {}
 
 
+class SWITCH_TYPE(Enum):
+    """The methods useable for switch options."""
+    FIRST = 'first'  # choose the first match
+    LAST = 'last'  # choose the last match
+    RANDOM = 'random'  # Randomly choose
+    ALL = 'all'  # Run all matching commands
+
+
+class TEMP_TYPES(Enum):
+    """Value used for import_template()'s force_type parameter.
+    """
+    default = 0  # Based on the original VMF settings
+    world = 1  # Import and add to world
+    detail = 2  # Import as a func_detail
+
+
 class Template:
     def __init__(
         self,

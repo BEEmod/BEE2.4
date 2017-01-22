@@ -7,8 +7,9 @@ import srctools
 import utils
 from conditions import (
     make_result, make_result_setup,
-    TEMP_TYPES, SOLIDS
+    SOLIDS
 )
+from template_brush import TEMP_TYPES
 from srctools import Property, Vec, Entity
 
 

@@ -1,4 +1,4 @@
-
+import template_brush
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -2028,7 +2028,7 @@ def add_glass_floorbeams(glass_locs):
                     temp_name,
                     pos,
                     rot,
-                    force_type=conditions.TEMP_TYPES.detail,
+                    force_type=template_brush.TEMP_TYPES.detail,
                 )
 
 
@@ -2840,7 +2840,7 @@ def change_func_brush():
                             Vec.from_str(brush['origin']),
                             Vec.from_str(ins['angles']),
                             targetname=targ,
-                            force_type=conditions.TEMP_TYPES.detail,
+                            force_type=template_brush.TEMP_TYPES.detail,
                         )
                         brush.solids = new_brush.detail.solids
                         new_brush.detail.remove()
@@ -2922,7 +2922,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
-            force_type=conditions.TEMP_TYPES.detail,
+            force_type=template_brush.TEMP_TYPES.detail,
         )
         conditions.retexture_template(
             temp_data,
@@ -2972,7 +2972,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
             vbsp_options.get(str, 'static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
-            force_type=conditions.TEMP_TYPES.detail,
+            force_type=template_brush.TEMP_TYPES.detail,
         )
         conditions.retexture_template(
             temp_data,

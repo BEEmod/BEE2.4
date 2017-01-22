@@ -1,8 +1,8 @@
 # coding: utf-8
+import inspect
 import itertools
 import math
 import random
-import inspect
 from collections import namedtuple, defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -12,11 +12,11 @@ from typing import (
     Dict, List, Tuple, NamedTuple, Set,
 )
 
+import comp_consts as consts
 import srctools
+import template_brush
 import utils
 import vbsp_options
-import comp_consts as consts
-import template_brush
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property,
@@ -52,22 +52,6 @@ TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
-
-
-class SWITCH_TYPE(Enum):
-    """The methods useable for switch options."""
-    FIRST = 'first'  # choose the first match
-    LAST = 'last'  # choose the last match
-    RANDOM = 'random'  # Randomly choose
-    ALL = 'all'  # Run all matching commands
-
-
-class TEMP_TYPES(Enum):
-    """Value used for import_template()'s force_type parameter.
-    """
-    default = 0  # Based on the original VMF settings
-    world = 1  # Import and add to world
-    detail = 2  # Import as a func_detail
 
 Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
 
@@ -1071,7 +1055,7 @@ def import_template(
         origin,
         angles=None,
         targetname='',
-        force_type=TEMP_TYPES.default,
+        force_type=template_brush.TEMP_TYPES.default,
         add_to_map=True,
         visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     ) -> Template:
@@ -1161,10 +1145,10 @@ def import_template(
         # Don't let the overlays get retextured too!
         vbsp.IGNORED_OVERLAYS.add(new_overlay)
 
-    if force_type is TEMP_TYPES.detail:
+    if force_type is template_brush.TEMP_TYPES.detail:
         new_detail.extend(new_world)
         new_world.clear()
-    elif force_type is TEMP_TYPES.world:
+    elif force_type is template_brush.TEMP_TYPES.world:
         new_world.extend(new_detail)
         new_detail.clear()
 
@@ -1494,7 +1478,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
             face.get_origin(),
             # The normal Z is swapped...
             normal.to_angle(),
-            force_type=TEMP_TYPES.world,
+            force_type=template_brush.TEMP_TYPES.world,
         ).world
 
         # Texture the new brush..
@@ -1680,7 +1664,7 @@ def res_end_condition():
 @make_result_setup('switch')
 def res_switch_setup(res: Property):
     flag = None
-    method = SWITCH_TYPE.FIRST
+    method = template_brush.SWITCH_TYPE.FIRST
     cases = []
     for prop in res:
         if prop.has_children():
@@ -1691,7 +1675,7 @@ def res_switch_setup(res: Property):
                 continue
             if prop.name == 'method':
                 try:
-                    method = SWITCH_TYPE(prop.value.casefold())
+                    method = template_brush.SWITCH_TYPE(prop.value.casefold())
                 except ValueError:
                     pass
 
@@ -1699,7 +1683,7 @@ def res_switch_setup(res: Property):
         for result in prop.value:
             Condition.setup_result(prop.value, result)
 
-    if method is SWITCH_TYPE.LAST:
+    if method is template_brush.SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
 
     return (
@@ -1722,7 +1706,7 @@ def res_switch(inst: Entity, res: Property):
     """
     flag_name, cases, method = res.value
 
-    if method is SWITCH_TYPE.RANDOM:
+    if method is template_brush.SWITCH_TYPE.RANDOM:
         cases = cases[:]
         random.shuffle(cases)
 
@@ -1733,7 +1717,7 @@ def res_switch(inst: Entity, res: Property):
                 continue
         for res in case:
             Condition.test_result(inst, res)
-        if method is not SWITCH_TYPE.ALL:
+        if method is not template_brush.SWITCH_TYPE.ALL:
             # All does them all, otherwise we quit now.
             break
 

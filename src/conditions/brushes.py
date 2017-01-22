@@ -5,12 +5,13 @@ from collections import defaultdict
 import brushLoc
 import conditions
 import srctools
+import template_brush
 import utils
 import vbsp
 import vbsp_options
 import comp_consts as const
 from conditions import (
-    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
+    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
@@ -396,11 +397,11 @@ def res_import_template_setup(res: Property):
         force_colour = None
 
     if 'world' in force:
-        force_type = TEMP_TYPES.world
+        force_type = template_brush.TEMP_TYPES.world
     elif 'detail' in force:
-        force_type = TEMP_TYPES.detail
+        force_type = template_brush.TEMP_TYPES.detail
     else:
-        force_type = TEMP_TYPES.default
+        force_type = template_brush.TEMP_TYPES.default
 
     for size in ('2x2', '4x4', 'wall', 'special'):
         if size in force:
@@ -449,7 +450,7 @@ def res_import_template_setup(res: Property):
 
         # Spawn everything as detail, so they get put into a brush
         # entity.
-        force_type = TEMP_TYPES.detail
+        force_type = template_brush.TEMP_TYPES.detail
     else:
         keys = None
     visgroup_mode = res['visgroup', 'none'].casefold()
