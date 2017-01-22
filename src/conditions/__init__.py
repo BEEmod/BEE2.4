@@ -1100,7 +1100,13 @@ def import_template(
     chosen_groups.add('')  # '' = no visgroup, always used.
 
     for group in chosen_groups:
-        world, detail, over = visgroups[group]
+        try:
+            world, detail, over = visgroups[group]
+        except KeyError:
+            raise ValueError('Unknown visgroup "{}" for ""! (valid: {})'.format(
+                group, temp_name, ', '.join(map(repr, visgroups)),
+            ))
+
         orig_world.append(world)
         orig_detail.append(detail)
         orig_over.extend(over)
