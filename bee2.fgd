@@ -48,11 +48,7 @@
 	]
 
 @PointClass 
-	iconsprite("BEE2/editor/bee2_icon.vmt") 
-	sidelist(realign_faces) 
-	sidelist(vertical_faces) 
-	sidelist(skip_faces) 
-	
+	iconsprite("BEE2/editor/bee2_icon.vmt")
 	= bee2_template_conf:
 	"Defines configuration options for a template."
 	[
@@ -63,6 +59,7 @@
 	"The faces must be axis-aligned."
 	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
 	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
+	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using ReplaceBrush."
 	
 	temp_type(choices): "Template Type" : "default" : "Convert brushes to this type of entity." =
 		[

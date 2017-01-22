@@ -16,6 +16,7 @@ import srctools
 import utils
 import vbsp_options
 import comp_consts as consts
+import template_brush
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property,
