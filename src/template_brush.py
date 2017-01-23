@@ -8,7 +8,6 @@ import vbsp_options
 
 from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec
 import comp_consts as consts
-import conditions
 import utils
 
 from typing import (
@@ -246,27 +245,31 @@ def get_template(temp_name):
     except KeyError as err:
         # Replace the KeyError with a more useful error message, and
         # list all the templates that are available.
-        LOGGER.info('Templates:')
-        LOGGER.info('\n'.join(
+        err.args ('Template not found: "{}"\n{}'.format(
+            temp_name,
+            '\n'.join(
             ('* "' + temp.upper() + '"')
             for temp in
             sorted(TEMPLATES.keys())
-        ))
-        # Overwrite the error's value
-        err.args = ('Template not found: "{}"'.format(temp_name),)
+            ),
+        ), )
         raise err
 
 
 def import_template(
-        temp_name,
+        temp_name: Union[str, Template],
         origin,
         angles=None,
         targetname='',
         force_type=TEMP_TYPES.default,
         add_to_map=True,
+        additional_visgroups: Iterable[str]=(),
         visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
     ) -> ExportedTemplate:
     """Import the given template at a location.
+
+    temp_name can be a string, or a template instance. visgroups is a list
+    of additional visgroups to use after the ones in the name string (if given).
 
     If force_type is set to 'detail' or 'world', all brushes will be converted
     to the specified type instead. A list of world brushes and the func_detail
@@ -279,9 +282,14 @@ def import_template(
     added - it's passed a list of names, and should return a list of ones to use.
     """
     import vbsp
-    temp_name, chosen_groups = parse_temp_name(temp_name)
-    template = get_template(temp_name)
+    if isinstance(temp_name, Template):
+        template, temp_name = temp_name, temp_name.id
+        chosen_groups = set()
+    else:
+        temp_name, chosen_groups = parse_temp_name(temp_name)
+        template = get_template(temp_name)
 
+    chosen_groups.update(additional_visgroups)
     chosen_groups.update(visgroup_choose(template.visgroups))
 
     orig_world, orig_detail, orig_over = template.visgrouped(chosen_groups)
