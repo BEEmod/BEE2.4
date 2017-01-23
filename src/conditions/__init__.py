@@ -21,7 +21,6 @@ from srctools import (
     Vec_tuple, Vec,
     Entity, Output, Solid, Side
 )
-from template_brush import MAT_TYPES, load_templates, import_template
 
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
@@ -44,10 +43,6 @@ ALL_META = []
 GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
 GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
-# A VMF containing template brushes, which will be loaded in and retextured
-# The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]]
-
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
@@ -65,7 +60,7 @@ solidGroup = NamedTuple('solidGroup', [
     ('face', Side),
     ('solid', Solid),
     ('normal', Vec),  # The normal of the face.
-    ('color', MAT_TYPES),
+    ('color', template_brush.MAT_TYPES),
 ])
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
@@ -440,7 +435,6 @@ def init(seed, inst_list, vmf_file):
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
 
     build_solid_dict()
-    load_templates()
 
 
 def check_all():
@@ -548,10 +542,10 @@ def build_solid_dict():
     import vbsp
     mat_types = {}
     for mat in vbsp.BLACK_PAN:
-        mat_types[mat] = MAT_TYPES.black
+        mat_types[mat] = template_brush.MAT_TYPES.black
 
     for mat in vbsp.WHITE_PAN:
-        mat_types[mat] = MAT_TYPES.white
+        mat_types[mat] = template_brush.MAT_TYPES.white
 
     for solid in VMF.brushes:
         for face in solid:
@@ -953,7 +947,7 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
         normal = face.normal()
 
         # Generate our new brush.
-        new_brushes = import_template(
+        new_brushes = template_brush.import_template(
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...

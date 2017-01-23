@@ -12,9 +12,10 @@ import conditions
 import utils
 
 from typing import (
-    Iterable, NamedTuple,
+    Iterable, Union, Callable,
+    NamedTuple, Tuple,
     Dict, List, Set,
-    Callable, Tuple)
+)
 
 LOGGER = utils.getLogger(__name__, alias='template')
 
@@ -23,6 +24,7 @@ TEMPLATES = {}  # type: Dict[str, Template]
 
 # The location of the template data.
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
+
 
 class MAT_TYPES(Enum):
     """Represents Black vs White."""
@@ -127,7 +129,7 @@ class Template:
         self._data = data = {}
 
         # We ensure the '' group is always present.
-        all_groups = set('')
+        all_groups = {''}
         all_groups.update(world)
         all_groups.update(detail)
         all_groups.update(overlays)
@@ -141,7 +143,7 @@ class Template:
         self.realign_faces = set(realign_faces)
         self.overlay_faces = set(overlay_transfer_faces)
 
-        TEMPLATES[temp_id] = self
+        TEMPLATES[temp_id.casefold()] = self
 
     @property
     def visgroups(self):
@@ -290,19 +292,18 @@ def import_template(
 
     id_mapping = {}  # A map of the original -> new face IDs.
 
-    for orig_lists, new_list in [
+    for orig_list, new_list in [
             (orig_world, new_world),
             (orig_detail, new_detail)
         ]:
-        for orig_list in orig_lists:
-            for old_brush in orig_list:
-                brush = old_brush.copy(
-                    map=vbsp.VMF,
-                    side_mapping=id_mapping,
-                    keep_vis=False,
-                )
-                brush.localise(origin, angles)
-                new_list.append(brush)
+        for old_brush in orig_list:
+            brush = old_brush.copy(
+                map=vbsp.VMF,
+                side_mapping=id_mapping,
+                keep_vis=False,
+            )
+            brush.localise(origin, angles)
+            new_list.append(brush)
 
     for overlay in orig_over:  # type: Entity
         new_overlay = overlay.copy(

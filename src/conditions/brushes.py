@@ -11,7 +11,7 @@ import vbsp
 import vbsp_options
 import comp_consts as const
 from conditions import (
-    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES
+    make_result, make_result_setup, SOLIDS
 )
 from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
@@ -388,9 +388,9 @@ def res_import_template_setup(res: Property):
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
-        force_colour = MAT_TYPES.white
+        force_colour = template_brush.MAT_TYPES.white
     elif 'black' in force:
-        force_colour = MAT_TYPES.black
+        force_colour = template_brush.MAT_TYPES.black
     elif 'invert' in force:
         force_colour = 'INVERT'
     else:
@@ -548,8 +548,12 @@ def res_import_template(inst: Entity, res: Property):
     ) = res.value
     temp_id = conditions.resolve_value(inst, orig_temp_id)
 
-    temp_name, vis = template_brush.parse_temp_name(temp_id)
-    if temp_name not in TEMPLATES:
+    LOGGER.info('TEMPLATE IMPORT: {}', temp_id)
+
+    temp_name, visgroups = template_brush.parse_temp_name(temp_id)
+    try:
+        template = template_brush.get_template(temp_name)
+    except KeyError:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
@@ -570,21 +574,23 @@ def res_import_template(inst: Entity, res: Property):
         invert_val = inst.fixup[invert_var].casefold()
 
         if invert_val == 'white':
-            force_colour = conditions.MAT_TYPES.white
+            force_colour = template_brush.MAT_TYPES.white
         elif invert_val == 'black':
-            force_colour = conditions.MAT_TYPES.black
+            force_colour = template_brush.MAT_TYPES.black
         elif srctools.conv_bool(invert_val):
-            force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
+            force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
     temp_data = template_brush.import_template(
-        temp_id,
+        template,
         origin,
         angles,
         targetname=inst['targetname', ''],
         force_type=force_type,
         visgroup_choose=visgroup_func,
+        add_to_map=True,
+        additional_visgroups=visgroups,
     )
 
     if key_block is not None:
@@ -621,7 +627,7 @@ def res_import_template(inst: Entity, res: Property):
             temp_data,
             brush_group,
             rem_replace_brush,
-            additional_replace_ids,
+            additional_replace_ids + template.overlay_faces,
             conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
         )
 

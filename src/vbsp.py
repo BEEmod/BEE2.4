@@ -23,6 +23,7 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import template_brush
 import comp_consts as consts
 
 from typing import (
@@ -344,6 +345,9 @@ def load_settings():
         for var in stylevar_block:
             settings['style_vars'][
                 var.name.casefold()] = srctools.conv_bool(var.value)
+
+    # Load in templates.
+    template_brush.load_templates()
 
     # Load in the config file holding item data.
     # This is used to lookup item's instances, or their connection commands.
@@ -2029,6 +2033,7 @@ def add_glass_floorbeams(glass_locs):
                     pos,
                     rot,
                     force_type=template_brush.TEMP_TYPES.detail,
+                    add_to_map=True,
                 )
 
 
@@ -2132,7 +2137,7 @@ def cond_force_clump(inst: Entity, res: Property):
     point2 = point2.copy().rotate(*angles)
     point2 += origin
 
-    min_pos, max_pos = Vec.bbox((point1, point2))
+    min_pos, max_pos = Vec.bbox(point1, point2)
 
     PRESET_CLUMPS.append(Clump(
         min_pos,
@@ -2927,11 +2932,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
-            force_colour=(
-                conditions.MAT_TYPES.white
-                if pan_type == 'white' else
-                conditions.MAT_TYPES.black
-            ),
+            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
             fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
@@ -2977,11 +2978,7 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
-            force_colour=(
-                conditions.MAT_TYPES.white
-                if pan_type == 'white' else
-                conditions.MAT_TYPES.black
-            ),
+            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
             fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
