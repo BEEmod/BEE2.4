@@ -417,7 +417,7 @@ def res_import_template_setup(res: Property):
         replace_tex[prop.name].append(prop.value)
 
     rem_replace_brush = True
-    additional_ids = ()
+    additional_ids = set()
     transfer_overlays = '1'
     try:
         replace_brush = res.find_key('replaceBrush')
@@ -426,7 +426,7 @@ def res_import_template_setup(res: Property):
     else:
         if replace_brush.has_children():
             replace_brush_pos = replace_brush['Pos', '0 0 0']
-            additional_ids = list(map(
+            additional_ids = set(map(
                 srctools.conv_int,
                 replace_brush['additionalIDs', ''].split(),
             ))
@@ -623,11 +623,12 @@ def res_import_template(inst: Entity, res: Property):
         # Not set or solid group doesn't exist, skip..
         pass
     else:
+        LOGGER.info('IDS: {}', additional_replace_ids | template.overlay_faces)
         conditions.steal_from_brush(
             temp_data,
             brush_group,
             rem_replace_brush,
-            additional_replace_ids + template.overlay_faces,
+            map(int, additional_replace_ids | template.overlay_faces),
             conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
         )
 

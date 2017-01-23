@@ -5,6 +5,7 @@ import operator
 import os
 import os.path
 import shutil
+import math
 from collections import defaultdict
 from contextlib import ExitStack
 from zipfile import ZipFile
@@ -2568,6 +2569,25 @@ class BrushTemplate(PakObject, has_img=False):
                 force_is_detail = True
             elif config['temp_type'] == 'world':
                 force_is_detail = False
+            # Add to the exported map as well.
+            export_config = config.copy(map=TEMPLATE_FILE, keep_vis=False)
+            # Remove the configs we've parsed
+            for key in (
+                'temp_type',
+                'is_scaling',
+                'discard_brushes',
+                'template_id',
+                'detail_auto_visgroup',
+                # Not used, but might be added by Hammer.
+                'origin',
+                'angles',
+            ):
+                del export_config[key]
+            # Only add if it has useful settings.
+            if export_config.keys:
+                TEMPLATE_FILE.add_ent(export_config)
+                export_config['template_id'] = temp_id
+
         else:
             conf_auto_visgroup = is_scaling = False
 
@@ -2669,6 +2689,17 @@ class BrushTemplate(PakObject, has_img=False):
         """Write the template VMF file."""
         # Sort the visgroup list by name, to make it easier to search through.
         TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
+
+        # Place the config entities in a nice grid.
+        conf_ents = list(TEMPLATE_FILE.by_class['bee2_template_conf'])
+        dist = math.floor(math.sqrt(len(conf_ents)))
+        half_dist = dist / 2
+        for i, ent in enumerate(conf_ents):
+            ent['origin'] = Vec(
+                16 * ((i // dist) - half_dist),
+                16 * ((i % dist) - half_dist),
+                256,
+            )
 
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:

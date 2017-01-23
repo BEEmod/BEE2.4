@@ -822,8 +822,6 @@ def steal_from_brush(
     transfer_overlays=True,
 ):
     """Copy IDs from a brush to a template."""
-    LOGGER.info('Steal: {}', locals())
-
     temp_brushes = temp_data.world.copy()
     # Overlays can't be applied to entities (other than func_detail).
     if temp_data.detail is not None and temp_data.detail['classname'] == 'func_detail':
@@ -837,11 +835,11 @@ def steal_from_brush(
         brush_group.face.mat = 'tools/toolsnodraw'
 
     # Additional is a list of IDs in the template VMF, not the final one.
-    additional = [
-        temp_data.orig_ids.get(face_id, -1)
+    additional = {
+        temp_data.orig_ids.get(int(face_id), -1)
         for face_id in
         additional
-    ]
+    }
     new_ids = []
 
     for brush in temp_brushes:

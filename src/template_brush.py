@@ -118,8 +118,10 @@ class Template:
         world: Dict[str, List[Solid]],
         detail: Dict[str, List[Solid]],
         overlays: Dict[str, List[Entity]],
+        skip_faces: Iterable[str]=(),
         realign_faces: Iterable[str]=(),
         overlay_transfer_faces: Iterable[str]=(),
+        vertical_faces: Iterable[str]=(),
     ):
         """Make an overlay.
 
@@ -141,8 +143,8 @@ class Template:
 
         self.realign_faces = set(realign_faces)
         self.overlay_faces = set(overlay_transfer_faces)
-
-        TEMPLATES[temp_id.casefold()] = self
+        self.vertical_faces = set(vertical_faces)
+        self.skip_faces     = set(skip_faces)
 
     @property
     def visgroups(self):
@@ -204,6 +206,7 @@ def load_templates():
     detail_ents = defaultdict(make_subdict)
     world_ents = defaultdict(make_subdict)
     overlay_ents = defaultdict(make_subdict)
+    conf_ents = {}
 
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[
@@ -226,12 +229,29 @@ def load_templates():
             ent['visgroup'].casefold()
         ].append(ent)
 
+    for ent in vmf.by_class['bee2_template_conf']:
+        conf_ents[ent['template_id'].casefold()] = ent
+
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
-        Template(
+        try:
+            conf = conf_ents[temp_id]
+        except KeyError:
+            overlay_faces = skip_faces = vertical_faces = realign_faces = []
+        else:
+            vertical_faces = conf['vertical_faces'].split()
+            realign_faces = conf['realign_faces'].split()
+            overlay_faces = conf['overlay_faces'].split()
+            skip_faces = conf['skip_faces'].split()
+
+        TEMPLATES[temp_id.casefold()] = Template(
             temp_id,
             world_ents[temp_id],
             detail_ents[temp_id],
             overlay_ents[temp_id],
+            skip_faces,
+            realign_faces,
+            overlay_faces,
+            vertical_faces,
         )
 
 
