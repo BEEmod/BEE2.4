@@ -400,7 +400,7 @@ def res_faith_mods(inst: Entity, res: Property):
             for solid in trig.solids:
                 solid.translate(offset)
         elif trig_temp:
-            trig.solids = conditions.import_template(
+            trig.solids = template_brush.import_template(
                 temp_name=trig_temp,
                 origin=trig_origin,
                 angles=Vec.from_str(inst['angles']),

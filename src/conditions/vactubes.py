@@ -3,14 +3,14 @@
 from collections import namedtuple
 
 import srctools
+import template_brush
 import utils
 import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    import_template, remove_ant_toggle,
+    remove_ant_toggle,
     GOO_LOCS, SOLIDS
 )
-from template_brush import TEMP_TYPES
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Vec, Vec_tuple,
@@ -376,11 +376,11 @@ def make_corner(origin, angle, size, config):
 
     temp = config['corner_temp', size]
     if temp:
-        temp_solids = import_template(
+        temp_solids = template_brush.import_template(
             temp,
             origin=origin,
             angles=Vec.from_str(angle),
-            force_type=TEMP_TYPES.world,
+            force_type=template_brush.TEMP_TYPES.world,
         ).world
         for solid in temp_solids:
             vbsp.VMF.remove_brush(solid)

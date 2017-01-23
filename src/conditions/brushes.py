@@ -224,10 +224,10 @@ def res_set_texture(inst: Entity, res: Property):
 
     temp = res['template', None]
     if temp:
-        temp = conditions.get_template(temp)
+        temp = template_brush.get_template(temp)
         # No visgroup, world brush, first of them
         try:
-            temp_brush = temp[''][0][0].copy()
+            temp_brush = temp.visgrouped()[0][0].copy()
         except LookupError:
             raise ValueError('Template must be one world brush!')
         temp_brush.localise(
@@ -548,7 +548,7 @@ def res_import_template(inst: Entity, res: Property):
     ) = res.value
     temp_id = conditions.resolve_value(inst, orig_temp_id)
 
-    temp_name, vis = conditions.parse_temp_name(temp_id)
+    temp_name, vis = template_brush.parse_temp_name(temp_id)
     if temp_name not in TEMPLATES:
         # The template map is read in after setup is performed, so
         # it must be checked here!
@@ -578,7 +578,7 @@ def res_import_template(inst: Entity, res: Property):
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    temp_data = conditions.import_template(
+    temp_data = template_brush.import_template(
         temp_id,
         origin,
         angles,
@@ -625,7 +625,7 @@ def res_import_template(inst: Entity, res: Property):
             conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
         )
 
-    conditions.retexture_template(
+    template_brush.retexture_template(
         temp_data,
         origin,
         inst.fixup,

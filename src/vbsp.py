@@ -1614,7 +1614,7 @@ def fixup_goo_sides():
     """
 
     if vbsp_options.get(str, 'goo_wall_scale_temp'):
-        scale = conditions.get_scaling_template(
+        scale = template_brush.get_scaling_template(
             vbsp_options.get(str, 'goo_wall_scale_temp')
         )
     else:
@@ -1825,7 +1825,7 @@ def change_brush():
 
     glass_temp = vbsp_options.get(str, "glass_template")
     if glass_temp:
-        glass_temp = conditions.get_scaling_template(glass_temp)
+        glass_temp = template_brush.get_scaling_template(glass_temp)
     else:
         glass_temp = None
 
@@ -2024,7 +2024,7 @@ def add_glass_floorbeams(glass_locs):
         for pos in group:
             # Every 'sep' positions..
             if (pos[axis] - offset) % separation == 0:
-                conditions.import_template(
+                template_brush.import_template(
                     temp_name,
                     pos,
                     rot,
@@ -2671,7 +2671,7 @@ def change_func_brush():
 
     grate_temp = vbsp_options.get(str, "grating_template")
     if grate_temp:
-        grate_temp = conditions.get_scaling_template(grate_temp)
+        grate_temp = template_brush.get_scaling_template(grate_temp)
     else:
         grate_temp = None
 
@@ -2835,7 +2835,7 @@ def change_func_brush():
 
                     if dynamic_pan_temp:
                         # Allow replacing the brush used for the surface.
-                        new_brush = conditions.import_template(
+                        new_brush = template_brush.import_template(
                             dynamic_pan_temp,
                             Vec.from_str(brush['origin']),
                             Vec.from_str(ins['angles']),
@@ -2917,14 +2917,14 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     # We use a template for the surface, so it can use correct textures.
     if angle == '00':
         # Special case: flat panels use different templates
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             vbsp_options.get(str, 'static_pan_temp_flat'),
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
             force_type=template_brush.TEMP_TYPES.detail,
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
             force_colour=(
@@ -2968,13 +2968,13 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos = Vec(64, 0, 0)
         faith_targ_pos.localise(temp_origin, temp_angles)
 
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             vbsp_options.get(str, 'static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
             force_type=template_brush.TEMP_TYPES.detail,
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
             force_colour=(

@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import template_brush
 import utils
 from conditions import (
     make_result, make_result_setup,
@@ -87,7 +88,7 @@ def res_insert_overlay(inst: Entity, res: Property):
         )
         return
 
-    temp = conditions.import_template(
+    temp = template_brush.import_template(
         temp_id,
         origin,
         angles,

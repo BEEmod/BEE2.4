@@ -122,7 +122,7 @@ def res_conveyor_belt(inst: Entity, res: Property):
             seg_inst.fixup.update(inst.fixup)
 
         if rail_template:
-            temp = conditions.import_template(
+            temp = template_brush.import_template(
                 rail_template,
                 pos,
                 angles,
