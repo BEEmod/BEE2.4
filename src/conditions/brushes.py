@@ -173,8 +173,10 @@ def res_set_texture(inst: Entity, res: Property):
     tex is the texture used.
     If tex begins and ends with '<>', certain
     textures will be used based on style:
-    - If tex is '<special>', the brush will be given a special texture
-      like angled and clear panels.
+    - '<delete>' will remove the brush entirely (it should be hollow).
+      Caution should be used to ensure no leaks occur.
+    - '<special>' the brush will be given a special texture
+      like angled and flip panels.
     - '<white>' and '<black>' will use the regular textures for the
       given color.
     - '<white-2x2>', '<white-4x4>', '<black-2x2>', '<black-4x4'> will use
@@ -250,6 +252,10 @@ def res_set_texture(inst: Entity, res: Property):
     elif tex.startswith('<') and tex.endswith('>'):
         # Special texture names!
         tex = tex[1:-1].casefold()
+        if tex == 'delete':
+            vbsp.VMF.remove_brush(brush)
+            return
+
         if tex == 'white':
             face_to_mod.mat = 'tile/white_wall_tile003a'
         elif tex == 'black':
