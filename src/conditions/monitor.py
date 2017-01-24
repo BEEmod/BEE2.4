@@ -32,6 +32,10 @@ Monitor = namedtuple('Monitor', 'inst')
 # Are there monitors that should be shot?
 NEEDS_TURRET = False
 
+# ai_relationships used for monitors.
+# If non-emtpy we have monitors to shoot by turrets.
+MONITOR_RELATIONSHIP_ENTS = []  # type: List[Entity]
+
 # The location of the voiceline room, used to position the camera.
 VOICELINE_LOC = Vec()
 
@@ -51,7 +55,6 @@ def res_monitor(inst: Entity, res: Property):
     """Result for the monitor component.
 
     """
-    global NEEDS_TURRET
     import vbsp
 
     (
@@ -86,7 +89,7 @@ def res_monitor(inst: Entity, res: Property):
             spawnflags=221186,  # Non-solid, invisible, etc..
             origin=loc,
         )
-        inst.map.create_ent(
+        relation = inst.map.create_ent(
             classname='ai_relationship',
             targetname='@monitor_turr_hate',
             spawnflags=2,  # Notify turrets about monitor locations
@@ -95,8 +98,7 @@ def res_monitor(inst: Entity, res: Property):
             subject='npc_portal_turret_floor',
             target=bullseye_name,
         )
-
-        NEEDS_TURRET = True
+        MONITOR_RELATIONSHIP_ENTS.append(relation)
 
 
 
@@ -253,21 +255,22 @@ def mon_camera_link():
                 vbsp_options.get(float, 'voice_studio_cam_pitch'),
                 vbsp_options.get(float, 'voice_studio_cam_yaw'),
             )
+            # If we start at the studio, make the ai_relationships
+            # for turret fire start active.
+            for relation in MONITOR_RELATIONSHIP_ENTS:
+                relation['StartActive'] = '1'
         else:
             # Start in arrival_departure_transition_ents...
             start_pos = '-2500 -2500 0'
             start_angles = '0 90 0'
 
-    vbsp.VMF.create_ent(
+    cam = vbsp.VMF.create_ent(
         classname='point_camera',
         targetname='@camera',
         spawnflags='0',  # Start on
         origin=start_pos,
         angles=start_angles,
         fov='60',
-
-        vscripts='BEE2/mon_camera_args.nut BEE2/mon_camera.nut',
-        thinkfunction='Think',
 
         # Copy fog settings from the skybox.
         fogEnable='1',
@@ -276,6 +279,16 @@ def mon_camera_link():
         fogStart=fog_opt['start'],
         fogEnd=fog_opt['end'],
     )
+
+    if not ALL_CAMERAS:
+        # No cameras in the map - we don't move at all.
+        # So we don't need the script.
+        return
+
+    # Set the vscripts
+    cam['vscripts'] = 'BEE2/mon_camera_args.nut BEE2/mon_camera.nut'
+    cam['thinkfunction'] = 'Think'
+
     vbsp.PACK_FILES.add('scripts/vscripts/BEE2/mon_camera.nut')
 
     # Write out a script containing the arguments to the camera.
@@ -310,7 +323,7 @@ def mon_camera_link():
                     chance=vbsp_options.get(float, 'voice_studio_inter_chance'),
                     pitch=vbsp_options.get(float, 'voice_studio_cam_pitch'),
                     yaw=vbsp_options.get(float, 'voice_studio_cam_yaw'),
-                    turret=int(NEEDS_TURRET),
+                    turret='1' if MONITOR_RELATIONSHIP_ENTS else '0',
                 )
             )
         else:
