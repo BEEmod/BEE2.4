@@ -4,7 +4,7 @@ import math
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Vec, Property
 import srctools
 import conditions
@@ -67,7 +67,7 @@ def res_unst_scaffold_setup(res: Property):
             if conf[logic_type + '_rev'] is None:
                 conf[logic_type + '_rev'] = conf[logic_type]
 
-        for inst in resolve_inst(block['file']):
+        for inst in instanceLocs.resolve(block['file']):
             targ_inst[inst] = conf
 
     # We need to provide vars to link the tracks and beams.

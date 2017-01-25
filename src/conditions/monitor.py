@@ -6,7 +6,7 @@ from conditions import (
     make_result, make_result_setup, meta_cond, RES_EXHAUSTED,
     local_name
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Property, Vec, Entity, VMF
 import srctools
 import vbsp_options
@@ -109,9 +109,9 @@ def res_camera_setup(res: Property):
         'yaw_off': Vec.from_str(res['YawOff', '']),
         'pitch_off': Vec.from_str(res['PitchOff', '']),
 
-        'io_inst': resolve_inst(res['IO_inst'])[0],
-        'yaw_inst': resolve_inst(res['yawInst', ''])[0],
-        'pitch_inst': resolve_inst(res['pitchInst', ''])[0],
+        'io_inst': instanceLocs.resolve_one(res['IO_inst'], error=True),
+        'yaw_inst': instanceLocs.resolve_one(res['yawInst', '']),
+        'pitch_inst': instanceLocs.resolve_one(res['pitchInst', '']),
 
         'yaw_range': srctools.conv_int(res['YawRange', ''], 90),
         'pitch_range': srctools.conv_int(res['YawRange', ''], 90),
@@ -195,7 +195,7 @@ def mon_remove_bullseyes(inst: Entity):
     if not BULLSYE_LOCS:
         return RES_EXHAUSTED
 
-    if inst['file'].casefold() not in resolve_inst('<ITEM_CATAPULT_TARGET>'):
+    if inst['file'].casefold() not in instanceLocs.resolve('<ITEM_CATAPULT_TARGET>'):
         return
 
     LOGGER.info('Bullseye {}', BULLSYE_LOCS)

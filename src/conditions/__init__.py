@@ -15,7 +15,7 @@ import comp_consts as consts
 import srctools
 import template_brush
 import utils
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import (
     Property,
     Vec_tuple, Vec,
@@ -473,7 +473,7 @@ def check_all():
     ])
     # Dynamically added by lru_cache()
     # noinspection PyUnresolvedReferences
-    LOGGER.info('instanceLocs cache: {}', resolve_inst.cache_info())
+    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
@@ -1197,7 +1197,7 @@ def res_switch(inst: Entity, res: Property):
 @make_result_setup('staticPiston')
 def make_static_pist_setup(res: Property):
     return {
-        name: resolve_inst(res[name, ''])[0]
+        name: instanceLocs.resolve_one(res[name, ''], error=True)
         for name in
         (
             'bottom_1', 'bottom_2', 'bottom_3',

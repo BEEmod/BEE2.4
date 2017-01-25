@@ -8,7 +8,7 @@ import template_brush
 import utils
 import vbsp
 import comp_consts as consts
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from perlin import SimplexNoise
 from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis
 
@@ -53,7 +53,7 @@ FLOOR_DEPTH = 8  # Distance we drop the floor
 def find_indicator_panels(inst: Entity):
     """We need to locate indicator panels, so they aren't overwritten.
     """
-    if inst['file'].casefold() not in resolve_inst('[indpan]'):
+    if inst['file'].casefold() not in instanceLocs.resolve('[indpan]'):
         return
     loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
     loc += Vec.from_str(inst['origin'])
@@ -86,7 +86,7 @@ def res_cutout_tile(res: Property):
     - "Floor4x4Black", "Ceil2x2White" and other combinations can be used to
        override the textures used.
     """
-    item = resolve_inst(res['markeritem'])
+    item = instanceLocs.resolve(res['markeritem'])
 
     INST_LOCS = {}  # Map targetnames -> surface loc
     CEIL_IO = []  # Pairs of ceil inst corners to cut out.

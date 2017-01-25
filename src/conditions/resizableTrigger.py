@@ -1,5 +1,6 @@
 """Logic for trigger items, allowing them to be resized."""
 import conditions
+import instanceLocs
 import srctools
 import utils
 import vbsp
@@ -7,7 +8,6 @@ import comp_consts as const
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
-from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, Output
 
 
@@ -47,7 +47,7 @@ def res_resizeable_trigger(res: Property):
     'localkeys': The same as above, except values will be changed to use
         instance-local names.
     """
-    marker = resolve_inst(res['markerInst'])
+    marker = instanceLocs.resolve(res['markerInst'])
 
     markers = {}
     for inst in vbsp.VMF.by_class['func_instance']:

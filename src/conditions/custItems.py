@@ -14,7 +14,7 @@ from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
 # Map sign_type values to the item ID and the resolveInst ID.
@@ -81,7 +81,7 @@ def res_cust_output(inst: Entity, res: Property):
         if out.target != toggle_name:
             targets[out.target].append(out)
 
-    pan_files = resolve_inst('[indPan]')
+    pan_files = instanceLocs.resolve('[indPan]')
 
     # These all require us to search through the instances.
     if force_sign_type or dec_con_count or targ_conditions:
@@ -100,7 +100,7 @@ def res_cust_output(inst: Entity, res: Property):
                 # Overwrite the signage instance, and then add the
                 # appropriate outputs to control it.
                 sign_id, sign_file_id = force_sign_type
-                con_inst['file'] = resolve_inst(sign_file_id)[0]
+                con_inst['file'] = instanceLocs.resolve_one(sign_file_id, error=True)
 
                 # First delete the original outputs:
                 for out in targets[con_inst['targetname']]:

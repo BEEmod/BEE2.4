@@ -2,6 +2,7 @@
 
 """
 import conditions
+import instanceLocs
 import srctools
 import vbsp
 import vbsp_options
@@ -10,7 +11,6 @@ from conditions import (
     make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
 )
-from instanceLocs import resolve as resolve_inst
 from srctools import Vec, Entity, Property
 
 LOGGER = utils.getLogger(__name__, 'cond.addInstance')
@@ -31,21 +31,19 @@ def res_add_global_inst(res: Property):
             Prefix, '1' is Suffix, and '2' is None.
     """
     if res.value is not None:
-        if (
-                srctools.conv_bool(res['allow_multiple', '0']) or
-                res['file'] not in GLOBAL_INSTANCES):
+        if res.bool('allow_multiple') or res['file'] not in GLOBAL_INSTANCES:
             # By default we will skip adding the instance
             # if was already added - this is helpful for
             # items that add to original items, or to avoid
             # bugs.
-            new_inst = Entity(vbsp.VMF, keys={
-                "classname": "func_instance",
-                "targetname": res['name', ''],
-                "file": resolve_inst(res['file'])[0],
-                "angles": res['angles', '0 0 0'],
-                "origin": res['position', '0 0 -10000'],
-                "fixup_style": res['fixup_style', '0'],
-                })
+            new_inst = vbsp.VMF.create_ent(
+                classname="func_instance",
+                targetname=res['name', ''],
+                file=instanceLocs.resolve_one(res['file'], error=True),
+                angles=res['angles', '0 0 0'],
+                origin=res['position', '0 0 -10000'],
+                fixup_style=res['fixup_style', '0'],
+            )
             GLOBAL_INSTANCES.add(res['file'])
             if new_inst['targetname'] == '':
                 new_inst['targetname'] = "inst_"
@@ -82,10 +80,7 @@ def res_add_overlay_inst(inst: Entity, res: Property):
     angle = res['angles', inst['angles', '0 0 0']]
 
     orig_name = conditions.resolve_value(inst, res['file', ''])
-    try:
-        filename = resolve_inst(orig_name)[0]
-    except IndexError:
-        filename = ''
+    filename = instanceLocs.resolve_one(orig_name)
 
     if not filename:
         if not res.bool('silentLookup'):
@@ -144,9 +139,7 @@ def res_add_overlay_inst(inst: Entity, res: Property):
         offset.rotate_by_str(
             inst['angles', '0 0 0']
         )
-        overlay_inst['origin'] = (
-            offset + Vec.from_str(inst['origin'])
-        ).join(' ')
+        overlay_inst['origin'] = offset + Vec.from_str(inst['origin'])
     return overlay_inst
 
 

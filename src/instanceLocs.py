@@ -11,7 +11,7 @@ from functools import lru_cache
 import utils
 from srctools import Property
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, T, Union
 
 LOGGER = utils.getLogger(__name__)
 
@@ -265,6 +265,25 @@ def resolve(path, silent=False) -> List[str]:
         return val
     else:
         return _resolve(path)
+
+
+def resolve_one(path, default: T='', error=False) -> Union[str, T]:
+    """Resolve a path into one instance.
+
+    If multiple are given, this returns the first.
+    If none are found, the default is returned (which may be any value).
+    If error is True, an exception will be raised instead.
+    """
+    instances = resolve(path)
+    if not instances:
+        if error:
+            raise ValueError('Path "{}" has no instances!'.format(path))
+        return default
+    if len(instances) > 1:
+        if error:
+            raise ValueError('Path "{}" has multiple instances!'.format(path))
+        LOGGER.warning('Path "{}" returned multiple instances', path)
+    return instances[0]
 
 
 # Cache the return values, since they're constant.

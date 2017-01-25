@@ -3,7 +3,7 @@ from conditions import (
     make_result, RES_EXHAUSTED,
     INST_ANGLE,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Vec, Property
 import conditions
 import utils
@@ -112,11 +112,11 @@ def res_make_catwalk(res: Property):
         Single_Wall: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
-    marker = resolve_inst(res['markerInst'])
+    marker = instanceLocs.resolve(res['markerInst'])
     output_target = res['output_name', 'MARKER']
 
     instances = {
-        name: resolve_inst(res[name, ''])[0]
+        name: instanceLocs.resolve_one(res[name, ''], error=True)
         for name in
         (
             'straight_128', 'straight_256', 'straight_512',

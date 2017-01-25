@@ -11,7 +11,7 @@ from conditions import (
     remove_ant_toggle,
     GOO_LOCS, SOLIDS
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import (
     Vec, Vec_tuple,
     Property, Entity,
@@ -147,7 +147,8 @@ def res_vactube_setup(res: Property):
                 size = 1
                 file = prop.value
 
-            inst_configs[resolve_inst(file)[0]] = conf, srctools.conv_int(size, 1)
+            for inst in instanceLocs.resolve(file):
+                inst_configs[inst] = conf, srctools.conv_int(size, 1)
 
     return group
 

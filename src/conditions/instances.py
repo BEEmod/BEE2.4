@@ -11,14 +11,14 @@ from conditions import (
     make_flag, make_result, make_result_setup,
     ALL_INST,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
 
 @make_flag('instance')
 def flag_file_equal(inst: Entity, flag: Property):
     """Evaluates True if the instance matches the given file."""
-    return inst['file'].casefold() in resolve_inst(flag.value)
+    return inst['file'].casefold() in instanceLocs.resolve(flag.value)
 
 
 @make_flag('instFlag', 'InstPart')
@@ -30,7 +30,7 @@ def flag_file_cont(inst: Entity, flag: Property):
 @make_flag('hasInst')
 def flag_has_inst(flag: Property):
     """Checks if the given instance is present anywhere in the map."""
-    flags = resolve_inst(flag.value)
+    flags = instanceLocs.resolve(flag.value)
     return any(
         inst.casefold() in flags
         for inst in
@@ -82,7 +82,7 @@ def flag_instvar(inst: Entity, flag: Property):
 @make_result('rename', 'changeInstance')
 def res_change_instance(inst: Entity, res: Property):
     """Set the file to a value."""
-    inst['file'] = resolve_inst(res.value)[0]
+    inst['file'] = instanceLocs.resolve_one(res.value, error=True)
 
 
 @make_result('suffix', 'instSuffix')
