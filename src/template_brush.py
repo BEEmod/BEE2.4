@@ -25,6 +25,23 @@ TEMPLATES = {}  # type: Dict[str, Template]
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
 
 
+class InvalidTemplateName(LookupError):
+    """Raised if a template ID is invalid."""
+    def __init__(self, temp_name):
+        self.temp_name = temp_name
+
+    def __str__(self):
+        # List all the templates that are available.
+        return 'Template not found: "{}"\nValid templates:\n{}'.format(
+            self.temp_name,
+            '\n'.join(
+                (' * "' + temp.upper() + '"')
+                for temp in
+                sorted(TEMPLATES.keys())
+            ),
+        )
+
+
 class MAT_TYPES(Enum):
     """Represents Black vs White."""
     black = 0
@@ -263,17 +280,7 @@ def get_template(temp_name):
     try:
         return TEMPLATES[temp_name.casefold()]
     except KeyError as err:
-        # Replace the KeyError with a more useful error message, and
-        # list all the templates that are available.
-        err.args ('Template not found: "{}"\n{}'.format(
-            temp_name,
-            '\n'.join(
-            ('* "' + temp.upper() + '"')
-            for temp in
-            sorted(TEMPLATES.keys())
-            ),
-        ), )
-        raise err
+        raise InvalidTemplateName(temp_name) from err
 
 
 def import_template(

@@ -559,7 +559,7 @@ def res_import_template(inst: Entity, res: Property):
     temp_name, visgroups = template_brush.parse_temp_name(temp_id)
     try:
         template = template_brush.get_template(temp_name)
-    except KeyError:
+    except template_brush.InvalidTemplateName:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
