@@ -11,7 +11,7 @@ import shutil
 import random
 import itertools
 from enum import Enum
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, Counter
 
 from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
@@ -64,8 +64,6 @@ TEX_VALVE = {
     consts.Special.BACKPANELS_CHEAP: "special.behind",
     consts.Special.PED_SIDE: "special.pedestalside",
     consts.Special.SQUAREBEAMS: "special.edge",
-    consts.Goo.REFLECTIVE: "special.goo",
-    consts.Goo.CHEAP: "special.goo_cheap",
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
     consts.Special.LASERFIELD: "special.laserfield",
@@ -89,6 +87,10 @@ TEX_DEFAULTS = [
     (consts.BlackPan.BLACK_2,  'black.wall'),
     (consts.BlackPan.BLACK_2x2,  'black.2x2'),
     (consts.BlackPan.BLACK_4x4,  'black.4x4'),
+
+    # This must be specially handled, switching between these.
+    (consts.Goo.REFLECTIVE, 'special.goo'),
+    (consts.Goo.CHEAP, 'special.goo_cheap'),
 
     # These replacements are deactivated when unset
     ('', 'special.white'),
@@ -1859,6 +1861,20 @@ def change_brush():
 
     highest_brush = 0
 
+    # Calculate the z-level with the largest number of goo brushes,
+    # so we can ensure the 'fancy' pit is the largest one.
+    # Valve just does it semi-randomly.
+    goo_heights = Counter()
+    for pos, block in brushLoc.POS.items():
+        if block.is_goo and block.is_top:
+            # Block position is the center,
+            # save at the height of the top face
+            goo_heights[brushLoc.g2w(pos).z + 32] += 1
+    # Find key with the highest value = z-level with highest brush.
+    best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+
+    LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
@@ -1875,6 +1891,14 @@ def change_brush():
                     )
                 # Apply goo scaling
                 face.scale = goo_scale
+                # Use fancy goo on the level with the
+                # highest number of blocks.
+                # All plane z are the same.
+                face.mat = get_tex(
+                    'special.goo' if
+                    face.planes[0].z == best_goo
+                    else 'special.goo_cheap'
+                )
             if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
                     try:
