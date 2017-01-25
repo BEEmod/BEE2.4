@@ -5,6 +5,7 @@ import conditions
 import srctools
 import vbsp
 import vbsp_options
+import utils
 from conditions import (
     make_result, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
@@ -12,6 +13,7 @@ from conditions import (
 from instanceLocs import resolve as resolve_inst
 from srctools import Vec, Entity, Property
 
+LOGGER = utils.getLogger(__name__, 'cond.addInstance')
 
 @make_result('addGlobal')
 def res_add_global_inst(res: Property):
@@ -78,10 +80,23 @@ def res_add_overlay_inst(inst: Entity, res: Property):
     """
 
     angle = res['angles', inst['angles', '0 0 0']]
+
+    orig_name = conditions.resolve_value(inst, res['file', ''])
+    try:
+        filename = resolve_inst(orig_name)[0]
+    except IndexError:
+        filename = ''
+
+    if not filename:
+        if not res.bool('silentLookup'):
+            LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
+        # Don't bother making a overlay which will be deleted.
+        return
+
     overlay_inst = vbsp.VMF.create_ent(
         classname='func_instance',
         targetname=inst['targetname', ''],
-        file=resolve_inst(res['file', ''])[0],
+        file=filename,
         angles=angle,
         origin=inst['origin'],
         fixup_style=res['fixup_style', '0'],
@@ -141,9 +156,10 @@ def res_cave_portrait(inst: Entity, res: Property):
 
     If the set quote pack is not Cave Johnson, this does nothing.
     Otherwise, this overlays an instance, setting the $skin variable
-    appropriately.
+    appropriately. Config values match that of addOverlay.
     """
     skin = vbsp_options.get(int, 'cave_port_skin')
     if skin is not None:
         new_inst = res_add_overlay_inst(inst, res)
-        new_inst.fixup['$skin'] = skin
+        if new_inst:
+            new_inst.fixup['$skin'] = skin
