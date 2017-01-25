@@ -69,7 +69,6 @@ TEX_VALVE = {
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
     consts.Special.LASERFIELD: "special.laserfield",
-    "sky_black": "special.sky",
 }
 
 
@@ -3078,7 +3077,7 @@ def fix_worldspawn():
             settings['has_attr']['gel'] or
             vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
-    VMF.spawn['skyname'] = get_tex("special.sky")
+    VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
 
 
 @conditions.make_result('Pack')

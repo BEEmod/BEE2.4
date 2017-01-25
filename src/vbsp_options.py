@@ -445,6 +445,9 @@ DEFAULTS = [
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
         """),
+    Opt('skybox', 'sky_black',
+        """The skybox name to use for the map.
+        """),
     Opt('elev_type', "RAND",
         """What type of elevator script to use:
 

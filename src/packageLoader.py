@@ -1791,7 +1791,7 @@ class Skybox(PakObject):
             )
 
         exp_data.vbsp_conf.set_key(
-            ('Textures', 'Special', 'Sky'),
+            ('Options', 'Skybox'),
             skybox.material,
         )
 
