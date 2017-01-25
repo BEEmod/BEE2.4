@@ -1871,7 +1871,11 @@ def change_brush():
             # save at the height of the top face
             goo_heights[brushLoc.g2w(pos).z + 32] += 1
     # Find key with the highest value = z-level with highest brush.
-    best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+    try:
+        best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+    except ValueError:
+        # No goo in the map, it's fine.
+        best_goo = 0
 
     LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
