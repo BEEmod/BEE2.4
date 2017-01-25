@@ -4,6 +4,7 @@ from conditions import (
     make_flag, make_result,
     DIRECTIONS, SOLIDS, GOO_LOCS,
 )
+import brushLoc
 from srctools import Vec, Entity, Property
 import srctools
 
@@ -139,6 +140,79 @@ def flag_goo_at_loc(inst: Entity, flag: Property):
     pos = pos // 128 * 128 + 64  # type: Vec
     val = pos.as_tuple() in GOO_LOCS
     return val
+
+
+@make_flag('BlockType')
+def flag_blockpos_type(inst: Entity, flag: Property):
+    """Determine the type of a grid position.
+
+    If the value is single value, that should be the type.
+    Otherwise, the value should be a block with 'offset' and 'type' values.
+    The offset is in block incrments, with 0 0 0 equal to the mounting surface.
+
+    The type should be a space-seperated list of locations:
+    * VOID (Outside the map)
+    * SOLID (Full wall cube)
+    * EMBED (Hollow wall cube)
+    * AIR (Inside the map, may be occupied by items)
+    * OCCUPIED (Known to be occupied by items)
+    * PIT (Bottomless pits, any)
+      * PIT_SINGLE (one-high)
+      * PIT_TOP
+      * PIT_MID
+      * PIT_BOTTOM
+    * GOO
+      * GOO_SINGLE (one-deep goo)
+      * GOO_TOP (goo surface)
+      * GOO_MID
+      * GOO_BOTTOM (floor)
+    """
+    if flag.has_children():
+        pos = flag.vec('offset') * 128
+        types = flag['type'].split()
+    else:
+        types = flag.value.split()
+        pos = Vec()
+    pos.z -= 128
+    pos.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+    block = brushLoc.POS['world': pos]
+    for block_type in types:
+        try:
+            allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
+        except KeyError:
+            raise ValueError('"{}" is not a valid block type!'.format(block_type))
+        if block in allowed:
+            return True
+    return False
+
+
+@make_result('SetBlock')
+def res_set_block(inst: Entity, res: Property):
+    """Set a block to the given value.
+
+    This should be used only if you know what is in the position.
+    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    """
+    pos = res.vec('offset') * 128
+    try:
+        new_vals = brushLoc.BLOCK_LOOKUP[res['type'].casefold()]
+    except KeyError:
+        raise ValueError('"{}" is not a valid block type!'.format(res['type']))
+
+    try:
+        [new_val] = new_vals
+    except ValueError:
+        raise ValueError("Can't use compound block types ({})!".format(res['type']))
+
+    pos.z -= 128
+    pos.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+    brushLoc.POS['world': pos] = new_val
 
 
 @make_result('forceUpright')
