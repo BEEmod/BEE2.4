@@ -6,6 +6,7 @@ import os
 import os.path
 import shutil
 import math
+import re
 from collections import defaultdict
 from contextlib import ExitStack
 from zipfile import ZipFile
@@ -801,6 +802,21 @@ class ItemVariant:
             vbsp_config.name = None
         else:
             vbsp_config = self.vbsp_config.copy()
+
+        if 'replace' in props:
+            # Replace property values in the config via regex.
+            replace_vals = [
+                (re.compile(prop.real_name, re.IGNORECASE), prop.value)
+                for prop in
+                props.find_children('Replace')
+            ]
+            for prop in vbsp_config.iter_tree():
+                for regex, sub in replace_vals:
+                    prop.name = regex.sub(sub, prop.real_name)
+                    old_value = prop.value
+                    prop.value = regex.sub(sub, prop.value)
+                    if old_value != prop.value:
+                        LOGGER.info('{} >> {}', old_value, prop.value)
 
         if 'description' in props:
             desc = desc_parse(props, source)
