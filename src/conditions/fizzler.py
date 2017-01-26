@@ -363,10 +363,10 @@ def res_fizzler_pair(vmf: VMF, begin_inst: Entity, res: Property):
 
     orig_file = begin_inst['file']
 
-    begin_inst['file'] = res['StartInst', orig_file]
-    end_file = res['EndInst', orig_file]
-    mid_file = res['MidInst', '']
-    single_file = res['SingleInst', '']
+    begin_inst['file'] = instanceLocs.resolve_one(res['StartInst'], error=True)
+    end_file = instanceLocs.resolve_one(res['EndInst'], error=True)
+    mid_file = instanceLocs.resolve_one(res['MidInst', ''])
+    single_file = instanceLocs.resolve_one(res['SingleInst', ''])
 
     begin_inst['targetname'] = pair_name
 
