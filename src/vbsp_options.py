@@ -320,10 +320,6 @@ DEFAULTS = [
 
         This is used for `grating_clip`.
         """),
-    Opt('grating_filter', "@not_paint_bomb",
-        """Filter used on grating `func_vphysics_clips`.
-
-        """),
     Opt('glass_template', TYPE.STR,
         """A template for rotation and scaling of glass.
 

@@ -1786,11 +1786,7 @@ def remove_barrier_ents():
 
     They're not used since we added their contents into the map directly.
     """
-    if (
-        not vbsp_options.get(str, 'grating_clip') or
-        not vbsp_options.get(str, 'glass_clip') or
-        vbsp_options.get(bool, 'keep_barrier_inst')
-    ):
+    if vbsp_options.get(bool, 'keep_barrier_inst'):
         return  # They're being used.
 
     barrier_file = instanceLocs.resolve('[glass_128]')
@@ -2707,6 +2703,11 @@ def change_func_brush():
     else:
         grate_temp = None
 
+    if 1 or srctools.conv_bool(settings['style_vars']['gratingpellets']):
+        grating_filter = '@grating_filter'
+    else:
+        grating_filter = '@not_paint_bomb'
+
     dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
 
@@ -2833,7 +2834,7 @@ def change_func_brush():
             clip_ent = VMF.create_ent(
                 classname='func_clip_vphysics',
                 origin=brush_loc.join(' '),
-                filtername=vbsp_options.get(str, 'grating_filter')
+                filtername=grating_filter
             )
             clip_ent.solids.append(grate_phys_clip_solid)
 
