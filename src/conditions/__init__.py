@@ -1196,15 +1196,33 @@ def res_switch(inst: Entity, res: Property):
 
 @make_result_setup('staticPiston')
 def make_static_pist_setup(res: Property):
-    return {
-        name: instanceLocs.resolve_one(res[name, ''], error=True)
-        for name in
-        (
-            'bottom_1', 'bottom_2', 'bottom_3',
-            'logic_0', 'logic_1', 'logic_2', 'logic_3',
-            'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
-        )
-    }
+    instances = (
+        'bottom_1', 'bottom_2', 'bottom_3',
+        'logic_0', 'logic_1', 'logic_2', 'logic_3',
+        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+    )
+
+    if res.has_children():
+        # Pull from config
+        return {
+            name: instanceLocs.resolve_one(
+                res[name, ''],
+                error=True,
+            ) for name in instances
+        }
+    else:
+        # Pull from editoritems
+        if ':' in res.value:
+            from_item, prefix = res.value.split(':', 1)
+        else:
+            from_item = res.value
+            prefix = ''
+        return {
+            name: instanceLocs.resolve_one(
+                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
+                error=True,
+            ) for name in instances
+        }
 
 
 @make_result('staticPiston')
@@ -1217,6 +1235,8 @@ def make_static_pist(ent: Entity, res: Property):
         Bottom_1/2/3: Moving piston with the given $bottom_level
         Logic_0/1/2/3: Additional logic instance for the given $bottom_level
         Static_0/1/2/3/4: A static piston at the given height.
+    Alternatively, specify all instances via editoritems, by setting the value
+    to the item ID optionally followed by a :prefix.
     """
 
     bottom_pos = ent.fixup['bottom_level', '-1']
