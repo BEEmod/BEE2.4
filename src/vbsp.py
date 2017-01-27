@@ -2703,7 +2703,7 @@ def change_func_brush():
     else:
         grate_temp = None
 
-    if 1 or srctools.conv_bool(settings['style_vars']['gratingpellets']):
+    if srctools.conv_bool(settings['style_vars']['gratingpellets']):
         grating_filter = '@grating_filter'
     else:
         grating_filter = '@not_paint_bomb'
