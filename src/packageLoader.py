@@ -1423,18 +1423,25 @@ class Item(PakObject):
                 )
                 continue
             voxel_part.name = "Voxel"
-            bbox_min, bbox_max = Vec.bbox(
-                voxel_part.vec('subpos1'),
-                voxel_part.vec('subpos2'),
-            )
-            del voxel_part['subpos1']
-            del voxel_part['subpos2']
-            for pos in Vec.iter_grid(bbox_min, bbox_max):
-                voxel_part.append(Property(
-                    "Surface", [
-                        Property("Pos", str(pos)),
-                    ])
-                )
+            pos_1 = None
+            voxel_subprops = list(voxel_part)
+            voxel_part.clear()
+            for prop in voxel_subprops:
+                if prop.name not in ('subpos', 'subpos1', 'subpos2'):
+                    voxel_part.append(prop)
+                    continue
+                pos_2 = Vec.from_str(prop.value)
+                if pos_1 is None:
+                    pos_1 = pos_2
+                    continue
+
+                bbox_min, bbox_max = Vec.bbox(pos_1, pos_2)
+                for pos in Vec.iter_grid(bbox_min, bbox_max):
+                    voxel_part.append(Property(
+                        "Surface", [
+                            Property("Pos", str(pos)),
+                        ])
+                    )
 
         # Full blocks
         for occu_voxels in new_editor.find_all("Exporting", "OccupiedVoxels"):
