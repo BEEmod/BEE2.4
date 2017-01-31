@@ -3117,6 +3117,14 @@ def packlist_cond(res: Property):
     return conditions.RES_EXHAUSTED
 
 
+@conditions.make_result('PackFile')
+def pack_file_cond(res: Property):
+    """Adda single file to the map."""
+    PACK_FILES.add(res.value)
+
+    return conditions.RES_EXHAUSTED
+
+
 @conditions.make_result('PackRename')
 def packlist_cond_rename(res: Property):
     """Add a file to the packlist, saved under a new name."""
