@@ -813,10 +813,7 @@ class ItemVariant:
             for prop in vbsp_config.iter_tree():
                 for regex, sub in replace_vals:
                     prop.name = regex.sub(sub, prop.real_name)
-                    old_value = prop.value
                     prop.value = regex.sub(sub, prop.value)
-                    if old_value != prop.value:
-                        LOGGER.info('{} >> {}', old_value, prop.value)
 
         if 'description' in props:
             desc = desc_parse(props, source)
