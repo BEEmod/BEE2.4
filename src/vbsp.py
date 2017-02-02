@@ -3040,61 +3040,6 @@ def change_ents():
                 VMF.remove_ent(auto)
 
 
-def fix_inst():
-    for inst in VMF.by_class['func_instance']:
-        # TODO: remake this in a condition
-        if "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
-            # find the triggers that match this entity and mod them
-            for trig in VMF.iter_ents(
-                    classname='trigger_portal_cleanser',
-                    targetname=inst['targetname'] + "_brush",
-                    ):
-                for side in trig.sides():
-                    side.mat = "tools/toolstrigger"
-
-                # get rid of the _, allowing direct control from the instance.
-                trig['targetname'] = inst['targetname'] + "-trigger"
-                trig['classname'] = "trigger_multiple"
-                trig["filtername"] = "@filter_pellet"
-                trig["wait"] = "0.1"
-                trig['spawnflags'] = "72"  # Physics Objects, Everything
-                # generate the output that triggers the pellet logic.
-                trig.add_out(VLib.Output(
-                    "OnStartTouch",
-                    inst['targetname'] + "-branch_toggle",
-                    "FireUser1",
-                    ))
-
-            inst.outputs.clear()  # All the original ones are junk, delete them!
-
-            for in_out in VMF.iter_ents_tags(
-                    vals={
-                        'classname': 'func_instance',
-                        'origin': inst['origin'],
-                        'angles': inst['angles'],
-                        },
-                    tags={
-                        'file': 'ccflag_comball_out',
-                        }
-                    ):
-                # Find the instance to use for output and add the
-                # commands to trigger its logic
-                inst.add_out(VLib.Output(
-                    "OnUser1",
-                    in_out['targetname'],
-                    "FireUser1",
-                    inst_in='in',
-                    inst_out='out',
-                    ))
-                inst.add_out(VLib.Output(
-                    "OnUser2",
-                    in_out['targetname'],
-                    "FireUser2",
-                    inst_in='in',
-                    inst_out='out',
-                    ))
-
-
 def fix_worldspawn():
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
@@ -3587,7 +3532,6 @@ def main():
             vmf_file=VMF,
         )
 
-        fix_inst()
         alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
