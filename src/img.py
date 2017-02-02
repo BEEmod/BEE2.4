@@ -14,7 +14,7 @@ from typing import Union, Dict, Tuple
 
 LOGGER = utils.getLogger('img')
 
-cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
+cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 
@@ -29,7 +29,7 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
     return size, size
 
 
-def png(path, resize_to=0, error=None, algo=Image.NEAREST):
+def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -42,7 +42,10 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
+    path = path.casefold().replace('\\', '/')
     orig_path = path
+
+    resize_to = tuple_size(resize_to)
 
     try:
         return cached_img[path, resize_to]
@@ -82,12 +85,15 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
         image = Image.open(img_file)
         image.load()
 
-    if resize_to:
-        image = image.resize(tuple_size(resize_to), algo)
+    if resize_to != (0, 0):
+        image = image.resize(resize_to, algo)
 
     tk_img = ImageTk.PhotoImage(image=image)
 
-    cached_img[orig_path, resize_to] = tk_img
+    resize_width, resize_height = resize_to
+
+    cached_img[orig_path, resize_width, resize_height] = tk_img
+    cached_img[orig_path, image.width, image.height] = tk_img
     return tk_img
 
 
