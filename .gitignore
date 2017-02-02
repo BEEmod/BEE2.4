@@ -77,3 +77,6 @@ config/
 
 # Logs
 BEE2.log*
+
+# Localisation files:
+*.mo

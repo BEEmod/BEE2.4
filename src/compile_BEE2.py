@@ -1,11 +1,52 @@
 from cx_Freeze import setup, Executable
+from zipfile import ZipFile, ZipInfo
 import os
 import shutil
 import utils
+import io
 
 shutil.rmtree('build_BEE2', ignore_errors=True)
 
 ico_path = os.path.join(os.getcwd(), "../bee2.ico")
+
+
+def get_localisation(key):
+    """Get localisation files from Loco."""
+    import requests
+
+    print('Reading translations... ', end='', flush=True)
+    zip_request = requests.get(
+        'https://localise.biz/api/export/archive/mo.zip',
+        headers={
+            'Authorization': 'Loco ' + key,
+        },
+        params={
+            'path': '{%lang}{_%region}.{%ext}',
+        },
+    )
+    zip_file = ZipFile(io.BytesIO(zip_request.content))
+    print('Done!')
+
+    print('Translations: ')
+
+    for file in zip_file.infolist():  # type: ZipInfo
+        if 'README.txt' in file.filename:
+            continue
+        filename = os.path.basename(file.filename)
+        print(filename)
+        # Copy to the dev and output directory.
+        with zip_file.open(file) as src, open('../i18n/' + filename, 'wb') as dest:
+            shutil.copyfileobj(src, dest)
+        with zip_file.open(file) as src, open('../build_BEE2/i18n/' + filename, 'wb') as dest:
+            shutil.copyfileobj(src, dest)
+
+try:
+    loco_key = os.environ['LOCO_KEY']
+except KeyError:
+    print('No localisation key! (LOCO_KEY)')
+else:
+    get_localisation(loco_key)
+
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
@@ -142,7 +183,9 @@ setup(
     ],
 )
 
+# -------------------------------------------------------
 # Now copy the required resources to the build directory.
+
 
 def copy_resource(tree):
     src = os.path.join('..', tree)
