@@ -3164,6 +3164,7 @@ def make_packlist(map_path):
                 if not pack_triggers:
                     break  # No more left
 
+    if not TO_PACK and not PACK_FILES:
         # Nothing to pack - wipe the packfile!
         open(map_path[:-4] + '.filelist.txt', 'w').close()
 
