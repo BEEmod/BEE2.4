@@ -3177,10 +3177,16 @@ def make_packlist(map_path):
         ).find_key('PackList', [])
 
     for pack_id in TO_PACK:
+        try:
+            files = props[pack_id]
+        except IndexError:
+            LOGGER.warning('Packlist "{}" does not exist!', pack_id.upper())
+            continue
+
         PACK_FILES.update(
             prop.value
             for prop in
-            props[pack_id, ()]
+            files
         )
 
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
