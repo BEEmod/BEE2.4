@@ -7,7 +7,7 @@ import io
 
 shutil.rmtree('build_BEE2', ignore_errors=True)
 
-ico_path = os.path.join(os.getcwd(), "../bee2.ico")
+ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
 
 
 def get_localisation(key):
@@ -120,7 +120,7 @@ INCLUDES = [
 INCLUDE_LIBS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    '/usr/local/lib/libavbin.dylib',  # OS X
+    'libavbin.dylib',  # OS X - must be relative.,,
     '/usr/lib/libavbin.so',  # Linux
 ]
 
