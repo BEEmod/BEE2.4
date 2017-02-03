@@ -75,7 +75,7 @@ styleOptions = [
         id='FunnelAllowSwitchedLights',
         name=_('Light Reversible Excursion Funnels'),
         default=1,
-        desc=_('Funnels emit a small amount of light. However, if multiple funnels'
+        desc=_('Funnels emit a small amount of light. However, if multiple funnels '
                'are near each other and can reverse polarity, this can cause '
                'lighting issues. Disable this to prevent that by disabling '
                'lights. Non-reversible Funnels do not have this issue.'),
