@@ -40,12 +40,7 @@ def get_localisation(key):
         with zip_file.open(file) as src, open('../build_BEE2/i18n/' + filename, 'wb') as dest:
             shutil.copyfileobj(src, dest)
 
-try:
-    loco_key = os.environ['LOCO_KEY']
-except KeyError:
-    print('No localisation key! (LOCO_KEY)')
-else:
-    get_localisation(loco_key)
+get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
 
 
 # Exclude bits of modules we don't need, to decrease package size.
