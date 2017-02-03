@@ -415,10 +415,10 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            name='NONE',
+            name=_('NONE'),
             short_name='',
             icon='BEE2/none_96.png',
-            desc=tkMarkdown.convert(none_desc),
+            desc=none_desc,
             attributes=dict(none_attrs),
         )
 
