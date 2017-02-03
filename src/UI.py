@@ -1186,8 +1186,8 @@ def pal_remove():
         pal = palettes[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
-                message=_('Are you sure you want to delete "{palette}"?').format(
-                    palette=pal.name,
+                message=_('Are you sure you want to delete "{}"?').format(
+                    pal.name,
                 ),
                 parent=TK_ROOT,
                 ):

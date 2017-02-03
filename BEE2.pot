@@ -511,8 +511,8 @@ msgstr ""
 msgid "This palette already exists. Overwrite?"
 msgstr ""
 
-#: src/UI.py:1189
-msgid "Are you sure you want to delete \"{palette}\"?"
+#: src/UI.py:1189 src/gameMan.py:1024
+msgid "Are you sure you want to delete \"{}\"?"
 msgstr ""
 
 #: src/UI.py:1216
@@ -937,10 +937,6 @@ msgstr ""
 msgid ""
 "\n"
 " (BEE2 will quit, this is the last game set!)"
-msgstr ""
-
-#: src/gameMan.py:1024
-msgid "Are you sure you want to delete \"{}?\""
 msgstr ""
 
 #: src/helpMenu.py:43

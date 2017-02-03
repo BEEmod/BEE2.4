@@ -1021,7 +1021,7 @@ def remove_game(e=None):
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message=_('Are you sure you want to delete "{}?"').format(
+        message=_('Are you sure you want to delete "{}"?').format(
                 selected_game.name
             ) + lastgame_mess,
         )
