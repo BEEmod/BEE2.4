@@ -9,7 +9,14 @@ import tkinter as tk
 
 import os.path
 
-from idlelib.WidgetRedirector import WidgetRedirector
+try:
+    # Python 3.6+
+    # noinspection PyCompatibility
+    from idlelib.redirector import WidgetRedirector
+except ImportError:
+    # Python 3.5 and below
+    # noinspection PyCompatibility
+    from idlelib.WidgetRedirector import WidgetRedirector
 
 import utils
 
