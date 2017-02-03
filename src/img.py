@@ -45,10 +45,10 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     path = path.casefold().replace('\\', '/')
     orig_path = path
 
-    resize_to = tuple_size(resize_to)
+    resize_width, resize_height = resize_to = tuple_size(resize_to)
 
     try:
-        return cached_img[path, resize_to]
+        return cached_img[path, resize_width, resize_height]
     except KeyError:
         pass
 
@@ -90,10 +90,7 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
 
     tk_img = ImageTk.PhotoImage(image=image)
 
-    resize_width, resize_height = resize_to
-
     cached_img[orig_path, resize_width, resize_height] = tk_img
-    cached_img[orig_path, image.width, image.height] = tk_img
     return tk_img
 
 
