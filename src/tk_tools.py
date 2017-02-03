@@ -24,6 +24,8 @@ import utils
 # object.
 TK_ROOT = tk.Tk()
 
+# Set icons for the application.
+
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
     TK_ROOT.wm_iconbitmap(default='../BEE2.ico')
@@ -36,8 +38,12 @@ if utils.WIN:
     # Use Windows APIs to tell the taskbar to group us as our own program,
     # not with python.exe. Then our icon will apply, and also won't group
     # with other scripts.
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-        'BEEMOD.application',
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            'BEEMOD.application',
+        )
+    except (AttributeError, WindowsError, ValueError):
+        pass  # It's not too bad if it fails.
     )
 else:
     import img
