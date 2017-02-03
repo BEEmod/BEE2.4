@@ -24,6 +24,14 @@ if utils.WIN:
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""
         window.wm_iconbitmap('../BEE2.ico')
+
+    import ctypes
+    # Use Windows APIs to tell the taskbar to group us as our own program,
+    # not with python.exe. Then our icon will apply, and also won't group
+    # with other scripts.
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        'BEEMOD.application',
+    )
 else:
     import img
     app_icon = img.get_app_icon()
