@@ -44,8 +44,20 @@ if utils.WIN:
         )
     except (AttributeError, WindowsError, ValueError):
         pass  # It's not too bad if it fails.
+elif utils.MAC:
+    # Call OS-X's specific api for setting the window icon.
+    TK_ROOT.tk.call(
+        'tk::mac::iconBitmap',
+        256,  # largest size in the .ico
+        256,
+        '-imageFile',
+        '../bee2.ico',
     )
-else:
+
+    def set_window_icon(window: tk.Toplevel):
+        """Does nothing."""
+else:  # Linux
+    # Get the tk image object.
     import img
     app_icon = img.get_app_icon()
 
