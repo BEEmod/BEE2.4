@@ -240,17 +240,28 @@ class Condition:
 
         """
         for res in self.results[:]:
-            self.setup_result(self.results, res)
+            self.setup_result(self.results, res, self.source)
 
         for res in self.else_results[:]:
-            self.setup_result(self.else_results, res)
+            self.setup_result(self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list, result):
+    def setup_result(res_list, result, source=''):
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
-            result.value = func(VMF, result)
+            # noinspection PyBroadException
+            try:
+                result.value = func(VMF, result)
+            except:
+                # Print the source of the condition if if fails...
+                LOGGER.exception(
+                    'Error in {} setup:',
+                    source or 'condition',
+                )
+                # Exit directly, so we don't print it again in the exception
+                # handler
+                utils.quit_app(1)
             if result.value is None:
                 # This result is invalid, remove it.
                 res_list.remove(result)
@@ -458,9 +469,9 @@ def check_all():
                     'Error in {}:',
                     condition.source or 'condition',
                 )
-                # Skip to next condition.
-                import sys
-                sys.exit(1)
+                # Exit directly, so we don't print it again in the exception
+                # handler
+                utils.quit_app(1)
             if not condition.results and not condition.else_results:
                 break  # Condition has run out of results, quit early
 
@@ -1153,7 +1164,11 @@ def res_switch_setup(res: Property):
 
     for prop in cases:
         for result in prop.value:
-            Condition.setup_result(prop.value, result)
+            Condition.setup_result(
+                prop.value,
+                result,
+                'switch: {} -> {}'.format(flag, prop.real_name),
+            )
 
     if method is SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
@@ -1361,10 +1376,3 @@ def res_goo_debris(res: Property):
         )
 
     return RES_EXHAUSTED
-
-
-
-
-
-
-

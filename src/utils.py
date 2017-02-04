@@ -468,6 +468,12 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
+def quit_app(status=0):
+    """Quit the application."""
+    logging.shutdown()
+    sys.exit(status)
+
+
 def set_readonly(file):
     """Make the given file read-only."""
     # Get the old flags
