@@ -20,6 +20,15 @@ LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
 
+# A few positions for material_modify_control,
+# so they aren't on top.
+MATMOD_OFFSETS = [
+    Vec(0,   0, -32),
+    Vec(0,  16, -32),
+    Vec(0, -16, -64),
+    Vec(0,   0,  32),
+] * 4  # Just in case there happens to be more textures.
+
 
 @make_result('custFizzler', 'custFizz', 'customFizzler', 'customFizz')
 def res_cust_fizzler(base_inst: Entity, res: Property):
@@ -239,10 +248,13 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
         var = config['var', '$outputintensity']
         if not var.startswith('$'):
             var = '$' + var
-        for tex in textures:
+
+        for off, tex in zip(MATMOD_OFFSETS, textures):
+            pos = off.copy().rotate_by_str(base_inst['angles'])
+            pos += Vec.from_str(base_inst['origin'])
             vbsp.VMF.create_ent(
                 classname='material_modify_control',
-                origin=base_inst['origin'],
+                origin=pos,
                 targetname=conditions.local_name(base_inst, mat_mod_name),
                 materialName='materials/' + tex + '.vmt',
                 materialVar=var,
