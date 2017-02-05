@@ -14,6 +14,10 @@ def get_localisation(key):
     """Get localisation files from Loco."""
     import requests
 
+    # Make the directories.
+    os.makedirs('../build_BEE2/i18n/', exist_ok=True)
+    os.makedirs('../i18n/', exist_ok=True)
+
     print('Reading translations... ', end='', flush=True)
     zip_request = requests.get(
         'https://localise.biz/api/export/archive/mo.zip',
@@ -183,6 +187,7 @@ setup(
 
 
 def copy_resource(tree):
+    print('Copying "{}"'.format(tree))
     src = os.path.join('..', tree)
     dest = os.path.join('..', 'build_BEE2', tree)
 
