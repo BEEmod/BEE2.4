@@ -23,6 +23,7 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import connections
 import instance_traits
 import template_brush
 import comp_consts as consts
@@ -3521,6 +3522,7 @@ def main():
 
         load_map(path)
         instance_traits.set_traits(VMF)
+        connections.calc_connections(VMF)  # Requires instance traits!
 
         MAP_RAND_SEED = calc_rand_seed()
 
