@@ -1215,6 +1215,7 @@ def make_static_pist_setup(res: Property):
         'bottom_1', 'bottom_2', 'bottom_3',
         'logic_0', 'logic_1', 'logic_2', 'logic_3',
         'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        'grate_low', 'grate_high',
     )
 
     if res.has_children():
@@ -1222,7 +1223,7 @@ def make_static_pist_setup(res: Property):
         return {
             name: instanceLocs.resolve_one(
                 res[name, ''],
-                error=True,
+                error=False,
             ) for name in instances
         }
     else:
@@ -1235,13 +1236,13 @@ def make_static_pist_setup(res: Property):
         return {
             name: instanceLocs.resolve_one(
                 '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=True,
+                error=False,
             ) for name in instances
         }
 
 
 @make_result('staticPiston')
-def make_static_pist(ent: Entity, res: Property):
+def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1254,38 +1255,53 @@ def make_static_pist(ent: Entity, res: Property):
     to the item ID optionally followed by a :prefix.
     """
 
-    bottom_pos = ent.fixup['bottom_level', '-1']
+    bottom_pos = ent.fixup.int('bottom_level', 0)
+    grate = None
 
     if (ent.fixup['connectioncount', '0'] != "0" or
             ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
-        if int(bottom_pos) > 0:
+        if bottom_pos > 0:
             # The piston doesn't go fully down, use alt instances.
-            val = res.value['bottom_' + bottom_pos]
+            val = res.value['bottom_' + str(bottom_pos)]
             if val:  # Only if defined
                 ent['file'] = val
-        logic_file = res.value['logic_' + bottom_pos]
+
+        logic_file = res.value['logic_' + str(bottom_pos)]
         if logic_file:
             # Overlay an additional logic file on top of the original
             # piston. This allows easily splitting the piston logic
             # from the styled components
             logic_ent = ent.copy()
             logic_ent['file'] = logic_file
-            VMF.add_ent(logic_ent)
+            vmf.add_ent(logic_ent)
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
             logic_ent.fixup['manager_a'] = srctools.bool_as_int(
                 ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
-        val = res.value[
-            'static_' + (
-                ent.fixup['top_level', '1']
-                if srctools.conv_bool(ent.fixup['start_up'], False)
-                else bottom_pos
-            )
-        ]
+        if ent.fixup.bool('start_up'):
+            pos = bottom_pos = ent.fixup.int('top_level', 1)
+        else:
+            pos = bottom_pos
+        ent.fixup['top_level'] = ent.fixup['bottom_level'] = pos
+
+        val = res.value['static_' + str(pos)]
         if val:
             ent['file'] = val
+
+    # Add in the grating for the bottom as an overlay.
+    # It's low to fit the piston at minimum, or higher if needed.
+    grate = res.value[
+        'grate_high'
+        if bottom_pos > 0 else
+        'grate_low'
+    ]
+    if grate:
+        grate_ent = ent.copy()
+        grate_ent['file'] = grate
+        vmf.add_ent(grate_ent)
+
 
 
 @make_result('GooDebris')
