@@ -4,10 +4,11 @@ from collections import defaultdict, namedtuple
 
 import conditions
 import srctools
+import template_brush
 import utils
 import vbsp
 import comp_consts as consts
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from perlin import SimplexNoise
 from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis
 
@@ -52,7 +53,7 @@ FLOOR_DEPTH = 8  # Distance we drop the floor
 def find_indicator_panels(inst: Entity):
     """We need to locate indicator panels, so they aren't overwritten.
     """
-    if inst['file'].casefold() not in resolve_inst('[indpan]'):
+    if inst['file'].casefold() not in instanceLocs.resolve('[indpan]'):
         return
     loc = Vec(0, 0, -64).rotate_by_str(inst['angles'])
     loc += Vec.from_str(inst['origin'])
@@ -85,7 +86,7 @@ def res_cutout_tile(res: Property):
     - "Floor4x4Black", "Ceil2x2White" and other combinations can be used to
        override the textures used.
     """
-    item = resolve_inst(res['markeritem'])
+    item = instanceLocs.resolve(res['markeritem'])
 
     INST_LOCS = {}  # Map targetnames -> surface loc
     CEIL_IO = []  # Pairs of ceil inst corners to cut out.
@@ -401,11 +402,11 @@ def convert_floor(
         # We need to generate a squarebeams brush to fill this gap.
 
         brush.face.mat = 'tools/toolsnodraw'  # It won't be visible
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             temp_name=FLOOR_TEMP_PILLAR,
             origin=loc,
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             loc,
             # Switch to use the configured squarebeams texture
@@ -790,7 +791,7 @@ def add_floor_sides(locs):
 
         diag_loc = (wall_loc.x, wall_loc.y, wall_loc.z + 128)
 
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             # If there's a wall surface directly above this point
             # or a ceiling brush in the next block over
             # we want to use a world brush to seal the leak.
@@ -804,7 +805,7 @@ def add_floor_sides(locs):
             origin=wall_loc,
             angles=Vec(0, rot, 0),
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             wall_loc,
             # Switch to use the configured squarebeams texture

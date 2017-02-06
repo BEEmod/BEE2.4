@@ -48,13 +48,30 @@ STEAM_IDS = {
     'TWTM': '286080',
     'THINKING WITH TIME MACHINE': '286080',
 
+    'MEL': '317400',  # Note - no workshop
+
+    'DEST_AP': '433970',
+    'DESTROYED_APERTURE': '433970',
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational
     # 247120: Sixense
     # 211480: 'In Motion'
-    # 317400: PS Mel - No workshop
 }
+
+if MAC or LINUX:
+    def fix_cur_directory():
+        """Change directory to the location of the executable.
+
+        Otherwise we can't find our files!
+        The Windows executable does this automatically.
+        """
+        os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
+else:
+    def fix_cur_directory():
+        """No-op on Windows."""
+
 
 if WIN:
     # Some events differ on different systems, so define them here.
@@ -185,20 +202,20 @@ elif LINUX:
         'KEY_SAVE': '<Control-Shift-s>',
     }
     KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+        'KEY_EXPORT': 'Ctrl+E',
+        'KEY_SAVE': 'Ctrl+S',
+        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'hand1',
         'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
+        'destroy_item': 'X_cursor',
+        'invalid_drag': 'circle',
     }
 
     def add_mousewheel(target, *frames, orient='y'):
@@ -449,6 +466,12 @@ def restart_app():
     )
     logging.shutdown()
     os.execv(sys.executable, args)
+
+
+def quit_app(status=0):
+    """Quit the application."""
+    logging.shutdown()
+    sys.exit(status)
 
 
 def set_readonly(file):

@@ -415,10 +415,10 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            name='NONE',
+            name=_('NONE'),
             short_name='',
             icon='BEE2/none_96.png',
-            desc=tkMarkdown.convert(none_desc),
+            desc=none_desc,
             attributes=dict(none_attrs),
         )
 
@@ -454,7 +454,15 @@ class selWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]  # type: Item
+        try:
+            self.selected = self.item_list[0]  # type: Item
+        except IndexError:
+            LOGGER.error('No items for window "{}"!', title)
+            # We crash without items, forcefully add the None item in so at
+            # least this works.
+            self.item_list = [self.noneItem]
+            self.selected = self.noneItem
+            
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -468,7 +476,7 @@ class selWin:
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
 
-        self.win.iconbitmap('../BEE2.ico')
+        tk_tools.set_window_icon(self.win)
 
         # Run our quit command when the exit button is pressed, or Escape
         # on the keyboard.

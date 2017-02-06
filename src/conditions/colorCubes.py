@@ -3,7 +3,7 @@ from conditions import make_result, make_flag, add_suffix
 from srctools import Vec, Entity, Property
 
 import utils
-import vbsp
+import brushLoc
 
 LOGGER = utils.getLogger(__name__, alias='cond.color_cubes')
 
@@ -45,7 +45,12 @@ COLORS = [
 ]
 del L, M, H
 
+# Origin -> the color at a position
 COLOR_POS = {}
+# For cube droppers, there's a cube item as well as the dropper.
+# This is a the ceiling opposite to colorisers on the floor, so
+# placing it on the cube will color the dropper.
+COLOR_SEC_POS = {}
 
 
 @make_result('_CubeColoriser')
@@ -53,11 +58,21 @@ def res_cube_coloriser(inst: Entity):
     """Allows recoloring cubes placed at a position."""
     origin = Vec.from_str(inst['origin'])
     timer_delay = inst.fixup.int('$timer_delay')
+
     if 3 <= timer_delay <= 30:
         COLOR_POS[origin.as_tuple()] = COLORS[timer_delay - 3]
     else:
         LOGGER.warning('Unknown timer value "{}"!', timer_delay)
     inst.remove()
+
+    # If pointing up, copy the value to the ceiling, so droppers
+    # can find a coloriser placed on the illusory cube item under them.
+    if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
+        pos = brushLoc.POS.raycast_world(
+            origin,
+            direction=(0, 0, 1),
+        )
+        COLOR_SEC_POS[pos.as_tuple()] = COLORS[timer_delay - 3]
 
 
 @make_flag('ColoredCube')
@@ -68,11 +83,13 @@ def res_colored_cube(inst: Entity):
     color. The flag value is True if the cube is coloured.
     """
     origin = Vec.from_str(inst['origin'])
-    LOGGER.info('Pos: {}\n\n, {}->{}', COLOR_POS, origin, COLOR_POS.get(origin.as_tuple()))
     try:
         color = COLOR_POS[origin.as_tuple()]
     except KeyError:
-        return False
+        try:
+            color = COLOR_SEC_POS[origin.as_tuple()]
+        except KeyError:
+            return False
     inst.fixup['$cube_color'] = '{} {} {}'.format(*color)
     return True
 

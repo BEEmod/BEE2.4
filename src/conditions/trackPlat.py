@@ -6,7 +6,7 @@ import vbsp
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Vec, Property, Entity
 
 
@@ -38,9 +38,8 @@ def res_track_plat(res: Property):
     (
         inst_bot_grate, inst_bottom, inst_middle,
         inst_top, inst_plat, inst_plat_oscil, inst_single
-    ) = resolve_inst(res['orig_item'])
-    # If invalid, [] = false so ''[0] = ''.
-    single_plat_inst = (resolve_inst(res['single_plat', '']) or '')[0]
+    ) = instanceLocs.resolve(res['orig_item'])
+    single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''])
     track_targets = res['track_name', '']
 
     track_files = [inst_bottom, inst_middle, inst_top, inst_single]

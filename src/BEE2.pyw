@@ -18,12 +18,7 @@ except NameError:
     builtins.ngettext = lambda a, b, n: a if n == 1 else b
 
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
-
+    utils.fix_cur_directory()
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are available
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile

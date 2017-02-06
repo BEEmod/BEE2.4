@@ -54,8 +54,15 @@ compiler/
 # Package source is in BEE2-items/
 packages/
 
-# The auto-generated palette
-palettes/LAST_EXPORT.zip
+# Ignore palettes
+palettes/*.bee2_palette
+
+# But not the default ones
+!palettes/ap_tag.bee2_palette
+!palettes/beemod.bee2_palette
+!palettes/blank.bee2_palette
+!palettes/collapsed.bee2_palette
+!palettes/original.bee2_palette
 
 #These folders are generated automatically by the BEE2
 images/cache/
@@ -70,3 +77,6 @@ config/
 
 # Logs
 BEE2.log*
+
+# Localisation files:
+*.mo

@@ -4,7 +4,7 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageDraw
 import os.path
 
 from srctools import Vec
@@ -14,7 +14,7 @@ from typing import Union, Dict, Tuple
 
 LOGGER = utils.getLogger('img')
 
-cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
+cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 
@@ -29,7 +29,7 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
     return size, size
 
 
-def png(path, resize_to=0, error=None, algo=Image.NEAREST):
+def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -42,10 +42,13 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
+    path = path.casefold().replace('\\', '/')
     orig_path = path
 
+    resize_width, resize_height = resize_to = tuple_size(resize_to)
+
     try:
-        return cached_img[path, resize_to]
+        return cached_img[path, resize_width, resize_height]
     except KeyError:
         pass
 
@@ -82,12 +85,12 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
         image = Image.open(img_file)
         image.load()
 
-    if resize_to:
-        image = image.resize(tuple_size(resize_to), algo)
+    if resize_to != (0, 0):
+        image = image.resize(resize_to, algo)
 
     tk_img = ImageTk.PhotoImage(image=image)
 
-    cached_img[orig_path, resize_to] = tk_img
+    cached_img[orig_path, resize_width, resize_height] = tk_img
     return tk_img
 
 
@@ -101,6 +104,70 @@ def spr(name, error=None):
 def icon(name, error=None):
     """Load in a palette icon, using the correct directory and size."""
     return png(os.path.join("items", name), error=error, resize_to=64)
+
+
+def get_app_icon():
+    """On non-Windows, retrieve the application icon."""
+    with open('../bee2.ico', 'rb') as f:
+        return ImageTk.PhotoImage(Image.open(f))
+
+
+def get_splash_screen(max_width, max_height, base_height):
+    """Return a random file from the splash_screens directory."""
+    import random
+    folder = os.path.join('..', 'images', 'splash_screen')
+    path = '<nothing>'
+    try:
+        path = random.choice(os.listdir(folder))
+        with open(os.path.join(folder, path), 'rb') as img_file:
+            image = Image.open(img_file)
+            image.load()
+    except (FileNotFoundError, IndexError, IOError):
+        # Not found, substitute a gray block.
+        LOGGER.warning('No splash screen found (tried "{}")', path)
+        image = Image.new(
+            mode='RGB',
+            size=(round(max_width), round(max_height)),
+            color=(128, 128, 128),
+        )
+    else:
+        if image.height > max_height:
+            image = image.resize((
+                round(image.width / image.height * max_height),
+                round(max_height),
+            ))
+        if image.width > max_width:
+            image = image.resize((
+                round(max_width),
+                round(image.height / image.width * max_width),
+            ))
+
+    draw = ImageDraw.Draw(image, 'RGBA')
+
+    rect_top = image.height - base_height - 40
+    draw.rectangle(
+        (
+            0,
+            rect_top + 40,
+            image.width,
+            image.height,
+         ),
+        fill=(0, 150, 120, 64),
+    )
+    # Add a gradient above the rectangle..
+    for y in range(40):
+        draw.rectangle(
+            (
+                0,
+                rect_top + y,
+                image.width,
+                image.height,
+            ),
+            fill=(0, 150, 120, int(y * 128/40)),
+        )
+
+    tk_img = ImageTk.PhotoImage(image=image)
+    return tk_img, image.width, image.height
 
 
 def color_square(color: Vec, size=16):

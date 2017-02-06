@@ -215,15 +215,15 @@ def load_item_data():
 
     wid['subitem', pos_for_item()]['relief'] = 'raised'
 
-    wid['author']['text'] = ', '.join(item_data['auth'])
+    wid['author']['text'] = ', '.join(item_data.authors)
     wid['name']['text'] = selected_sub_item.name
-    wid['ent_count']['text'] = item_data['ent']
+    wid['ent_count']['text'] = item_data.ent_count or '??'
 
     wid['desc'].set_text(
         get_description(
             global_last=selected_item.item.glob_desc_last,
             glob_desc=selected_item.item.glob_desc,
-            style_desc=item_data['desc']
+            style_desc=item_data.desc,
         )
     )
 
@@ -249,7 +249,7 @@ def load_item_data():
         wid['moreinfo'].state(['!disabled'])
     wid['moreinfo'].tooltip_text = selected_item.url
 
-    editor_data = item_data['editor']
+    editor_data = item_data.editor
 
     has_inputs = False
     has_polarity = False
@@ -476,7 +476,7 @@ def init_widgets():
     desc_frame.grid(row=5, column=0, columnspan=3, sticky="EW")
     desc_frame.columnconfigure(0, weight=1)
 
-    wid['desc'] = tkRichText(desc_frame, width=40, height=8)
+    wid['desc'] = tkRichText(desc_frame, width=40, height=16)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
     desc_scroll = tk_tools.HidingScroll(

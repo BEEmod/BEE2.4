@@ -3,6 +3,8 @@
 from srctools import Property, Vec, Entity, Output
 
 import conditions
+import template_brush
+import instanceLocs
 import srctools
 
 
@@ -34,13 +36,10 @@ def res_conveyor_belt(inst: Entity, res: Property):
     move_dir.rotate_by_str(inst['angles'])
     start_offset = srctools.conv_float(inst.fixup['$starting_position'], 0)
     teleport_to_start = res.bool('TrackTeleport', True)
-    segment_inst_file = res['SegmentInst', '']
+    segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''])
     rail_template = res['RailTemplate', None]
 
     vmf = inst.map
-
-    if segment_inst_file:
-        segment_inst_file = conditions.resolve_inst(segment_inst_file)[0]
 
     track_speed = res['speed', None]
 
@@ -121,11 +120,11 @@ def res_conveyor_belt(inst: Entity, res: Property):
             seg_inst.fixup.update(inst.fixup)
 
         if rail_template:
-            temp = conditions.import_template(
+            temp = template_brush.import_template(
                 rail_template,
                 pos,
                 angles,
-                force_type=conditions.TEMP_TYPES.world,
+                force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
             )
             rail_temp_solids.extend(temp.world)

@@ -6,7 +6,6 @@ import itertools
 import operator
 import random
 
-import srctools
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
@@ -14,6 +13,7 @@ from BEE2_config import ConfigFile, GEN_OPTS
 import sound as snd
 from loadScreen import main_loader as loader
 import paletteLoader
+import packageLoader
 import img
 import utils
 import tk_tools
@@ -28,6 +28,7 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
+import helpMenu
 import backup as backup_win
 import tooltip
 
@@ -87,7 +88,6 @@ class Item:
         'pak_name',
         'names',
         'url',
-        'can_group',
         ]
 
     def __init__(self, item):
@@ -102,11 +102,11 @@ class Item:
             self.selected_ver = self.item.def_ver['id']
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']
+        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
-            self.def_data['editor'].find_all(
+            self.def_data.editor.find_all(
                 "Editor",
                 "Subtype",
                 "Palette",
@@ -117,7 +117,7 @@ class Item:
             # with the file.
             raise Exception('Item {} has no subtypes!'.format(item.id))
 
-        self.authors = self.def_data['auth']
+        self.authors = self.def_data.authors
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
@@ -133,20 +133,14 @@ class Item:
         self.data = version['styles'].get(
             selected_style,
             self.def_data,
-            )
+            )  # type: packageLoader.ItemVariant
         self.names = [
             gameMan.translate(prop['name', ''])
             for prop in
-            self.data['editor'].find_all("Editor", "Subtype")
+            self.data.editor.find_all("Editor", "Subtype")
             if prop['Palette', None] is not None
         ]
-        self.url = self.data['url']
-
-        # This checks to see if all the data is present to enable
-        # grouped items
-        self.can_group = ('all' in self.data['icons'] and
-                          self.data['all_name'] is not None and
-                          self.data['all_icon'] is not None)
+        self.url = self.data.url
 
         # attributes used for filtering (tags, authors, packages...)
         self.filter_tags = set()
@@ -154,11 +148,11 @@ class Item:
         # The custom tags set for this item
         self.tags = set()
 
-        for tag in self.data['tags']:
+        for tag in self.data.tags:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.TAG, tag, pretty=tag)
             )
-        for auth in self.data['auth']:
+        for auth in self.data.authors:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
             )
@@ -174,13 +168,13 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
-        icons = self.data['icons']
+        icons = self.data.icons
         num_picked = sum(
             1 for item in
             pal_picked if
             item.id == self.id
             )
-        if allow_single and self.can_group and num_picked <= single_num:
+        if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
             img_key = 'all'
@@ -201,7 +195,7 @@ class Item:
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
                 if not prop.bool('BEE2_ignore'):
                     yield prop.name
@@ -211,7 +205,7 @@ class Item:
 
         """
         result = {}
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
                 name = prop.name
 
@@ -510,6 +504,7 @@ def load_packages(data):
         }),
         (music_list, musics, 'Music', {
             'TBEAM': 'has_tbeam',
+            'TBEAM_SYNC': 'has_synced_tbeam',
             'GEL_BOUNCE': 'has_bouncegel',
             'GEL_SPEED': 'has_speedgel',
         }),
@@ -631,7 +626,8 @@ def load_packages(data):
         attributes=[
             SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
             SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', _('Excursion Funnel SFX')),
+            SelAttr.bool('TBEAM', _('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
         ],
     )
 
@@ -761,10 +757,19 @@ def suggested_refresh():
 
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
+    global selectedPalette
+    cur_palette = palettes[selectedPalette]
     palettes.sort(key=str)  # sort by name
-    UI['palette'].delete(0, END)
+    selectedPalette = palettes.index(cur_palette)
+
+    listbox = UI['palette']  # type: Listbox
+    listbox.delete(0, END)
     for i, pal in enumerate(palettes):
-        UI['palette'].insert(i, pal.name)
+        listbox.insert(i, pal.name)
+        if pal.prevent_overwrite:
+            listbox.itemconfig(i, foreground='grey', background='white')
+        else:
+            listbox.itemconfig(i, foreground='black', background='white')
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -779,12 +784,7 @@ def refresh_pal_ui():
             value=val,
             command=set_pal_radio,
             )
-    if len(palettes) < 2:
-        UI['pal_remove'].state(('disabled',))
-        menus['pal'].entryconfigure(1, state=DISABLED)
-    else:
-        UI['pal_remove'].state(('!disabled',))
-        menus['pal'].entryconfigure(1, state=NORMAL)
+    selectedPalette_radio.set(selectedPalette)
 
 
 def export_editoritems(e=None):
@@ -854,15 +854,30 @@ def export_editoritems(e=None):
                   'Launch game?'),
     )
 
+    export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
+
     for pal in palettes[:]:
-        if pal.name == '<Last Export>':
+        if pal.filename == export_filename:
             palettes.remove(pal)
+
     new_pal = paletteLoader.Palette(
-        _('<Last Export>'),
+        '??',
         pal_data,
-        options={},
-        filename='LAST_EXPORT.zip',
+        # This makes it lookup the translated name
+        # instead of using a configured one.
+        trans_name='LAST_EXPORT',
+        # Use a specific filename - this replaces existing files.
+        filename=export_filename,
+        # And prevent overwrite
+        prevent_overwrite=True,
         )
+    palettes.append(new_pal)
+    new_pal.save(ignore_readonly=True)
+
+    # Select the last_export palette, so reloading loads this item selection.
+    palettes.sort(key=str)
+    selectedPalette_radio.set(palettes.index(new_pal))
+    set_pal_radio()
 
     # Save the configs since we're writing to disk anyway.
     GEN_OPTS.save_check()
@@ -870,11 +885,6 @@ def export_editoritems(e=None):
 
     # Update corridor configs for standalone mode..
     CompilerPane.save_corridors()
-
-    # Since last_export is a zip, users won't be able to overwrite it
-    # normally!
-    palettes.append(new_pal)
-    new_pal.save(allow_overwrite=True)
     refresh_pal_ui()
 
     if launch_game:
@@ -1089,6 +1099,14 @@ def set_palette(e=None):
             sub,
             is_pre=True,
         ))
+
+    if len(palettes) < 2 or palettes[selectedPalette].prevent_overwrite:
+        UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
+    else:
+        UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
+
     flow_preview()
 
 
@@ -1137,15 +1155,6 @@ def pal_save_as(e=None):
         if name is None:
             # Cancelled...
             return False
-        # Check for non-basic characters to ensure the filename is valid..
-        elif not srctools.is_plain_text(name):
-            messagebox.showinfo(
-                icon=messagebox.ERROR,
-                title='BEE2',
-                message=_('Please only use basic characters in palette '
-                        'names.'),
-                parent=TK_ROOT,
-            )
         elif paletteLoader.check_exists(name):
             if messagebox.askyesno(
                 icon=messagebox.QUESTION,
@@ -1155,14 +1164,19 @@ def pal_save_as(e=None):
                 break
         else:
             break
-    paletteLoader.save_pal(pal_picked, name)
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        name,
+    )
     refresh_pal_ui()
 
 
 def pal_save(e=None):
     pal = palettes[selectedPalette]
-    pal.pos = [(it.id, it.subKey) for it in pal_picked]
-    pal.save(allow_overwrite=True)  # overwrite it
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        pal.name,
+    )
     refresh_pal_ui()
 
 
@@ -1172,8 +1186,8 @@ def pal_remove():
         pal = palettes[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
-                message=_('Are you sure you want to delete "{palette}"?').format(
-                    palette=pal.name,
+                message=_('Are you sure you want to delete "{}"?').format(
+                    pal.name,
                 ),
                 parent=TK_ROOT,
                 ):
@@ -1663,9 +1677,7 @@ def init_menu_bar(win):
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
 
-    menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
-    bar.add_cascade(menu=menus['help'], label=_('Help'))
-    menus['help'].add_command(label=_('About'))  # Authors etc
+    helpMenu.make_help_menu(bar)
 
 
 def init_windows():
@@ -1678,7 +1690,6 @@ def init_windows():
         height=TK_ROOT.winfo_screenheight(),
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
 
     if utils.MAC:
         # OS X has a special quit menu item.

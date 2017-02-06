@@ -98,6 +98,10 @@ setup(
                 # later.
                 cond=';'.join(condition_modules),
             ),
+
+            # Include all modules in the zip..
+            'zip_include_packages': '*',
+            'zip_exclude_packages': '',
         },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '

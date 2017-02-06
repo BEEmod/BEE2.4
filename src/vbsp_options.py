@@ -320,10 +320,6 @@ DEFAULTS = [
 
         This is used for `grating_clip`.
         """),
-    Opt('grating_filter', "@not_paint_bomb",
-        """Filter used on grating `func_vphysics_clips`.
-
-        """),
     Opt('glass_template', TYPE.STR,
         """A template for rotation and scaling of glass.
 
@@ -444,6 +440,9 @@ DEFAULTS = [
         """),
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
+        """),
+    Opt('skybox', 'sky_black',
+        """The skybox name to use for the map.
         """),
     Opt('elev_type', "RAND",
         """What type of elevator script to use:

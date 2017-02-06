@@ -1,26 +1,25 @@
 # coding: utf-8
+import inspect
 import itertools
 import math
 import random
-import inspect
 from collections import namedtuple, defaultdict
 from decimal import Decimal
 from enum import Enum
 
 from typing import (
-    Callable, Any, Iterable,
-    Dict, List, Tuple, NamedTuple, Set,
-)
+    Callable, Any, Iterable, Optional,
+    Dict, List, Tuple, NamedTuple, )
 
-import srctools
-import utils
-import vbsp_options
 import comp_consts as consts
-from instanceLocs import resolve as resolve_inst
+import srctools
+import template_brush
+import utils
+import instanceLocs
 from srctools import (
     Property,
     Vec_tuple, Vec,
-    Entity, Output, Solid, Side, UVAxis
+    Entity, Output, Solid, Side
 )
 
 
@@ -44,11 +43,6 @@ ALL_META = []
 GOO_LOCS = {}  # A mapping from blocks containing goo to the top face
 GOO_FACE_LOC = {}  # A mapping from face origin -> face for top faces.
 
-# A VMF containing template brushes, which will be loaded in and retextured
-# The first list is for world brushes, the second are func_detail brushes. The third holds overlays.
-TEMPLATES = {}  # type: Dict[str, Dict[str, Tuple[List[Solid], List[Solid], List[Entity]]]]
-TEMPLATE_LOCATION = 'bee2/templates.vmf'
-
 # A template shaped like embeddedVoxel blocks
 TEMP_EMBEDDED_VOXEL = 'BEE2_EMBEDDED_VOXEL'
 
@@ -61,33 +55,12 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-class TEMP_TYPES(Enum):
-    """Value used for import_template()'s force_type parameter.
-    """
-    default = 0  # Based on the original VMF settings
-    world = 1  # Import and add to world
-    detail = 2  # Import as a func_detail
-
-Template = namedtuple('Template', ['world', 'detail', 'overlay', 'orig_ids'])
-
-
-class MAT_TYPES(Enum):
-    """The values saved in the solidGroup.color attribute."""
-    black = 0
-    white = 1
-
-    def __str__(self):
-        if self is MAT_TYPES.black:
-            return 'black'
-        if self is MAT_TYPES.white:
-            return 'white'
-
 # A dictionary mapping origins to their brushes
 solidGroup = NamedTuple('solidGroup', [
     ('face', Side),
     ('solid', Solid),
-    ('normal', Vec), # The normal of the face.
-    ('color', MAT_TYPES),
+    ('normal', Vec),  # The normal of the face.
+    ('color', template_brush.MAT_TYPES),
 ])
 SOLIDS = {}  # type: Dict[Vec_tuple, solidGroup]
 
@@ -175,54 +148,6 @@ PETI_INST_ANGLE = {
 }
 
 del xp, xn, yp, yn, zp, zn
-
-B = MAT_TYPES.black
-W = MAT_TYPES.white
-TEMPLATE_RETEXTURE = {
-    # textures map -> surface types for template brushes.
-    # It's mainly for grid size and colour - floor/ceiling textures
-    # will be used instead at those orientations
-
-    'metal/black_wall_metal_002c': (B, 'wall'),
-    'metal/black_wall_metal_002a': (B, '2x2'),
-    'metal/black_wall_metal_002b': (B, '4x4'),
-
-    'tile/white_wall_tile001a': (W, 'wall'),
-    'tile/white_wall_tile003a': (W, 'wall'),
-    'tile/white_wall_tile003b': (W, 'wall'),
-    'tile/white_wall_tile003c': (W, '2x2'),
-    'tile/white_wall_tile003h': (W, 'wall'),
-    'tile/white_wall_state': (W, '2x2'),
-    'tile/white_wall_tile003f': (W, '4x4'),
-
-    # No black portal-placement texture, so use the bullseye instead
-    'metal/black_floor_metal_bullseye_001': (B, 'special'),
-    'tile/white_wall_tile004j': (W, 'special'),
-    'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
-
-    consts.Special.BACKPANELS: 'special.behind',
-    consts.Special.SQUAREBEAMS: 'special.edge',
-    consts.Special.GLASS: 'special.glass',
-    consts.Special.GRATING: 'special.grating',
-
-    consts.Goo.CHEAP: 'special.goo_cheap',
-}
-del B, W
-
-TEMP_TILE_PIX_SIZE = {
-    # The width in texture pixels of each tile size.
-    # We decrease offset to this much +- at maximum (so adjacient template
-    # brushes merge with each other). This still allows creating brushes
-    # with half-grid offsets.
-    '4x4': 128,
-    'floor': 128,  # == 4x4
-    'ceiling': 128,
-
-    '2x2': 256,
-
-    'wall': 512,
-    'special': 512,
-}
 
 
 class NextInstance(Exception):
@@ -317,17 +242,28 @@ class Condition:
 
         """
         for res in self.results[:]:
-            self.setup_result(self.results, res)
+            self.setup_result(self.results, res, self.source)
 
         for res in self.else_results[:]:
-            self.setup_result(self.else_results, res)
+            self.setup_result(self.else_results, res, self.source)
 
     @staticmethod
-    def setup_result(res_list, result):
+    def setup_result(res_list, result, source=''):
         """Helper method to perform result setup."""
         func = RESULT_SETUP.get(result.name)
         if func:
-            result.value = func(VMF, result)
+            # noinspection PyBroadException
+            try:
+                result.value = func(VMF, result)
+            except:
+                # Print the source of the condition if if fails...
+                LOGGER.exception(
+                    'Error in {} setup:',
+                    source or 'condition',
+                )
+                # Exit directly, so we don't print it again in the exception
+                # handler
+                utils.quit_app(1)
             if result.value is None:
                 # This result is invalid, remove it.
                 res_list.remove(result)
@@ -512,7 +448,6 @@ def init(seed, inst_list, vmf_file):
     conditions.sort(key=lambda cond: getattr(cond, 'priority', zero))
 
     build_solid_dict()
-    load_templates()
 
 
 def check_all():
@@ -536,9 +471,9 @@ def check_all():
                     'Error in {}:',
                     condition.source or 'condition',
                 )
-                # Skip to next condition.
-                import sys
-                sys.exit(1)
+                # Exit directly, so we don't print it again in the exception
+                # handler
+                utils.quit_app(1)
             if not condition.results and not condition.else_results:
                 break  # Condition has run out of results, quit early
 
@@ -549,12 +484,15 @@ def check_all():
         vbsp.settings['has_attr'].items()
         if value
     ])
-    LOGGER.info('instanceLocs cache: {}', resolve_inst.cache_info())
+    # Dynamically added by lru_cache()
+    # noinspection PyUnresolvedReferences
+    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve.cache_info())
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
 def check_flag(flag: Property, inst: Entity):
+    """Determine the result for a condition flag."""
     LOGGER.debug(
         'Checking {} ({!s}) on {}',
         flag.real_name,
@@ -589,6 +527,7 @@ def import_conditions():
 
     # pkgutil doesn't work when frozen, so we need to use a hardcoded list.
     try:
+        # noinspection PyUnresolvedReferences
         from BUILD_CONSTANTS import cond_modules
         modules = cond_modules.split(';')
     except ImportError:
@@ -616,10 +555,10 @@ def build_solid_dict():
     import vbsp
     mat_types = {}
     for mat in vbsp.BLACK_PAN:
-        mat_types[mat] = MAT_TYPES.black
+        mat_types[mat] = template_brush.MAT_TYPES.black
 
     for mat in vbsp.WHITE_PAN:
-        mat_types[mat] = MAT_TYPES.white
+        mat_types[mat] = template_brush.MAT_TYPES.white
 
     for solid in VMF.brushes:
         for face in solid:
@@ -874,7 +813,7 @@ def remove_ant_toggle(toggle_ent):
             ent.remove()
 
 
-def reallocate_overlays(mapping: Dict[str, List[str]]):
+def reallocate_overlays(mapping: Dict[str, Optional[List[str]]]):
     """Replace one side ID with others in all overlays.
 
     The IDs should be strings.
@@ -882,10 +821,13 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
     for overlay in VMF.by_class['info_overlay']:  # type: Entity
         sides = overlay['sides', ''].split(' ')
         for side in sides[:]:
-            if side not in mapping:
+            try:
+                new_ids = mapping[side]
+            except KeyError:
                 continue
             sides.remove(side)
-            sides.extend(mapping[side])
+            if new_ids is not None:
+                sides.extend(new_ids)
         if not sides:
             # The overlay doesn't have any sides at all!
             VMF.remove_ent(overlay)
@@ -894,14 +836,13 @@ def reallocate_overlays(mapping: Dict[str, List[str]]):
 
 
 def steal_from_brush(
-    temp_data: Template,
+    temp_data: template_brush.ExportedTemplate,
     brush_group: 'solidGroup',
     rem_brush=True,
     additional: Iterable[int]=(),
+    transfer_overlays=True,
 ):
     """Copy IDs from a brush to a template."""
-    LOGGER.info('Steal: {}', locals())
-
     temp_brushes = temp_data.world.copy()
     # Overlays can't be applied to entities (other than func_detail).
     if temp_data.detail is not None and temp_data.detail['classname'] == 'func_detail':
@@ -915,11 +856,11 @@ def steal_from_brush(
         brush_group.face.mat = 'tools/toolsnodraw'
 
     # Additional is a list of IDs in the template VMF, not the final one.
-    additional = [
-        temp_data.orig_ids.get(face_id, -1)
+    additional = {
+        temp_data.orig_ids.get(int(face_id), -1)
         for face_id in
         additional
-    ]
+    }
     new_ids = []
 
     for brush in temp_brushes:
@@ -935,11 +876,9 @@ def steal_from_brush(
             elif face.id in additional:
                 new_ids.append(str(face.id))
 
-    LOGGER.info('New IDS: {}', {
-            str(brush_group.face.id): new_ids,
-        })
-
     if new_ids:
+        if not transfer_overlays:
+            new_ids = None
         reallocate_overlays({
             str(brush_group.face.id): new_ids,
         })
@@ -988,461 +927,6 @@ def resolve_value(inst: Entity, value: str):
         return value
 
 
-def parse_temp_name(name) -> Tuple[str, Set[str]]:
-    if ':' in name:
-        temp_name, visgroups = name.rsplit(':', 1)
-        return temp_name.casefold(), {
-            vis.strip().casefold()
-            for vis in
-            visgroups.split(',')
-        }
-    else:
-        return name.casefold(), set()
-
-
-def load_templates():
-    """Load in the template file, used for import_template()."""
-    with open(TEMPLATE_LOCATION) as file:
-        props = Property.parse(file, TEMPLATE_LOCATION)
-    vmf = srctools.VMF.parse(props, preserve_ids=True)
-
-    def make_subdict():
-        return defaultdict(list)
-    # detail_ents[temp_id][visgroup]
-    detail_ents = defaultdict(make_subdict)
-    world_ents = defaultdict(make_subdict)
-    overlay_ents = defaultdict(make_subdict)
-
-    for ent in vmf.by_class['bee2_template_world']:
-        world_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].extend(ent.solids)
-
-    for ent in vmf.by_class['bee2_template_detail']:
-        detail_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].extend(ent.solids)
-
-    for ent in vmf.by_class['bee2_template_overlay']:
-        overlay_ents[
-            ent['template_id'].casefold()
-        ][
-            ent['visgroup'].casefold()
-        ].append(ent)
-
-    for temp_id in set(detail_ents).union(world_ents, overlay_ents):
-        world = world_ents[temp_id]
-        detail = detail_ents[temp_id]
-        overlay = overlay_ents[temp_id]
-        visgroup_ids = set(world).union(detail, overlay)
-        TEMPLATES[temp_id] = groups = {
-            visgroup: (
-                world[visgroup],
-                detail[visgroup],
-                overlay[visgroup],
-            ) for visgroup in visgroup_ids
-        }
-        if '' not in groups:
-            # We ensure the '' group is always present.
-            # This is always exported later, so just make it empty.
-            groups[''] = ([], [], [])
-
-
-def get_template(temp_name):
-    """Get the data associated with a given template.
-
-    This is a dictionary mapping visgroups -> (world, detail, over) tuples.
-    """
-    try:
-        return TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        # Replace the KeyError with a more useful error message, and
-        # list all the templates that are available.
-        LOGGER.info('Templates:')
-        LOGGER.info('\n'.join(
-            ('* "' + temp.upper() + '"')
-            for temp in
-            sorted(TEMPLATES.keys())
-        ))
-        # Overwrite the error's value
-        err.args = ('Template not found: "{}"'.format(temp_name),)
-        raise err
-
-
-def import_template(
-        temp_name,
-        origin,
-        angles=None,
-        targetname='',
-        force_type=TEMP_TYPES.default,
-        add_to_map=True,
-        visgroup_choose: Callable[[Iterable[str]], Iterable[str]]=lambda x: (),
-    ) -> Template:
-    """Import the given template at a location.
-
-    If force_type is set to 'detail' or 'world', all brushes will be converted
-    to the specified type instead. A list of world brushes and the func_detail
-    entity will be returned. If there are no detail brushes, None will be
-    returned instead of an invalid entity.
-
-    If targetname is set, it will be used to localise overlay names.
-    add_to_map sets whether to add the brushes and func_detail to the map.
-    visgroup_choose is a callback used to determine if visgroups should be
-    added - it's passed a list of names, and should return a list of ones to use.
-    """
-    import vbsp
-    temp_name, visgroup_ids = parse_temp_name(temp_name)
-    visgroups = get_template(temp_name)
-    orig_world = []  # type: List[List[Solid]]
-    orig_detail = []  # type: List[List[Solid]]
-    orig_over = []  # type: List[Entity]
-
-    chosen_groups = visgroup_ids.union(visgroup_choose(
-        # Skip the '' visgroup in the callback.
-        filter(None, visgroups.keys()),
-    ), ('', ))  # '' = no visgroup, always used.
-
-    for group in chosen_groups:
-        world, detail, over = visgroups[group]
-        orig_world.append(world)
-        orig_detail.append(detail)
-        orig_over.extend(over)
-
-    new_world = []  # type: List[Solid]
-    new_detail = []  # type: List[Solid]
-    new_over = []  # type: List[Entity]
-
-    id_mapping = {}  # A map of the original -> new face IDs.
-
-    for orig_lists, new_list in [
-            (orig_world, new_world),
-            (orig_detail, new_detail)
-        ]:
-        for orig_list in orig_lists:
-            for old_brush in orig_list:
-                brush = old_brush.copy(map=VMF, side_mapping=id_mapping, keep_vis=False)
-                brush.localise(origin, angles)
-                new_list.append(brush)
-
-    for overlay in orig_over:  # type: Entity
-        new_overlay = overlay.copy(
-            map=VMF,
-            keep_vis=False,
-        )
-        del new_overlay['template_id']  # Remove this, it's not part of overlays
-        new_overlay['classname'] = 'info_overlay'
-
-        sides = overlay['sides'].split()
-        new_overlay['sides'] = ' '.join(
-            str(id_mapping[int(side)])
-            for side in sides
-            if int(side) in id_mapping
-        )
-
-        srctools.vmf.localise_overlay(new_overlay, origin, angles)
-        orig_target = new_overlay['targetname']
-
-        # Only change the targetname if the overlay is not global, and we have
-        # a passed name.
-        if targetname and orig_target and orig_target[0] != '@':
-            new_overlay['targetname'] = targetname + '-' + orig_target
-
-        VMF.add_ent(new_overlay)
-        new_over.append(new_overlay)
-
-        # Don't let the overlays get retextured too!
-        vbsp.IGNORED_OVERLAYS.add(new_overlay)
-
-    # Don't let these get retextured normally - that should be
-    # done by retexture_template(), if at all!
-    for brush in new_world + new_detail:
-        vbsp.IGNORED_FACES.update(brush.sides)
-
-    if force_type is TEMP_TYPES.detail:
-        new_detail.extend(new_world)
-        new_world.clear()
-    elif force_type is TEMP_TYPES.world:
-        new_world.extend(new_detail)
-        new_detail.clear()
-
-    if add_to_map:
-        VMF.add_brushes(new_world)
-
-    if new_detail:
-        detail_ent = VMF.create_ent(
-            classname='func_detail'
-        )
-        detail_ent.solids = new_detail
-        if not add_to_map:
-            detail_ent.remove()
-    else:
-        detail_ent = None
-        new_detail = []
-
-    # Don't let these get retextured normally - that should be
-    # done by retexture_template(), if at all!
-    for solid in new_world:
-        vbsp.IGNORED_FACES.update(solid.sides)
-    for solid in new_detail:
-        vbsp.IGNORED_FACES.update(solid.sides)
-
-    return Template(new_world, detail_ent, new_over, id_mapping)
-
-
-def get_scaling_template(
-        temp_id: str,
-    ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
-    """Get the scaling data from a template.
-
-    This is a dictionary mapping normals to the U,V and rotation data.
-    """
-    if ':' in temp_id:
-        temp_name, over_name = temp_id.split(':', 1)
-    else:
-        temp_name = temp_id
-        over_name = ''
-    world, detail, over = get_template(temp_name)[over_name]
-
-    if detail:
-        world = world + detail  # Don't mutate the lists
-
-    uvs = {}
-
-    for brush in world:
-        for side in brush.sides:
-            uvs[side.normal().as_tuple()] = (
-                side.uaxis.copy(),
-                side.vaxis.copy(),
-                side.ham_rot,
-            )
-
-    return uvs
-
-
-# 'Opposite' values for retexture_template(force_colour)
-TEMP_COLOUR_INVERT = {
-    MAT_TYPES.white: MAT_TYPES.black,
-    MAT_TYPES.black: MAT_TYPES.white,
-    None: 'INVERT',
-    'INVERT': None,
-}
-
-
-def retexture_template(
-        template_data: Template,
-        origin: Vec,
-        fixup: srctools.vmf.EntityFixup=None,
-        replace_tex: dict= srctools.EmptyMapping,
-        force_colour: MAT_TYPES=None,
-        force_grid: str=None,
-        use_bullseye=False,
-        ):
-    """Retexture a template at the given location.
-
-    - Only textures in the TEMPLATE_RETEXTURE dict will be replaced.
-    - Others will be ignored (nodraw, plasticwall, etc)
-    - Wall textures pointing up and down will switch to floor/ceiling textures.
-    - Textures of the same type, normal and inst origin will randomise to the
-      same type.
-    - replace_tex is a replacement table. This overrides everything else.
-      The values should either be a list (random), or a single value.
-    - If force_colour is set, all tile textures will be switched accordingly.
-      If set to 'INVERT', white and black textures will be swapped.
-    - If force_grid is set, all tile textures will be that size:
-      ('wall', '2x2', '4x4', 'special')
-    - If use_bullseye is true, the bullseye textures will be used for all panel
-      sides instead of the normal textures. (This overrides force_grid.)
-    - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
-    """
-    import vbsp
-
-    all_brushes = list(template_data.world)
-    if template_data.detail is not None:
-        all_brushes.extend(template_data.detail.solids)
-
-    # Template faces are randomised per block and side. This means
-    # multiple templates in the same block get the same texture, so they
-    # can clip into each other without looking bad.
-    rand_prefix = 'TEMPLATE_{}_{}_{}:'.format(*(origin // 128))
-
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    floor_tolerance = 0.8
-
-    can_clump = vbsp.can_clump()
-
-    # Ensure all values are lists.
-    replace_tex = {
-        key.casefold(): ([value] if isinstance(value, str) else value)
-        for key, value in
-        replace_tex.items()
-    }
-
-    for brush in all_brushes:
-        for face in brush:
-            folded_mat = face.mat.casefold()
-
-            norm = face.normal()
-            random.seed(rand_prefix + norm.join('_'))
-
-            if folded_mat in replace_tex:
-                # Replace_tex overrides everything.
-                mat = random.choice(replace_tex[folded_mat])
-                LOGGER.info('Mat: {}, replacement: {}', folded_mat, mat)
-                if mat[:1] == '$' and fixup is not None:
-                    mat = fixup[mat]
-                face.mat = mat
-                continue
-
-            tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
-
-            if tex_type is None:
-                continue  # It's nodraw, or something we shouldn't change
-
-            if isinstance(tex_type, str):
-                # It's something like squarebeams or backpanels, just look
-                # it up
-                face.mat = vbsp.get_tex(tex_type)
-
-                if tex_type == 'special.goo_cheap':
-                    if face.normal() != (0, 0, 1):
-                        # Goo must be facing upright!
-                        # Retexture to nodraw, so a template can be made with
-                        # all faces goo to work in multiple orientations.
-                        face.mat = 'tools/toolsnodraw'
-                    else:
-                        # Goo always has the same orientation!
-                        face.uaxis = UVAxis(
-                            1, 0, 0,
-                            offset=0,
-                            scale=vbsp_options.get(float, 'goo_scale'),
-                        )
-                        face.vaxis = UVAxis(
-                            0, -1, 0,
-                            offset=0,
-                            scale=vbsp_options.get(float, 'goo_scale'),
-                        )
-                continue
-            # It's a regular wall type!
-            tex_colour, grid_size = tex_type
-
-            if force_colour == 'INVERT':
-                # Invert the texture
-                tex_colour = (
-                    MAT_TYPES.white
-                    if tex_colour is MAT_TYPES.black else
-                    MAT_TYPES.black
-                )
-            elif force_colour is not None:
-                tex_colour = force_colour
-
-            if force_grid is not None:
-                grid_size = force_grid
-
-            if 1 in norm or -1 in norm:  # Facing NSEW or up/down
-                # If axis-aligned, make the orientation aligned to world
-                # That way multiple items merge well, and walls are upright.
-                # We allow offsets < 1 grid tile, so items can be offset.
-                face.uaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
-                face.vaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
-
-            if use_bullseye:
-                # We want to use the bullseye textures, instead of normal
-                # ones
-                if norm.z < -floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_floor'.format(tex_colour)
-                    )
-                elif norm.z > floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_ceiling'.format(tex_colour)
-                    )
-                else:
-                    face.mat = ''  # Ensure next if statement triggers
-
-                # If those aren't defined, try the wall texture..
-                if face.mat == '':
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_wall'.format(tex_colour)
-                    )
-                if face.mat != '':
-                    continue  # Set to a bullseye texture,
-                    # don't use the wall one
-
-            if grid_size == 'special':
-                # Don't use wall on faces similar to floor/ceiling:
-                if -floor_tolerance < norm.z < floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.{!s}_wall'.format(tex_colour)
-                    )
-                else:
-                    face.mat = ''  # Ensure next if statement triggers
-
-                # Various fallbacks if not defined
-                if face.mat == '':
-                    face.mat = vbsp.get_tex(
-                        'special.{!s}'.format(tex_colour)
-                    )
-                if face.mat == '':
-                    # No special texture - use a wall one.
-                    grid_size = 'wall'
-                else:
-                    # Set to a special texture,
-                    continue # don't use the wall one
-
-            if norm.z > floor_tolerance:
-                grid_size = 'ceiling'
-            if norm.z < -floor_tolerance:
-                grid_size = 'floor'
-
-            if can_clump:
-                # For the clumping algorithm, set to Valve PeTI and let
-                # clumping handle retexturing.
-                vbsp.IGNORED_FACES.remove(face)
-                if tex_colour is MAT_TYPES.white:
-                    if grid_size == '4x4':
-                        face.mat = 'tile/white_wall_tile003f'
-                    elif grid_size == '2x2':
-                        face.mat = 'tile/white_wall_tile003c'
-                    else:
-                        face.mat = 'tile/white_wall_tile003h'
-                elif tex_colour is MAT_TYPES.black:
-                    if grid_size == '4x4':
-                        face.mat = 'metal/black_wall_metal_002b'
-                    elif grid_size == '2x2':
-                        face.mat = 'metal/black_wall_metal_002a'
-                    else:
-                        face.mat = 'metal/black_wall_metal_002e'
-            else:
-                face.mat = vbsp.get_tex(
-                    '{!s}.{!s}'.format(tex_colour, grid_size)
-                )
-
-    for over in template_data.overlay[:]:
-        random.seed('TEMP_OVERLAY_' + over['basisorigin'])
-        mat = over['material'].casefold()
-        if mat in replace_tex:
-            mat = random.choice(replace_tex[mat])
-            if mat[:1] == '$':
-                mat = fixup[mat]
-        elif mat in vbsp.TEX_VALVE:
-            mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
-        else:
-            continue
-        if mat == '':
-            # If blank, remove the overlay from the map and the list.
-            # (Since it's inplace, this can affect the tuple.)
-            template_data.overlay.remove(over)
-            over.remove()
-        else:
-            over['material'] = mat
-
-
 def hollow_block(solid_group: solidGroup, remove_orig_face=False):
     """Convert a solid into a embeddedVoxel-style block.
 
@@ -1482,12 +966,12 @@ def hollow_block(solid_group: solidGroup, remove_orig_face=False):
         normal = face.normal()
 
         # Generate our new brush.
-        new_brushes = import_template(
+        new_brushes = template_brush.import_template(
             TEMP_EMBEDDED_VOXEL,
             face.get_origin(),
             # The normal Z is swapped...
             normal.to_angle(),
-            force_type=TEMP_TYPES.world,
+            force_type=template_brush.TEMP_TYPES.world,
         ).world
 
         # Texture the new brush..
@@ -1690,7 +1174,11 @@ def res_switch_setup(res: Property):
 
     for prop in cases:
         for result in prop.value:
-            Condition.setup_result(prop.value, result)
+            Condition.setup_result(
+                prop.value,
+                result,
+                'switch: {} -> {}'.format(flag, prop.real_name),
+            )
 
     if method is SWITCH_TYPE.LAST:
         cases[:] = cases[::-1]
@@ -1733,19 +1221,38 @@ def res_switch(inst: Entity, res: Property):
 
 @make_result_setup('staticPiston')
 def make_static_pist_setup(res: Property):
-    return {
-        name: resolve_inst(res[name, ''])[0]
-        for name in
-        (
-            'bottom_1', 'bottom_2', 'bottom_3',
-            'logic_0', 'logic_1', 'logic_2', 'logic_3',
-            'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
-        )
-    }
+    instances = (
+        'bottom_1', 'bottom_2', 'bottom_3',
+        'logic_0', 'logic_1', 'logic_2', 'logic_3',
+        'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
+        'grate_low', 'grate_high',
+    )
+
+    if res.has_children():
+        # Pull from config
+        return {
+            name: instanceLocs.resolve_one(
+                res[name, ''],
+                error=False,
+            ) for name in instances
+        }
+    else:
+        # Pull from editoritems
+        if ':' in res.value:
+            from_item, prefix = res.value.split(':', 1)
+        else:
+            from_item = res.value
+            prefix = ''
+        return {
+            name: instanceLocs.resolve_one(
+                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
+                error=False,
+            ) for name in instances
+        }
 
 
 @make_result('staticPiston')
-def make_static_pist(ent: Entity, res: Property):
+def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1754,40 +1261,57 @@ def make_static_pist(ent: Entity, res: Property):
         Bottom_1/2/3: Moving piston with the given $bottom_level
         Logic_0/1/2/3: Additional logic instance for the given $bottom_level
         Static_0/1/2/3/4: A static piston at the given height.
+    Alternatively, specify all instances via editoritems, by setting the value
+    to the item ID optionally followed by a :prefix.
     """
 
-    bottom_pos = ent.fixup['bottom_level', '-1']
+    bottom_pos = ent.fixup.int('bottom_level', 0)
+    grate = None
 
     if (ent.fixup['connectioncount', '0'] != "0" or
             ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
-        if int(bottom_pos) > 0:
+        if bottom_pos > 0:
             # The piston doesn't go fully down, use alt instances.
-            val = res.value['bottom_' + bottom_pos]
+            val = res.value['bottom_' + str(bottom_pos)]
             if val:  # Only if defined
                 ent['file'] = val
-        logic_file = res.value['logic_' + bottom_pos]
+
+        logic_file = res.value['logic_' + str(bottom_pos)]
         if logic_file:
             # Overlay an additional logic file on top of the original
             # piston. This allows easily splitting the piston logic
             # from the styled components
             logic_ent = ent.copy()
             logic_ent['file'] = logic_file
-            VMF.add_ent(logic_ent)
+            vmf.add_ent(logic_ent)
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
             logic_ent.fixup['manager_a'] = srctools.bool_as_int(
                 ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
-        val = res.value[
-            'static_' + (
-                ent.fixup['top_level', '1']
-                if srctools.conv_bool(ent.fixup['start_up'], False)
-                else bottom_pos
-            )
-        ]
+        if ent.fixup.bool('start_up'):
+            pos = bottom_pos = ent.fixup.int('top_level', 1)
+        else:
+            pos = bottom_pos
+        ent.fixup['top_level'] = ent.fixup['bottom_level'] = pos
+
+        val = res.value['static_' + str(pos)]
         if val:
             ent['file'] = val
+
+    # Add in the grating for the bottom as an overlay.
+    # It's low to fit the piston at minimum, or higher if needed.
+    grate = res.value[
+        'grate_high'
+        if bottom_pos > 0 else
+        'grate_low'
+    ]
+    if grate:
+        grate_ent = ent.copy()
+        grate_ent['file'] = grate
+        vmf.add_ent(grate_ent)
+
 
 
 @make_result('GooDebris')
@@ -1878,10 +1402,3 @@ def res_goo_debris(res: Property):
         )
 
     return RES_EXHAUSTED
-
-
-
-
-
-
-
