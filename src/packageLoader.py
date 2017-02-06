@@ -1416,7 +1416,7 @@ class Item(PakObject):
                 LOGGER.warning(
                     'Item {} has invalid OccupiedVoxels part '
                     '(needs SubPos1 and SubPos2)!',
-                    self.id
+                    self.id,
                 )
                 continue
             voxel_part.name = "Voxel"
@@ -1433,12 +1433,18 @@ class Item(PakObject):
                     continue
 
                 bbox_min, bbox_max = Vec.bbox(pos_1, pos_2)
+                pos_1 = None
                 for pos in Vec.iter_grid(bbox_min, bbox_max):
                     voxel_part.append(Property(
                         "Surface", [
                             Property("Pos", str(pos)),
                         ])
                     )
+            if pos_1 is not None:
+                LOGGER.warning(
+                    'Item {} has only half of SubPos bbox!',
+                    self.id,
+                )
 
         # Full blocks
         for occu_voxels in new_editor.find_all("Exporting", "OccupiedVoxels"):
