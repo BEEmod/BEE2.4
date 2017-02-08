@@ -17,13 +17,13 @@ ID_ATTRS = {
         {'placement_helper'},
     ],
     'ITEM_INDICATOR_TOGGLE': [
-        {'antline', 'toggle'},
+        {'antline', 'toggle', 'indicator_toggle'},
     ],
     'ITEM_INDICATOR_PANEL': [
-        {'antline', 'checkmark'},
+        {'antline', 'checkmark', 'indicator_panel'},
     ],
     'ITEM_INDICATOR_PANEL_TIMER': [
-        {'antline', 'timer'},
+        {'antline', 'timer', 'indicator_panel'},
     ],
     'ITEM_POINT_LIGHT': [
         {'ambient_light'},

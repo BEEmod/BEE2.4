@@ -5,9 +5,11 @@ from srctools import VMF, Entity, Output
 import instanceLocs
 import conditions
 import instance_traits
+import utils
 
 from typing import Iterable, Dict, List, Set
 
+LOGGER = utils.getLogger(__name__)
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
@@ -19,57 +21,119 @@ class ConnType(Enum):
 
     BOTH = 3  # Trigger both simultaneously.
 
+CONN_NAMES = {
+    ConnType.DEFAULT: '',
+    ConnType.PRIMARY: 'A',
+    ConnType.SECONDARY: 'B',
+    ConnType.BOTH: 'A+B',
+}
 
-# Instance -> outputs from it.
-OUTPUTS = defaultdict(set)  # type: Dict[Entity, Set[Connection]]
-# Instance -> inputs to it.
-INPUTS = defaultdict(set)  # type: Dict[Entity, Set[Connection]]
-# instance -> Antline
-ANTLINES = {}  # type: Dict[Entity, Antline]
+
+# Targetname -> item
+ITEMS = {}  # type: Dict[str, Item]
 
 
-class Connection:
-    """Represents an item connection."""
-
+class Item:
+    """Represents one item/instance with IO."""
+    __slots__ = [
+        'inst',
+        'ind_panels', 'ind_toggle',
+        'antlines',
+        'timer',
+        'inputs', 'outputs',
+    ]
     def __init__(
         self,
-        in_inst: Entity,   # Instance this is triggering
-        out_inst: Entity,  # Instance this comes from
-        conn_type=ConnType.DEFAULT,
-        timer_count: int=None,
-        outputs: Iterable[Output]=(),
-    ):
-        self.in_inst = in_inst
-        self.out_inst = out_inst
-        self.type = conn_type
-        self.timer_count = timer_count
-        self.outputs = list(outputs)
-
-    def add(self):
-        """Add this to the directories."""
-        OUTPUTS[self.in_inst].add(self)
-        INPUTS[self.out_inst].add(self)
-
-    def remove(self):
-        """Remove this from the directories."""
-        OUTPUTS[self.in_inst].discard(self)
-        INPUTS[self.out_inst].discard(self)
-
-
-class Antline:
-    """Represents the antlines coming from an item."""
-    def __init__(
-        self,
-        toggle: Entity=None,
+        inst: Entity,
+        toggle: Entity = None,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
         timer_count: int=None,
     ):
-        self.ind_panels = list(panels)
+        self.inst = inst
+
+        # Associated indicator panels
+        self.ind_panels = set(panels)  # type: Set[Entity]
         self.ind_toggle = toggle
-        self.antlines = list(antlines)
-        # None = checkmark
-        self.timer_count = timer_count
+        # Overlays (also signs)
+        self.antlines = set(antlines)  # type: Set[Entity]
+
+        # None = Infinite/normal.
+        self.timer = timer_count
+
+        # From this item
+        self.outputs = set()  # type: Set[Connection]
+        # To this item
+        self.inputs = set()  # type: Set[Connection]
+
+        assert self.name, 'Blank name!'
+
+    def __repr__(self):
+        return '<Item "{}">'.format(self.name)
+
+    @property
+    def traits(self):
+        """Return the set of instance traits for the item."""
+        return instance_traits.get(self.inst)
+
+    @property
+    def name(self) -> str:
+        """Return the targetname of the item."""
+        return self.inst['targetname']
+
+    @name.setter
+    def name(self, name: str):
+        """Set the targetname of the item."""
+        self.inst['targetname'] = name
+
+
+class Connection:
+    """Represents a connection between two items.
+
+    The item references should not be modified, as this will invalidate
+    INPUTS and OUTPUTS.
+    """
+
+    __slots__ = [
+        'inp', 'out', 'type', 'outputs',
+    ]
+    def __init__(
+        self,
+        to_item: Item,   # Item this is triggering
+        from_item: Item,  # Item this comes from
+        conn_type=ConnType.DEFAULT,
+        outputs: Iterable[Output]=(),
+    ):
+        self.inp = to_item
+        self.out = from_item
+        self.type = conn_type
+        self.outputs = list(outputs)
+
+    def __repr__(self):
+        return '<Connection {} {} -> {}>'.format(
+            CONN_NAMES[self.type],
+            self.out.name,
+            self.inp.name,
+        )
+
+    def add(self):
+        """Add this to the directories."""
+        self.inp.inputs.add(self)
+        self.out.outputs.add(self)
+
+    def remove(self):
+        """Remove this from the directories."""
+        self.inp.inputs.discard(self)
+        self.out.outputs.discard(self)
+
+    def set_item(self, input=None, output=None):
+        """Set the input or output used for this item."""
+        self.remove()
+        if input is not None:
+            self.inp = input
+        if output is not None:
+            self.out = output
+        self.add()
 
 
 def calc_connections(vmf: VMF):
@@ -79,9 +143,8 @@ def calc_connections(vmf: VMF):
     Instance Traits must have been calculated.
     """
     # First we want to match targetnames to item types.
-    items = {}  # type: Dict[str, Entity]
     toggles = {}  # type: Dict[str, Entity]
-    overlays = defaultdict(list)  # type: Dict[str, List[Entity]]
+    overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
     panels = {}  # type: Dict[str, Entity]
 
     panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
@@ -95,79 +158,60 @@ def calc_connections(vmf: VMF):
     tbeam_io = {tbeam_io.in_act, tbeam_io.in_deact}
 
     for inst in vmf.by_class['func_instance']:
-        if not inst['targetname']:
+        inst_name = inst['targetname']
+        if not inst_name:
             continue
-        filename = inst['file'].casefold()
 
         traits = instance_traits.get(inst)
 
-        if 'toggle' in traits:
-            inst_dict = toggles
-        elif 'antline' in traits:
-            inst_dict = panels
+        if 'indicator_toggle' in traits:
+            toggles[inst['targetname']] = inst
+        elif 'indicator_panel' in traits:
+            panels[inst['targetname']] = inst
         else:
-            inst_dict = items
-
-        inst_dict[inst['targetname']] = inst
+            ITEMS[inst_name] = Item(inst)
 
     for over in vmf.by_class['info_overlay']:
-        overlays[over['targetname']].append(over)
+        overlays[over['targetname']].add(over)
 
-    # Now build the connections.
-    for inst in items.values():
-        if not inst.outputs:
-            # No outputs..
-            continue
-
-        inst_toggle = None
-        inst_panels = []
-        inst_overlays = []
+    # Now build the connections and items.
+    for item in ITEMS.values():
         input_items = []  # Instances we trigger
         inputs = defaultdict(list)  # type: Dict[str, List[Output]]
-        for out in inst.outputs:
+
+        for out in item.inst.outputs:
             inputs[out.target].append(out)
+        # inst.outputs.clear()
 
         for out_name in inputs:
-            # Fizzler base -> model outputs, skip.
+            # Fizzler base -> model outputs, skip and readd.
             if out_name.endswith(('_modelStart', '_modelEnd')):
+                item.inst.add_out(*inputs[out_name])
                 continue
 
             if out_name in toggles:
                 inst_toggle = toggles[out_name]
-                inst_overlays = overlays[inst_toggle.fixup['indicator_name']]
+                item.antlines |= overlays[inst_toggle.fixup['indicator_name']]
             elif out_name in panels:
-                inst_panels.append(panels[out_name])
+                item.ind_panels.add(panels[out_name])
             else:
                 try:
-                    input_items.append(items[out_name])
+                    input_items.append(ITEMS[out_name])
                 except KeyError:
                     raise ValueError('"{}" is not a known instance!'.format(out_name))
 
-        timer_delay = inst.fixup.int('timer_delay', -1)
-        if 0 <= timer_delay <= 30:
-            desired_panel_inst = panel_timer
-        else:
-            desired_panel_inst = panel_check
-            timer_delay = None
+        desired_panel_inst = panel_check if item.timer is None else panel_timer
 
         # Check/cross instances sometimes don't match the kind of timer delay.
-        for pan in inst_panels:
+        for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
 
-        antline = Antline(
-            inst_toggle,
-            inst_panels,
-            inst_overlays,
-            timer_delay
-        )
-        ANTLINES[inst] = antline
-
-        for inp_inst in input_items:
+        for inp_item in input_items:  # type: Item
             # Default A/B type.
             conn_type = ConnType.DEFAULT
-            in_outputs = inputs[inp_inst['targetname']]
+            in_outputs = inputs[inp_item.name]
 
-            if 'tbeam_emitter' in instance_traits.get(inp_inst):
+            if 'tbeam_emitter' in inp_item.traits:
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:  # type: Output
@@ -180,16 +224,21 @@ def calc_connections(vmf: VMF):
                         break
                 else:
                     raise ValueError(
-                        'Tbeam "{}" has inputs, but no valid types!'.format(
-                            inp_inst['targetname']
-                        )
+                        'Excursion Funnel "{}" has inputs, '
+                        'but no valid types!'.format(inp_item.name)
                     )
 
             conn = Connection(
-                inp_inst,
-                inst,
+                inp_item,
+                item,
                 conn_type,
-                timer_delay,
                 in_outputs,
             )
             conn.add()
+
+    for item in ITEMS.values():
+        # Copying items can fail to update the connection counts.
+        # Make sure they're correct.
+        LOGGER.info('Item "{}": {} -> {}', item.name, item.inputs, item.outputs)
+        if '$connectioncount' in item.inst.fixup:
+            item.inst.fixup['$connectioncount'] = len(item.inputs)
