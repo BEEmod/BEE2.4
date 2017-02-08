@@ -184,9 +184,9 @@ def calc_connections(vmf: VMF):
         # inst.outputs.clear()
 
         for out_name in inputs:
-            # Fizzler base -> model outputs, skip and readd.
-            if out_name.endswith(('_modelStart', '_modelEnd')):
-                item.inst.add_out(*inputs[out_name])
+            # Fizzler base -> model/brush outputs, skip and readd.
+            if out_name.endswith(('_modelStart', '_modelEnd', '_brush')):
+                # item.inst.add_out(*inputs[out_name])
                 continue
 
             if out_name in toggles:
