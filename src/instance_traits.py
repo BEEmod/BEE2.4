@@ -7,7 +7,7 @@ from instanceLocs import ITEM_FOR_FILE
 
 import utils
 
-from typing import Optional, Set
+from typing import Optional, Callable, Dict, Set
 
 LOGGER = utils.getLogger(__name__)
 
@@ -130,6 +130,26 @@ CLASS_ATTRS = {
     # Other classes have no traits - single or no instances.
 }
 
+# Special functions to call on an instance for their item ID (str)
+# or class (enum).
+# Arguments are the instance, trait set, item ID and subtype index.
+TRAIT_ID_FUNC = {}  # type: Dict[str, Callable[[Entity, int], None]]
+TRAIT_CLS_FUNC = {}  # type: Dict[ItemClass, Callable[[Entity], None]]
+
+
+def trait_id_func(target: str):
+    def deco(func):
+        TRAIT_ID_FUNC[target.casefold()] = func
+        return func
+    return deco
+
+
+def trait_cls_func(target: ItemClass):
+    def deco(func):
+        TRAIT_ID_FUNC[target] = func
+        return func
+    return deco
+
 
 def get(inst: Entity) -> Set[str]:
     """Return the traits for an instance.
@@ -179,10 +199,23 @@ def set_traits(vmf: VMF):
         inst.peti_class = item_class
         traits = get(inst)
         try:
-            traits.update(ID_ATTRS[item_id.upper()][item_ind])
+            traits |= ID_ATTRS[item_id.upper()][item_ind]
         except (IndexError, KeyError):
             pass
         try:
-            traits.update(CLASS_ATTRS[item_class][item_ind])
+            traits |= CLASS_ATTRS[item_class][item_ind]
         except (IndexError, KeyError):
             pass
+
+        try:
+            func = TRAIT_ID_FUNC[item_id.casefold()]
+        except KeyError:
+            pass
+        else:
+            func(inst, traits, item_id, item_ind)
+        try:
+            func = TRAIT_CLS_FUNC[item_class]
+        except KeyError:
+            pass
+        else:
+            func(inst, traits, item_id, item_ind)
