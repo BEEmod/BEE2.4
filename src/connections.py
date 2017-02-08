@@ -241,4 +241,16 @@ def calc_connections(vmf: VMF):
         # Make sure they're correct.
         LOGGER.info('Item "{}": {} -> {}', item.name, item.inputs, item.outputs)
         if '$connectioncount' in item.inst.fixup:
-            item.inst.fixup['$connectioncount'] = len(item.inputs)
+            # Don't count the polarity outputs...
+            item.inst.fixup['$connectioncount'] = sum(
+                1 for conn
+                in item.inputs
+                if conn.type is not ConnType.TBEAM_DIR
+            )
+        if '$connectioncount_polarity' in item.inst.fixup:
+            # Only count the polarity outputs...
+            item.inst.fixup['$connectioncount_polarity'] = sum(
+                1 for conn
+                in item.inputs
+                if conn.type is ConnType.TBEAM_DIR
+            )
