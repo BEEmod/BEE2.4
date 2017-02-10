@@ -1222,7 +1222,7 @@ def res_switch(inst: Entity, res: Property):
 @make_result_setup('staticPiston')
 def make_static_pist_setup(res: Property):
     instances = (
-        'bottom_1', 'bottom_2', 'bottom_3',
+        'bottom_0', 'bottom_1', 'bottom_2', 'bottom_3',
         'logic_0', 'logic_1', 'logic_2', 'logic_3',
         'static_0', 'static_1', 'static_2', 'static_3', 'static_4',
         'grate_low', 'grate_high',
@@ -1266,15 +1266,15 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     """
 
     bottom_pos = ent.fixup.int('bottom_level', 0)
-    grate = None
 
     if (ent.fixup['connectioncount', '0'] != "0" or
             ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
-        if bottom_pos > 0:
-            # The piston doesn't go fully down, use alt instances.
-            val = res.value['bottom_' + str(bottom_pos)]
-            if val:  # Only if defined
-                ent['file'] = val
+        ent.fixup['$is_static'] = True
+
+        # Use instances based on the height of the bottom position.
+        val = res.value['bottom_' + str(bottom_pos)]
+        if val:  # Only if defined
+            ent['file'] = val
 
         logic_file = res.value['logic_' + str(bottom_pos)]
         if logic_file:
@@ -1290,6 +1290,7 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
                 ent.fixup['connectioncount', '0'] == '0'
             )
     else:  # we are static
+        ent.fixup['$is_static'] = False
         if ent.fixup.bool('start_up'):
             pos = bottom_pos = ent.fixup.int('top_level', 1)
         else:
