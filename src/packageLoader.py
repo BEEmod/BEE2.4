@@ -15,7 +15,7 @@ import extract_packages
 import srctools
 import tkMarkdown
 import utils
-from FakeZip import FakeZip, zip_names, zip_open_bin
+from FakeZip import FakeZip, zip_names, zip_open_bin, zip_open_text
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
@@ -234,7 +234,7 @@ def get_config(
         # Add extension
         path += extension
     try:
-        with zip_file.open(path) as f:
+        with zip_open_text(zip_file, path) as f:
             return Property.parse(
                 f,
                 pak_id + ':' + path,
@@ -280,7 +280,7 @@ def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
 
         try:
             # Valid packages must have an info.txt file!
-            info_file = zip_file.open('info.txt')
+            info_file = zip_open_text(zip_file, 'info.txt')
         except KeyError:
             if is_dir:
                 # This isn't a package, so check the subfolders too...
@@ -665,11 +665,11 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
         try:
-            with zip_file.open(prop_path, 'r') as prop_file:
+            with zip_open_text(zip_file, prop_path) as prop_file:
                 props = Property.parse(
                     prop_file, pak_id + ':' + prop_path,
                 ).find_key('Properties')
-            with zip_file.open(editor_path, 'r') as editor_file:
+            with zip_open_text(zip_file, editor_path) as editor_file:
                 editor = Property.parse(
                     editor_file, pak_id + ':' + editor_path
                 )
@@ -728,7 +728,7 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
                 path=prop_path,
             )
         try:
-            with zip_file.open(config_path, 'r') as vbsp_config:
+            with zip_open_text(zip_file, config_path) as vbsp_config:
                 folders[fold].vbsp_config = conf = Property.parse(
                     vbsp_config,
                     pak_id + ':' + config_path,
@@ -1063,7 +1063,7 @@ class Style(PakObject):
             else:
                 raise ValueError('Style missing configuration!')
         else:
-            with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
+            with zip_open_text(data.zip_file, folder + '/items.txt') as item_data:
                 items = Property.parse(
                     item_data,
                     data.pak_id + ':' + folder + '/items.txt'
@@ -1071,7 +1071,7 @@ class Style(PakObject):
 
             config = folder + '/vbsp_config.cfg'
             try:
-                with data.zip_file.open(config, 'r') as vbsp_config:
+                with zip_open_text(data.zip_file, config) as vbsp_config:
                     vbsp = Property.parse(
                         vbsp_config,
                         data.pak_id + ':' + config,
@@ -1509,7 +1509,7 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:  # type: Property
                     file_loc = 'items/' + style.value + '.cfg'
-                    with data.zip_file.open(file_loc) as f:
+                    with zip_open_text(data.zip_file, file_loc) as f:
                         styles[style.real_name] = conf = Property.parse(
                             f,
                             data.pak_id + ':' + file_loc,
@@ -2382,7 +2382,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
             try:
-                with data.zip_file.open(path) as f:
+                with zip_open_text(data.zip_file, path) as f:
                     # Each line is a file to pack.
                     # Skip blank lines, strip whitespace, and
                     # allow // comments.
