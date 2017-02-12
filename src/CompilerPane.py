@@ -188,7 +188,7 @@ def load_corridors():
 def set_corr_values(group_name, props):
     """Set the corrdors according to the passed prop_block."""
     count = 7 if group_name == 'sp_entry' else 4
-    group = CORRIDOR[group_name] = ['Random'] + [
+    group = CORRIDOR[group_name] = [_('Random')] + [
         # Note: default corridor description
         str(i) + ': ' + _('Corridor')
         for i in
@@ -637,7 +637,7 @@ def make_comp_widgets(frame: ttk.Frame):
 
     ttk.Label(
         count_frame,
-        text='Brush',
+        text=_('Brush'),
         anchor=CENTER,
     ).grid(row=2, column=2, sticky=EW)
     UI['count_brush'] = ttk.Progressbar(

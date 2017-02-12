@@ -1786,7 +1786,7 @@ def init_windows():
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Palettes',
+        title=_('Palettes'),
         name='pal',
         resize_x=True,
         resize_y=True,

@@ -1,8 +1,17 @@
-# Translations template for BEE2.4
+# Translations template for PROJECT.
+# Copyright (C) 2017 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2017.
 #
 #, fuzzy
 msgid ""
 msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2017-02-12 18:49+1000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -52,6 +61,10 @@ msgstr ""
 msgid ""
 "Overlays are smaller images affixed to surfaces, like signs or indicator "
 "lights. Hiding long antlines or setting them to signage will reduce this."
+msgstr ""
+
+#: src/CompilerPane.py:191
+msgid "Random"
 msgstr ""
 
 #. Note: default corridor description
@@ -171,6 +184,10 @@ msgstr ""
 msgid ""
 "Refresh the compile progress bars. Press after a compile has been "
 "performed to show the new values."
+msgstr ""
+
+#: src/CompilerPane.py:640
+msgid "Brush"
 msgstr ""
 
 #: src/CompilerPane.py:667
@@ -619,6 +636,10 @@ msgstr ""
 
 #: src/UI.py:1663
 msgid "Save Palette"
+msgstr ""
+
+#: src/UI.py:1789
+msgid "Palettes"
 msgstr ""
 
 #: src/UI.py:1814
@@ -1268,6 +1289,18 @@ msgstr ""
 
 #: src/tagsPane.py:50
 msgid "Authors"
+msgstr ""
+
+#: src/tagsPane.py:160
+msgid "Any"
+msgstr ""
+
+#: src/tagsPane.py:169
+msgid "All"
+msgstr ""
+
+#: src/tagsPane.py:195
+msgid "Available Tags (click):"
 msgstr ""
 
 #: src/voiceEditor.py:35
