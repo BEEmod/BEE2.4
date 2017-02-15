@@ -316,7 +316,6 @@ def calc_connections(
     for item in ITEMS.values():
         # Copying items can fail to update the connection counts.
         # Make sure they're correct.
-        LOGGER.info('Item "{}": {} -> {}', item.name, item.inputs, item.outputs)
         if '$connectioncount' in item.inst.fixup:
             # Don't count the polarity outputs...
             item.inst.fixup['$connectioncount'] = sum(
@@ -334,8 +333,6 @@ def calc_connections(
 
     # Make signage frames
     shape_frame_tex = [mat for mat in shape_frame_tex if mat]
-    LOGGER.info('Shapes: {} <- {}', enable_shape_frame,shape_frame_tex)
-    LOGGER.info('Indexed: {}', sign_shape_by_index)
     if shape_frame_tex and enable_shape_frame:
         for shape_mat in sign_shape_by_index.values():
             # Sort by name, so which gets what frame is consistent

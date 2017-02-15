@@ -554,8 +554,6 @@ def res_import_template(inst: Entity, res: Property):
     ) = res.value
     temp_id = conditions.resolve_value(inst, orig_temp_id)
 
-    LOGGER.info('TEMPLATE IMPORT: {}', temp_id)
-
     temp_name, visgroups = template_brush.parse_temp_name(temp_id)
     try:
         template = template_brush.get_template(temp_name)

@@ -494,7 +494,6 @@ def retexture_template(
             if folded_mat in replace_tex:
                 # Replace_tex overrides everything.
                 mat = random.choice(replace_tex[folded_mat])
-                LOGGER.info('Mat: {}, replacement: {}', folded_mat, mat)
                 if mat[:1] == '$' and fixup is not None:
                     mat = fixup[mat]
                 if mat.startswith('<') or mat.endswith('>'):
