@@ -185,7 +185,7 @@ class Grid(Dict[_grid_keys, Block]):
         self,
         pos: Vec,
         direction: Vec,
-        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM}),
+        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
     ) -> Vec:
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
