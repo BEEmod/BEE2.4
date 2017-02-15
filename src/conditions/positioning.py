@@ -260,3 +260,52 @@ def res_translate_inst(inst: Entity, res: Property):
 
     offset = val.rotate_by_str(inst['angles'])
     inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
+
+
+@make_result('OppositeWallDist')
+def res_calc_opposite_wall_dist(inst: Entity, res: Property):
+    """Calculate the distance between this item and the opposing wall.
+
+    The value is stored in the $var specified by the property value.
+    Alternately it is set by `ResultVar`, and `offset` adds or subtracts to the value.
+    `GooCollide` means that it will stop when goo is found, otherwise it is
+    ignored.
+    `GooAdjust` means additionally if the space is goo, the distance will
+    be modified so that it specifies the surface of the goo.
+    """
+    if res.has_children():
+        result_var = res['ResultVar']
+        dist_off = res.float('offset')
+        collide_goo = res.bool('GooCollide')
+        adjust_goo = res.bool('GooAdjust')
+    else:
+        result_var = res.value
+        dist_off = 0
+        collide_goo = adjust_goo = False
+
+    origin = Vec.from_str(inst['origin'])
+    normal = Vec(z=1).rotate_by_str(inst['angles'])
+
+    mask = [
+        brushLoc.Block.SOLID,
+        brushLoc.Block.EMBED,
+        brushLoc.Block.PIT_BOTTOM,
+        brushLoc.Block.PIT_SINGLE,
+    ]
+
+    # Only if actually downward.
+    if normal == (0, 0, -1) and collide_goo:
+        mask.append(brushLoc.Block.GOO_TOP)
+        mask.append(brushLoc.Block.GOO_SINGLE)
+
+    opposing_pos = brushLoc.POS.raycast_world(
+        origin,
+        normal,
+        mask,
+    )
+
+    if adjust_goo and brushLoc.POS['world': opposing_pos].is_goo:
+        # If the top is goo, adjust so the 64 below is the top of the goo.
+        dist_off += 32
+
+    inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
