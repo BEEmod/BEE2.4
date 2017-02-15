@@ -123,6 +123,10 @@ TEX_DEFAULTS = [
     ('', 'overlay.antlinebrokenfloor'),
     ('', 'overlay.antlinebrokenfloorcorner'),
 
+    # If set and enabled, adds frames for >10 sign pairs
+    # to distinguish repeats.
+    ('', 'overlay.shapeframe'),
+
     # Only used if set - replace the decals with textures
     ('', 'special.bullseye_white_wall'),
     ('', 'special.bullseye_white_floor'),
@@ -3522,7 +3526,13 @@ def main():
 
         load_map(path)
         instance_traits.set_traits(VMF)
-        connections.calc_connections(VMF)  # Requires instance traits!
+
+        # Requires instance traits!
+        connections.calc_connections(
+            VMF,
+            settings['textures']['overlay.shapeframe'],
+            settings['style_vars']['enableshapesignageframe'],
+        )
 
         MAP_RAND_SEED = calc_rand_seed()
 

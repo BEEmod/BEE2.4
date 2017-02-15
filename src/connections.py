@@ -2,14 +2,16 @@
 from enum import Enum
 from collections import defaultdict
 from srctools import VMF, Entity, Output
+import comp_consts as const
 import instanceLocs
 import conditions
 import instance_traits
 import utils
 
-from typing import Iterable, Dict, List, Set
+from typing import Iterable, Dict, List, Set, Tuple
 
 LOGGER = utils.getLogger(__name__)
+
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
@@ -28,9 +30,55 @@ CONN_NAMES = {
     ConnType.BOTH: 'A+B',
 }
 
+# The order signs are used in maps.
+SIGN_ORDER = [
+    const.Signage.SHAPE_DOT,
+    const.Signage.SHAPE_MOON,
+    const.Signage.SHAPE_TRIANGLE,
+    const.Signage.SHAPE_CROSS,
+    const.Signage.SHAPE_SQUARE,
+    const.Signage.SHAPE_CIRCLE,
+    const.Signage.SHAPE_SINE,
+    const.Signage.SHAPE_SLASH,
+    const.Signage.SHAPE_STAR,
+    const.Signage.SHAPE_WAVY
+]
+
+SIGN_ORDER_LOOKUP = {
+    sign: index
+    for index, sign in
+    enumerate(SIGN_ORDER)
+}
+
 
 # Targetname -> item
 ITEMS = {}  # type: Dict[str, Item]
+
+
+class ShapeSignage:
+    """Represents a pair of signage shapes."""
+    def __init__(self, overlays: List[Entity]):
+        super().__init__()
+        if not overlays:
+            raise ValueError('No overlays')
+        self.overlays = list(overlays)
+        self.name = self.overlays[0]['targetname']
+
+        # Index in SIGN_ORDER
+        mat = self.overlays[0]['material']
+        self.index = SIGN_ORDER_LOOKUP[mat]
+
+        # Not useful...
+        for overlay in self.overlays:
+            del overlay['targetname']
+
+        # Groups these into repeats of the shapes.
+        self.repeat_group = 0
+
+        self.overlay_frames = []  # type: List[Entity]
+
+    def __iter__(self):
+        yield from self.overlays
 
 
 class Item:
@@ -38,16 +86,18 @@ class Item:
     __slots__ = [
         'inst',
         'ind_panels', 'ind_toggle',
-        'antlines',
+        'antlines', 'shape_signs',
         'timer',
         'inputs', 'outputs',
     ]
+
     def __init__(
         self,
         inst: Entity,
         toggle: Entity = None,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
+        shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
     ):
         self.inst = inst
@@ -55,8 +105,9 @@ class Item:
         # Associated indicator panels
         self.ind_panels = set(panels)  # type: Set[Entity]
         self.ind_toggle = toggle
-        # Overlays (also signs)
+        # Overlays
         self.antlines = set(antlines)  # type: Set[Entity]
+        self.shape_signs = list(shape_signs)
 
         # None = Infinite/normal.
         self.timer = timer_count
@@ -136,15 +187,23 @@ class Connection:
         self.add()
 
 
-def calc_connections(vmf: VMF):
+def calc_connections(
+    vmf: VMF,
+    shape_frame_tex: List[str],
+    enable_shape_frame: bool,
+):
     """Compute item connections from the map file.
 
     This also fixes cases where items have incorrect checkmark/timer signs.
     Instance Traits must have been calculated.
+    It also applies frames to shape signage to distinguish repeats.
     """
     # First we want to match targetnames to item types.
     toggles = {}  # type: Dict[str, Entity]
     overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
+    # Accumulate all the signs into groups, so the list should be 2-long:
+    # sign_shapes[name, material][0/1]
+    sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
     panels = {}  # type: Dict[str, Entity]
 
     panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
@@ -172,7 +231,25 @@ def calc_connections(vmf: VMF):
             ITEMS[inst_name] = Item(inst)
 
     for over in vmf.by_class['info_overlay']:
-        overlays[over['targetname']].add(over)
+        name = over['targetname']
+        mat = over['material']
+        if mat in SIGN_ORDER_LOOKUP:
+            sign_shape_overlays[name, mat.casefold()].append(over)
+        else:
+            # Antlines
+            overlays[name].add(over)
+
+    # Name -> signs pairs
+    sign_shapes = defaultdict(list)  # type: Dict[str, List[ShapeSignage]]
+    # By material index, for group frames.
+    sign_shape_by_index = defaultdict(list)  # type: Dict[int, List[ShapeSignage]]
+    for (name, mat), sign_pair in sign_shape_overlays.items():
+        # It's possible - but rare - for more than 2 to be in a pair.
+        # We have to just treat them as all in their 'pair'.
+        # Shouldn't be an issue, it'll be both from one item...
+        shape = ShapeSignage(sign_pair)
+        sign_shapes[name].append(shape)
+        sign_shape_by_index[shape.index].append(shape)
 
     # Now build the connections and items.
     for item in ITEMS.values():
@@ -254,3 +331,24 @@ def calc_connections(vmf: VMF):
                 in item.inputs
                 if conn.type is ConnType.TBEAM_DIR
             )
+
+    # Make signage frames
+    shape_frame_tex = [mat for mat in shape_frame_tex if mat]
+    LOGGER.info('Shapes: {} <- {}', enable_shape_frame,shape_frame_tex)
+    LOGGER.info('Indexed: {}', sign_shape_by_index)
+    if shape_frame_tex and enable_shape_frame:
+        for shape_mat in sign_shape_by_index.values():
+            # Sort by name, so which gets what frame is consistent
+            shape_mat.sort(key=lambda shape: shape.name)
+            for index, shape in enumerate(shape_mat):
+                shape.repeat_group = index
+                if index == 0:
+                    continue  # First, no frames..
+                frame_mat = shape_frame_tex[(index-1) % len(shape_frame_tex)]
+
+                for overlay in shape:
+                    frame = overlay.copy()
+                    shape.overlay_frames.append(frame)
+                    vmf.add_ent(frame)
+                    frame['material'] = frame_mat
+                    frame['renderorder'] = 1 # On top

@@ -79,7 +79,16 @@ styleOptions = [
                'are near each other and can reverse polarity, this can cause '
                'lighting issues. Disable this to prevent that by disabling '
                'lights. Non-reversible Funnels do not have this issue.'),
-    )
+    ),
+
+    stylevar(
+        id='EnableShapeSignageFrame',
+        name=_('Enable Shape Framing'),
+        default=1,
+        desc=_('After 10 shape-type antlines are used, the signs repeat. '
+               'With this enabled, colored frames will be added to '
+               'distinguish them.'),
+    ),
 ]
 
 checkbox_all = {}
