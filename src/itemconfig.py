@@ -21,8 +21,10 @@ WIDGETS = utils.FuncLookup('Widgets')
 
 CONFIG = ConfigFile('item_cust_configs.cfg')
 
+CONFIG_ORDER = []  # type: List[ConfigGroup]
 
-class ConfigGroup(PakObject):
+
+class ConfigGroup(PakObject, allow_mult=False, has_img=False):
     """A group of configs for an item."""
     def __init__(self, conf_id: str, group_name: str, desc, widgets):
         self.id = conf_id
@@ -34,7 +36,7 @@ class ConfigGroup(PakObject):
     def parse(cls, data: ParseData) -> 'PakObject':
         props = data.info  # type: Property
 
-        group_name = props['GroupName']
+        group_name = props['Name']
         desc = desc_parse(props, data.id)
 
         widgets = []
@@ -49,7 +51,7 @@ class ConfigGroup(PakObject):
             is_timer = props.bool('UseTimer')
             wid_id = wid['id'].casefold()
             if is_timer:
-                default = tk.StringVar(
+                values = tk.StringVar(
                     value=CONFIG.get_val(
                         data.id,
                         wid_id,
@@ -58,7 +60,7 @@ class ConfigGroup(PakObject):
                     name=wid_id,
                 )
             else:
-                default = [
+                values = [
                     tk.StringVar(
                         value=CONFIG.get_val(
                             data.id,
@@ -69,22 +71,23 @@ class ConfigGroup(PakObject):
                     )
                     for i in range(3, 31)
                 ]
-            config = props.find_key('Config', [])
 
             widgets.append(Widget(
                 wid_id,
                 create_func,
-                config,
-                default,
+                props,
+                values,
                 is_timer,
             ))
 
-        return cls(
+        group = cls(
             data.id,
             group_name,
             desc,
             widgets,
         )
+        CONFIG_ORDER.append(group)
+        return group
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -94,8 +97,51 @@ class ConfigGroup(PakObject):
         """
         pass
 
+
 def make_pane(parent: ttk.Frame):
-    pass
+    """Create all the widgets we use."""
+    if not CONFIG_ORDER:
+        # No configs at all...
+        ttk.Label(parent, text=_('No Item Configuration!')).pack(fill='both')
+        return
+
+    CONFIG_ORDER.sort(key=lambda grp: grp.name)
+
+    parent.columnconfigure(0, weight=1)
+    parent.rowconfigure(1, weight=1)
+
+    item_frames = []  # type: List[ttk.Frame]
+
+    def swap_to_item():
+        """Swap what's shown in the pane."""
+        for frame in item_frames:
+            frame.grid_forget()
+
+        cur_dropdown = dropdown.current()
+        if cur_dropdown == -1:
+            # Not valid
+            return
+        item_frames[cur_dropdown].grid(row=1, column=0, sticky='nsew')
+
+    dropdown = ttk.Combobox(
+        parent,
+        state='readonly',
+        exportselection=False,
+        values=[
+            group.name
+            for group in
+            CONFIG_ORDER
+        ],
+        postcommand=swap_to_item,
+    )
+    dropdown.grid(row=0, column=0, sticky='ew')
+
+    for config in CONFIG_ORDER:
+        frame = ttk.Labelframe(text=config.name)
+        item_frames.append(frame)
+        
+    swap_to_item()
+
 
 
 class Widget:
