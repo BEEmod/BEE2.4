@@ -55,7 +55,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                     value=CONFIG.get_val(
                         data.id,
                         wid_id,
-                        props['default'],
+                        wid['default'],
                     ),
                     name=wid_id,
                 )
@@ -65,7 +65,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                         value=CONFIG.get_val(
                             data.id,
                             '{}_{}'.format(wid_id, i),
-                            props['default'],
+                            wid['default'],
                         ),
                         name='{}_{}'.format(wid_id, i)
                     )
@@ -139,7 +139,7 @@ def make_pane(parent: ttk.Frame):
     for config in CONFIG_ORDER:
         frame = ttk.Labelframe(text=config.name)
         item_frames.append(frame)
-        
+
     swap_to_item()
 
 
