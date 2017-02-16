@@ -304,7 +304,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
         mask,
     )
 
-    if adjust_goo and brushLoc.POS['world': opposing_pos].is_goo:
+    if adjust_goo and brushLoc.POS['world': opposing_pos + 128*normal].is_goo:
         # If the top is goo, adjust so the 64 below is the top of the goo.
         dist_off += 32
 
