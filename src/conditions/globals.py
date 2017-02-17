@@ -12,9 +12,6 @@ import vbsp
 # Overwritten by VBSP to get the actual values.
 ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
 
-STYLE_VARS = vbsp.settings['style_vars']
-VOICE_ATTR = vbsp.settings['has_attr']
-
 
 @make_flag('styleVar')
 def flag_stylevar(flag: Property):
@@ -22,7 +19,7 @@ def flag_stylevar(flag: Property):
 
     Use the NOT flag to invert if needed.
     """
-    return STYLE_VARS[flag.value.casefold()]
+    return vbsp.settings['style_vars'][flag.value.casefold()]
 
 
 @make_flag('has')
@@ -31,7 +28,7 @@ def flag_voice_has(flag: Property):
 
     Use the NOT flag to invert if needed.
     """
-    return VOICE_ATTR[flag.value.casefold()]
+    return vbsp.settings['has_attr'][flag.value.casefold()]
 
 
 @make_flag('has_music')
@@ -129,9 +126,9 @@ def res_set_style_var(res: Property):
     """
     for opt in res.value:
         if opt.name == 'settrue':
-            STYLE_VARS[opt.value.casefold()] = True
+            vbsp.settings['style_vars'][opt.value.casefold()] = True
         elif opt.name == 'setfalse':
-            STYLE_VARS[opt.value.casefold()] = False
+            vbsp.settings['style_vars'][opt.value.casefold()] = False
     return RES_EXHAUSTED
 
 
@@ -144,9 +141,9 @@ def res_set_voice_attr(res: Property):
     """
     if res.has_children():
         for opt in res.value:
-            VOICE_ATTR[opt.name] = True
+            vbsp.settings['has_attr'][opt.name] = True
     else:
-        VOICE_ATTR[res.value.casefold()] = 1
+        vbsp.settings['has_attr'][res.value.casefold()] = 1
     return RES_EXHAUSTED
 
 CACHED_MODELS = set()

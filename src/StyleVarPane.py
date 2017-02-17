@@ -240,6 +240,8 @@ def make_pane(tool_frame):
     nbook.enable_traversal()
 
     stylevar_frame = ttk.Frame(nbook)
+    stylevar_frame.rowconfigure(0, weight=1)
+    stylevar_frame.columnconfigure(0, weight=1)
     nbook.add(stylevar_frame, text=_('Styles'))
 
     UI['style_can'] = Canvas(stylevar_frame, highlightthickness=0)
