@@ -5,13 +5,12 @@ from tk_tools import TK_ROOT
 
 from collections import namedtuple
 
-from srctools import Property, Vec
-from packageLoader import PakObject, ExportData, ParseData, get_config, desc_parse
+from srctools import Property
+from packageLoader import PakObject, ExportData, ParseData, desc_parse
 from BEE2_config import ConfigFile
 import utils
-import srctools
 
-from typing import List, Callable
+from typing import Union, Callable, List
 
 LOGGER = utils.getLogger(__name__)
 
@@ -23,14 +22,43 @@ CONFIG = ConfigFile('item_cust_configs.cfg')
 
 CONFIG_ORDER = []  # type: List[ConfigGroup]
 
+TIMER_NUM = ['inf'] + list(map(str, range(3, 31)))
+
+
+class Widget:
+    """Represents a widget that can appear on a ConfigGroup."""
+    def __init__(
+        self,
+        wid_id: str,
+        name: str,
+        create_func: Callable[[tk.Frame, tk.StringVar, Property], None],
+        config: Property,
+        values: Union[tk.StringVar, List[tk.StringVar]],
+        is_timer: bool,
+    ):
+        self.id = wid_id
+        self.name = name
+        self.values = values
+        self.config = config
+        self.create_func = create_func
+        self.is_timer = is_timer
+
 
 class ConfigGroup(PakObject, allow_mult=False, has_img=False):
     """A group of configs for an item."""
-    def __init__(self, conf_id: str, group_name: str, desc, widgets):
+    def __init__(
+        self,
+        conf_id: str,
+        group_name: str,
+        desc,
+        widgets: List['Widget'],
+        timer_widgets: List['Widget'],
+    ):
         self.id = conf_id
         self.name = group_name
         self.desc = desc
         self.widgets = widgets
+        self.timer_widgets = timer_widgets
 
     @classmethod
     def parse(cls, data: ParseData) -> 'PakObject':
@@ -40,42 +68,64 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
         desc = desc_parse(props, data.id)
 
         widgets = []
+        timer_widgets = []
 
         for wid in props.find_all('Widget'):
             try:
                 create_func = WIDGETS[wid['type']]
             except KeyError:
-                LOGGER.warning('Unknown widget type "{}" in <{}:{}>!')
+                LOGGER.warning(
+                    'Unknown widget type "{}" in <{}:{}>!',
+                    wid['type'],
+                    data.pak_id,
+                    data.id,
+                )
                 continue
 
             is_timer = props.bool('UseTimer')
             wid_id = wid['id'].casefold()
+            name = wid['Label']
+            default = wid.find_key('Default')
             if is_timer:
-                values = tk.StringVar(
-                    value=CONFIG.get_val(
-                        data.id,
-                        wid_id,
-                        wid['default'],
-                    ),
-                    name=wid_id,
-                )
-            else:
+                if default.has_children():
+                    defaults = {
+                        num: default[num]
+                        for num in TIMER_NUM
+                    }
+                else:
+                    # All the same.
+                    defaults = dict.fromkeys(TIMER_NUM, default.value)
                 values = [
                     tk.StringVar(
                         value=CONFIG.get_val(
                             data.id,
-                            '{}_{}'.format(wid_id, i),
-                            wid['default'],
+                            '{}_{}'.format(wid_id, num),
+                            defaults[num],
                         ),
-                        name='{}_{}'.format(wid_id, i)
+                        name='itemconf_{}_{}_{}'.format(data.id, wid_id, num)
                     )
-                    for i in range(3, 31)
+                    for num in TIMER_NUM
                 ]
+            else:
+                if default.has_children():
+                    raise ValueError(
+                        'Can only have multiple defaults for timered widgets!'
+                    )
+                values = tk.StringVar(
+                    value=CONFIG.get_val(
+                        data.id,
+                        wid_id,
+                        default.value,
+                    ),
+                    name='itemconf_{}_{}'.format(data.id, wid_id),
+                )
+                print(values.set(values.get()))
 
-            widgets.append(Widget(
+            (timer_widgets if is_timer else widgets).append(Widget(
                 wid_id,
+                name,
                 create_func,
-                props,
+                wid,
                 values,
                 is_timer,
             ))
@@ -85,17 +135,26 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             group_name,
             desc,
             widgets,
+            timer_widgets,
         )
         CONFIG_ORDER.append(group)
+
+        # If we are new, write our defaults to config.
+        CONFIG.save_check()
+
         return group
 
     @staticmethod
     def export(exp_data: ExportData):
-        """We immediately write to the config.
-
-        Exporting isn't needed.
-        """
-        pass
+        """Write all our values to the config."""
+        for conf in CONFIG_ORDER:
+            config_section = CONFIG[conf.id]
+            for wid in conf.widgets:
+                config_section[wid.id] = wid.values.get()
+            for wid in conf.timer_widgets:
+                for num, var in zip(TIMER_NUM, wid.values):
+                    config_section['{}_{}'.format(wid.id, num)] = var.get()
+        CONFIG.save_check()
 
 
 def make_pane(parent: ttk.Frame):
@@ -137,28 +196,51 @@ def make_pane(parent: ttk.Frame):
     dropdown.grid(row=0, column=0, sticky='ew')
 
     for config in CONFIG_ORDER:
-        frame = ttk.Labelframe(text=config.name)
+        frame = ttk.Frame(parent)
+        frame.columnconfigure(0, weight=1)
         item_frames.append(frame)
 
+        # Now make the widgets.
+        if config.widgets:
+            non_timer_frame = ttk.LabelFrame(frame, text=_('General'))
+            non_timer_frame.grid(row=0, column=0, sticky='ew')
+            non_timer_frame.columnconfigure(1, weight=1)
+
+            for row, wid in enumerate(config.widgets):
+                label = ttk.Label(non_timer_frame, text=wid.name)
+                label.grid(row=row, column=0)
+                widget = wid.create_func(non_timer_frame, wid.values, wid.config)
+                widget.grid(row=row, column=1, sticky='ew')
+
+        if config.widgets and config.timer_widgets:
+            ttk.Separator(orient='horizontal').grid(
+                row=1, column=0, sticky='ew',
+            )
+
+        # Skip if no timer widgets
+        if not config.timer_widgets:
+            continue
+
+        for timer_ind, timer in enumerate(TIMER_NUM):
+            timer_frame = ttk.LabelFrame(frame, text=_('Timer: {}').format(
+                '∞' if timer == 'inf' else timer
+            ))
+            timer_frame.grid(row=2 + timer_ind, column=0, sticky='ew')
+            timer_frame.columnconfigure(1, weight=1)
+
+            for subrow, wid in enumerate(config.timer_widgets):
+                label = ttk.Label(timer_frame, text=wid.name)
+                label.grid(row=subrow, column=0)
+                widget = wid.create_func(
+                    timer_frame,
+                    wid.values[timer_ind],
+                    wid.config,
+                )
+                widget.grid(row=subrow, column=1, sticky='ew')
+
+    # Select the first item, so we show something.
+    dropdown.current(0)
     swap_to_item()
-
-
-
-class Widget:
-    def __init__(
-        self,
-        wid_id: str,
-        create_func: Callable[[tk.Frame, tk.StringVar], None],
-        config: Property,
-        values: List[tk.StringVar],
-        is_timer: bool,
-    ):
-        self.id = wid_id
-        self.values = values
-        self.config = config
-        self.create_func = create_func
-        self.is_timer = is_timer
-
 
 # ------------
 # Widget types
@@ -166,46 +248,34 @@ class Widget:
 
 
 @WIDGETS('string', 'str')
-def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property):
+def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Simple textbox for entering text."""
-    wid = ttk.Entry(
+    return ttk.Entry(
         parent,
         textvariable=var,
     )
-    wid.pack(fill='both')
 
 
 @WIDGETS('boolean', 'bool', 'checkbox')
-def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
+def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Allows ticking a box."""
-
-    wid = ttk.Checkbutton(
+    return ttk.Checkbutton(
         parent,
         text='',
         variable=var,
         onvalue='1',
         offvalue='0',
     )
-    wid.pack(fill='both')
 
 
 @WIDGETS('range', 'slider')
-def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property):
+def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Provides a slider for setting a number in a range."""
-
-    min_value = conf.float('min')
-
-    var.trace_variable(
-        'w',
-        lambda: wid.set(srctools.conv_float(var.get(), min_value))
-    )
-
-    wid = tk.Scale(
+    return tk.Scale(
         parent,
-        from_=min_value,
+        orient='horizontal',
+        from_=conf.float('min'),
         to=conf.float('max', 100),
         resolution=conf.float('step', 1),
-        command=lambda: var.set(wid.get()),
-        value=srctools.conv_float(var.get(), min_value),
+        variable=var,
     )
-    wid.pack(fill='both')
