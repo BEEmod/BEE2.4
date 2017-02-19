@@ -81,7 +81,7 @@ INCLUDES += [
     condition_modules
 ]
 
-bee_version = input('BEE2 Version: ')
+bee_version = input('BEE2 Version (or blank for dev): ')
 
 setup(
     name='VBSP_VRAD',

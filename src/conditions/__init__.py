@@ -261,22 +261,33 @@ class Condition:
                     'Error in {} setup:',
                     source or 'condition',
                 )
-                # Exit directly, so we don't print it again in the exception
-                # handler
-                utils.quit_app(1)
+                if utils.DEV_MODE:
+                    # Crash so this is immediately noticable..
+                    utils.quit_app(1)
+                else:
+                    # In release, just skip this one - that way it's
+                    # still hopefully possible to run the game.
+                    result.value = None
             if result.value is None:
                 # This result is invalid, remove it.
                 res_list.remove(result)
 
     @staticmethod
-    def test_result(inst, res):
+    def test_result(inst: Entity, res: Property):
         """Execute the given result."""
         try:
             func = RESULT_LOOKUP[res.name]
         except KeyError:
-            raise ValueError('"{name}" is not a valid condition result!'.format(
+            err_msg = '"{name}" is not a valid condition result!'.format(
                 name=res.real_name,
-            )) from None
+            )
+            if utils.DEV_MODE:
+                # Crash here.
+                raise ValueError(err_msg) from None
+            else:
+                LOGGER.warning(err_msg)
+                # Delete this so it doesn't re-fire..
+                return RES_EXHAUSTED
         else:
             return func(VMF, inst, res)
 
@@ -509,9 +520,14 @@ def check_flag(flag: Property, inst: Entity):
     try:
         func = FLAG_LOOKUP[name]
     except KeyError:
-        raise ValueError(
-            '"{}" is not a valid condition flag!'.format(name)
-        ) from None
+        err_msg = '"{}" is not a valid condition flag!'.format(name)
+        if utils.DEV_MODE:
+            # Crash here.
+            raise ValueError(err_msg) from None
+        else:
+            LOGGER.warning(err_msg)
+            # Skip these conditions..
+            return False
 
     res = func(VMF, inst, flag)
     return res == desired_result

@@ -20,8 +20,11 @@ except ImportError:
     # We're running from source!
     BEE_VERSION = "(dev)"
     FROZEN = False
+    DEV_MODE = True
 else:
     FROZEN = True
+    # If blank, in dev mode.
+    DEV_MODE = not BEE_VERSION
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
