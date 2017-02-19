@@ -181,7 +181,7 @@ def make_pane(parent: ttk.Frame):
 
     item_frames = []  # type: List[ttk.Frame]
 
-    def swap_to_item():
+    def swap_to_item(e: tk.Event=None):
         """Swap what's shown in the pane."""
         for frame in item_frames:
             frame.grid_forget()
@@ -201,9 +201,9 @@ def make_pane(parent: ttk.Frame):
             for group in
             CONFIG_ORDER
         ],
-        postcommand=swap_to_item,
     )
     dropdown.grid(row=0, column=0, columnspan=2, sticky='ew')
+    dropdown.bind('<<ComboboxSelected>>', swap_to_item)
 
     # need to use a canvas to allow scrolling
     canvas = tk.Canvas(parent, highlightthickness=0)
