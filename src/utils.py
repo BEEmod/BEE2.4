@@ -358,24 +358,33 @@ del N, S, E, W
 class FuncLookup(collections.abc.Mapping):
     """A dict for holding callback functions.
 
+    Functions are added by using this as a decorator. Positional arguments
+    are aliases, keyword arguments will set attributes on the functions.
     If casefold is True, this will casefold keys to be case-insensitive.
     Additionally overwriting names is not allowed.
     Iteration yields all functions.
     """
-    def __init__(self, name, casefold=True):
+    def __init__(self, name, *, casefold=True, attrs=()):
         self.casefold = casefold
         self.__name__ = name
         self._registry = {}
+        self.allowed_attrs = set(attrs)
 
-    def __call__(self, *names: str):
+    def __call__(self, *names: str, **kwargs):
         """Add a function to the dict."""
         if not names:
             raise TypeError('No names passed!')
+
+        bad_keywords = kwargs.keys() - self.allowed_attrs
+        if bad_keywords:
+            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
 
         def callback(func):
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            for name, value in kwargs.items():
+                setattr(func, name, value)
             self.__setitem__(names, func)
             return func
 
