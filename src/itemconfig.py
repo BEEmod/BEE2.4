@@ -175,10 +175,8 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             for wid in conf.widgets:
                 config_section[wid.id] = wid.values.get()
             for wid in conf.multi_widgets:
-                for num in TIMER_NUM:
-                    if num == 'inf' and not wid.use_inf:
-                        continue
-                    config_section['{}_{}'.format(wid.id, num)] = wid.values[num].get()
+                for num, var in wid.values:
+                    config_section['{}_{}'.format(wid.id, num)] = var.get()
         CONFIG.save_check()
 
 
