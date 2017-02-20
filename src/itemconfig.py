@@ -1,12 +1,11 @@
 """Customizable configuration for specific items or groups of them."""
-import random
 import tkinter as tk
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 
-from collections import namedtuple
+from functools import lru_cache
 
-from srctools import Property, Vec, conv_float
+from srctools import Property, Vec, conv_int
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 from BEE2_config import ConfigFile
 from tooltip import add_tooltip
@@ -447,3 +446,93 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label
 
     return swatch
 
+
+@lru_cache(maxsize=20)
+def timer_values(min_value, max_value):
+    """Return 0:38-like strings up to the max value."""
+    return [
+        '{}:{:02}'.format(i//60, i % 60)
+        for i in range(min_value + 1, max_value + 1)
+    ]
+
+
+@WidgetLookup('Timer', 'MinuteSeconds')
+def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+    """A widget for specifying times - minutes and seconds.
+
+    The value is saved as seconds.
+    Max specifies the largest amount.
+    """
+    max_value = conf.int('max', 60)
+    min_value = conf.int('min', 0)
+    if min_value > max_value:
+        raise ValueError('Bad min and max values!')
+
+    values = timer_values(min_value, max_value)
+
+    default_value = conv_int(var.get(), 1)
+    if 0 < default_value <= max_value:
+        default_text = values[default_value - 1]
+    else:
+        default_text = '0:01'
+        var.set(1)
+
+    disp_var = tk.StringVar(value=default_text)
+
+    def set_var():
+        """Set the variable to the current value."""
+        try:
+            minutes, seconds = disp_var.get().split(':')
+            var.set(int(minutes) * 60 + int(seconds))
+        except (ValueError, TypeError):
+            pass
+
+    def validate(reason: str, operation_type: str, cur_value: str, new_char: str, new_value: str):
+        """Validate the values for the text."""
+        if operation_type == '0' or reason == 'forced':
+            # Deleting or done by the program, allow that always.
+            return True
+
+        if operation_type == '1':
+            # Disallow non number and colons
+            if new_char not in '0123456789:':
+                return False
+            # Only one colon.
+            if ':' in cur_value and new_char == ':':
+                return False
+
+            # Don't allow more values if it has more than 2 numbers after
+            # the colon - if there is one, and it's not in the last 3 characters.
+            if ':' in new_value and ':' not in new_value[-3:]:
+                return False
+
+        if reason == 'focusout':
+            # When leaving focus, apply range limits and set the var.
+            try:
+                minutes, seconds = new_value.split(':')
+                seconds = int(minutes) * 60 + int(seconds)
+            except (ValueError, TypeError):
+                seconds = default_value
+            if seconds < min_value:
+                seconds = min_value
+            if seconds > max_value:
+                seconds = max_value
+            disp_var.set('{}:{:02}'.format(seconds // 60, seconds % 60))
+            var.set(seconds)
+        return True
+
+    validate_cmd = parent.register(validate)
+
+    spinbox = tk.Spinbox(
+        parent,
+        exportselection=False,
+        textvariable=disp_var,
+        command=set_var,
+        wrap=True,
+        values=values,
+
+        validate='all',
+        # %args substitute the values for the args to validate_cmd.
+        validatecommand=(validate_cmd, '%V', '%d', '%s', '%S', '%P'),
+    )
+    return spinbox
