@@ -1,6 +1,6 @@
 """Implements the ability to recolor cubes."""
 from conditions import make_result, make_flag, add_suffix
-from srctools import Vec, Entity, Property
+from srctools import Vec, Entity, parse_vec_str
 
 import utils
 import brushLoc
@@ -57,22 +57,29 @@ COLOR_SEC_POS = {}
 def res_cube_coloriser(inst: Entity):
     """Allows recoloring cubes placed at a position."""
     origin = Vec.from_str(inst['origin'])
+    # Provided from the timer value directly.
     timer_delay = inst.fixup.int('$timer_delay')
 
-    if 3 <= timer_delay <= 30:
-        COLOR_POS[origin.as_tuple()] = COLORS[timer_delay - 3]
+    # Provided from item config panel
+    color_override = parse_vec_str(inst.fixup['$color'])
+
+    if color_override != (0, 0, 0):
+        color = COLOR_POS[origin.as_tuple()] = color_override
+    elif 3 <= timer_delay <= 30:
+        color = COLOR_POS[origin.as_tuple()] = COLORS[timer_delay - 3]
     else:
         LOGGER.warning('Unknown timer value "{}"!', timer_delay)
+        color = None
     inst.remove()
 
     # If pointing up, copy the value to the ceiling, so droppers
     # can find a coloriser placed on the illusory cube item under them.
-    if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
+    if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1) and color is not None:
         pos = brushLoc.POS.raycast_world(
             origin,
             direction=(0, 0, 1),
         )
-        COLOR_SEC_POS[pos.as_tuple()] = COLORS[timer_delay - 3]
+        COLOR_SEC_POS[pos.as_tuple()] = color
 
 
 @make_flag('ColoredCube')
@@ -96,7 +103,7 @@ def res_colored_cube(inst: Entity):
 
 if __name__ == '__main__':
     # Dump colours as HTML
-    TD_TMP = '''<html>
+    TD_TMP = '''
     <td style="background-color: rgb({r}, {g}, {b})">{i} = ({r}, {g}, {b})</td>
     </tr>'''
     with open('out.htm', 'w') as f:

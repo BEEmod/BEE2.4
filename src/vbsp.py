@@ -27,6 +27,7 @@ import connections
 import instance_traits
 import template_brush
 import comp_consts as consts
+import conditions.globals
 
 from typing import (
     Dict, Tuple, List
@@ -426,10 +427,15 @@ def load_settings():
 
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
-    if vbsp_options.get(str, 'BEE2_loc'):
+    bee2_loc = vbsp_options.get(str, 'BEE2_loc')
+    if bee2_loc:
         BEE2_config = ConfigFile(
             'config/compile.cfg',
-            root=vbsp_options.get(str, 'BEE2_loc'),
+            root=bee2_loc,
+        )
+        conditions.globals.ITEM_CONFIG = ConfigFile(
+            'config/item_cust_configs.cfg',
+            root=bee2_loc,
         )
     else:
         BEE2_config = ConfigFile(None)

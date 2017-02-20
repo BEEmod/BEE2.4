@@ -1,5 +1,5 @@
 # coding=utf-8
-import collections
+import collections.abc
 import functools
 import logging
 import os.path
@@ -9,7 +9,7 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, List, Iterator,
+    Tuple, List, Union, Iterator,
 )
 
 
@@ -356,6 +356,102 @@ CONN_LOOKUP = {
 }
 
 del N, S, E, W
+
+
+class FuncLookup(collections.abc.Mapping):
+    """A dict for holding callback functions.
+
+    Functions are added by using this as a decorator. Positional arguments
+    are aliases, keyword arguments will set attributes on the functions.
+    If casefold is True, this will casefold keys to be case-insensitive.
+    Additionally overwriting names is not allowed.
+    Iteration yields all functions.
+    """
+    def __init__(self, name, *, casefold=True, attrs=()):
+        self.casefold = casefold
+        self.__name__ = name
+        self._registry = {}
+        self.allowed_attrs = set(attrs)
+
+    def __call__(self, *names: str, **kwargs):
+        """Add a function to the dict."""
+        if not names:
+            raise TypeError('No names passed!')
+
+        bad_keywords = kwargs.keys() - self.allowed_attrs
+        if bad_keywords:
+            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+
+        def callback(func):
+            """Decorator to do the work of adding the function."""
+            # Set the name to <dict['name']>
+            func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            for name, value in kwargs.items():
+                setattr(func, name, value)
+            self.__setitem__(names, func)
+            return func
+
+        return callback
+
+    def __eq__(self, other):
+        if isinstance(other, FuncLookup):
+            return self._registry == other._registry
+        if not isinstance(other, collections.abc.Mapping):
+            return NotImplemented
+        return self._registry == dict(other.items())
+
+    def __iter__(self):
+        yield from self.values()
+
+    def __len__(self):
+        return len(set(self._registry.values()))
+
+    def __getitem__(self, names: Union[str, Tuple[str]]):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            try:
+                return self._registry[name]
+            except KeyError:
+                pass
+        else:
+            raise KeyError('No function with names {}!'.format(
+                ', '.join(names),
+            ))
+
+    def __setitem__(self, names: Union[str, Tuple[str]], func):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            if name in self._registry:
+                raise ValueError('Overwrote {!r}!'.format(name))
+            self._registry[name] = func
+
+    def __delitem__(self, name: str):
+        if self.casefold:
+            name = name.casefold()
+        del self._registry[name]
+
+    def __contains__(self, name):
+        if self.casefold:
+            name = name.casefold()
+        return name in self._registry
+
+    def functions(self):
+        """Return the set of functions in this mapping."""
+        return set(self._registry.values())
+
+    values = functions
+
+    def clear(self):
+        """Delete all functions."""
+        self._registry.clear()
 
 
 def get_indent(line: str):

@@ -184,6 +184,7 @@ def color_square(color: Vec, size=16):
         )
         tk_img = ImageTk.PhotoImage(image=img)
         cached_squares[key] = tk_img
+        return tk_img
 
 
 def invis_square(size):
