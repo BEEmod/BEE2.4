@@ -1,30 +1,39 @@
 """Customizable configuration for specific items or groups of them."""
+import random
 import tkinter as tk
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 
 from collections import namedtuple
 
-from srctools import Property, Vec
+from srctools import Property, Vec, conv_float
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 from BEE2_config import ConfigFile
+from tooltip import add_tooltip
 import utils
 import img
+import sound
 
-from typing import Union, Callable, List, Dict
+from typing import Union, Callable, List, Dict, Optional, Tuple
 
 
 LOGGER = utils.getLogger(__name__)
 
 # Functions for each widget.
 # The function is passed a parent frame, StringVar, and Property block.
-WIDGETS = utils.FuncLookup('Widgets')
+WidgetLookup = utils.FuncLookup('Widgets')
+# Override for timer-type widgets to be more compact - passed a num:var dict
+# of StringVars instead. The widgets should insert themselves into the parent
+# frame.
+WidgetLookupMulti = utils.FuncLookup('Multi-Widgets')
 
 CONFIG = ConfigFile('item_cust_configs.cfg')
 
 CONFIG_ORDER = []  # type: List[ConfigGroup]
 
 TIMER_NUM = ['inf'] + list(map(str, range(3, 31)))
+
+INF = '∞'
 
 
 class Widget:
@@ -34,6 +43,7 @@ class Widget:
         wid_id: str,
         name: str,
         create_func: Callable[[tk.Frame, tk.StringVar, Property], None],
+        multi_func: Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None],
         config: Property,
         values: Union[tk.StringVar, Dict[Union[int, str], tk.StringVar]],
         is_timer: bool,
@@ -44,6 +54,7 @@ class Widget:
         self.values = values
         self.config = config
         self.create_func = create_func
+        self.multi_func = multi_func
         self.is_timer = is_timer
         self.use_inf = use_inf  # For timer, is infinite valid?
 
@@ -56,13 +67,13 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
         group_name: str,
         desc,
         widgets: List['Widget'],
-        timer_widgets: List['Widget'],
+        multi_widgets: List['Widget'],
     ):
         self.id = conf_id
         self.name = group_name
         self.desc = desc
         self.widgets = widgets
-        self.timer_widgets = timer_widgets
+        self.multi_widgets = multi_widgets
 
     @classmethod
     def parse(cls, data: ParseData) -> 'PakObject':
@@ -72,11 +83,11 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
         desc = desc_parse(props, data.id)
 
         widgets = []
-        timer_widgets = []
+        multi_widgets = []
 
         for wid in props.find_all('Widget'):
             try:
-                create_func = WIDGETS[wid['type']]
+                create_func = WidgetLookup[wid['type']]
             except KeyError:
                 LOGGER.warning(
                     'Unknown widget type "{}" in <{}:{}>!',
@@ -85,6 +96,10 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                     data.id,
                 )
                 continue
+            try:
+                timer_func = WidgetLookupMulti[wid['type']]
+            except KeyError:
+                timer_func = widget_timer_generic(create_func)
 
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
@@ -100,19 +115,19 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                 else:
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM, default.value)
-                values = {
-                    num: tk.StringVar(
+                values = [
+                    (num, tk.StringVar(
                         value=CONFIG.get_val(
                             data.id,
                             '{}_{}'.format(wid_id, num),
                             defaults[num],
                         ),
                         name='itemconf_{}_{}_{}'.format(data.id, wid_id, num)
-                    )
+                    ))
                     for num in TIMER_NUM
                     # Exclude infinite if use_inf is False.
                     if use_inf or num != 'inf'
-                }
+                ]
             else:
                 if default.has_children():
                     raise ValueError(
@@ -126,12 +141,12 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                     ),
                     name='itemconf_{}_{}'.format(data.id, wid_id),
                 )
-                print(values.set(values.get()))
 
-            (timer_widgets if is_timer else widgets).append(Widget(
+            (multi_widgets if is_timer else widgets).append(Widget(
                 wid_id,
                 name,
                 create_func,
+                timer_func,
                 wid,
                 values,
                 is_timer,
@@ -143,7 +158,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             group_name,
             desc,
             widgets,
-            timer_widgets,
+            multi_widgets,
         )
         CONFIG_ORDER.append(group)
 
@@ -159,7 +174,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             config_section = CONFIG[conf.id]
             for wid in conf.widgets:
                 config_section[wid.id] = wid.values.get()
-            for wid in conf.timer_widgets:
+            for wid in conf.multi_widgets:
                 for num in TIMER_NUM:
                     if num == 'inf' and not wid.use_inf:
                         continue
@@ -190,6 +205,11 @@ def make_pane(parent: ttk.Frame):
         if cur_dropdown == -1:
             # Not valid
             return
+
+        # Block sound for the first few millisec to stop excess sounds from
+        # playing during gridding.
+        sound.block_fx()
+
         item_frames[cur_dropdown].grid(row=1, column=0, sticky='nsew')
 
     dropdown = ttk.Combobox(
@@ -240,39 +260,26 @@ def make_pane(parent: ttk.Frame):
                 widget = wid.create_func(non_timer_frame, wid.values, wid.config)
                 widget.grid(row=row, column=1, sticky='ew')
 
-        if config.widgets and config.timer_widgets:
+        if config.widgets and config.multi_widgets:
             ttk.Separator(orient='horizontal').grid(
                 row=1, column=0, sticky='ew',
             )
 
         # Skip if no timer widgets
-        if not config.timer_widgets:
+        if not config.multi_widgets:
             continue
 
-        for timer_ind, timer in enumerate(TIMER_NUM):
-            if timer == 'inf':
-                if not any(wid.use_inf for wid in config.timer_widgets):
-                    continue
-                timer_disp = '∞'
-            else:
-                timer_disp = str(timer)
+        for row, wid in enumerate(config.multi_widgets):
 
-            timer_frame = ttk.LabelFrame(frame, text=_('Timer: {}').format(timer_disp))
-            timer_frame.grid(row=2 + timer_ind, column=0, sticky='ew')
-            timer_frame.columnconfigure(1, weight=1)
+            wid_frame = ttk.LabelFrame(frame, text=wid.name)
+            wid_frame.grid(row=2 + row, column=0, sticky='ew')
+            wid_frame.columnconfigure(1, weight=1)
 
-            for subrow, wid in enumerate(config.timer_widgets):
-                if timer == 'inf' and not wid.use_inf:
-                    continue
-
-                label = ttk.Label(timer_frame, text=wid.name)
-                label.grid(row=subrow, column=0)
-                widget = wid.create_func(
-                    timer_frame,
-                    wid.values[timer],
-                    wid.config,
-                )
-                widget.grid(row=subrow, column=1, sticky='ew')
+            wid.multi_func(
+                wid_frame,
+                wid.values,
+                wid.config,
+            )
 
     # Select the first item, so we show something.
     dropdown.current(0)
@@ -289,12 +296,54 @@ def make_pane(parent: ttk.Frame):
 
     canvas.bind('<Configure>', canvas_reflow)
 
+
+def widget_timer_generic(widget_func):
+    """For widgets without a multi version, do it generically."""
+    def generic_func(parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+        """Generically make a set of labels."""
+        for row, (timer, var) in enumerate(values):
+            if timer == 'inf':
+                timer_disp = INF
+            else:
+                timer_disp = timer
+
+            parent.columnconfigure(1, weight=1)
+
+            label = ttk.Label(parent, text=timer_disp + ':')
+            label.grid(row=row, column=0)
+            widget = widget_func(
+                parent,
+                var,
+                conf,
+            )
+            widget.grid(row=row, column=1, sticky='ew')
+
+    return generic_func
+
+
+def multi_grid(values: List[Tuple[str, tk.StringVar]]):
+    """Generate the row and columns needed for a nice layout of square widgets."""
+    for tim, var in values:
+        if tim == 'inf':
+            tim_disp = INF
+            index = 0
+        else:
+            tim_disp = str(tim)
+            index = int(tim)
+        row, column = divmod(index - 1, 10)
+        yield row, column, tim_disp, var
+
+
+def widget_sfx(*args):
+    """Play sounds when interacting."""
+    sound.fx_blockable('config')
+
+
 # ------------
 # Widget types
 # ------------
 
-
-@WIDGETS('string', 'str')
+@WidgetLookup('string', 'str')
 def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Simple textbox for entering text."""
     return ttk.Entry(
@@ -303,8 +352,8 @@ def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Mis
     )
 
 
-@WIDGETS('boolean', 'bool', 'checkbox')
-def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+@WidgetLookup('boolean', 'bool', 'checkbox')
+def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
     """Allows ticking a box."""
     return ttk.Checkbutton(
         parent,
@@ -312,29 +361,61 @@ def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.
         variable=var,
         onvalue='1',
         offvalue='0',
+        command=widget_sfx,
     )
 
 
-@WIDGETS('range', 'slider')
+@WidgetLookupMulti('boolean', 'bool', 'checkbox')
+def widget_checkmark(
+        parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    """For timers, display in a more compact form."""
+    for row, column, tim_text, var in multi_grid(values):
+        checkbox = widget_checkmark(parent, var, conf)
+        checkbox.grid(row=row, column=column)
+        add_tooltip(checkbox, tim_text, delay=0)
+
+
+@WidgetLookup('range', 'slider')
 def widget_slider(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Provides a slider for setting a number in a range."""
-    return tk.Scale(
+
+    scale = tk.Scale(
         parent,
         orient='horizontal',
         from_=conf.float('min'),
         to=conf.float('max', 100),
         resolution=conf.float('step', 1),
         variable=var,
+        command=widget_sfx,
     )
+    return scale
 
 
-@WIDGETS('color', 'colour', 'rgb')
-def widget_color(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+@WidgetLookup('color', 'colour', 'rgb')
+def widget_color_single(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
     """Provides a colour swatch for specifying colours.
 
     Values can be provided as #RRGGBB, but will be written as 3 0-255 values.
     """
+    # Isolates the swatch so it doesn't resize.
+    frame = ttk.Frame(parent)
+    swatch = make_color_swatch(frame, var)
+    swatch.grid(row=0, column=0, sticky='w')
+    return frame
 
+
+@WidgetLookupMulti('color', 'colour', 'rgb')
+def widget_color_multi(
+        parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    """For timers, display in a more compact form."""
+    for row, column, tim_text, var in multi_grid(values):
+        swatch = make_color_swatch(parent, var)
+        swatch.grid(row=row, column=column)
+        add_tooltip(swatch, tim_text, delay=0)
+
+
+def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label:
+    """Make a single swatch."""
     color = var.get()
     if color.startswith('#'):
         try:
@@ -346,26 +427,25 @@ def widget_color(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc
         r, g, b = Vec.from_str(color, 128, 128, 128)
 
     def open_win(e):
+        """Display the color selection window."""
         nonlocal r, g, b
-        color, tk_color = askcolor(
+        widget_sfx()
+        new_color, tk_color = askcolor(
             color=(r, g, b),
             parent=parent.winfo_toplevel(),
             title=_('Choose a Color'),
         )
-        if color is not None:
-            r, g, b = color
+        if new_color is not None:
+            r, g, b = new_color
             var.set('{} {} {}'.format(int(r), int(g), int(b)))
-            swatch['image'] = img.color_square(round(Vec(r, g, b)))
+            swatch['image'] = img.color_square(round(Vec(r, g, b)), size)
 
-    # Isolates the swatch so it doesn't resize.
-    frame = ttk.Frame(parent)
     swatch = ttk.Label(
-        frame,
+        parent,
         relief='raised',
-        image=img.color_square(Vec(r, g, b)),
+        image=img.color_square(Vec(r, g, b), size),
     )
     utils.bind_leftclick(swatch, open_win)
-    swatch.grid(row=0, column=0, sticky='w')
 
-    return frame
+    return swatch
 
