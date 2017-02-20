@@ -1609,14 +1609,12 @@ def init_menu_bar(win):
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
-
-
     file_menu.add_command(
         label=_("Add Game"),
         command=gameMan.add_game,
     )
     file_menu.add_command(
-        label=_("Remove Selected Game"),
+        label=_("Uninstall from Selected Game"),
         command=gameMan.remove_game,
         )
     file_menu.add_command(
