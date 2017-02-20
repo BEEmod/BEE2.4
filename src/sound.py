@@ -47,6 +47,13 @@ except ImportError:
     def load_snd():
         pass
 
+    def fx_blockable(sound):
+        pass
+
+    def block_fx():
+        """Block fx_blockable() for a short time."""
+        pass
+
     initiallised = False
     pyglet = avbin = None
     SamplePlayer = None
