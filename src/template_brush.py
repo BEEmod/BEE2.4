@@ -6,7 +6,7 @@ from enum import Enum
 import srctools
 import vbsp_options
 
-from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec
+from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec, VMF
 import comp_consts as consts
 import utils
 
@@ -124,7 +124,16 @@ ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('detail', List[Solid]),
     ('overlay', List[Entity]),
     ('orig_ids', Dict[str, str]),
+    ('template', 'Template'),
 ])
+
+# Make_prism() generates faces aligned to world, copy the required UVs.
+realign_solid = VMF().make_prism(Vec(-16,-16,-16), Vec(16,16,16)).solid  # type: Solid
+REALIGN_UVS = {
+    face.normal().as_tuple(): (face.uaxis, face.vaxis)
+    for face in realign_solid
+}
+del realign_solid
 
 
 class Template:
@@ -161,7 +170,7 @@ class Template:
         self.realign_faces = set(realign_faces)
         self.overlay_faces = set(overlay_transfer_faces)
         self.vertical_faces = set(vertical_faces)
-        self.skip_faces     = set(skip_faces)
+        self.skip_faces = set(skip_faces)
 
     @property
     def visgroups(self):
@@ -404,6 +413,7 @@ def import_template(
         detail_ent,
         new_over,
         id_mapping,
+        template,
     )
 
 
@@ -461,7 +471,17 @@ def retexture_template(
     """
     import vbsp
 
-    all_brushes = list(template_data.world)
+    template = template_data.template  # type: Template
+
+    rev_id_mapping = {
+        new_id: str(old_id)
+        for old_id, new_id in
+        template_data.orig_ids.items()
+    }
+
+    LOGGER.info('New->old: {}\nskip: {}\nrealign: {}', rev_id_mapping, template.skip_faces, template.realign_faces)
+
+    all_brushes = list(template_data.world)  # type: List[Solid]
     if template_data.detail is not None:
         all_brushes.extend(template_data.detail.solids)
 
@@ -486,10 +506,29 @@ def retexture_template(
 
     for brush in all_brushes:
         for face in brush:
+            orig_id = rev_id_mapping[face.id]
+
+            if orig_id in template.skip_faces:
+                continue
+
             folded_mat = face.mat.casefold()
 
             norm = face.normal()
             random.seed(rand_prefix + norm.join('_'))
+
+            if orig_id in template.realign_faces:
+                try:
+                    uaxis, vaxis = REALIGN_UVS[norm.as_tuple()]
+                except KeyError:
+                    LOGGER.warning(
+                        'Realign face in template "{}" ({} in final) is '
+                        'not on grid!',
+                        template.id,
+                        face.id,
+                    )
+                else:
+                    face.uaxis = uaxis.copy()
+                    face.vaxis = vaxis.copy()
 
             if folded_mat in replace_tex:
                 # Replace_tex overrides everything.
@@ -513,7 +552,7 @@ def retexture_template(
                 face.mat = vbsp.get_tex(tex_type)
 
                 if tex_type == 'special.goo_cheap':
-                    if face.normal() != (0, 0, 1):
+                    if norm != (0, 0, 1):
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.
