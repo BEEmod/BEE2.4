@@ -50,9 +50,11 @@ except ImportError:
     initiallised = False
     pyglet = avbin = None
     SamplePlayer = None
+    play_sfx_repeat = False
 else:
     # Succeeded in loading PyGame
     initiallised = True
+    play_sfx_repeat = True
 
     def load_snd():
         """Load in sound FX."""
@@ -64,6 +66,30 @@ else:
         """Play a sound effect stored in the sounds{} dict."""
         if play_sound and name in SOUNDS:
             SOUNDS[name].play()
+
+
+    def _reset_fx_blockable():
+        """Reset the fx_norep() call after a delay."""
+        global play_sfx_repeat
+        play_sfx_repeat = True
+
+    def fx_blockable(sound):
+        """Play a sound effect.
+
+        This waits for a certain amount of time between retriggering sounds
+        so they don't overlap.
+        """
+        global play_sfx_repeat
+        if play_sound and play_sfx_repeat:
+            fx(sound)
+            play_sfx_repeat = False
+            TK_ROOT.after(75, _reset_fx_blockable)
+
+    def block_fx():
+        """Block fx_blockable() for a short time."""
+        global play_sfx_repeat
+        play_sfx_repeat = False
+        TK_ROOT.after(50, _reset_fx_blockable)
 
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
