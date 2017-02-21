@@ -262,7 +262,10 @@ def load_templates():
         try:
             conf = conf_ents[temp_id]
         except KeyError:
-            overlay_faces = skip_faces = vertical_faces = realign_faces = []
+            overlay_faces = []
+            skip_faces = []
+            vertical_faces = []
+            realign_faces = []
         else:
             vertical_faces = conf['vertical_faces'].split()
             realign_faces = conf['realign_faces'].split()
@@ -478,8 +481,6 @@ def retexture_template(
         for old_id, new_id in
         template_data.orig_ids.items()
     }
-
-    LOGGER.info('New->old: {}\nskip: {}\nrealign: {}', rev_id_mapping, template.skip_faces, template.realign_faces)
 
     all_brushes = list(template_data.world)  # type: List[Solid]
     if template_data.detail is not None:
