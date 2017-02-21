@@ -49,6 +49,7 @@
 
 @PointClass 
 	iconsprite("BEE2/editor/bee2_icon.vmt")
+	sidelist(realign_faces)
 	= bee2_template_conf:
 	"Defines configuration options for a template."
 	[
