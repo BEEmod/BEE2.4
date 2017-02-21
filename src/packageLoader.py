@@ -637,7 +637,6 @@ def setup_style_tree(
                 )
 
             for to_id, from_id in style_lookups.items():
-                LOGGER.warning('REF "{}": {} -> {}', item.id, from_id, to_id)
                 try:
                     vers['styles'][to_id] = vers['styles'][from_id]
                 except KeyError:
@@ -2528,7 +2527,7 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
+    def __init__(self, temp_id: str, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
         This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
@@ -2567,6 +2566,16 @@ class BrushTemplate(PakObject, has_img=False):
             )
         elif len(conf_ents) == 1:
             config = conf_ents[0]
+            config_id = config['template_id']
+            if config_id and temp_id:
+                if config['template_id'].casefold() != temp_id.casefold():
+                    raise ValueError('VMF and info.txt have different ids: {}, {}'.format(
+                        config['template_id'],
+                        temp_id,
+                    ))
+            # Override passed ID with the one in the VMF.
+            elif config_id and not temp_id:
+                self.id = temp_id = config_id
             conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
             if srctools.conv_bool(config['discard_brushes']):
                 keep_brushes = False
@@ -2596,6 +2605,8 @@ class BrushTemplate(PakObject, has_img=False):
 
         else:
             conf_auto_visgroup = is_scaling = False
+            if not temp_id:
+                raise ValueError('No template ID passed in!')
 
         if is_scaling:
             raise NotImplementedError()  # TODO
