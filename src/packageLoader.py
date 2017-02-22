@@ -366,7 +366,6 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        images = 0
         for pak_id, pack in packages.items():
             if not pack.enabled:
                 LOGGER.info('Package {id} disabled!', id=pak_id)
@@ -375,8 +374,7 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            img_count = parse_package(pack, has_tag_music, has_mel_music)
-            images += img_count
+            parse_package(pack, has_tag_music, has_mel_music)
             loader.step("PAK")
 
         # If new packages were added, update the config!
@@ -387,10 +385,6 @@ def load_packages(
             for obj_type in
             all_obj.values()
         ))
-        if images:
-            loader.set_length("IMG_EX", images)
-        else:
-            loader.skip_stage('IMG_EX')
 
         # The number of images we need to load is the number of objects,
         # excluding some types like Stylevars or PackLists.
@@ -439,29 +433,6 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        # Extract all resources/BEE2/ images.
-
-        img_dest = '../images/cache'
-
-        shutil.rmtree(img_dest, ignore_errors=True)
-        img_loc = os.path.join('resources', 'bee2')
-        for filesystem in PACKAGE_SYS.values():
-            with filesystem:
-                for file in filesystem:
-                    loc = os.path.normcase(file.path).casefold()
-                    if not loc.startswith(img_loc):
-                        continue
-                    # Strip resources/BEE2/ from the path and move to the
-                    # cache folder.
-                    dest_loc = os.path.join(
-                        img_dest,
-                        os.path.relpath(loc, img_loc)
-                    )
-                    # Make the destination directory and copy over the image
-                    os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-                    with file.open_bin() as src, open(dest_loc, mode='wb') as dest:
-                        shutil.copyfileobj(src, dest)
-                    loader.step("IMG_EX")
         should_close_filesystems = False
     finally:
         if should_close_filesystems:
@@ -526,12 +497,9 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                 pack.disp_name,
             )
 
-    img_count = 0
+    # Figure out how many resources are in the package..
     for file in pack.fsys.walk_folder('resources'):
         extract_packages.res_count += 1
-        if file.path.casefold().startswith('resources/bee2'):
-            img_count += 1
-    return img_count
 
 
 def setup_style_tree(

@@ -50,6 +50,7 @@ import gameMan
 import extract_packages
 import logWindow
 import sound
+import img
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -124,6 +125,10 @@ if __name__ == '__main__':
         has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
         has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
     )
+
+    # Load filesystems into img, so it can load images from packages.
+    img.load_filesystems(packageLoader.PACKAGE_SYS.values())
+
     UI.load_packages(pack_data)
     LOGGER.info('Done!')
 
