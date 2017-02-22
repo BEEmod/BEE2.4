@@ -424,7 +424,6 @@ class SplashScreen(BaseLoadScreen):
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
     ('OBJ', _('Loading Objects')),
-    ('IMG_EX', _('Extracting Images')),
     ('IMG', _('Loading Images')),
     ('UI', _('Initialising UI')),
 )

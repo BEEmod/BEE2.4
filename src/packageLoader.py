@@ -8,14 +8,11 @@ import shutil
 import math
 import re
 from collections import defaultdict
-from contextlib import ExitStack
-from zipfile import ZipFile
 
 import extract_packages
 import srctools
 import tkMarkdown
 import utils
-from FakeZip import FakeZip, zip_names, zip_open_bin, zip_open_text
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
@@ -25,6 +22,7 @@ from srctools import (
     VMF, Entity, Solid,
     VPK,
 )
+from srctools.filesys import FileSystem, get_filesystem, RawFileSystem
 
 from typing import (
     Union, Optional, Any, TYPE_CHECKING,
@@ -44,6 +42,9 @@ OBJ_TYPES = {}
 
 data = {}
 
+# Maps a package ID to the matching filesystem for reading files easily.
+PACKAGE_SYS = {}  # type: Dict[str, FileSystem]
+
 res_count = -1
 
 # Don't change face IDs when copying to here.
@@ -58,14 +59,14 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 # Tempory data stored when parsing info.txt, but before .parse() is called.
 # This allows us to parse all packages before loading objects.
 ObjData = NamedTuple('ObjData', [
-    ('zip_file', Union[ZipFile, FakeZip]),
+    ('fsys', FileSystem),
     ('info_block', Property),
     ('pak_id', str),
     ('disp_name', str),
 ])
 # The arguments for pak_object.parse().
 ParseData = NamedTuple('ParseData', [
-    ('zip_file', Union[ZipFile, FakeZip]),
+    ('fsys', FileSystem),
     ('id', str),
     ('info', Property),
     ('pak_id', str),
@@ -146,7 +147,7 @@ class PakObject(metaclass=_PakObjectMeta):
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
-        - zip_file, the package's ZipFile or FakeZip
+        - fsys, the package's FileSystem
         - id, the ID of the item
         - info, the Property block in info.txt
         - pak_id, the ID of the package
@@ -206,13 +207,13 @@ def reraise_keyerror(err, obj_id):
 
 def get_config(
         prop_block: Property,
-        zip_file,
+        fsys: FileSystem,
         folder: str,
         pak_id='',
         prop_name='config',
         extension='.cfg',
         ):
-    """Extract a config file refered to by the given property block.
+    """Extract a config file referred to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
     If the keyvalue has a value of "", an empty tree is returned.
@@ -228,18 +229,14 @@ def get_config(
     if prop_block.value == '':
         return Property(None, [])
 
-    # Zips must use '/' for the seperator, even on Windows!
+    # Zips must use '/' for the separator, even on Windows!
     path = folder + '/' + prop_block.value
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
     try:
-        with zip_open_text(zip_file, path) as f:
-            return Property.parse(
-                f,
-                pak_id + ':' + path,
-            )
-    except KeyError:
+        return fsys.read_prop(path)
+    except FileNotFoundError:
         LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
         return Property(None, [])
     except UnicodeDecodeError:
@@ -258,57 +255,68 @@ def set_cond_source(props: Property, source: str):
         cond['__src__'] = source
 
 
-def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
+def find_packages(pak_dir):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
-        is_dir = os.path.isdir(name)
-        if name.endswith('.zip') and os.path.isfile(name):
-            zip_file = ZipFile(name)
-            # Ensure we quit close this zipfile..
-            zip_stack.enter_context(zip_file)
-        elif is_dir:
-            zip_file = FakeZip(name)
-            # FakeZips don't actually hold a file handle, we don't need to
-            # close them.
-        else:
+        try:
+            filesys = get_filesystem(name)
+        except ValueError:
             LOGGER.info('Extra file: {}', name)
             continue
 
         LOGGER.debug('Reading package "' + name + '"')
 
+        # Gain a persistent hold on the filesystem's handle.
+        # That means we don't need to reopen the zip files constantly.
+        filesys.open_ref()
+
+        # Valid packages must have an info.txt file!
         try:
-            # Valid packages must have an info.txt file!
-            info_file = zip_open_text(zip_file, 'info.txt')
-        except KeyError:
-            if is_dir:
+            info = filesys.read_prop('info.txt')
+        except FileNotFoundError:
+            # Close the ref we've gotten, since it's not in the dict
+            # it won't be done by load_packages().
+            filesys.close_ref()
+
+            if os.path.isdir(name):
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name, zips, zip_stack, zip_name_lst)
+                find_packages(name)
             else:
-                # Invalid, explicitly close this zipfile handle..
-                zip_file.close()
                 LOGGER.warning('ERROR: Bad package "{}"!', name)
-        else:
-            with info_file:
-                info = Property.parse(info_file, name + ':info.txt')
-
-            # Add the zipfile to the list, it's valid
-            zips.append(zip_file)
-            zip_name_lst.append(os.path.abspath(name))
-
+            # Don't continue to parse this "package"
+            continue
+        try:
             pak_id = info['ID']
-            packages[pak_id] = Package(
-                pak_id,
-                zip_file,
-                info,
-                name,
-            )
-            found_pak = True
+        except:
+            # Close the ref we've gotten, since it's not in the dict
+            # it won't be done by load_packages().
+            filesys.close_ref()
+            raise
+
+        PACKAGE_SYS[pak_id] = filesys
+
+        packages[pak_id] = Package(
+            pak_id,
+            filesys,
+            info,
+            name,
+        )
+        found_pak = True
 
     if not found_pak:
         LOGGER.debug('No packages in folder!')
+
+
+def close_filesystems():
+    """Close the package's filesystems.
+
+    This means future access needs to reopen the file handle.
+    """
+    for sys in PACKAGE_SYS.values():
+        sys.close_ref()
 
 
 def load_packages(
@@ -320,7 +328,7 @@ def load_packages(
         has_mel_music=False,
         has_tag_music=False,
         ):
-    """Scan and read in all packages in the specified directory."""
+    """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
@@ -344,12 +352,11 @@ def load_packages(
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
-    zips = []
-    data['zips'] = []
 
-    # Use ExitStack to dynamically manage the zipfiles we find and open.
-    with ExitStack() as zip_stack:
-        find_packages(pak_dir, zips, zip_stack, data['zips'])
+    # If we fail we want to clean up our filesystems.
+    should_close_filesystems = True
+    try:
+        find_packages(pak_dir)
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
@@ -359,7 +366,6 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        images = 0
         for pak_id, pack in packages.items():
             if not pack.enabled:
                 LOGGER.info('Package {id} disabled!', id=pak_id)
@@ -368,8 +374,7 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            img_count = parse_package(pack, has_tag_music, has_mel_music)
-            images += img_count
+            parse_package(pack, has_tag_music, has_mel_music)
             loader.step("PAK")
 
         # If new packages were added, update the config!
@@ -380,7 +385,6 @@ def load_packages(
             for obj_type in
             all_obj.values()
         ))
-        loader.set_length("IMG_EX", images)
 
         # The number of images we need to load is the number of objects,
         # excluding some types like Stylevars or PackLists.
@@ -402,7 +406,7 @@ def load_packages(
                 try:
                     object_ = obj_class.parse(
                         ParseData(
-                            obj_data.zip_file,
+                            obj_data.fsys,
                             obj_id,
                             obj_data.info_block,
                             obj_data.pak_id,
@@ -429,29 +433,10 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        # Extract all resources/BEE2/ images.
-
-        img_dest = '../images/cache'
-
-        shutil.rmtree(img_dest, ignore_errors=True)
-        img_loc = os.path.join('resources', 'bee2')
-        for zip_file in zips:
-            for path in zip_names(zip_file):
-                loc = os.path.normcase(path).casefold()
-                if not loc.startswith(img_loc):
-                    continue
-                # Strip resources/BEE2/ from the path and move to the
-                # cache folder.
-                dest_loc = os.path.join(
-                    img_dest,
-                    os.path.relpath(loc, img_loc)
-                )
-                # Make the destination directory and copy over the image
-                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-                with zip_open_bin(zip_file, path) as src:
-                    with open(dest_loc, mode='wb') as dest:
-                        shutil.copyfileobj(src, dest)
-                loader.step("IMG_EX")
+        should_close_filesystems = False
+    finally:
+        if should_close_filesystems:
+            close_filesystems()
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
@@ -490,7 +475,7 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
         for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(pack.zip, obj_id, obj, pack.id, True)
+                ParseData(pack.fsys, obj_id, obj, pack.id, True)
             )
 
         for obj in pack.info.find_all(comp_type):
@@ -499,28 +484,22 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(pack.zip, obj_id, obj, pack.id, True)
+                        ParseData(pack.fsys, obj_id, obj, pack.id, True)
                     )
                     # Don't continue to parse and overwrite
                     continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
-                pack.zip,
+                pack.fsys,
                 obj,
                 pack.id,
                 pack.disp_name,
             )
 
-    img_count = 0
-    img_loc = os.path.join('resources', 'bee2')
-    for item in zip_names(pack.zip):
-        item = os.path.normcase(item).casefold()
-        if item.startswith("resources"):
-            extract_packages.res_count += 1
-            if item.startswith(img_loc):
-                img_count += 1
-    return img_count
+    # Figure out how many resources are in the package..
+    for file in pack.fsys.walk_folder('resources'):
+        extract_packages.res_count += 1
 
 
 def setup_style_tree(
@@ -653,7 +632,7 @@ def setup_style_tree(
             vers['def_style'] = vers['styles'][vers['def_style']]
 
 
-def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
+def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
     """Parse through the data in item/ folders.
 
     folders is a dict, with the keys set to the folder names we want.
@@ -664,16 +643,10 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
         try:
-            with zip_open_text(zip_file, prop_path) as prop_file:
-                props = Property.parse(
-                    prop_file, pak_id + ':' + prop_path,
-                ).find_key('Properties')
-            with zip_open_text(zip_file, editor_path) as editor_file:
-                editor = Property.parse(
-                    editor_file, pak_id + ':' + editor_path
-                )
-        except KeyError as err:
-            # Opening the files failed!
+            with filesystem:
+                props = filesystem.read_prop(prop_path).find_key('Properties')
+                editor = filesystem.read_prop(editor_path)
+        except FileNotFoundError as err:
             raise IOError(
                 '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
@@ -727,12 +700,11 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
                 path=prop_path,
             )
         try:
-            with zip_open_text(zip_file, config_path) as vbsp_config:
-                folders[fold].vbsp_config = conf = Property.parse(
-                    vbsp_config,
-                    pak_id + ':' + config_path,
+            with filesystem:
+                folders[fold].vbsp_config = conf = filesystem.read_prop(
+                    config_path,
                 )
-        except KeyError:
+        except FileNotFoundError:
             folders[fold].vbsp_config = conf = Property(None, [])
 
         set_cond_source(conf, folders[fold].source)
@@ -924,7 +896,7 @@ class Package:
     def __init__(
             self,
             pak_id: str,
-            zip_file: ZipFile,
+            filesystem: FileSystem,
             info: Property,
             name: str,
             ):
@@ -934,7 +906,7 @@ class Package:
             disp_name = pak_id.lower()
 
         self.id = pak_id
-        self.zip = zip_file
+        self.fsys = filesystem
         self.info = info
         self.name = name
         self.disp_name = disp_name
@@ -959,7 +931,7 @@ class Package:
 
     def is_stale(self):
         """Check to see if this package has been modified since the last run."""
-        if isinstance(self.zip, FakeZip):
+        if isinstance(self.fsys, RawFileSystem):
             # unzipped packages are for development, so always extract.
             LOGGER.info('Extracting resources - {} is unzipped!', self.id)
             return True
@@ -974,7 +946,7 @@ class Package:
     def set_modtime(self):
         """After the cache has been extracted, set the modification dates
          in the config."""
-        if isinstance(self.zip, FakeZip):
+        if isinstance(self.fsys, RawFileSystem):
             # No modification time
             PACK_CONFIG[self.id]['ModTime'] = '0'
         else:
@@ -1019,9 +991,10 @@ class Style(PakObject):
         set_cond_source(self.config, 'Style <{}>'.format(style_id))
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a style definition."""
-        info = data.info
+        info = data.info  # type: Property
+        filesystem = data.fsys  # type: FileSystem
         selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = srctools.conv_bool(
@@ -1059,27 +1032,20 @@ class Style(PakObject):
         try:
             folder = 'styles/' + info['folder']
         except IndexError:
+            # It's OK for override styles to be missing their 'folder'
+            # value.
             if data.is_override:
                 items = Property(None, [])
                 vbsp = None
             else:
                 raise ValueError('Style missing configuration!')
         else:
-            with zip_open_text(data.zip_file, folder + '/items.txt') as item_data:
-                items = Property.parse(
-                    item_data,
-                    data.pak_id + ':' + folder + '/items.txt'
-                )
-
-            config = folder + '/vbsp_config.cfg'
-            try:
-                with zip_open_text(data.zip_file, config) as vbsp_config:
-                    vbsp = Property.parse(
-                        vbsp_config,
-                        data.pak_id + ':' + config,
-                    )
-            except KeyError:
-                vbsp = None
+            with filesystem:
+                items = filesystem.read_prop(folder + '/items.txt')
+                try:
+                    vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
+                except FileNotFoundError:
+                    vbsp = None
 
         return cls(
             style_id=data.id,
@@ -1090,7 +1056,7 @@ class Style(PakObject):
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
-            vpk_name=vpk_name
+            vpk_name=vpk_name,
         )
 
     def add_over(self, override: 'Style'):
@@ -1109,7 +1075,6 @@ class Style(PakObject):
             for self_sugg, over_sugg in
             zip(self.suggested, override.suggested)
         )
-
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -1174,7 +1139,7 @@ class Item(PakObject):
 
         all_config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -1202,7 +1167,7 @@ class Item(PakObject):
                     if 'config' in folder:
                         folder['config'] = get_config(
                             folder,
-                            data.zip_file,
+                            data.fsys,
                             'items',
                             data.pak_id,
                         )
@@ -1228,7 +1193,7 @@ class Item(PakObject):
                 def_version = vals
 
         # Fill out the folders dict with the actual data
-        parse_item_folder(folders, data.zip_file, data.pak_id)
+        parse_item_folder(folders, data.fsys, data.pak_id)
 
         # Then copy over to the styles values
         for ver in versions.values():
@@ -1492,11 +1457,12 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data: ParseData):
+        filesystem = data.fsys  # type: FileSystem
         vers = {}
 
         all_config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -1505,20 +1471,19 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             data.pak_id, data.id,
         ))
 
-        for ver in data.info.find_all('Version'):  # type: Property
-            ver_id = ver['ID', 'VER_DEFAULT']
-            vers[ver_id] = styles = {}
-            for sty_block in ver.find_all('Styles'):
-                for style in sty_block:  # type: Property
-                    file_loc = 'items/' + style.value + '.cfg'
-                    with zip_open_text(data.zip_file, file_loc) as f:
-                        styles[style.real_name] = conf = Property.parse(
-                            f,
-                            data.pak_id + ':' + file_loc,
+        with filesystem:
+            for ver in data.info.find_all('Version'):  # type: Property
+                ver_id = ver['ID', 'VER_DEFAULT']
+                vers[ver_id] = styles = {}
+                for sty_block in ver.find_all('Styles'):
+                    for style in sty_block:
+                        styles[style.real_name] = conf = filesystem.read_prop(
+                            'items/' + style.value + '.cfg'
                         )
-                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
-                        data.pak_id, data.id, style.real_name,
-                    ))
+
+                        set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                            data.pak_id, data.id, style.real_name,
+                        ))
 
         return cls(
             data.id,
@@ -1608,7 +1573,7 @@ class QuotePack(PakObject):
 
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'voice',
             pak_id=data.pak_id,
             prop_name='file',
@@ -1778,7 +1743,7 @@ class Skybox(PakObject):
         mat = data.info['material', 'sky_black']
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'skybox',
             pak_id=data.pak_id,
         )
@@ -1883,10 +1848,7 @@ class Music(PakObject):
         if rel_sample:
             sample = os.path.abspath('../sounds/music_samp/' + rel_sample)
             zip_sample = 'resources/music_samp/' + rel_sample
-            try:
-                with zip_open_bin(data.zip_file, zip_sample):
-                    pass
-            except KeyError:
+            if zip_sample not in data.fsys:
                 LOGGER.warning(
                     'Music sample for <{}> does not exist in zip: "{}"',
                     data.id,
@@ -1914,7 +1876,7 @@ class Music(PakObject):
 
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'music',
             pak_id=data.pak_id,
         )
@@ -2129,22 +2091,20 @@ class StyleVPK(PakObject, has_img=False):
 
         os.makedirs(dest_folder, exist_ok=True)
 
-        zip_file = data.zip_file  # type: ZipFile
+        filesystem = data.fsys  # type: FileSystem
 
         has_files = False
         source_folder = os.path.normpath('vpk/' + vpk_name)
 
-        for filename in zip_names(zip_file):
-            if os.path.normpath(filename).startswith(source_folder):
-                dest_loc = os.path.join(
-                    dest_folder,
-                    os.path.relpath(filename, source_folder)
-                )
-                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-                with zip_open_bin(zip_file, filename) as fsrc:
-                    with open(dest_loc, 'wb') as fdest:
-                        shutil.copyfileobj(fsrc, fdest)
-                has_files = True
+        for file in filesystem.walk_folder(source_folder):
+            dest_loc = os.path.join(
+                dest_folder,
+                file.path,
+            )
+            os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
+            with file.open_bin() as fsrc, open(dest_loc, 'wb') as fdest:
+                shutil.copyfileobj(fsrc, fdest)
+            has_files = True
 
         if not has_files:
             raise Exception(
@@ -2366,6 +2326,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data):
+        filesystem = data.fsys  # type: FileSystem
         conf = data.info.find_key('Config', '')
         mats = [
             prop.value
@@ -2383,22 +2344,14 @@ class PackList(PakObject, allow_mult=True, has_img=False):
             ]
         elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
-            try:
-                with zip_open_text(data.zip_file, path) as f:
-                    # Each line is a file to pack.
-                    # Skip blank lines, strip whitespace, and
-                    # allow // comments.
-                    for line in f:
-                        line = srctools.clean_line(line)
-                        if line:
-                            files.append(line)
-            except KeyError as ex:
-                raise FileNotFoundError(
-                    '"{}:{}" not in zip!'.format(
-                        data.id,
-                        path,
-                    )
-                ) from ex
+            with filesystem, filesystem.open_str(path) as f:
+                # Each line is a file to pack.
+                # Skip blank lines, strip whitespace, and
+                # allow // comments.
+                for line in f:
+                    line = srctools.clean_line(line)
+                    if line:
+                        files.append(line)
 
         # We know that if it's a material, it must be packing the VMT at the
         # very least.
@@ -2410,11 +2363,10 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
-            zip_files = {
+            resources = {
                 os.path.normpath(file).casefold()
                 for file in
-                zip_names(data.zip_file)
-                if file.startswith('resources')
+                filesystem.walk_folder('resources/')
             }
             for file in files:
                 if file.startswith(('-#', 'precache_sound:')):
@@ -2426,8 +2378,9 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
-                if file not in zip_files:
-                    LOGGER.warning('Warning: "{file}" not in zip! ({pak_id})',
+                if file not in resources:
+                    LOGGER.warning(
+                        'Warning: "{file}" not in zip! ({pak_id})',
                         file=file,
                         pak_id=data.pak_id,
                     )
@@ -2440,7 +2393,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
     def add_over(self, override):
         """Override items just append to the list of files."""
-        # Dont copy over if it's already present
+        # Don't copy over if it's already present
         for item in override.files:
             if item not in self.files:
                 self.files.append(item)
@@ -2579,6 +2532,8 @@ class BrushTemplate(PakObject, has_img=False):
             # Override passed ID with the one in the VMF.
             elif config_id and not temp_id:
                 self.id = temp_id = config_id
+            elif not config_id:
+                LOGGER.info('"{}" has no conf ID!', temp_id)
             conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
             if srctools.conv_bool(config['discard_brushes']):
                 keep_brushes = False
@@ -2610,6 +2565,7 @@ class BrushTemplate(PakObject, has_img=False):
             conf_auto_visgroup = is_scaling = False
             if not temp_id:
                 raise ValueError('No template ID passed in!')
+            LOGGER.info('Template "{}" has no config!', temp_id)
 
         if is_scaling:
             raise NotImplementedError()  # TODO
@@ -2690,7 +2646,7 @@ class BrushTemplate(PakObject, has_img=False):
     def parse(cls, data: ParseData):
         file = get_config(
             prop_block=data.info,
-            zip_file=data.zip_file,
+            fsys=data.fsys,
             folder='templates',
             pak_id=data.pak_id,
             prop_name='file',
@@ -2755,7 +2711,6 @@ def desc_parse(info, id=''):
             lines.append(prop.value)
 
     return tkMarkdown.convert('\n'.join(lines))
-
 
 
 def get_selitem_data(info):
