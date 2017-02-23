@@ -1887,6 +1887,10 @@ def change_brush():
 
     LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
+    # This needs to be a func_brush, otherwise the clip texture data will be
+    # merged with other clips.
+    glass_clip_ent = VMF.create_ent(classname='func_brush', solidbsp=1)
+
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
@@ -1930,9 +1934,13 @@ def change_brush():
                 solid.get_origin(),
                 glass_clip_mat,
             )
-            VMF.add_brush(glass_clip.solid)
+            glass_clip_ent.solids.append(glass_clip.solid)
             if floorbeam_locs is not None and glass_norm.z != 0:
                 floorbeam_locs.append((glass_loc, glass_norm))
+
+    # Remove if it's empty.
+    if not glass_clip_ent.solids:
+        glass_clip_ent.remove()
 
     if vbsp_options.get(str, 'glass_pack') and settings['has_attr']['glass']:
         TO_PACK.add(vbsp_options.get(str, 'glass_pack').casefold())
@@ -2747,6 +2755,10 @@ def change_func_brush():
     # TODO: Merge nearby grating brushes
     # Clips are shared every 512 grid spaces
 
+    # This needs to be a func_brush, otherwise the clip texture data will be
+    # merged with other clips.
+    grate_player_clip = VMF.create_ent(classname='func_brush', solidbsp=1)
+
     for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
         if brush in IGNORED_BRUSH_ENTS:
             continue
@@ -2766,7 +2778,7 @@ def change_func_brush():
         # Func_brush/func_rotating (for angled panels and flip panels)
         # often use different textures, so let the style do that.
 
-        surf_face = None # The angled-panel top face..
+        surf_face = None  # The angled-panel top face..
 
         is_grating = False
         delete_brush = False
@@ -2837,7 +2849,7 @@ def change_func_brush():
 
         if is_grating and grating_clip_mat:
             grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
-            VMF.add_brush(grate_clip.solid)
+            grate_player_clip.solids.append(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
             for face in grate_phys_clip_solid.sides:
@@ -2901,6 +2913,10 @@ def change_func_brush():
 
                 break  # Don't run twice - there might be a second matching
                 # overlay instance!
+
+    # Remove if it's empty.
+    if not grate_player_clip.solids:
+        grate_player_clip.remove()
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
         TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
