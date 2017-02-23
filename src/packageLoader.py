@@ -1844,10 +1844,9 @@ class Music(PakObject):
         sound = data.info.find_key('soundscript', '')  # type: Property
 
         # The sample music file to play, if found.
-        rel_sample = data.info['sample', '']
-        if rel_sample:
-            sample = os.path.abspath('../sounds/music_samp/' + rel_sample)
-            zip_sample = 'resources/music_samp/' + rel_sample
+        sample = data.info['sample', '']
+        if sample:
+            zip_sample = 'resources/music_samp/' + sample
             if zip_sample not in data.fsys:
                 LOGGER.warning(
                     'Music sample for <{}> does not exist in zip: "{}"',

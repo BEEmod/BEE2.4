@@ -10,15 +10,16 @@ from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-import sound as snd
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
+from srctools.filesys import FileSystem, FileSystemChain
+import sound as snd
 import paletteLoader
 import packageLoader
 import img
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 import extract_packages
 import voiceEditor
 import contextWin
@@ -31,6 +32,8 @@ import optionWindow
 import helpMenu
 import backup as backup_win
 import tooltip
+
+from typing import Iterable, List
 
 LOGGER = utils.getLogger(__name__)
 
@@ -456,7 +459,7 @@ def load_settings():
     optionWindow.load()
 
 
-def load_packages(data):
+def load_packages(data, package_systems: Iterable[FileSystem]):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -480,11 +483,11 @@ def load_packages(data):
     for editor_sound in data['EditorSound']:
         editor_sounds[editor_sound.id] = editor_sound
 
-    sky_list = []
-    voice_list = []
-    style_list = []
-    music_list = []
-    elev_list = []
+    sky_list   = []  # type: List[selWinItem]
+    voice_list = []  # type: List[selWinItem]
+    style_list = []  # type: List[selWinItem]
+    music_list = []  # type: List[selWinItem]
+    elev_list  = []  # type: List[selWinItem]
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -539,7 +542,7 @@ def load_packages(data):
             loader.step("IMG")
 
     # Set the 'sample' value for music items
-    for sel_item in music_list: # type: selWinItem
+    for sel_item in music_list:  # type: selWinItem
         sel_item.snd_sample = musics[sel_item.name].sample
 
     def win_callback(style_id, win_name):
@@ -611,6 +614,12 @@ def load_packages(data):
         ],
     )
 
+    # Build a chain of the package systems, in the music sample directory
+    # to play sounds from.
+    music_sys = FileSystemChain()
+    for system in package_systems:
+        music_sys.add_sys(system, prefix='resources/music_samp/')
+
     music_win = selWin(
         TK_ROOT,
         music_list,
@@ -619,7 +628,7 @@ def load_packages(data):
                'tracks have variations which are played when interacting '
                'with certain testing elements.'),
         has_none=True,
-        has_snd_sample=True,
+        sound_sys=music_sys,
         none_desc=_('Add no music to the map at all.'),
         callback=win_callback,
         callback_params=['Music'],

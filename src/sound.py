@@ -4,7 +4,11 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
+from tempfile import NamedTemporaryFile
+import shutil
+
 from tk_tools import TK_ROOT
+from srctools.filesys import FileSystem, FileSystemChain
 import utils
 
 LOGGER = utils.getLogger(__name__)
@@ -100,7 +104,7 @@ else:
 
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
-        def __init__(self, start_callback, stop_callback):
+        def __init__(self, start_callback, stop_callback, system: FileSystemChain):
             """Initialise the sample-playing manager.
             """
             self.sample = None
@@ -108,6 +112,7 @@ else:
             self.start_callback = start_callback
             self.stop_callback = stop_callback
             self.cur_file = None
+            self.system = system
 
         @property
         def is_playing(self):
@@ -127,12 +132,23 @@ else:
                 return
 
             try:
-                sound = pyglet.media.load(self.cur_file, streaming=False)
-            # AVbin raises it's own error if the file isn't found..
-            except (FileNotFoundError, pyglet.media.MediaFormatException):
+                file = self.system[self.cur_file]
+            except KeyError:
                 self.stop_callback()
                 LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
+
+            # TODO: Pyglet doesn't support direct streams, so we have to
+            # TODO: extract sounds to disk first.
+            with NamedTemporaryFile() as fdest:
+                with self.system.get_system(file), file.open_bin() as fsrc:
+                    shutil.copyfileobj(fsrc, fdest)
+                try:
+                    sound = pyglet.media.load(fdest.name, streaming=False)
+                except pyglet.media.MediaFormatException:
+                    self.stop_callback()
+                    LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
+                    return  # Abort if music isn't found..
 
             self.sample = sound.play()
             self.after = TK_ROOT.after(

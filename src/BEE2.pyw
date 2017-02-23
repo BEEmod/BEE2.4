@@ -129,7 +129,7 @@ if __name__ == '__main__':
     # Load filesystems into img, so it can load images from packages.
     img.load_filesystems(packageLoader.PACKAGE_SYS.values())
 
-    UI.load_packages(pack_data)
+    UI.load_packages(pack_data, packageLoader.PACKAGE_SYS.values())
     LOGGER.info('Done!')
 
     LOGGER.info('Loading Palettes...')
