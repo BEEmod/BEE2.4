@@ -2724,9 +2724,25 @@ def change_func_brush():
         grate_temp = None
 
     if srctools.conv_bool(settings['style_vars']['gratingpellets']):
-        grating_filter = '@grating_filter'
+        # Merge together these existing filters in global_pti_ents
+        VMF.create_ent(
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            targetname='@grating_filter',
+            classname='filter_multi',
+            filtertype=0,
+            negated=0,
+            filter01='@not_pellet',
+            filter02='@not_paint_bomb',
+        )
     else:
-        grating_filter = '@not_paint_bomb'
+        # Just skip paint bombs.
+        VMF.create_ent(
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            targetname='@grating_filter',
+            classname='filter_activator_class',
+            negated=1,
+            filterclass='prop_paint_bomb',
+        )
 
     dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
@@ -2858,7 +2874,7 @@ def change_func_brush():
             clip_ent = VMF.create_ent(
                 classname='func_clip_vphysics',
                 origin=brush_loc.join(' '),
-                filtername=grating_filter
+                filtername='@grating_filter',
             )
             clip_ent.solids.append(grate_phys_clip_solid)
 
