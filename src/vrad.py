@@ -620,7 +620,7 @@ def inject_files():
             yield filename, arcname
 
 
-def pack_content(path, is_peti):
+def pack_content(bsp_file: BSP, path: str, is_peti: bool):
     """Pack any custom content into the map.
 
     Filelist format: "[control char]filename[\t packname]"
@@ -711,9 +711,6 @@ def pack_content(path, is_peti):
         LOGGER.info(' # "' + file + '"')
 
     LOGGER.info("Packing Files!")
-    bsp_file = BSP(path)
-    LOGGER.debug(' - Header read')
-    bsp_file.read_header()
 
     # Manipulate the zip entirely in memory
     zip_data = BytesIO()
@@ -968,8 +965,13 @@ def main(argv):
 
     LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
 
+    LOGGER.info('Reading BSP')
+    bsp_file = BSP(path)
+    bsp_file.read_header()
+    LOGGER.info('Done!')
+
     if '-no_pack' not in args:
-        pack_content(path, is_peti)
+        pack_content(bsp_file, path, is_peti)
     else:
         LOGGER.warning("Packing files is disabled!")
 
