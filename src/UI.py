@@ -20,7 +20,6 @@ import img
 import utils
 import tk_tools
 import SubPane
-import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
@@ -56,7 +55,6 @@ selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
 # Variable used for export button (changes to include game name)
-# This is used after resource copying is done.
 EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
 # All the stuff we've loaded in
@@ -1272,27 +1270,17 @@ def init_option(f):
         frame,
         text=_("Save Palette..."),
         command=pal_save,
-        ).grid(row=0, sticky="EW", padx=5)
+    ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
         command=pal_save_as,
-        ).grid(row=1, sticky="EW", padx=5)
-    UI['export_button'] = ttk.Button(
+    ).grid(row=1, sticky="EW", padx=5)
+    ttk.Button(
         frame,
-        textvariable=extract_packages.export_btn_text,
+        textvariable=EXPORT_CMD_VAR,
         command=export_editoritems,
-    )
-    UI['export_button'].state(['disabled'])
-    UI['export_button'].grid(row=2, sticky="EW", padx=5)
-
-    UI['extract_progress'] = ttk.Progressbar(
-        frame,
-        length=200,
-        maximum=1000,
-        variable=extract_packages.progress_var,
-    )
-    UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
+    ).grid(row=2, sticky="EW", padx=5)
 
     props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
     props.columnconfigure(1, weight=1)
@@ -1579,7 +1567,7 @@ def init_drag_icon():
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game):
+def set_game(game: gameMan.Game):
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
@@ -1587,6 +1575,11 @@ def set_game(game):
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
     text = _('Export to "{}"...').format(game.name)
+
+    if game.cache_invalid():
+        # Mark that it needs extractions
+        text += ' *'
+
     menus['file'].entryconfigure(
         menus['file'].export_btn_index,
         label=text,
@@ -1683,6 +1676,7 @@ def init_menu_bar(win):
 
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
+    win.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
 
     helpMenu.make_help_menu(bar)
 
@@ -1960,25 +1954,6 @@ def init_windows():
             win.set_suggested(sugg_val)
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
-
-    def copy_done_callback():
-        """Callback run when all resources have been extracted."""
-
-        UI['export_button'].state(['!disabled'])
-        UI['export_button']['textvariable'] = EXPORT_CMD_VAR
-        UI['extract_progress'].grid_remove()
-        windows['opt'].update_idletasks()
-        # Reload the option window's position and sizing configuration,
-        # that way it resizes automatically.
-        windows['opt'].save_conf()
-        windows['opt'].load_conf()
-        menus['file'].entryconfigure(
-            menus['file'].export_btn_index,
-            state=NORMAL,
-        )
-        TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
-        LOGGER.info('Done extracting resources!')
-    extract_packages.done_callback = copy_done_callback
 
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)

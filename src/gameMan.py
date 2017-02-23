@@ -17,19 +17,23 @@ import math
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Vec, Property, NoKeyError, VPK, VMF, Output
+from srctools import (
+    Vec, VPK,
+    Property, NoKeyError,
+    VMF, Output,
+    FileSystemChain,
+)
 import backup
-import extract_packages
 import loadScreen
 import packageLoader
 import utils
 import srctools
 
-from typing import List, Optional
+from typing import List
 
 LOGGER = utils.getLogger(__name__)
 
-all_games = [] # type: List[Game]
+all_games = []  # type: List[Game]
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
@@ -90,6 +94,9 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
+
+# The systems we need to copy to ingame resources
+res_system = FileSystemChain()
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
@@ -168,7 +175,17 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
+def load_filesystems(package_sys):
+    """Load package filesystems into a chain."""
+    for system in package_sys:
+        res_system.add_sys(system, prefix='resources/')
+
+
 def translate(string):
+    """Translate the string using Portal 2's language files.
+
+    This is needed for Valve items, since they translate automatically.
+    """
     return TRANS_DATA.get(string, string)
 
 
@@ -348,45 +365,50 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
-    def cache_valid(self):
+    def cache_invalid(self):
         """Check to see if the cache is valid."""
+        if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+            # Skipped always
+            return False
+
         cache_time = GEN_OPTS.get_int('General', 'cache_time', 0)
 
-        if cache_time == self.mod_time:
-            LOGGER.info("Skipped copying cache!")
-            return True
-        LOGGER.info("Cache invalid - copying..")
-        return False
+        # If the game/cache's time is 0, it's never been copied or is a
+        # folder (must always be copied).
+        return cache_time != self.mod_time or self.mod_time == 0
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
-
         screen_func = export_screen.step
-        copy = shutil.copy
 
-        def copy_func(src, dest):
-            screen_func('RES')
-            copy(src, dest)
+        with res_system:
+            for file in res_system.walk_folder_repeat():
+                try:
+                    start_folder, path = file.path.split('/', 1)
+                except ValueError:
+                    LOGGER.warning('File in resources root: "{}"!', file.path)
+                    continue
 
-        for folder in os.listdir('../cache/resources/'):
-            source = os.path.join('../cache/resources/', folder)
-            if not os.path.isdir(source):
-                continue  # Skip DS_STORE, desktop.ini, etc.
+                start_folder = start_folder.casefold()
 
-            if folder == 'instances':
-                dest = self.abs_path(INST_PATH)
-            elif folder.casefold() == 'bee2':
-                continue  # Skip app icons
-            else:
-                dest = self.abs_path(os.path.join('bee2', folder))
-            LOGGER.info('Copying to "{}" ...', dest)
-            try:
-                shutil.rmtree(dest)
-            except (IOError, shutil.Error):
-                pass
+                if start_folder == 'instances':
+                    dest = self.abs_path(INST_PATH + '/' + path)
+                elif start_folder in ('bee2', 'music_samp'):
+                    screen_func('RES')
+                    continue  # Skip app icons
+                else:
+                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
 
-            # This handles existing folders, without raising in os.makedirs().
-            utils.merge_tree(source, dest, copy_function=copy_func)
+                # Already copied from another package.
+                if os.path.exists(dest):
+                    screen_func('RES')
+                    continue
+
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
+                    shutil.copyfileobj(fsrc, fdest)
+                screen_func('RES')
+
         LOGGER.info('Cache copied.')
         # Save the new cache modification date.
         self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
@@ -450,19 +472,30 @@ class Game:
         LOGGER.info('Should refresh: {}', should_refresh)
         if should_refresh:
             # Check to ensure the cache needs to be copied over..
-            should_refresh = not self.cache_valid()
-
-        if should_refresh:
-            export_screen.set_length('RES', extract_packages.res_count)
-        else:
-            export_screen.skip_stage('RES')
-            export_screen.skip_stage('MUS')
+            should_refresh = self.cache_invalid()
+            if should_refresh:
+                LOGGER.info("Cache invalid - copying..")
+            else:
+                LOGGER.info("Skipped copying cache!")
 
         # The items, plus editoritems, vbsp_config and the instance list.
         export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
 
+        # Do this before setting music and resources,
+        # those can take time to compute.
+
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
+
+        if should_refresh:
+            # Count the files.
+            export_screen.set_length(
+                'RES',
+                sum(1 for file in res_system.walk_folder_repeat()),
+            )
+        else:
+            export_screen.skip_stage('RES')
+            export_screen.skip_stage('MUS')
 
         # Make the folders we need to copy files to, if desired.
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)

@@ -9,7 +9,6 @@ import math
 import re
 from collections import defaultdict
 
-import extract_packages
 import srctools
 import tkMarkdown
 import utils
@@ -327,7 +326,7 @@ def load_packages(
         log_incorrect_packfile=False,
         has_mel_music=False,
         has_tag_music=False,
-        ):
+        ) -> Tuple[dict, Iterable[FileSystem]]:
     """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
@@ -445,7 +444,7 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    return data
+    return data, PACKAGE_SYS.values()
 
 
 def parse_package(pack: 'Package', has_tag=False, has_mel=False):
@@ -496,10 +495,6 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                 pack.id,
                 pack.disp_name,
             )
-
-    # Figure out how many resources are in the package..
-    for file in pack.fsys.walk_folder('resources'):
-        extract_packages.res_count += 1
 
 
 def setup_style_tree(

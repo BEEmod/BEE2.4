@@ -47,7 +47,6 @@ import loadScreen
 import paletteLoader
 import packageLoader
 import gameMan
-import extract_packages
 import logWindow
 import sound
 import img
@@ -112,7 +111,7 @@ if __name__ == '__main__':
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
-    pack_data = packageLoader.load_packages(
+    pack_data, package_sys = packageLoader.load_packages(
         GEN_OPTS['Directories']['package'],
         log_item_fallbacks=GEN_OPTS.get_bool(
             'Debug', 'log_item_fallbacks'),
@@ -126,10 +125,11 @@ if __name__ == '__main__':
         has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
     )
 
-    # Load filesystems into img, so it can load images from packages.
-    img.load_filesystems(packageLoader.PACKAGE_SYS.values())
+    # Load filesystems into various modules
+    img.load_filesystems(package_sys)
+    gameMan.load_filesystems(package_sys)
 
-    UI.load_packages(pack_data, packageLoader.PACKAGE_SYS.values())
+    UI.load_packages(pack_data, package_sys)
     LOGGER.info('Done!')
 
     LOGGER.info('Loading Palettes...')
@@ -153,9 +153,5 @@ if __name__ == '__main__':
 
     loadScreen.main_loader.destroy()
 
-    if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
-        extract_packages.done_callback()
-    else:
-        extract_packages.check_cache(pack_data['zips'])
 
     TK_ROOT.mainloop()
