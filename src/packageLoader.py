@@ -347,8 +347,6 @@ def load_packages(
         )
         sys.exit('No Packages Directory!')
 
-    shutil.rmtree('../vpk_cache/', ignore_errors=True)
-
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
 
@@ -2074,38 +2072,27 @@ class StyleVPK(PakObject, has_img=False):
     These are copied into _dlc3, allowing changing the in-editor wall
     textures.
     """
-    def __init__(self, vpk_id, file_count=0):
+    def __init__(self, vpk_id, filesys: FileSystem, directory: str):
         """Initialise a StyleVPK object."""
         self.id = vpk_id
+        self.fsys = filesys
+        self.dir = directory
 
     @classmethod
     def parse(cls, data: ParseData):
         vpk_name = data.info['filename']
-        dest_folder = os.path.join('../vpk_cache', data.id.casefold())
-
-        os.makedirs(dest_folder, exist_ok=True)
 
         filesystem = data.fsys  # type: FileSystem
 
-        has_files = False
         source_folder = os.path.normpath('vpk/' + vpk_name)
 
-        for file in filesystem.walk_folder(source_folder):
-            dest_loc = os.path.join(
-                dest_folder,
-                file.path,
-            )
-            os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-            with file.open_bin() as fsrc, open(dest_loc, 'wb') as fdest:
-                shutil.copyfileobj(fsrc, fdest)
-            has_files = True
-
-        if not has_files:
+        # At least one exists?
+        if not any(filesystem.walk_folder(source_folder)):
             raise Exception(
                 'VPK object "{}" has no associated files!'.format(data.id)
             )
 
-        return cls(data.id)
+        return cls(data.id, filesystem, source_folder)
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -2150,12 +2137,14 @@ class StyleVPK(PakObject, has_img=False):
         # Generate the VPK.
         vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
         if sel_vpk is not None:
-            src_folder = os.path.abspath(
-                os.path.join(
-                    '../vpk_cache',
-                    sel_vpk.id.casefold()
-                ))
-            vpk_file.add_folder(src_folder)
+            with vpk_file:
+                for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
+                    with file.open_bin() as open_file:
+                        vpk_file.add_file(
+                            file.path,
+                            open_file.read(),
+                            sel_vpk.dir,
+                        )
 
         # Additionally, pack in game/vpk_override/ into the vpk - this allows
         # users to easily override resources in general.
