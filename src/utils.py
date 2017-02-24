@@ -651,8 +651,10 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
 
 def setup_localisations(logger: logging.Logger):
     """Setup gettext localisations."""
+    from srctools.property_parser import PROP_FLAGS_DEFAULT
     import gettext
     import locale
+
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
 
@@ -668,6 +670,11 @@ def setup_localisations(logger: logging.Logger):
 
     logger.info('Language: {!r}', lang_code)
     logger.debug('Language codes: {!r}', expanded_langs)
+
+    # Add these to Property's default flags, so config files can also
+    # be localised.
+    for lang in expanded_langs:
+        PROP_FLAGS_DEFAULT['lang_' + lang] = True
 
     for lang in expanded_langs:
         try:
