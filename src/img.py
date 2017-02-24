@@ -64,14 +64,15 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     except KeyError:
         pass
 
-    try:
-        img_file = filesystem[path]
-    except KeyError:
-        LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-        return error or img_error
-    with filesystem.get_system(img_file), img_file.open_bin() as file:
-        image = Image.open(file)
-        image.load()
+    with filesystem:
+        try:
+            img_file = filesystem[path]
+        except KeyError:
+            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
+            return error or img_error
+        with img_file.open_bin() as file:
+            image = Image.open(file)
+            image.load()
 
     if resize_to != (0, 0):
         image = image.resize(resize_to, algo)
