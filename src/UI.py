@@ -886,7 +886,10 @@ def export_editoritems(e=None):
     selectedPalette_radio.set(palettes.index(new_pal))
     set_pal_radio()
 
-    # Save the configs since we're writing to disk anyway.
+    # Re-set this, so we clear the '*' on buttons if extracting cache.
+    set_game(gameMan.selected_game)
+
+    # Save the configs since we're writing to disk lots anyway.
     GEN_OPTS.save_check()
     item_opts.save_check()
 

@@ -204,12 +204,12 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id: str, folder, mod_time=0):
+    def __init__(self, name, steam_id: str, folder, mod_times):
         self.name = name
         self.steamID = steam_id
         self.root = folder
-        # The modified date of the cache, so we know whether to copy it over.
-        self.mod_time = mod_time
+        # The last modified date of packages, so we know whether to copy it over.
+        self.mod_times = mod_times
 
     @classmethod
     def parse(cls, gm_id, config: ConfigFile):
@@ -224,19 +224,22 @@ class Game:
             raise ValueError(
                 'Game {} has no folder!'.format(gm_id)
             )
+        mod_times = {}
 
-        mod_time = config.get_int(gm_id, 'ModTime', 0)
+        for name, value in config.items(gm_id):
+            if name.startswith('pack_mod_'):
+                mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_time)
+        return cls(gm_id, steam_id, folder, mod_times)
 
     def save(self):
         """Write a game into the config page."""
-        if self.name not in CONFIG:
-            CONFIG[self.name] = {}  # Make the section if it's not there.
+        # Wipe the original configs
+        CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
-        CONFIG[self.name]['ModTime'] = str(self.mod_time)
-
+        for pack, mod_time in self.mod_times.items():
+            CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
     def dlc_priority(self):
         """Iterate through all subfolders, in order of high to low priority.
@@ -371,11 +374,17 @@ class Game:
             # Skipped always
             return False
 
-        cache_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        # Check lengths, to ensure we re-extract if packages were removed.
+        if len(packageLoader.packages) != len(self.mod_times):
+            LOGGER.info('Need to extract - package counts inconsistent!')
+            return True
 
-        # If the game/cache's time is 0, it's never been copied or is a
-        # folder (must always be copied).
-        return cache_time != self.mod_time or self.mod_time == 0
+        if any(
+            pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
+            for pack_id, pack in
+            packageLoader.packages.items()
+        ):
+            return True
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
@@ -411,7 +420,9 @@ class Game:
 
         LOGGER.info('Cache copied.')
         # Save the new cache modification date.
-        self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        self.mod_times.clear()
+        for pack_id, pack in packageLoader.packages.items():
+            self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
 
@@ -426,7 +437,7 @@ class Game:
         except PermissionError:
             pass
 
-        self.mod_time = 0
+        self.mod_times.clear()
 
     def export(
             self,

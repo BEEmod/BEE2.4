@@ -44,7 +44,6 @@ data = {}
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS = {}  # type: Dict[str, FileSystem]
 
-res_count = -1
 
 # Don't change face IDs when copying to here.
 # This allows users to refer to the stuff in templates specifically.
@@ -373,9 +372,6 @@ def load_packages(
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
             parse_package(pack, has_tag_music, has_mel_music)
             loader.step("PAK")
-
-        # If new packages were added, update the config!
-        PACK_CONFIG.save_check()
 
         loader.set_length("OBJ", sum(
             len(obj_type)
@@ -922,30 +918,29 @@ class Package:
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
-    def is_stale(self):
+    def is_stale(self, mod_time: int):
         """Check to see if this package has been modified since the last run."""
         if isinstance(self.fsys, RawFileSystem):
             # unzipped packages are for development, so always extract.
-            LOGGER.info('Extracting resources - {} is unzipped!', self.id)
+            LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
-        last_modtime = PACK_CONFIG.get_int(self.id, 'ModTime', 0)
+
         zip_modtime = int(os.stat(self.name).st_mtime)
 
-        if zip_modtime != last_modtime:
-            LOGGER.info('Package {} is stale! Extracting resources...', self.id)
+        # If zero, it's never extracted...
+        if zip_modtime != mod_time or mod_time == 0:
+            LOGGER.info('Need to extract resources - {} is stale!', self.id)
             return True
         return False
 
-    def set_modtime(self):
+    def get_modtime(self):
         """After the cache has been extracted, set the modification dates
          in the config."""
         if isinstance(self.fsys, RawFileSystem):
             # No modification time
-            PACK_CONFIG[self.id]['ModTime'] = '0'
+            return 0
         else:
-            PACK_CONFIG[self.id]['ModTime'] = str(int(
-                os.stat(self.name).st_mtime
-            ))
+            return int(os.stat(self.name).st_mtime)
 
 
 class Style(PakObject):
