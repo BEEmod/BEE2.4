@@ -41,13 +41,6 @@ styleOptions = [
     ),
 
     stylevar(
-        id='GratingPellets',
-        name=_('Pellets Can Pass Through Grating'),
-        default=1,
-        desc=_('Make High Energy Pellets pass through Gratings.')
-    ),
-
-    stylevar(
         id='NoMidVoices',
         name=_('Suppress Mid-Chamber Dialogue'),
         default=0,

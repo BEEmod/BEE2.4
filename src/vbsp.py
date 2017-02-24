@@ -433,7 +433,7 @@ def load_settings():
             'config/compile.cfg',
             root=bee2_loc,
         )
-        conditions.globals.ITEM_CONFIG = ConfigFile(
+        vbsp_options.ITEM_CONFIG = ConfigFile(
             'config/item_cust_configs.cfg',
             root=bee2_loc,
         )
@@ -2723,7 +2723,7 @@ def change_func_brush():
     else:
         grate_temp = None
 
-    if srctools.conv_bool(settings['style_vars']['gratingpellets']):
+    if vbsp_options.ITEM_CONFIG.get_bool('BEE_PELLET', 'PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
         VMF.create_ent(
             origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),

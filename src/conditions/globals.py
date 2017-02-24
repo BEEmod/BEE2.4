@@ -3,14 +3,11 @@ import utils
 import vbsp_options
 
 from srctools import Vec, Property, Entity, conv_bool
-from BEE2_config import ConfigFile
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
 )
 import vbsp
 
-# Overwritten by VBSP to get the actual values.
-ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
 
 
 @make_flag('styleVar')
@@ -200,7 +197,7 @@ def res_get_item_config(inst: Entity, res: Property):
         else:
             wid_name += '_{}'.format(timer_delay)
 
-    inst.fixup[res['ResultVar']] = ITEM_CONFIG.get_val(
+    inst.fixup[res['ResultVar']] = vbsp_options.ITEM_CONFIG.get_val(
         group_id,
         wid_name,
         default,

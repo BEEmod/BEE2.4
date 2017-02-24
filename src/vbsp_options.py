@@ -5,6 +5,7 @@ import inspect
 import io
 
 from srctools import Property, Vec, parse_vec_str
+from BEE2_config import ConfigFile
 import srctools
 import utils
 
@@ -13,6 +14,9 @@ from typing import T, Type, Optional, Iterator
 LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
+
+# Overwritten by VBSP to get the actual values.
+ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
 
 class TYPE(Enum):
     """The types arguments can have."""
@@ -29,6 +33,7 @@ TYPE_NAMES = {
     TYPE.BOOL: 'True/False',
     TYPE.VEC: 'Vector',
 }
+
 
 class Opt:
     def __init__(self, id, default, doc, fallback=None):
