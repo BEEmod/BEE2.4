@@ -41,6 +41,7 @@ class Widget:
         self,
         wid_id: str,
         name: str,
+        tooltip: str,
         create_func: Callable[[tk.Frame, tk.StringVar, Property], None],
         multi_func: Callable[[tk.Frame, List[Tuple[str, tk.StringVar]], Property], None],
         config: Property,
@@ -50,6 +51,7 @@ class Widget:
     ):
         self.id = wid_id
         self.name = name
+        self.tooltip = tooltip
         self.values = values
         self.config = config
         self.create_func = create_func
@@ -104,7 +106,9 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
             name = wid['Label']
+            tooltip = wid['Tooltip', '']
             default = wid.find_key('Default')
+
             if is_timer:
                 if default.has_children():
                     defaults = {
@@ -144,6 +148,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             (multi_widgets if is_timer else widgets).append(Widget(
                 wid_id,
                 name,
+                tooltip,
                 create_func,
                 timer_func,
                 wid,
@@ -257,6 +262,10 @@ def make_pane(parent: ttk.Frame):
                 widget = wid.create_func(non_timer_frame, wid.values, wid.config)
                 widget.grid(row=row, column=1, sticky='ew')
 
+                if wid.tooltip:
+                    add_tooltip(widget, wid.tooltip)
+                    add_tooltip(label, wid.tooltip)
+
         if config.widgets and config.multi_widgets:
             ttk.Separator(orient='horizontal').grid(
                 row=1, column=0, sticky='ew',
@@ -277,6 +286,9 @@ def make_pane(parent: ttk.Frame):
                 wid.values,
                 wid.config,
             )
+
+            if wid.tooltip:
+                add_tooltip(wid_frame, wid.tooltip)
 
     # Select the first item, so we show something.
     dropdown.current(0)
