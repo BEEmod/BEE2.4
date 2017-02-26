@@ -9,6 +9,7 @@ from srctools import Property, Vec, conv_int
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 from BEE2_config import ConfigFile
 from tooltip import add_tooltip
+import tkMarkdown
 import utils
 import img
 import sound
@@ -80,7 +81,12 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
     def parse(cls, data: ParseData) -> 'PakObject':
         props = data.info  # type: Property
 
-        group_name = props['Name']
+        if data.is_override:
+            # Override doesn't have a name
+            group_name = ''
+        else:
+            group_name = props['Name']
+
         desc = desc_parse(props, data.id)
 
         widgets = []
@@ -171,6 +177,28 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
 
         return group
 
+    def add_over(self, override: 'ConfigGroup'):
+        """Override a ConfigGroup to add additional widgets."""
+        # Make sure they don't double-up.
+        conficts = self.widget_ids() & override.widget_ids()
+        if conficts:
+            raise ValueError('Duplicate IDs in "{}" override - {}', self.id, conficts)
+
+        self.widgets.extend(override.widgets)
+        self.multi_widgets.extend(override.multi_widgets)
+        self.desc = tkMarkdown.join(self.desc, override.desc)
+
+        # Don't display that as well.
+        CONFIG_ORDER.remove(override)
+
+    def widget_ids(self):
+        """Return the set of widget IDs used."""
+        return {
+            wid.id
+            for wid_cat in (self.widgets, self.multi_widgets)
+            for wid in wid_cat
+        }
+
     @staticmethod
     def export(exp_data: ExportData):
         """Write all our values to the config."""
@@ -257,7 +285,7 @@ def make_pane(parent: ttk.Frame):
             non_timer_frame.columnconfigure(1, weight=1)
 
             for row, wid in enumerate(config.widgets):
-                label = ttk.Label(non_timer_frame, text=wid.name)
+                label = ttk.Label(non_timer_frame, text=wid.name + ': ')
                 label.grid(row=row, column=0)
                 widget = wid.create_func(non_timer_frame, wid.values, wid.config)
                 widget.grid(row=row, column=1, sticky='ew')
