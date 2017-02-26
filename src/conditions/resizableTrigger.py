@@ -4,6 +4,7 @@ import instanceLocs
 import srctools
 import utils
 import vbsp
+import vbsp_options
 import comp_consts as const
 from conditions import (
     make_result, RES_EXHAUSTED,
@@ -22,7 +23,7 @@ def res_resizeable_trigger(res: Property):
     Options:
     'markerInst': <ITEM_ID:1,2> value referencing the marker instances, or a filename.
     'markerItem': The item's ID
-    'previewVar': A stylevar which enables/disables the preview overlay.
+    'previewConf': A item config which enables/disables the preview overlay.
     'previewinst': An instance to place at the marker location in preview mode.
         This should contain checkmarks to display the value when testing.
     'previewMat': If set, the material to use for an overlay func_brush.
@@ -70,11 +71,8 @@ def res_resizeable_trigger(res: Property):
     mark_deact_name, mark_deact_out = marker_connection.out_deact
     del marker_connection
 
-    preview_var = res['previewVar', ''].casefold()
-
-    # Display preview overlays if it's preview mode, and the style var is true
-    # or does not exist
-    if vbsp.IS_PREVIEW and (not preview_var or vbsp.settings['style_vars'][preview_var]):
+    # Display preview overlays if it's preview mode, and the config is true
+    if vbsp.IS_PREVIEW and vbsp_options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
         pre_act_name, pre_act_inp = Output.parse_name(
