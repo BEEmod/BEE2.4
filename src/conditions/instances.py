@@ -249,38 +249,72 @@ def res_global_input(inst: Entity, res: Property):
             if Name is not set.
         - "Param": The parameter for the output.
     """
-    name, inp_name, inp_command, output, delay, param, target = res.value
+    name, proxy_name, command, output, delay, param, target = res.value
 
-    if name is not None:
-        name = conditions.resolve_value(inst, name)
+    global_input(inst, command, proxy_name, name, output, target, param, delay)
+
+
+def global_input(
+    inst: Entity,
+    command: str,
+    proxy_name: str=None,
+    relay_name: str=None,
+    relay_out: str='OnTrigger',
+    target: str=None,
+    param='',
+    delay=0.0,
+):
+    """Create a global input."""
+
+    if relay_name is not None:
+        relay_name = conditions.resolve_value(inst, relay_name)
     if target is not None:
         target = conditions.resolve_value(inst, target)
 
     try:
-        glob_ent = GLOBAL_INPUT_ENTS[name]
+        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
     except KeyError:
-        if name is None:
+        if relay_name is None:
             glob_ent = GLOBAL_INPUT_ENTS[None] = inst.map.create_ent(
                 classname='logic_auto',
                 origin=inst['origin'],
             )
         else:
-            glob_ent = GLOBAL_INPUT_ENTS[name] = inst.map.create_ent(
+            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = inst.map.create_ent(
                 classname='logic_relay',
-                targetname=name,
+                targetname=relay_name,
                 origin=inst['origin'],
             )
 
     out = Output(
-        out=('OnMapSpawn' if name is None else output),
+        out=('OnMapSpawn' if relay_name is None else relay_out),
         targ=(
             conditions.local_name(inst, target)
             if target else
             inst['targetname']
         ),
-        inp=inp_command,
-        inst_in=inp_name,
+        inp=command,
+        inst_in=proxy_name,
         delay=delay,
         param=conditions.resolve_value(inst, param),
     )
     glob_ent.add_out(out)
+
+
+@make_result('ScriptVar')
+def res_script_var(inst: Entity, res: Property):
+    """Set a variable on a script, via a logic_auto.
+
+    Name is the local name for the script entity.
+    Var is the variable name.
+    Value is the value to set.
+    """
+    global_input(
+        inst,
+        command='RunScriptCode',
+        target=conditions.local_name(inst, res['name']),
+        param='{} <- {}'.format(
+            res['var'],
+            conditions.resolve_value(inst, res['value']),
+        ),
+    )
