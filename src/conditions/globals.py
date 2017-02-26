@@ -115,6 +115,29 @@ def flag_has_exit_signage():
     return False
 
 
+@make_flag('ItemConfig')
+def res_get_item_config(inst: Entity, res: Property):
+    """Check if an item config panel value matches another value.
+
+    ID is the ID of the group. Name is the name of the widget.
+    If UseTimer is true, it uses $timer_delay to choose the value to use.
+    Value is the value to compare to.
+    """
+    group_id = res['ID']
+    wid_name = res['Name'].casefold()
+    desired_value = res['Value']
+    if res.bool('UseTimer'):
+        timer_delay = inst.fixup.int('$timer_delay')
+    else:
+        timer_delay = None
+
+    conf = vbsp_options.get_itemconf((group_id, wid_name), None, timer_delay)
+    if conf is None:  # Doesn't exist
+        return False
+
+    return conf == desired_value
+
+
 @make_result('styleVar')
 def res_set_style_var(res: Property):
     """Set Style Vars.

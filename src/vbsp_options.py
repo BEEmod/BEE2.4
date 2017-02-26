@@ -141,13 +141,14 @@ def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
 
 def get_itemconf(
     name: Union[str, Tuple[str, str]],
-    default: OptionType,
+    default: Optional[OptionType],
     timer_delay: int=None,
-) -> OptionType:
+) -> Optional[OptionType]:
     """Get an itemconfig value.
 
     The name should be an 'ID:Section', or a tuple of the same.
     The type of the default sets what value it will be converted to.
+    None returns the string, or None if not present.
     If set, timer_value is the value used for the timer.
     """
     if name == '':
@@ -162,6 +163,8 @@ def get_itemconf(
         LOGGER.warning('Invalid item config: {!r}!', name)
         return default
 
+    wid_id = wid_id.casefold()
+
     if timer_delay is not None:
         if timer_delay < 3 or timer_delay > 30:
             wid_id += '_inf'
@@ -172,7 +175,7 @@ def get_itemconf(
     if not value:
         return default
 
-    if isinstance(default, str):
+    if isinstance(default, str) or default is None:
         return value
     elif isinstance(default, Vec):
         return Vec.from_str(value, default.x, default.y, default.z)
