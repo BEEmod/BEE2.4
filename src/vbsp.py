@@ -2723,7 +2723,7 @@ def change_func_brush():
     else:
         grate_temp = None
 
-    if vbsp_options.ITEM_CONFIG.get_bool('BEE_PELLET', 'PelletGrating', False):
+    if vbsp_options.get_itemconf('BEE_PELLET:PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
         VMF.create_ent(
             origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),

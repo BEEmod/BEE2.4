@@ -192,13 +192,11 @@ def res_get_item_config(inst: Entity, res: Property):
     default = res['default']
     if res.bool('UseTimer'):
         timer_delay = inst.fixup.int('$timer_delay')
-        if timer_delay < 3 or timer_delay > 30:
-            wid_name += '_inf'
-        else:
-            wid_name += '_{}'.format(timer_delay)
+    else:
+        timer_delay = None
 
-    inst.fixup[res['ResultVar']] = vbsp_options.ITEM_CONFIG.get_val(
-        group_id,
-        wid_name,
+    inst.fixup[res['ResultVar']] = vbsp_options.get_itemconf(
+        (group_id, wid_name),
         default,
+        timer_delay,
     )

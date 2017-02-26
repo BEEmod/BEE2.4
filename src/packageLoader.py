@@ -852,7 +852,6 @@ class ItemVariant:
                 subtype['name'] = item['name']  # Name for the subtype
 
             if bee2_icon:
-                print(item.name, variant.icons)
                 variant.icons[item.name] = bee2_icon
 
             if pal_name or pal_icon:
