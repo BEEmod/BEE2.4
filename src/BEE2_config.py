@@ -70,7 +70,7 @@ class ConfigFile(ConfigParser):
                     self[sect][key] = str(default)
         self.save_check()
 
-    def get_val(self, section, value, default):
+    def get_val(self, section: str, value: str, default: str) -> str:
         """Get the value in the specifed section.
 
         If either does not exist, set to the default and return it.
