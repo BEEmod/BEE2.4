@@ -66,7 +66,7 @@ def res_monitor(inst: Entity, res: Property):
 
     ALL_MONITORS.append(Monitor(inst))
 
-    has_laser = vbsp.settings['style_vars'].get('haslaser', False)
+    has_laser = vbsp.settings['has_attr']['laser']
     # Allow turrets if the monitor is setup to allow it, and the actor should
     # be shot.
     needs_turret = bullseye_name and vbsp_options.get(bool, 'voice_studio_should_shoot')
