@@ -2510,7 +2510,7 @@ class BrushTemplate(PakObject, has_img=False):
             elif config_id and not temp_id:
                 self.id = temp_id = config_id
             elif not config_id:
-                LOGGER.info('"{}" has no conf ID!', temp_id)
+                LOGGER.warning('"{}" has no conf ID!', temp_id)
             conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
             if srctools.conv_bool(config['discard_brushes']):
                 keep_brushes = False
@@ -2542,7 +2542,7 @@ class BrushTemplate(PakObject, has_img=False):
             conf_auto_visgroup = is_scaling = False
             if not temp_id:
                 raise ValueError('No template ID passed in!')
-            LOGGER.info('Template "{}" has no config!', temp_id)
+            LOGGER.warning('Template "{}" has no config!', temp_id)
 
         if is_scaling:
             raise NotImplementedError()  # TODO
