@@ -85,6 +85,15 @@ ExportData = NamedTuple('ExportData', [
     ('game', 'Game'),
 ])
 
+# The desired variant for an item, before we've figured out the dependencies.
+UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
+    ('filesys', FileSystem),  # The original filesystem.
+    ('folder', str),  # If set, use the given folder from our package.
+    ('style', str),  # Inherit from a specific style (implies folder is None)
+    ('config', Property),  # Config for editing
+])
+
+
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
 
@@ -497,7 +506,7 @@ def setup_style_tree(
     log_fallbacks,
     log_missing_styles,
 ):
-    """Modify all items so item inheritance is properly handled.
+    """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
     combination of item and version.
@@ -539,13 +548,94 @@ def setup_style_tree(
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
         for vers in all_ver:
+            # We need to repeatedly loop to handle the chains of
+            # dependencies. This is a list of (style_id, UnParsed).
+            to_change = []  # type: List[Tuple[str, UnParsedItemVariant]]
+            styles = vers['styles']  # type:  Dict[str, Optional[ItemVariant]]
+            for sty_id, conf in styles.items():
+                to_change.append((sty_id, conf))
+                # Not done yet
+                styles[sty_id] = None
+
+            # Evaluate style lookups and modifications
+            while to_change:
+                # Needs to be done next loop.
+                deferred = []
+                # filesys = FileSystem  # The original filesystem.
+                # folder = str  # If set, use the given folder from our package.
+                # style = str  # Inherit from a specific style (implies folder is None)
+                # config = Property  # Config for editing
+                for sty_id, conf in to_change:
+                    if conf.style:
+                        try:
+                            start_data = styles[conf.style]
+                        except KeyError:
+                            raise ValueError(
+                                'Item {}\'s {} style referenced '
+                                'invalid style "{}"'.format(
+                                    item.id,
+                                    sty_id,
+                                    conf.style,
+                                ))
+                        if start_data is None:
+                            # Not done yet!
+                            deferred.append((sty_id, conf))
+                            continue
+                        # Can't have both!
+                        if conf.folder:
+                            raise ValueError(
+                                'Item {}\'s {} style has both folder and'
+                                ' style!'.format(
+                                    item.id,
+                                    sty_id,
+                                ))
+                    elif conf.folder:
+                        # Just a folder ref, we can do it immediately.
+                        # We know this dict should be set.
+                        try:
+                            start_data = item.folders[conf.filesys, conf.folder]
+                        except KeyError:
+                            LOGGER.info('Folders: {}', item.folders.keys())
+                            raise
+                    else:
+                        # No source for our data!
+                        raise ValueError(
+                            'Item {}\'s {} style has no data source!'.format(
+                                item.id,
+                                sty_id,
+                            ))
+
+                    if conf.config is None:
+                        styles[sty_id] = start_data.copy()
+                    else:
+                        styles[sty_id] = start_data.modify(
+                            conf.filesys,
+                            conf.config,
+                            '<{}:{}.{}>'.format(item.id, vers['id'], sty_id),
+                        )
+
+                # If we defer all the styles, there must be a loop somewhere.
+                # We can't resolve that!
+                if len(deferred) == len(to_change):
+                    raise ValueError(
+                        'Loop in style references:' + '\n'.join(
+                            '{} -> {}'.format(conf.style, sty_id)
+                            for sty_id, conf in deferred
+                        )
+                    )
+                to_change = deferred
+
+            # Fix this reference to point to the actual value.
+            vers['def_style'] = styles[vers['def_style']]
+
+
             for sty_id, style in all_styles.items():
-                if sty_id in vers['styles']:
-                    continue  # We already have a definition, or a reference
+                if sty_id in styles:
+                    continue  # We already have a definition
                 for base_style in style.bases:
-                    if base_style.id in vers['styles']:
+                    if base_style.id in styles:
                         # Copy the values for the parent to the child style
-                        vers['styles'][sty_id] = vers['styles'][base_style.id]
+                        styles[sty_id] = styles[base_style.id]
                         if log_fallbacks and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using parent '
@@ -559,7 +649,7 @@ def setup_style_tree(
                     # For the base version, use the first style if
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
-                        vers['styles'][sty_id] = vers['styles'][vers['def_style']]
+                        styles[sty_id] = vers['def_style']
                         if log_missing_styles and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using '
@@ -570,55 +660,7 @@ def setup_style_tree(
                     else:
                         # For versions other than the first, use
                         # the base version's definition
-                        vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
-
-            style_lookups = {}
-
-            # Evaluate style lookups and modifications
-            for sty_id, props in vers['styles'].items():
-                if not isinstance(props, Property):
-                    continue  # Normal value
-                if props.name is None:
-                    # Style lookup
-                    style_lookups[sty_id] = props.value
-                    continue
-                # It's a reference to another style.
-                base = props['base', '']
-                if not base:
-                    raise Exception('No base for "{}", in "{}" style.'.format(
-                        item.id, sty_id,
-                    ))
-
-                try:
-                    base_variant = vers['styles'][base]  # type: ItemVariant
-                except KeyError:
-                    raise Exception(
-                        'Invalid style base '
-                        '("{}") for "{}", in "{}" style.'.format(
-                            base, item.id, sty_id,
-                        )
-                    )
-
-                vers['styles'][sty_id] = base_variant.modify(
-                    props,
-                    '<{}:{}.{}>'.format(item.id, vers['id'], sty_id)
-                )
-
-            for to_id, from_id in style_lookups.items():
-                try:
-                    vers['styles'][to_id] = vers['styles'][from_id]
-                except KeyError:
-                    raise Exception(
-                        'Invalid style reference '
-                        '("{}") for "{}", in "{}" style.'.format(
-                            from_id, item.id, to_id,
-                        )
-                    )
-
-            # The default style is a value reference, fix it up.
-            # If it's an invalid value the above loop will have caught
-            # that, since it already read the value.
-            vers['def_style'] = vers['styles'][vers['def_style']]
+                        styles[sty_id] = item.def_ver['styles'][sty_id]
 
 
 def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
@@ -733,6 +775,23 @@ class ItemVariant:
         self.all_name = all_name
         self.all_icon = all_icon
 
+    def copy(self) -> 'ItemVariant':
+        """Make a copy of all the data."""
+        return ItemVariant(
+            self.editor.copy(),
+            self.vbsp_config.copy(),
+            self.editor_extra.copy(),
+            self.authors.copy(),
+            self.tags.copy(),
+            self.desc.copy(),
+            self.icons.copy(),
+            self.ent_count,
+            self.url,
+            self.all_name,
+            self.all_icon,
+            self.source,
+        )
+
     def can_group(self):
         """Does this variant have the data needed to group?"""
         return (
@@ -748,7 +807,7 @@ class ItemVariant:
         self.vbsp_config += other.vbsp_config
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    def modify(self, props: Property, source: str) -> 'ItemVariant':
+    def modify(self, fsys: FileSystem, props: Property, source: str) -> 'ItemVariant':
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -756,10 +815,12 @@ class ItemVariant:
         """
         if 'config' in props:
             # Item.parse() has resolved this to the actual config.
-            vbsp_config = props.find_key('config').copy()
-            # Specify this is a collection of blocks, not a "config"
-            # block.
-            vbsp_config.name = None
+            vbsp_config = get_config(
+                props,
+                fsys,
+                'items',
+                pak_id=fsys.path,
+            )
         else:
             vbsp_config = self.vbsp_config.copy()
 
@@ -1099,6 +1160,7 @@ class Item(PakObject):
             unstyled=False,
             glob_desc=(),
             desc_last=False,
+            folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
             ):
         self.id = item_id
         self.versions = versions
@@ -1109,6 +1171,8 @@ class Item(PakObject):
         self.unstyled = unstyled
         self.glob_desc = glob_desc
         self.glob_desc_last = desc_last
+        # Dict of folders we need to have decoded.
+        self.folders = folders
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1146,28 +1210,32 @@ class Item(PakObject):
                 }
             for style in ver.find_children('styles'):
                 if style.has_children():
-                    # It's a modification to another folder, keep the property.
-                    folder = style
-                    # Read in the vbsp_config data if specified.
-                    # We need to do this here, since the other functions
-                    # don't have access to the zip file.
-                    if 'config' in folder:
-                        folder['config'] = get_config(
-                            folder,
-                            data.fsys,
-                            'items',
-                            data.pak_id,
-                        )
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        folder=style['folder', None],
+                        style=style['Base', ''],
+                        config=style,
+                    )
 
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
-                    # None signals this should be calculated after the other
-                    # modifications
-                    folder = Property(None, style.value[1:-1])
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        style=style.value[1:-1],
+                        folder=None,
+                        config=None,
+                    )
                 else:
                     # Reference to the actual folder...
-                    folder = style.value
-                    folders[folder] = None
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        folder=style.value,
+                        style=None,
+                        config=None,
+                    )
+                # We need to parse the folder now if set.
+                if folder.folder:
+                    folders[folder.folder] = True
 
                 # The first style is considered the 'default', and is used
                 # if not otherwise present.
@@ -1202,12 +1270,20 @@ class Item(PakObject):
             unstyled=unstyled,
             glob_desc=glob_desc,
             desc_last=desc_last,
+            # Add filesystem to individualise this to the package.
+            folders={
+                (data.fsys, folder): item_variant
+                for folder, item_variant in
+                folders.items()
+            }
         )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Item'):
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
         self.all_conf += override.all_conf
+
+        self.folders.update(override.folders)
 
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
@@ -1220,14 +1296,13 @@ class Item(PakObject):
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
-                        our_style = our_ver[sty_id]  # type: ItemVariant
-                        # We both have a matching folder, merge the
-                        # definitions. We don't override editoritems!
-
-                        if isinstance(our_style, str) or isinstance(style, str):
-                            raise Exception("Can't override with a <STYLE> def.")
-
-                        our_style.override_from_folder(style)
+                        raise ValueError(
+                            'Two definitions for item folder {}.{}.{}',
+                            self.id,
+                            ver_id,
+                            sty_id,
+                        )
+                        # our_style.override_from_folder(style)
 
     def __repr__(self):
         return '<Item:' + self.id + '>'
