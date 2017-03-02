@@ -883,8 +883,6 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
 
     def except_handler(*exc_info):
         """Log uncaught exceptions."""
-        if on_error is not None:
-            on_error(*exc_info)
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
@@ -892,6 +890,8 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
             exc_info=exc_info,
         )
         logging.shutdown()
+        if on_error is not None:
+            on_error(*exc_info)
         # Call the original handler - that prints to the normal console.
         old_except_handler(*exc_info)
 
