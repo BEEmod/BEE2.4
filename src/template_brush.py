@@ -121,7 +121,7 @@ TEMP_COLOUR_INVERT = {
 
 ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('world', List[Solid]),
-    ('detail', List[Solid]),
+    ('detail', Entity),
     ('overlay', List[Entity]),
     ('orig_ids', Dict[str, str]),
     ('template', 'Template'),
