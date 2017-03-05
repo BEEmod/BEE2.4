@@ -844,6 +844,12 @@ class ItemVariant:
         else:
             desc = self.desc.copy()
 
+        if 'appenddesc' in props:
+            desc = tkMarkdown.join(
+                desc,
+                desc_parse(props, source, prop_name='appenddesc'),
+            )
+
         if 'authors' in props:
             authors = sep_values(props['authors', ''])
         else:
@@ -2746,13 +2752,13 @@ class BrushTemplate(PakObject, has_img=False):
             yield ent.solids.copy(), True, ent.visgroup_ids
 
 
-def desc_parse(info, id=''):
+def desc_parse(info, id='', *, prop_name='description'):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
     has_warning = False
     lines = []
-    for prop in info.find_all("description"):
+    for prop in info.find_all(prop_name):
         if prop.has_children():
             for line in prop:
                 if line.name and not has_warning:
