@@ -10,6 +10,7 @@ import utils
 import vbsp
 import vbsp_options
 import comp_consts as const
+import instance_traits
 from conditions import (
     make_result, make_result_setup, SOLIDS
 )
@@ -534,7 +535,10 @@ def res_import_template(inst: Entity, res: Property):
     - invertVar or colorVar: If this fixup value is true, tile colour will be
             swapped to the opposite of the current force option. If it is set
             to 'white' or 'black', that colour will be forced instead.
-    - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
+            If the value is '<editor>', the colour will be chosen based on
+            the color of the surface for ItemButtonFloor, funnels or
+            entry/exit frames.
+    - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
     """
@@ -574,7 +578,21 @@ def res_import_template(inst: Entity, res: Property):
             )
         return
 
-    if invert_var != '':
+    if invert_var.casefold() == '<editor>':
+        # Check traits for the colour it should be.
+        traits = instance_traits.get(inst)
+        if 'white' in traits:
+            force_colour = template_brush.MAT_TYPES.white
+        elif 'black' in traits:
+            force_colour = template_brush.MAT_TYPES.black
+        else:
+            LOGGER.warning(
+                '"{}": Instance "{}" '
+                "isn't one with inherent color!",
+                temp_id,
+                inst['file'],
+            )
+    elif invert_var:
         invert_val = inst.fixup[invert_var].casefold()
 
         if invert_val == 'white':
@@ -583,6 +601,8 @@ def res_import_template(inst: Entity, res: Property):
             force_colour = template_brush.MAT_TYPES.black
         elif srctools.conv_bool(invert_val):
             force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
+        # else: False value, no invert.
+    # else: invert_var = None
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
