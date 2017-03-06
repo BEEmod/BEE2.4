@@ -1929,8 +1929,6 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    refresh_pal_ui()
-
     def style_select_callback(style_id):
         """Callback whenever a new style is chosen."""
         global selected_style
@@ -1961,3 +1959,5 @@ def init_windows():
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     set_palette()
+    # Set_palette needs to run first, so it can fix invalid palette indexes.
+    refresh_pal_ui()
