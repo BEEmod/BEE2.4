@@ -836,8 +836,13 @@ class ItemVariant:
                     prop.name = regex.sub(sub, prop.real_name)
                     prop.value = regex.sub(sub, prop.value)
 
-        for prop in props.find_all('append'):
-            vbsp_config += list(prop.copy())
+        vbsp_config += list(get_config(
+            props,
+            fsys,
+            'items',
+            prop_name='append',
+            pak_id=fsys.path,
+        ))
 
         if 'description' in props:
             desc = desc_parse(props, source)
