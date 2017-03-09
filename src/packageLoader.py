@@ -267,6 +267,10 @@ def find_packages(pak_dir):
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
+        if name.endswith('.vpk') and not name.endswith('_dir.vpk'):
+            # _000.vpk files, useless without the directory
+            continue
+
         try:
             filesys = get_filesystem(name)
         except ValueError:
