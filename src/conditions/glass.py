@@ -56,6 +56,7 @@ CORNER_POINTS = {
 
 
 def glass_item_setup(conf: dict, item_id, config_dict):
+    """Build the config dictionary for a custom glass item."""
     [base_inst] = resolve_inst('<{}:0>'.format(item_id))
 
     conf.update({
@@ -66,11 +67,15 @@ def glass_item_setup(conf: dict, item_id, config_dict):
 
 
 def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dict]]:
+    """Find the bounding boxes for all the glass items matching a config.
+
+    This yields (targetname, min, max, normal, config) tuples.
+    """
     # targetname -> min, max, normal, config
     glass_items = {}
     for inst in vmf.by_class['func_instance']:  # type: Entity
         try:
-            conf = BREAKABLE_GLASS_CONF[inst['file'].casefold()]
+            conf = config[inst['file'].casefold()]
         except KeyError:
             continue
         targ = inst['targetname']
