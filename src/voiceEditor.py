@@ -49,7 +49,7 @@ class TabTypes(Enum):
 win = Toplevel(TK_ROOT, name='voiceEditor')
 win.columnconfigure(0, weight=1)
 win.transient(master=TK_ROOT)
-win.iconbitmap('../BEE2.ico')
+tk_tools.set_window_icon(win)
 win.protocol("WM_DELETE_WINDOW", win.withdraw)
 win.bind("<Escape>", win.withdraw)
 win.withdraw()

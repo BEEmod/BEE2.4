@@ -3,17 +3,18 @@
 from collections import namedtuple
 
 import srctools
+import template_brush
 import utils
 import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
-    import_template, remove_ant_toggle,
-    TEMP_TYPES, GOO_LOCS, SOLIDS
+    remove_ant_toggle,
+    GOO_LOCS, SOLIDS
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import (
     Vec, Vec_tuple,
-    Entity,
+    Property, Entity,
 )
 
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
@@ -101,7 +102,7 @@ VAC_CONFIGS = {}
 
 
 @make_result_setup('CustVactube')
-def res_vactube_setup(res):
+def res_vactube_setup(res: Property):
     group = res['group', 'DEFAULT_GROUP']
 
     if group not in VAC_CONFIGS:
@@ -146,13 +147,14 @@ def res_vactube_setup(res):
                 size = 1
                 file = prop.value
 
-            inst_configs[resolve_inst(file)[0]] = conf, srctools.conv_int(size, 1)
+            for inst in instanceLocs.resolve(file):
+                inst_configs[inst] = conf, srctools.conv_int(size, 1)
 
     return group
 
 
 @make_result('CustVactube')
-def res_make_vactubes(_, res):
+def res_make_vactubes(res: Property):
     """Speciallised result to generate vactubes from markers.
 
     Only runs once, and then quits the condition list.
@@ -375,11 +377,11 @@ def make_corner(origin, angle, size, config):
 
     temp = config['corner_temp', size]
     if temp:
-        temp_solids = import_template(
+        temp_solids = template_brush.import_template(
             temp,
             origin=origin,
             angles=Vec.from_str(angle),
-            force_type=TEMP_TYPES.world,
+            force_type=template_brush.TEMP_TYPES.world,
         ).world
         for solid in temp_solids:
             vbsp.VMF.remove_brush(solid)

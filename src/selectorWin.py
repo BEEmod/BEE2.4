@@ -20,6 +20,7 @@ import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
 from srctools import Vec, EmptyMapping
+from srctools.filesys import FileSystem, FileSystemChain
 import tkMarkdown
 import sound
 import utils
@@ -71,6 +72,8 @@ class NAV_KEYS(Enum):
 
     HOME = 'Home'
     END = 'End'
+
+    ENTER = 'Return'
 
     # Space plays the current item.
     PLAY_SOUND = 'space'
@@ -367,7 +370,7 @@ class selWin:
             *,  # Make all keyword-only for readability
             has_none=True,
             has_def=True,
-            has_snd_sample=False,
+            sound_sys: FileSystem=None,
             modal=False,
             # i18n: 'None' item description
             none_desc=_('Do not add anything.'),
@@ -391,8 +394,9 @@ class selWin:
           of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
-        - If has_snd_sample is True, a '>' button will appear next to names
+        - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
+          The value should be a FileSystem to look for samples in.
         - none_desc holds an optional description for the <none> Item,
           which can be used to describe what it results in.
         - title is the title of the selector window.
@@ -400,7 +404,7 @@ class selWin:
          changes.
         - callback_params is a list of additional values which will be
           passed to the callback function.
-          The first arguement to the callback is always the selected item ID.
+          The first argument to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
           context menu.
         - attributes is a list of AttrDef tuples.
@@ -413,10 +417,10 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            name='NONE',
+            name=_('NONE'),
             short_name='',
             icon='BEE2/none_96.png',
-            desc=tkMarkdown.convert(none_desc),
+            desc=none_desc,
             attributes=dict(none_attrs),
         )
 
@@ -452,7 +456,15 @@ class selWin:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
-        self.selected = self.item_list[0]  # type: Item
+        try:
+            self.selected = self.item_list[0]  # type: Item
+        except IndexError:
+            LOGGER.error('No items for window "{}"!', title)
+            # We crash without items, forcefully add the None item in so at
+            # least this works.
+            self.item_list = [self.noneItem]
+            self.selected = self.noneItem
+            
         self.orig_selected = self.selected
         self.parent = tk
         self._readonly = False
@@ -466,7 +478,7 @@ class selWin:
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
 
-        self.win.iconbitmap('../BEE2.ico')
+        tk_tools.set_window_icon(self.win)
 
         # Run our quit command when the exit button is pressed, or Escape
         # on the keyboard.
@@ -575,6 +587,7 @@ class selWin:
             name_frame,
             text="Item",
             justify=CENTER,
+            width=-10,
             font=("Helvetica", 12, "bold"),
         )
         name_frame.grid(row=1, column=0, columnspan=4)
@@ -582,7 +595,7 @@ class selWin:
         self.prop_name.grid(row=0, column=0)
 
         # For music items, add a '>' button to play sound samples
-        if has_snd_sample and sound.initiallised:
+        if sound_sys is not None and sound.initiallised:
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 text=BTN_PLAY,
@@ -603,6 +616,7 @@ class selWin:
             self.sampler = sound.SamplePlayer(
                 stop_callback=set_samp_play,
                 start_callback=set_samp_stop,
+                system=sound_sys,
             )
             samp_button['command'] = self.sampler.play_sample
             utils.bind_leftclick(self.prop_icon, self.sampler.play_sample)
@@ -740,14 +754,19 @@ class selWin:
             )
 
             item.win = self.win
-            utils.bind_leftclick(
-                item.button,
-                functools.partial(self.sel_item, item),
-            )
-            utils.bind_leftclick_double(
-                item.button,
-                self.save,
-            )
+
+            @utils.bind_leftclick(item.button)
+            def click_item(event=None, *, _item=item):
+                """Handle clicking on the item.
+
+                If it's already selected, save and close the window.
+                """
+                # We need to capture the item in a default, since it's
+                # the same variable in different iterations
+                if _item is self.selected:
+                    self.save()
+                else:
+                    self.sel_item(_item)
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(self.grouped_items)
@@ -1087,6 +1106,9 @@ class selWin:
         if key is NAV_KEYS.PLAY_SOUND:
             if self.sampler is not None:
                 self.sampler.play_sample()
+            return
+        elif key is NAV_KEYS.ENTER:
+            self.save()
             return
 
         # A list of groups names, in the order that they're visible onscreen

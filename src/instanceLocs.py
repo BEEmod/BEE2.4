@@ -4,18 +4,37 @@ This way VBSP_config files can generically refer to items, and work in
 multiple styles.
 """
 import logging
+import re
 from collections import defaultdict
 from functools import lru_cache
 
 import utils
 from srctools import Property
 
-from typing import Optional, List, Dict
+from typing import (
+    Optional, Union, T,
+    List, Dict, Tuple,
+)
 
 LOGGER = utils.getLogger(__name__)
 
 # The list of instance each item uses.
 INSTANCE_FILES = {}
+
+# Item ID and index/special name for instances set in editoritems.
+# Note this is imperfect - two items could reuse the same instance.
+ITEM_FOR_FILE = {}  # type: Dict[str, Tuple[str, Union[int, str]]]
+
+_RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
+_RE_SUBITEMS = re.compile(r'''
+    \s*<
+    \s*([^:]+)
+    \s*(?:
+    : \s*
+    ([^>:]+)
+    )?
+    \s*>\s*
+''', re.VERBOSE)
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
@@ -85,7 +104,7 @@ SPECIAL_INST = {
     # for toggle/timer panels:
     'indPanCheck':  '<ITEM_INDICATOR_PANEL>',
     'indPanTimer':  '<ITEM_INDICATOR_PANEL_TIMER>',
-    # 'indpan' is defined below from these two
+    'indPan': '<ITEM_INDICATOR_PANEL>, <ITEM_INDICATOR_PANEL_TIMER>',
 
     # The values in ITEM_EXIT_DOOR aren't actually used!
     'door_frame_sp': '<ITEM_ENTRY_DOOR:7,8>',
@@ -96,6 +115,20 @@ SPECIAL_INST = {
     'door_frame_coop': '<ITEM_COOP_EXIT_DOOR:4,5>',
     'white_frame_coop': '<ITEM_COOP_EXIT_DOOR:4>',
     'black_frame_coop': '<ITEM_COOP_EXIT_DOOR:5>',
+
+    # Combinations of above
+    'door_frame': '<ITEM_ENTRY_DOOR:7,8>, <ITEM_COOP_EXIT_DOOR:4,5>',
+    'white_frame': '<ITEM_ENTRY_DOOR:7>, <ITEM_COOP_EXIT_DOOR:4>',
+    'black_frame': '<ITEM_ENTRY_DOOR:8>, <ITEM_COOP_EXIT_DOOR:5>',
+
+    # Arrival_departure_ents is set in both entry doors - it's usually the same
+    # though.
+    'transitionents': '<ITEM_ENTRY_DOOR:11>, <ITEM_COOP_ENTRY_DOOR:4>',
+
+    # Convenience, both parts of laser items:
+    'laserEmitter': '<ITEM_LASER_EMITTER_CENTER>, <ITEM_LASER_EMITTER_OFFSET>',
+    'laserCatcher': '<ITEM_LASER_CATCHER_CENTER>, <ITEM_LASER_CATCHER_OFFSET>',
+    'laserRelay': '<ITEM_LASER_RELAY_CENTER>, <ITEM_LASER_RELAY_OFFSET>',
 }
 
 # The resolved versions of SPECIAL_INST
@@ -176,76 +209,38 @@ SUBITEMS = {
     'fizz_model': 1,
 }
 
+SPECIAL_INST_FOLDED = {
+    key.casefold(): value
+    for key, value in
+    SPECIAL_INST.items()
+}
+
 
 def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
+    # Normal instances: index -> filename
     for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.name] = [
-            inst.value.casefold()
-            for inst in
-            prop
-        ]
+        INSTANCE_FILES[prop.name] = inst_list = []
+        for ind, inst in enumerate(prop):
+            file = inst.value.casefold()
+            inst_list.append(file)
+            ITEM_FOR_FILE[file] = (prop.name, ind)
 
+    # Extra definitions: key -> filename
     for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.name] = {
-            inst.name: inst.value.casefold()
-            for inst in
-            prop
-        }
+        CUST_INST_FILES[prop.name] = special_inst = {}
+        for inst in prop:
+            file = inst.value.casefold()
+            special_inst[inst.name] = file
+            ITEM_FOR_FILE[file] = (prop.name, inst.name)
 
     INST_SPECIAL = {
         key.casefold(): resolve(val_string, silent=True)
         for key, val_string in
         SPECIAL_INST.items()
     }
-
-    # Several special items which use multiple item types!
-
-    # Checkmark and Timer indicator panels:
-    INST_SPECIAL['indpan'] = (
-        INST_SPECIAL['indpancheck'] +
-        INST_SPECIAL['indpantimer']
-    )
-
-    INST_SPECIAL['door_frame'] = (
-        INST_SPECIAL['door_frame_sp'] +
-        INST_SPECIAL['door_frame_coop']
-    )
-
-    INST_SPECIAL['white_frame'] = (
-        INST_SPECIAL['white_frame_sp'] +
-        INST_SPECIAL['white_frame_coop']
-    )
-
-    INST_SPECIAL['black_frame'] = (
-        INST_SPECIAL['black_frame_sp'] +
-        INST_SPECIAL['black_frame_coop']
-    )
-
-    # Arrival_departure_ents is set in both entry doors - it's usually the same
-    # though.
-    INST_SPECIAL['transitionents'] = (
-        resolve('<ITEM_ENTRY_DOOR:11>') +
-        resolve('<ITEM_COOP_ENTRY_DOOR:4>')
-    )
-
-    # Laser items have the offset and centered item versions.
-    INST_SPECIAL['lasercatcher'] = (
-        resolve('<ITEM_LASER_CATCHER_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_CATCHER_OFFSET>', silent=True)
-    )
-
-    INST_SPECIAL['laseremitter'] = (
-        resolve('<ITEM_LASER_EMITTER_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_EMITTER_OFFSET>', silent=True)
-    )
-
-    INST_SPECIAL['laserrelay'] = (
-        resolve('<ITEM_LASER_RELAY_CENTER>', silent=True) +
-        resolve('<ITEM_LASER_RELAY_OFFSET>', silent=True)
-    )
 
 
 def resolve(path, silent=False) -> List[str]:
@@ -265,6 +260,8 @@ def resolve(path, silent=False) -> List[str]:
     if it's invalid. Incorrect [] will raise an exception (since these are
     hardcoded).
     When using <> values, "" filenames will be skipped.
+    Multiple paths can be used in the same string (other than raw paths):
+    "<ITEM_ID>, [spExitCorridor], <ITEM_2:0>"...
 
     If silent is True, no error messages will be output (for use with hardcoded
     names).
@@ -279,112 +276,126 @@ def resolve(path, silent=False) -> List[str]:
         return _resolve(path)
 
 
+def resolve_one(path, default: T='', error=False) -> Union[str, T]:
+    """Resolve a path into one instance.
+
+    If multiple are given, this returns the first.
+    If none are found, the default is returned (which may be any value).
+    If error is True, an exception will be raised instead.
+    """
+    instances = resolve(path)
+    if not instances:
+        if error:
+            raise ValueError('Path "{}" has no instances!'.format(path))
+        return default
+    if len(instances) > 1:
+        if error:
+            raise ValueError('Path "{}" has multiple instances!'.format(path))
+        LOGGER.warning('Path "{}" returned multiple instances', path)
+    return instances[0]
+
+
 # Cache the return values, since they're constant.
 @lru_cache(maxsize=256)
 def _resolve(path):
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
     """
-
-    if path.startswith('<') and path.endswith('>'):
-        path = path[1:-1]
-        if ':' in path:  # We have a set of subitems to parse
-            item, subitem = path.split(':')
-            item = item.casefold()
-            try:
-                item_values = INSTANCE_FILES[item]
-            except KeyError:
-                LOGGER.warning(
-                    '"{}" not a valid item!',
-                    item,
-                )
-                return []
-            cust_item_vals = CUST_INST_FILES[item]
-            out = []
-            if not subitem:
-                # <ITEM_ID:> gives all items + subitems...
-                return [
-                    inst for inst in
-                    item_values
-                    if inst != ''
-                ] + list(CUST_INST_FILES[item].values())
-            for val in subitem.split(','):
-                folded_value = val.strip().casefold()
-                if folded_value.startswith('bee2_'):
-                    # A custom value...
-                    try:
-                        out.append(cust_item_vals[folded_value[5:]])
-                        continue
-                    except KeyError:
-                        LOGGER.warning(
-                            'Invalid custom instance name - "{}" for '
-                            '<{}> (Valid: {!r})',
-                            folded_value[5:],
-                            item,
-                            cust_item_vals,
-                        )
-                        return []
-
-                ind = SUBITEMS.get(folded_value, None)
-
-                if ind is None:
-                    try:
-                        ind = int(folded_value)
-                    except ValueError:
-                        LOGGER.info('--------\nValid subitems:')
-                        LOGGER.info('\n'.join(
-                            ('> ' + k + ' = ' + str(v))
-                            for k, v in
-                            SUBITEMS.items()
-                        ))
-                        LOGGER.info('--------')
-                        raise Exception(
-                            '"' + val + '" is not a valid instance'
-                            ' subtype or index!'
-                        )
-                # SUBITEMS has tuple values, which represent multiple subitems.
-                if isinstance(ind, tuple):
-                    out.extend(ind)
+    groups = _RE_DEFS.findall(path)
+    if groups:
+        out = []
+        for group in groups:
+            if group[0] == '<':
+                item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
+                item_id = item_id.casefold()
+                try:
+                    item_inst = INSTANCE_FILES[item_id]
+                except KeyError:
+                    LOGGER.warning(
+                        '"{}" not a valid item!',
+                        item_id,
+                    )
+                    return []
+                if subitems:
+                    out.extend(get_subitems(subitems, item_inst, item_id))
                 else:
-                    out.append(ind)
+                    # It's just the <item_id>, return all the values
+                    out.extend(item_inst)
 
-            # Convert to instance lists
-            inst_out = []
-            for ind in out:
-                if isinstance(ind, str):
-                    inst_out.append(ind)
+            elif group[0] == '[':
+                special_name = group[1:-1].casefold()
+                try:
+                    out.extend(INST_SPECIAL[special_name])
+                except KeyError:
+                    LOGGER.warning('"{}" not a valid instance category!', special_name)
                     continue
+            else:
+                raise Exception(group)
+        # Remove "" from the output.
+        return list(filter(None, out))
+    else:
+        return [path.casefold()]
 
-                # Only use if it's actually in range
-                if 0 <= ind < len(item_values):
-                    # Skip "" instance blocks
-                    if item_values[ind] != '':
-                        inst_out.append(item_values[ind])
-            return inst_out
-        else:
-            # It's just the <item_id>, return all the values
+
+def get_subitems(comma_list, item_inst, item_id) -> List[str]:
+    """Pick out the subitems from a list."""
+    output = []
+    for val in comma_list.split(','):
+        folded_value = val.strip().casefold()
+        if folded_value.startswith('bee2_'):
+            # A custom value...
+            bee_inst = CUST_INST_FILES[item_id]
             try:
-                # Skip "" instances
-                return [
-                    inst for inst in
-                    INSTANCE_FILES[path.casefold()]
-                    if inst != ''
-                    ]
+                output.append(bee_inst[folded_value[5:]])
+                continue
             except KeyError:
                 LOGGER.warning(
-                    '"{}" not a valid item!',
-                    path,
+                    'Invalid custom instance name - "{}" for '
+                    '<{}> (Valid: {!r})',
+                    folded_value[5:],
+                    item_id,
+                    bee_inst,
                 )
-                return []
-    elif path.startswith('[') and path.endswith(']'):
-        path = path[1:-1].casefold()
-        try:
-            return INST_SPECIAL[path]
-        except KeyError:
-            LOGGER.warning('"{}" not a valid instance category!', path)
-            return []
-    else:  # Just a normal path
-        return [path.casefold()]
+                continue
+
+        ind = SUBITEMS.get(folded_value, None)
+
+        if ind is None:
+            try:
+                ind = int(folded_value)
+            except ValueError:
+                LOGGER.info('--------\nValid subitems:')
+                LOGGER.info('\n'.join(
+                    ('> ' + k + ' = ' + str(v))
+                    for k, v in
+                    SUBITEMS.items()
+                ))
+                LOGGER.info('--------')
+                raise Exception(
+                    '"' + val + '" is not a valid instance'
+                                ' subtype or index!'
+                )
+        # SUBITEMS has tuple values, which represent multiple subitems.
+        if isinstance(ind, tuple):
+            output.extend(ind)
+        else:
+            output.append(ind)
+
+    # Convert to instance lists
+    inst_out = []
+    for ind in output:
+        # bee_ instance, already evaluated
+        if isinstance(ind, str):
+            inst_out.append(ind)
+            continue
+
+        # Only use if it's actually in range
+        if 0 <= ind < len(item_inst):
+            # Skip "" instance blocks
+            if item_inst[ind] != '':
+                inst_out.append(item_inst[ind])
+    return inst_out
+
 
 # Copy over the lru_cache() functions to make them easily acessable.
 resolve.cache_info = _resolve.cache_info
@@ -407,11 +418,13 @@ def get_special_inst(name: str):
         raise KeyError("Invalid special instance name! ({})".format(name))
 
     # The number you'll get is fixed, so it's fine if we return different
-    # types - unpack single instances, since that's what you want most of the
-    # time.
-    if len(inst) == 1:
+    # types.
+    # Unpack single instances, since that's what you want most of the
+    # time. We only do that if there's no ',' in the <> lookup, so it doesn't
+    # affect
+    if len(inst) == 1 and ',' not in SPECIAL_INST_FOLDED[name.casefold()]:
         return inst[0]
     elif len(inst) == 0:
-        return None  # No value
+        return ()
     else:
         return inst

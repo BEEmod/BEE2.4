@@ -24,7 +24,6 @@ EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
-    'dis',  # From inspect, not needed
     'lzma',  # We use this for packages, but not in VBSP & VRAD
     'optparse',  # Used in calendar.__main__
     'pprint',  # From pickle, not needed
@@ -81,7 +80,7 @@ INCLUDES += [
     condition_modules
 ]
 
-bee_version = input('BEE2 Version: ')
+bee_version = input('BEE2 Version (or blank for dev): ')
 
 setup(
     name='VBSP_VRAD',
@@ -98,6 +97,10 @@ setup(
                 # later.
                 cond=';'.join(condition_modules),
             ),
+
+            # Include all modules in the zip..
+            'zip_include_packages': '*',
+            'zip_exclude_packages': '',
         },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '

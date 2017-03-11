@@ -5,6 +5,7 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import template_brush
 import utils
 import vbsp
 import vbsp_options
@@ -13,7 +14,7 @@ from conditions import (
     Condition, make_result, make_result_setup,
     CONNECTIONS,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
 # Map sign_type values to the item ID and the resolveInst ID.
@@ -27,7 +28,7 @@ LOGGER = utils.getLogger(__name__, alias='cond.custItems')
 
 
 @make_result_setup('custOutput')
-def res_cust_output_setup(res):
+def res_cust_output_setup(res: Property):
     conds = [
         Condition.parse(sub_res)
         for sub_res in res
@@ -49,7 +50,7 @@ def res_cust_output_setup(res):
 
 
 @make_result('custOutput')
-def res_cust_output(inst, res):
+def res_cust_output(inst: Entity, res: Property):
     """Add an additional output to the instance with any values.
 
     Always points to the targeted item.
@@ -80,11 +81,11 @@ def res_cust_output(inst, res):
         if out.target != toggle_name:
             targets[out.target].append(out)
 
-    pan_files = resolve_inst('[indPan]')
+    pan_files = instanceLocs.resolve('[indPan]')
 
     # These all require us to search through the instances.
     if force_sign_type or dec_con_count or targ_conditions:
-        for con_inst in vbsp.VMF.by_class['func_instance']:  # type: VLib.Entity
+        for con_inst in vbsp.VMF.by_class['func_instance']:  # type: Entity
             if con_inst['targetname'] not in targets:
                 # Not our instance
                 continue
@@ -99,7 +100,7 @@ def res_cust_output(inst, res):
                 # Overwrite the signage instance, and then add the
                 # appropriate outputs to control it.
                 sign_id, sign_file_id = force_sign_type
-                con_inst['file'] = resolve_inst(sign_file_id)[0]
+                con_inst['file'] = instanceLocs.resolve_one(sign_file_id, error=True)
 
                 # First delete the original outputs:
                 for out in targets[con_inst['targetname']]:
@@ -213,7 +214,7 @@ def res_cust_antline_setup(res: Property):
 
 
 @make_result('custAntline')
-def res_cust_antline(inst, res):
+def res_cust_antline(inst: Entity, res: Property):
     """Customise the output antline texture, toggle instances.
 
     This allows adding extra outputs between the instance and the toggle.
@@ -267,7 +268,7 @@ def res_cust_antline(inst, res):
 
 
 @make_result_setup('changeOutputs')
-def res_change_outputs_setup(res):
+def res_change_outputs_setup(res: Property):
     return [
         (
             Output.parse_name(prop.real_name),
@@ -279,13 +280,13 @@ def res_change_outputs_setup(res):
 
 
 @make_result('changeOutputs')
-def res_change_outputs(inst: Entity, res):
+def res_change_outputs(inst: Entity, res: Property):
     """Switch the outputs on an instance.
 
     Each child is a original -> replace value. These match the values
     in editoritems.txt. Use a blank value to indicate it should be deleted.
     """
-    for output in inst.outputs[:]:  # type: VLib.Output
+    for output in inst.outputs[:]:  # type: Output
         for (orig_name, orig_comm), rep in res.value:
             if output.inst_out == orig_name and output.output == orig_comm:
                 if rep == (None, ''):
@@ -313,7 +314,7 @@ def res_change_inputs_setup(res: Property):
 
 
 @make_result('changeInputs')
-def res_change_inputs(inst: Entity, res):
+def res_change_inputs(inst: Entity, res: Property):
     """Switch the inputs for an instance.
 
     Each child is an input to replace. The name is the original input, matching
@@ -331,7 +332,7 @@ def res_change_inputs(inst: Entity, res):
 
     # ReplaceInstance might make some not instances anymore..
     for inst in vbsp.VMF.entities:
-        for out in inst.outputs[:]:  # type: VLib.Output
+        for out in inst.outputs[:]:  # type: Output
             if out.target.casefold() != name:
                 continue
 
@@ -399,11 +400,11 @@ def res_faith_mods(inst: Entity, res: Property):
             for solid in trig.solids:
                 solid.translate(offset)
         elif trig_temp:
-            trig.solids = conditions.import_template(
+            trig.solids = template_brush.import_template(
                 temp_name=trig_temp,
                 origin=trig_origin,
                 angles=Vec.from_str(inst['angles']),
-                force_type=conditions.TEMP_TYPES.world,
+                force_type=template_brush.TEMP_TYPES.world,
             ).world
             # Remove the trigger solids from worldspawn..
             for solid in trig.solids:

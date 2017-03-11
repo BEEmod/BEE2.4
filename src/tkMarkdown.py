@@ -12,12 +12,21 @@ LOGGER = utils.getLogger(__name__)
 
 # These tags if present simply add a TK tag.
 SIMPLE_TAGS = {
-    'u': ('underline',),
-    'strong': ('bold',),
-    'em': ('italic',),
+    'u': 'underline',
+    'strong': 'bold',
+    'em': 'italic',
     # Blockquotes become white-on-black text
-    'blockquote': ('invert',),
-    'li': ('indent', ),
+    'blockquote': 'invert',
+    'li': 'indent',
+
+    # The parser will already split these into their own line,
+    # add paragraphs - we just increase font size.
+    'h1': 'heading_1',
+    'h2': 'heading_2',
+    'h3': 'heading_3',
+    'h4': 'heading_4',
+    'h5': 'heading_5',
+    'h6': 'heading_6',
 }
 
 UL_START = '\u2022 '
@@ -44,6 +53,12 @@ class MarkdownData:
     def __bool__(self):
         """Empty data is false."""
         return bool(self.tags)
+
+    def copy(self) -> 'MarkdownData':
+        """Create and return a duplicate of this object."""
+        return MarkdownData(self.tags, self.links.copy())
+
+    __copy__ = copy
 
 
 def iter_elemtext(elem: etree.Element, parent_path=()):
@@ -122,11 +137,19 @@ def parse_html(element: etree.Element):
             # Don't output these internal values.
             continue
 
+        force_return = False
+
         tk_tags = set()
         for tag in {elem.tag for elem in path}:
             # Simple tags are things like strong, u - no additional value.
             if tag in SIMPLE_TAGS:
-                tk_tags.update(SIMPLE_TAGS[tag])
+                to_add = SIMPLE_TAGS[tag]
+                if isinstance(to_add, str):
+                    tk_tags.add(to_add)
+                else:
+                    tk_tags.update(to_add)
+            if tag in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                force_return = True
 
         # Handle links.
         for elem in path:
@@ -145,6 +168,10 @@ def parse_html(element: etree.Element):
 
         yield text
         yield tuple(tk_tags)
+
+        if force_return:
+            yield '\n'
+            yield ()
 
     yield links
 

@@ -11,9 +11,9 @@ import shutil
 import random
 import itertools
 from enum import Enum
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, Counter
 
-from srctools import Property, Vec, AtomicWriter
+from srctools import Property, Vec, AtomicWriter, Entity
 from BEE2_config import ConfigFile
 import srctools.vmf as VLib
 import srctools
@@ -23,7 +23,11 @@ import instanceLocs
 import brushLoc
 import bottomlessPit
 import conditions
+import connections
+import instance_traits
+import template_brush
 import comp_consts as consts
+import conditions.globals
 
 from typing import (
     Dict, Tuple, List
@@ -63,12 +67,9 @@ TEX_VALVE = {
     consts.Special.BACKPANELS_CHEAP: "special.behind",
     consts.Special.PED_SIDE: "special.pedestalside",
     consts.Special.SQUAREBEAMS: "special.edge",
-    consts.Goo.REFLECTIVE: "special.goo",
-    consts.Goo.CHEAP: "special.goo_cheap",
     consts.Special.GLASS: "special.glass",
     consts.Special.GRATING: "special.grating",
     consts.Special.LASERFIELD: "special.laserfield",
-    "sky_black": "special.sky",
 }
 
 
@@ -89,6 +90,10 @@ TEX_DEFAULTS = [
     (consts.BlackPan.BLACK_2,  'black.wall'),
     (consts.BlackPan.BLACK_2x2,  'black.2x2'),
     (consts.BlackPan.BLACK_4x4,  'black.4x4'),
+
+    # This must be specially handled, switching between these.
+    (consts.Goo.REFLECTIVE, 'special.goo'),
+    (consts.Goo.CHEAP, 'special.goo_cheap'),
 
     # These replacements are deactivated when unset
     ('', 'special.white'),
@@ -118,6 +123,10 @@ TEX_DEFAULTS = [
     ('', 'overlay.antlinebrokencorner'),
     ('', 'overlay.antlinebrokenfloor'),
     ('', 'overlay.antlinebrokenfloorcorner'),
+
+    # If set and enabled, adds frames for >10 sign pairs
+    # to distinguish repeats.
+    ('', 'overlay.shapeframe'),
 
     # Only used if set - replace the decals with textures
     ('', 'special.bullseye_white_wall'),
@@ -296,7 +305,7 @@ def load_settings():
     """Load in all our settings from vbsp_config."""
     global BEE2_config
     try:
-        with open("bee2/vbsp_config.cfg") as config:
+        with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
             conf = Property.parse(config, 'bee2/vbsp_config.cfg')
     except FileNotFoundError:
         LOGGER.warning('Error: No vbsp_config file!')
@@ -344,6 +353,9 @@ def load_settings():
         for var in stylevar_block:
             settings['style_vars'][
                 var.name.casefold()] = srctools.conv_bool(var.value)
+
+    # Load in templates.
+    template_brush.load_templates()
 
     # Load in the config file holding item data.
     # This is used to lookup item's instances, or their connection commands.
@@ -415,10 +427,15 @@ def load_settings():
 
     # Find the location of the BEE2 app, and load the options
     # set in the 'Compiler Pane'.
-    if vbsp_options.get(str, 'BEE2_loc'):
+    bee2_loc = vbsp_options.get(str, 'BEE2_loc')
+    if bee2_loc:
         BEE2_config = ConfigFile(
             'config/compile.cfg',
-            root=vbsp_options.get(str, 'BEE2_loc'),
+            root=bee2_loc,
+        )
+        vbsp_options.ITEM_CONFIG = ConfigFile(
+            'config/item_cust_configs.cfg',
+            root=bee2_loc,
         )
     else:
         BEE2_config = ConfigFile(None)
@@ -438,7 +455,7 @@ def load_map(map_path):
 
 
 @conditions.meta_cond(priority=100)
-def add_voice(_):
+def add_voice():
     """Add voice lines to the map."""
     voiceLine.add_voice(
         has_items=settings['has_attr'],
@@ -450,7 +467,7 @@ def add_voice(_):
 
 
 @conditions.meta_cond(priority=-250)
-def add_fizz_borders(_):
+def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
     This is used in 50s and BTS styles.
@@ -563,7 +580,7 @@ def add_fizz_borders(_):
 
 
 @conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst):
+def fix_fizz_models(inst: Entity):
     """Fix some bugs with fizzler model instances.
     This removes extra numbers from model instances, which prevents
     inputs from being read correctly.
@@ -594,7 +611,7 @@ def fix_fizz_models(inst):
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
-def static_pan(inst):
+def static_pan(inst: Entity):
     """Switches glass angled panels to static instances, if needed."""
     if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
         # white/black are found via the func_brush
@@ -609,7 +626,7 @@ PANEL_FAITH_TARGETS = defaultdict(list)
 
 
 @conditions.meta_cond(-1000)
-def find_panel_locs(_):
+def find_panel_locs():
     """Find the locations of panels, used for FaithBullseye."""
 
     non_panel_mats = {
@@ -654,7 +671,7 @@ def find_panel_locs(_):
 
 
 @conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res):
+def res_faith_bullseye_check(res: Property):
     """Do a check to ensure there are actually textures availble."""
     for col in ('white', 'black'):
         for orient in ('wall', 'floor', 'ceiling'):
@@ -666,7 +683,7 @@ def res_faith_bullseye_check(res):
 
 
 @conditions.make_result('FaithBullseye')
-def res_faith_bullseye(inst, res):
+def res_faith_bullseye(inst: Entity, res: Property):
     """Replace the bullseye instances with textures instead."""
 
     pos = Vec(0, 0, -64).rotate_by_str(inst['angles'])
@@ -763,7 +780,7 @@ FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def anti_fizz_bump(inst):
+def anti_fizz_bump():
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
     This makes it more difficult to portal-bump through an active fizzler.
@@ -855,7 +872,7 @@ PLAYER_MODELS = {
 
 
 @conditions.meta_cond(priority=400, only_once=True)
-def set_player_model(_):
+def set_player_model():
     """Set the player model in SinglePlayer."""
 
     # Add the model changer instance.
@@ -942,7 +959,7 @@ def set_player_model(_):
 
 
 @conditions.meta_cond(priority=500, only_once=True)
-def set_player_portalgun(inst):
+def set_player_portalgun():
     """Controls which portalgun the player will be given.
 
     This does not apply to coop. It checks the 'blueportal' and
@@ -1025,7 +1042,7 @@ def set_player_portalgun(inst):
 
 
 @conditions.meta_cond(priority=750, only_once=True)
-def add_screenshot_logic(inst):
+def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
@@ -1040,7 +1057,7 @@ def add_screenshot_logic(inst):
 
 
 @conditions.meta_cond(priority=100, only_once=True)
-def add_fog_ents(_):
+def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
     VMF.create_ent(
@@ -1142,7 +1159,7 @@ def add_fog_ents(_):
 
 
 @conditions.meta_cond(priority=50, only_once=True)
-def set_elev_videos(_):
+def set_elev_videos():
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
 
@@ -1189,79 +1206,6 @@ def set_elev_videos(_):
     PACK_FILES.add('scripts/vscripts/' + script)
 
 
-@conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(_):
-    """Perform modifications for Aperture Tag.
-
-    * All fizzlers will be combined with a trigger_paint_cleanser
-    * Paint is always present in every map!
-    * Suppress ATLAS's Portalgun in coop
-    * Override the transition ent instance to have the Gel Gun
-    * Create subdirectories with the user's steam ID
-    """
-    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
-        return  # Wrong game!
-
-    LOGGER.info('Performing Aperture Tag modifications...')
-
-    has = settings['has_attr']
-    # This will enable the PaintInMap property.
-    has['Gel'] = True
-
-    # Set as if the player spawned with no pgun
-    has['spawn_dual'] = False
-    has['spawn_single'] = False
-    has['spawn_nogun'] = True
-
-    for fizz in VMF.by_class['trigger_portal_cleanser']:
-        p_fizz = fizz.copy()
-        p_fizz['classname'] = 'trigger_paint_cleanser'
-        VMF.add_ent(p_fizz)
-
-        if p_fizz['targetname'].endswith('_brush'):
-            p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
-
-        del p_fizz['drawinfastreflection']
-        del p_fizz['visible']
-        del p_fizz['useScanline']
-
-        for side in p_fizz.sides():
-            side.mat = 'tools/toolstrigger'
-            side.scale = 0.25
-
-    if GAME_MODE == 'COOP':
-        VMF.create_ent(
-            classname='info_target',
-            targetname='supress_blue_portalgun_spawn',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            angles='0 0 0'
-        )
-
-    transition_ents = instanceLocs.get_special_inst('transitionents')
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() not in transition_ents:
-            continue
-        inst['file'] = 'instances/bee2/transition_ents_tag.vmf'
-
-    # Because of a bug in P2, these folders aren't created automatically.
-    # We need a folder with the user's ID in portal2/maps/puzzlemaker.
-    try:
-        puzz_folders = os.listdir('../aperturetag/puzzles')
-    except FileNotFoundError:
-        LOGGER.warning("Aperturetag/puzzles/ doesn't exist??")
-    else:
-        for puzz_folder in puzz_folders:
-            new_folder = os.path.abspath(os.path.join(
-                '../portal2/maps/puzzlemaker',
-                puzz_folder,
-            ))
-            LOGGER.info('Creating', new_folder)
-            os.makedirs(
-                new_folder,
-                exist_ok=True,
-            )
-
-
 def get_map_info():
     """Determine various attributes about the map.
 
@@ -1282,14 +1226,14 @@ def get_map_info():
 
     # These have multiple instances, so 'in' must be used.
     # If both frames are set to "", get_special returns None so fix that.
-    file_coop_corr = instanceLocs.get_special_inst('coopCorr') or ()
-    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr') or ()
-    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr') or ()
-    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp') or ()
-    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop') or ()
+    file_coop_corr = instanceLocs.get_special_inst('coopCorr')
+    file_sp_entry_corr = instanceLocs.get_special_inst('spEntryCorr')
+    file_sp_exit_corr = instanceLocs.get_special_inst('spExitCorr')
+    file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
+    file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
-    file_ind_panel = instanceLocs.get_special_inst('indpan') or ()
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle') or ()
+    file_ind_panel = instanceLocs.get_special_inst('indpan')
+    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
 
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
@@ -1687,7 +1631,7 @@ def fixup_goo_sides():
     """
 
     if vbsp_options.get(str, 'goo_wall_scale_temp'):
-        scale = conditions.get_scaling_template(
+        scale = template_brush.get_scaling_template(
             vbsp_options.get(str, 'goo_wall_scale_temp')
         )
     else:
@@ -1796,7 +1740,7 @@ def remove_static_ind_toggles():
 
 
 @conditions.meta_cond(priority=-50)
-def set_barrier_frame_type(_):
+def set_barrier_frame_type():
     """Set a $type instvar on glass frame.
 
     This allows using different instances on glass and grating.
@@ -1854,11 +1798,7 @@ def remove_barrier_ents():
 
     They're not used since we added their contents into the map directly.
     """
-    if (
-        not vbsp_options.get(str, 'grating_clip') or
-        not vbsp_options.get(str, 'glass_clip') or
-        vbsp_options.get(bool, 'keep_barrier_inst')
-    ):
+    if vbsp_options.get(bool, 'keep_barrier_inst'):
         return  # They're being used.
 
     barrier_file = instanceLocs.resolve('[glass_128]')
@@ -1898,7 +1838,7 @@ def change_brush():
 
     glass_temp = vbsp_options.get(str, "glass_template")
     if glass_temp:
-        glass_temp = conditions.get_scaling_template(glass_temp)
+        glass_temp = template_brush.get_scaling_template(glass_temp)
     else:
         glass_temp = None
 
@@ -1916,6 +1856,9 @@ def change_brush():
     if vbsp_options.get(bool, 'remove_pedestal_plat'):
         # Remove the pedestal platforms
         for ent in VMF.by_class['func_detail']:
+            if ent in IGNORED_BRUSH_ENTS:
+                continue
+
             for side in ent.sides():
                 if side.mat.casefold() == 'plastic/plasticwall004a':
                     VMF.remove_ent(ent)
@@ -1925,6 +1868,28 @@ def change_brush():
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
 
     highest_brush = 0
+
+    # Calculate the z-level with the largest number of goo brushes,
+    # so we can ensure the 'fancy' pit is the largest one.
+    # Valve just does it semi-randomly.
+    goo_heights = Counter()
+    for pos, block in brushLoc.POS.items():
+        if block.is_goo and block.is_top:
+            # Block position is the center,
+            # save at the height of the top face
+            goo_heights[brushLoc.g2w(pos).z + 32] += 1
+    # Find key with the highest value = z-level with highest brush.
+    try:
+        best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+    except ValueError:
+        # No goo in the map, it's fine.
+        best_goo = 0
+
+    LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
+
+    # This needs to be a func_brush, otherwise the clip texture data will be
+    # merged with other clips.
+    glass_clip_ent = VMF.create_ent(classname='func_brush', solidbsp=1)
 
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
@@ -1942,6 +1907,14 @@ def change_brush():
                     )
                 # Apply goo scaling
                 face.scale = goo_scale
+                # Use fancy goo on the level with the
+                # highest number of blocks.
+                # All plane z are the same.
+                face.mat = get_tex(
+                    'special.goo' if
+                    face.planes[0].z == best_goo
+                    else 'special.goo_cheap'
+                )
             if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
                     try:
@@ -1961,9 +1934,13 @@ def change_brush():
                 solid.get_origin(),
                 glass_clip_mat,
             )
-            VMF.add_brush(glass_clip.solid)
+            glass_clip_ent.solids.append(glass_clip.solid)
             if floorbeam_locs is not None and glass_norm.z != 0:
                 floorbeam_locs.append((glass_loc, glass_norm))
+
+    # Remove if it's empty.
+    if not glass_clip_ent.solids:
+        glass_clip_ent.remove()
 
     if vbsp_options.get(str, 'glass_pack') and settings['has_attr']['glass']:
         TO_PACK.add(vbsp_options.get(str, 'glass_pack').casefold())
@@ -2094,11 +2071,12 @@ def add_glass_floorbeams(glass_locs):
         for pos in group:
             # Every 'sep' positions..
             if (pos[axis] - offset) % separation == 0:
-                conditions.import_template(
+                template_brush.import_template(
                     temp_name,
                     pos,
                     rot,
-                    force_type=conditions.TEMP_TYPES.detail,
+                    force_type=template_brush.TEMP_TYPES.detail,
+                    add_to_map=True,
                 )
 
 
@@ -2155,7 +2133,7 @@ Clump = namedtuple('Clump', [
 
 
 @conditions.make_result_setup('SetAreaTex')
-def cond_force_clump_setup(res):
+def cond_force_clump_setup(res: Property):
     point1 = Vec.from_str(res['point1'])
     point2 = Vec.from_str(res['point2'])
 
@@ -2187,7 +2165,7 @@ def cond_force_clump_setup(res):
 
 
 @conditions.make_result('SetAreaTex')
-def cond_force_clump(inst, res):
+def cond_force_clump(inst: Entity, res: Property):
     """Force an area to use certain textures.
 
     This only works in styles using the clumping texture algorithm.
@@ -2202,7 +2180,7 @@ def cond_force_clump(inst, res):
     point2 = point2.copy().rotate(*angles)
     point2 += origin
 
-    min_pos, max_pos = Vec.bbox((point1, point2))
+    min_pos, max_pos = Vec.bbox(point1, point2)
 
     PRESET_CLUMPS.append(Clump(
         min_pos,
@@ -2741,9 +2719,30 @@ def change_func_brush():
 
     grate_temp = vbsp_options.get(str, "grating_template")
     if grate_temp:
-        grate_temp = conditions.get_scaling_template(grate_temp)
+        grate_temp = template_brush.get_scaling_template(grate_temp)
     else:
         grate_temp = None
+
+    if vbsp_options.get_itemconf('BEE_PELLET:PelletGrating', False):
+        # Merge together these existing filters in global_pti_ents
+        VMF.create_ent(
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            targetname='@grating_filter',
+            classname='filter_multi',
+            filtertype=0,
+            negated=0,
+            filter01='@not_pellet',
+            filter02='@not_paint_bomb',
+        )
+    else:
+        # Just skip paint bombs.
+        VMF.create_ent(
+            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            targetname='@grating_filter',
+            classname='filter_activator_class',
+            negated=1,
+            filterclass='prop_paint_bomb',
+        )
 
     dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
@@ -2772,6 +2771,10 @@ def change_func_brush():
     # TODO: Merge nearby grating brushes
     # Clips are shared every 512 grid spaces
 
+    # This needs to be a func_brush, otherwise the clip texture data will be
+    # merged with other clips.
+    grate_player_clip = VMF.create_ent(classname='func_brush', solidbsp=1)
+
     for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
         if brush in IGNORED_BRUSH_ENTS:
             continue
@@ -2791,7 +2794,7 @@ def change_func_brush():
         # Func_brush/func_rotating (for angled panels and flip panels)
         # often use different textures, so let the style do that.
 
-        surf_face = None # The angled-panel top face..
+        surf_face = None  # The angled-panel top face..
 
         is_grating = False
         delete_brush = False
@@ -2862,7 +2865,7 @@ def change_func_brush():
 
         if is_grating and grating_clip_mat:
             grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
-            VMF.add_brush(grate_clip.solid)
+            grate_player_clip.solids.append(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
             for face in grate_phys_clip_solid.sides:
@@ -2871,7 +2874,7 @@ def change_func_brush():
             clip_ent = VMF.create_ent(
                 classname='func_clip_vphysics',
                 origin=brush_loc.join(' '),
-                filtername=vbsp_options.get(str, 'grating_filter')
+                filtername='@grating_filter',
             )
             clip_ent.solids.append(grate_phys_clip_solid)
 
@@ -2905,12 +2908,12 @@ def change_func_brush():
 
                     if dynamic_pan_temp:
                         # Allow replacing the brush used for the surface.
-                        new_brush = conditions.import_template(
+                        new_brush = template_brush.import_template(
                             dynamic_pan_temp,
                             Vec.from_str(brush['origin']),
                             Vec.from_str(ins['angles']),
                             targetname=targ,
-                            force_type=conditions.TEMP_TYPES.detail,
+                            force_type=template_brush.TEMP_TYPES.detail,
                         )
                         brush.solids = new_brush.detail.solids
                         new_brush.detail.remove()
@@ -2926,6 +2929,10 @@ def change_func_brush():
 
                 break  # Don't run twice - there might be a second matching
                 # overlay instance!
+
+    # Remove if it's empty.
+    if not grate_player_clip.solids:
+        grate_player_clip.remove()
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
         TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
@@ -2987,21 +2994,17 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
     # We use a template for the surface, so it can use correct textures.
     if angle == '00':
         # Special case: flat panels use different templates
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             vbsp_options.get(str, 'static_pan_temp_flat'),
             origin=Vec.from_str(ent['origin']),
             angles=Vec.from_str(ent['angles']),
             targetname=ent['targetname'],
-            force_type=conditions.TEMP_TYPES.detail,
+            force_type=template_brush.TEMP_TYPES.detail,
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
-            force_colour=(
-                conditions.MAT_TYPES.white
-                if pan_type == 'white' else
-                conditions.MAT_TYPES.black
-            ),
+            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
             fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
@@ -3038,20 +3041,16 @@ def make_static_pan(ent, pan_type, is_bullseye=False):
         faith_targ_pos = Vec(64, 0, 0)
         faith_targ_pos.localise(temp_origin, temp_angles)
 
-        temp_data = conditions.import_template(
+        temp_data = template_brush.import_template(
             vbsp_options.get(str, 'static_pan_temp_' + pan_type),
             temp_origin,
             temp_angles,
-            force_type=conditions.TEMP_TYPES.detail,
+            force_type=template_brush.TEMP_TYPES.detail,
         )
-        conditions.retexture_template(
+        template_brush.retexture_template(
             temp_data,
             origin=Vec.from_str(ent['origin']),
-            force_colour=(
-                conditions.MAT_TYPES.white
-                if pan_type == 'white' else
-                conditions.MAT_TYPES.black
-            ),
+            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
             fixup=ent.fixup,
             use_bullseye=is_bullseye,
         )
@@ -3085,61 +3084,6 @@ def change_ents():
                 VMF.remove_ent(auto)
 
 
-def fix_inst():
-    for inst in VMF.by_class['func_instance']:
-        # TODO: remake this in a condition
-        if "ccflag_comball_base" in inst['file', '']:  # Rexaura Flux Fields
-            # find the triggers that match this entity and mod them
-            for trig in VMF.iter_ents(
-                    classname='trigger_portal_cleanser',
-                    targetname=inst['targetname'] + "_brush",
-                    ):
-                for side in trig.sides():
-                    side.mat = "tools/toolstrigger"
-
-                # get rid of the _, allowing direct control from the instance.
-                trig['targetname'] = inst['targetname'] + "-trigger"
-                trig['classname'] = "trigger_multiple"
-                trig["filtername"] = "@filter_pellet"
-                trig["wait"] = "0.1"
-                trig['spawnflags'] = "72"  # Physics Objects, Everything
-                # generate the output that triggers the pellet logic.
-                trig.add_out(VLib.Output(
-                    "OnStartTouch",
-                    inst['targetname'] + "-branch_toggle",
-                    "FireUser1",
-                    ))
-
-            inst.outputs.clear()  # All the original ones are junk, delete them!
-
-            for in_out in VMF.iter_ents_tags(
-                    vals={
-                        'classname': 'func_instance',
-                        'origin': inst['origin'],
-                        'angles': inst['angles'],
-                        },
-                    tags={
-                        'file': 'ccflag_comball_out',
-                        }
-                    ):
-                # Find the instance to use for output and add the
-                # commands to trigger its logic
-                inst.add_out(VLib.Output(
-                    "OnUser1",
-                    in_out['targetname'],
-                    "FireUser1",
-                    inst_in='in',
-                    inst_out='out',
-                    ))
-                inst.add_out(VLib.Output(
-                    "OnUser2",
-                    in_out['targetname'],
-                    "FireUser2",
-                    inst_in='in',
-                    inst_out='out',
-                    ))
-
-
 def fix_worldspawn():
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
@@ -3151,19 +3095,27 @@ def fix_worldspawn():
             settings['has_attr']['gel'] or
             vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
         )
-    VMF.spawn['skyname'] = get_tex("special.sky")
+    VMF.spawn['skyname'] = vbsp_options.get(str, 'skybox')
 
 
 @conditions.make_result('Pack')
-def packlist_cond(_, res):
+def packlist_cond(res: Property):
     """Add the files in the given packlist to the map."""
     TO_PACK.add(res.value.casefold())
 
     return conditions.RES_EXHAUSTED
 
 
+@conditions.make_result('PackFile')
+def pack_file_cond(res: Property):
+    """Adda single file to the map."""
+    PACK_FILES.add(res.value)
+
+    return conditions.RES_EXHAUSTED
+
+
 @conditions.make_result('PackRename')
-def packlist_cond_rename(_, res):
+def packlist_cond_rename(res: Property):
     """Add a file to the packlist, saved under a new name."""
     PACK_RENAME[res['dest']] = res['file']
     return conditions.RES_EXHAUSTED
@@ -3201,7 +3153,7 @@ def make_packlist(map_path):
                 if not pack_triggers:
                     break  # No more left
 
-    if not TO_PACK:
+    if not TO_PACK and not PACK_FILES:
         # Nothing to pack - wipe the packfile!
         open(map_path[:-4] + '.filelist.txt', 'w').close()
 
@@ -3214,10 +3166,16 @@ def make_packlist(map_path):
         ).find_key('PackList', [])
 
     for pack_id in TO_PACK:
+        try:
+            files = props[pack_id]
+        except IndexError:
+            LOGGER.warning('Packlist "{}" does not exist!', pack_id.upper())
+            continue
+
         PACK_FILES.update(
             prop.value
             for prop in
-            props[pack_id, ()]
+            files
         )
 
     with open(map_path[:-4] + '.filelist.txt', 'w') as f:
@@ -3280,7 +3238,7 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
-    with open('bee2/vrad_config.cfg', 'w') as f:
+    with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
             f.write(line)
 
@@ -3605,6 +3563,14 @@ def main():
         load_settings()
 
         load_map(path)
+        instance_traits.set_traits(VMF)
+
+        # Requires instance traits!
+        connections.calc_connections(
+            VMF,
+            settings['textures']['overlay.shapeframe'],
+            settings['style_vars']['enableshapesignageframe'],
+        )
 
         MAP_RAND_SEED = calc_rand_seed()
 
@@ -3618,7 +3584,6 @@ def main():
             vmf_file=VMF,
         )
 
-        fix_inst()
         alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)

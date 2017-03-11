@@ -4,32 +4,45 @@ import srctools
 import utils
 import vbsp
 import instanceLocs
+import comp_consts as const
+import template_brush
 from conditions import (
     make_result, meta_cond,
-    ITEM_CLASSES, CONNECTIONS
+    ITEMS_WITH_CLASS, CONNECTIONS
 )
-from srctools import Vec, Entity, Output
+from srctools import Vec, Property, VMF, Entity, Solid, Output
 from vbsp import TEX_FIZZLER
 
-from typing import List
+from typing import List, Dict
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
-FIZZ_BRUSH_ENTS = {} # The brush entities we generated, used when merging.
+FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
 
-@make_result('custFizzler')
-def res_cust_fizzler(base_inst, res):
+# A few positions for material_modify_control,
+# so they aren't on top.
+MATMOD_OFFSETS = [
+    Vec(0,   0, -32),
+    Vec(0,  16, -32),
+    Vec(0, -16, -64),
+    Vec(0,   0,  32),
+] * 4  # Just in case there happens to be more textures.
+
+
+@make_result('custFizzler', 'custFizz', 'customFizzler', 'customFizz')
+def res_cust_fizzler(base_inst: Entity, res: Property):
     """Customises the various components of a custom fizzler item.
 
     This should be executed on the base instance. Brush and MakeLaserField
-    are ignored on laserfield barriers.
+    are not permitted on laserfield barriers.
+    When executed, the $is_laser variable will be set on the base.
     Options:
         * ModelName: sets the targetname given to the model instances.
         * UniqueModel: If true, each model instance will get a suffix to
             allow unique targetnames.
         * Brush: A brush entity that will be generated (the original is
-         deleted.)
+         deleted.) This cannot be used on laserfields.
             * Name is the instance name for the brush
             * Left/Right/Center/Short/Nodraw are the textures used
             * Keys are a block of keyvalues to be set. Targetname and
@@ -38,6 +51,16 @@ def res_cust_fizzler(base_inst, res):
               By default it is 2 units thick.
             * Outputs is a block of outputs (laid out like in VMFs). The
               targetnames will be localised to the instance.
+            * MergeBrushes, if true will merge this brush set into one
+              entity for each fizzler. This is useful for non-fizzlers to
+              reduce the entity count.
+            * SimplifyBrush, if true will merge the three parts into one brush.
+              All sides will receive the "nodraw" texture at 0.25 scale.
+            * MaterialModify generates material_modify_controls to control
+              the brush. One is generated for each texture used in the brush.
+              This has subkeys 'name' and 'var' - the entity name and shader
+              variable to be modified. MergeBrushes must be enabled if this
+              is present.
         * MakeLaserField generates a brush stretched across the whole
           area.
             * Name, keys and thickness are the same as the regular Brush.
@@ -46,7 +69,7 @@ def res_cust_fizzler(base_inst, res):
               scale it correctly.
     """
     model_name = res['modelname', None]
-    make_unique = srctools.conv_bool(res['UniqueModel', '0'])
+    make_unique = res.bool('UniqueModel')
     fizz_name = base_inst['targetname', '']
 
     # search for the model instances
@@ -56,7 +79,7 @@ def res_cust_fizzler(base_inst, res):
         )
     is_laser = False
     for inst in vbsp.VMF.by_class['func_instance']:
-        if inst['targetname', ''] in model_targetnames:
+        if inst['targetname'] in model_targetnames:
             if inst.fixup['skin', '0'] == '2':
                 is_laser = True
             if model_name is not None:
@@ -74,14 +97,20 @@ def res_cust_fizzler(base_inst, res):
             for key, value in base_inst.fixup.items():
                 inst.fixup[key] = value
 
+    base_inst.fixup['$is_laser'] = is_laser
+
     new_brush_config = list(res.find_all('brush'))
     if len(new_brush_config) == 0:
         return  # No brush modifications
 
     if is_laser:
         # This is a laserfield! We can't edit those brushes!
-        LOGGER.warning('CustFizzler excecuted on LaserField!')
+        LOGGER.warning('CustFizzler executed on LaserField!')
         return
+
+    # Record which materialmodify controls are used, so we can add if needed.
+    # Conf id -> (brush_name, conf, [textures])
+    modify_controls = {}
 
     for orig_brush in (
             vbsp.VMF.by_class['trigger_portal_cleanser'] &
@@ -91,12 +120,21 @@ def res_cust_fizzler(base_inst, res):
 
             new_brush = orig_brush.copy()
             # Unique to the particular config property & fizzler name
-            merge_key = (id(config), fizz_name)
+            conf_key = (id(config), fizz_name)
+
+            if config.bool('SimplifyBrush'):
+                # Replace the brush with a simple one of the same size.
+                bbox_min, bbox_max = new_brush.get_bbox()
+                new_brush.solids = [vbsp.VMF.make_prism(
+                    bbox_min, bbox_max,
+                    mat=const.Tools.NODRAW,
+                ).solid]
+
             should_merge = config.bool('MergeBrushes')
-            if should_merge and merge_key in FIZZ_BRUSH_ENTS:
+            if should_merge and conf_key in FIZZ_BRUSH_ENTS:
                 # These are shared by both ents, but new_brush won't be added to
                 # the map. (We need it though for the widening code to work).
-                FIZZ_BRUSH_ENTS[merge_key].solids.extend(new_brush.solids)
+                FIZZ_BRUSH_ENTS[conf_key].solids.extend(new_brush.solids)
             else:
                 vbsp.VMF.add_ent(new_brush)
                 # Don't allow restyling it
@@ -104,10 +142,9 @@ def res_cust_fizzler(base_inst, res):
 
                 new_brush.clear_keys()  # Wipe the original keyvalues
                 new_brush['origin'] = orig_brush['origin']
-                new_brush['targetname'] = (
-                    fizz_name +
-                    '-' +
-                    config['name', 'brush']
+                new_brush['targetname'] = conditions.local_name(
+                    base_inst,
+                    config['name'],
                 )
                 # All ents must have a classname!
                 new_brush['classname'] = 'trigger_portal_cleanser'
@@ -127,25 +164,45 @@ def res_cust_fizzler(base_inst, res):
                     new_brush.add_out(out)
 
                 if should_merge:  # The first brush...
-                    FIZZ_BRUSH_ENTS[merge_key] = new_brush
+                    FIZZ_BRUSH_ENTS[conf_key] = new_brush
+
+            mat_mod_conf = config.find_key('MaterialModify', [])
+            if mat_mod_conf:
+                try:
+                    used_materials = modify_controls[id(mat_mod_conf)][2]
+                except KeyError:
+                    used_materials = set()
+                    modify_controls[id(mat_mod_conf)] = (
+                        new_brush['targetname'],
+                        mat_mod_conf,
+                        used_materials
+                    )
+                # It can only parent to one brush, so it can't attach
+                # to them all properly.
+                if not should_merge:
+                    raise Exception(
+                        "MaterialModify won't work without MergeBrushes!"
+                    )
+            else:
+                used_materials = None
 
             laserfield_conf = config.find_key('MakeLaserField', None)
             if laserfield_conf.value is not None:
                 # Resize the brush into a laserfield format, without
                 # the 128*64 parts. If the brush is 128x128, we can
                 # skip the resizing since it's already correct.
-                laser_tex = laserfield_conf['texture', 'effects/laserplane']
-                nodraw_tex = laserfield_conf['nodraw', 'tools/toolsnodraw']
+                laser_tex = laserfield_conf['texture', const.Special.LASERFIELD]
+                nodraw_tex = laserfield_conf['nodraw', const.Tools.NODRAW]
                 tex_width = laserfield_conf.int('texwidth', 512)
                 is_short = False
                 for side in new_brush.sides():
-                    if side.mat.casefold() == 'effects/fizzler':
+                    if side == const.Fizzler.SHORT:
                         is_short = True
                         break
 
                 if is_short:
                     for side in new_brush.sides():
-                        if side.mat.casefold() == 'effects/fizzler':
+                        if side == const.Fizzler.SHORT:
                             side.mat = laser_tex
 
                             side.uaxis.offset = 0
@@ -160,16 +217,20 @@ def res_cust_fizzler(base_inst, res):
                         nodraw_tex,
                         tex_width,
                     )
+                if used_materials is not None:
+                    used_materials.add(laser_tex.casefold())
             else:
                 # Just change the textures
                 for side in new_brush.sides():
                     try:
-                        side.mat = config[
-                            TEX_FIZZLER[side.mat.casefold()]
-                        ]
+                        tex_cat = TEX_FIZZLER[side.mat.casefold()]
+                        side.mat = config[tex_cat]
                     except (KeyError, IndexError):
                         # If we fail, just use the original textures
                         pass
+                    else:
+                        if used_materials is not None and tex_cat != 'nodraw':
+                            used_materials.add(side.mat.casefold())
 
             widen_amount = config.float('thickness', 2.0)
             if widen_amount != 2:
@@ -178,6 +239,28 @@ def res_cust_fizzler(base_inst, res):
                         brush,
                         thickness=widen_amount,
                     )
+
+    for brush_name, config, textures in modify_controls.values():
+        skip_if_static = config.bool('dynamicOnly', True)
+        if skip_if_static and base_inst.fixup['$connectioncount'] == '0':
+            continue
+        mat_mod_name = config['name', 'modify']
+        var = config['var', '$outputintensity']
+        if not var.startswith('$'):
+            var = '$' + var
+
+        for off, tex in zip(MATMOD_OFFSETS, textures):
+            pos = off.copy().rotate_by_str(base_inst['angles'])
+            pos += Vec.from_str(base_inst['origin'])
+            vbsp.VMF.create_ent(
+                classname='material_modify_control',
+                origin=pos,
+                targetname=conditions.local_name(base_inst, mat_mod_name),
+                materialName='materials/' + tex + '.vmt',
+                materialVar=var,
+                parentname=brush_name,
+            )
+
 
 
 def convert_to_laserfield(
@@ -255,9 +338,11 @@ PAIR_AXES = {
     (0, 0, -1): 'xy' 'z',
 }
 
+# For singleBrush in fizzlermodelpair
+PAIR_FIZZ_BRUSHES = {}  # type: Dict[str, Solid]
 
 @make_result('fizzlerModelPair')
-def res_fizzler_pair(begin_inst, res):
+def res_fizzler_pair(vmf: VMF, begin_inst: Entity, res: Property):
     """Modify the instance of a fizzler to link with its pair.
 
     Each pair will be given a name along the lines of "fizz_name-model1334".
@@ -266,6 +351,13 @@ def res_fizzler_pair(begin_inst, res):
         - MidInst: An instance placed every 128 units between emitters.
         - SingleInst: If the models are 1 block apart, replace both with this
             instance.
+        - BrushKeys, LocalBrushKeys: If specified, a brush entity will be
+           generated from some templates at the position of the models.
+        - StartTemp, EndTemp, SingleTemp: Templates for the above.
+        - SingleBrush: If true, the brush will be shared among the entirety
+           of this fizzler.
+        - uniqueName: If true, all pairs get a unique name for themselves.
+          if False, all instances use the base instance name.
     """
     orig_target = begin_inst['targetname']
 
@@ -283,13 +375,39 @@ def res_fizzler_pair(begin_inst, res):
 
     orig_file = begin_inst['file']
 
-    begin_file = res['StartInst', orig_file]
-    end_file = res['EndInst', orig_file]
-    mid_file = res['MidInst', '']
-    single_file = res['SingleInst', '']
+    begin_inst['file'] = instanceLocs.resolve_one(res['StartInst'], error=True)
+    end_file = instanceLocs.resolve_one(res['EndInst'], error=True)
+    mid_file = instanceLocs.resolve_one(res['MidInst', ''])
+    single_file = instanceLocs.resolve_one(res['SingleInst', ''])
 
-    begin_inst['file'] = begin_file
     begin_inst['targetname'] = pair_name
+
+    brush = None
+    if 'brushkeys' in res:
+        begin_temp = res['StartTemp', '']
+        end_temp = res['EndTemp', '']
+        single_temp = res['SingleTemp']
+
+        if res.bool('SingleBrush'):
+            try:
+                brush = PAIR_FIZZ_BRUSHES[orig_target]
+            except KeyError:
+                pass
+        if not brush:
+            brush = vmf.create_ent(
+                classname='func_brush',  # default
+                origin=begin_inst['origin'],
+            )
+            conditions.set_ent_keys(
+                brush,
+                begin_inst,
+                res,
+                'BrushKeys',
+            )
+            if res.bool('SingleBrush'):
+                PAIR_FIZZ_BRUSHES[orig_target] = brush
+    else:
+        begin_temp = end_temp = single_temp = None
 
     direction = Vec(0, 0, 1).rotate_by_str(begin_inst['angles'])
 
@@ -313,15 +431,47 @@ def res_fizzler_pair(begin_inst, res):
         LOGGER.warning('No matching pair for {}!!', orig_target)
         return
 
-    if single_file and length == 0:
-        end_inst.remove()
-        begin_inst['file'] = single_file
-        return
+    if length == 0:
+        if single_temp:
+            temp_brushes = template_brush.import_template(
+                single_temp,
+                Vec.from_str(begin_inst['origin']),
+                Vec.from_str(begin_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
+
+        if single_file:
+            end_inst.remove()
+            begin_inst['file'] = single_file
+            # Don't do anything else with end instances.
+            return
+    else:
+        if begin_temp:
+            temp_brushes = template_brush.import_template(
+                begin_temp,
+                Vec.from_str(begin_inst['origin']),
+                Vec.from_str(begin_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
+
+        if end_temp:
+            temp_brushes = template_brush.import_template(
+                end_temp,
+                Vec.from_str(end_inst['origin']),
+                Vec.from_str(end_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
 
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
 
-    if mid_file != '':
+    if mid_file != '' and length:
         # Go 64 from each side, and always have at least 1 section
         # A 128 gap will have length = 0
         for dis in range(0, abs(length) + 1, 128):
@@ -331,12 +481,12 @@ def res_fizzler_pair(begin_inst, res):
                 targetname=pair_name,
                 angles=begin_inst['angles'],
                 file=mid_file,
-                origin=new_pos.join(' '),
+                origin=new_pos,
             )
 
 
 @meta_cond(priority=-200, only_once=True)
-def fizzler_out_relay(_):
+def fizzler_out_relay():
     """Link fizzlers with a relay item so they can be given outputs."""
     relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
     if not relay_file:
@@ -348,9 +498,7 @@ def fizzler_out_relay(_):
     # base -> connections
     fizz_bases = {}
 
-    LOGGER.info('Item classes: {}', ITEM_CLASSES)
-
-    for fizz_id in ITEM_CLASSES['itembarrierhazard']:
+    for fizz_id in ITEMS_WITH_CLASS[const.ItemClass.FIZZLER]:
         base, model = instanceLocs.resolve(
             '<{}: fizz_base, fizz_model>'.format(fizz_id)
         )

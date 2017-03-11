@@ -11,26 +11,26 @@ from conditions import (
     make_flag, make_result, make_result_setup,
     ALL_INST,
 )
-from instanceLocs import resolve as resolve_inst
+import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
 
 @make_flag('instance')
-def flag_file_equal(inst, flag):
+def flag_file_equal(inst: Entity, flag: Property):
     """Evaluates True if the instance matches the given file."""
-    return inst['file'].casefold() in resolve_inst(flag.value)
+    return inst['file'].casefold() in instanceLocs.resolve(flag.value)
 
 
 @make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst, flag):
+def flag_file_cont(inst: Entity, flag: Property):
     """Evaluates True if the instance contains the given portion."""
     return flag.value in inst['file'].casefold()
 
 
 @make_flag('hasInst')
-def flag_has_inst(_, flag):
+def flag_has_inst(flag: Property):
     """Checks if the given instance is present anywhere in the map."""
-    flags = resolve_inst(flag.value)
+    flags = instanceLocs.resolve(flag.value)
     return any(
         inst.casefold() in flags
         for inst in
@@ -56,7 +56,7 @@ INSTVAR_COMP = {
 
 
 @make_flag('instVar')
-def flag_instvar(inst, flag):
+def flag_instvar(inst: Entity, flag: Property):
     """Checks if the $replace value matches the given value.
 
     The flag value follows the form "$start_enabled == 1", with or without
@@ -80,19 +80,19 @@ def flag_instvar(inst, flag):
 
 
 @make_result('rename', 'changeInstance')
-def res_change_instance(inst, res):
+def res_change_instance(inst: Entity, res: Property):
     """Set the file to a value."""
-    inst['file'] = resolve_inst(res.value)[0]
+    inst['file'] = instanceLocs.resolve_one(res.value, error=True)
 
 
 @make_result('suffix', 'instSuffix')
-def res_add_suffix(inst, res):
+def res_add_suffix(inst: Entity, res: Property):
     """Add the specified suffix to the filename."""
     conditions.add_suffix(inst, '_' + res.value)
 
 
 @make_result('setKey')
-def res_set_key(inst, res):
+def res_set_key(inst: Entity, res: Property):
     """Set a keyvalue to the given value.
 
     The name and value should be separated by a space.
@@ -102,7 +102,7 @@ def res_set_key(inst, res):
 
 
 @make_result('instVar', 'instVarSuffix')
-def res_add_inst_var(inst, res):
+def res_add_inst_var(inst: Entity, res: Property):
     """Append the value of an instance variable to the filename.
 
     Pass either the variable name, or a set of value->suffix pairs for a
@@ -121,7 +121,7 @@ def res_add_inst_var(inst, res):
 
 
 @make_result('setInstVar')
-def res_set_inst_var(inst, res):
+def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
     Values follow the format "$start_enabled 1", with or without the $.
@@ -145,7 +145,7 @@ def res_map_inst_var_setup(res: Property):
 
 
 @make_result('mapInstVar')
-def res_map_inst_var(inst: Entity, res):
+def res_map_inst_var(inst: Entity, res: Property):
     """Set one instance var based on the value of another.
 
     The first value is the in -> out var, and all following are values to map.
@@ -158,19 +158,19 @@ def res_map_inst_var(inst: Entity, res):
 
 
 @make_result('clearOutputs', 'clearOutput')
-def res_clear_outputs(inst, res):
+def res_clear_outputs(inst: Entity):
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
 @make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
-def res_rem_fixup(inst, res):
+def res_rem_fixup(inst: Entity, res: Property):
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
 @make_result('localTarget')
-def res_local_targetname(inst, res):
+def res_local_targetname(inst: Entity, res: Property):
     """Generate a instvar with an instance-local name.
 
     Useful with AddOutput commands, or other values which use
@@ -186,7 +186,7 @@ def res_local_targetname(inst, res):
 
 
 @make_result('replaceInstance')
-def res_replace_instance(inst: Entity, res):
+def res_replace_instance(inst: Entity, res: Property):
     """Replace an instance with another entity.
 
     'keys' and 'localkeys' defines the new keyvalues used.
@@ -224,7 +224,7 @@ GLOBAL_INPUT_ENTS = {}  # type: Dict[Optional[str], Entity]
 
 
 @make_result_setup('GlobalInput')
-def res_global_input_setup(res):
+def res_global_input_setup(res: Property):
     target = res['target', ''] or None
     name = res['name', ''] or None
     output = res['output', 'OnTrigger']
@@ -249,38 +249,72 @@ def res_global_input(inst: Entity, res: Property):
             if Name is not set.
         - "Param": The parameter for the output.
     """
-    name, inp_name, inp_command, output, delay, param, target = res.value
+    name, proxy_name, command, output, delay, param, target = res.value
 
-    if name is not None:
-        name = conditions.resolve_value(inst, name)
+    global_input(inst, command, proxy_name, name, output, target, param, delay)
+
+
+def global_input(
+    inst: Entity,
+    command: str,
+    proxy_name: str=None,
+    relay_name: str=None,
+    relay_out: str='OnTrigger',
+    target: str=None,
+    param='',
+    delay=0.0,
+):
+    """Create a global input."""
+
+    if relay_name is not None:
+        relay_name = conditions.resolve_value(inst, relay_name)
     if target is not None:
         target = conditions.resolve_value(inst, target)
 
     try:
-        glob_ent = GLOBAL_INPUT_ENTS[name]
+        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
     except KeyError:
-        if name is None:
+        if relay_name is None:
             glob_ent = GLOBAL_INPUT_ENTS[None] = inst.map.create_ent(
                 classname='logic_auto',
                 origin=inst['origin'],
             )
         else:
-            glob_ent = GLOBAL_INPUT_ENTS[name] = inst.map.create_ent(
+            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = inst.map.create_ent(
                 classname='logic_relay',
-                targetname=name,
+                targetname=relay_name,
                 origin=inst['origin'],
             )
 
     out = Output(
-        out=('OnMapSpawn' if name is None else output),
+        out=('OnMapSpawn' if relay_name is None else relay_out),
         targ=(
             conditions.local_name(inst, target)
             if target else
             inst['targetname']
         ),
-        inp=inp_command,
-        inst_in=inp_name,
+        inp=command,
+        inst_in=proxy_name,
         delay=delay,
         param=conditions.resolve_value(inst, param),
     )
     glob_ent.add_out(out)
+
+
+@make_result('ScriptVar')
+def res_script_var(inst: Entity, res: Property):
+    """Set a variable on a script, via a logic_auto.
+
+    Name is the local name for the script entity.
+    Var is the variable name.
+    Value is the value to set.
+    """
+    global_input(
+        inst,
+        command='RunScriptCode',
+        target=conditions.local_name(inst, res['name']),
+        param='{} <- {}'.format(
+            res['var'],
+            conditions.resolve_value(inst, res['value']),
+        ),
+    )

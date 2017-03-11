@@ -18,12 +18,7 @@ except NameError:
     builtins.ngettext = lambda a, b, n: a if n == 1 else b
 
 if __name__ == '__main__':
-    if utils.MAC or utils.LINUX:
-        # Change directory to the location of the executable
-        # Otherwise we can't find our files!
-        # The Windows executable does this automatically.
-        os.chdir(os.path.dirname(sys.argv[0]))
-
+    utils.fix_cur_directory()
     if is_forking(sys.argv):
         # Initialise the logger, which ensures sys.stdout & stderr are available
         # This fixes a bug in multiprocessing. We don't want to reopen the logfile
@@ -52,9 +47,9 @@ import loadScreen
 import paletteLoader
 import packageLoader
 import gameMan
-import extract_packages
 import logWindow
 import sound
+import img
 
 DEFAULT_SETTINGS = {
     'Directories': {
@@ -116,7 +111,7 @@ if __name__ == '__main__':
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
-    pack_data = packageLoader.load_packages(
+    pack_data, package_sys = packageLoader.load_packages(
         GEN_OPTS['Directories']['package'],
         log_item_fallbacks=GEN_OPTS.get_bool(
             'Debug', 'log_item_fallbacks'),
@@ -129,7 +124,12 @@ if __name__ == '__main__':
         has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
         has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
     )
-    UI.load_packages(pack_data)
+
+    # Load filesystems into various modules
+    img.load_filesystems(package_sys)
+    gameMan.load_filesystems(package_sys)
+
+    UI.load_packages(pack_data, package_sys)
     LOGGER.info('Done!')
 
     LOGGER.info('Loading Palettes...')
@@ -153,9 +153,5 @@ if __name__ == '__main__':
 
     loadScreen.main_loader.destroy()
 
-    if GEN_OPTS.get_bool('General', 'preserve_BEE2_resource_dir'):
-        extract_packages.done_callback()
-    else:
-        extract_packages.check_cache(pack_data['zips'])
 
     TK_ROOT.mainloop()

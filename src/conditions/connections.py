@@ -1,6 +1,7 @@
 """Results relating to item connections."""
 import srctools
 import utils
+import instance_traits
 from conditions import (
     make_flag, make_result, make_result_setup,
     resolve_value, local_name,
@@ -13,9 +14,17 @@ from typing import Optional, Dict, Tuple
 
 LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
+# Traits set on item_cube.
+CUBE_TYPES = [
+    'cube_standard',
+    'cube_companion',
+    'cube_reflect',
+    'cube_ball',
+    'cube_franken',
+]
 
 @make_result_setup('AddOutput')
-def res_add_output_setup(res):
+def res_add_output_setup(res: Property):
     output = res['output']
     input_name = res['input']
     inst_in = res['inst_in', '']
@@ -132,7 +141,7 @@ def res_locking_output(inst: Entity, res: Property):
 
 
 @make_flag('LockingIO')
-def res_locking_input(inst: Entity, res: Property) -> str:
+def res_locking_input(inst: Entity, res: Property):
     """Executed on the input item, and evaluates to True if successful.
 
     The parameter is an `instance:name;Input` value, which resets the item.
@@ -191,7 +200,7 @@ def res_locking_input(inst: Entity, res: Property) -> str:
         )
     return True
 
-LINKED_CUBES = {}  # type: Dict[int, Tuple[Entity, str, Optional[str], str]]
+LINKED_CUBES = {}  # type: Dict[int, Tuple[Entity, Optional[str], str]]
 
 
 @make_result('_MarkLinkedCube')
@@ -201,8 +210,9 @@ def res_linked_cube(inst: Entity, res: Property):
     This assumes some things about the item.
     """
     time = inst.fixup.int('$timer_delay')
-    if not (0 < time <= 30):
-        # Infinite - this behaviour is disabled..
+    # Portal 2 bug - when loading existing maps, timers are set to 3...
+    if not (3 < time <= 30):
+        # Infinite or 3-second - this behaviour is disabled..
         return
 
     if time in LINKED_CUBES:
@@ -217,7 +227,6 @@ def res_linked_cube(inst: Entity, res: Property):
 
     LINKED_CUBES[time] = (
         inst,
-        inst.fixup['$cube_type'],
         resp_out_name, resp_out,
     )
 
@@ -226,20 +235,30 @@ def res_linked_cube(inst: Entity, res: Property):
 def res_linked_cube_dropper(drp_inst: Entity, res: Property):
     """Link a cube and dropper together, to preplace the cube at a location."""
     time = drp_inst.fixup.int('$timer_delay')
-    if not (0 < time <= 30):
-        # Infinite - this behaviour is disabled..
+    # Portal 2 bug - when loading existing maps, timers are set to 3...
+    if not (3 < time <= 30):
+        # Infinite or 3-second - this behaviour is disabled..
         return
 
     try:
-
-        cube_inst, cube_type, resp_out_name, resp_out = LINKED_CUBES[time]
+        cube_inst, resp_out_name, resp_out = LINKED_CUBES[time]
     except KeyError:
         raise Exception('Unknown cube "linkage" value ({}) in dropper!'.format(
             time,
         ))
 
     # Force the dropper to match the cube..
-    #  = cube_type
+    if '$cube_type' in cube_inst.fixup:
+        # Trust instvar if set (custom items for example)
+        drp_inst.fixup['$cube_type'] = cube_inst.fixup['$cube_type']
+    else:
+        cube_traits = instance_traits.get(cube_inst)
+        for ind, cube_type in enumerate(CUBE_TYPES):
+            if cube_type in cube_traits:
+                drp_inst.fixup['$cube_type'] = ind
+                break
+        else:
+            LOGGER.warning('Cube "{}" has no cube type traits!', cube_inst['targetname'])
 
     # Set auto-drop to False (so there isn't two cubes),
     # and auto-respawn to True (so it actually functions).

@@ -1,0 +1,160 @@
+// Definitions for BEE2-specific entities
+ 
+@BaseClass = TemplateEnt
+	[
+	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
+	visgroup(string): "Visgroup" : "" : "The visgroup this brush/overlay was contained in (in the combined file)."
+	]
+
+@SolidClass base(TemplateEnt) = bee2_template_world: "A set of world brushes which will be templated into a map."
+	[
+	]
+
+@SolidClass base(TemplateEnt) = bee2_template_detail: "A set of detail brushes which will be templated into a map."
+	[
+	]
+
+@PointClass base(TemplateEnt, info_overlay) 
+	size(-1 -1 0, 1 1 1)
+	color(80 150 225)
+	studio("models/editor/overlay_helper.mdl")
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+	sphere(fademindist)
+	sphere(fademaxdist)
+	overlay()
+	= bee2_template_overlay : 
+	"An overlay which will be templated into a map." 
+	[
+	]
+	
+@PointClass base(TemplateEnt) iconsprite("BEE2/editor/bee2_icon.vmt") = bee2_template_scaling:
+	"Used to store the values for a scaling template."
+	[
+	up_tex(material): "Up texture" : "" : "Texture for the upward-pointing face."
+	up_uaxis(string): "Up (U)" : "" : "Uaxis data for the upward-pointing face."
+	up_vaxis(string): "Up (V)" : "" : "Vaxis data for the upward-pointing face."
+	
+	dn_tex(material): "Down texture" : "" : "Texture for the downward-pointing face."
+	dn_uaxis(string): "Down (U)" : "" : "Uaxis data for the downward-pointing face."
+	dn_vaxis(string): "Down (V)" : "" : "Vaxis data for the downward-pointing face."
+	
+	n_tex(material): "North texture" : "" : "Texture for the north-pointing face."
+	n_uaxis(string): "North (U)"  : "" : "Uaxis data for the north-pointing face."
+	n_vaxis(string): "North (V)"  : "" : "Vaxis data for the north-pointing face."
+	
+	s_tex(material): "South texture" : "" : "Texture for the south-pointing face."
+	s_uaxis(string): "South (U)"  : "" : "Uaxis data for the south-pointing face."
+	s_vaxis(string): "South (V)"  : "" : "Vaxis data for the south-pointing face."
+	]
+
+@PointClass 
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+	sidelist(realign_faces)
+	= bee2_template_conf:
+	"Defines configuration options for a template."
+	[
+	template_id(string): "Template ID" : "" : "The ID given to this template. If set this will be loaded automatically."
+	
+	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world." +
+	"This should be used on axis-aligned tile surfaces, to make texturing match in different templates. " +
+	"The faces must be axis-aligned."
+	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
+	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
+	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using ReplaceBrush."
+	
+	temp_type(choices): "Template Type" : "default" : "Convert brushes to this type of entity." =
+		[
+		"default" : "Original Type"
+		"world" : "World Brush"
+		"detail" : "func_detail"
+		]
+	
+	is_scaling(boolean): "Save as Scaling Template" : 0 : "Scaling templates are a world-aligned cube for texturing brush sides in specific orientations. " +
+	"Set this to discard excess data."
+	discard_brushes(boolean): "Discard Brushes" : 0 : "Don't keep brushes, for templates used to position overlays only."
+	detail_auto_visgroup(boolean): "Group Detail Entities" : 0 : "If True, each func_detail entity will be put into a auto_xx visgroup. Otherwise, all func_detail will be ungrouped. World brushes stay ungrouped regardless."
+	]
+
+// --------
+// Entities used with editoritems_gen.py to make editoritems configs.
+// These should not appear in any maps.
+
+@PointClass 
+	base(Angles)
+	studioprop("models/BEE2/editor/connection_point.mdl")
+	= bee2_editor_connectionpoint: "Defines a connection point for antlines."
+	[
+	skin(choices) : "Orientation" : 1 : "The position of the antline relative to the signage." =
+		[
+		// 0 = useless, needed to distinguish materials in the model.
+		1: "Close Left"
+		2: "Close Right"
+		3: "Far Left"
+		4: "Far Right"
+		]
+	priority(integer) : "Priority" : 0 : "Defines which connection points are used first."
+	group_id(string) : "Group ID" : "" : "?"
+	]
+
+@PointClass wirebox(min, max) = bee2_editor_embeddedvoxel: "Defines an EmbeddedVoxel section of an item. The shape is aligned to the 128-grid."
+	[
+	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the hollowed area."
+	min(vecline) : "Maximum Position" : "64 64 0" : "The maximum position of the hollowed area."
+	]
+
+@PointClass wirebox(min, max)= bee2_editor_embedface: "Defines a EmbedFace section for an item."
+	[
+	min(vecline) : "Minimum Position" : "-64 -64 0" : "The minimum position of the brush section. Vertical position is ignored."
+	min(vecline) : "Maximum Position" : "64 64 0" : "The minimum position of the brush section. Vertical position is ignored."
+	
+	tile_type(choices)  : "Tile Size" : "4x4" : "The size of tile to generate." =
+		[
+		"4x4_checkered" : "4x4 Checkered Tiles"
+		"4x4"           : "4x4 Tiles"
+		"2x2"           : "2x2 Tiles"
+		"1x1"           : "1x1 Tiles"
+		"Grid_Default"  : "Normal Wall"
+		]
+	]
+
+@AutoVisGroup = "BEE2"
+	[
+	"Templates"
+		[
+		"bee2_template_world"
+		"bee2_template_detail"
+		"bee2_template_overlay"
+		"bee2_template_scaling"
+		"bee2_template_conf"
+		]
+	"Editoritems"
+		[
+		"bee2_editor_connectionpoint"
+		"bee2_editor_embeddedvoxel"
+		"bee2_editor_embedface"
+		]
+	]
+
+@AutoVisGroup = "Templates"
+	[
+	"World"
+		[
+		"bee2_template_world"
+		]
+	"Detail"
+		[
+		"bee2_template_detail"
+		]
+	"Overlay"
+		[
+		"bee2_template_overlay"
+		]
+	"Scaling Temp"
+		[
+		"bee2_template_scaling"
+		]
+	"Configuration"
+		[
+		"bee2_template_conf"
+		]
+	]

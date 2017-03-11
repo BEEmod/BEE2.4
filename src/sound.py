@@ -4,7 +4,11 @@ To use, call sound.fx() with one of the dict keys.
 If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
+from tempfile import NamedTemporaryFile
+import shutil
+
 from tk_tools import TK_ROOT
+from srctools.filesys import FileSystem, FileSystemChain
 import utils
 
 LOGGER = utils.getLogger(__name__)
@@ -47,12 +51,21 @@ except ImportError:
     def load_snd():
         pass
 
+    def fx_blockable(sound):
+        pass
+
+    def block_fx():
+        """Block fx_blockable() for a short time."""
+        pass
+
     initiallised = False
     pyglet = avbin = None
     SamplePlayer = None
+    play_sfx_repeat = False
 else:
     # Succeeded in loading PyGame
     initiallised = True
+    play_sfx_repeat = True
 
     def load_snd():
         """Load in sound FX."""
@@ -65,9 +78,33 @@ else:
         if play_sound and name in SOUNDS:
             SOUNDS[name].play()
 
+
+    def _reset_fx_blockable():
+        """Reset the fx_norep() call after a delay."""
+        global play_sfx_repeat
+        play_sfx_repeat = True
+
+    def fx_blockable(sound):
+        """Play a sound effect.
+
+        This waits for a certain amount of time between retriggering sounds
+        so they don't overlap.
+        """
+        global play_sfx_repeat
+        if play_sound and play_sfx_repeat:
+            fx(sound)
+            play_sfx_repeat = False
+            TK_ROOT.after(75, _reset_fx_blockable)
+
+    def block_fx():
+        """Block fx_blockable() for a short time."""
+        global play_sfx_repeat
+        play_sfx_repeat = False
+        TK_ROOT.after(50, _reset_fx_blockable)
+
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
-        def __init__(self, start_callback, stop_callback):
+        def __init__(self, start_callback, stop_callback, system: FileSystemChain):
             """Initialise the sample-playing manager.
             """
             self.sample = None
@@ -75,6 +112,7 @@ else:
             self.start_callback = start_callback
             self.stop_callback = stop_callback
             self.cur_file = None
+            self.system = system
 
         @property
         def is_playing(self):
@@ -94,12 +132,23 @@ else:
                 return
 
             try:
-                sound = pyglet.media.load(self.cur_file, streaming=False)
-            # AVbin raises it's own error if the file isn't found..
-            except (FileNotFoundError, pyglet.media.MediaFormatException):
+                file = self.system[self.cur_file]
+            except KeyError:
                 self.stop_callback()
                 LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
+
+            # TODO: Pyglet doesn't support direct streams, so we have to
+            # TODO: extract sounds to disk first.
+            with NamedTemporaryFile() as fdest:
+                with self.system.get_system(file), file.open_bin() as fsrc:
+                    shutil.copyfileobj(fsrc, fdest)
+                try:
+                    sound = pyglet.media.load(fdest.name, streaming=False)
+                except pyglet.media.MediaFormatException:
+                    self.stop_callback()
+                    LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
+                    return  # Abort if music isn't found..
 
             self.sample = sound.play()
             self.after = TK_ROOT.after(

@@ -60,7 +60,6 @@ Section.index = [Section[key] for key in Section.__members__.keys()].index
 
 def filter_items():
     """Update items based on selected tags."""
-    show_wip = optionWindow.SHOW_WIP.get()
     style_unlocked = StyleVarPane.tk_vars['UnlockDefault'].get() == 1
 
     # any() or all()
@@ -76,9 +75,6 @@ def filter_items():
 
     for item in UI.pal_items:
         if item.needs_unlock and not style_unlocked:
-            item.visible = False
-            continue
-        if item.item.is_wip and not show_wip:
             item.visible = False
             continue
 
@@ -159,10 +155,9 @@ def init(frm):
     frm.bind('<Enter>', expand)
     frm.bind('<Leave>', contract)
 
-
     wid['tag_mode_any'] = widget = ttk.Radiobutton(
         frm,
-        text='Any',
+        text=_('Any'),
         variable=TAG_MODE,
         value='ANY',
         command=filter_items,
@@ -171,7 +166,7 @@ def init(frm):
 
     wid['tag_mode_all'] = widget = ttk.Radiobutton(
         frm,
-        text='All',
+        text=_('All'),
         variable=TAG_MODE,
         value='ALL',
         command=filter_items,
@@ -197,7 +192,7 @@ def init(frm):
 
     ttk.Label(
         exp,
-        text='Available Tags (click):',
+        text=_('Available Tags (click):'),
     ).grid(row=0, column=0, columnspan=2)
 
     # Make the tag section the dynamically-resizing portion

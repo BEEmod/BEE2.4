@@ -1,5 +1,5 @@
 # coding=utf-8
-import collections
+import collections.abc
 import functools
 import logging
 import os.path
@@ -9,7 +9,7 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, Iterator,
+    Tuple, List, Union, Iterator,
 )
 
 
@@ -20,8 +20,11 @@ except ImportError:
     # We're running from source!
     BEE_VERSION = "(dev)"
     FROZEN = False
+    DEV_MODE = True
 else:
     FROZEN = True
+    # If blank, in dev mode.
+    DEV_MODE = not BEE_VERSION
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -48,13 +51,30 @@ STEAM_IDS = {
     'TWTM': '286080',
     'THINKING WITH TIME MACHINE': '286080',
 
+    'MEL': '317400',  # Note - no workshop
+
+    'DEST_AP': '433970',
+    'DESTROYED_APERTURE': '433970',
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational
     # 247120: Sixense
     # 211480: 'In Motion'
-    # 317400: PS Mel - No workshop
 }
+
+if MAC or LINUX:
+    def fix_cur_directory():
+        """Change directory to the location of the executable.
+
+        Otherwise we can't find our files!
+        The Windows executable does this automatically.
+        """
+        os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
+else:
+    def fix_cur_directory():
+        """No-op on Windows."""
+
 
 if WIN:
     # Some events differ on different systems, so define them here.
@@ -185,20 +205,20 @@ elif LINUX:
         'KEY_SAVE': '<Control-Shift-s>',
     }
     KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+        'KEY_EXPORT': 'Ctrl+E',
+        'KEY_SAVE': 'Ctrl+S',
+        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'hand1',
         'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
+        'destroy_item': 'X_cursor',
+        'invalid_drag': 'circle',
     }
 
     def add_mousewheel(target, *frames, orient='y'):
@@ -338,6 +358,102 @@ CONN_LOOKUP = {
 del N, S, E, W
 
 
+class FuncLookup(collections.abc.Mapping):
+    """A dict for holding callback functions.
+
+    Functions are added by using this as a decorator. Positional arguments
+    are aliases, keyword arguments will set attributes on the functions.
+    If casefold is True, this will casefold keys to be case-insensitive.
+    Additionally overwriting names is not allowed.
+    Iteration yields all functions.
+    """
+    def __init__(self, name, *, casefold=True, attrs=()):
+        self.casefold = casefold
+        self.__name__ = name
+        self._registry = {}
+        self.allowed_attrs = set(attrs)
+
+    def __call__(self, *names: str, **kwargs):
+        """Add a function to the dict."""
+        if not names:
+            raise TypeError('No names passed!')
+
+        bad_keywords = kwargs.keys() - self.allowed_attrs
+        if bad_keywords:
+            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+
+        def callback(func):
+            """Decorator to do the work of adding the function."""
+            # Set the name to <dict['name']>
+            func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            for name, value in kwargs.items():
+                setattr(func, name, value)
+            self.__setitem__(names, func)
+            return func
+
+        return callback
+
+    def __eq__(self, other):
+        if isinstance(other, FuncLookup):
+            return self._registry == other._registry
+        if not isinstance(other, collections.abc.Mapping):
+            return NotImplemented
+        return self._registry == dict(other.items())
+
+    def __iter__(self):
+        yield from self.values()
+
+    def __len__(self):
+        return len(set(self._registry.values()))
+
+    def __getitem__(self, names: Union[str, Tuple[str]]):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            try:
+                return self._registry[name]
+            except KeyError:
+                pass
+        else:
+            raise KeyError('No function with names {}!'.format(
+                ', '.join(names),
+            ))
+
+    def __setitem__(self, names: Union[str, Tuple[str]], func):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            if name in self._registry:
+                raise ValueError('Overwrote {!r}!'.format(name))
+            self._registry[name] = func
+
+    def __delitem__(self, name: str):
+        if self.casefold:
+            name = name.casefold()
+        del self._registry[name]
+
+    def __contains__(self, name):
+        if self.casefold:
+            name = name.casefold()
+        return name in self._registry
+
+    def functions(self):
+        """Return the set of functions in this mapping."""
+        return set(self._registry.values())
+
+    values = functions
+
+    def clear(self):
+        """Delete all functions."""
+        self._registry.clear()
+
+
 def get_indent(line: str):
     """Return the whitespace which this line starts with.
 
@@ -451,6 +567,12 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
+def quit_app(status=0):
+    """Quit the application."""
+    logging.shutdown()
+    sys.exit(status)
+
+
 def set_readonly(file):
     """Make the given file read-only."""
     # Get the old flags
@@ -495,7 +617,7 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
     names = os.listdir(src)
 
     os.makedirs(dst, exist_ok=True)
-    errors = []
+    errors = []  # type: List[Tuple[str, str, str]]
     for name in names:
         srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
@@ -529,8 +651,10 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
 
 def setup_localisations(logger: logging.Logger):
     """Setup gettext localisations."""
+    from srctools.property_parser import PROP_FLAGS_DEFAULT
     import gettext
     import locale
+
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
 
@@ -546,6 +670,11 @@ def setup_localisations(logger: logging.Logger):
 
     logger.info('Language: {!r}', lang_code)
     logger.debug('Language codes: {!r}', expanded_langs)
+
+    # Add these to Property's default flags, so config files can also
+    # be localised.
+    for lang in expanded_langs:
+        PROP_FLAGS_DEFAULT['lang_' + lang] = True
 
     for lang in expanded_langs:
         try:
@@ -614,7 +743,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger, alias=None):
+    def __init__(self, logger: logging.Logger, alias=None) -> None:
         # Alias is a replacement module name for log messages.
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
@@ -656,7 +785,7 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         """Allow passing an alias for log modules."""
         # This breaks %-formatting, so only set when init_logging() is called.
 
-        alias = None
+        alias = None  # type: str
 
         def getMessage(self):
             """We have to hook here to change the value of .module.
@@ -692,12 +821,21 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         log_handler = handlers.RotatingFileHandler(
             filename,
             maxBytes=500 * 1024,
-            backupCount=10,
+            backupCount=1,
         )
         log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
-
         logger.addHandler(log_handler)
+
+        err_log_handler = handlers.RotatingFileHandler(
+            filename[:-3] + 'error.' + filename[-3:],
+            maxBytes=500 * 1024,
+            backupCount=1,
+        )
+        err_log_handler.setLevel(logging.WARNING)
+        err_log_handler.setFormatter(long_log_format)
+
+        logger.addHandler(err_log_handler)
 
     # This is needed for multiprocessing, since it tries to flush stdout.
     # That'll fail if it is None.
@@ -745,8 +883,6 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
 
     def except_handler(*exc_info):
         """Log uncaught exceptions."""
-        if on_error is not None:
-            on_error(*exc_info)
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
@@ -754,6 +890,8 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
             exc_info=exc_info,
         )
         logging.shutdown()
+        if on_error is not None:
+            on_error(*exc_info)
         # Call the original handler - that prints to the normal console.
         old_except_handler(*exc_info)
 
