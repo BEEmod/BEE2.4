@@ -1,5 +1,5 @@
 """Adds breakable glass."""
-from conditions import make_result_setup, make_result, RES_EXHAUSTED
+from conditions import make_result_setup, make_result, RES_EXHAUSTED, local_name
 from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
@@ -13,6 +13,7 @@ LOGGER = utils.getLogger(__name__)
 BREAKABLE_GLASS_CONF = {}
 
 # For each direction, whether min/max
+# zero should be the normal axis.
 CORNER_NAMES = ['lowerleft', 'lowerright', 'upperleft', 'upperright']
 CORNER_POINTS = {
     Vec.N: [
@@ -129,6 +130,7 @@ def make_frames(vmf: VMF, targ: str, conf: dict, bbox_min: Vec, bbox_max: Vec, n
         ubend_axis = u_axis
     else:
         ubend_axis = None
+
     if ubend_axis is not None:
         for bend_mag, bbox in [(1, bbox_min), (-1, bbox_max)]:
             make_frame(
@@ -137,27 +139,33 @@ def make_frames(vmf: VMF, targ: str, conf: dict, bbox_min: Vec, bbox_max: Vec, n
                 norm.to_angle_roll(Vec.with_axes(ubend_axis, bend_mag)),
             )
     else:
-        # Make 4 corners.
-        make_frame(
-            'corner',
-            bbox_min,
-            norm.to_angle_roll(Vec.with_axes(v_axis, 1)),
-        )
-        make_frame(
-            'corner',
-            bbox_max,
-            norm.to_angle_roll(Vec.with_axes(v_axis, -1)),
-        )
-        make_frame(
-            'corner',
-            Vec.with_axes(u_axis, bbox_min, v_axis, bbox_max, norm_axis, bbox_min),
-            norm.to_angle_roll(Vec.with_axes(u_axis, 1)),
-        )
-        make_frame(
-            'corner',
-            Vec.with_axes(u_axis, bbox_max, v_axis, bbox_min, norm_axis, bbox_min),
-            norm.to_angle_roll(Vec.with_axes(u_axis, -1)),
-        )
+        # Make 4 corners - one in each roll direction.
+
+        for roll in range(0, 360, 90):
+            angles = norm.to_angle(roll)
+            # The two directions with a border in the corner instance.
+            # We want to put it on those sides.
+            corner_a = Vec(y=-1).rotate(*angles)
+            corner_b = Vec(z=-1).rotate(*angles)
+
+            # If the normal is positive, we want to be bbox_max in that axis,
+            # otherwise bbox_min.
+
+            pos = Vec.with_axes(
+                norm_axis, bbox_min,
+
+                corner_a.axis(),
+                (bbox_max if corner_a >= (0, 0, 0) else bbox_min),
+
+                corner_b.axis(),
+                (bbox_max if corner_b >= (0, 0, 0) else bbox_min),
+            )
+
+            make_frame(
+                'corner',
+                pos,
+                angles,
+            )
 
     # Make straight sections.
     straight_u_pos = norm.to_angle_roll(v_norm)
