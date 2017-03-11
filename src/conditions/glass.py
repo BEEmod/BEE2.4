@@ -252,7 +252,7 @@ def res_breakable_glass(inst: Entity, res: Property):
         breakable_surf = vmf.create_ent(
             classname='func_breakable_surf',
             targetname=targ + '-surf',
-            spawnflags=3,  # 'Physics damage decals, and take damage from held
+            spawnflags=1,  # 'Physics damage decals
             drawinfastreflection=1,
             # propdata=24,  # Glass.Window
             health=20,
@@ -279,7 +279,13 @@ def res_breakable_glass(inst: Entity, res: Property):
         clip_min += (conf['offset'] + 0.3) * norm
         clip_max += (conf['offset'] + 0.6) * norm
 
-        clip = vmf.create_ent(classname='func_brush', origin=bbox_min, spawnflags=0, targetname=targ + '-clip')
+        clip = vmf.create_ent(
+            targetname=targ + '-clip',
+            classname='func_brush',
+            # Make sure it's inside the map.
+            origin=bbox_min - 32 * norm,
+            spawnflags=0,
+        )
         clip.solids.append(
             vmf.make_prism(
                 clip_min,
