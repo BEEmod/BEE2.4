@@ -3,6 +3,7 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
 from tk_tools import TK_ROOT
+from enum import Enum
 
 from BEE2_config import GEN_OPTS
 from tooltip import add_tooltip
@@ -14,10 +15,22 @@ import srctools
 import contextWin
 import logWindow
 
+
+class AfterExport(Enum):
+    """Specifies what happens after exporting."""
+    NORMAL = 0  # Stay visible
+    MINIMISE = 1  # Minimise to tray
+    QUIT = 2  # Quit the app.
+
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
+LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
+AFTER_EXPORT_ACTION = IntVar(
+    value=AfterExport.MINIMISE.value,
+    name='OPT_after_export_action',
+)
 
 refresh_callbacks = []  # functions called to apply settings.
 
@@ -39,6 +52,7 @@ win.withdraw()
 
 
 def show():
+    """Display the option window."""
     win.deiconify()
     contextWin.hide_context()  # Ensure this closes
     utils.center_win(win)
@@ -94,7 +108,6 @@ def clear_caches():
     packageLoader.PACK_CONFIG.save_check()
 
     utils.restart_app()
-
 
 
 def make_checkbox(
@@ -225,6 +238,72 @@ def init_widgets():
 
 
 def init_gen_tab(f):
+    """Make widgets in the 'General' tab."""
+    def load_after_export():
+        """Read the 'After Export' radio set."""
+        AFTER_EXPORT_ACTION.set(GEN_OPTS.get_int(
+            'General',
+            'after_export_action',
+            AFTER_EXPORT_ACTION.get()
+        ))
+
+    def save_after_export():
+        """Save the 'After Export' radio set."""
+        GEN_OPTS['General']['after_export_action'] = str(AFTER_EXPORT_ACTION.get())
+
+    after_export_frame = ttk.LabelFrame(
+        f,
+        text=_('After Export:'),
+    )
+    after_export_frame.grid(
+        row=0,
+        rowspan=2,
+        column=0,
+        sticky='NS',
+        padx=(0, 10),
+    )
+
+    VARS['General', 'after_export_action'] = AFTER_EXPORT_ACTION
+    AFTER_EXPORT_ACTION.load = load_after_export
+    AFTER_EXPORT_ACTION.save = save_after_export
+    load_after_export()
+
+    exp_nothing = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Do Nothing'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.NORMAL.value,
+    )
+    exp_minimise = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Minimise BEE2'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.MINIMISE.value,
+    )
+    exp_quit = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Quit BEE2'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.QUIT.value,
+    )
+    exp_nothing.grid(row=0, column=0, sticky='w')
+    exp_minimise.grid(row=1, column=0, sticky='w')
+    exp_quit.grid(row=2, column=0, sticky='w')
+
+    add_tooltip(exp_nothing, _('After exports, do nothing and '
+                               'keep the BEE2 in focus.'))
+    add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
+    add_tooltip(exp_minimise, _('After exports, quit the BEE2.'))
+
+    UI['launch_game'] = launch_game = make_checkbox(
+        after_export_frame,
+        section='General',
+        item='launch_Game',
+        var=LAUNCH_AFTER_EXPORT,
+        desc=_('Launch Game'),
+        tooltip=_('After exporting, launch the selected game automatically.'),
+    )
+    launch_game.grid(row=3, column=0, sticky='W', pady=(10, 0))
 
     if sound.initiallised:
         UI['mute'] = mute = make_checkbox(
@@ -245,14 +324,14 @@ def init_gen_tab(f):
             _('Pyglet is either not installed or broken.\n'
               'Sound effects have been disabled.')
         )
-    mute.grid(row=0, column=0, sticky=W)
+    mute.grid(row=0, column=1, sticky='E')
 
     UI['reset_cache'] = reset_cache = ttk.Button(
         f,
         text=_('Reset Package Caches'),
         command=clear_caches,
     )
-    reset_cache.grid(row=2, column=0, columnspan=2, sticky='SEW')
+    reset_cache.grid(row=1, column=1, sticky='EW')
     add_tooltip(
         reset_cache,
         _('Force re-extracting all package resources. This requires a restart.'),

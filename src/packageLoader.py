@@ -116,6 +116,9 @@ VPK_FOLDER = {
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
 
+class NoVPKExport(Exception):
+    """Raised to indicate that VPK files weren't copied."""
+
 
 class _PakObjectMeta(type):
     def __new__(mcs, name, bases, namespace, allow_mult=False, has_img=True):
@@ -2195,7 +2198,7 @@ class StyleVPK(PakObject, has_img=False):
         try:
             dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
         except PermissionError:
-            return  # We can't edit the VPK files - P2 is open..
+            raise NoVPKExport() # We can't edit the VPK files - P2 is open..
 
         if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
             # In Portal 2, we make a dlc3 folder - this changes priorities,

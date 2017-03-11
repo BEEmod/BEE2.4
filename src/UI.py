@@ -831,7 +831,7 @@ def export_editoritems(e=None):
         item_opts.items()
     }
 
-    success = gameMan.selected_game.export(
+    success, vpk_success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
             # Specify the 'chosen item' for each object type
@@ -855,12 +855,6 @@ def export_editoritems(e=None):
     if not success:
         return
 
-    launch_game = messagebox.askyesno(
-        'BEEMOD2',
-        message=_('Selected Items and Style successfully exported!\n'
-                  'Launch game?'),
-    )
-
     export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
     for pal in palettes[:]:
@@ -881,6 +875,40 @@ def export_editoritems(e=None):
     palettes.append(new_pal)
     new_pal.save(ignore_readonly=True)
 
+    # Update corridor configs for standalone mode..
+    CompilerPane.save_corridors()
+
+    # Save the configs since we're writing to disk lots anyway.
+    GEN_OPTS.save_check()
+    item_opts.save_check()
+
+    message = _('Selected Items and Style successfully exported!')
+    if not vpk_success:
+        message += _(
+            '\n\nWarning: VPK files were not exported, quit Portal 2 and '
+            'Hammer to ensure editor wall previews are changed.'
+        )
+
+    chosen_action = optionWindow.AfterExport(
+        optionWindow.AFTER_EXPORT_ACTION.get()
+    )
+
+    messagebox.showinfo('BEEMOD2', message)
+
+    # Launch first so quitting doesn't affect this.
+    if optionWindow.LAUNCH_AFTER_EXPORT.get():
+        gameMan.selected_game.launch()
+
+    # Do the desired action - if quit, we don't bother to update UI.
+    if chosen_action is optionWindow.AfterExport.NORMAL:
+        pass
+    elif chosen_action is optionWindow.AfterExport.MINIMISE:
+        TK_ROOT.iconify()
+    elif chosen_action is optionWindow.AfterExport.QUIT:
+        utils.quit_app()
+    else:
+        raise ValueError('Unknown action "{}"'.format(chosen_action))
+
     # Select the last_export palette, so reloading loads this item selection.
     palettes.sort(key=str)
     selectedPalette_radio.set(palettes.index(new_pal))
@@ -889,17 +917,7 @@ def export_editoritems(e=None):
     # Re-set this, so we clear the '*' on buttons if extracting cache.
     set_game(gameMan.selected_game)
 
-    # Save the configs since we're writing to disk lots anyway.
-    GEN_OPTS.save_check()
-    item_opts.save_check()
-
-    # Update corridor configs for standalone mode..
-    CompilerPane.save_corridors()
     refresh_pal_ui()
-
-    if launch_game:
-        gameMan.selected_game.launch()
-        TK_ROOT.iconify()
 
 
 def set_disp_name(item, e=None):
@@ -1232,9 +1250,13 @@ def init_palette(f):
 
     def set_pal_listbox(e=None):
         global selectedPalette
-        selectedPalette = int(UI['palette'].curselection()[0])
-        selectedPalette_radio.set(selectedPalette)
-        set_palette()
+        cur_selection = UI['palette'].curselection()
+        if cur_selection: # Might be blank if none selected
+            selectedPalette = int(cur_selection[0])
+            selectedPalette_radio.set(selectedPalette)
+            set_palette()
+        else:
+            UI['palette'].selection_set(selectedPalette, selectedPalette)
     UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
     UI['palette'].bind("<Enter>", set_pal_listbox_selection)
     # Set the selected state when hovered, so users can see which is

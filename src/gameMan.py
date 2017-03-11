@@ -29,7 +29,7 @@ import packageLoader
 import utils
 import srctools
 
-from typing import List
+from typing import List, Tuple
 
 LOGGER = utils.getLogger(__name__)
 
@@ -440,11 +440,11 @@ class Game:
         self.mod_times.clear()
 
     def export(
-            self,
-            style: packageLoader.Style,
-            selected_objects: dict,
-            should_refresh=False,
-            ):
+        self,
+        style: packageLoader.Style,
+        selected_objects: dict,
+        should_refresh=False,
+        ) -> Tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -515,6 +515,8 @@ class Game:
         editoritems, vbsp_config = style.export()
         export_screen.step('EXP')
 
+        vpk_success = True
+
         # Export each object type.
         for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
             if obj_name == 'Style':
@@ -523,13 +525,18 @@ class Game:
             LOGGER.info('Exporting "{}"', obj_name)
             selected = selected_objects.get(obj_name, None)
 
-            obj_data.cls.export(packageLoader.ExportData(
-                game=self,
-                selected=selected,
-                editoritems=editoritems,
-                vbsp_conf=vbsp_config,
-                selected_style=style,
-            ))
+            try:
+                obj_data.cls.export(packageLoader.ExportData(
+                    game=self,
+                    selected=selected,
+                    editoritems=editoritems,
+                    vbsp_conf=vbsp_config,
+                    selected_style=style,
+                ))
+            except packageLoader.NoVPKExport:
+                # Raised by StyleVPK to indicate it failed to copy.
+                vpk_success = False
+
             export_screen.step('EXP')
 
         vbsp_config.set_key(
@@ -642,7 +649,7 @@ class Game:
                                 ),
                         master=TK_ROOT,
                     )
-                    return False
+                    return False, vpk_success
                 export_screen.step('COMP')
 
 
@@ -658,7 +665,7 @@ class Game:
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
-        return True
+        return True, vpk_success
 
     @staticmethod
     def build_instance_data(editoritems: Property):
