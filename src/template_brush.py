@@ -1,6 +1,7 @@
 """Templates are sets of brushes which can be copied into the map."""
 import random
 from collections import defaultdict
+from collections.abc import Mapping
 from enum import Enum
 
 import srctools
@@ -19,7 +20,7 @@ from typing import (
 LOGGER = utils.getLogger(__name__, alias='template')
 
 # A lookup for templates.
-TEMPLATES = {}  # type: Dict[str, Template]
+TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
 
 # The location of the template data.
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
@@ -340,6 +341,10 @@ def load_templates():
     for ent in vmf.by_class['bee2_template_conf']:
         conf_ents[ent['template_id'].casefold()] = ent
 
+    for ent in vmf.by_class['bee2_template_scaling']:
+        temp = ScalingTemplate.parse(ent)
+        TEMPLATES[temp.id.casefold()] = temp
+
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
         try:
             conf = conf_ents[temp_id]
@@ -366,15 +371,20 @@ def load_templates():
         )
 
 
-def get_template(temp_name):
-    """Get the data associated with a given template.
-
-    This is a dictionary mapping visgroups -> (world, detail, over) tuples.
-    """
+def get_template(temp_name) -> Template:
+    """Get the data associated with a given template."""
     try:
-        return TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        raise InvalidTemplateName(temp_name) from err
+        temp = TEMPLATES[temp_name.casefold()]
+    except KeyError:
+        raise InvalidTemplateName(temp_name) from None
+
+    if isinstance(temp, ScalingTemplate):
+        raise ValueError(
+            'Scaling Template "{}" cannot be used '
+            'as a normal template!'.format(temp_name)
+        )
+
+    return temp
 
 
 def import_template(
@@ -502,15 +512,24 @@ def import_template(
     )
 
 
-def get_scaling_template(
-        temp_id: str,
-    ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
+def get_scaling_template(temp_id: str) -> ScalingTemplate:
     """Get the scaling data from a template.
 
     This is a dictionary mapping normals to the U,V and rotation data.
     """
     temp_name, over_names = parse_temp_name(temp_id)
-    world, detail, over = get_template(temp_name).visgrouped(over_names)
+
+    try:
+        temp = TEMPLATES[temp_name.casefold()]
+    except KeyError:
+        raise InvalidTemplateName(temp_name) from None
+
+    if isinstance(temp, ScalingTemplate):
+        return temp
+
+    # Otherwise parse the normal template into a scaling one.
+
+    world, detail, over = temp.visgrouped(over_names)
 
     if detail:
         world += detail
@@ -520,12 +539,15 @@ def get_scaling_template(
     for brush in world:
         for side in brush.sides:
             uvs[side.normal().as_tuple()] = (
+                side.mat,
                 side.uaxis.copy(),
                 side.vaxis.copy(),
-                side.ham_rot,
             )
 
-    return uvs
+    return ScalingTemplate(
+        temp.id,
+        uvs
+    )
 
 
 def retexture_template(
