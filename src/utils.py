@@ -881,19 +881,25 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
     # logging system.
     old_except_handler = sys.excepthook
 
-    def except_handler(*exc_info):
+    def except_handler(exc_type, exc_value, exc_tb):
         """Log uncaught exceptions."""
+        if not issubclass(exc_type, Exception):
+            # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
+            # so we should quit without messages.
+            logging.shutdown()
+            return
+
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
             args=(),
-            exc_info=exc_info,
+            exc_info=(exc_type, exc_value, exc_tb),
         )
         logging.shutdown()
         if on_error is not None:
-            on_error(*exc_info)
+            on_error(exc_type, exc_value, exc_tb)
         # Call the original handler - that prints to the normal console.
-        old_except_handler(*exc_info)
+        old_except_handler(exc_type, exc_value, exc_tb)
 
     sys.excepthook = except_handler
 

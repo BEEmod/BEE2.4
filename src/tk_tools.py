@@ -95,6 +95,11 @@ def on_error(exc_type, exc_value, exc_tb):
     except Exception:
         pass
 
+    if not issubclass(exc_type, Exception):
+        # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
+        # so ignore the error.
+        return
+
     # Put it onscreen.
     try:
         from tkinter import messagebox

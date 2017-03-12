@@ -356,11 +356,10 @@ def load_packages(
             message='The given packages directory is not present!\n'
                     'Get the packages from '
                     '"http://github.com/BEEmod/BEE2-items" '
-                    'and place them in "' + pak_dir +
-                    os.path.sep + '".',
+                    'and place them in "' + pak_dir + os.path.sep + '".',
                     # Add slash to the end to indicate it's a folder.
         )
-        sys.exit('No Packages Directory!')
+        sys.exit()
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
