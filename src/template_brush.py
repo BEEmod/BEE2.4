@@ -207,6 +207,88 @@ class Template:
         return world_brushes, detail_brushes, overlays
 
 
+class ScalingTemplate(Mapping):
+    """Represents a special version of templates, used for texturing brushes.
+
+    The template is a single world-aligned cube brush, with the 6 sides used
+    to determine orientation and materials for some texture set.
+    It's stored in an ent so we don't need all the data. Values are returned
+    as (material, U, V, rotation) tuples.
+    """
+
+    def __init__(
+        self,
+        temp_id: str,
+        axes: Dict[Tuple[float, float, float], Tuple[str, UVAxis, UVAxis, float]],
+    ):
+        self.id = temp_id
+        self._axes = axes
+        # Only keys used....
+        assert set(axes.keys()) == {
+            (0, 0, 1), (0, 0, -1),
+            (1, 0, 0), (-1, 0, 0),
+            (0, -1, 0), (0, 1, 0),
+        }, axes.keys()
+
+    @classmethod
+    def parse(cls, ent: Entity):
+        """Parse a template from a config entity.
+
+        This should be a 'bee2_template_scaling' entity.
+        """
+        axes = {}
+
+        for norm, name in (
+            ((0, 0, 1), 'up'),
+            ((0, 0, -1), 'dn'),
+            ((0, 1, 0), 'n'),
+            ((0, -1, 0), 's'),
+            ((1, 0, 0), 'e'),
+            ((-1, 0, 0), 'w'),
+        ):
+            axes[norm] = (
+                ent[name + '_tex'],
+                UVAxis.parse(ent[name + '_uaxis']),
+                UVAxis.parse(ent[name + '_vaxis']),
+                srctools.conv_float(ent[name + '_rotation']),
+            )
+        return cls(ent['template_id'], axes)
+
+    def __len__(self):
+        return 6
+
+    def __iter__(self):
+        yield from [
+            Vec(-1, 0, 0),
+            Vec(1, 0, 0),
+            Vec(0, -1, 0),
+            Vec(0, 1, 0),
+            Vec(0, 0, -1),
+            Vec(0, 0, 1),
+        ]
+
+    def __getitem__(self, normal: Union[Vec, Tuple[float, float, float]]):
+        mat, axis_u, axis_v, rotation = self._axes[tuple(normal)]
+        return mat, axis_u.copy(), axis_v.copy(), rotation
+
+    def rotate(self, angles: Vec):
+        """Rotate this template, and return a new template with those angles."""
+        new_axis = {}
+        for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
+            axis_u = axis_u.rotate(angles)
+            axis_v = axis_v.rotate(angles)
+            norm = Vec(norm).rotate(*angles)
+            new_axis[norm.as_tuple()] = mat, axis_u, axis_v, rot
+
+        return ScalingTemplate(self.id, new_axis)
+
+    def apply(self, face: Side, *, change_mat=True):
+        """Apply the template to a face."""
+        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal().as_tuple()]
+        if change_mat:
+            face.mat = mat
+
+
 def parse_temp_name(name) -> Tuple[str, Set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
