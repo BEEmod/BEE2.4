@@ -2552,6 +2552,16 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
+    # For scaling templates, maps normals to the prefix to use in the ent.
+    NORMAL_TO_NAME = {
+        (0, 0, 1): 'up',
+        (0, 0, -1): 'dn',
+        (0, 1, 0): 'n',
+        (0, -1, 0): 's',
+        (1, 0, 0): 'e',
+        (-1, 0, 0): 'w',
+    }
+
     def __init__(self, temp_id: str, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
@@ -2625,8 +2635,9 @@ class BrushTemplate(PakObject, has_img=False):
                 'angles',
             ):
                 del export_config[key]
-            # Only add if it has useful settings.
-            if export_config.keys:
+            # Only add if it has useful settings, and we're not a scaling
+            # template.
+            if export_config.keys and not is_scaling:
                 TEMPLATE_FILE.add_ent(export_config)
                 export_config['template_id'] = temp_id
 
@@ -2637,7 +2648,39 @@ class BrushTemplate(PakObject, has_img=False):
             LOGGER.warning('Template "{}" has no config!', temp_id)
 
         if is_scaling:
-            raise NotImplementedError()  # TODO
+            # Make a scaling template config.
+            scaling_conf = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_scaling',
+                template_id=temp_id,
+            )
+            scale_brush = None
+            for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+                for brush in brushes:
+                    if scale_brush is None:
+                        scale_brush = brush
+                    else:
+                        raise ValueError(
+                            'Too many brushes in scaling '
+                            'template "{}"!'.format(temp_id),
+                        )
+            if scale_brush is None:
+                raise ValueError(
+                    'No brushes in scaling template "{}"!'.format(temp_id)
+                )
+
+            for face in scale_brush:
+                try:
+                    prefix = BrushTemplate.NORMAL_TO_NAME[face.normal().as_tuple()]
+                except KeyError:
+                    raise ValueError(
+                        'Non Axis-Aligned face in '
+                        'scaling template "{}"!'.format(temp_id),
+                    )
+                scaling_conf[prefix + '_tex'] = face.mat
+                scaling_conf[prefix + '_uaxis'] = face.uaxis
+                scaling_conf[prefix + '_vaxis'] = face.vaxis
+                scaling_conf[prefix + '_rotation'] = face.ham_rot
+
         elif keep_brushes:
             for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
                 if force_is_detail is not None:
@@ -2736,15 +2779,19 @@ class BrushTemplate(PakObject, has_img=False):
         TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
 
         # Place the config entities in a nice grid.
-        conf_ents = list(TEMPLATE_FILE.by_class['bee2_template_conf'])
-        dist = math.floor(math.sqrt(len(conf_ents)))
-        half_dist = dist / 2
-        for i, ent in enumerate(conf_ents):
-            ent['origin'] = Vec(
-                16 * ((i // dist) - half_dist),
-                16 * ((i % dist) - half_dist),
-                256,
-            )
+        for conf_class, height in (
+            ('bee2_template_conf', 256),
+            ('bee2_template_scaling', 256 + 16),
+        ):
+            conf_ents = list(TEMPLATE_FILE.by_class[conf_class])
+            dist = math.floor(math.sqrt(len(conf_ents)))
+            half_dist = dist / 2
+            for i, ent in enumerate(conf_ents):
+                ent['origin'] = Vec(
+                    16 * ((i // dist) - half_dist),
+                    16 * ((i % dist) - half_dist),
+                    height,
+                )
 
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:
