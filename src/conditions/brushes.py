@@ -417,7 +417,8 @@ def res_import_template_setup(res: Property):
     else:
         force_grid = None
 
-    invert_var = res['invertVar', res['colorVar', '']]
+    invert_var = res['invertVar', '']
+    color_var = res['colorVar', '']
 
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
@@ -494,6 +495,7 @@ def res_import_template_setup(res: Property):
         transfer_overlays,
         additional_ids,
         invert_var,
+        color_var,
         visgroup_func,
         keys,
     )
@@ -532,12 +534,14 @@ def res_import_template(inst: Entity, res: Property):
             - "origin", offset automatically.
             - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
-    - invertVar or colorVar: If this fixup value is true, tile colour will be
-            swapped to the opposite of the current force option. If it is set
-            to 'white' or 'black', that colour will be forced instead.
+    - colorVar: If this fixup var is set
+            to 'white' or 'black', that colour will be forced.
             If the value is '<editor>', the colour will be chosen based on
             the color of the surface for ItemButtonFloor, funnels or
             entry/exit frames.
+    - invertVar: If this fixup value is true, tile colour will be
+            swapped to the opposite of the current force option. This applies
+            after colorVar.
     - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
@@ -553,6 +557,7 @@ def res_import_template(inst: Entity, res: Property):
         transfer_overlays,
         additional_replace_ids,
         invert_var,
+        color_var,
         visgroup_func,
         key_block,
     ) = res.value
@@ -578,7 +583,7 @@ def res_import_template(inst: Entity, res: Property):
             )
         return
 
-    if invert_var.casefold() == '<editor>':
+    if color_var.casefold() == '<editor>':
         # Check traits for the colour it should be.
         traits = instance_traits.get(inst)
         if 'white' in traits:
@@ -592,17 +597,18 @@ def res_import_template(inst: Entity, res: Property):
                 temp_id,
                 inst['file'],
             )
-    elif invert_var:
-        invert_val = inst.fixup[invert_var].casefold()
+    elif color_var:
+        color_val = conditions.resolve_value(inst, color_var).casefold()
 
-        if invert_val == 'white':
+        if color_val == 'white':
             force_colour = template_brush.MAT_TYPES.white
-        elif invert_val == 'black':
+        elif color_val == 'black':
             force_colour = template_brush.MAT_TYPES.black
-        elif srctools.conv_bool(invert_val):
-            force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
-        # else: False value, no invert.
-    # else: invert_var = None
+    # else: no color var
+
+    if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):
+        force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
+    # else: False value, no invert.
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
