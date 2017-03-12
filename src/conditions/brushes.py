@@ -484,6 +484,9 @@ def res_import_template_setup(res: Property):
                 if val <= visgroup_mode:
                     yield group
 
+    # If true, force visgroups to all be used.
+    visgroup_force_var = res['forceVisVar', '']
+
     return (
         temp_id,
         dict(replace_tex),
@@ -497,6 +500,7 @@ def res_import_template_setup(res: Property):
         invert_var,
         color_var,
         visgroup_func,
+        visgroup_force_var,
         keys,
     )
 
@@ -545,6 +549,8 @@ def res_import_template(inst: Entity, res: Property):
     - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
+    - visgroup_force_var: If set and True, visgroup is ignored and all groups
+            are added.
     """
     (
         orig_temp_id,
@@ -559,9 +565,15 @@ def res_import_template(inst: Entity, res: Property):
         invert_var,
         color_var,
         visgroup_func,
+        visgroup_force_var,
         key_block,
     ) = res.value
     temp_id = conditions.resolve_value(inst, orig_temp_id)
+
+    if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+        def visgroup_func(group):
+            """Use all the groups."""
+            yield from group
 
     temp_name, visgroups = template_brush.parse_temp_name(temp_id)
     try:
