@@ -1659,14 +1659,12 @@ def fixup_goo_sides():
                     if face.mat == '':  # goo_floor is invalid, or not used
                         face.mat = get_tex('special.goo_wall')
 
-                    if face.mat == '': # No overrides, use normal textures.
+                    if face.mat == '':  # No overrides, use normal textures.
                         face.mat = get_tex('black.4x4')
 
                     if scale is not None:
                         # Allow altering the orientation of the texture.
-                        u, v, face.ham_rot = scale[norm.as_tuple()]
-                        face.uaxis = u.copy()
-                        face.vaxis = v.copy()
+                        scale.apply(face, change_mat=False)
 
                     IGNORED_FACES.add(face)
 
@@ -1917,13 +1915,7 @@ def change_brush():
                 )
             if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
-                    try:
-                        u, v, face.ham_rot = glass_temp[face.normal().as_tuple()]
-                    except KeyError:
-                        pass
-                    else:
-                        face.uaxis = u.copy()
-                        face.vaxis = v.copy()
+                    glass_temp.apply(face, change_mat=False)
                 else:
                     # Apply the glass scaling option
                     face.scale = glass_scale
@@ -2834,13 +2826,7 @@ def change_func_brush():
                 if side.mat == consts.Special.GRATING:
                     is_grating = True
                     if grate_temp is not None:
-                        try:
-                            u, v, side.ham_rot = grate_temp[side.normal().as_tuple()]
-                        except KeyError:
-                            pass
-                        else:
-                            side.uaxis = u.copy()
-                            side.vaxis = v.copy()
+                        grate_temp.apply(side, change_mat=False)
                     else:
                         side.scale = grating_scale
 

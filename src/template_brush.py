@@ -1,6 +1,7 @@
 """Templates are sets of brushes which can be copied into the map."""
 import random
 from collections import defaultdict
+from collections.abc import Mapping
 from enum import Enum
 
 import srctools
@@ -19,7 +20,7 @@ from typing import (
 LOGGER = utils.getLogger(__name__, alias='template')
 
 # A lookup for templates.
-TEMPLATES = {}  # type: Dict[str, Template]
+TEMPLATES = {}  # type: Dict[str, Union[Template, ScalingTemplate]]
 
 # The location of the template data.
 TEMPLATE_LOCATION = 'bee2/templates.vmf'
@@ -207,6 +208,88 @@ class Template:
         return world_brushes, detail_brushes, overlays
 
 
+class ScalingTemplate(Mapping):
+    """Represents a special version of templates, used for texturing brushes.
+
+    The template is a single world-aligned cube brush, with the 6 sides used
+    to determine orientation and materials for some texture set.
+    It's stored in an ent so we don't need all the data. Values are returned
+    as (material, U, V, rotation) tuples.
+    """
+
+    def __init__(
+        self,
+        temp_id: str,
+        axes: Dict[Tuple[float, float, float], Tuple[str, UVAxis, UVAxis, float]],
+    ):
+        self.id = temp_id
+        self._axes = axes
+        # Only keys used....
+        assert set(axes.keys()) == {
+            (0, 0, 1), (0, 0, -1),
+            (1, 0, 0), (-1, 0, 0),
+            (0, -1, 0), (0, 1, 0),
+        }, axes.keys()
+
+    @classmethod
+    def parse(cls, ent: Entity):
+        """Parse a template from a config entity.
+
+        This should be a 'bee2_template_scaling' entity.
+        """
+        axes = {}
+
+        for norm, name in (
+            ((0, 0, 1), 'up'),
+            ((0, 0, -1), 'dn'),
+            ((0, 1, 0), 'n'),
+            ((0, -1, 0), 's'),
+            ((1, 0, 0), 'e'),
+            ((-1, 0, 0), 'w'),
+        ):
+            axes[norm] = (
+                ent[name + '_tex'],
+                UVAxis.parse(ent[name + '_uaxis']),
+                UVAxis.parse(ent[name + '_vaxis']),
+                srctools.conv_float(ent[name + '_rotation']),
+            )
+        return cls(ent['template_id'], axes)
+
+    def __len__(self):
+        return 6
+
+    def __iter__(self):
+        yield from [
+            Vec(-1, 0, 0),
+            Vec(1, 0, 0),
+            Vec(0, -1, 0),
+            Vec(0, 1, 0),
+            Vec(0, 0, -1),
+            Vec(0, 0, 1),
+        ]
+
+    def __getitem__(self, normal: Union[Vec, Tuple[float, float, float]]):
+        mat, axis_u, axis_v, rotation = self._axes[tuple(normal)]
+        return mat, axis_u.copy(), axis_v.copy(), rotation
+
+    def rotate(self, angles: Vec):
+        """Rotate this template, and return a new template with those angles."""
+        new_axis = {}
+        for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
+            axis_u = axis_u.rotate(angles)
+            axis_v = axis_v.rotate(angles)
+            norm = Vec(norm).rotate(*angles)
+            new_axis[norm.as_tuple()] = mat, axis_u, axis_v, rot
+
+        return ScalingTemplate(self.id, new_axis)
+
+    def apply(self, face: Side, *, change_mat=True):
+        """Apply the template to a face."""
+        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal().as_tuple()]
+        if change_mat:
+            face.mat = mat
+
+
 def parse_temp_name(name) -> Tuple[str, Set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
@@ -258,6 +341,10 @@ def load_templates():
     for ent in vmf.by_class['bee2_template_conf']:
         conf_ents[ent['template_id'].casefold()] = ent
 
+    for ent in vmf.by_class['bee2_template_scaling']:
+        temp = ScalingTemplate.parse(ent)
+        TEMPLATES[temp.id.casefold()] = temp
+
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
         try:
             conf = conf_ents[temp_id]
@@ -284,15 +371,20 @@ def load_templates():
         )
 
 
-def get_template(temp_name):
-    """Get the data associated with a given template.
-
-    This is a dictionary mapping visgroups -> (world, detail, over) tuples.
-    """
+def get_template(temp_name) -> Template:
+    """Get the data associated with a given template."""
     try:
-        return TEMPLATES[temp_name.casefold()]
-    except KeyError as err:
-        raise InvalidTemplateName(temp_name) from err
+        temp = TEMPLATES[temp_name.casefold()]
+    except KeyError:
+        raise InvalidTemplateName(temp_name) from None
+
+    if isinstance(temp, ScalingTemplate):
+        raise ValueError(
+            'Scaling Template "{}" cannot be used '
+            'as a normal template!'.format(temp_name)
+        )
+
+    return temp
 
 
 def import_template(
@@ -420,15 +512,24 @@ def import_template(
     )
 
 
-def get_scaling_template(
-        temp_id: str,
-    ) -> Dict[Vec_tuple, Tuple[UVAxis, UVAxis, float]]:
+def get_scaling_template(temp_id: str) -> ScalingTemplate:
     """Get the scaling data from a template.
 
     This is a dictionary mapping normals to the U,V and rotation data.
     """
     temp_name, over_names = parse_temp_name(temp_id)
-    world, detail, over = get_template(temp_name).visgrouped(over_names)
+
+    try:
+        temp = TEMPLATES[temp_name.casefold()]
+    except KeyError:
+        raise InvalidTemplateName(temp_name) from None
+
+    if isinstance(temp, ScalingTemplate):
+        return temp
+
+    # Otherwise parse the normal template into a scaling one.
+
+    world, detail, over = temp.visgrouped(over_names)
 
     if detail:
         world += detail
@@ -438,12 +539,15 @@ def get_scaling_template(
     for brush in world:
         for side in brush.sides:
             uvs[side.normal().as_tuple()] = (
+                side.mat,
                 side.uaxis.copy(),
                 side.vaxis.copy(),
-                side.ham_rot,
             )
 
-    return uvs
+    return ScalingTemplate(
+        temp.id,
+        uvs
+    )
 
 
 def retexture_template(
