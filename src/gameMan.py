@@ -1053,7 +1053,7 @@ def add_game(e=None, refresh_menu=True):
             else:
                 break
 
-        new_game = Game(name, gm_id, folder)
+        new_game = Game(name, gm_id, folder, {})
         new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
         if refresh_menu:
