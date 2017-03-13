@@ -46,15 +46,12 @@ EXCLUDES = [
 import logging.handlers
 if not hasattr(logging.handlers, 'socket'):
     EXCLUDES.append('socket')
+    # Subprocess uses this in UNIX-style OSes, but not Windows.
+    if utils.WIN:
+        EXCLUDES += ['selectors', 'select']
 if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
-
-if utils.WIN:
-    # Subprocess uses this in UNIX-style OSes, but not Windows
-    EXCLUDES.append('select')
-    if 'socket' in EXCLUDES:  # Only if not used by socket!
-        EXCLUDES.append('selectors')
 
 if utils.MAC or utils.LINUX:
     EXCLUDES += ['grp', 'pwd']  # Unix authentication modules, optional
