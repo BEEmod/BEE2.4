@@ -5,6 +5,7 @@ from srctools import Property, Vec, VMF, Solid, Side, Entity, Output
 
 import utils
 import comp_consts as const
+import template_brush
 
 from typing import Iterator, Any, Tuple, Dict, List
 
@@ -206,7 +207,7 @@ def make_frames(vmf: VMF, targ: str, conf: dict, bbox_min: Vec, bbox_max: Vec, n
 def res_breakable_glass_setup(res: Property):
     item_id = res['item']
     conf = {
-        'material': res['material'],
+        'template': template_brush.get_scaling_template(res['template']),
         'offset': res.float('offset', 0.5),
         # Distance inward from the frames the glass should span.
         'border_size': res.float('border_size', 0),
@@ -252,7 +253,7 @@ def res_breakable_glass(inst: Entity, res: Property):
         surf_solid = vmf.make_prism(solid_min, solid_max).solid
         for face in surf_solid:  # type: Side
             if face.normal() == norm:
-                face.mat = conf['material']
+                conf['template'].apply(face, change_mat=True)
 
         breakable_surf = vmf.create_ent(
             classname='func_breakable_surf',
