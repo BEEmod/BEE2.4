@@ -453,6 +453,8 @@ def widget_color_multi(
 
 def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label:
     """Make a single swatch."""
+    # Note: tkinter requires RGB as ints, not float!
+
     color = var.get()
     if color.startswith('#'):
         try:
@@ -461,7 +463,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label
             LOGGER.warning('Invalid RGB value: "{}"!', color)
             r = g = b = 128
     else:
-        r, g, b = Vec.from_str(color, 128, 128, 128)
+        r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
 
     def open_win(e):
         """Display the color selection window."""
@@ -473,7 +475,7 @@ def make_color_swatch(parent: tk.Frame, var: tk.StringVar, size=16) -> ttk.Label
             title=_('Choose a Color'),
         )
         if new_color is not None:
-            r, g, b = new_color
+            r, g, b = map(int, new_color) # Returned as floats, which is wrong.
             var.set('{} {} {}'.format(int(r), int(g), int(b)))
             swatch['image'] = img.color_square(round(Vec(r, g, b)), size)
 
