@@ -529,6 +529,12 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 
     # Otherwise parse the normal template into a scaling one.
 
+    LOGGER.warning(
+        'Template "{}" used as scaling template,'
+        ' but is not really one!',
+        temp_id,
+    )
+
     world, detail, over = temp.visgrouped(over_names)
 
     if detail:
@@ -542,6 +548,7 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
                 side.mat,
                 side.uaxis.copy(),
                 side.vaxis.copy(),
+                side.ham_rot
             )
 
     return ScalingTemplate(
