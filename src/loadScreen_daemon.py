@@ -23,6 +23,7 @@ def run_screen(
 
     window = tk.Tk()
     window.wm_overrideredirect(True)
+    window.attributes('-topmost', 1)
 
     window['cursor'] = utils.CURSORS['wait']
     
