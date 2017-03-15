@@ -124,5 +124,10 @@ LOGGER.info('Initialising UI...')
 UI.init_windows()  # create all windows
 LOGGER.info('UI initialised!')
 
+loadScreen.main_loader.destroy()
+# Delay this until the loop has actually run.
+# Directly run TK_ROOT.lift() in TCL, instead
+# of building a callable.
+TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
 
 TK_ROOT.mainloop()
