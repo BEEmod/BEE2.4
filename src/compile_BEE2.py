@@ -163,7 +163,7 @@ setup(
     },
     executables=[
         Executable(
-            'BEE2.pyw',
+            'BEE2_launch.pyw',
             base=base,
             icon=ico_path,
         ),
