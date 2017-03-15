@@ -1,15 +1,15 @@
 """Displays a loading menu while packages, palettes, etc are being loaded."""
-from tkinter import *  # ui library
-from tkinter.font import Font
+from tkinter import *
 from tk_tools import TK_ROOT
 from tkinter import ttk
 
 from weakref import WeakSet
 from abc import abstractmethod
 import contextlib
+import multiprocessing
 
+from loadScreen_daemon import run_screen as _splash_daemon
 import utils
-import img
 
 # Keep a reference to all loading screens, so we can close them globally.
 _ALL_SCREENS = WeakSet()
@@ -58,7 +58,7 @@ def patch_tk_dialogs():
 patch_tk_dialogs()
 
 
-class BaseLoadScreen(Toplevel):
+class BaseLoadScreen:
     """Code common to both loading screen types."""
     def __init__(self, stages):
         self.stages = list(stages)
@@ -68,38 +68,7 @@ class BaseLoadScreen(Toplevel):
 
         self.active = False
         # active determines whether the screen is on, and if False stops most
-        # functions from doing anything.
-
-        # Initialise the window
-        super().__init__(
-            TK_ROOT,
-            cursor=utils.CURSORS['wait'],
-        )
-        self.withdraw()
-
-        _ALL_SCREENS.add(self)
-
-        # this prevents stuff like the title bar, normal borders etc from
-        # appearing in this window.
-        self.overrideredirect(1)
-        self.resizable(False, False)
-        self.attributes('-topmost', 1)
-
-    def show(self):
-        """Display this loading screen."""
-        self.active = True
-        self.deiconify()
-        self.lift()
-        self.update()  # Force an update so the reqwidth is correct
-        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
-        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
-        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
-        self.update()  # Force an update of the window to position it
-
-    def set_length(self, stage, num):
-        """Set the number of items in a stage."""
-        self.maxes[stage] = num
-        self.set_nums(stage)
+        # functions from doing anything
 
     def __enter__(self):
         """LoadScreen can be used as a context manager.
@@ -115,8 +84,9 @@ class BaseLoadScreen(Toplevel):
         self.reset()
 
     # Methods the subclasses must implement.
+    
     @abstractmethod
-    def set_nums(self, stage: str):
+    def set_length(self, stage: str, num: str):
         pass
 
     @abstractmethod
@@ -127,6 +97,11 @@ class BaseLoadScreen(Toplevel):
     def skip_stage(self, stage: str):
         """Skip over this stage of the loading process."""
         pass
+        
+    @abstractmethod
+    def show(self):
+        """Display the loading screen."""
+        pass
 
     @abstractmethod
     def reset(self):
@@ -134,7 +109,7 @@ class BaseLoadScreen(Toplevel):
         pass
 
 
-class LoadScreen(BaseLoadScreen):
+class LoadScreen(BaseLoadScreen, Toplevel):
     """LoadScreens show a loading screen for items.
 
     stages should be (id, title) pairs for each screen stage.
@@ -142,9 +117,25 @@ class LoadScreen(BaseLoadScreen):
     The title can be blank.
     """
     def __init__(self, *stages, title_text):
-        super().__init__(stages)
+        BaseLoadScreen.__init__(self, stages)
         self.bar_var = {}
         self.widgets = {}
+        
+        # Initialise the window
+        Toplevel.__init__(
+            self,
+            TK_ROOT,
+            cursor=utils.CURSORS['wait'],
+        )
+        self.withdraw()
+
+        _ALL_SCREENS.add(self)
+        
+        # this prevents stuff like the title bar, normal borders etc from
+        # appearing in this window.
+        self.overrideredirect(1)
+        self.resizable(False, False)
+        self.attributes('-topmost', 1)
 
         self.frame = ttk.Frame(self, cursor=utils.CURSORS['wait'])
         self.frame.grid(row=0, column=0)
@@ -191,6 +182,17 @@ class LoadScreen(BaseLoadScreen):
             )
             self.widgets[st_id].grid(row=ind*2+3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind*2+2, column=1, sticky="E")
+            
+    def show(self):
+        """Display this loading screen."""
+        self.active = True
+        self.deiconify()
+        self.lift()
+        self.update()  # Force an update so the reqwidth is correct
+        loc_x = (self.winfo_screenwidth()-self.winfo_reqwidth())//2
+        loc_y = (self.winfo_screenheight()-self.winfo_reqheight())//2
+        self.geometry('+' + str(loc_x) + '+' + str(loc_y))
+        self.update()  # Force an update of the window to position it
 
     def step(self, stage):
         """Increment a stage by one."""
@@ -198,8 +200,14 @@ class LoadScreen(BaseLoadScreen):
         self.set_nums(stage)
         if self.active:
             self.widgets[stage].update()
+            
+    def set_length(self, stage, num):
+        """Set the number of items in a stage."""
+        self.maxes[stage] = num
+        self.set_nums(stage)
 
     def set_nums(self, stage):
+        """Set the fraction text for a stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
             self.bar_var[stage].set(1000)
@@ -244,182 +252,76 @@ class LoadScreen(BaseLoadScreen):
 
 
 class SplashScreen(BaseLoadScreen):
-    """The screen show for the main loading screen."""
+    """The screen shown for the main loading screen. It only works once.
+    
+    This is implemented as a subprocess, to enable interacting with
+    the UI while loading occurs. TKinter does not play well with 
+    multiple threads, and Python's GIL makes that difficult as well.
+    """
 
     def __init__(self, *stages):
         super().__init__(stages)
-        self.stage_names = {}
-
-        self.splash, width, height = img.get_splash_screen(
-            max(self.winfo_screenwidth() * 0.6, 500),
-            max(self.winfo_screenheight() * 0.6, 500),
-            base_height=len(self.stages) * 20,
+        self.values = {
+            stage_id: 0 
+            for stage_id, disp_name in 
+            stages
+        }
+        
+        self.maxes = {
+            stage_id: 10 
+            for stage_id, disp_name in 
+            stages
+        }
+        
+        # self.pipe -> sub_conn
+        sub_conn, self._pipe = multiprocessing.Pipe(duplex=False)
+        
+        self._subproc = multiprocessing.Process(
+            target=_splash_daemon,
+            # Pass lots of data along, so it doesn't have to import
+            # things to calculate those itself.
+            args=(
+                sub_conn,
+                stages,
+                _('Better Extended Editor for Portal 2'),
+                _('Version: ') + utils.BEE_VERSION,
+                _('Skipped!'),
+            ),
+            name='BEE2_splashscreen',
         )
-        self.height = height
-        self.width = width
-
-        self.canvas = canvas = Canvas(
-            self,
-            width=width,
-            height=height,
-        )
-        canvas.grid(row=0, column=0)
-        # Splash screen...
-        canvas.create_image(
-            0, 0,
-            anchor='nw',
-            image=self.splash,
-        )
-        canvas.create_image(
-            10, 10,
-            anchor='nw',
-            image=img.png('BEE2/splash_logo'),
-        )
-
-        self.disp_font = font = Font(
-            family='Times',  # Generic special case
-            size=-18,  # negative = in pixels
-            weight='bold',
-        )
-
-        canvas.create_text(
-            10, 125,
-            anchor='nw',
-            text=_('Better Extended Editor for Portal 2'),
-            fill='white',
-            font=font,
-        )
-        canvas.create_text(
-            10, 145,
-            anchor='nw',
-            text=_('Version: ') + utils.BEE_VERSION,
-            fill='white',
-            font=font,
-        )
-
-        for ind, (st_id, stage_name) in enumerate(reversed(self.stages), start=1):
-            self.bar_val[st_id] = 0
-            self.maxes[st_id] = 10
-            self.stage_names[st_id] = stage_name
-            canvas.create_rectangle(
-                20,
-                height - (ind + 0.5) * 20,
-                20,
-                height - (ind - 0.5) * 20,
-                fill='#00785A',  # 0, 120, 90
-                width=0,
-                tags='bar_' + st_id,
-            )
-            # Border
-            canvas.create_rectangle(
-                20,
-                height - (ind + 0.5) * 20,
-                width - 20,
-                height - (ind - 0.5) * 20,
-                outline='#00785A',
-                width=2,
-            )
-            canvas.create_text(
-                25,
-                height - ind * 20,
-                anchor='w',
-                text=stage_name + ': (0/???)',
-                fill='white',
-                tags='text_' + st_id,
-            )
+        # Destroy when we quit, in case of errors
+        self._subproc.daemon = True
+        
+        self.active = True
+            
+    def show(self):
+        """Start the process."""
+        self._subproc.start()
 
     def step(self, stage):
         """Increment a step by one."""
-        self.bar_val[stage] += 1
-        self.set_nums(stage)
-        self.canvas.update()
-
-    def set_nums(self, stage: str):
-        max_val = self.maxes[stage]
-        self.canvas.itemconfig(
-            'text_' + stage,
-            text='{}: ({}/{})'.format(
-                self.stage_names[stage],
-                self.bar_val[stage],
-                max_val,
-            )
-        )
-        self.bar_length(stage, self.bar_val[stage] / max_val)
-        self.canvas.update()
-
+        self.values[stage] += 1
+        self._pipe.send((stage, 'value', self.values[stage]))
 
     def set_length(self, stage, num):
         """Set the number of items in a stage."""
-        super().set_length(stage, num)
-
-        self.canvas.delete('tick_' + stage)
-
-        if num == 0:
-            return  # No ticks
-
-        # Draw the ticks in...
-        _, y1, _, y2 = self.canvas.coords('bar_' + stage)
-
-        dist = (self.width-40) / num
-        if round(dist) <= 1:
-            # Don't have ticks if they're right next to each other
-            return
-        tag = 'tick_' + stage
-        for i in range(num):
-            pos = int(20 + dist*i)
-            self.canvas.create_line(
-                pos, y1, pos, y2,
-                fill='#00785A',
-                tags=tag,
-            )
-        self.canvas.tag_lower('tick_' + stage, 'bar_' + stage)
-
+        self._pipe.send((stage, 'length', num))
 
     def skip_stage(self, stage: str):
         """Skip over this stage of the loading process."""
-        self.bar_val[stage] = 0
-        self.maxes[stage] = 0
-        self.canvas.itemconfig(
-            'text_' + stage,
-            text=self.stage_names[stage] + ': ' + _('Skipped!'),
-        )
-        self.bar_length(stage, 1)
-        self.canvas.delete('tick_' + stage)
-        self.canvas.update()
-
-    def bar_length(self, stage, fraction):
-        """Set a progress bar to this fractional length."""
-        x1, y1, x2, y2 = self.canvas.coords('bar_' + stage)
-        self.canvas.coords(
-            'bar_' + stage,
-            20,
-            y1,
-            20 + round(fraction * (self.width-40)),
-            y2,
-        )
+        self._pipe.send((stage, 'skip', None))
 
     def destroy(self):
         """Delete all parts of the loading screen."""
         if self.active:
-            super().destroy()
+            del self.values
             del self.maxes
-            del self.splash
-            del self.bar_val
+            self._pipe.send((None, None, None)) # Instruct subprocess to self-destruct.
             self.active = False
             _ALL_SCREENS.discard(self)
+            self._subproc.join()  # Wait until quit.
 
-    def reset(self):
-        """Hide the loading screen, and reset stages to zero."""
-        self.withdraw()
-        self.active = False
-        for stage, stage_name in self.stages:
-            self.maxes[stage] = 10
-            self.bar_val[stage] = 0
-            self.bar_length(stage, 0)
-            self.canvas.itemconfig('text_' + stage, stage_name + ': (0/???)')
-            self.set_nums(stage)
-
-            self.canvas.delete('tick_' + stage)
+    reset = destroy
 
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
