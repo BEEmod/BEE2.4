@@ -5,7 +5,7 @@ from tkinter.colorchooser import askcolor
 
 from functools import lru_cache
 
-from srctools import Property, Vec, conv_int
+from srctools import Property, Vec, conv_int, conv_bool
 from packageLoader import PakObject, ExportData, ParseData, desc_parse
 from BEE2_config import ConfigFile
 from tooltip import add_tooltip
@@ -113,7 +113,7 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             wid_id = wid['id'].casefold()
             name = wid['Label']
             tooltip = wid['Tooltip', '']
-            default = wid.find_key('Default')
+            default = wid.find_key('Default', '')
 
             if is_timer:
                 if default.has_children():
@@ -392,6 +392,12 @@ def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Mis
 @WidgetLookup('boolean', 'bool', 'checkbox')
 def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
     """Allows ticking a box."""
+    # Ensure it's a bool value.
+    if conv_bool(var.get()):
+        var.set('1')
+    else:
+        var.set('0')
+
     return ttk.Checkbutton(
         parent,
         text='',
@@ -517,7 +523,7 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
         default_text = values[default_value - 1]
     else:
         default_text = '0:01'
-        var.set(1)
+        var.set('1')
 
     disp_var = tk.StringVar(value=default_text)
 
