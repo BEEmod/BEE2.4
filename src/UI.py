@@ -17,6 +17,7 @@ import sound as snd
 import paletteLoader
 import packageLoader
 import img
+import itemconfig
 import utils
 import tk_tools
 import SubPane
@@ -1961,6 +1962,10 @@ def init_windows():
 
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything
+
+        # Update variant selectors on the itemconfig pane
+        for func in itemconfig.ITEM_VARIANT_LOAD:
+            func()
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video

@@ -35,6 +35,8 @@ TIMER_NUM = ['inf'] + list(map(str, range(3, 31)))
 
 INF = '∞'
 
+# For itemvariant, we need to refresh on style changes.
+ITEM_VARIANT_LOAD = []
 
 class Widget:
     """Represents a widget that can appear on a ConfigGroup."""
@@ -114,6 +116,11 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             name = wid['Label']
             tooltip = wid['Tooltip', '']
             default = wid.find_key('Default', '')
+
+            # Special case - can't be timer!
+            if create_func is widget_item_variant and is_timer:
+                LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
+                is_timer = use_inf = False
 
             if is_timer:
                 if default.has_children():
@@ -205,10 +212,15 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
         for conf in CONFIG_ORDER:
             config_section = CONFIG[conf.id]
             for wid in conf.widgets:
-                config_section[wid.id] = wid.values.get()
+                # Item_variant doesn't have an output value.
+                # Skip it.
+                if wid.create_func is not widget_item_variant:
+                    config_section[wid.id] = wid.values.get()
             for wid in conf.multi_widgets:
                 for num, var in wid.values:
                     config_section['{}_{}'.format(wid.id, num)] = var.get()
+            if not config_section:
+                del CONFIG[conf.id]
         CONFIG.save_check()
 
 
@@ -379,6 +391,48 @@ def widget_sfx(*args):
 # ------------
 # Widget types
 # ------------
+
+@WidgetLookup('itemvariant', 'variant')
+def widget_item_variant(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+    """Special widget - chooses item variants.
+
+    This replicates the box on the right-click menu for items.
+    It's special-cased in the above code.
+    """
+    import UI
+    import contextWin
+    # We don't use the variable passed to us.
+
+    try:
+        item = UI.item_list[conf['ItemID']]  # type: UI.Item
+    except KeyError:
+        raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
+
+    version_lookup = None
+
+    def update_data():
+        """Refresh the data in the list."""
+        nonlocal version_lookup
+        version_lookup = contextWin.set_version_combobox(combobox, item)
+
+    update_data.item_id = item.id
+
+    def change_callback(e: tk.Event=None):
+        """Change the item version."""
+        item.change_version(version_lookup[combobox.current()])
+
+    combobox = ttk.Combobox(
+        parent,
+        exportselection=0,
+        values=[''],
+    )
+    combobox.state(['readonly'])  # Prevent directly typing in values
+    combobox.bind('<<ComboboxSelected>>', change_callback)
+
+    ITEM_VARIANT_LOAD.append(update_data)
+    update_data()
+    return combobox
+
 
 @WidgetLookup('string', 'str')
 def widget_string(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
