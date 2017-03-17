@@ -179,13 +179,17 @@ def run_screen(
         """Update stages from the parent process."""
         while cmd_source.poll():  # Pop off all the values.
             stage, operation, value = cmd_source.recv()
-            if stage is None:
+            if operation == 'kill':
                 # Destroy everything
                 window.destroy()
                 # mainloop() will quit, this function will too, and
                 # all our stuff will die.
                 return
-            if operation == 'value':
+            elif operation == 'hide':
+                window.withdraw()
+            elif operation == 'show':
+                window.deiconify()
+            elif operation == 'value':
                 stage_values[stage] = value
                 set_nums(stage)
             elif operation == 'length':

@@ -11,8 +11,10 @@ import multiprocessing
 from loadScreen_daemon import run_screen as _splash_daemon
 import utils
 
+from typing import Set
+
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS = WeakSet()
+_ALL_SCREENS = WeakSet()  # type: Set[BaseLoadScreen]
 
 LOGGER = utils.getLogger(__name__)
 
@@ -30,15 +32,14 @@ def surpress_screens():
     for screen in _ALL_SCREENS:
         if not screen.active:
             continue
-        screen.wm_focusmodel()
-        screen.withdraw()
+        screen.suppress()
         screen.active = False
         active.append(screen)
 
     yield
 
     for screen in active:
-        screen.deiconify()
+        screen.unsuppress()
         screen.active = True
         screen.lift()
 
@@ -69,6 +70,8 @@ class BaseLoadScreen:
         self.active = False
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
+
+        _ALL_SCREENS.add(self)
 
     def __enter__(self):
         """LoadScreen can be used as a context manager.
@@ -108,6 +111,14 @@ class BaseLoadScreen:
         """Hide the loading screen and reset all the progress bars."""
         pass
 
+    @abstractmethod
+    def suppress(self):
+        """Temporarily hide the screen."""
+
+    @abstractmethod
+    def unsuppress(self):
+        """Undo temporarily hiding the screen."""
+
 
 class LoadScreen(BaseLoadScreen, Toplevel):
     """LoadScreens show a loading screen for items.
@@ -129,7 +140,6 @@ class LoadScreen(BaseLoadScreen, Toplevel):
         )
         self.withdraw()
 
-        _ALL_SCREENS.add(self)
         
         # this prevents stuff like the title bar, normal borders etc from
         # appearing in this window.
@@ -250,6 +260,13 @@ class LoadScreen(BaseLoadScreen, Toplevel):
             self.active = False
             _ALL_SCREENS.discard(self)
 
+    def suppress(self):
+        """Temporarily hide the screen."""
+        self.withdraw()
+
+    def unsuppress(self):
+        """Undo temporarily hiding the screen."""
+        self.deiconify()
 
 class SplashScreen(BaseLoadScreen):
     """The screen shown for the main loading screen. It only works once.
@@ -316,12 +333,20 @@ class SplashScreen(BaseLoadScreen):
         if self.active:
             del self.values
             del self.maxes
-            self._pipe.send((None, None, None)) # Instruct subprocess to self-destruct.
+            self._pipe.send((None, 'kill', None))  # Instruct subprocess to self-destruct.
             self.active = False
             _ALL_SCREENS.discard(self)
             self._subproc.join()  # Wait until quit.
 
     reset = destroy
+
+    def suppress(self):
+        """Temporarily hide the screen."""
+        self._pipe.send((None, 'hide', None))
+
+    def unsuppress(self):
+        """Undo temporarily hiding the screen."""
+        self._pipe.send((None, 'show', None))
 
 main_loader = SplashScreen(
     ('PAK', _('Packages')),
