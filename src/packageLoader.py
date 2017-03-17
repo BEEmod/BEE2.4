@@ -624,7 +624,7 @@ def setup_style_tree(
                 # We can't resolve that!
                 if len(deferred) == len(to_change):
                     raise ValueError(
-                        'Loop in style references:' + '\n'.join(
+                        'Loop in style references!\nNot resolved:\n' + '\n'.join(
                             '{} -> {}'.format(conf.style, sty_id)
                             for sty_id, conf in deferred
                         )
@@ -1260,6 +1260,14 @@ class Item(PakObject):
                 if vals['def_style'] is None:
                     vals['def_style'] = style.real_name
                 vals['styles'][style.real_name] = folder
+
+                if style.real_name == folder.style:
+                    raise ValueError(
+                        'Item "{}"\'s "{}" style '
+                        'can\'t inherit from itself!'.format(
+                            data.id,
+                            style.real_name,
+                        ))
             versions[vals['id']] = vals
             if def_version is None:
                 def_version = vals
