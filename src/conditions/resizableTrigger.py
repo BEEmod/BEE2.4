@@ -108,7 +108,7 @@ def res_resizeable_trigger(res: Property):
             # Only do once if inst == other
             ent.remove()
 
-        is_coop = vbsp.GAME_MODE == 'COOP' and (
+        is_coop = coop_var is not None and vbsp.GAME_MODE == 'COOP' and (
             inst.fixup.bool(coop_var) or
             other.fixup.bool(coop_var)
         )
