@@ -2230,8 +2230,8 @@ class StyleVPK(PakObject, has_img=False):
 
         # Generate the VPK.
         vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
-        if sel_vpk is not None:
-            with vpk_file:
+        with vpk_file:
+            if sel_vpk is not None:
                 for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
                     with file.open_bin() as open_file:
                         vpk_file.add_file(
@@ -2240,20 +2240,18 @@ class StyleVPK(PakObject, has_img=False):
                             sel_vpk.dir,
                         )
 
-        # Additionally, pack in game/vpk_override/ into the vpk - this allows
-        # users to easily override resources in general.
+            # Additionally, pack in game/vpk_override/ into the vpk - this allows
+            # users to easily override resources in general.
 
-        override_folder = exp_data.game.abs_path('vpk_override')
-        os.makedirs(override_folder, exist_ok=True)
+            override_folder = exp_data.game.abs_path('vpk_override')
+            os.makedirs(override_folder, exist_ok=True)
 
-        # Also write a file to explain what it's for..
-        with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
-            f.write(VPK_OVERRIDE_README)
+            # Also write a file to explain what it's for..
+            with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
+                f.write(VPK_OVERRIDE_README)
 
-        vpk_file.add_folder(override_folder)
-        del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
-
-        vpk_file.write_dirfile()
+            vpk_file.add_folder(override_folder)
+            del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
 
