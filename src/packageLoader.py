@@ -2441,7 +2441,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
             resources = {
-                os.path.normpath(file).casefold()
+                os.path.normpath(file.path).casefold()
                 for file in
                 filesystem.walk_folder('resources/')
             }
