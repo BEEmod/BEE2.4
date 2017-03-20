@@ -166,6 +166,7 @@ setup(
             'BEE2_launch.pyw',
             base=base,
             icon=ico_path,
+            targetName='BEE2' + ('.exe' if utils.WIN else ''),
         ),
         Executable(
             'backup.py',
