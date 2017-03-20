@@ -197,7 +197,7 @@ class Template:
             try:
                 world, detail, over = self._data[group]
             except KeyError:
-                raise ValueError('Unknown visgroup "{}" for ""! (valid: {})'.format(
+                raise ValueError('Unknown visgroup "{}" for "{}"! (valid: {})'.format(
                     group, self.id,
                     ', '.join(map(repr, self._data)),
                 ))
