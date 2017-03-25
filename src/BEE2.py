@@ -65,7 +65,6 @@ loadScreen.main_loader.show()
 # OS X starts behind other windows, fix that.
 if utils.MAC:
     TK_ROOT.lift()
-    loadScreen.main_loader.lift()
 
 GEN_OPTS.load()
 GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
