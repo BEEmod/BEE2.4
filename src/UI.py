@@ -1151,16 +1151,16 @@ def pal_shuffle():
     if len(pal_picked) == 32:
         return
 
-    shuff_items = item_list.copy()
+    shuff_item_dict = item_list.copy()
     for palitem in pal_picked:
         # Don't add items that are already on the palette!
         try:
-            del shuff_items[palitem.id]
+            del shuff_item_dict[palitem.id]
         except KeyError:
             # We might try removing it multiple times
             pass
 
-    shuff_items = list(shuff_items.values())
+    shuff_items = list(shuff_item_dict.values())
 
     random.shuffle(shuff_items)
 

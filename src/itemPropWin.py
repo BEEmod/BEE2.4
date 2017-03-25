@@ -14,6 +14,8 @@ import contextWin
 import gameMan
 import tk_tools
 
+from typing import Dict, List, Union, Any
+
 LOGGER = utils.getLogger(__name__)
 
 
@@ -109,13 +111,17 @@ PROP_POS = [
     'autorespawn',
     ]
 
-widgets = {}  # holds the checkbox or other item used to manipulate the box
-labels = {}  # holds the descriptive labels for each property
+# holds the checkbox or other item used to manipulate the box
+widgets = {}  # type: Dict[str, Any]
+# holds the descriptive labels for each property
+labels = {}  # type: Dict[str, ttk.Label]
 
-propList = []
+# The properties we currently have displayed.
+propList = []  # type: List[str]
 
-values = {}  # selected values for this items
-out_values = {}
+# selected values for this items
+values = {}  # type: Dict[str, Union[Variable, str, float]]
+out_values = {}  # type: Dict[str, Union[Variable, str, float]]
 
 PAINT_OPTS = [
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
@@ -264,7 +270,11 @@ def exit_win(e=None):
         if key in PROP_TYPES:
             # Use out_values if it has a matching key,
             # or use values by default.
-            out[key] = out_values.get(key, values[key])
+            out_val = out_values.get(key, values[key])
+            if isinstance(out_val, Variable):
+                out[key] = str(out_val.get())
+            else:
+                out[key] = out_val
     callback(out)
 
     if contextWin.is_open:
@@ -415,8 +425,8 @@ def init(cback):
 
 
 def show_window(used_props, parent, item_name):
-    global propList, is_open, last_angle
-    propList = [key.casefold() for key in used_props]
+    global is_open, last_angle
+    propList[:] = [key.casefold() for key in used_props]
     is_open = True
     spec_row = 1
 

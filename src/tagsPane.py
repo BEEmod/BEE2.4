@@ -16,6 +16,8 @@ import UI
 import utils
 import tk_tools
 
+from typing import Dict, List
+
 is_expanded = False
 wid = {}
 
@@ -26,9 +28,9 @@ TAG_MODES = {
 }
 
 # A list of all tags, mapped to their current state.
-TAGS = {}
+TAGS = {}  # type: Dict[str, bool]
 # A 'pretty' name for a tag, if it exists
-PRETTY_TAG = {}
+PRETTY_TAG = {}  # type: Dict[str, str]
 
 
 TAG_REP_TRANSLATE = str.maketrans(
@@ -39,7 +41,7 @@ TAG_REP_TRANSLATE = str.maketrans(
 )
 
 # A list of tags, sorted into sections
-TAG_BY_SECTION = defaultdict(list)
+TAG_BY_SECTION = defaultdict(list)  # type: Dict[List[str]]
 
 BOLD_FONT = font.nametofont('TkDefaultFont').copy()
 BOLD_FONT.configure(weight='bold')

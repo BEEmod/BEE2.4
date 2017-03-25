@@ -1199,7 +1199,7 @@ class Item(PakObject):
         # The folders we parse for this - we don't want to parse the same
         # one twice. First they're set to True if we need to read them,
         # then parse_item_folder() replaces that with the actual values
-        folders = {}  # type: Dict[str, Optional[ItemVariant]
+        folders = {}  # type: Dict[str, Optional[ItemVariant]]
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)

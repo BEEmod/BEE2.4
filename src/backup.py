@@ -77,7 +77,7 @@ BACKUPS = {
     'backup_path': None,
 
     # The backup zip file
-    'backup_zip': None,  # type: ZipFile
+    'backup_zip': None,
     # The currently-open file
     'unsaved_file': None,
 }
