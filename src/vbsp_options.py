@@ -39,7 +39,7 @@ OptionType = TypeVar('OptionType', str, int, float, bool, Vec)
 
 
 class Opt:
-    def __init__(self, id, default, doc, fallback=None):
+    def __init__(self, id: str, default, doc, fallback=None):
         if isinstance(default, TYPE):
             self.type = default
             self.default = None
