@@ -94,7 +94,7 @@ def clear_caches():
         return
 
     for game in gameMan.all_games:
-        game.mod_time = 0
+        game.mod_times.clear()
         game.save()
     GEN_OPTS['General']['cache_time'] = '0'
 
