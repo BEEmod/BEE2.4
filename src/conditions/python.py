@@ -82,7 +82,6 @@ class Checker(ast.NodeVisitor):
             self.visit(right)
 
     visit_IfExp = safe_visit  # a if x else b
-    visit_Subscript = safe_visit  # We allow subscripts, for vec.x...
 
     # Objects
     visit_Slice = safe_visit  # allow  string[1:2]
