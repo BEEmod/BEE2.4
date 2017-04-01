@@ -63,7 +63,7 @@ INJECT_FILES = {
     'music_script.txt': 'scripts/BEE2_generated_music.txt',
 
     # Applied to @glados's entity scripts.
-    'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
+    'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
 
     # Commands for monitor items.
     'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
@@ -601,7 +601,9 @@ def gen_auto_script(preload, is_peti):
 
     with open(dest, 'w') as file:
         if not preload:
-            return  # Leave it empty, don't write an empty body.
+            # Leave it empty, don't write an empty function body.
+            file.write('//---\n')
+            return
 
         file.write('function Precache() {\n')
         for entry in preload:
