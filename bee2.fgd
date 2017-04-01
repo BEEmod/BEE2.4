@@ -1,4 +1,5 @@
 // Definitions for BEE2-specific entities
+@include "portal2.fgd"
  
 @BaseClass = TemplateEnt
 	[
