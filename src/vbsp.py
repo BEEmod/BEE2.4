@@ -2663,6 +2663,14 @@ def add_extra_ents(mode):
     pti_file = vbsp_options.get(str, 'global_pti_ents')
     pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
 
+    # Add a cubemap into the map, so materials get a blank one generated.
+    # If none are present this doesn't happen...
+    VMF.create_ent(
+        classname='env_cubemap',
+        cubemapsize=1, # Make as small as possible..
+        origin=pti_loc,
+    )
+
     if pti_file:
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = VMF.create_ent(
