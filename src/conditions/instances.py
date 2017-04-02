@@ -54,16 +54,6 @@ INSTVAR_COMP = {
     '=<': operator.le,
 }
 
-INSTVAR_MATH = {
-    '+': operator.add,
-    '-': operator.sub,
-    '/': operator.truediv,
-    '//': operator.floordiv,
-    '%': operator.mod,
-    '*': operator.mul,
-    'x': operator.mul,
-}
-
 
 @make_flag('instVar')
 def flag_instvar(inst: Entity, flag: Property):
@@ -139,17 +129,6 @@ def res_set_inst_var(inst: Entity, res: Property):
     """
     var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = conditions.resolve_value(inst, val)
-
-
-@make_result('instVarMath')
-def res_inst_var_math(inst: Entity, res: Property):
-    val_a = float(conditions.resolve_value(inst, res['srcVar1']))
-    val_b = float(conditions.resolve_value(inst, res['srcVar2']))
-    try:
-        operation = INSTVAR_MATH[res['operator']]
-    except KeyError:
-        raise ValueError('Invalid math operation "{}"!'.format(res['operator']))
-    inst.fixup[res['resultVar']] = format(operation(val_a, val_b), 'g')
 
 
 @make_result_setup('mapInstVar')
