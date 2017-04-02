@@ -125,7 +125,6 @@ def res_python_setup(res: Property):
     # Now process the code to convert it into a function taking variables
     # and returning them.
     # We also need to whitelist operations for security.
-
     expression = ast.parse(
         code,
         '<bee2_op>',
@@ -158,7 +157,7 @@ def res_python_setup(res: Property):
         )
     ]
     # The last statement returns the target expression.
-    statements.append(ast.Return(expr=expression, lineno=len(variable_order)+1, col_offset=0))
+    statements.append(ast.Return(expression, lineno=len(variable_order)+1, col_offset=0))
 
     func = ast.Module([
             ast.FunctionDef(
