@@ -556,7 +556,7 @@ def timer_values(min_value, max_value):
     """Return 0:38-like strings up to the max value."""
     return [
         '{}:{:02}'.format(i//60, i % 60)
-        for i in range(min_value + 1, max_value + 1)
+        for i in range(min_value, max_value + 1)
     ]
 
 
@@ -574,10 +574,11 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
 
     values = timer_values(min_value, max_value)
 
-    default_value = conv_int(var.get(), 1)
-    if 0 < default_value <= max_value:
-        default_text = values[default_value - 1]
+    default_value = conv_int(var.get(), -1)
+    if min_value <= default_value <= max_value:
+        default_text = values[default_value - min_value]
     else:
+        LOGGER.warning('Bad timer value "{}" for "{}"!', var.get(), conf['id'])
         default_text = '0:01'
         var.set('1')
 
