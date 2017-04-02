@@ -582,7 +582,7 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
         default_text = '0:01'
         var.set('1')
 
-    disp_var = tk.StringVar(value=default_text)
+    disp_var = tk.StringVar()
 
     def set_var():
         """Set the variable to the current value."""
@@ -640,4 +640,6 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
         # %args substitute the values for the args to validate_cmd.
         validatecommand=(validate_cmd, '%V', '%d', '%s', '%S', '%P'),
     )
+    # We need to set this after, it gets reset to the first one.
+    disp_var.set(default_text)
     return spinbox
