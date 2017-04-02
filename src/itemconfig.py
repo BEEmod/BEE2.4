@@ -127,6 +127,8 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
                     defaults = {
                         num: default[num]
                         for num in TIMER_NUM
+                        # Exclude infinite if use_inf is False.
+                        if use_inf or num != 'inf'
                     }
                 else:
                     # All the same.
