@@ -117,12 +117,13 @@ class ConfigGroup(PakObject, allow_mult=False, has_img=False):
             tooltip = wid['Tooltip', '']
             default = wid.find_key('Default', '')
 
-            # Special case - can't be timer!
-            if create_func is widget_item_variant and is_timer:
-                LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
-                is_timer = use_inf = False
-
-            if is_timer:
+            # Special case - can't be timer, and no values.
+            if create_func is widget_item_variant:
+                if is_timer:
+                    LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
+                    is_timer = use_inf = False
+                values = None
+            elif is_timer:
                 if default.has_children():
                     defaults = {
                         num: default[num]
