@@ -158,7 +158,7 @@ def res_python_setup(res: Property):
         )
     ]
     # The last statement returns the target expression.
-    statements.append(ast.Return(expr=expression, lineno=len(variable_order)+1, col_offset=0))
+    statements.append(ast.Return(expression, lineno=len(variable_order)+1, col_offset=0))
 
     func = ast.Module([
             ast.FunctionDef(
