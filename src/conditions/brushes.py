@@ -227,23 +227,11 @@ def res_set_texture(inst: Entity, res: Property):
 
     temp = res['template', None]
     if temp:
-        temp = template_brush.get_template(temp)
-        # No visgroup, world brush, first of them
-        try:
-            temp_brush = temp.visgrouped()[0][0].copy()
-        except LookupError:
-            raise ValueError('Template must be one world brush!')
-        temp_brush.localise(
-            Vec.from_str(inst['origin']),
+        # Grab the scaling template and apply it to the brush.
+        template_brush.get_scaling_template(temp).rotate(
             Vec.from_str(inst['angles']),
-        )
-        for face in temp_brush:
-            if face.normal() == brush.normal:
-                face_to_mod.mat = face.mat
-                # It's OK to reuse this axis, the original is
-                # going away when we go out of scope.
-                face_to_mod.uaxis = face.uaxis
-                face_to_mod.vaxis = face.vaxis
+            Vec.from_str(inst['origin']),
+        ).apply(face_to_mod)
         return
 
     tex = res['tex']

@@ -272,12 +272,13 @@ class ScalingTemplate(Mapping):
         mat, axis_u, axis_v, rotation = self._axes[tuple(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Vec):
+    def rotate(self, angles: Vec, origin: Vec=(0, 0, 0)):
         """Rotate this template, and return a new template with those angles."""
         new_axis = {}
+        origin = Vec(origin)
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
-            axis_u = axis_u.rotate(angles)
-            axis_v = axis_v.rotate(angles)
+            axis_u = axis_u.localise(origin, angles)
+            axis_v = axis_v.localise(origin, angles)
             norm = Vec(norm).rotate(*angles)
             new_axis[norm.as_tuple()] = mat, axis_u, axis_v, rot
 
