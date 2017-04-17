@@ -395,9 +395,16 @@ def make_widgets():
     """Create the compiler options pane.
 
     """
+    ttk.Label(window, justify='center', text=_(
+        "Options on this panel can be changed \n"
+        "without exporting or restarting the game."
+    )).grid(row=0, column=0, sticky=EW, padx=2, pady=2)
+
     UI['nbook'] = nbook = ttk.Notebook(window)
 
-    nbook.grid(row=0, column=0, sticky=NSEW)
+    nbook.grid(row=1, column=0, sticky=NSEW)
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(1, weight=1)
 
     nbook.enable_traversal()
 
@@ -819,10 +826,6 @@ def init_application():
     window = TK_ROOT
     window.title(_('Compiler Options - {}').format(utils.BEE_VERSION))
     window.resizable(True, False)
-
-    window.columnconfigure(0, weight=1)
-    window.rowconfigure(0, weight=1)  # Resizing screenshots
-    window.rowconfigure(4, weight=1)  # Resizing pack-dump
 
     make_widgets()
 
