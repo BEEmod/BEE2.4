@@ -562,7 +562,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         # either side - use neg_trig for that purpose!
         # We want to get rid of pos_trig to save ents
         vmf.remove_ent(pos_trig)
-        neg_trig['targetname'] = fizz_name + '-trig'
+        neg_trig['targetname'] = fizz_name + '-trig_off'
         neg_trig.outputs.clear()
         neg_trig.add_out(Output(
             output,
