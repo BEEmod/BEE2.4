@@ -941,20 +941,41 @@ class ItemVariant:
 
         # Allow overriding the instance blocks.
         instances = variant.editor.ensure_exists('Exporting').ensure_exists('Instances')
+        inst_children = {
+            self._inst_block_key(prop): prop
+            for prop in
+            instances
+        }
+        instances.clear()
+
         for inst in props.find_children('Instances'):
             try:
-                del instances[inst.real_name]
-            except IndexError:
+                del inst_children[self._inst_block_key(inst)]
+            except KeyError:
                 pass
-            if inst.has_children() or not inst.name.isdecimal():
-                instances.append(inst.copy())
+            if inst.has_children():
+                inst_children[self._inst_block_key(inst)] = inst.copy()
             else:
                 # Shortcut to just create the property
-                instances += Property(inst.real_name, [
-                    Property('Name', inst.value),
-                ])
+                inst_children[self._inst_block_key(inst)] = Property(
+                    inst.real_name,
+                    [Property('Name', inst.value)],
+                )
+        for key, prop in sorted(inst_children.items(), key=operator.itemgetter(0)):
+            instances.append(prop)
 
         return variant
+
+    @staticmethod
+    def _inst_block_key(prop: Property):
+        """Sort function for the instance blocks.
+        
+        String values come first, then all numeric ones in order.
+        """
+        if prop.real_name.isdecimal():
+            return 0, int(prop.real_name)
+        else:
+            return 1, prop.real_name
 
 
 class Package:
