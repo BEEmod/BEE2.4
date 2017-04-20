@@ -39,13 +39,15 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
 
     is_tag = vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
 
-    offset = res.vec('origin').rotate_by_str(inst['angles'])
-    normal = res.vec('facing', z=1).rotate_by_str(
-        inst['angles'],
-    )
+    origin = res.vec('origin')
+    normal = res.vec('facing', z=1)
 
-    origin = Vec.from_str(inst['origin'])
-    origin += offset
+    # Some styles might want to ignore the instance we're running on.
+    if not res.bool('global'):
+        origin = origin.rotate_by_str(inst['angles'])
+        normal = normal.rotate_by_str(inst['angles'])
+        origin += Vec.from_str(inst['origin'])
+
     angles = normal.to_angle()
 
     if is_tag:
