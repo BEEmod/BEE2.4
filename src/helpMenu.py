@@ -14,6 +14,12 @@ import img
 import utils
 import tk_tools
 
+# For version info
+from PIL import PILLOW_VERSION
+import platform
+import sound  # We read pyglet indirectly from here so it can safely fail.
+import markdown
+
 
 class ResIcon(Enum):
     """Icons to show on the menu list."""
@@ -67,12 +73,12 @@ del Res, steam_url
 CREDITS_TEXT = '''\
 Used software / libraries in the BEE2.4:
 
-* [pyglet][pyglet] and [AVBin][avbin] by Alex Holkner
-* [Pillow][pillow]/PIL by Alex Clark and Contributors
-* [noise][perlin_noise] by Casey Duncan
-* [markdown][markdown] for rich text parsing
-* [TKinter/TTK][tcl] (Standard Library)
-* [Python][python] 3.4
+* [pyglet {pyglet_ver}][pyglet] and [AVBin {avbin_ver}][avbin] by Alex Holkner
+* [Pillow {pil_ver}][pillow] by Alex Clark and Contributors
+* [noise (2008-12-15)][perlin_noise] by Casey Duncan
+* [markdown {md_ver}][markdown] by the Python Markdown Project
+* [TKinter {tk_ver}/TTK {ttk_ver}/Tcl {tcl_ver}][tcl]
+* [Python {py_ver}][python]
 
 [pyglet]: https://bitbucket.org/pyglet/pyglet/wiki/Home
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
@@ -171,7 +177,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''.replace('\n', '  \n')  # Add two spaces to keep line breaks.
+'''.format(
+    # Inject the running Python version.
+    py_ver=platform.python_version(),
+    tk_ver=tk.TkVersion,
+    tcl_ver=tk.TclVersion,
+    ttk_ver=ttk.__version__,
+    pyglet_ver=sound.pyglet_version,
+    avbin_ver=sound.avbin_version,
+    md_ver=markdown.version,
+    pil_ver=PILLOW_VERSION,
+).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
 class Dialog(tk.Toplevel):
