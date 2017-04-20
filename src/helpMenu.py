@@ -22,6 +22,7 @@ class ResIcon(Enum):
     BEE2 = 'menu_bee2'
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
+    DISCORD = 'menu_discord'
 
     PORTAL2 = 'menu_p2'
     TAG = 'menu_tag'
@@ -32,6 +33,7 @@ SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
+DISCORD_SERVER = 'https://discordapp.com/invite/mZ4peDd'
 
 
 def steam_url(name):
@@ -46,6 +48,7 @@ WEB_RESOURCES = [
         'https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker',
         ResIcon.PORTAL2,
     ),
+    Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
     Res(_('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
