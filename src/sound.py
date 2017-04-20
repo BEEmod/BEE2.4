@@ -41,8 +41,13 @@ SOUNDS = {
 try:
     import pyglet.media
     from pyglet.media import avbin  # We need this extension, so error early..
+
+    pyglet_version = pyglet.version
+    avbin_version = avbin.get_version()
 except ImportError:
     LOGGER.warning('ERROR:SOUNDS NOT INITIALISED!')
+
+    pyglet_version = avbin_version = '(Not installed)'
 
     def fx(*args, **kwargs):
         """Pyglet has failed to initialise!
@@ -146,7 +151,7 @@ else:
                 SAMPLE_WRITE_PATH + os.path.splitext(self.cur_file)[1], 'wb',
             ) as fdest:
                 shutil.copyfileobj(fsrc, fdest)
-            
+
             try:
                 sound = pyglet.media.load(fdest.name, streaming=False)
             except pyglet.media.MediaFormatException:
