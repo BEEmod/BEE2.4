@@ -48,7 +48,6 @@ def res_add_global_inst(res: Property):
             if new_inst['targetname'] == '':
                 new_inst['targetname'] = "inst_"
                 new_inst.make_unique()
-            vbsp.VMF.add_ent(new_inst)
     return RES_EXHAUSTED
 
 
