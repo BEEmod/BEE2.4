@@ -50,9 +50,11 @@ class Opt:
         self.name = id
         self.fallback = fallback
         # Remove indentation, and trailing carriage return
-        self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
+        self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
-            self.doc += 'If unset, the default is read from `{}`.'.format(default)
+            self.doc.append(
+                'If unset, the default is read from `{}`.'.format(default)
+            )
 
 
 def load(opt_blocks: Iterator[Property]):
@@ -195,19 +197,24 @@ INFO_DUMP_FORMAT = """\
 
 """
 
+DOC_HEADER = '''\
+<!-- Don't edit. This is generated from text in the compiler code. -->
 
-def dump_info():
-    """Create a Markdown description of all options."""
-    file = io.StringIO()
-    print('*' * 20, file=file)
-    
-    print('# VBSP_config options:', file=file)
+# VBSP_config Options List
+
+This is a list of all current options for the config.
+'''
+
+
+def dump_info(file):
+    """Create the wiki page for item options, given a file to write to."""
+    print(DOC_HEADER, file=file)
     
     for opt in DEFAULTS:
         if opt.default is None:
             default = ''
         elif type(opt.default) is Vec:
-            default =  '(`' + opt.default.join(' ') + '`)' 
+            default = '(`' + opt.default.join(' ') + '`)'
         else:
             default = ' = `' + repr(opt.default) + '`'
         file.write(INFO_DUMP_FORMAT.format(
@@ -216,9 +223,6 @@ def dump_info():
             type=TYPE_NAMES[opt.type],
             desc='\n'.join(opt.doc),
         ))
-    
-    print('*' * 20, file=file)
-    return file.getvalue()
 
 DEFAULTS = [
     Opt('goo_mist', False,

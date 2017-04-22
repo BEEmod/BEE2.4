@@ -654,49 +654,55 @@ def build_itemclass_dict(prop_block: Property):
         CLASS_FOR_ITEM[prop.name] = it_class
 
 
+DOC_HEADER = '''\
+<!-- Don't edit. This is generated from text in the compiler code. -->
 
-def dump_conditions():
-    """Print a list of all the condition flags, results, metaconditions
+# Conditions List
 
-    to the screen, and then quit.
-    """
+This is a list of all condition flags and results in the current release.
+'''
 
-    print('Dumping conditions:')
-    print('-------------------')
+
+def dump_conditions(file):
+    """Dump docs for all the condition flags, results and metaconditions."""
+
+    LOGGER.info('Dumping conditions...')
+
+    print(DOC_HEADER, file=file)
+
+    print('# MetaConditions', file=file)
+
+    ALL_META.sort(key=lambda i: i[1])  # Sort by priority
+    for flag_key, priority, func in ALL_META:
+        print('## `{}` ({}):\n'.format(flag_key, priority), file=file)
+        dump_func_docs(file, func)
+        file.write('\n')
 
     for lookup, name in [
             (ALL_FLAGS, 'Flags'),
             (ALL_RESULTS, 'Results'),
             ]:
-        print(name + ':')
-        print('-'*len(name) + '-')
+        print('<!------->', file=file)
+        print('# ' + name, file=file)
+        print('<!------->', file=file)
         lookup.sort()
         for flag_key, aliases, func in lookup:
-            print('"{}":'.format(flag_key))
+            print('## `{}`:\n'.format(flag_key), file=file)
             if aliases:
-                print('\tAliases: "' + '", "'.join(aliases) + '"')
-            dump_func_docs(func)
-        input('...')
-        print('')
-
-    print('MetaConditions:')
-    print('---------------')
-    ALL_META.sort(key=lambda i: i[1]) # Sort by priority
-    for flag_key, priority, func in ALL_META:
-        print('{} ({}):'.format(flag_key, priority))
-        dump_func_docs(func)
-        print('')
+                print('> **Aliases:** `' + '`, `'.join(aliases) + '`', file=file)
+            dump_func_docs(file, func)
+            file.write('\n')
 
 
-def dump_func_docs(func):
+def dump_func_docs(file, func):
     import inspect
     docs = inspect.getdoc(func)
     if docs:
         for line in docs.split('\n'):
             if line.strip():
-                print('\t' + line.rstrip('\n'))
+                print('>' + line.rstrip('\n'), file=file)
     else:
-        print('\tNo documentation!')
+        print('>**No documentation!**', file=file)
 
 
 def weighted_random(count: int, weights: str):

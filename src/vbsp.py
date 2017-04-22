@@ -3456,6 +3456,19 @@ def main():
     global MAP_RAND_SEED, IS_PREVIEW, GAME_MODE
     LOGGER.info("BEE{} VBSP hook initiallised.", utils.BEE_VERSION)
 
+    conditions.import_conditions()  # Import all the conditions and
+    # register them.
+
+    if 'BEE2_WIKI_OPT_LOC' in os.environ:
+        # Special override - generate docs for the BEE2 wiki.
+        LOGGER.info('Writing Wiki text...')
+        with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
+            vbsp_options.dump_info(f)
+        with open(os.environ['BEE2_WIKI_COND_LOC'], 'w') as f:
+            conditions.dump_conditions(f)
+        LOGGER.info('Done. Exiting now!')
+        sys.exit()
+
     # Just in case we fail, overwrite the VRAD config so it doesn't use old
     # data.
     open('bee2/vrad_config.cfg', 'w').close()
@@ -3488,14 +3501,6 @@ def main():
     if '-bee2_verbose' in folded_args or '-verbose' in folded_args:
         utils.stdout_loghandler.setLevel('DEBUG')
         LOGGER.info('Switched to verbose logging.')
-
-    conditions.import_conditions()  # Import all the conditions and
-    # register them.
-
-    if '-dump_conditions' in folded_args:
-        # Print all the condition flags, results, and metaconditions
-        conditions.dump_conditions()
-        sys.exit()
 
     if not path.endswith(".vmf"):
         path += ".vmf"
