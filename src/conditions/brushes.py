@@ -68,20 +68,20 @@ def res_fix_rotation_axis(ent: Entity, res: Property):
       instance, and will set the `origin` and `targetname` respectively.
     - `Keys` are any other keyvalues to be be set.
     - `Flags` sets additional spawnflags. Multiple values may be
-       separated by '+', and will be added together.
+       separated by `+`, and will be added together.
     - `Classname` specifies which entity will be created, as well as
        which other values will be set to specify the correct orientation.
     - `AddOut` is used to add outputs to the generated entity. It takes
        the options `Output`, `Target`, `Input`, `Param` and `Delay`. If
        `Inst_targ` is defined, it will be used with the input to construct
        an instance proxy input. If `OnceOnly` is set, the output will be
-       deleted when fired.
+       deleted when fired.  
 
     Permitted entities:
-     * `func_rotating`
-     * `func_door_rotating`
-     * `func_rot_button`
-     * `func_platrot`
+       * `func_rotating`
+       * `func_door_rotating`
+       * `func_rot_button`
+       * `func_platrot`
     """
     des_axis = res['axis', 'z'].casefold()
     reverse = srctools.conv_bool(res['reversed', '0'])
@@ -293,9 +293,9 @@ def res_set_texture(inst: Entity, res: Property):
 def res_add_brush(inst: Entity, res: Property):
     """Spawn in a brush at the indicated points.
 
-    - point1 and point2 are locations local to the instance, with '0 0 0'
+    - point1 and point2 are locations local to the instance, with `0 0 0`
       as the floor-position.
-    - type is either 'black' or 'white'.
+    - type is either `black` or `white`.
     - detail should be set to True/False. If true the brush will be a
       func_detail instead of a world brush.
 
@@ -497,14 +497,14 @@ def res_import_template_setup(res: Property):
 
 @make_result('TemplateBrush')
 def res_import_template(inst: Entity, res: Property):
-    """Import a template VMF file, retexturing it to match orientatation.
+    """Import a template VMF file, retexturing it to match orientation.
 
-    It will be placed overlapping the given instance.
-    Options:
+    It will be placed overlapping the given instance.  
+    Options:  
     - ID: The ID of the template to be inserted. Add visgroups to additionally
             add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
-             present, the colour of tiles will be overriden. If 'invert' is
+             present, the colour of tiles will be overridden. If 'invert' is
             added, white/black tiles will be swapped. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or

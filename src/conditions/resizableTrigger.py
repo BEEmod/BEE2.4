@@ -18,35 +18,35 @@ LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 
 @make_result('ResizeableTrigger')
 def res_resizeable_trigger(res: Property):
-    """Replace two markers with a trigger brush.
+    """Replace two markers with a trigger brush.  
 
-    This is run once to affect all of an item.
+    This is run once to affect all of an item.  
     Options:
-    'markerInst': <ITEM_ID:1,2> value referencing the marker instances, or a filename.
-    'markerItem': The item's ID
-    'previewConf': A item config which enables/disables the preview overlay.
-    'previewinst': An instance to place at the marker location in preview mode.
+    * `markerInst`: <ITEM_ID:1,2> value referencing the marker instances, or a filename.
+    * `markerItem`: The item's ID
+    * `previewConf`: A item config which enables/disables the preview overlay.
+    * `previewinst`: An instance to place at the marker location in preview mode.
         This should contain checkmarks to display the value when testing.
-    'previewMat': If set, the material to use for an overlay func_brush.
+    * `previewMat`: If set, the material to use for an overlay func_brush.
         The brush will be parented to the trigger, so it vanishes once killed.
         It is also non-solid.
-    'previewScale': The scale for the func_brush materials.
-    'previewActivate', 'previewDeactivate': The 'instance:name;Input' value
+    * `previewScale`: The scale for the func_brush materials.
+    * `previewActivate`, `previewDeactivate`: The `instance:name;Input` value
         to turn the previewInst on and off.
 
-    'triggerActivate, triggerDeactivate': The outputs used when the trigger
+    * `triggerActivate, triggerDeactivate`: The outputs used when the trigger
         turns on or off.
 
-    'coopVar': The instance variable which enables detecting both Coop players.
+    * `coopVar`: The instance variable which enables detecting both Coop players.
         The trigger will be a trigger_playerteam.
 
-    'coopActivate, coopDeactivate': The outputs used when coopVar is enabled.
+    * `coopActivate, coopDeactivate`: The outputs used when coopVar is enabled.
         These should be suitable for a logic_coop_manager.
-    'coopOnce': If true, kill the manager after it first activates.
+    * `coopOnce`: If true, kill the manager after it first activates.
 
-    'keys': A block of keyvalues for the trigger brush. Origin and targetname
+    * `keys`: A block of keyvalues for the trigger brush. Origin and targetname
         will be set automatically.
-    'localkeys': The same as above, except values will be changed to use
+    * `localkeys`: The same as above, except values will be changed to use
         instance-local names.
     """
     marker = instanceLocs.resolve(res['markerInst'])
