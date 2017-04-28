@@ -741,7 +741,7 @@ def dump_conditions(file):
             for flag_key, aliases, func in funcs:
                 print('#### `{}`:\n'.format(flag_key), file=file)
                 if aliases:
-                    print('> **Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
+                    print('**Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
                 dump_func_docs(file, func)
                 file.write('\n')
 
@@ -750,11 +750,9 @@ def dump_func_docs(file, func):
     import inspect
     docs = inspect.getdoc(func)
     if docs:
-        for line in docs.split('\n'):
-            if line.strip():
-                print('>' + line.rstrip('\n'), file=file)
+        print(docs, file=file)
     else:
-        print('>**No documentation!**', file=file)
+        print('**No documentation!**', file=file)
 
 
 def weighted_random(count: int, weights: str):
