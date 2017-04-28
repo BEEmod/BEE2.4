@@ -17,6 +17,8 @@ from conditions import (
 import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
+COND_MOD_NAME = 'Custom Items'
+
 # Map sign_type values to the item ID and the resolveInst ID.
 IND_PANEL_TYPES = {
     'check': ('item_indicator_panel', '[indPanCheck]'),

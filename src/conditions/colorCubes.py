@@ -5,6 +5,8 @@ from srctools import Vec, Entity, parse_vec_str
 import utils
 import brushLoc
 
+COND_MOD_NAME = None
+
 LOGGER = utils.getLogger(__name__, alias='cond.color_cubes')
 
 # The colours used, indexed by timer delay - 3.

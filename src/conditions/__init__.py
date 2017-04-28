@@ -22,6 +22,7 @@ from srctools import (
     Entity, Output, Solid, Side
 )
 
+COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = utils.getLogger(__name__, alias='cond.core')
 
@@ -404,6 +405,12 @@ def meta_cond(priority=0, only_once=True):
 def make_flag(orig_name, *aliases):
     """Decorator to add flags to the lookup."""
     def x(func: Callable[[Entity, Property], bool]):
+        try:
+            func.group = func.__globals__['COND_MOD_NAME']
+        except KeyError:
+            func.group = func.__globals__['__name__']
+            LOGGER.info('No name for module "{}"!', func.group)
+
         wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_FLAGS.append(
             (orig_name, aliases, func)
@@ -418,6 +425,12 @@ def make_flag(orig_name, *aliases):
 def make_result(orig_name, *aliases):
     """Decorator to add results to the lookup."""
     def x(func: Callable[..., Any]):
+        try:
+            func.group = func.__globals__['COND_MOD_NAME']
+        except KeyError:
+            func.group = func.__globals__['__name__']
+            LOGGER.info('No name for module "{}"!', func.group)
+
         wrapper = annotation_caller(func, srctools.VMF, Entity, Property)
         ALL_RESULTS.append(
             (orig_name, aliases, func)
@@ -662,6 +675,13 @@ DOC_HEADER = '''\
 This is a list of all condition flags and results in the current release.
 '''
 
+DOC_SPECIAL_GROUP = '''\
+### Specialized Conditions
+
+These are used to implement complex items which need their own code.
+They have limited utility otherwise.
+'''
+
 
 def dump_conditions(file):
     """Dump docs for all the condition flags, results and metaconditions."""
@@ -674,7 +694,7 @@ def dump_conditions(file):
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
-        print('## `{}` ({}):\n'.format(flag_key, priority), file=file)
+        print('#### `{}` ({}):\n'.format(flag_key, priority), file=file)
         dump_func_docs(file, func)
         file.write('\n')
 
@@ -685,13 +705,45 @@ def dump_conditions(file):
         print('<!------->', file=file)
         print('# ' + name, file=file)
         print('<!------->', file=file)
-        lookup.sort()
+
+        lookup_grouped = defaultdict(list)
+
         for flag_key, aliases, func in lookup:
-            print('## `{}`:\n'.format(flag_key), file=file)
-            if aliases:
-                print('> **Aliases:** `' + '`, `'.join(aliases) + '`', file=file)
-            dump_func_docs(file, func)
-            file.write('\n')
+            group = getattr(func, 'group', 'ERROR')
+            if group is None:
+                group = '00special'
+            lookup_grouped[group].append((flag_key, aliases, func))
+
+        # Collapse 1-large groups into Ungrouped.
+        for group in list(lookup_grouped):
+            if len(lookup_grouped[group]) < 2:
+                lookup_grouped[''].extend(lookup_grouped[group])
+                del lookup_grouped[group]
+
+        if not lookup_grouped['']:
+            del lookup_grouped['']
+
+        for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
+            if group == '':
+                group = 'Ungrouped Conditions'
+
+            if header_ind:
+                # Not before the first one...
+                print('\n---------\n', file=file)
+
+            if group == '00special':
+                print(DOC_SPECIAL_GROUP, file=file)
+            else:
+                print('### ' + group + '\n', file=file)
+
+            LOGGER.info('Doing {} group...', group)
+
+            for flag_key, aliases, func in funcs:
+                print('#### `{}`:\n'.format(flag_key), file=file)
+                if aliases:
+                    print('> **Aliases:** `' + '`, `'.join(aliases) + '`' + '  \n', file=file)
+                dump_func_docs(file, func)
+                file.write('\n')
 
 
 def dump_func_docs(file, func):

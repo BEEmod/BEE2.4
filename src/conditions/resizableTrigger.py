@@ -11,6 +11,7 @@ from conditions import (
 )
 from srctools import Property, Vec, Entity, Output
 
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 

@@ -14,6 +14,7 @@ from conditions import (
 )
 from srctools import Vec, Property, VMF, Entity, Output
 
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__)
 

@@ -3,6 +3,8 @@
 from conditions import make_flag, check_flag
 from srctools import Entity, Property
 
+COND_MOD_NAME = 'Logic'
+
 
 @make_flag('AND')
 def flag_and(inst: Entity, flag: Property):

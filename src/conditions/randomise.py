@@ -9,6 +9,7 @@ from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
 
+COND_MOD_NAME = 'Randomisation'
 
 @make_flag('random')
 def flag_random(inst: Entity, res: Property):

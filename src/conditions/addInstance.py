@@ -13,7 +13,10 @@ from conditions import (
 )
 from srctools import Vec, Entity, Property
 
+COND_MOD_NAME = 'Instance Generation'
+
 LOGGER = utils.getLogger(__name__, 'cond.addInstance')
+
 
 @make_result('addGlobal')
 def res_add_global_inst(res: Property):

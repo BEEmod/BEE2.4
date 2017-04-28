@@ -8,6 +8,8 @@ import brushLoc
 from srctools import Vec, Entity, Property
 import srctools
 
+COND_MOD_NAME = 'Positioning'
+
 
 @make_flag(
     'rotation',

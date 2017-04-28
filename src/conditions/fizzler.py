@@ -15,6 +15,8 @@ from vbsp import TEX_FIZZLER
 
 from typing import List, Dict
 
+COND_MOD_NAME = 'Fizzlers'
+
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
 FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.

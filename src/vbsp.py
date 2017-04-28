@@ -33,6 +33,7 @@ from typing import (
     Dict, Tuple, List
 )
 
+COND_MOD_NAME = 'VBSP'
 
 # Configuration data extracted from VBSP_config
 settings = {

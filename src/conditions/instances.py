@@ -14,6 +14,8 @@ from conditions import (
 import instanceLocs
 from srctools import Property, Vec, Entity, Output
 
+COND_MOD_NAME = 'Instances'
+
 
 @make_flag('instance')
 def flag_file_equal(inst: Entity, flag: Property):

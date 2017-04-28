@@ -18,6 +18,8 @@ from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
 from typing import Dict, Tuple
 
+COND_MOD_NAME = 'Brushes'
+
 LOGGER = utils.getLogger(__name__)
 
 

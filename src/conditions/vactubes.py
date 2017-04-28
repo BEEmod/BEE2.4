@@ -17,6 +17,8 @@ from srctools import (
     Property, Entity,
 )
 
+COND_MOD_NAME = None
+
 LOGGER = utils.getLogger(__name__, alias='cond.vactubes')
 
 PUSH_SPEED = 700  # The speed of the push triggers.

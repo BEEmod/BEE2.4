@@ -9,6 +9,8 @@ import conditions
 import utils
 import vbsp
 
+COND_MOD_NAME = None
+
 LOGGER = utils.getLogger(__name__, alias='cond.catwalks')
 
 CATWALK_TYPES = {

@@ -13,6 +13,7 @@ from conditions import (
 from template_brush import TEMP_TYPES
 from srctools import Property, Vec, VMF, Entity
 
+COND_MOD_NAME = 'Entities'
 
 LOGGER = utils.getLogger(__name__, alias='cond.entities')
 

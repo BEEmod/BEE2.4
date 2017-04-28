@@ -9,6 +9,8 @@ from conditions import (
 import instanceLocs
 from srctools import Vec, Property, Entity
 
+COND_MOD_NAME = 'Track Platforms'
+
 
 LOGGER = utils.getLogger(__name__, alias='cond.trackPlat')
 

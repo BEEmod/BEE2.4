@@ -8,6 +8,7 @@ from conditions import (
 )
 import vbsp
 
+COND_MOD_NAME = 'Global Properties'
 
 
 @make_flag('styleVar')

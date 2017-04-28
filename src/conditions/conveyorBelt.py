@@ -7,6 +7,7 @@ import template_brush
 import instanceLocs
 import srctools
 
+COND_MOD_NAME = None
 
 @conditions.make_result('ConveyorBelt')
 def res_conveyor_belt(inst: Entity, res: Property):

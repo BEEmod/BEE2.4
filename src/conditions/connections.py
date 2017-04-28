@@ -12,6 +12,8 @@ from srctools import Property, Entity, Output
 
 from typing import Optional, Dict, Tuple
 
+COND_MOD_NAME = 'I/O'
+
 LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
 # Traits set on item_cube.

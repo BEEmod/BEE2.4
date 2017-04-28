@@ -9,6 +9,8 @@ import template_brush
 
 from typing import Iterator, Any, Tuple, Dict, List
 
+COND_MOD_NAME = 'Breakable Glass'
+
 LOGGER = utils.getLogger(__name__)
 
 BREAKABLE_GLASS_CONF = {}

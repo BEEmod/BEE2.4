@@ -14,6 +14,8 @@ import utils
 
 from typing import List
 
+COND_MOD_NAME = 'Monitors'
+
 LOGGER = utils.getLogger(__name__, 'cond.monitor')
 
 ALL_MONITORS = []  # type: List[Monitor]
