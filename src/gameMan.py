@@ -660,6 +660,7 @@ class Game:
             self.copy_mod_music()
 
         if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
             with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
                 TAG_COOP_INST_VMF.export(f)
 
