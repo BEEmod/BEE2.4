@@ -270,7 +270,15 @@ def calc_connections(
                 inst_toggle = toggles[out_name]
                 item.antlines |= overlays[inst_toggle.fixup['indicator_name']]
             elif out_name in panels:
-                item.ind_panels.add(panels[out_name])
+                pan = panels[out_name]
+                item.ind_panels.add(pan)
+                if pan.fixup.bool('$is_timer'):
+                    item.timer = tim = pan.fixup.int('$timer_delay')
+                    if not (1 <= tim <= 30):
+                        # These would be infinite.
+                        item.timer = None
+                else:
+                    item.timer = None
             else:
                 try:
                     input_items.append(ITEMS[out_name])
@@ -282,6 +290,7 @@ def calc_connections(
         # Check/cross instances sometimes don't match the kind of timer delay.
         for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
+            pan.fixup['$is_timer'] = int(item.timer is not None)
 
         for inp_item in input_items:  # type: Item
             # Default A/B type.
