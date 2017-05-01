@@ -42,6 +42,15 @@ DEFAULT_SETTINGS = {
         # We need this value to detect just removing a package.
         'cache_pack_count': '0',
     },
+    'Packages': {
+        # The GitHub repro to retrieve the manifest from.
+        'manifest_repro': 'BEEmod/BEE2-items',
+        # Hash of last downloaded manifest, to check if we need
+        # to redownload things.
+        'manifest_sha1': '',
+        # Time since last check - we only do it once a day automatically.
+        'last_check': '0',
+    },
     'Debug': {
         # Log whenever items fallback to the parent style
         'log_item_fallbacks': '0',
