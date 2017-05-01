@@ -1590,8 +1590,8 @@ def add_goo_mist(sides):
 def fit_goo_mist(
         sides,
         needs_mist,
-        grid_x,
-        grid_y,
+        grid_x: int,
+        grid_y: int,
         particle,
         angles='0 0 0',
         ):
