@@ -301,13 +301,21 @@ def push_trigger(loc, normal, solids):
 
 
 def motion_trigger(*solids):
+    """Create the anti-gravity trigger, and force crouching."""
     motion_trig = vbsp.VMF.create_ent(
         classname='trigger_vphysics_motion',
         SetGravityScale='0.0',
         origin=solids[0].get_origin(),
         spawnflags='1103',  # Clients, Physics, Everything
     )
-    motion_trig.solids.extend(solids)
+    duck_trig = vbsp.VMF.create_ent(
+        classname='trigger_playermovement',
+        origin=motion_trig['origin'],
+        spawnflags=1 + 2048,  # Clients, Auto-duck while in trigger.
+    )
+    for solid in solids:
+        motion_trig.solids.append(solid.copy())
+        duck_trig.solids.append(solid.copy())
 
 
 def make_straight(
