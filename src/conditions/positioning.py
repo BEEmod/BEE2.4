@@ -150,7 +150,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
 
     If the value is single value, that should be the type.
     Otherwise, the value should be a block with 'offset' and 'type' values.
-    The offset is in block incrments, with 0 0 0 equal to the mounting surface.
+    The offset is in block increments, with 0 0 0 equal to the mounting surface.
 
     The type should be a space-seperated list of locations:
     * VOID (Outside the map)
