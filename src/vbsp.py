@@ -1964,7 +1964,7 @@ def can_clump():
     return vbsp_options.get(bool, "clump_wall_tex")
 
 
-def make_barrier_solid(origin, material):
+def make_barrier_solid(origin, material, thin_player_clip=False):
     """Make a brush covering a given glass/grating location.
     """
     # Find the center point of this location to find where the brush
@@ -1978,6 +1978,17 @@ def make_barrier_solid(origin, material):
     # This sets the two side axes to 1, and the normal axis to 0.
     side_offset = 1 - abs(normal)  # type: Vec
     side_offset *= 64
+    
+    # The func_brush player clip doesn't block you going through a portal,
+    # so add a normal player clip inside it as func_detail to ensure it is
+    # detected.
+    if thin_player_clip:
+        clip = VMF.create_ent('func_detail')
+        clip.solids.append(VMF.make_prism(
+            (loc + normal*61 + side_offset),
+            (loc + normal*63 - side_offset),
+            mat=consts.Tools.PLAYER_CLIP,
+        ).solid)
 
     return VMF.make_prism(
         # Adding the side_offset moves the other directions out 64
@@ -2859,12 +2870,16 @@ def change_func_brush():
             brush_loc = brush.get_origin()  # type: Vec
 
         if is_grating and grating_clip_mat:
-            grate_clip, _, _ = make_barrier_solid(brush_loc, grating_clip_mat)
+            grate_clip, _, _ = make_barrier_solid(
+                brush_loc,
+                grating_clip_mat,
+                thin_player_clip=True,
+            )
             grate_player_clip.solids.append(grate_clip.solid)
 
             grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
             for face in grate_phys_clip_solid.sides:
-                face.mat = 'tools/toolstrigger'
+                face.mat = consts.Tools.TRIGGER
 
             clip_ent = VMF.create_ent(
                 classname='func_clip_vphysics',
