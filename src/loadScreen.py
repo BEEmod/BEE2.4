@@ -89,11 +89,15 @@ class BaseLoadScreen:
     # Methods the subclasses must implement.
     
     @abstractmethod
-    def set_length(self, stage: str, num: str):
+    def set_length(self, stage: str, num: int):
         pass
 
     @abstractmethod
     def step(self, stage: str):
+        pass
+
+    @abstractmethod
+    def set_stage(self, stage: str, num: int):
         pass
 
     @abstractmethod
@@ -140,7 +144,6 @@ class LoadScreen(BaseLoadScreen, Toplevel):
         )
         self.withdraw()
 
-        
         # this prevents stuff like the title bar, normal borders etc from
         # appearing in this window.
         self.overrideredirect(1)
@@ -204,9 +207,16 @@ class LoadScreen(BaseLoadScreen, Toplevel):
         self.geometry('+' + str(loc_x) + '+' + str(loc_y))
         self.update()  # Force an update of the window to position it
 
-    def step(self, stage):
+    def step(self, stage: str):
         """Increment a stage by one."""
         self.bar_val[stage] += 1
+        self.set_nums(stage)
+        if self.active:
+            self.widgets[stage].update()
+
+    def set_stage(self, stage: str, num: int):
+        """Set a stage to a value."""
+        self.bar_val[stage] = num
         self.set_nums(stage)
         if self.active:
             self.widgets[stage].update()
@@ -268,6 +278,7 @@ class LoadScreen(BaseLoadScreen, Toplevel):
         """Undo temporarily hiding the screen."""
         self.deiconify()
 
+
 class SplashScreen(BaseLoadScreen):
     """The screen shown for the main loading screen. It only works once.
     
@@ -319,6 +330,11 @@ class SplashScreen(BaseLoadScreen):
         """Increment a step by one."""
         self.values[stage] += 1
         self._pipe.send((stage, 'value', self.values[stage]))
+
+    def set_stage(self, stage: str, num: int):
+        """Set a stage to a value."""
+        self.values[stage] = num
+        self._pipe.send((stage, 'value', num))
 
     def set_length(self, stage, num):
         """Set the number of items in a stage."""
