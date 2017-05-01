@@ -3,15 +3,82 @@
 This way it's easy to edit them.
 Additionally all resources are saved into zips/resources.zip.
 """
+from zipfile import ZipFile, ZIP_LZMA
+from io import StringIO
+import itertools
 import os
 import shutil
-import sys
-import itertools
-from zipfile import ZipFile, ZIP_LZMA, ZIP_DEFLATED
 
 from srctools import Property, KeyValError, VMF, Entity, conv_bool
+from uritemplate import URITemplate
+import requests
+
+import updater
 
 OPTIMISE = False
+PACKAGE_LOC = os.environ['BEE2_PACKAGE_LOC']
+
+
+def build_manifest(
+    zip_path,
+    upload_url: URITemplate,
+    download_url: str,
+    bee2_version='',
+):
+    """Generate the manifest file needed to download packages."""
+    manifest = Property(None, [])
+    if bee2_version:
+        manifest['BEE2_version'] = bee2_version
+    man_packages = Property('Packages', [])
+    manifest.append(man_packages)
+
+    try:
+        web_manifest = Property.parse(updater.dl_manifest())
+    except ValueError:
+        web_manifest = Property(None, [])
+
+    orig_hashes = {}
+
+    for prop in web_manifest.find_children('Packages'):
+        orig_hashes[prop.real_name] = prop['sha1'], prop['url']
+
+    for zip_name in os.listdir(zip_path):
+        pack_loc = os.path.join(zip_path, zip_name)
+        last_hash, last_url = orig_hashes.get(zip_name, 'xx')
+        print('{}: {} -> '.format(zip_name, last_hash), end='', flush=True)
+        cur_hash = updater.hash_file(pack_loc)
+        print(cur_hash)
+
+        if cur_hash == last_hash:
+            cur_url = last_url
+        else:
+            # We need to upload to the release.
+            print('Uploading "{}"...'.format(zip_name), end='')
+            requests.post(
+                upload_url.expand(name=zip_name),
+                params=updater.GH_TOKEN_PARMS,
+                data=open(pack_loc, 'rb'),
+                headers={'Content-Type': 'application/zip'},
+            )
+            cur_url = download_url + zip_name
+            print(' Done!')
+
+        man_packages.append(Property(zip_name, [
+            Property('SHA1', cur_hash),
+            Property('URL', cur_url),
+        ]))
+
+    manifest_data = StringIO()
+    for line in manifest.export():
+        manifest_data.write(line)
+
+    print('Uploading manifest...', end='')
+    requests.post(
+        upload_url.expand(name='manifest.txt', label='manifest'),
+        params=updater.GH_TOKEN_PARMS,
+        data=manifest_data.getvalue().encode('utf8'),
+        headers={'Content-Type': 'text/plain'},
+    )
 
 
 def clean_vmf(vmf_path):
@@ -76,6 +143,8 @@ def clean_vmf(vmf_path):
 
 # Text files we should clean up.
 PROP_EXT = ('.cfg', '.txt', '.vmt', '.nut')
+
+
 def clean_text(file_path):
     # Try and parse as a property file. If it succeeds,
     # write that out - it removes excess whitespace between lines
@@ -198,40 +267,79 @@ def build_package(package_path, pack_zip_path, zip_path):
 
 def main():
     global OPTIMISE
-    
-    OPTIMISE = conv_bool(input('Optimise zips? '))
-    
-    print('Optimising: ', OPTIMISE)
 
-    zip_path = os.path.join(
-        os.getcwd(),
-        'zips',
-        'sml' if OPTIMISE else 'lrg',
+    skip = input('Optimise zips or SKIP? ').casefold()
+    item_version = input('Items Version: ')
+    bee2_version = input(' BEE2 Version: ')
+    OPTIMISE = conv_bool(skip)
+
+    updater.GEN_OPTS.load()
+    user, repro_name = updater.get_repro()
+
+    release_resp = requests.post(
+        'https://api.github.com/repos/{}/{}/releases'.format(user, repro_name),
+        params=updater.GH_TOKEN_PARMS,
+        json={
+            'tag_name': 'v' + item_version,
+            'target_commitish': 'dev',
+            "name": 'Packages Version ' + item_version,
+            'body': 'This release is incomplete. Do not download.',
+            'draft': True,
+            'prerelease': False,
+        },
     )
-    if os.path.isdir(zip_path):
-        for file in os.listdir(zip_path):
-            print('Deleting', file)
-            os.remove(os.path.join(zip_path, file))
-    else:
-        os.makedirs(zip_path, exist_ok=True)
+    release_resp.raise_for_status()
+    release_data = release_resp.json()
+    keep_release = False
+    try:
+        print('Release made!')
+        print('Remaining on limit: {}/{}'.format(
+            release_resp.headers['X-RateLimit-Remaining'],
+            release_resp.headers['X-RateLimit-Limit'],
+        ))
+        upload_url = URITemplate(release_data['upload_url'])
+        download_url = 'https://github.com/{}/{}/releases/download/v{}/'.format(
+            user, repro_name, item_version
+        )
 
-    shutil.rmtree('zips/hammer/', ignore_errors=True)
+        zip_path = os.path.join(
+            PACKAGE_LOC,
+            'zips',
+            'sml' if OPTIMISE else 'lrg',
+        )
 
-    path = os.path.join(os.getcwd(), 'packages\\', )
-    
-    # A list of all the package zips.
-    for package in search_folder(zip_path, path):
-        build_package(*package)
+        if skip.casefold() != 'skip':
+            if os.path.isdir(zip_path):
+                for file in os.listdir(zip_path):
+                    print('Deleting', file)
+                    os.remove(os.path.join(zip_path, file))
+            else:
+                os.makedirs(zip_path, exist_ok=True)
 
-    print('Building main zip...')
+            shutil.rmtree(os.path.join(PACKAGE_LOC, 'zips/hammer/'), ignore_errors=True)
 
-    pack_name = 'BEE{}_packages.zip'.format(input('Version: '))
-    
-    with ZipFile(os.path.join('zips', pack_name), 'w', compression=ZIP_DEFLATED) as zip_file:
-        for file in os.listdir(zip_path):
-            zip_file.write(os.path.join(zip_path, file), os.path.join('packages/', file))
-            print('.', end='', flush=True)
-    print('Done!')
+            path = os.path.join(PACKAGE_LOC, 'packages\\')
+
+            # A list of all the package zips.
+            for package in search_folder(zip_path, path):
+                build_package(*package)
+
+        build_manifest(zip_path, upload_url, download_url, bee2_version)
+
+        keep_release = True
+    finally:
+        # If we fail delete the release to clean up.
+        if not keep_release:
+            print('Deleting release!')
+            requests.delete(
+                'https://api.github.com/repos/{}/{}/releases/{}'.format(
+                    user,
+                    repro_name,
+                    release_data['id'],
+                ),
+                params=updater.GH_TOKEN_PARMS,
+            )
+    print('Complete!')
 
 if __name__ == '__main__':
     main()

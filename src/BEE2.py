@@ -20,6 +20,7 @@ import UI
 import loadScreen
 import paletteLoader
 import packageLoader
+import updater
 import gameMan
 import logWindow
 import sound
@@ -48,8 +49,8 @@ DEFAULT_SETTINGS = {
         # Hash of last downloaded manifest, to check if we need
         # to redownload things.
         'manifest_sha1': '',
-        # Time since last check - we only do it once a day automatically.
-        'last_check': '0',
+        # Time of last check - we only do it once a day automatically.
+        'last_check': updater.DEFAULT_TIME,
     },
     'Debug': {
         # Log whenever items fallback to the parent style
@@ -90,6 +91,8 @@ gameMan.set_game_by_name(
     GEN_OPTS.get_val('Last_Selected', 'Game', ''),
     )
 gameMan.scan_music_locs()
+
+updater.check_packages()
 
 LOGGER.info('Loading Packages...')
 pack_data, package_sys = packageLoader.load_packages(

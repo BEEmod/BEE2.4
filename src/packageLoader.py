@@ -265,9 +265,12 @@ def set_cond_source(props: Property, source: str):
         cond['__src__'] = source
 
 
-def find_packages(pak_dir):
+def find_packages(pak_dir, skippable=False):
     """Search a folder for packages, recursing if necessary."""
+    pak_dir = os.path.abspath(pak_dir)
+
     found_pak = False
+
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
         if name.endswith('.vpk') and not name.endswith('_dir.vpk'):
@@ -297,7 +300,7 @@ def find_packages(pak_dir):
             if os.path.isdir(name):
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name)
+                find_packages(name, skippable)
             else:
                 LOGGER.warning('ERROR: Bad package "{}"!', name)
             # Don't continue to parse this "package"
@@ -310,6 +313,13 @@ def find_packages(pak_dir):
             filesys.close_ref()
             raise
 
+        if pak_id in packages:
+            if skippable:
+                filesys.close_ref()
+                continue
+            else:
+                raise ValueError('Duplicate package "{}"!', pak_id)
+
         PACKAGE_SYS[pak_id] = filesys
 
         packages[pak_id] = Package(
@@ -321,7 +331,7 @@ def find_packages(pak_dir):
         found_pak = True
 
     if not found_pak:
-        LOGGER.debug('No packages in folder!')
+        LOGGER.debug('No packages in folder "{}"!', pak_dir)
 
 
 def close_filesystems():
@@ -344,22 +354,6 @@ def load_packages(
         ) -> Tuple[dict, Iterable[FileSystem]]:
     """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
-    pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
-
-    if not os.path.isdir(pak_dir):
-        from tkinter import messagebox
-        import sys
-        # We don't have a packages directory!
-        messagebox.showerror(
-            master=loader,
-            title='BEE2 - Invalid Packages Directory!',
-            message='The given packages directory is not present!\n'
-                    'Get the packages from '
-                    '"http://github.com/BEEmod/BEE2-items" '
-                    'and place them in "' + pak_dir + os.path.sep + '".',
-                    # Add slash to the end to indicate it's a folder.
-        )
-        sys.exit()
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -367,7 +361,10 @@ def load_packages(
     # If we fail we want to clean up our filesystems.
     should_close_filesystems = True
     try:
-        find_packages(pak_dir)
+        # Load local files first, then downloaded packages if not locally
+        # available.
+        find_packages(os.path.join('..', pak_dir), skippable=False)
+        find_packages('../dl_packages/', skippable=True)
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
