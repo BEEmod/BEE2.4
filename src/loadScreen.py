@@ -7,6 +7,7 @@ from weakref import WeakSet
 from abc import abstractmethod
 import contextlib
 import multiprocessing
+import time
 
 from loadScreen_daemon import run_screen as _splash_daemon
 import utils
@@ -325,6 +326,8 @@ class SplashScreen(BaseLoadScreen):
     def show(self):
         """Start the process."""
         self._subproc.start()
+        # Wait a bit for the subprocess to boot up.
+        time.sleep(0.2)
 
     def step(self, stage):
         """Increment a step by one."""
