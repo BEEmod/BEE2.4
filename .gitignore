@@ -65,6 +65,7 @@ palettes/*.bee2_palette
 !palettes/original.bee2_palette
 
 #These folders are generated automatically by the BEE2
+dl_packages/
 images/cache/
 inst_cache/
 source_cache/
