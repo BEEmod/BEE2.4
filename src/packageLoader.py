@@ -892,8 +892,10 @@ class ItemVariant:
             pal_name = item['pal_name', None]  # Name for the palette icon
             bee2_icon = item['bee2', None]
             if item.name == 'all':
-                variant.all_icon = pal_icon
-                variant.all_name = pal_name
+                if pal_icon:
+                    variant.all_icon = pal_icon
+                if pal_name:
+                    variant.all_name = pal_name
                 if bee2_icon:
                     variant.icons['all'] = bee2_icon
                 continue
