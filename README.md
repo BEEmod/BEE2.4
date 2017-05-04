@@ -1,7 +1,7 @@
 [![BEE2.4 Releases](https://img.shields.io/github/downloads/BEEmod/BEE2.4/total.svg?label=App)](https://github.com/BEEmod/BEE2.4/releases)
 [![BEE2-items Releases](https://img.shields.io/github/downloads/BEEmod/BEE2-items/total.svg?label=Packages)](https://github.com/BEEmod/BEE2-items/releases)
 
-Join the Discord [here](https://discord.gg/mZ4peDd) and chat with us!
+Join the Discord [here](https://discord.me/beemod) and chat with us!
 
 
 ![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/bee2.ico)
