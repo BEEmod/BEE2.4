@@ -1,6 +1,7 @@
 """Results relating to item connections."""
 import srctools
 import utils
+import instance_traits
 from conditions import (
     make_flag, make_result, make_result_setup,
     resolve_value, local_name,
@@ -11,8 +12,18 @@ from srctools import Property, Entity, Output
 
 from typing import Optional, Dict, Tuple
 
+COND_MOD_NAME = 'I/O'
+
 LOGGER = utils.getLogger(__name__, alias='cond.connections')
 
+# Traits set on item_cube.
+CUBE_TYPES = [
+    'cube_standard',
+    'cube_companion',
+    'cube_reflect',
+    'cube_ball',
+    'cube_franken',
+]
 
 @make_result_setup('AddOutput')
 def res_add_output_setup(res: Property):
@@ -191,7 +202,7 @@ def res_locking_input(inst: Entity, res: Property):
         )
     return True
 
-LINKED_CUBES = {}  # type: Dict[int, Tuple[Entity, str, Optional[str], str]]
+LINKED_CUBES = {}  # type: Dict[int, Tuple[Entity, Optional[str], str]]
 
 
 @make_result('_MarkLinkedCube')
@@ -218,7 +229,6 @@ def res_linked_cube(inst: Entity, res: Property):
 
     LINKED_CUBES[time] = (
         inst,
-        inst.fixup['$cube_type'],
         resp_out_name, resp_out,
     )
 
@@ -233,15 +243,24 @@ def res_linked_cube_dropper(drp_inst: Entity, res: Property):
         return
 
     try:
-
-        cube_inst, cube_type, resp_out_name, resp_out = LINKED_CUBES[time]
+        cube_inst, resp_out_name, resp_out = LINKED_CUBES[time]
     except KeyError:
         raise Exception('Unknown cube "linkage" value ({}) in dropper!'.format(
             time,
         ))
 
     # Force the dropper to match the cube..
-    #  = cube_type
+    if '$cube_type' in cube_inst.fixup:
+        # Trust instvar if set (custom items for example)
+        drp_inst.fixup['$cube_type'] = cube_inst.fixup['$cube_type']
+    else:
+        cube_traits = instance_traits.get(cube_inst)
+        for ind, cube_type in enumerate(CUBE_TYPES):
+            if cube_type in cube_traits:
+                drp_inst.fixup['$cube_type'] = ind
+                break
+        else:
+            LOGGER.warning('Cube "{}" has no cube type traits!', cube_inst['targetname'])
 
     # Set auto-drop to False (so there isn't two cubes),
     # and auto-respawn to True (so it actually functions).

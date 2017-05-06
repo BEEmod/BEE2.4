@@ -9,6 +9,7 @@ from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
 
+COND_MOD_NAME = 'Randomisation'
 
 @make_flag('random')
 def flag_random(inst: Entity, res: Property):
@@ -141,7 +142,7 @@ def res_add_variant(inst: Entity, res: Property):
         Weights: A comma-separated list of weights for each instance.
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of "2, 1, 1" means the first instance has a 2/4 chance of
-    being chosen, and the other 2 have a 1/4 chance of being chosen.
+    being chosen, and the other 2 have a 1/4 chance of being chosen.  
     The chosen variant depends on the position, direction and name of
     the instance.
 

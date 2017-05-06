@@ -2,10 +2,11 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
+from zipfile import ZIP_STORED
 import shutil
 import os
+import io
 
-from zipfile import ZIP_STORED
 
 
 class FakeZipInfo:
@@ -125,8 +126,17 @@ def zip_names(zip):
 
 
 def zip_open_bin(zip, filename):
-    """Open in binary mode if a fake zip."""
+    """Open zips and fake zips in binary mode."""
     if isinstance(zip, FakeZip):
         return zip.open(filename, 'rb')
     else:
         return zip.open(filename, 'r')
+
+
+def zip_open_text(zip, filename):
+    """Open zips and fake zips in text mode."""
+    if isinstance(zip, FakeZip):
+        return zip.open(filename)
+    else:
+        # Wrap the zip file to decode.
+        return io.TextIOWrapper(zip.open(filename, 'r'), encoding='utf8')

@@ -1,53 +1,55 @@
 """Logic for trigger items, allowing them to be resized."""
 import conditions
+import instanceLocs
 import srctools
 import utils
 import vbsp
+import vbsp_options
 import comp_consts as const
 from conditions import (
     make_result, RES_EXHAUSTED,
 )
-from instanceLocs import resolve as resolve_inst
 from srctools import Property, Vec, Entity, Output
 
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__, alias='cond.resizeTrig')
 
 
 @make_result('ResizeableTrigger')
 def res_resizeable_trigger(res: Property):
-    """Replace two markers with a trigger brush.
+    """Replace two markers with a trigger brush.  
 
-    This is run once to affect all of an item.
+    This is run once to affect all of an item.  
     Options:
-    'markerInst': <ITEM_ID:1,2> value referencing the marker instances, or a filename.
-    'markerItem': The item's ID
-    'previewVar': A stylevar which enables/disables the preview overlay.
-    'previewinst': An instance to place at the marker location in preview mode.
+    * `markerInst`: <ITEM_ID:1,2> value referencing the marker instances, or a filename.
+    * `markerItem`: The item's ID
+    * `previewConf`: A item config which enables/disables the preview overlay.
+    * `previewinst`: An instance to place at the marker location in preview mode.
         This should contain checkmarks to display the value when testing.
-    'previewMat': If set, the material to use for an overlay func_brush.
+    * `previewMat`: If set, the material to use for an overlay func_brush.
         The brush will be parented to the trigger, so it vanishes once killed.
         It is also non-solid.
-    'previewScale': The scale for the func_brush materials.
-    'previewActivate', 'previewDeactivate': The 'instance:name;Input' value
+    * `previewScale`: The scale for the func_brush materials.
+    * `previewActivate`, `previewDeactivate`: The `instance:name;Input` value
         to turn the previewInst on and off.
 
-    'triggerActivate, triggerDeactivate': The outputs used when the trigger
+    * `triggerActivate, triggerDeactivate`: The outputs used when the trigger
         turns on or off.
 
-    'coopVar': The instance variable which enables detecting both Coop players.
+    * `coopVar`: The instance variable which enables detecting both Coop players.
         The trigger will be a trigger_playerteam.
 
-    'coopActivate, coopDeactivate': The outputs used when coopVar is enabled.
+    * `coopActivate, coopDeactivate`: The outputs used when coopVar is enabled.
         These should be suitable for a logic_coop_manager.
-    'coopOnce': If true, kill the manager after it first activates.
+    * `coopOnce`: If true, kill the manager after it first activates.
 
-    'keys': A block of keyvalues for the trigger brush. Origin and targetname
+    * `keys`: A block of keyvalues for the trigger brush. Origin and targetname
         will be set automatically.
-    'localkeys': The same as above, except values will be changed to use
+    * `localkeys`: The same as above, except values will be changed to use
         instance-local names.
     """
-    marker = resolve_inst(res['markerInst'])
+    marker = instanceLocs.resolve(res['markerInst'])
 
     markers = {}
     for inst in vbsp.VMF.by_class['func_instance']:
@@ -70,11 +72,8 @@ def res_resizeable_trigger(res: Property):
     mark_deact_name, mark_deact_out = marker_connection.out_deact
     del marker_connection
 
-    preview_var = res['previewVar', ''].casefold()
-
-    # Display preview overlays if it's preview mode, and the style var is true
-    # or does not exist
-    if vbsp.IS_PREVIEW and (not preview_var or vbsp.settings['style_vars'][preview_var]):
+    # Display preview overlays if it's preview mode, and the config is true
+    if vbsp.IS_PREVIEW and vbsp_options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
         pre_act_name, pre_act_inp = Output.parse_name(
@@ -110,7 +109,7 @@ def res_resizeable_trigger(res: Property):
             # Only do once if inst == other
             ent.remove()
 
-        is_coop = vbsp.GAME_MODE == 'COOP' and (
+        is_coop = coop_var is not None and vbsp.GAME_MODE == 'COOP' and (
             inst.fixup.bool(coop_var) or
             other.fixup.bool(coop_var)
         )

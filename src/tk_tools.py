@@ -9,13 +9,22 @@ import tkinter as tk
 
 import os.path
 
-from idlelib.WidgetRedirector import WidgetRedirector
+try:
+    # Python 3.6+
+    # noinspection PyCompatibility
+    from idlelib.redirector import WidgetRedirector
+except ImportError:
+    # Python 3.5 and below
+    # noinspection PyCompatibility
+    from idlelib.WidgetRedirector import WidgetRedirector
 
 import utils
 
 # Put this in a module so it's a singleton, and we can always import the same
 # object.
 TK_ROOT = tk.Tk()
+
+# Set icons for the application.
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -24,7 +33,31 @@ if utils.WIN:
     def set_window_icon(window: tk.Toplevel):
         """Set the window icon."""
         window.wm_iconbitmap('../BEE2.ico')
-else:
+
+    import ctypes
+    # Use Windows APIs to tell the taskbar to group us as our own program,
+    # not with python.exe. Then our icon will apply, and also won't group
+    # with other scripts.
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            'BEEMOD.application',
+        )
+    except (AttributeError, WindowsError, ValueError):
+        pass  # It's not too bad if it fails.
+elif utils.MAC:
+    # Call OS-X's specific api for setting the window icon.
+    TK_ROOT.tk.call(
+        'tk::mac::iconBitmap',
+        256,  # largest size in the .ico
+        256,
+        '-imageFile',
+        '../bee2.ico',
+    )
+
+    def set_window_icon(window: tk.Toplevel):
+        """Does nothing."""
+else:  # Linux
+    # Get the tk image object.
     import img
     app_icon = img.get_app_icon()
 
@@ -61,6 +94,11 @@ def on_error(exc_type, exc_value, exc_tb):
         TK_ROOT.clipboard_append(err)
     except Exception:
         pass
+
+    if not issubclass(exc_type, Exception):
+        # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
+        # so ignore the error.
+        return
 
     # Put it onscreen.
     try:

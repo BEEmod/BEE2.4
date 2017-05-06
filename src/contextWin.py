@@ -18,6 +18,7 @@ import webbrowser
 
 from richTextBox import tkRichText
 import img
+import itemconfig
 import sound as snd
 import itemPropWin
 import tkMarkdown
@@ -182,8 +183,34 @@ def show_prop(widget, warp_cursor=False):
 
 
 def set_item_version(e=None):
+    """Callback for the version combobox. Set the item variant."""
     selected_item.change_version(version_lookup[wid['variant'].current()])
+    # Refresh our data.
     load_item_data()
+
+    # Refresh itemconfig comboboxes to match us.
+    for func in itemconfig.ITEM_VARIANT_LOAD:
+        if func.item_id == selected_item.id:
+            func()
+
+
+def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list:
+    """Set values on the variant combobox.
+
+    This is in a function so itemconfig can reuse it.
+    It returns a list of IDs in the same order as the names.
+    """
+    ver_lookup, version_names = item.get_version_names()
+    if len(version_names) <= 1:
+        # There aren't any alternates to choose from, disable the box
+        box.state(['disabled'])
+        box['values'] = [_('No Alternate Versions!')]
+        box.current(0)
+    else:
+        box.state(['!disabled'])
+        box['values'] = version_names
+        box.current(ver_lookup.index(item.selected_ver))
+    return ver_lookup
 
 
 def get_description(global_last, glob_desc, style_desc):
@@ -232,16 +259,7 @@ def load_item_data():
     else:
         wid['changedefaults'].state(['disabled'])
 
-    version_lookup, version_names = selected_item.get_version_names()
-    if len(version_names) <= 1:
-        # There aren't any alternates to choose from, disable the box
-        wid['variant'].state(['disabled'])
-        wid['variant']['values'] = [_('No Alternate Versions!')]
-        wid['variant'].current(0)
-    else:
-        wid['variant'].state(['!disabled'])
-        wid['variant']['values'] = version_names
-        wid['variant'].current(version_lookup.index(selected_item.selected_ver))
+    version_lookup = set_version_combobox(wid['variant'], selected_item)
 
     if selected_item.url is None:
         wid['moreinfo'].state(['disabled'])

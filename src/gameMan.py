@@ -17,19 +17,23 @@ import math
 
 from BEE2_config import ConfigFile, GEN_OPTS
 from query_dialogs import ask_string
-from srctools import Vec, Property, NoKeyError, VPK, VMF, Output
+from srctools import (
+    Vec, VPK,
+    Property, NoKeyError,
+    VMF, Output,
+    FileSystemChain,
+)
 import backup
-import extract_packages
 import loadScreen
 import packageLoader
 import utils
 import srctools
 
-from typing import List, Optional
+from typing import List, Tuple
 
 LOGGER = utils.getLogger(__name__)
 
-all_games = [] # type: List[Game]
+all_games = []  # type: List[Game]
 selected_game = None  # type: Game
 selectedGame_radio = IntVar(value=0)
 game_menu = None  # type: Menu
@@ -90,6 +94,9 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
+
+# The systems we need to copy to ingame resources
+res_system = FileSystemChain()
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
@@ -168,7 +175,17 @@ sp_a5_finale02_stage_end.wav\
 # want_you_gone_guitar_cover.wav
 
 
+def load_filesystems(package_sys):
+    """Load package filesystems into a chain."""
+    for system in package_sys:
+        res_system.add_sys(system, prefix='resources/')
+
+
 def translate(string):
+    """Translate the string using Portal 2's language files.
+
+    This is needed for Valve items, since they translate automatically.
+    """
     return TRANS_DATA.get(string, string)
 
 
@@ -187,12 +204,12 @@ def quit_application():
 
 
 class Game:
-    def __init__(self, name, steam_id: str, folder, mod_time=0):
+    def __init__(self, name, steam_id: str, folder, mod_times):
         self.name = name
         self.steamID = steam_id
         self.root = folder
-        # The modified date of the cache, so we know whether to copy it over.
-        self.mod_time = mod_time
+        # The last modified date of packages, so we know whether to copy it over.
+        self.mod_times = mod_times
 
     @classmethod
     def parse(cls, gm_id, config: ConfigFile):
@@ -207,19 +224,22 @@ class Game:
             raise ValueError(
                 'Game {} has no folder!'.format(gm_id)
             )
+        mod_times = {}
 
-        mod_time = config.get_int(gm_id, 'ModTime', 0)
+        for name, value in config.items(gm_id):
+            if name.startswith('pack_mod_'):
+                mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_time)
+        return cls(gm_id, steam_id, folder, mod_times)
 
     def save(self):
         """Write a game into the config page."""
-        if self.name not in CONFIG:
-            CONFIG[self.name] = {}  # Make the section if it's not there.
+        # Wipe the original configs
+        CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
-        CONFIG[self.name]['ModTime'] = str(self.mod_time)
-
+        for pack, mod_time in self.mod_times.items():
+            CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
     def dlc_priority(self):
         """Iterate through all subfolders, in order of high to low priority.
@@ -260,7 +280,7 @@ class Game:
                 'game_sounds_editor.txt'
             ))
             if os.path.isfile(file):
-                break # We found it
+                break  # We found it
         else:
             # Assume it's in dlc2
             file = self.abs_path(os.path.join(
@@ -269,7 +289,7 @@ class Game:
                 'game_sounds_editor.txt',
             ))
         try:
-            with open(file) as f:
+            with open(file, encoding='utf8') as f:
                 file_data = list(f)
         except FileNotFoundError:
             # If the file doesn't exist, we'll just write our stuff in.
@@ -280,7 +300,7 @@ class Game:
                 del file_data[i:]
 
         # Then add our stuff!
-        with open(file, 'w') as f:
+        with open(file, 'w', encoding='utf8') as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -297,7 +317,7 @@ class Game:
         for folder in self.dlc_priority():
             info_path = os.path.join(self.root, folder, 'gameinfo.txt')
             if os.path.isfile(info_path):
-                with open(info_path) as file:
+                with open(info_path, encoding='utf8') as file:
                     data = list(file)
 
                 for line_num, line in reversed(list(enumerate(data))):
@@ -348,48 +368,61 @@ class Game:
                     shutil.move(backup_path, item_path)
             self.clear_cache()
 
-    def cache_valid(self):
+    def cache_invalid(self):
         """Check to see if the cache is valid."""
-        cache_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        if GEN_OPTS.get_bool('General', 'preserve_bee2_resource_dir'):
+            # Skipped always
+            return False
 
-        if cache_time == self.mod_time:
-            LOGGER.info("Skipped copying cache!")
+        # Check lengths, to ensure we re-extract if packages were removed.
+        if len(packageLoader.packages) != len(self.mod_times):
+            LOGGER.info('Need to extract - package counts inconsistent!')
             return True
-        LOGGER.info("Cache invalid - copying..")
-        return False
+
+        if any(
+            pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
+            for pack_id, pack in
+            packageLoader.packages.items()
+        ):
+            return True
 
     def refresh_cache(self):
         """Copy over the resource files into this game."""
-
         screen_func = export_screen.step
-        copy = shutil.copy
 
-        def copy_func(src, dest):
-            screen_func('RES')
-            copy(src, dest)
+        with res_system:
+            for file in res_system.walk_folder_repeat():
+                try:
+                    start_folder, path = file.path.split('/', 1)
+                except ValueError:
+                    LOGGER.warning('File in resources root: "{}"!', file.path)
+                    continue
 
-        for folder in os.listdir('../cache/resources/'):
-            source = os.path.join('../cache/resources/', folder)
-            if not os.path.isdir(source):
-                continue  # Skip DS_STORE, desktop.ini, etc.
+                start_folder = start_folder.casefold()
 
-            if folder == 'instances':
-                dest = self.abs_path(INST_PATH)
-            elif folder.casefold() == 'bee2':
-                continue  # Skip app icons
-            else:
-                dest = self.abs_path(os.path.join('bee2', folder))
-            LOGGER.info('Copying to "{}" ...', dest)
-            try:
-                shutil.rmtree(dest)
-            except (IOError, shutil.Error):
-                pass
+                if start_folder == 'instances':
+                    dest = self.abs_path(INST_PATH + '/' + path)
+                elif start_folder in ('bee2', 'music_samp'):
+                    screen_func('RES')
+                    continue  # Skip app icons
+                else:
+                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
 
-            # This handles existing folders, without raising in os.makedirs().
-            utils.merge_tree(source, dest, copy_function=copy_func)
+                # Already copied from another package.
+                if os.path.exists(dest):
+                    screen_func('RES')
+                    continue
+
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
+                    shutil.copyfileobj(fsrc, fdest)
+                screen_func('RES')
+
         LOGGER.info('Cache copied.')
         # Save the new cache modification date.
-        self.mod_time = GEN_OPTS.get_int('General', 'cache_time', 0)
+        self.mod_times.clear()
+        for pack_id, pack in packageLoader.packages.items():
+            self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
 
@@ -404,14 +437,14 @@ class Game:
         except PermissionError:
             pass
 
-        self.mod_time = 0
+        self.mod_times.clear()
 
     def export(
-            self,
-            style: packageLoader.Style,
-            selected_objects: dict,
-            should_refresh=False,
-            ):
+        self,
+        style: packageLoader.Style,
+        selected_objects: dict,
+        should_refresh=False,
+        ) -> Tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -450,19 +483,30 @@ class Game:
         LOGGER.info('Should refresh: {}', should_refresh)
         if should_refresh:
             # Check to ensure the cache needs to be copied over..
-            should_refresh = not self.cache_valid()
-
-        if should_refresh:
-            export_screen.set_length('RES', extract_packages.res_count)
-        else:
-            export_screen.skip_stage('RES')
-            export_screen.skip_stage('MUS')
+            should_refresh = self.cache_invalid()
+            if should_refresh:
+                LOGGER.info("Cache invalid - copying..")
+            else:
+                LOGGER.info("Skipped copying cache!")
 
         # The items, plus editoritems, vbsp_config and the instance list.
         export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
 
+        # Do this before setting music and resources,
+        # those can take time to compute.
+
         export_screen.show()
         export_screen.grab_set_global()  # Stop interaction with other windows
+
+        if should_refresh:
+            # Count the files.
+            export_screen.set_length(
+                'RES',
+                sum(1 for file in res_system.walk_folder_repeat()),
+            )
+        else:
+            export_screen.skip_stage('RES')
+            export_screen.skip_stage('MUS')
 
         # Make the folders we need to copy files to, if desired.
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
@@ -470,6 +514,8 @@ class Game:
         # Start off with the style's data.
         editoritems, vbsp_config = style.export()
         export_screen.step('EXP')
+
+        vpk_success = True
 
         # Export each object type.
         for obj_name, obj_data in packageLoader.OBJ_TYPES.items():
@@ -479,13 +525,18 @@ class Game:
             LOGGER.info('Exporting "{}"', obj_name)
             selected = selected_objects.get(obj_name, None)
 
-            obj_data.cls.export(packageLoader.ExportData(
-                game=self,
-                selected=selected,
-                editoritems=editoritems,
-                vbsp_conf=vbsp_config,
-                selected_style=style,
-            ))
+            try:
+                obj_data.cls.export(packageLoader.ExportData(
+                    game=self,
+                    selected=selected,
+                    editoritems=editoritems,
+                    vbsp_conf=vbsp_config,
+                    selected_style=style,
+                ))
+            except packageLoader.NoVPKExport:
+                # Raised by StyleVPK to indicate it failed to copy.
+                vpk_success = False
+
             export_screen.step('EXP')
 
         vbsp_config.set_key(
@@ -543,7 +594,7 @@ class Game:
         self.edit_gameinfo(True)
 
         LOGGER.info('Writing instance list!')
-        with open(self.abs_path('bin/bee2/instances.cfg'), 'w') as inst_file:
+        with open(self.abs_path('bin/bee2/instances.cfg'), 'w', encoding='utf8') as inst_file:
             for line in self.build_instance_data(editoritems):
                 inst_file.write(line)
         export_screen.step('EXP')
@@ -559,7 +610,7 @@ class Game:
 
         LOGGER.info('Writing VBSP Config!')
         os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
-        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w') as vbsp_file:
+        with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
             for line in vbsp_config.export():
                 vbsp_file.write(line)
         export_screen.step('EXP')
@@ -598,7 +649,7 @@ class Game:
                                 ),
                         master=TK_ROOT,
                     )
-                    return False
+                    return False, vpk_success
                 export_screen.step('COMP')
 
 
@@ -609,12 +660,13 @@ class Game:
             self.copy_mod_music()
 
         if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
+            os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
             with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f:
                 TAG_COOP_INST_VMF.export(f)
 
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
-        return True
+        return True, vpk_success
 
     @staticmethod
     def build_instance_data(editoritems: Property):
@@ -678,10 +730,10 @@ class Game:
 
             # The funnel item type is special, having the additional input type.
             # Handle that specially.
-            if item['type'] == 'item_tbeam':
+            if item['type'].casefold() == 'item_tbeam':
                 for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
                     for io_prop in block:
-                        comm_block['TBEAM_' + io_prop.real_name] = io_prop.value
+                        comm_block['TBeam' + io_prop.real_name] = io_prop.value
 
             # Fizzlers don't work correctly with outputs. This is a signal to
             # conditions.fizzler, but it must be removed in editoritems.
@@ -1002,7 +1054,7 @@ def add_game(e=None, refresh_menu=True):
             else:
                 break
 
-        new_game = Game(name, gm_id, folder)
+        new_game = Game(name, gm_id, folder, {})
         new_game.edit_gameinfo(add_line=True)
         all_games.append(new_game)
         if refresh_menu:
@@ -1021,7 +1073,7 @@ def remove_game(e=None):
     )
     confirm = messagebox.askyesno(
         title="BEE2",
-        message=_('Are you sure you want to delete "{}?"').format(
+        message=_('Are you sure you want to delete "{}"?').format(
                 selected_game.name
             ) + lastgame_mess,
         )

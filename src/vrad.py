@@ -63,7 +63,7 @@ INJECT_FILES = {
     'music_script.txt': 'scripts/BEE2_generated_music.txt',
 
     # Applied to @glados's entity scripts.
-    'auto_run.nut': 'scripts/vscripts/BEE2/auto_run.nut',
+    'auto_run.nut': 'scripts/vscripts/bee2/auto_run.nut',
 
     # Commands for monitor items.
     'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
@@ -307,7 +307,7 @@ def load_config():
     global CONF
     LOGGER.info('Loading Settings...')
     try:
-        with open("bee2/vrad_config.cfg") as config:
+        with open("bee2/vrad_config.cfg", encoding='utf8') as config:
             CONF = Property.parse(config, 'bee2/vrad_config.cfg').find_key(
                 'Config', []
             )
@@ -601,7 +601,9 @@ def gen_auto_script(preload, is_peti):
 
     with open(dest, 'w') as file:
         if not preload:
-            return  # Leave it empty, don't write an empty body.
+            # Leave it empty, don't write an empty function body.
+            file.write('//---\n')
+            return
 
         file.write('function Precache() {\n')
         for entry in preload:
@@ -620,7 +622,7 @@ def inject_files():
             yield filename, arcname
 
 
-def pack_content(path, is_peti):
+def pack_content(bsp_file: BSP, path: str, is_peti: bool):
     """Pack any custom content into the map.
 
     Filelist format: "[control char]filename[\t packname]"
@@ -711,9 +713,6 @@ def pack_content(path, is_peti):
         LOGGER.info(' # "' + file + '"')
 
     LOGGER.info("Packing Files!")
-    bsp_file = BSP(path)
-    LOGGER.debug(' - Header read')
-    bsp_file.read_header()
 
     # Manipulate the zip entirely in memory
     zip_data = BytesIO()
@@ -968,8 +967,13 @@ def main(argv):
 
     LOGGER.info('Final status: is_peti={}, edit_args={}', is_peti, edit_args)
 
+    LOGGER.info('Reading BSP')
+    bsp_file = BSP(path)
+    bsp_file.read_header()
+    LOGGER.info('Done!')
+
     if '-no_pack' not in args:
-        pack_content(path, is_peti)
+        pack_content(bsp_file, path, is_peti)
     else:
         LOGGER.warning("Packing files is disabled!")
 

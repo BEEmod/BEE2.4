@@ -4,8 +4,11 @@ from conditions import (
     make_flag, make_result,
     DIRECTIONS, SOLIDS, GOO_LOCS,
 )
+import brushLoc
 from srctools import Vec, Entity, Property
 import srctools
+
+COND_MOD_NAME = 'Positioning'
 
 
 @make_flag(
@@ -141,6 +144,79 @@ def flag_goo_at_loc(inst: Entity, flag: Property):
     return val
 
 
+@make_flag('BlockType')
+def flag_blockpos_type(inst: Entity, flag: Property):
+    """Determine the type of a grid position.
+
+    If the value is single value, that should be the type.
+    Otherwise, the value should be a block with 'offset' and 'type' values.
+    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+
+    The type should be a space-seperated list of locations:
+    * VOID (Outside the map)
+    * SOLID (Full wall cube)
+    * EMBED (Hollow wall cube)
+    * AIR (Inside the map, may be occupied by items)
+    * OCCUPIED (Known to be occupied by items)
+    * PIT (Bottomless pits, any)
+      * PIT_SINGLE (one-high)
+      * PIT_TOP
+      * PIT_MID
+      * PIT_BOTTOM
+    * GOO
+      * GOO_SINGLE (one-deep goo)
+      * GOO_TOP (goo surface)
+      * GOO_MID
+      * GOO_BOTTOM (floor)
+    """
+    if flag.has_children():
+        pos = flag.vec('offset') * 128
+        types = flag['type'].split()
+    else:
+        types = flag.value.split()
+        pos = Vec()
+    pos.z -= 128
+    pos.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+    block = brushLoc.POS['world': pos]
+    for block_type in types:
+        try:
+            allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
+        except KeyError:
+            raise ValueError('"{}" is not a valid block type!'.format(block_type))
+        if block in allowed:
+            return True
+    return False
+
+
+@make_result('SetBlock')
+def res_set_block(inst: Entity, res: Property):
+    """Set a block to the given value.
+
+    This should be used only if you know what is in the position.
+    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    """
+    pos = res.vec('offset') * 128
+    try:
+        new_vals = brushLoc.BLOCK_LOOKUP[res['type'].casefold()]
+    except KeyError:
+        raise ValueError('"{}" is not a valid block type!'.format(res['type']))
+
+    try:
+        [new_val] = new_vals
+    except ValueError:
+        raise ValueError("Can't use compound block types ({})!".format(res['type']))
+
+    pos.z -= 128
+    pos.localise(
+        Vec.from_str(inst['origin']),
+        Vec.from_str(inst['angles']),
+    )
+    brushLoc.POS['world': pos] = new_val
+
+
 @make_result('forceUpright')
 def res_force_upright(inst: Entity):
     """Position an instance to orient upwards while keeping the normal.
@@ -186,3 +262,52 @@ def res_translate_inst(inst: Entity, res: Property):
 
     offset = val.rotate_by_str(inst['angles'])
     inst['origin'] = (offset + Vec.from_str(inst['origin'])).join(' ')
+
+
+@make_result('OppositeWallDist')
+def res_calc_opposite_wall_dist(inst: Entity, res: Property):
+    """Calculate the distance between this item and the opposing wall.
+
+    The value is stored in the $var specified by the property value.
+    Alternately it is set by `ResultVar`, and `offset` adds or subtracts to the value.
+    `GooCollide` means that it will stop when goo is found, otherwise it is
+    ignored.
+    `GooAdjust` means additionally if the space is goo, the distance will
+    be modified so that it specifies the surface of the goo.
+    """
+    if res.has_children():
+        result_var = res['ResultVar']
+        dist_off = res.float('offset')
+        collide_goo = res.bool('GooCollide')
+        adjust_goo = res.bool('GooAdjust')
+    else:
+        result_var = res.value
+        dist_off = 0
+        collide_goo = adjust_goo = False
+
+    origin = Vec.from_str(inst['origin'])
+    normal = Vec(z=1).rotate_by_str(inst['angles'])
+
+    mask = [
+        brushLoc.Block.SOLID,
+        brushLoc.Block.EMBED,
+        brushLoc.Block.PIT_BOTTOM,
+        brushLoc.Block.PIT_SINGLE,
+    ]
+
+    # Only if actually downward.
+    if normal == (0, 0, -1) and collide_goo:
+        mask.append(brushLoc.Block.GOO_TOP)
+        mask.append(brushLoc.Block.GOO_SINGLE)
+
+    opposing_pos = brushLoc.POS.raycast_world(
+        origin,
+        normal,
+        mask,
+    )
+
+    if adjust_goo and brushLoc.POS['world': opposing_pos + 128*normal].is_goo:
+        # If the top is goo, adjust so the 64 below is the top of the goo.
+        dist_off += 32
+
+    inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off

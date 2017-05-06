@@ -4,15 +4,18 @@ from collections import defaultdict
 
 import conditions
 import srctools
+import template_brush
 import utils
 from conditions import (
     make_result, make_result_setup,
-    TEMP_TYPES, SOLIDS
+    SOLIDS
 )
-from srctools import Property, Vec, Entity
+from template_brush import TEMP_TYPES
+from srctools import Property, Vec, VMF, Entity
 
+COND_MOD_NAME = 'Entities'
 
-LOGGER = utils.getLogger(__name__, alias='cond.scaffold')
+LOGGER = utils.getLogger(__name__, alias='cond.entities')
 
 
 @make_result_setup('TemplateOverlay')
@@ -86,7 +89,7 @@ def res_insert_overlay(inst: Entity, res: Property):
         )
         return
 
-    temp = conditions.import_template(
+    temp = template_brush.import_template(
         temp_id,
         origin,
         angles,
@@ -94,7 +97,7 @@ def res_insert_overlay(inst: Entity, res: Property):
         force_type=TEMP_TYPES.detail,
     )
 
-    for over in temp.overlay:  # type: VLib.Entity
+    for over in temp.overlay:  # type: Entity
         random.seed('TEMP_OVERLAY_' + over['basisorigin'])
         mat = random.choice(replace.get(
             over['material'],
@@ -117,6 +120,29 @@ def res_insert_overlay(inst: Entity, res: Property):
             'Overlay template "{}" could set keep_brushes=0.',
             temp_id,
         )
+
+
+@make_result('createEntity')
+def res_create_entity(vmf: VMF, inst: Entity, res: Property):
+    """Create an entity.
+
+    'keys' and 'localkeys' defines the new keyvalues used.
+    'Origin' will be used to offset the given amount from the current location.
+    """
+
+    origin = Vec.from_str(inst['origin'])
+
+    new_ent = vmf.create_ent(
+        # Ensure there's a classname, just in case.
+        classname='info_null'
+    )
+
+    conditions.set_ent_keys(new_ent, inst, res)
+
+    origin += Vec.from_str(new_ent['origin']).rotate_by_str(inst['angles'])
+
+    new_ent['origin'] = origin
+    new_ent['angles'] = inst['angles']
 
 
 @make_result_setup('WaterSplash')

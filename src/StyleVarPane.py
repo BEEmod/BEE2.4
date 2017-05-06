@@ -13,6 +13,7 @@ from SubPane import SubPane
 import packageLoader
 import tooltip
 import utils
+import itemconfig
 
 from typing import Union
 
@@ -68,11 +69,20 @@ styleOptions = [
         id='FunnelAllowSwitchedLights',
         name=_('Light Reversible Excursion Funnels'),
         default=1,
-        desc=_('Funnels emit a small amount of light. However, if multiple funnels'
+        desc=_('Funnels emit a small amount of light. However, if multiple funnels '
                'are near each other and can reverse polarity, this can cause '
                'lighting issues. Disable this to prevent that by disabling '
                'lights. Non-reversible Funnels do not have this issue.'),
-    )
+    ),
+
+    stylevar(
+        id='EnableShapeSignageFrame',
+        name=_('Enable Shape Framing'),
+        default=1,
+        desc=_('After 10 shape-type antlines are used, the signs repeat. '
+               'With this enabled, colored frames will be added to '
+               'distinguish them.'),
+    ),
 ]
 
 checkbox_all = {}
@@ -207,7 +217,7 @@ def make_pane(tool_frame):
     window = SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title=_('Style Properties'),
+        title=_('Style/Item Properties'),
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
@@ -215,20 +225,32 @@ def make_pane(tool_frame):
         tool_col=3,
     )
 
-    UI['style_can'] = Canvas(window, highlightthickness=0)
+    UI['nbook'] = nbook = ttk.Notebook(window)
+
+    nbook.grid(row=0, column=0, sticky=NSEW)
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+    nbook.enable_traversal()
+
+    stylevar_frame = ttk.Frame(nbook)
+    stylevar_frame.rowconfigure(0, weight=1)
+    stylevar_frame.columnconfigure(0, weight=1)
+    nbook.add(stylevar_frame, text=_('Styles'))
+
+    UI['style_can'] = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
     UI['style_can'].grid(sticky='NSEW')
     window.rowconfigure(0, weight=1)
 
     UI['style_scroll'] = ttk.Scrollbar(
-        window,
+        stylevar_frame,
         orient=VERTICAL,
         command=UI['style_can'].yview,
         )
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
 
-    utils.add_mousewheel(UI['style_can'], window)
+    utils.add_mousewheel(UI['style_can'], stylevar_frame)
 
     canvas_frame = ttk.Frame(UI['style_can'])
 
@@ -320,3 +342,7 @@ def make_pane(tool_frame):
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
+
+    item_config_frame = ttk.Frame(nbook)
+    nbook.add(item_config_frame, text=_('Items'))
+    itemconfig.make_pane(item_config_frame)

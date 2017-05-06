@@ -20,6 +20,7 @@ import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
 from srctools import Vec, EmptyMapping
+from srctools.filesys import FileSystem, FileSystemChain
 import tkMarkdown
 import sound
 import utils
@@ -369,7 +370,7 @@ class selWin:
             *,  # Make all keyword-only for readability
             has_none=True,
             has_def=True,
-            has_snd_sample=False,
+            sound_sys: FileSystem=None,
             modal=False,
             # i18n: 'None' item description
             none_desc=_('Do not add anything.'),
@@ -393,8 +394,9 @@ class selWin:
           of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
-        - If has_snd_sample is True, a '>' button will appear next to names
+        - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
+          The value should be a FileSystem to look for samples in.
         - none_desc holds an optional description for the <none> Item,
           which can be used to describe what it results in.
         - title is the title of the selector window.
@@ -402,7 +404,7 @@ class selWin:
          changes.
         - callback_params is a list of additional values which will be
           passed to the callback function.
-          The first arguement to the callback is always the selected item ID.
+          The first argument to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
           context menu.
         - attributes is a list of AttrDef tuples.
@@ -415,10 +417,10 @@ class selWin:
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
-            name='NONE',
+            name=_('NONE'),
             short_name='',
             icon='BEE2/none_96.png',
-            desc=tkMarkdown.convert(none_desc),
+            desc=none_desc,
             attributes=dict(none_attrs),
         )
 
@@ -593,7 +595,7 @@ class selWin:
         self.prop_name.grid(row=0, column=0)
 
         # For music items, add a '>' button to play sound samples
-        if has_snd_sample and sound.initiallised:
+        if sound_sys is not None and sound.initiallised:
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 text=BTN_PLAY,
@@ -614,6 +616,7 @@ class selWin:
             self.sampler = sound.SamplePlayer(
                 stop_callback=set_samp_play,
                 start_callback=set_samp_stop,
+                system=sound_sys,
             )
             samp_button['command'] = self.sampler.play_sample
             utils.bind_leftclick(self.prop_icon, self.sampler.play_sample)

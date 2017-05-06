@@ -10,16 +10,17 @@ from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-import sound as snd
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
+from srctools.filesys import FileSystem, FileSystemChain
+import sound as snd
 import paletteLoader
 import packageLoader
 import img
+import itemconfig
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
-import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
@@ -31,6 +32,8 @@ import optionWindow
 import helpMenu
 import backup as backup_win
 import tooltip
+
+from typing import Iterable, List
 
 LOGGER = utils.getLogger(__name__)
 
@@ -53,7 +56,6 @@ selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
 # Variable used for export button (changes to include game name)
-# This is used after resource copying is done.
 EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
 # All the stuff we've loaded in
@@ -456,7 +458,7 @@ def load_settings():
     optionWindow.load()
 
 
-def load_packages(data):
+def load_packages(data, package_systems: Iterable[FileSystem]):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -480,11 +482,11 @@ def load_packages(data):
     for editor_sound in data['EditorSound']:
         editor_sounds[editor_sound.id] = editor_sound
 
-    sky_list = []
-    voice_list = []
-    style_list = []
-    music_list = []
-    elev_list = []
+    sky_list   = []  # type: List[selWinItem]
+    voice_list = []  # type: List[selWinItem]
+    style_list = []  # type: List[selWinItem]
+    music_list = []  # type: List[selWinItem]
+    elev_list  = []  # type: List[selWinItem]
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -539,7 +541,7 @@ def load_packages(data):
             loader.step("IMG")
 
     # Set the 'sample' value for music items
-    for sel_item in music_list: # type: selWinItem
+    for sel_item in music_list:  # type: selWinItem
         sel_item.snd_sample = musics[sel_item.name].sample
 
     def win_callback(style_id, win_name):
@@ -611,6 +613,12 @@ def load_packages(data):
         ],
     )
 
+    # Build a chain of the package systems, in the music sample directory
+    # to play sounds from.
+    music_sys = FileSystemChain()
+    for system in package_systems:
+        music_sys.add_sys(system, prefix='resources/music_samp/')
+
     music_win = selWin(
         TK_ROOT,
         music_list,
@@ -619,7 +627,7 @@ def load_packages(data):
                'tracks have variations which are played when interacting '
                'with certain testing elements.'),
         has_none=True,
-        has_snd_sample=True,
+        sound_sys=music_sys,
         none_desc=_('Add no music to the map at all.'),
         callback=win_callback,
         callback_params=['Music'],
@@ -824,7 +832,7 @@ def export_editoritems(e=None):
         item_opts.items()
     }
 
-    success = gameMan.selected_game.export(
+    success, vpk_success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
             # Specify the 'chosen item' for each object type
@@ -848,12 +856,6 @@ def export_editoritems(e=None):
     if not success:
         return
 
-    launch_game = messagebox.askyesno(
-        'BEEMOD2',
-        message=_('Selected Items and Style successfully exported!\n'
-                  'Launch game?'),
-    )
-
     export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
     for pal in palettes[:]:
@@ -874,22 +876,49 @@ def export_editoritems(e=None):
     palettes.append(new_pal)
     new_pal.save(ignore_readonly=True)
 
+    # Update corridor configs for standalone mode..
+    CompilerPane.save_corridors()
+
+    # Save the configs since we're writing to disk lots anyway.
+    GEN_OPTS.save_check()
+    item_opts.save_check()
+
+    message = _('Selected Items and Style successfully exported!')
+    if not vpk_success:
+        message += _(
+            '\n\nWarning: VPK files were not exported, quit Portal 2 and '
+            'Hammer to ensure editor wall previews are changed.'
+        )
+
+    chosen_action = optionWindow.AfterExport(
+        optionWindow.AFTER_EXPORT_ACTION.get()
+    )
+
+    messagebox.showinfo('BEEMOD2', message)
+
+    # Launch first so quitting doesn't affect this.
+    if optionWindow.LAUNCH_AFTER_EXPORT.get():
+        gameMan.selected_game.launch()
+
+    # Do the desired action - if quit, we don't bother to update UI.
+    if chosen_action is optionWindow.AfterExport.NORMAL:
+        pass
+    elif chosen_action is optionWindow.AfterExport.MINIMISE:
+        TK_ROOT.iconify()
+    elif chosen_action is optionWindow.AfterExport.QUIT:
+        utils.quit_app()
+    else:
+        raise ValueError('Unknown action "{}"'.format(chosen_action))
+
     # Select the last_export palette, so reloading loads this item selection.
     palettes.sort(key=str)
     selectedPalette_radio.set(palettes.index(new_pal))
     set_pal_radio()
 
-    # Save the configs since we're writing to disk anyway.
-    GEN_OPTS.save_check()
-    item_opts.save_check()
+    # Re-set this, so we clear the '*' on buttons if extracting cache.
+    set_game(gameMan.selected_game)
 
-    # Update corridor configs for standalone mode..
-    CompilerPane.save_corridors()
     refresh_pal_ui()
-
-    if launch_game:
-        gameMan.selected_game.launch()
-        TK_ROOT.iconify()
 
 
 def set_disp_name(item, e=None):
@@ -1122,16 +1151,16 @@ def pal_shuffle():
     if len(pal_picked) == 32:
         return
 
-    shuff_items = item_list.copy()
+    shuff_item_dict = item_list.copy()
     for palitem in pal_picked:
         # Don't add items that are already on the palette!
         try:
-            del shuff_items[palitem.id]
+            del shuff_item_dict[palitem.id]
         except KeyError:
             # We might try removing it multiple times
             pass
 
-    shuff_items = list(shuff_items.values())
+    shuff_items = list(shuff_item_dict.values())
 
     random.shuffle(shuff_items)
 
@@ -1186,8 +1215,8 @@ def pal_remove():
         pal = palettes[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
-                message=_('Are you sure you want to delete "{palette}"?').format(
-                    palette=pal.name,
+                message=_('Are you sure you want to delete "{}"?').format(
+                    pal.name,
                 ),
                 parent=TK_ROOT,
                 ):
@@ -1222,9 +1251,13 @@ def init_palette(f):
 
     def set_pal_listbox(e=None):
         global selectedPalette
-        selectedPalette = int(UI['palette'].curselection()[0])
-        selectedPalette_radio.set(selectedPalette)
-        set_palette()
+        cur_selection = UI['palette'].curselection()
+        if cur_selection: # Might be blank if none selected
+            selectedPalette = int(cur_selection[0])
+            selectedPalette_radio.set(selectedPalette)
+            set_palette()
+        else:
+            UI['palette'].selection_set(selectedPalette, selectedPalette)
     UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
     UI['palette'].bind("<Enter>", set_pal_listbox_selection)
     # Set the selected state when hovered, so users can see which is
@@ -1263,27 +1296,17 @@ def init_option(f):
         frame,
         text=_("Save Palette..."),
         command=pal_save,
-        ).grid(row=0, sticky="EW", padx=5)
+    ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
         command=pal_save_as,
-        ).grid(row=1, sticky="EW", padx=5)
-    UI['export_button'] = ttk.Button(
+    ).grid(row=1, sticky="EW", padx=5)
+    ttk.Button(
         frame,
-        textvariable=extract_packages.export_btn_text,
+        textvariable=EXPORT_CMD_VAR,
         command=export_editoritems,
-    )
-    UI['export_button'].state(['disabled'])
-    UI['export_button'].grid(row=2, sticky="EW", padx=5)
-
-    UI['extract_progress'] = ttk.Progressbar(
-        frame,
-        length=200,
-        maximum=1000,
-        variable=extract_packages.progress_var,
-    )
-    UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
+    ).grid(row=2, sticky="EW", padx=5)
 
     props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
     props.columnconfigure(1, weight=1)
@@ -1570,7 +1593,7 @@ def init_drag_icon():
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game):
+def set_game(game: gameMan.Game):
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
@@ -1578,6 +1601,11 @@ def set_game(game):
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
     text = _('Export to "{}"...').format(game.name)
+
+    if game.cache_invalid():
+        # Mark that it needs extractions
+        text += ' *'
+
     menus['file'].entryconfigure(
         menus['file'].export_btn_index,
         label=text,
@@ -1609,14 +1637,12 @@ def init_menu_bar(win):
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
-
-
     file_menu.add_command(
         label=_("Add Game"),
         command=gameMan.add_game,
     )
     file_menu.add_command(
-        label=_("Remove Selected Game"),
+        label=_("Uninstall from Selected Game"),
         command=gameMan.remove_game,
         )
     file_menu.add_command(
@@ -1676,6 +1702,7 @@ def init_menu_bar(win):
 
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
+    win.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
 
     helpMenu.make_help_menu(bar)
 
@@ -1786,7 +1813,7 @@ def init_windows():
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Palettes',
+        title=_('Palettes'),
         name='pal',
         resize_x=True,
         resize_y=True,
@@ -1925,8 +1952,6 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    refresh_pal_ui()
-
     def style_select_callback(style_id):
         """Callback whenever a new style is chosen."""
         global selected_style
@@ -1937,6 +1962,10 @@ def init_windows():
 
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything
+
+        # Update variant selectors on the itemconfig pane
+        for func in itemconfig.ITEM_VARIANT_LOAD:
+            func()
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
@@ -1954,25 +1983,8 @@ def init_windows():
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
 
-    def copy_done_callback():
-        """Callback run when all resources have been extracted."""
-
-        UI['export_button'].state(['!disabled'])
-        UI['export_button']['textvariable'] = EXPORT_CMD_VAR
-        UI['extract_progress'].grid_remove()
-        windows['opt'].update_idletasks()
-        # Reload the option window's position and sizing configuration,
-        # that way it resizes automatically.
-        windows['opt'].save_conf()
-        windows['opt'].load_conf()
-        menus['file'].entryconfigure(
-            menus['file'].export_btn_index,
-            state=NORMAL,
-        )
-        TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
-        LOGGER.info('Done extracting resources!')
-    extract_packages.done_callback = copy_done_callback
-
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     set_palette()
+    # Set_palette needs to run first, so it can fix invalid palette indexes.
+    refresh_pal_ui()

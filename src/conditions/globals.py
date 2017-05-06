@@ -2,15 +2,13 @@
 import utils
 import vbsp_options
 
-from srctools import Vec, Property, conv_bool
+from srctools import Vec, Property, Entity, conv_bool
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
 )
 import vbsp
 
-
-STYLE_VARS = vbsp.settings['style_vars']
-VOICE_ATTR = vbsp.settings['has_attr']
+COND_MOD_NAME = 'Global Properties'
 
 
 @make_flag('styleVar')
@@ -19,7 +17,7 @@ def flag_stylevar(flag: Property):
 
     Use the NOT flag to invert if needed.
     """
-    return STYLE_VARS[flag.value.casefold()]
+    return vbsp.settings['style_vars'][flag.value.casefold()]
 
 
 @make_flag('has')
@@ -28,7 +26,7 @@ def flag_voice_has(flag: Property):
 
     Use the NOT flag to invert if needed.
     """
-    return VOICE_ATTR[flag.value.casefold()]
+    return vbsp.settings['has_attr'][flag.value.casefold()]
 
 
 @make_flag('has_music')
@@ -118,6 +116,29 @@ def flag_has_exit_signage():
     return False
 
 
+@make_flag('ItemConfig')
+def res_get_item_config(inst: Entity, res: Property):
+    """Check if an item config panel value matches another value.
+
+    ID is the ID of the group. Name is the name of the widget.
+    If UseTimer is true, it uses $timer_delay to choose the value to use.
+    Value is the value to compare to.
+    """
+    group_id = res['ID']
+    wid_name = res['Name'].casefold()
+    desired_value = res['Value']
+    if res.bool('UseTimer'):
+        timer_delay = inst.fixup.int('$timer_delay')
+    else:
+        timer_delay = None
+
+    conf = vbsp_options.get_itemconf((group_id, wid_name), None, timer_delay)
+    if conf is None:  # Doesn't exist
+        return False
+
+    return conf == desired_value
+
+
 @make_result('styleVar')
 def res_set_style_var(res: Property):
     """Set Style Vars.
@@ -126,9 +147,9 @@ def res_set_style_var(res: Property):
     """
     for opt in res.value:
         if opt.name == 'settrue':
-            STYLE_VARS[opt.value.casefold()] = True
+            vbsp.settings['style_vars'][opt.value.casefold()] = True
         elif opt.name == 'setfalse':
-            STYLE_VARS[opt.value.casefold()] = False
+            vbsp.settings['style_vars'][opt.value.casefold()] = False
     return RES_EXHAUSTED
 
 
@@ -141,9 +162,9 @@ def res_set_voice_attr(res: Property):
     """
     if res.has_children():
         for opt in res.value:
-            VOICE_ATTR[opt.name] = True
+            vbsp.settings['has_attr'][opt.name] = True
     else:
-        VOICE_ATTR[res.value.casefold()] = 1
+        vbsp.settings['has_attr'][res.value.casefold()] = 1
     return RES_EXHAUSTED
 
 CACHED_MODELS = set()
@@ -178,4 +199,28 @@ def res_pre_cache_model(res: Property):
         solid=0,
         shadowdepthnocache=2,
         spawnflags=256,  # Start with collision off.
+    )
+
+
+@make_result('GetItemConfig')
+def res_get_item_config(inst: Entity, res: Property):
+    """Load a config from the item config panel onto a fixup.
+
+    ID is the ID of the group. Name is the name of the widget, and resultVar
+    is the location to store. If UseTimer is true, it uses $timer_delay to
+    choose the value to use. Default is the default value, if the config
+    isn't found.
+    """
+    group_id = res['ID']
+    wid_name = res['Name']
+    default = res['default']
+    if res.bool('UseTimer'):
+        timer_delay = inst.fixup.int('$timer_delay')
+    else:
+        timer_delay = None
+
+    inst.fixup[res['ResultVar']] = vbsp_options.get_itemconf(
+        (group_id, wid_name),
+        default,
+        timer_delay,
     )

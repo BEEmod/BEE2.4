@@ -30,6 +30,7 @@ def grid_to_world(pos: Vec) -> Vec:
 w2g = world_to_grid
 g2w = grid_to_world
 
+
 class Block(Enum):
     """Various contents categories for grid positions."""
     VOID = 0  # Outside the map
@@ -100,6 +101,24 @@ class Block(Enum):
         """Is this the base of goo or a bottomless pit?"""
         return self.value in (10, 13, 20, 23)
 
+# Keywords to a set of blocks.
+BLOCK_LOOKUP = {
+    block.name.casefold(): {block}
+    for block in Block
+}
+BLOCK_LOOKUP['goo'] = {
+    Block.GOO_SINGLE,
+    Block.GOO_TOP,
+    Block.GOO_MID,
+    Block.GOO_BOTTOM,
+}
+BLOCK_LOOKUP['pit'] = {
+    Block.PIT_SINGLE,
+    Block.PIT_TOP,
+    Block.PIT_MID,
+    Block.PIT_BOTTOM,
+}
+
 _grid_keys = Union[Vec, Vec_tuple, tuple, slice]
 
 
@@ -166,7 +185,7 @@ class Grid(Dict[_grid_keys, Block]):
         self,
         pos: Vec,
         direction: Vec,
-        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM}),
+        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
     ) -> Vec:
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
@@ -178,7 +197,9 @@ class Grid(Dict[_grid_keys, Block]):
 
     def __setitem__(self, pos: _grid_keys, value: Block):
         if type(value) is not Block:
-            raise ValueError('Must be set to a Block item!')
+            raise ValueError('Must be set to a Block item, not "{}"!'.format(
+                type(value).__name__,
+            ))
 
         super().__setitem__(self._conv_key(pos), value)
 

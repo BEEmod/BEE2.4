@@ -75,5 +75,7 @@ sounds/music_samp/
 # The config files automatically regenerate with the defaults.
 config/
 
-# Logs
-BEE2.log*
+logs/
+
+# Localisation files:
+*.mo

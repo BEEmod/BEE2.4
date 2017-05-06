@@ -7,12 +7,14 @@ from enum import Enum
 import math
 import random
 
-import sound as snd
+import sound
 import utils
 import srctools
 import contextWin
 import gameMan
 import tk_tools
+
+from typing import Dict, List, Union, Any
 
 LOGGER = utils.getLogger(__name__)
 
@@ -109,13 +111,17 @@ PROP_POS = [
     'autorespawn',
     ]
 
-widgets = {}  # holds the checkbox or other item used to manipulate the box
-labels = {}  # holds the descriptive labels for each property
+# holds the checkbox or other item used to manipulate the box
+widgets = {}  # type: Dict[str, Any]
+# holds the descriptive labels for each property
+labels = {}  # type: Dict[str, ttk.Label]
 
-propList = []
+# The properties we currently have displayed.
+propList = []  # type: List[str]
 
-values = {}  # selected values for this items
-out_values = {}
+# selected values for this items
+values = {}  # type: Dict[str, Union[Variable, str, float]]
+out_values = {}  # type: Dict[str, Union[Variable, str, float]]
 
 PAINT_OPTS = [
     'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_light',
@@ -154,31 +160,12 @@ DEFAULTS = {  # default values for this item
 
 last_angle = '0'
 
-play_sound = False
 is_open = False
 enable_tim_callback = True
 
 def callback(name):
     """Do nothing by default!"""
     pass
-
-
-def reset_sfx():
-    global play_sound
-    play_sound = True
-
-
-def sfx(sound):
-    """Play a sound effect.
-
-    This waits for a certain amount of time between retriggering sounds
-    so they don't overlap.
-    """
-    global play_sound
-    if play_sound is True:
-        snd.fx(sound)
-        play_sound = False
-        win.after(75, reset_sfx)
 
 
 def scroll_angle(key, e):
@@ -189,16 +176,16 @@ def scroll_angle(key, e):
 
 
 def save_paint(key, val):
-    sfx('config')
+    sound.fx_blockable('config')
     out_values[key] = val
 
 
 def save_angle(key, new_angle):
     global last_angle
     if new_angle > last_angle:
-        sfx('raise_' + random.choice('123'))
+        sound.fx_blockable('raise_' + random.choice('123'))
     elif new_angle < last_angle:
-        sfx('lower_' + random.choice('123'))
+        sound.fx_blockable('lower_' + random.choice('123'))
     last_angle = new_angle
     out_values[key] = 'ramp_' + str(new_angle) + '_deg_open'
 
@@ -219,9 +206,9 @@ def save_tim(key, val):
         )
 
         if new_val > values[key]:
-            sfx('add')
+            sound.fx_blockable('add')
         elif new_val < values[key]:
-            sfx('subtract')
+            sound.fx_blockable('subtract')
         values[key] = new_val
         out_values[key] = str(new_val)
 
@@ -229,12 +216,12 @@ def save_tim(key, val):
 def save_pist(key, val):
     if widgets['toplevel'].get() == widgets['bottomlevel'].get():
         # user moved them to match, switch the other one around
-        sfx('swap')
+        sound.fx_blockable('swap')
         widgets[
             'toplevel' if key == 'bottomlevel' else 'bottomlevel'
             ].set(values[key])
     else:
-        sfx('move')
+        sound.fx_blockable('move')
 
     start_pos = widgets['toplevel'].get()
     end_pos = widgets['bottomlevel'].get()
@@ -264,12 +251,12 @@ def toggleCheck(key, var, e=None):
 
 
 def set_check(key):
-    sfx('config')
+    sound.fx_blockable('config')
     out_values[key] = str(values[key].get())
 
 
 def paint_fx(e=None):
-    sfx('config')
+    sound.fx_blockable('config')
 
 
 def exit_win(e=None):
@@ -283,7 +270,11 @@ def exit_win(e=None):
         if key in PROP_TYPES:
             # Use out_values if it has a matching key,
             # or use values by default.
-            out[key] = out_values.get(key, values[key])
+            out_val = out_values.get(key, values[key])
+            if isinstance(out_val, Variable):
+                out[key] = str(out_val.get())
+            else:
+                out[key] = out_val
     callback(out)
 
     if contextWin.is_open:
@@ -434,8 +425,8 @@ def init(cback):
 
 
 def show_window(used_props, parent, item_name):
-    global propList, is_open, block_sound, last_angle
-    propList = [key.casefold() for key in used_props]
+    global is_open, last_angle
+    propList[:] = [key.casefold() for key in used_props]
     is_open = True
     spec_row = 1
 
@@ -586,8 +577,7 @@ def show_window(used_props, parent, item_name):
 
     # Block sound for the first few millisec to stop excess sounds from
     # playing
-    block_sound = False
-    win.after(50, reset_sfx)
+    sound.block_fx()
 
     widgets['titleLabel'].configure(text='Settings for "' + item_name + '"')
     win.title('BEE2 - ' + item_name)

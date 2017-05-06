@@ -107,6 +107,8 @@ class TextHandler(logging.Handler):
             )
         self.widget.see(END)  # Scroll to the end
         self.widget['state'] = "disabled"
+        # Update it, so it still runs even when we're busy with other stuff.
+        self.widget.update_idletasks()
 
         self.has_text = True
 
@@ -244,6 +246,8 @@ def init(start_open, log_level='info'):
     if start_open:
         window.deiconify()
         window.lift()
+        # Force an update, we're busy with package extraction...
+        window.update()
     else:
         window.withdraw()
 

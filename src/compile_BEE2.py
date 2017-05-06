@@ -1,11 +1,51 @@
 from cx_Freeze import setup, Executable
+from zipfile import ZipFile, ZipInfo
 import os
 import shutil
 import utils
+import io
 
 shutil.rmtree('build_BEE2', ignore_errors=True)
 
-ico_path = os.path.join(os.getcwd(), "../bee2.ico")
+ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+
+
+def get_localisation(key):
+    """Get localisation files from Loco."""
+    import requests
+
+    # Make the directories.
+    os.makedirs('../build_BEE2/i18n/', exist_ok=True)
+    os.makedirs('../i18n/', exist_ok=True)
+
+    print('Reading translations... ', end='', flush=True)
+    zip_request = requests.get(
+        'https://localise.biz/api/export/archive/mo.zip',
+        headers={
+            'Authorization': 'Loco ' + key,
+        },
+        params={
+            'path': '{%lang}{_%region}.{%ext}',
+        },
+    )
+    zip_file = ZipFile(io.BytesIO(zip_request.content))
+    print('Done!')
+
+    print('Translations: ')
+
+    for file in zip_file.infolist():  # type: ZipInfo
+        if 'README.txt' in file.filename:
+            continue
+        filename = os.path.basename(file.filename)
+        print(filename)
+        # Copy to the dev and output directory.
+        with zip_file.open(file) as src, open('../i18n/' + filename, 'wb') as dest:
+            shutil.copyfileobj(src, dest)
+        with zip_file.open(file) as src, open('../build_BEE2/i18n/' + filename, 'wb') as dest:
+            shutil.copyfileobj(src, dest)
+
+get_localisation('kV-oMlhZPJEJoYPI5EQ6HaqeAc1zQ73G')
+
 
 # Exclude bits of modules we don't need, to decrease package size.
 EXCLUDES = [
@@ -71,9 +111,6 @@ EXCLUDES = [
 ]
 
 
-if not utils.MAC:
-    EXCLUDES.append('platform')  # Only used in the mac pyglet code..
-
 # cx_freeze doesn't detect these required modules
 INCLUDES = [
     'pyglet.clock',
@@ -84,13 +121,14 @@ INCLUDES = [
 INCLUDE_LIBS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    '/usr/local/lib/libavbin.dylib',  # OS X
+    'libavbin.dylib',  # OS X - must be relative.
     '/usr/lib/libavbin.so',  # Linux
 ]
 
 
 if utils.WIN:
     base = 'Win32GUI'
+    INCLUDE_LIBS.extend(['tcl86t.dll', 'tk86t.dll'])
 else:
     base = None
 
@@ -123,9 +161,10 @@ setup(
     },
     executables=[
         Executable(
-            'BEE2.pyw',
+            'BEE2_launch.pyw',
             base=base,
             icon=ico_path,
+            targetName='BEE2' + ('.exe' if utils.WIN else ''),
         ),
         Executable(
             'backup.py',
@@ -142,9 +181,12 @@ setup(
     ],
 )
 
+# -------------------------------------------------------
 # Now copy the required resources to the build directory.
 
+
 def copy_resource(tree):
+    print('Copying "{}"'.format(tree))
     src = os.path.join('..', tree)
     dest = os.path.join('..', 'build_BEE2', tree)
 
@@ -159,6 +201,7 @@ def copy_resource(tree):
 copy_resource('BEE2.ico')
 copy_resource('images/BEE2')
 copy_resource('images/icons')
+copy_resource('images/splash_screen')
 copy_resource('palettes')
 for snd in os.listdir('../sounds/'):
     if snd == 'music_samp':

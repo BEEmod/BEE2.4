@@ -8,18 +8,30 @@ from PIL import ImageTk, Image, ImageDraw
 import os.path
 
 from srctools import Vec
+from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import utils
 
-from typing import Union, Dict, Tuple
+from typing import Iterable, Union, Dict, Tuple
 
 LOGGER = utils.getLogger('img')
 
-cached_img = {}  # type: Dict[Tuple[str, int], ImageTk.PhotoImage]
+cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
 # r, g, b, size -> image
 cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
 
 # Colour of the palette item background
 PETI_ITEM_BG = Vec(229, 232, 233)
+
+filesystem = FileSystemChain(
+    # Highest priority is the in-built UI images.
+    RawFileSystem(os.path.join(os.getcwd(), '../', 'images')),
+)
+
+
+def load_filesystems(systems: Iterable[FileSystem]):
+    """Load in the filesystems used in packages."""
+    for sys in systems:
+        filesystem.add_sys(sys, 'resources/BEE2/')
 
 
 def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
@@ -29,7 +41,7 @@ def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
     return size, size
 
 
-def png(path, resize_to=0, error=None, algo=Image.NEAREST):
+def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -42,52 +54,32 @@ def png(path, resize_to=0, error=None, algo=Image.NEAREST):
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
+    path = path.casefold().replace('\\', '/')
     orig_path = path
 
+    resize_width, resize_height = resize_to = tuple_size(resize_to)
+
     try:
-        return cached_img[path, resize_to]
+        return cached_img[path, resize_width, resize_height]
     except KeyError:
         pass
 
-    base_path = os.path.abspath(
-        os.path.join(
-            os.getcwd(),
-            "../",
-            "images",
-            path,
-        )
-    )
-    cache_path = os.path.abspath(
-        os.path.join(
-            os.getcwd(),
-            "../",
-            "images",
-            "cache",
-            path,
-        )
-    )
+    with filesystem:
+        try:
+            img_file = filesystem[path]
+        except KeyError:
+            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
+            return error or img_error
+        with img_file.open_bin() as file:
+            image = Image.open(file)
+            image.load()
 
-    if os.path.isfile(base_path):
-        path = base_path
-    else:
-        # If not in the main folder, load from the zip-cache
-        path = cache_path
-
-    try:
-        img_file = open(path, 'rb')
-    except FileNotFoundError:
-        LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-        return error or img_error
-    with img_file:
-        image = Image.open(img_file)
-        image.load()
-
-    if resize_to:
-        image = image.resize(tuple_size(resize_to), algo)
+    if resize_to != (0, 0):
+        image = image.resize(resize_to, algo)
 
     tk_img = ImageTk.PhotoImage(image=image)
 
-    cached_img[orig_path, resize_to] = tk_img
+    cached_img[orig_path, resize_width, resize_height] = tk_img
     return tk_img
 
 
@@ -181,6 +173,7 @@ def color_square(color: Vec, size=16):
         )
         tk_img = ImageTk.PhotoImage(image=img)
         cached_squares[key] = tk_img
+        return tk_img
 
 
 def invis_square(size):

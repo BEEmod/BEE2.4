@@ -24,7 +24,6 @@ EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
     'distutils',  # Found in shutil, used if zipfile is not availible
     'doctest',  # Used in __main__ of decimal and heapq
-    'dis',  # From inspect, not needed
     'lzma',  # We use this for packages, but not in VBSP & VRAD
     'optparse',  # Used in calendar.__main__
     'pprint',  # From pickle, not needed
@@ -47,13 +46,12 @@ EXCLUDES = [
 import logging.handlers
 if not hasattr(logging.handlers, 'socket'):
     EXCLUDES.append('socket')
+    # Subprocess uses this in UNIX-style OSes, but not Windows.
+    if utils.WIN:
+        EXCLUDES += ['selectors', 'select']
 if not hasattr(logging.handlers, 'pickle'):
     EXCLUDES.append('pickle')
 del logging
-
-if utils.WIN:
-    # Subprocess uses these in UNIX-style OSes, but not Windows
-    EXCLUDES += ['select', 'selectors']
 
 if utils.MAC or utils.LINUX:
     EXCLUDES += ['grp', 'pwd']  # Unix authentication modules, optional
@@ -81,7 +79,7 @@ INCLUDES += [
     condition_modules
 ]
 
-bee_version = input('BEE2 Version: ')
+bee_version = input('BEE2 Version (or blank for dev): ')
 
 setup(
     name='VBSP_VRAD',

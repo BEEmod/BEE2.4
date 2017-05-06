@@ -1,5 +1,5 @@
 # coding=utf-8
-import collections
+import collections.abc
 import functools
 import logging
 import os.path
@@ -9,7 +9,7 @@ import sys
 from enum import Enum
 
 from typing import (
-    Tuple, List, Iterator,
+    Tuple, List, Union, Iterator,
 )
 
 
@@ -20,8 +20,11 @@ except ImportError:
     # We're running from source!
     BEE_VERSION = "(dev)"
     FROZEN = False
+    DEV_MODE = True
 else:
     FROZEN = True
+    # If blank, in dev mode.
+    DEV_MODE = not BEE_VERSION
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -355,6 +358,102 @@ CONN_LOOKUP = {
 del N, S, E, W
 
 
+class FuncLookup(collections.abc.Mapping):
+    """A dict for holding callback functions.
+
+    Functions are added by using this as a decorator. Positional arguments
+    are aliases, keyword arguments will set attributes on the functions.
+    If casefold is True, this will casefold keys to be case-insensitive.
+    Additionally overwriting names is not allowed.
+    Iteration yields all functions.
+    """
+    def __init__(self, name, *, casefold=True, attrs=()):
+        self.casefold = casefold
+        self.__name__ = name
+        self._registry = {}
+        self.allowed_attrs = set(attrs)
+
+    def __call__(self, *names: str, **kwargs):
+        """Add a function to the dict."""
+        if not names:
+            raise TypeError('No names passed!')
+
+        bad_keywords = kwargs.keys() - self.allowed_attrs
+        if bad_keywords:
+            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+
+        def callback(func):
+            """Decorator to do the work of adding the function."""
+            # Set the name to <dict['name']>
+            func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            for name, value in kwargs.items():
+                setattr(func, name, value)
+            self.__setitem__(names, func)
+            return func
+
+        return callback
+
+    def __eq__(self, other):
+        if isinstance(other, FuncLookup):
+            return self._registry == other._registry
+        if not isinstance(other, collections.abc.Mapping):
+            return NotImplemented
+        return self._registry == dict(other.items())
+
+    def __iter__(self):
+        yield from self.values()
+
+    def __len__(self):
+        return len(set(self._registry.values()))
+
+    def __getitem__(self, names: Union[str, Tuple[str]]):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            try:
+                return self._registry[name]
+            except KeyError:
+                pass
+        else:
+            raise KeyError('No function with names {}!'.format(
+                ', '.join(names),
+            ))
+
+    def __setitem__(self, names: Union[str, Tuple[str]], func):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            if name in self._registry:
+                raise ValueError('Overwrote {!r}!'.format(name))
+            self._registry[name] = func
+
+    def __delitem__(self, name: str):
+        if self.casefold:
+            name = name.casefold()
+        del self._registry[name]
+
+    def __contains__(self, name):
+        if self.casefold:
+            name = name.casefold()
+        return name in self._registry
+
+    def functions(self):
+        """Return the set of functions in this mapping."""
+        return set(self._registry.values())
+
+    values = functions
+
+    def clear(self):
+        """Delete all functions."""
+        self._registry.clear()
+
+
 def get_indent(line: str):
     """Return the whitespace which this line starts with.
 
@@ -468,6 +567,12 @@ def restart_app():
     os.execv(sys.executable, args)
 
 
+def quit_app(status=0):
+    """Quit the application."""
+    logging.shutdown()
+    sys.exit(status)
+
+
 def set_readonly(file):
     """Make the given file read-only."""
     # Get the old flags
@@ -546,8 +651,10 @@ def merge_tree(src, dst, copy_function=shutil.copy2):
 
 def setup_localisations(logger: logging.Logger):
     """Setup gettext localisations."""
+    from srctools.property_parser import PROP_FLAGS_DEFAULT
     import gettext
     import locale
+
     # Get the 'en_US' style language code
     lang_code = locale.getdefaultlocale()[0]
 
@@ -563,6 +670,11 @@ def setup_localisations(logger: logging.Logger):
 
     logger.info('Language: {!r}', lang_code)
     logger.debug('Language codes: {!r}', expanded_langs)
+
+    # Add these to Property's default flags, so config files can also
+    # be localised.
+    for lang in expanded_langs:
+        PROP_FLAGS_DEFAULT['lang_' + lang] = True
 
     for lang in expanded_langs:
         try:
@@ -709,12 +821,21 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
         log_handler = handlers.RotatingFileHandler(
             filename,
             maxBytes=500 * 1024,
-            backupCount=10,
+            backupCount=1,
         )
         log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
-
         logger.addHandler(log_handler)
+
+        err_log_handler = handlers.RotatingFileHandler(
+            filename[:-3] + 'error.' + filename[-3:],
+            maxBytes=500 * 1024,
+            backupCount=1,
+        )
+        err_log_handler.setLevel(logging.WARNING)
+        err_log_handler.setFormatter(long_log_format)
+
+        logger.addHandler(err_log_handler)
 
     # This is needed for multiprocessing, since it tries to flush stdout.
     # That'll fail if it is None.
@@ -760,19 +881,25 @@ def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.L
     # logging system.
     old_except_handler = sys.excepthook
 
-    def except_handler(*exc_info):
+    def except_handler(exc_type, exc_value, exc_tb):
         """Log uncaught exceptions."""
-        if on_error is not None:
-            on_error(*exc_info)
+        if not issubclass(exc_type, Exception):
+            # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
+            # so we should quit without messages.
+            logging.shutdown()
+            return
+
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
             args=(),
-            exc_info=exc_info,
+            exc_info=(exc_type, exc_value, exc_tb),
         )
         logging.shutdown()
+        if on_error is not None:
+            on_error(exc_type, exc_value, exc_tb)
         # Call the original handler - that prints to the normal console.
-        old_except_handler(*exc_info)
+        old_except_handler(exc_type, exc_value, exc_tb)
 
     sys.excepthook = except_handler
 

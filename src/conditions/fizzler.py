@@ -5,19 +5,31 @@ import utils
 import vbsp
 import instanceLocs
 import comp_consts as const
+import template_brush
 from conditions import (
     make_result, meta_cond,
-    ITEM_CLASSES, CONNECTIONS
+    ITEMS_WITH_CLASS, CONNECTIONS
 )
-from srctools import Vec, Property, Entity, Output
+from srctools import Vec, Property, VMF, Entity, Solid, Output
 from vbsp import TEX_FIZZLER
 
-from typing import List
+from typing import List, Dict
+
+COND_MOD_NAME = 'Fizzlers'
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
 
 FIZZ_BRUSH_ENTS = {}  # The brush entities we generated, used when merging.
 # Key = (conf id, targetname)
+
+# A few positions for material_modify_control,
+# so they aren't on top.
+MATMOD_OFFSETS = [
+    Vec(0,   0, -32),
+    Vec(0,  16, -32),
+    Vec(0, -16, -64),
+    Vec(0,   0,  32),
+] * 4  # Just in case there happens to be more textures.
 
 
 @make_result('custFizzler', 'custFizz', 'customFizzler', 'customFizz')
@@ -238,10 +250,13 @@ def res_cust_fizzler(base_inst: Entity, res: Property):
         var = config['var', '$outputintensity']
         if not var.startswith('$'):
             var = '$' + var
-        for tex in textures:
+
+        for off, tex in zip(MATMOD_OFFSETS, textures):
+            pos = off.copy().rotate_by_str(base_inst['angles'])
+            pos += Vec.from_str(base_inst['origin'])
             vbsp.VMF.create_ent(
                 classname='material_modify_control',
-                origin=base_inst['origin'],
+                origin=pos,
                 targetname=conditions.local_name(base_inst, mat_mod_name),
                 materialName='materials/' + tex + '.vmt',
                 materialVar=var,
@@ -325,9 +340,11 @@ PAIR_AXES = {
     (0, 0, -1): 'xy' 'z',
 }
 
+# For singleBrush in fizzlermodelpair
+PAIR_FIZZ_BRUSHES = {}  # type: Dict[str, Solid]
 
 @make_result('fizzlerModelPair')
-def res_fizzler_pair(begin_inst: Entity, res: Property):
+def res_fizzler_pair(vmf: VMF, begin_inst: Entity, res: Property):
     """Modify the instance of a fizzler to link with its pair.
 
     Each pair will be given a name along the lines of "fizz_name-model1334".
@@ -336,6 +353,13 @@ def res_fizzler_pair(begin_inst: Entity, res: Property):
         - MidInst: An instance placed every 128 units between emitters.
         - SingleInst: If the models are 1 block apart, replace both with this
             instance.
+        - BrushKeys, LocalBrushKeys: If specified, a brush entity will be
+           generated from some templates at the position of the models.
+        - StartTemp, EndTemp, SingleTemp: Templates for the above.
+        - SingleBrush: If true, the brush will be shared among the entirety
+           of this fizzler.
+        - uniqueName: If true, all pairs get a unique name for themselves.
+          if False, all instances use the base instance name.
     """
     orig_target = begin_inst['targetname']
 
@@ -353,13 +377,39 @@ def res_fizzler_pair(begin_inst: Entity, res: Property):
 
     orig_file = begin_inst['file']
 
-    begin_file = res['StartInst', orig_file]
-    end_file = res['EndInst', orig_file]
-    mid_file = res['MidInst', '']
-    single_file = res['SingleInst', '']
+    begin_inst['file'] = instanceLocs.resolve_one(res['StartInst'], error=True)
+    end_file = instanceLocs.resolve_one(res['EndInst'], error=True)
+    mid_file = instanceLocs.resolve_one(res['MidInst', ''])
+    single_file = instanceLocs.resolve_one(res['SingleInst', ''])
 
-    begin_inst['file'] = begin_file
     begin_inst['targetname'] = pair_name
+
+    brush = None
+    if 'brushkeys' in res:
+        begin_temp = res['StartTemp', '']
+        end_temp = res['EndTemp', '']
+        single_temp = res['SingleTemp']
+
+        if res.bool('SingleBrush'):
+            try:
+                brush = PAIR_FIZZ_BRUSHES[orig_target]
+            except KeyError:
+                pass
+        if not brush:
+            brush = vmf.create_ent(
+                classname='func_brush',  # default
+                origin=begin_inst['origin'],
+            )
+            conditions.set_ent_keys(
+                brush,
+                begin_inst,
+                res,
+                'BrushKeys',
+            )
+            if res.bool('SingleBrush'):
+                PAIR_FIZZ_BRUSHES[orig_target] = brush
+    else:
+        begin_temp = end_temp = single_temp = None
 
     direction = Vec(0, 0, 1).rotate_by_str(begin_inst['angles'])
 
@@ -383,15 +433,47 @@ def res_fizzler_pair(begin_inst: Entity, res: Property):
         LOGGER.warning('No matching pair for {}!!', orig_target)
         return
 
-    if single_file and length == 0:
-        end_inst.remove()
-        begin_inst['file'] = single_file
-        return
+    if length == 0:
+        if single_temp:
+            temp_brushes = template_brush.import_template(
+                single_temp,
+                Vec.from_str(begin_inst['origin']),
+                Vec.from_str(begin_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
+
+        if single_file:
+            end_inst.remove()
+            begin_inst['file'] = single_file
+            # Don't do anything else with end instances.
+            return
+    else:
+        if begin_temp:
+            temp_brushes = template_brush.import_template(
+                begin_temp,
+                Vec.from_str(begin_inst['origin']),
+                Vec.from_str(begin_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
+
+        if end_temp:
+            temp_brushes = template_brush.import_template(
+                end_temp,
+                Vec.from_str(end_inst['origin']),
+                Vec.from_str(end_inst['angles']),
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=False,
+            )
+            brush.solids.extend(temp_brushes.world)
 
     end_inst['targetname'] = pair_name
     end_inst['file'] = end_file
 
-    if mid_file != '':
+    if mid_file != '' and length:
         # Go 64 from each side, and always have at least 1 section
         # A 128 gap will have length = 0
         for dis in range(0, abs(length) + 1, 128):
@@ -401,7 +483,7 @@ def res_fizzler_pair(begin_inst: Entity, res: Property):
                 targetname=pair_name,
                 angles=begin_inst['angles'],
                 file=mid_file,
-                origin=new_pos.join(' '),
+                origin=new_pos,
             )
 
 
@@ -418,9 +500,7 @@ def fizzler_out_relay():
     # base -> connections
     fizz_bases = {}
 
-    LOGGER.info('Item classes: {}', ITEM_CLASSES)
-
-    for fizz_id in ITEM_CLASSES['itembarrierhazard']:
+    for fizz_id in ITEMS_WITH_CLASS[const.ItemClass.FIZZLER]:
         base, model = instanceLocs.resolve(
             '<{}: fizz_base, fizz_model>'.format(fizz_id)
         )

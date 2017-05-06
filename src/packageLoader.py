@@ -5,15 +5,13 @@ import operator
 import os
 import os.path
 import shutil
+import math
+import re
 from collections import defaultdict
-from contextlib import ExitStack
-from zipfile import ZipFile
 
-import extract_packages
 import srctools
 import tkMarkdown
 import utils
-from FakeZip import FakeZip, zip_names, zip_open_bin
 from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
@@ -23,6 +21,7 @@ from srctools import (
     VMF, Entity, Solid,
     VPK,
 )
+from srctools.filesys import FileSystem, get_filesystem, RawFileSystem
 
 from typing import (
     Union, Optional, Any, TYPE_CHECKING,
@@ -42,7 +41,9 @@ OBJ_TYPES = {}
 
 data = {}
 
-res_count = -1
+# Maps a package ID to the matching filesystem for reading files easily.
+PACKAGE_SYS = {}  # type: Dict[str, FileSystem]
+
 
 # Don't change face IDs when copying to here.
 # This allows users to refer to the stuff in templates specifically.
@@ -56,14 +57,14 @@ TEMPLATE_FILE = VMF(preserve_ids=True)
 # Tempory data stored when parsing info.txt, but before .parse() is called.
 # This allows us to parse all packages before loading objects.
 ObjData = NamedTuple('ObjData', [
-    ('zip_file', Union[ZipFile, FakeZip]),
+    ('fsys', FileSystem),
     ('info_block', Property),
     ('pak_id', str),
     ('disp_name', str),
 ])
 # The arguments for pak_object.parse().
 ParseData = NamedTuple('ParseData', [
-    ('zip_file', Union[ZipFile, FakeZip]),
+    ('fsys', FileSystem),
     ('id', str),
     ('info', Property),
     ('pak_id', str),
@@ -83,6 +84,15 @@ ExportData = NamedTuple('ExportData', [
     ('vbsp_conf', Property),
     ('game', 'Game'),
 ])
+
+# The desired variant for an item, before we've figured out the dependencies.
+UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
+    ('filesys', FileSystem),  # The original filesystem.
+    ('folder', str),  # If set, use the given folder from our package.
+    ('style', str),  # Inherit from a specific style (implies folder is None)
+    ('config', Property),  # Config for editing
+])
+
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
@@ -105,6 +115,9 @@ VPK_FOLDER = {
     # This doesn't have VPK files, and is higher priority.
     utils.STEAM_IDS['APERTURE TAG']: 'portal2',
 }
+
+class NoVPKExport(Exception):
+    """Raised to indicate that VPK files weren't copied."""
 
 
 class _PakObjectMeta(type):
@@ -144,7 +157,7 @@ class PakObject(metaclass=_PakObjectMeta):
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
-        - zip_file, the package's ZipFile or FakeZip
+        - fsys, the package's FileSystem
         - id, the ID of the item
         - info, the Property block in info.txt
         - pak_id, the ID of the package
@@ -204,13 +217,13 @@ def reraise_keyerror(err, obj_id):
 
 def get_config(
         prop_block: Property,
-        zip_file,
+        fsys: FileSystem,
         folder: str,
         pak_id='',
         prop_name='config',
         extension='.cfg',
         ):
-    """Extract a config file refered to by the given property block.
+    """Extract a config file referred to by the given property block.
 
     Looks for the prop_name key in the given prop_block.
     If the keyvalue has a value of "", an empty tree is returned.
@@ -226,18 +239,14 @@ def get_config(
     if prop_block.value == '':
         return Property(None, [])
 
-    # Zips must use '/' for the seperator, even on Windows!
+    # Zips must use '/' for the separator, even on Windows!
     path = folder + '/' + prop_block.value
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
     try:
-        with zip_file.open(path) as f:
-            return Property.parse(
-                f,
-                pak_id + ':' + path,
-            )
-    except KeyError:
+        return fsys.read_prop(path)
+    except FileNotFoundError:
         LOGGER.warning('"{id}:{path}" not in zip!', id=pak_id, path=path)
         return Property(None, [])
     except UnicodeDecodeError:
@@ -256,57 +265,72 @@ def set_cond_source(props: Property, source: str):
         cond['__src__'] = source
 
 
-def find_packages(pak_dir, zips, zip_stack: ExitStack, zip_name_lst):
+def find_packages(pak_dir):
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     for name in os.listdir(pak_dir):  # Both files and dirs
         name = os.path.join(pak_dir, name)
-        is_dir = os.path.isdir(name)
-        if name.endswith('.zip') and os.path.isfile(name):
-            zip_file = ZipFile(name)
-            # Ensure we quit close this zipfile..
-            zip_stack.enter_context(zip_file)
-        elif is_dir:
-            zip_file = FakeZip(name)
-            # FakeZips don't actually hold a file handle, we don't need to
-            # close them.
-        else:
+        if name.endswith('.vpk') and not name.endswith('_dir.vpk'):
+            # _000.vpk files, useless without the directory
+            continue
+
+        try:
+            filesys = get_filesystem(name)
+        except ValueError:
             LOGGER.info('Extra file: {}', name)
             continue
 
         LOGGER.debug('Reading package "' + name + '"')
 
+        # Gain a persistent hold on the filesystem's handle.
+        # That means we don't need to reopen the zip files constantly.
+        filesys.open_ref()
+
+        # Valid packages must have an info.txt file!
         try:
-            # Valid packages must have an info.txt file!
-            info_file = zip_file.open('info.txt')
-        except KeyError:
-            if is_dir:
+            info = filesys.read_prop('info.txt')
+        except FileNotFoundError:
+            # Close the ref we've gotten, since it's not in the dict
+            # it won't be done by load_packages().
+            filesys.close_ref()
+
+            if os.path.isdir(name):
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                find_packages(name, zips, zip_stack, zip_name_lst)
+                find_packages(name)
             else:
-                # Invalid, explicitly close this zipfile handle..
-                zip_file.close()
                 LOGGER.warning('ERROR: Bad package "{}"!', name)
-        else:
-            with info_file:
-                info = Property.parse(info_file, name + ':info.txt')
-
-            # Add the zipfile to the list, it's valid
-            zips.append(zip_file)
-            zip_name_lst.append(os.path.abspath(name))
-
+            # Don't continue to parse this "package"
+            continue
+        try:
             pak_id = info['ID']
-            packages[pak_id] = Package(
-                pak_id,
-                zip_file,
-                info,
-                name,
-            )
-            found_pak = True
+        except:
+            # Close the ref we've gotten, since it's not in the dict
+            # it won't be done by load_packages().
+            filesys.close_ref()
+            raise
+
+        PACKAGE_SYS[pak_id] = filesys
+
+        packages[pak_id] = Package(
+            pak_id,
+            filesys,
+            info,
+            name,
+        )
+        found_pak = True
 
     if not found_pak:
         LOGGER.debug('No packages in folder!')
+
+
+def close_filesystems():
+    """Close the package's filesystems.
+
+    This means future access needs to reopen the file handle.
+    """
+    for sys in PACKAGE_SYS.values():
+        sys.close_ref()
 
 
 def load_packages(
@@ -317,8 +341,8 @@ def load_packages(
         log_incorrect_packfile=False,
         has_mel_music=False,
         has_tag_music=False,
-        ):
-    """Scan and read in all packages in the specified directory."""
+        ) -> Tuple[dict, Iterable[FileSystem]]:
+    """Scan and read in all packages."""
     global LOG_ENT_COUNT, CHECK_PACKFILE_CORRECTNESS
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
@@ -332,22 +356,18 @@ def load_packages(
             message='The given packages directory is not present!\n'
                     'Get the packages from '
                     '"http://github.com/BEEmod/BEE2-items" '
-                    'and place them in "' + pak_dir +
-                    os.path.sep + '".',
+                    'and place them in "' + pak_dir + os.path.sep + '".',
                     # Add slash to the end to indicate it's a folder.
         )
-        sys.exit('No Packages Directory!')
-
-    shutil.rmtree('../vpk_cache/', ignore_errors=True)
+        sys.exit()
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
-    zips = []
-    data['zips'] = []
 
-    # Use ExitStack to dynamically manage the zipfiles we find and open.
-    with ExitStack() as zip_stack:
-        find_packages(pak_dir, zips, zip_stack, data['zips'])
+    # If we fail we want to clean up our filesystems.
+    should_close_filesystems = True
+    try:
+        find_packages(pak_dir)
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
@@ -357,7 +377,6 @@ def load_packages(
             obj_override[obj_type] = defaultdict(list)
             data[obj_type] = []
 
-        images = 0
         for pak_id, pack in packages.items():
             if not pack.enabled:
                 LOGGER.info('Package {id} disabled!', id=pak_id)
@@ -366,19 +385,14 @@ def load_packages(
                 continue
 
             LOGGER.info('Reading objects from "{id}"...', id=pak_id)
-            img_count = parse_package(pack, has_tag_music, has_mel_music)
-            images += img_count
+            parse_package(pack, has_tag_music, has_mel_music)
             loader.step("PAK")
-
-        # If new packages were added, update the config!
-        PACK_CONFIG.save_check()
 
         loader.set_length("OBJ", sum(
             len(obj_type)
             for obj_type in
             all_obj.values()
         ))
-        loader.set_length("IMG_EX", images)
 
         # The number of images we need to load is the number of objects,
         # excluding some types like Stylevars or PackLists.
@@ -400,7 +414,7 @@ def load_packages(
                 try:
                     object_ = obj_class.parse(
                         ParseData(
-                            obj_data.zip_file,
+                            obj_data.fsys,
                             obj_id,
                             obj_data.info_block,
                             obj_data.pak_id,
@@ -427,29 +441,10 @@ def load_packages(
                 data[obj_type].append(object_)
                 loader.step("OBJ")
 
-        # Extract all resources/BEE2/ images.
-
-        img_dest = '../images/cache'
-
-        shutil.rmtree(img_dest, ignore_errors=True)
-        img_loc = os.path.join('resources', 'bee2')
-        for zip_file in zips:
-            for path in zip_names(zip_file):
-                loc = os.path.normcase(path).casefold()
-                if not loc.startswith(img_loc):
-                    continue
-                # Strip resources/BEE2/ from the path and move to the
-                # cache folder.
-                dest_loc = os.path.join(
-                    img_dest,
-                    os.path.relpath(loc, img_loc)
-                )
-                # Make the destination directory and copy over the image
-                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-                with zip_open_bin(zip_file, path) as src:
-                    with open(dest_loc, mode='wb') as dest:
-                        shutil.copyfileobj(src, dest)
-                loader.step("IMG_EX")
+        should_close_filesystems = False
+    finally:
+        if should_close_filesystems:
+            close_filesystems()
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
@@ -458,7 +453,7 @@ def load_packages(
         log_item_fallbacks,
         log_missing_styles,
     )
-    return data
+    return data, PACKAGE_SYS.values()
 
 
 def parse_package(pack: 'Package', has_tag=False, has_mel=False):
@@ -488,7 +483,7 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
         for obj in pack.info.find_all("Overrides", comp_type):
             obj_id = obj['id']
             obj_override[comp_type][obj_id].append(
-                ParseData(pack.zip, obj_id, obj, pack.id, True)
+                ParseData(pack.fsys, obj_id, obj, pack.id, True)
             )
 
         for obj in pack.info.find_all(comp_type):
@@ -497,28 +492,18 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
                 if allow_dupes:
                     # Pretend this is an override
                     obj_override[comp_type][obj_id].append(
-                        ParseData(pack.zip, obj_id, obj, pack.id, True)
+                        ParseData(pack.fsys, obj_id, obj, pack.id, True)
                     )
                     # Don't continue to parse and overwrite
                     continue
                 else:
                     raise Exception('ERROR! "' + obj_id + '" defined twice!')
             all_obj[comp_type][obj_id] = ObjData(
-                pack.zip,
+                pack.fsys,
                 obj,
                 pack.id,
                 pack.disp_name,
             )
-
-    img_count = 0
-    img_loc = os.path.join('resources', 'bee2')
-    for item in zip_names(pack.zip):
-        item = os.path.normcase(item).casefold()
-        if item.startswith("resources"):
-            extract_packages.res_count += 1
-            if item.startswith(img_loc):
-                img_count += 1
-    return img_count
 
 
 def setup_style_tree(
@@ -527,7 +512,7 @@ def setup_style_tree(
     log_fallbacks,
     log_missing_styles,
 ):
-    """Modify all items so item inheritance is properly handled.
+    """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
     combination of item and version.
@@ -569,13 +554,94 @@ def setup_style_tree(
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
         for vers in all_ver:
+            # We need to repeatedly loop to handle the chains of
+            # dependencies. This is a list of (style_id, UnParsed).
+            to_change = []  # type: List[Tuple[str, UnParsedItemVariant]]
+            styles = vers['styles']  # type:  Dict[str, Optional[ItemVariant]]
+            for sty_id, conf in styles.items():
+                to_change.append((sty_id, conf))
+                # Not done yet
+                styles[sty_id] = None
+
+            # Evaluate style lookups and modifications
+            while to_change:
+                # Needs to be done next loop.
+                deferred = []
+                # filesys = FileSystem  # The original filesystem.
+                # folder = str  # If set, use the given folder from our package.
+                # style = str  # Inherit from a specific style (implies folder is None)
+                # config = Property  # Config for editing
+                for sty_id, conf in to_change:
+                    if conf.style:
+                        try:
+                            start_data = styles[conf.style]
+                        except KeyError:
+                            raise ValueError(
+                                'Item {}\'s {} style referenced '
+                                'invalid style "{}"'.format(
+                                    item.id,
+                                    sty_id,
+                                    conf.style,
+                                ))
+                        if start_data is None:
+                            # Not done yet!
+                            deferred.append((sty_id, conf))
+                            continue
+                        # Can't have both!
+                        if conf.folder:
+                            raise ValueError(
+                                'Item {}\'s {} style has both folder and'
+                                ' style!'.format(
+                                    item.id,
+                                    sty_id,
+                                ))
+                    elif conf.folder:
+                        # Just a folder ref, we can do it immediately.
+                        # We know this dict should be set.
+                        try:
+                            start_data = item.folders[conf.filesys, conf.folder]
+                        except KeyError:
+                            LOGGER.info('Folders: {}', item.folders.keys())
+                            raise
+                    else:
+                        # No source for our data!
+                        raise ValueError(
+                            'Item {}\'s {} style has no data source!'.format(
+                                item.id,
+                                sty_id,
+                            ))
+
+                    if conf.config is None:
+                        styles[sty_id] = start_data.copy()
+                    else:
+                        styles[sty_id] = start_data.modify(
+                            conf.filesys,
+                            conf.config,
+                            '<{}:{}.{}>'.format(item.id, vers['id'], sty_id),
+                        )
+
+                # If we defer all the styles, there must be a loop somewhere.
+                # We can't resolve that!
+                if len(deferred) == len(to_change):
+                    raise ValueError(
+                        'Loop in style references!\nNot resolved:\n' + '\n'.join(
+                            '{} -> {}'.format(conf.style, sty_id)
+                            for sty_id, conf in deferred
+                        )
+                    )
+                to_change = deferred
+
+            # Fix this reference to point to the actual value.
+            vers['def_style'] = styles[vers['def_style']]
+
+
             for sty_id, style in all_styles.items():
-                if sty_id in vers['styles']:
-                    continue  # We already have a definition, or a reference
+                if sty_id in styles:
+                    continue  # We already have a definition
                 for base_style in style.bases:
-                    if base_style.id in vers['styles']:
+                    if base_style.id in styles:
                         # Copy the values for the parent to the child style
-                        vers['styles'][sty_id] = vers['styles'][base_style.id]
+                        styles[sty_id] = styles[base_style.id]
                         if log_fallbacks and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using parent '
@@ -589,7 +655,7 @@ def setup_style_tree(
                     # For the base version, use the first style if
                     # a styled version is not present
                     if vers['id'] == item.def_ver['id']:
-                        vers['styles'][sty_id] = vers['styles'][vers['def_style']]
+                        styles[sty_id] = vers['def_style']
                         if log_missing_styles and not item.unstyled:
                             LOGGER.warning(
                                 'Item "{item}" using '
@@ -600,59 +666,10 @@ def setup_style_tree(
                     else:
                         # For versions other than the first, use
                         # the base version's definition
-                        vers['styles'][sty_id] = item.def_ver['styles'][sty_id]
-
-            style_lookups = {}
-
-            # Evaluate style lookups and modifications
-            for sty_id, props in vers['styles'].items():
-                if not isinstance(props, Property):
-                    continue  # Normal value
-                if props.name is None:
-                    # Style lookup
-                    style_lookups[sty_id] = props.value
-                    continue
-                # It's a reference to another style.
-                base = props['base', '']
-                if not base:
-                    raise Exception('No base for "{}", in "{}" style.'.format(
-                        item.id, sty_id,
-                    ))
-
-                try:
-                    base_variant = vers['styles'][base]  # type: ItemVariant
-                except KeyError:
-                    raise Exception(
-                        'Invalid style base '
-                        '("{}") for "{}", in "{}" style.'.format(
-                            base, item.id, sty_id,
-                        )
-                    )
-
-                vers['styles'][sty_id] = base_variant.modify(
-                    props,
-                    '<{}:{}.{}>'.format(item.id, vers['id'], sty_id)
-                )
-
-            for to_id, from_id in style_lookups.items():
-                LOGGER.warning('REF "{}": {} -> {}', item.id, from_id, to_id)
-                try:
-                    vers['styles'][to_id] = vers['styles'][from_id]
-                except KeyError:
-                    raise Exception(
-                        'Invalid style reference '
-                        '("{}") for "{}", in "{}" style.'.format(
-                            from_id, item.id, to_id,
-                        )
-                    )
-
-            # The default style is a value reference, fix it up.
-            # If it's an invalid value the above loop will have caught
-            # that, since it already read the value.
-            vers['def_style'] = vers['styles'][vers['def_style']]
+                        styles[sty_id] = item.def_ver['styles'][sty_id]
 
 
-def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
+def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
     """Parse through the data in item/ folders.
 
     folders is a dict, with the keys set to the folder names we want.
@@ -663,16 +680,10 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
         editor_path = 'items/' + fold + '/editoritems.txt'
         config_path = 'items/' + fold + '/vbsp_config.cfg'
         try:
-            with zip_file.open(prop_path, 'r') as prop_file:
-                props = Property.parse(
-                    prop_file, pak_id + ':' + prop_path,
-                ).find_key('Properties')
-            with zip_file.open(editor_path, 'r') as editor_file:
-                editor = Property.parse(
-                    editor_file, pak_id + ':' + editor_path
-                )
-        except KeyError as err:
-            # Opening the files failed!
+            with filesystem:
+                props = filesystem.read_prop(prop_path).find_key('Properties')
+                editor = filesystem.read_prop(editor_path)
+        except FileNotFoundError as err:
             raise IOError(
                 '"' + pak_id + ':items/' + fold + '" not valid!'
                 'Folder likely missing! '
@@ -726,12 +737,11 @@ def parse_item_folder(folders: Dict[str, Any], zip_file, pak_id):
                 path=prop_path,
             )
         try:
-            with zip_file.open(config_path, 'r') as vbsp_config:
-                folders[fold].vbsp_config = conf = Property.parse(
-                    vbsp_config,
-                    pak_id + ':' + config_path,
+            with filesystem:
+                folders[fold].vbsp_config = conf = filesystem.read_prop(
+                    config_path,
                 )
-        except KeyError:
+        except FileNotFoundError:
             folders[fold].vbsp_config = conf = Property(None, [])
 
         set_cond_source(conf, folders[fold].source)
@@ -771,6 +781,23 @@ class ItemVariant:
         self.all_name = all_name
         self.all_icon = all_icon
 
+    def copy(self) -> 'ItemVariant':
+        """Make a copy of all the data."""
+        return ItemVariant(
+            self.editor.copy(),
+            self.vbsp_config.copy(),
+            self.editor_extra.copy(),
+            self.authors.copy(),
+            self.tags.copy(),
+            self.desc.copy(),
+            self.icons.copy(),
+            self.ent_count,
+            self.url,
+            self.all_name,
+            self.all_icon,
+            self.source,
+        )
+
     def can_group(self):
         """Does this variant have the data needed to group?"""
         return (
@@ -786,7 +813,7 @@ class ItemVariant:
         self.vbsp_config += other.vbsp_config
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    def modify(self, props: Property, source: str) -> 'ItemVariant':
+    def modify(self, fsys: FileSystem, props: Property, source: str) -> 'ItemVariant':
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -794,17 +821,45 @@ class ItemVariant:
         """
         if 'config' in props:
             # Item.parse() has resolved this to the actual config.
-            vbsp_config = props.find_key('config').copy()
-            # Specify this is a collection of blocks, not a "config"
-            # block.
-            vbsp_config.name = None
+            vbsp_config = get_config(
+                props,
+                fsys,
+                'items',
+                pak_id=fsys.path,
+            )
         else:
             vbsp_config = self.vbsp_config.copy()
+
+        if 'replace' in props:
+            # Replace property values in the config via regex.
+            replace_vals = [
+                (re.compile(prop.real_name, re.IGNORECASE), prop.value)
+                for prop in
+                props.find_children('Replace')
+            ]
+            for prop in vbsp_config.iter_tree():
+                for regex, sub in replace_vals:
+                    prop.name = regex.sub(sub, prop.real_name)
+                    prop.value = regex.sub(sub, prop.value)
+
+        vbsp_config += list(get_config(
+            props,
+            fsys,
+            'items',
+            prop_name='append',
+            pak_id=fsys.path,
+        ))
 
         if 'description' in props:
             desc = desc_parse(props, source)
         else:
             desc = self.desc.copy()
+
+        if 'appenddesc' in props:
+            desc = tkMarkdown.join(
+                desc,
+                desc_parse(props, source, prop_name='appenddesc'),
+            )
 
         if 'authors' in props:
             authors = sep_values(props['authors', ''])
@@ -837,8 +892,10 @@ class ItemVariant:
             pal_name = item['pal_name', None]  # Name for the palette icon
             bee2_icon = item['bee2', None]
             if item.name == 'all':
-                variant.all_icon = pal_icon
-                variant.all_name = pal_name
+                if pal_icon:
+                    variant.all_icon = pal_icon
+                if pal_name:
+                    variant.all_name = pal_name
                 if bee2_icon:
                     variant.icons['all'] = bee2_icon
                 continue
@@ -875,7 +932,6 @@ class ItemVariant:
                 subtype['name'] = item['name']  # Name for the subtype
 
             if bee2_icon:
-                print(item.name, variant.icons)
                 variant.icons[item.name] = bee2_icon
 
             if pal_name or pal_icon:
@@ -887,20 +943,41 @@ class ItemVariant:
 
         # Allow overriding the instance blocks.
         instances = variant.editor.ensure_exists('Exporting').ensure_exists('Instances')
+        inst_children = {
+            self._inst_block_key(prop): prop
+            for prop in
+            instances
+        }
+        instances.clear()
+
         for inst in props.find_children('Instances'):
             try:
-                del instances[inst.real_name]
-            except IndexError:
+                del inst_children[self._inst_block_key(inst)]
+            except KeyError:
                 pass
-            if inst.has_children() or not inst.name.isdecimal():
-                instances.append(inst.copy())
+            if inst.has_children():
+                inst_children[self._inst_block_key(inst)] = inst.copy()
             else:
                 # Shortcut to just create the property
-                instances += Property(inst.real_name, [
-                    Property('Name', inst.value),
-                ])
+                inst_children[self._inst_block_key(inst)] = Property(
+                    inst.real_name,
+                    [Property('Name', inst.value)],
+                )
+        for key, prop in sorted(inst_children.items(), key=operator.itemgetter(0)):
+            instances.append(prop)
 
         return variant
+
+    @staticmethod
+    def _inst_block_key(prop: Property):
+        """Sort function for the instance blocks.
+        
+        String values come first, then all numeric ones in order.
+        """
+        if prop.real_name.isdecimal():
+            return 0, int(prop.real_name)
+        else:
+            return 1, prop.real_name
 
 
 class Package:
@@ -908,7 +985,7 @@ class Package:
     def __init__(
             self,
             pak_id: str,
-            zip_file: ZipFile,
+            filesystem: FileSystem,
             info: Property,
             name: str,
             ):
@@ -918,7 +995,7 @@ class Package:
             disp_name = pak_id.lower()
 
         self.id = pak_id
-        self.zip = zip_file
+        self.fsys = filesystem
         self.info = info
         self.name = name
         self.disp_name = disp_name
@@ -941,30 +1018,29 @@ class Package:
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
     enabled = enabled.setter(set_enabled)
 
-    def is_stale(self):
+    def is_stale(self, mod_time: int):
         """Check to see if this package has been modified since the last run."""
-        if isinstance(self.zip, FakeZip):
+        if isinstance(self.fsys, RawFileSystem):
             # unzipped packages are for development, so always extract.
-            LOGGER.info('Extracting resources - {} is unzipped!', self.id)
+            LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
-        last_modtime = PACK_CONFIG.get_int(self.id, 'ModTime', 0)
+
         zip_modtime = int(os.stat(self.name).st_mtime)
 
-        if zip_modtime != last_modtime:
-            LOGGER.info('Package {} is stale! Extracting resources...', self.id)
+        # If zero, it's never extracted...
+        if zip_modtime != mod_time or mod_time == 0:
+            LOGGER.info('Need to extract resources - {} is stale!', self.id)
             return True
         return False
 
-    def set_modtime(self):
+    def get_modtime(self):
         """After the cache has been extracted, set the modification dates
          in the config."""
-        if isinstance(self.zip, FakeZip):
+        if isinstance(self.fsys, RawFileSystem):
             # No modification time
-            PACK_CONFIG[self.id]['ModTime'] = '0'
+            return 0
         else:
-            PACK_CONFIG[self.id]['ModTime'] = str(int(
-                os.stat(self.name).st_mtime
-            ))
+            return int(os.stat(self.name).st_mtime)
 
 
 class Style(PakObject):
@@ -1003,9 +1079,10 @@ class Style(PakObject):
         set_cond_source(self.config, 'Style <{}>'.format(style_id))
 
     @classmethod
-    def parse(cls, data):
+    def parse(cls, data: ParseData):
         """Parse a style definition."""
-        info = data.info
+        info = data.info  # type: Property
+        filesystem = data.fsys  # type: FileSystem
         selitem_data = get_selitem_data(info)
         base = info['base', '']
         has_video = srctools.conv_bool(
@@ -1043,27 +1120,20 @@ class Style(PakObject):
         try:
             folder = 'styles/' + info['folder']
         except IndexError:
+            # It's OK for override styles to be missing their 'folder'
+            # value.
             if data.is_override:
                 items = Property(None, [])
                 vbsp = None
             else:
                 raise ValueError('Style missing configuration!')
         else:
-            with data.zip_file.open(folder + '/items.txt', 'r') as item_data:
-                items = Property.parse(
-                    item_data,
-                    data.pak_id + ':' + folder + '/items.txt'
-                )
-
-            config = folder + '/vbsp_config.cfg'
-            try:
-                with data.zip_file.open(config, 'r') as vbsp_config:
-                    vbsp = Property.parse(
-                        vbsp_config,
-                        data.pak_id + ':' + config,
-                    )
-            except KeyError:
-                vbsp = None
+            with filesystem:
+                items = filesystem.read_prop(folder + '/items.txt')
+                try:
+                    vbsp = filesystem.read_prop(folder + '/vbsp_config.cfg')
+                except FileNotFoundError:
+                    vbsp = None
 
         return cls(
             style_id=data.id,
@@ -1074,7 +1144,7 @@ class Style(PakObject):
             suggested=sugg,
             has_video=has_video,
             corridor_names=corridors,
-            vpk_name=vpk_name
+            vpk_name=vpk_name,
         )
 
     def add_over(self, override: 'Style'):
@@ -1093,7 +1163,6 @@ class Style(PakObject):
             for self_sugg, over_sugg in
             zip(self.suggested, override.suggested)
         )
-
 
     def __repr__(self):
         return '<Style:' + self.id + '>'
@@ -1131,6 +1200,7 @@ class Item(PakObject):
             unstyled=False,
             glob_desc=(),
             desc_last=False,
+            folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
             ):
         self.id = item_id
         self.versions = versions
@@ -1141,6 +1211,8 @@ class Item(PakObject):
         self.unstyled = unstyled
         self.glob_desc = glob_desc
         self.glob_desc_last = desc_last
+        # Dict of folders we need to have decoded.
+        self.folders = folders
 
     @classmethod
     def parse(cls, data: ParseData):
@@ -1150,7 +1222,7 @@ class Item(PakObject):
         # The folders we parse for this - we don't want to parse the same
         # one twice. First they're set to True if we need to read them,
         # then parse_item_folder() replaces that with the actual values
-        folders = {}  # type: Dict[str, Optional[ItemVariant]
+        folders = {}  # type: Dict[str, Optional[ItemVariant]]
         unstyled = data.info.bool('unstyled')
 
         glob_desc = desc_parse(data.info, 'global:' + data.id)
@@ -1158,7 +1230,7 @@ class Item(PakObject):
 
         all_config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -1178,28 +1250,32 @@ class Item(PakObject):
                 }
             for style in ver.find_children('styles'):
                 if style.has_children():
-                    # It's a modification to another folder, keep the property.
-                    folder = style
-                    # Read in the vbsp_config data if specified.
-                    # We need to do this here, since the other functions
-                    # don't have access to the zip file.
-                    if 'config' in folder:
-                        folder['config'] = get_config(
-                            folder,
-                            data.zip_file,
-                            'items',
-                            data.pak_id,
-                        )
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        folder=style['folder', None],
+                        style=style['Base', ''],
+                        config=style,
+                    )
 
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
-                    # None signals this should be calculated after the other
-                    # modifications
-                    folder = Property(None, style.value[1:-1])
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        style=style.value[1:-1],
+                        folder=None,
+                        config=None,
+                    )
                 else:
                     # Reference to the actual folder...
-                    folder = style.value
-                    folders[folder] = None
+                    folder = UnParsedItemVariant(
+                        data.fsys,
+                        folder=style.value,
+                        style=None,
+                        config=None,
+                    )
+                # We need to parse the folder now if set.
+                if folder.folder:
+                    folders[folder.folder] = True
 
                 # The first style is considered the 'default', and is used
                 # if not otherwise present.
@@ -1207,12 +1283,20 @@ class Item(PakObject):
                 if vals['def_style'] is None:
                     vals['def_style'] = style.real_name
                 vals['styles'][style.real_name] = folder
+
+                if style.real_name == folder.style:
+                    raise ValueError(
+                        'Item "{}"\'s "{}" style '
+                        'can\'t inherit from itself!'.format(
+                            data.id,
+                            style.real_name,
+                        ))
             versions[vals['id']] = vals
             if def_version is None:
                 def_version = vals
 
         # Fill out the folders dict with the actual data
-        parse_item_folder(folders, data.zip_file, data.pak_id)
+        parse_item_folder(folders, data.fsys, data.pak_id)
 
         # Then copy over to the styles values
         for ver in versions.values():
@@ -1234,12 +1318,20 @@ class Item(PakObject):
             unstyled=unstyled,
             glob_desc=glob_desc,
             desc_last=desc_last,
+            # Add filesystem to individualise this to the package.
+            folders={
+                (data.fsys, folder): item_variant
+                for folder, item_variant in
+                folders.items()
+            }
         )
 
-    def add_over(self, override):
+    def add_over(self, override: 'Item'):
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
         self.all_conf += override.all_conf
+
+        self.folders.update(override.folders)
 
         for ver_id, version in override.versions.items():
             if ver_id not in self.versions:
@@ -1252,14 +1344,13 @@ class Item(PakObject):
                         # We don't have that style!
                         our_ver[sty_id] = style
                     else:
-                        our_style = our_ver[sty_id]  # type: ItemVariant
-                        # We both have a matching folder, merge the
-                        # definitions. We don't override editoritems!
-
-                        if isinstance(our_style, str) or isinstance(style, str):
-                            raise Exception("Can't override with a <STYLE> def.")
-
-                        our_style.override_from_folder(style)
+                        raise ValueError(
+                            'Two definitions for item folder {}.{}.{}',
+                            self.id,
+                            ver_id,
+                            sty_id,
+                        )
+                        # our_style.override_from_folder(style)
 
     def __repr__(self):
         return '<Item:' + self.id + '>'
@@ -1402,21 +1493,34 @@ class Item(PakObject):
                 LOGGER.warning(
                     'Item {} has invalid OccupiedVoxels part '
                     '(needs SubPos1 and SubPos2)!',
-                    self.id
+                    self.id,
                 )
                 continue
             voxel_part.name = "Voxel"
-            bbox_min, bbox_max = Vec.bbox(
-                voxel_part.vec('subpos1'),
-                voxel_part.vec('subpos2'),
-            )
-            del voxel_part['subpos1']
-            del voxel_part['subpos2']
-            for pos in Vec.iter_grid(bbox_min, bbox_max):
-                voxel_part.append(Property(
-                    "Surface", [
-                        Property("Pos", str(pos)),
-                    ])
+            pos_1 = None
+            voxel_subprops = list(voxel_part)
+            voxel_part.clear()
+            for prop in voxel_subprops:
+                if prop.name not in ('subpos', 'subpos1', 'subpos2'):
+                    voxel_part.append(prop)
+                    continue
+                pos_2 = Vec.from_str(prop.value)
+                if pos_1 is None:
+                    pos_1 = pos_2
+                    continue
+
+                bbox_min, bbox_max = Vec.bbox(pos_1, pos_2)
+                pos_1 = None
+                for pos in Vec.iter_grid(bbox_min, bbox_max):
+                    voxel_part.append(Property(
+                        "Surface", [
+                            Property("Pos", str(pos)),
+                        ])
+                    )
+            if pos_1 is not None:
+                LOGGER.warning(
+                    'Item {} has only half of SubPos bbox!',
+                    self.id,
                 )
 
         # Full blocks
@@ -1463,11 +1567,12 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data: ParseData):
+        filesystem = data.fsys  # type: FileSystem
         vers = {}
 
         all_config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -1476,20 +1581,19 @@ class ItemConfig(PakObject, allow_mult=True, has_img=False):
             data.pak_id, data.id,
         ))
 
-        for ver in data.info.find_all('Version'):  # type: Property
-            ver_id = ver['ID', 'VER_DEFAULT']
-            vers[ver_id] = styles = {}
-            for sty_block in ver.find_all('Styles'):
-                for style in sty_block:  # type: Property
-                    file_loc = 'items/' + style.value + '.cfg'
-                    with data.zip_file.open(file_loc) as f:
-                        styles[style.real_name] = conf = Property.parse(
-                            f,
-                            data.pak_id + ':' + file_loc,
+        with filesystem:
+            for ver in data.info.find_all('Version'):  # type: Property
+                ver_id = ver['ID', 'VER_DEFAULT']
+                vers[ver_id] = styles = {}
+                for sty_block in ver.find_all('Styles'):
+                    for style in sty_block:
+                        styles[style.real_name] = conf = filesystem.read_prop(
+                            'items/' + style.value + '.cfg'
                         )
-                    set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
-                        data.pak_id, data.id, style.real_name,
-                    ))
+
+                        set_cond_source(conf, "<ItemConfig {}:{} in '{}'>".format(
+                            data.pak_id, data.id, style.real_name,
+                        ))
 
         return cls(
             data.id,
@@ -1579,7 +1683,7 @@ class QuotePack(PakObject):
 
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'voice',
             pak_id=data.pak_id,
             prop_name='file',
@@ -1749,7 +1853,7 @@ class Skybox(PakObject):
         mat = data.info['material', 'sky_black']
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'skybox',
             pak_id=data.pak_id,
         )
@@ -1790,7 +1894,7 @@ class Skybox(PakObject):
             )
 
         exp_data.vbsp_conf.set_key(
-            ('Textures', 'Special', 'Sky'),
+            ('Options', 'Skybox'),
             skybox.material,
         )
 
@@ -1850,14 +1954,10 @@ class Music(PakObject):
         sound = data.info.find_key('soundscript', '')  # type: Property
 
         # The sample music file to play, if found.
-        rel_sample = data.info['sample', '']
-        if rel_sample:
-            sample = os.path.abspath('../sounds/music_samp/' + rel_sample)
-            zip_sample = 'resources/music_samp/' + rel_sample
-            try:
-                with zip_open_bin(data.zip_file, zip_sample):
-                    pass
-            except KeyError:
+        sample = data.info['sample', '']
+        if sample:
+            zip_sample = 'resources/music_samp/' + sample
+            if zip_sample not in data.fsys:
                 LOGGER.warning(
                     'Music sample for <{}> does not exist in zip: "{}"',
                     data.id,
@@ -1885,7 +1985,7 @@ class Music(PakObject):
 
         config = get_config(
             data.info,
-            data.zip_file,
+            data.fsys,
             'music',
             pak_id=data.pak_id,
         )
@@ -2089,40 +2189,27 @@ class StyleVPK(PakObject, has_img=False):
     These are copied into _dlc3, allowing changing the in-editor wall
     textures.
     """
-    def __init__(self, vpk_id, file_count=0):
+    def __init__(self, vpk_id, filesys: FileSystem, directory: str):
         """Initialise a StyleVPK object."""
         self.id = vpk_id
+        self.fsys = filesys
+        self.dir = directory
 
     @classmethod
     def parse(cls, data: ParseData):
         vpk_name = data.info['filename']
-        dest_folder = os.path.join('../vpk_cache', data.id.casefold())
 
-        os.makedirs(dest_folder, exist_ok=True)
+        filesystem = data.fsys  # type: FileSystem
 
-        zip_file = data.zip_file  # type: ZipFile
-
-        has_files = False
         source_folder = os.path.normpath('vpk/' + vpk_name)
 
-        for filename in zip_names(zip_file):
-            if os.path.normpath(filename).startswith(source_folder):
-                dest_loc = os.path.join(
-                    dest_folder,
-                    os.path.relpath(filename, source_folder)
-                )
-                os.makedirs(os.path.dirname(dest_loc), exist_ok=True)
-                with zip_open_bin(zip_file, filename) as fsrc:
-                    with open(dest_loc, 'wb') as fdest:
-                        shutil.copyfileobj(fsrc, fdest)
-                has_files = True
-
-        if not has_files:
+        # At least one exists?
+        if not any(filesystem.walk_folder(source_folder)):
             raise Exception(
                 'VPK object "{}" has no associated files!'.format(data.id)
             )
 
-        return cls(data.id)
+        return cls(data.id, filesystem, source_folder)
 
     @staticmethod
     def export(exp_data: ExportData):
@@ -2141,7 +2228,7 @@ class StyleVPK(PakObject, has_img=False):
         try:
             dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
         except PermissionError:
-            return  # We can't edit the VPK files - P2 is open..
+            raise NoVPKExport() # We can't edit the VPK files - P2 is open..
 
         if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
             # In Portal 2, we make a dlc3 folder - this changes priorities,
@@ -2166,48 +2253,28 @@ class StyleVPK(PakObject, has_img=False):
 
         # Generate the VPK.
         vpk_file = VPK(os.path.join(dest_folder, 'pak01_dir.vpk'), mode='w')
-        if sel_vpk is not None:
-            src_folder = os.path.abspath(
-                os.path.join(
-                    '../vpk_cache',
-                    sel_vpk.id.casefold()
-                ))
-            vpk_file.add_folder(src_folder)
+        with vpk_file:
+            if sel_vpk is not None:
+                for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
+                    with file.open_bin() as open_file:
+                        vpk_file.add_file(
+                            file.path,
+                            open_file.read(),
+                            sel_vpk.dir,
+                        )
 
-        # Additionally, pack in game/vpk_override/ into the vpk - this allows
-        # users to easily override resources in general.
+            # Additionally, pack in game/vpk_override/ into the vpk - this allows
+            # users to easily override resources in general.
 
-        override_folder = exp_data.game.abs_path('vpk_override')
-        os.makedirs(override_folder, exist_ok=True)
+            override_folder = exp_data.game.abs_path('vpk_override')
+            os.makedirs(override_folder, exist_ok=True)
 
-        # Also write a file to explain what it's for..
-        with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
-            f.write(VPK_OVERRIDE_README)
+            # Also write a file to explain what it's for..
+            with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
+                f.write(VPK_OVERRIDE_README)
 
-        vpk_file.add_folder(override_folder)
-        del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
-
-        # Fix Valve's fail with the cubemap file - if we have the resource,
-        # override the original via DLC3.
-        try:
-            cave_cubemap_file = open(
-                '../cache/resources/materials/BEE2/cubemap_cave01.vtf',
-                'rb'
-            )
-        except FileNotFoundError:
-            pass
-        else:
-            with cave_cubemap_file:
-                try:
-                    vpk_file.add_file(
-                        ('materials/cubemaps/', 'cubemap_cave01', 'vtf'),
-                        cave_cubemap_file.read(),
-                    )
-                except FileExistsError:
-                    # The user might have added it to the vpk_override/ folder.
-                    pass
-
-        vpk_file.write_dirfile()
+            vpk_file.add_folder(override_folder)
+            del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though..
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
 
@@ -2357,6 +2424,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
     @classmethod
     def parse(cls, data):
+        filesystem = data.fsys  # type: FileSystem
         conf = data.info.find_key('Config', '')
         mats = [
             prop.value
@@ -2374,22 +2442,14 @@ class PackList(PakObject, allow_mult=True, has_img=False):
             ]
         elif conf.value:
             path = 'pack/' + conf.value + '.cfg'
-            try:
-                with data.zip_file.open(path) as f:
-                    # Each line is a file to pack.
-                    # Skip blank lines, strip whitespace, and
-                    # allow // comments.
-                    for line in f:
-                        line = srctools.clean_line(line)
-                        if line:
-                            files.append(line)
-            except KeyError as ex:
-                raise FileNotFoundError(
-                    '"{}:{}" not in zip!'.format(
-                        data.id,
-                        path,
-                    )
-                ) from ex
+            with filesystem, filesystem.open_str(path) as f:
+                # Each line is a file to pack.
+                # Skip blank lines, strip whitespace, and
+                # allow // comments.
+                for line in f:
+                    line = srctools.clean_line(line)
+                    if line:
+                        files.append(line)
 
         # We know that if it's a material, it must be packing the VMT at the
         # very least.
@@ -2401,11 +2461,10 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
         if CHECK_PACKFILE_CORRECTNESS:
             # Use normpath so sep differences are ignored, plus case.
-            zip_files = {
-                os.path.normpath(file).casefold()
+            resources = {
+                os.path.normpath(file.path).casefold()
                 for file in
-                zip_names(data.zip_file)
-                if file.startswith('resources')
+                filesystem.walk_folder('resources/')
             }
             for file in files:
                 if file.startswith(('-#', 'precache_sound:')):
@@ -2417,8 +2476,9 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
                 #  Check to make sure the files exist...
                 file = os.path.join('resources', os.path.normpath(file)).casefold()
-                if file not in zip_files:
-                    LOGGER.warning('Warning: "{file}" not in zip! ({pak_id})',
+                if file not in resources:
+                    LOGGER.warning(
+                        'Warning: "{file}" not in zip! ({pak_id})',
                         file=file,
                         pak_id=data.pak_id,
                     )
@@ -2431,7 +2491,7 @@ class PackList(PakObject, allow_mult=True, has_img=False):
 
     def add_over(self, override):
         """Override items just append to the list of files."""
-        # Dont copy over if it's already present
+        # Don't copy over if it's already present
         for item in override.files:
             if item not in self.files:
                 self.files.append(item)
@@ -2521,7 +2581,17 @@ class BrushTemplate(PakObject, has_img=False):
     based on orientation.
     All world and detail brushes from the given VMF will be copied.
     """
-    def __init__(self, temp_id, vmf_file: VMF, force=None, keep_brushes=True):
+    # For scaling templates, maps normals to the prefix to use in the ent.
+    NORMAL_TO_NAME = {
+        (0, 0, 1): 'up',
+        (0, 0, -1): 'dn',
+        (0, 1, 0): 'n',
+        (0, -1, 0): 's',
+        (1, 0, 0): 'e',
+        (-1, 0, 0): 'w',
+    }
+
+    def __init__(self, temp_id: str, vmf_file: VMF, force=None, keep_brushes=True):
         """Import in a BrushTemplate object.
 
         This copies the solids out of VMF_FILE and into TEMPLATE_FILE.
@@ -2560,6 +2630,18 @@ class BrushTemplate(PakObject, has_img=False):
             )
         elif len(conf_ents) == 1:
             config = conf_ents[0]
+            config_id = config['template_id']
+            if config_id and temp_id:
+                if config['template_id'].casefold() != temp_id.casefold():
+                    raise ValueError('VMF and info.txt have different ids: {}, {}'.format(
+                        config['template_id'],
+                        temp_id,
+                    ))
+            # Override passed ID with the one in the VMF.
+            elif config_id and not temp_id:
+                self.id = temp_id = config_id
+            elif not config_id:
+                LOGGER.warning('"{}" has no conf ID!', temp_id)
             conf_auto_visgroup = int(srctools.conv_bool(config['detail_auto_visgroup']))
             if srctools.conv_bool(config['discard_brushes']):
                 keep_brushes = False
@@ -2568,11 +2650,66 @@ class BrushTemplate(PakObject, has_img=False):
                 force_is_detail = True
             elif config['temp_type'] == 'world':
                 force_is_detail = False
+            # Add to the exported map as well.
+            export_config = config.copy(map=TEMPLATE_FILE, keep_vis=False)
+            # Remove the configs we've parsed
+            for key in (
+                'temp_type',
+                'is_scaling',
+                'discard_brushes',
+                'template_id',
+                'detail_auto_visgroup',
+                # Not used, but might be added by Hammer.
+                'origin',
+                'angles',
+            ):
+                del export_config[key]
+            # Only add if it has useful settings, and we're not a scaling
+            # template.
+            if export_config.keys and not is_scaling:
+                TEMPLATE_FILE.add_ent(export_config)
+                export_config['template_id'] = temp_id
+
         else:
             conf_auto_visgroup = is_scaling = False
+            if not temp_id:
+                raise ValueError('No template ID passed in!')
+            LOGGER.warning('Template "{}" has no config!', temp_id)
 
         if is_scaling:
-            raise NotImplementedError()  # TODO
+            # Make a scaling template config.
+            scaling_conf = TEMPLATE_FILE.create_ent(
+                classname='bee2_template_scaling',
+                template_id=temp_id,
+            )
+            scale_brush = None
+            for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+                for brush in brushes:
+                    if scale_brush is None:
+                        scale_brush = brush
+                    else:
+                        raise ValueError(
+                            'Too many brushes in scaling '
+                            'template "{}"!'.format(temp_id),
+                        )
+            if scale_brush is None:
+                raise ValueError(
+                    'No brushes in scaling template "{}"!'.format(temp_id)
+                )
+
+            for face in scale_brush:
+                try:
+                    prefix = BrushTemplate.NORMAL_TO_NAME[face.normal().as_tuple()]
+                except KeyError:
+                    raise ValueError(
+                        'Non Axis-Aligned face in '
+                        'scaling template "{}"!'.format(temp_id),
+                    )
+                scaling_conf[prefix + '_tex'] = face.mat
+                scaling_conf[prefix + '_uaxis'] = face.uaxis
+                scaling_conf[prefix + '_vaxis'] = face.vaxis
+                scaling_conf[prefix + '_rotation'] = face.ham_rot
+
         elif keep_brushes:
             for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
                 if force_is_detail is not None:
@@ -2650,7 +2787,7 @@ class BrushTemplate(PakObject, has_img=False):
     def parse(cls, data: ParseData):
         file = get_config(
             prop_block=data.info,
-            zip_file=data.zip_file,
+            fsys=data.fsys,
             folder='templates',
             pak_id=data.pak_id,
             prop_name='file',
@@ -2670,6 +2807,21 @@ class BrushTemplate(PakObject, has_img=False):
         # Sort the visgroup list by name, to make it easier to search through.
         TEMPLATE_FILE.vis_tree.sort(key=lambda vis: vis.name)
 
+        # Place the config entities in a nice grid.
+        for conf_class, height in (
+            ('bee2_template_conf', 256),
+            ('bee2_template_scaling', 256 + 16),
+        ):
+            conf_ents = list(TEMPLATE_FILE.by_class[conf_class])
+            dist = math.floor(math.sqrt(len(conf_ents)))
+            half_dist = dist / 2
+            for i, ent in enumerate(conf_ents):
+                ent['origin'] = Vec(
+                    16 * ((i // dist) - half_dist),
+                    16 * ((i % dist) - half_dist),
+                    height,
+                )
+
         path = exp_data.game.abs_path('bin/bee2/templates.vmf')
         with open(path, 'w') as temp_file:
             TEMPLATE_FILE.export(temp_file, inc_version=False)
@@ -2687,13 +2839,13 @@ class BrushTemplate(PakObject, has_img=False):
             yield ent.solids.copy(), True, ent.visgroup_ids
 
 
-def desc_parse(info, id=''):
+def desc_parse(info, id='', *, prop_name='description'):
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
     has_warning = False
     lines = []
-    for prop in info.find_all("description"):
+    for prop in info.find_all(prop_name):
         if prop.has_children():
             for line in prop:
                 if line.name and not has_warning:
@@ -2704,7 +2856,6 @@ def desc_parse(info, id=''):
             lines.append(prop.value)
 
     return tkMarkdown.convert('\n'.join(lines))
-
 
 
 def get_selitem_data(info):

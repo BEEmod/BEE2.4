@@ -3,6 +3,7 @@ import math
 import os
 
 import srctools
+import instanceLocs
 import utils
 import vbsp_options
 import vbsp
@@ -11,9 +12,9 @@ from conditions import (
     remove_ant_toggle,
     PETI_INST_ANGLE, RES_EXHAUSTED
 )
-from instanceLocs import resolve as resolve_inst, get_special_inst
 from srctools import Vec, Property, VMF, Entity, Output
 
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__)
 
@@ -39,13 +40,15 @@ def res_make_tag_coop_spawn(vmf: VMF, inst: Entity, res: Property):
 
     is_tag = vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
 
-    offset = res.vec('origin').rotate_by_str(inst['angles'])
-    normal = res.vec('facing', z=1).rotate_by_str(
-        inst['angles'],
-    )
+    origin = res.vec('origin')
+    normal = res.vec('facing', z=1)
 
-    origin = Vec.from_str(inst['origin'])
-    origin += offset
+    # Some styles might want to ignore the instance we're running on.
+    if not res.bool('global'):
+        origin = origin.rotate_by_str(inst['angles'])
+        normal = normal.rotate_by_str(inst['angles'])
+        origin += Vec.from_str(inst['origin'])
+
     angles = normal.to_angle()
 
     if is_tag:
@@ -126,7 +129,7 @@ def ap_tag_modifications(vmf: VMF):
             side.mat = 'tools/toolstrigger'
             side.scale = 0.25
 
-    transition_ents = get_special_inst('transitionents')
+    transition_ents = instanceLocs.get_special_inst('transitionents')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue
@@ -160,7 +163,7 @@ def res_find_potential_tag_fizzlers(vmf: VMF, inst: Entity):
     if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
         return RES_EXHAUSTED
 
-    if inst['file'].casefold() not in resolve_inst('<ITEM_BARRIER_HAZARD:0>'):
+    if inst['file'].casefold() not in instanceLocs.resolve('<ITEM_BARRIER_HAZARD:0>'):
         return
 
     # The key list in the dict will be a set of all fizzler items!
@@ -399,7 +402,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     )
 
     if 'base_inst' in res:
-        fizz_base['file'] = resolve_inst(res['base_inst'])[0]
+        fizz_base['file'] = instanceLocs.resolve_one(res['base_inst'], error=True)
     fizz_base.outputs.clear()  # Remove outputs, otherwise they break
     # branch_toggle entities
 
@@ -411,7 +414,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
     ))
 
     if 'model_inst' in res:
-        model_inst = resolve_inst(res['model_inst'])[0]
+        model_inst = instanceLocs.resolve_one(res['model_inst'], error=True)
         for mdl_inst in vmf.by_class['func_instance']:
             if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
                 mdl_inst['file'] = model_inst
@@ -562,7 +565,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         # either side - use neg_trig for that purpose!
         # We want to get rid of pos_trig to save ents
         vmf.remove_ent(pos_trig)
-        neg_trig['targetname'] = fizz_name + '-trig'
+        neg_trig['targetname'] = fizz_name + '-trig_off'
         neg_trig.outputs.clear()
         neg_trig.add_out(Output(
             output,

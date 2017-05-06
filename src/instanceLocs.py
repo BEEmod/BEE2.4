@@ -11,12 +11,19 @@ from functools import lru_cache
 import utils
 from srctools import Property
 
-from typing import Optional, List, Dict
+from typing import (
+    Optional, Union, T,
+    List, Dict, Tuple,
+)
 
 LOGGER = utils.getLogger(__name__)
 
 # The list of instance each item uses.
 INSTANCE_FILES = {}
+
+# Item ID and index/special name for instances set in editoritems.
+# Note this is imperfect - two items could reuse the same instance.
+ITEM_FOR_FILE = {}  # type: Dict[str, Tuple[str, Union[int, str]]]
 
 _RE_DEFS = re.compile(r'\s* ((?: \[ [^][]+ \] ) | (?: < [^<>]+ > )) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
@@ -213,19 +220,21 @@ def load_conf(prop_block: Property):
     """Read the config and build our dictionaries."""
     global INST_SPECIAL
 
+    # Normal instances: index -> filename
     for prop in prop_block.find_key('Allinstances', []):
-        INSTANCE_FILES[prop.name] = [
-            inst.value.casefold()
-            for inst in
-            prop
-        ]
+        INSTANCE_FILES[prop.name] = inst_list = []
+        for ind, inst in enumerate(prop):
+            file = inst.value.casefold()
+            inst_list.append(file)
+            ITEM_FOR_FILE[file] = (prop.name, ind)
 
+    # Extra definitions: key -> filename
     for prop in prop_block.find_key('CustInstances', []):
-        CUST_INST_FILES[prop.name] = {
-            inst.name: inst.value.casefold()
-            for inst in
-            prop
-        }
+        CUST_INST_FILES[prop.name] = special_inst = {}
+        for inst in prop:
+            file = inst.value.casefold()
+            special_inst[inst.name] = file
+            ITEM_FOR_FILE[file] = (prop.name, inst.name)
 
     INST_SPECIAL = {
         key.casefold(): resolve(val_string, silent=True)
@@ -265,6 +274,25 @@ def resolve(path, silent=False) -> List[str]:
         return val
     else:
         return _resolve(path)
+
+
+def resolve_one(path, default: T='', error=False) -> Union[str, T]:
+    """Resolve a path into one instance.
+
+    If multiple are given, this returns the first.
+    If none are found, the default is returned (which may be any value).
+    If error is True, an exception will be raised instead.
+    """
+    instances = resolve(path)
+    if not instances:
+        if error:
+            raise ValueError('Path "{}" has no instances!'.format(path))
+        return default
+    if len(instances) > 1:
+        if error:
+            raise ValueError('Path "{}" has multiple instances!'.format(path))
+        LOGGER.warning('Path "{}" returned multiple instances', path)
+    return instances[0]
 
 
 # Cache the return values, since they're constant.
