@@ -111,9 +111,6 @@ EXCLUDES = [
 ]
 
 
-if not utils.MAC:
-    EXCLUDES.append('platform')  # Only used in the mac pyglet code..
-
 # cx_freeze doesn't detect these required modules
 INCLUDES = [
     'pyglet.clock',
