@@ -200,6 +200,7 @@ def copy_resource(tree):
 copy_resource('BEE2.ico')
 copy_resource('images/BEE2')
 copy_resource('images/icons')
+copy_resource('images/splash_screen')
 copy_resource('palettes')
 for snd in os.listdir('../sounds/'):
     if snd == 'music_samp':
