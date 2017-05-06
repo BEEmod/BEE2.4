@@ -19,8 +19,7 @@ from tkinter import messagebox
 from tk_tools import TK_ROOT
 
 from datetime import datetime
-from io import BytesIO
-from codecs import EncodedFile
+from io import BytesIO, TextIOWrapper
 import time
 import os
 import shutil
@@ -139,9 +138,9 @@ class P2C:
                     # Decode the P2C as UTF-8, and skip unknown characters.
                     # We're only using it for display purposes, so that should
                     # be sufficent.
-                    EncodedFile(
+                    TextIOWrapper(
                         file,
-                        data_encoding='utf-8',
+                        encoding='utf-8',
                         errors='replace',
                     ),
                     path,
