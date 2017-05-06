@@ -351,7 +351,6 @@ def load_packages(
         import sys
         # We don't have a packages directory!
         messagebox.showerror(
-            master=loader,
             title='BEE2 - Invalid Packages Directory!',
             message='The given packages directory is not present!\n'
                     'Get the packages from '
