@@ -41,7 +41,6 @@ def surpress_screens():
     for screen in active:
         screen.unsuppress()
         screen.active = True
-        screen.lift()
 
 
 def patch_tk_dialogs():
