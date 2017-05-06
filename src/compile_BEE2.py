@@ -121,13 +121,14 @@ INCLUDES = [
 INCLUDE_LIBS = [
     'C:/Windows/system32/avbin.dll',  # Win 32 bit
     'C:/Windows/sysWOW64/avbin64.dll',  # Win 64 bit
-    'libavbin.dylib',  # OS X - must be relative.,,
+    'libavbin.dylib',  # OS X - must be relative.
     '/usr/lib/libavbin.so',  # Linux
 ]
 
 
 if utils.WIN:
     base = 'Win32GUI'
+    INCLUDE_LIBS.extend(['tcl86t.dll', 'tk86t.dll'])
 else:
     base = None
 
