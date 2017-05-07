@@ -982,13 +982,13 @@ def load():
             new_game.edit_gameinfo(True)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
-        loadScreen.main_loader.withdraw()
+        loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
         if not add_game(refresh_menu=False):
             # they cancelled, quit
             quit_application()
-        loadScreen.main_loader.deiconify()  # Show it again
+        loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
