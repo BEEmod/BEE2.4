@@ -696,6 +696,26 @@ def setup_localisations(logger: logging.Logger):
     # Add these functions to builtins, plus _=gettext
     trans.install(['gettext', 'ngettext'])
 
+    # Some lang-specific overrides..
+
+    if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
+        # For Japanese/Chinese, we want a 'sans-serif' / gothic font
+        # style.
+        from tkinter import font
+        font_names = [
+            'TkDefaultFont',
+            'TkHeadingFont',
+            'TkTooltipFont',
+            'TkMenuFont',
+            'TkTextFont',
+            'TkCaptionFont',
+            'TkSmallCaptionFont',
+            'TkIconFont',
+            # Note - not fixed-width...
+        ]
+        for font_name in font_names:
+            font.nametofont(font_name).configure(family='sans-serif')
+
 
 class LogMessage:
     """Allow using str.format() in logging messages.

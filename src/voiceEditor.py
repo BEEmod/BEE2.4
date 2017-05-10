@@ -90,6 +90,9 @@ def init_widgets():
     trans_inner_frame.rowconfigure(0, weight=1)
     trans_inner_frame.columnconfigure(0, weight=1)
 
+    default_bold_font = font.nametofont('TkDefaultFont').copy()
+    default_bold_font['weight'] = 'bold'
+
     UI['trans'] = Text(
         trans_inner_frame,
         width=10,
@@ -97,7 +100,7 @@ def init_widgets():
         wrap='word',
         relief='flat',
         state='disabled',
-        font=('Helvectia', 10),
+        font='TkDefaultFont',
         )
     UI['trans_scroll'] = tk_tools.HidingScroll(
         trans_inner_frame,
@@ -106,7 +109,7 @@ def init_widgets():
         )
     UI['trans'].tag_config(
         'bold',
-        font=('Helvectia', 10, 'bold'),
+        font=default_bold_font,
     )
     UI['trans']['yscrollcommand'] = UI['trans_scroll'].set
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
