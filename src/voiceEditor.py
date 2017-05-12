@@ -47,15 +47,17 @@ class TabTypes(Enum):
     RESPONSE = RESP = 2
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
-win.columnconfigure(0, weight=1)
-win.transient(master=TK_ROOT)
-tk_tools.set_window_icon(win)
-win.protocol("WM_DELETE_WINDOW", win.withdraw)
-win.bind("<Escape>", win.withdraw)
 win.withdraw()
 
 
 def init_widgets():
+    """Make all the window components."""
+    win.columnconfigure(0, weight=1)
+    win.transient(master=TK_ROOT)
+    tk_tools.set_window_icon(win)
+    win.protocol("WM_DELETE_WINDOW", win.withdraw)
+    win.bind("<Escape>", lambda event: win.withdraw())
+
     pane = PanedWindow(
         win,
         orient=VERTICAL,
@@ -117,7 +119,7 @@ def init_widgets():
 
     ttk.Button(
         win,
-        text='Save',
+        text=_('Save'),
         command=save,
         ).grid(row=2, column=0)
 
@@ -289,8 +291,8 @@ def show(quote_pack):
     add_tabs()
 
     win.deiconify()
-    win.lift(win.winfo_parent())
     utils.center_win(win)  # Center inside the parent
+    win.lift()
 
 
 def make_tab(group, config: ConfigFile, tab_type):
