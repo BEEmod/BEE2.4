@@ -54,6 +54,7 @@ WEB_RESOURCES = [
         'https://developer.valvesoftware.com/wiki/Category:Portal_2_Puzzle_Maker',
         ResIcon.PORTAL2,
     ),
+    # i18n: The chat program.
     Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
