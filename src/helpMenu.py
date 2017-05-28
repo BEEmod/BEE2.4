@@ -29,6 +29,7 @@ class ResIcon(Enum):
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
+    STEAM = 'menu_steam'
 
     PORTAL2 = 'menu_p2'
     TAG = 'menu_tag'
@@ -39,7 +40,9 @@ SEPERATOR = object()
 
 BEE2_REPO = 'https://github.com/BEEmod/BEE2.4/'
 BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
-DISCORD_SERVER = 'https://discordapp.com/invite/mZ4peDd'
+DISCORD_SERVER = 'https://discord.me/beemod'
+# Open https://steamcommunity.com/groups/beemod direct in the Steam Client
+STEAM_GROUP = 'steam://url/GroupSteamIDPage/103582791458212641'
 
 
 def steam_url(name):
@@ -56,6 +59,7 @@ WEB_RESOURCES = [
     ),
     # i18n: The chat program.
     Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
+    Res(_('Steam Group...'), STEAM_GROUP, ResIcon.STEAM),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
     Res(_('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
