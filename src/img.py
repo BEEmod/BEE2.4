@@ -4,7 +4,7 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-from PIL import ImageTk, Image, ImageDraw
+from PIL import ImageTk, Image, ImageDraw, ImageFont
 import os.path
 
 from srctools import Vec
@@ -101,8 +101,18 @@ def get_app_icon():
         return ImageTk.PhotoImage(Image.open(f))
 
 
-def get_splash_screen(max_width, max_height, base_height):
-    """Return a random file from the splash_screens directory."""
+def make_splash_screen(
+    max_width: float,
+    max_height: float,
+    base_height: int,
+    text1_bbox: Tuple[int, int, int, int],
+    text2_bbox: Tuple[int, int, int, int],
+):
+    """Create the splash screen image.
+
+    This uses a random screenshot from the splash_screens directory.
+    It then adds the gradients on top.
+    """
     import random
     folder = os.path.join('..', 'images', 'splash_screen')
     path = '<nothing>'
@@ -154,6 +164,21 @@ def get_splash_screen(max_width, max_height, base_height):
             ),
             fill=(0, 150, 120, int(y * 128/40)),
         )
+
+    # Draw the shadows behind the text.
+    # This is done by progressively drawing smaller rectangles
+    # with a low alpha. The center is overdrawn more making it thicker.
+    for x1, y1, x2, y2 in [text1_bbox, text2_bbox]:
+        for border in reversed(range(5)):
+            draw.rectangle(
+                (
+                    x1 - border,
+                    y1 - border,
+                    x2 + border,
+                    y2 + border,
+                ),
+                fill=(0, 150, 120, 20),
+            )
 
     tk_img = ImageTk.PhotoImage(image=image)
     return tk_img, image.width, image.height

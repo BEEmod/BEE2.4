@@ -31,31 +31,12 @@ def run_screen(
     stage_maxes = {}
     stage_names = {}
 
-    # Import PIL directly to avoid depending on all the code in img.
     import img
-
-    # Create window....
-    splash, width, height = img.get_splash_screen(
-        max(window.winfo_screenwidth() * 0.6, 500),
-        max(window.winfo_screenheight() * 0.6, 500),
-        base_height=len(stages) * 20,
-    )
 
     logo_img = img.png('BEE2/splash_logo')
 
-    canvas = tk.Canvas(
-        window,
-        width=width,
-        height=height,
-    )
+    canvas = tk.Canvas(window)
     canvas.grid(row=0, column=0)
-    # Splash screen...
-    canvas.create_image(
-        0, 0,
-        anchor='nw',
-        image=splash,
-    )
-    canvas.splash_img = splash # Keep this alive
     canvas.create_image(
         10, 10,
         anchor='nw',
@@ -68,20 +49,35 @@ def run_screen(
         weight='bold',
     )
 
-    canvas.create_text(
+    text1 = canvas.create_text(
         10, 125,
         anchor='nw',
         text=trans_title,
         fill='white',
         font=font,
     )
-    canvas.create_text(
+    text2 = canvas.create_text(
         10, 145,
         anchor='nw',
         text=trans_version,
         fill='white',
         font=font,
     )
+
+    # Now add shadows behind the text, and draw to the canvas.
+    splash, canvas['width'], canvas['height'] = splash, width, height = img.make_splash_screen(
+        max(window.winfo_screenwidth() * 0.6, 500),
+        max(window.winfo_screenheight() * 0.6, 500),
+        base_height=len(stages) * 20,
+        text1_bbox=canvas.bbox(text1),
+        text2_bbox=canvas.bbox(text2),
+    )
+    canvas.tag_lower(canvas.create_image(
+        0, 0,
+        anchor='nw',
+        image=splash,
+    ))
+    canvas.splash_img = splash  # Keep this alive
 
     for ind, (st_id, stage_name) in enumerate(reversed(stages), start=1):
         stage_values[st_id] = 0
