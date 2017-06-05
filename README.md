@@ -13,7 +13,7 @@ bugfixes and improvments.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
-## Download and Use (Recommended)
+## Download and Use (Recommended, for using the BEE2.4)
 Download the latest releases of the BEE2.4 and items from the following pages:
 - [Application](https://github.com/BEEmod/BEE2.4/releases)
 - [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
@@ -21,7 +21,7 @@ Download the latest releases of the BEE2.4 and items from the following pages:
 - Place extracted package folder in the root BEE2 folder. _e.g. C:\BEE2.4\packages_
 - To run, locate the BEE2.exe in the bin folder and execute it. _e.g. C:\BEE2.4\bin\BEE2.exe_
 
-## Build From Source ##
+## Build from Source (Advanced, for Adding to BEE2.4 Program) ##
 ### Dependencies ###
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
