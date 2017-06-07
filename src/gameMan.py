@@ -733,7 +733,7 @@ class Game:
             if item['type'].casefold() == 'item_tbeam':
                 for block in item.find_all('Exporting', 'Inputs', CONN_FUNNEL):
                     for io_prop in block:
-                        comm_block['TBeam' + io_prop.real_name] = io_prop.value
+                        comm_block['TBeam_' + io_prop.real_name] = io_prop.value
 
             # Fizzlers don't work correctly with outputs. This is a signal to
             # conditions.fizzler, but it must be removed in editoritems.
