@@ -701,7 +701,10 @@ def setup_localisations(logger: logging.Logger):
     if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
         # For Japanese/Chinese, we want a 'sans-serif' / gothic font
         # style.
-        from tkinter import font
+        try:
+            from tkinter import font
+        except ImportError:
+            return
         font_names = [
             'TkDefaultFont',
             'TkHeadingFont',

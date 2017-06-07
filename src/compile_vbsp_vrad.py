@@ -33,6 +33,8 @@ EXCLUDES = [
     # We don't localise the compiler, but utils imports the modules.
     'locale', 'gettext',
 
+    # This isn't ever used in the compiler.
+    'tkinter',
 
     # Imported by logging handlers which we don't use..
     'win32evtlog',
