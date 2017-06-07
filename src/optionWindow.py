@@ -367,9 +367,9 @@ def init_dev_tab(f):
         f,
         section='Debug',
         item='log_missing_ent_count',
-        desc='Log missing entity counts',
-        tooltip='When loading items, log items with missing entity counts '
-                'in their properties.txt file.',
+        desc=_('Log missing entity counts'),
+        tooltip=_('When loading items, log items with missing entity counts '
+                  'in their properties.txt file.'),
     ).grid(row=0, column=0, sticky=W)
 
     make_checkbox(
@@ -385,7 +385,7 @@ def init_dev_tab(f):
         f,
         section='Debug',
         item='log_item_fallbacks',
-        desc="Log when item uses parent's style",
+        desc=_("Log when item uses parent's style"),
         tooltip=_('Log when an item reuses a variant from a parent style '
                   '(1970s using 1950s items, for example). This is usually '
                   'fine, but may need to be fixed.'),
