@@ -47,15 +47,17 @@ class TabTypes(Enum):
     RESPONSE = RESP = 2
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
-win.columnconfigure(0, weight=1)
-win.transient(master=TK_ROOT)
-tk_tools.set_window_icon(win)
-win.protocol("WM_DELETE_WINDOW", win.withdraw)
-win.bind("<Escape>", win.withdraw)
 win.withdraw()
 
 
 def init_widgets():
+    """Make all the window components."""
+    win.columnconfigure(0, weight=1)
+    win.transient(master=TK_ROOT)
+    tk_tools.set_window_icon(win)
+    win.protocol("WM_DELETE_WINDOW", win.withdraw)
+    win.bind("<Escape>", lambda event: win.withdraw())
+
     pane = PanedWindow(
         win,
         orient=VERTICAL,
@@ -90,6 +92,9 @@ def init_widgets():
     trans_inner_frame.rowconfigure(0, weight=1)
     trans_inner_frame.columnconfigure(0, weight=1)
 
+    default_bold_font = font.nametofont('TkDefaultFont').copy()
+    default_bold_font['weight'] = 'bold'
+
     UI['trans'] = Text(
         trans_inner_frame,
         width=10,
@@ -97,7 +102,7 @@ def init_widgets():
         wrap='word',
         relief='flat',
         state='disabled',
-        font=('Helvectia', 10),
+        font='TkDefaultFont',
         )
     UI['trans_scroll'] = tk_tools.HidingScroll(
         trans_inner_frame,
@@ -106,7 +111,7 @@ def init_widgets():
         )
     UI['trans'].tag_config(
         'bold',
-        font=('Helvectia', 10, 'bold'),
+        font=default_bold_font,
     )
     UI['trans']['yscrollcommand'] = UI['trans_scroll'].set
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
@@ -114,7 +119,7 @@ def init_widgets():
 
     ttk.Button(
         win,
-        text='Save',
+        text=_('Save'),
         command=save,
         ).grid(row=2, column=0)
 
@@ -286,8 +291,8 @@ def show(quote_pack):
     add_tabs()
 
     win.deiconify()
-    win.lift(win.winfo_parent())
     utils.center_win(win)  # Center inside the parent
+    win.lift()
 
 
 def make_tab(group, config: ConfigFile, tab_type):

@@ -1632,8 +1632,6 @@ def init_menu_bar(win):
         label=_("Export"),
         command=export_editoritems,
         accelerator=utils.KEY_ACCEL['KEY_EXPORT'],
-        # This will be enabled when the resources have been unpacked
-        state=DISABLED,
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 

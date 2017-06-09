@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2017-05-24 13:52+1000\n"
+"POT-Creation-Date: 2017-06-04 13:31+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -558,7 +558,7 @@ msgstr ""
 msgid "Clear Palette"
 msgstr ""
 
-#: src/UI.py:1277 src/UI.py:1681
+#: src/UI.py:1277 src/UI.py:1679
 msgid "Delete Palette"
 msgstr ""
 
@@ -566,7 +566,7 @@ msgstr ""
 msgid "Save Palette..."
 msgstr ""
 
-#: src/UI.py:1302 src/UI.py:1694
+#: src/UI.py:1302 src/UI.py:1692
 msgid "Save Palette As..."
 msgstr ""
 
@@ -620,55 +620,55 @@ msgstr ""
 msgid "Export"
 msgstr ""
 
-#: src/UI.py:1641 src/backup.py:876
+#: src/UI.py:1639 src/backup.py:876
 msgid "Add Game"
 msgstr ""
 
-#: src/UI.py:1645
+#: src/UI.py:1643
 msgid "Uninstall from Selected Game"
 msgstr ""
 
-#: src/UI.py:1649
+#: src/UI.py:1647
 msgid "Backup/Restore Puzzles..."
 msgstr ""
 
-#: src/UI.py:1653
+#: src/UI.py:1651
 msgid "Manage Packages..."
 msgstr ""
 
-#: src/UI.py:1658
+#: src/UI.py:1656
 msgid "Options"
 msgstr ""
 
-#: src/UI.py:1663
+#: src/UI.py:1661
 msgid "Quit"
 msgstr ""
 
-#: src/UI.py:1674
+#: src/UI.py:1672
 msgid "Palette"
 msgstr ""
 
-#: src/UI.py:1676
+#: src/UI.py:1674
 msgid "Clear"
 msgstr ""
 
-#: src/UI.py:1685
+#: src/UI.py:1683
 msgid "Fill Palette"
 msgstr ""
 
-#: src/UI.py:1689
+#: src/UI.py:1687
 msgid "Save Palette"
 msgstr ""
 
-#: src/UI.py:1816
+#: src/UI.py:1814
 msgid "Palettes"
 msgstr ""
 
-#: src/UI.py:1841
+#: src/UI.py:1839
 msgid "Export Options"
 msgstr ""
 
-#: src/UI.py:1872
+#: src/UI.py:1870
 msgid "Fill empty spots in the palette with random items."
 msgstr ""
 
@@ -982,66 +982,70 @@ msgid ""
 " (BEE2 will quit, this is the last game set!)"
 msgstr ""
 
-#: src/helpMenu.py:51
+#: src/helpMenu.py:54
 msgid "Wiki..."
 msgstr ""
 
-#: src/helpMenu.py:53
+#: src/helpMenu.py:56
 msgid "Original Items..."
 msgstr ""
 
 #. i18n: The chat program.
-#: src/helpMenu.py:58
+#: src/helpMenu.py:61
 msgid "Discord Server..."
 msgstr ""
 
-#: src/helpMenu.py:60
-msgid "Application Repository..."
-msgstr ""
-
-#: src/helpMenu.py:61
-msgid "Items Repository..."
-msgstr ""
-
-#: src/helpMenu.py:63
-msgid "Submit Application Bugs..."
+#: src/helpMenu.py:62
+msgid "Steam Group..."
 msgstr ""
 
 #: src/helpMenu.py:64
+msgid "Application Repository..."
+msgstr ""
+
+#: src/helpMenu.py:65
+msgid "Items Repository..."
+msgstr ""
+
+#: src/helpMenu.py:67
+msgid "Submit Application Bugs..."
+msgstr ""
+
+#: src/helpMenu.py:68
 msgid "Submit Item Bugs..."
 msgstr ""
 
 #. i18n: Original Palette
-#: src/helpMenu.py:66 src/paletteLoader.py:34
+#: src/helpMenu.py:70 src/paletteLoader.py:34
 msgid "Portal 2"
 msgstr ""
 
 #. i18n: Aperture Tag's palette
-#: src/helpMenu.py:67 src/paletteLoader.py:36
+#: src/helpMenu.py:71 src/paletteLoader.py:36
 msgid "Aperture Tag"
 msgstr ""
 
-#: src/helpMenu.py:68
+#: src/helpMenu.py:72
 msgid "Portal Stories: Mel"
 msgstr ""
 
-#: src/helpMenu.py:69
+#: src/helpMenu.py:73
 msgid "Thinking With Time Machine"
 msgstr ""
 
-#: src/helpMenu.py:233 src/itemPropWin.py:322
+#: src/helpMenu.py:237 src/itemPropWin.py:322
 msgid "Close"
 msgstr ""
 
-#: src/helpMenu.py:250
+#: src/helpMenu.py:254
 msgid "Help"
 msgstr ""
 
-#: src/helpMenu.py:261
+#: src/helpMenu.py:265
 msgid "BEE2 Credits"
 msgstr ""
 
-#: src/helpMenu.py:278
+#: src/helpMenu.py:282
 msgid "Credits..."
 msgstr ""
 
@@ -1223,6 +1227,16 @@ msgstr ""
 msgid "Reset All Window Positions"
 msgstr ""
 
+#: src/optionWindow.py:370
+msgid "Log missing entity counts"
+msgstr ""
+
+#: src/optionWindow.py:371
+msgid ""
+"When loading items, log items with missing entity counts in their "
+"properties.txt file."
+msgstr ""
+
 #: src/optionWindow.py:379
 msgid "Log when item doesn't have a style"
 msgstr ""
@@ -1231,6 +1245,10 @@ msgstr ""
 msgid ""
 "Log items have no applicable version for a particular style.This usually "
 "means it will look very bad."
+msgstr ""
+
+#: src/optionWindow.py:388
+msgid "Log when item uses parent's style"
 msgstr ""
 
 #: src/optionWindow.py:389
@@ -1370,6 +1388,10 @@ msgstr ""
 msgid "Available Tags (click):"
 msgstr ""
 
+#: src/utils.py:701
+msgid "__LANG_USE_SANS_SERIF__"
+msgstr ""
+
 #: src/voiceEditor.py:35
 msgid "Death - Toxic Goo"
 msgstr ""
@@ -1386,45 +1408,49 @@ msgstr ""
 msgid "Death - LaserField"
 msgstr ""
 
-#: src/voiceEditor.py:81
+#: src/voiceEditor.py:83
 msgid "Transcript:"
 msgstr ""
 
+#: src/voiceEditor.py:122
+msgid "Save"
+msgstr ""
+
 #. Note: 'response' tab name, should be short.
-#: src/voiceEditor.py:203
+#: src/voiceEditor.py:208
 msgid "Resp"
 msgstr ""
 
-#: src/voiceEditor.py:220
+#: src/voiceEditor.py:225
 msgid "BEE2 - Configure \"{}\""
 msgstr ""
 
-#: src/voiceEditor.py:297
+#: src/voiceEditor.py:302
 msgid "Mid - Chamber"
 msgstr ""
 
-#: src/voiceEditor.py:299
+#: src/voiceEditor.py:304
 msgid ""
 "Lines played during the actual chamber, after specific events have "
 "occurred."
 msgstr ""
 
 #. Note: 'Response' tab header, and description
-#: src/voiceEditor.py:305
+#: src/voiceEditor.py:310
 msgid "Responses"
 msgstr ""
 
-#: src/voiceEditor.py:307
+#: src/voiceEditor.py:312
 msgid "Lines played in response to certain events in Coop."
 msgstr ""
 
 #. note: default for quote names
-#: src/voiceEditor.py:409
+#: src/voiceEditor.py:414
 msgid "No Name!"
 msgstr ""
 
 #. note: default voice line name next to checkbox.
-#: src/voiceEditor.py:431
+#: src/voiceEditor.py:436
 msgid "No Name?"
 msgstr ""
 
