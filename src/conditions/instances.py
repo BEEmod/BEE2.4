@@ -314,7 +314,7 @@ def res_script_var(inst: Entity, res: Property):
     global_input(
         inst,
         command='RunScriptCode',
-        target=conditions.local_name(inst, res['name']),
+        target=res['name'],
         param='{} <- {}'.format(
             res['var'],
             conditions.resolve_value(inst, res['value']),
