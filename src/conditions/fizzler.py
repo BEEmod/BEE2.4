@@ -478,13 +478,14 @@ def res_fizzler_pair(vmf: VMF, begin_inst: Entity, res: Property):
         # A 128 gap will have length = 0
         for dis in range(0, abs(length) + 1, 128):
             new_pos = begin_pos + direction * dis
-            vbsp.VMF.create_ent(
+            inst = vbsp.VMF.create_ent(
                 classname='func_instance',
                 targetname=pair_name,
                 angles=begin_inst['angles'],
                 file=mid_file,
                 origin=new_pos,
             )
+            inst.fixup.update(begin_inst.fixup)
 
 
 @meta_cond(priority=-200, only_once=True)
