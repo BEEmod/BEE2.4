@@ -2648,18 +2648,88 @@ def add_extra_ents(mode):
             message=sound,
             health='10',  # Volume
         )
-        music.add_out(VLib.Output('OnUser1', '@music', 'PlaySound'))
 
-        if snd_length > 0:
-            # Allow us to use non-looping mp3s, by continually re-triggering
-            # the music entity.
-            music.add_out(
-                VLib.Output('OnUser1', '@music', 'FireUser1', delay=snd_length)
+        music_start = VMF.create_ent(
+            classname='logic_relay',
+            spawnflags='0',
+            targetname='@music_start',
+            origin=loc + (-16, 0, -16),
+        )
+        music_stop = VMF.create_ent(
+            classname='logic_relay',
+            spawnflags='0',
+            targetname='@music_stop',
+            origin=loc + (16, 0, -16),
+        )
+        music_stop.add_out(
+            VLib.Output('OnTrigger', music, 'StopSound'),
+            VLib.Output('OnTrigger', music, 'Volume', '0'),
+        )
+
+        # In SinglePlayer, music gets killed during reload,
+        # so we need to restart it.
+
+        # If snd_length is set, we have a non-loopable MP3
+        # and want to re-trigger it after the time elapses, to simulate
+        # looping.
+
+        # In either case, we need @music_restart to do that safely.
+        if GAME_MODE == 'SP' or snd_length > 0:
+
+            music_restart = VMF.create_ent(
+                classname='logic_relay',
+                spawnflags='2',  # Allow fast retrigger.
+                targetname='@music_restart',
+                StartDisabled='1',
+                origin=loc + (0, 0, -16),
             )
-            # Set to non-looping, so re-playing will restart it correctly.
-            music['spawnflags'] = '49'
+
+            music_start.add_out(
+                VLib.Output('OnTrigger', music_restart, 'Enable'),
+                VLib.Output('OnTrigger', music_restart, 'Trigger', delay=0.01),
+            )
+
+            music_stop.add_out(
+                VLib.Output('OnTrigger', music_restart, 'Disable'),
+                VLib.Output('OnTrigger', music_restart, 'CancelPending'),
+            )
+
+            music_restart.add_out(
+                VLib.Output('OnTrigger', music, 'StopSound'),
+                VLib.Output('OnTrigger', music, 'Volume', '0'),
+                VLib.Output('OnTrigger', music, 'Volume', '10', delay=0.1),
+                VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
+            )
+
+            if GAME_MODE == 'SP':
+                # Trigger on level loads.
+                VMF.create_ent(
+                    classname='logic_auto',
+                    origin=loc + (0, 0, 16),
+                    spawnflags='0',  # Don't remove after fire
+                    globalstate='',
+                ).add_out(
+                    VLib.Output('OnLoadGame', music_restart, 'CancelPending'),
+                    VLib.Output('OnLoadGame', music_restart, 'Trigger', delay=0.01),
+                )
+
+            if snd_length > 0:
+                # Re-trigger after the music duration.
+                music_restart.add_out(
+                    VLib.Output('OnTrigger', '!self', 'Trigger', delay=snd_length)
+                )
+                # Set to non-looping, so re-playing will restart it correctly.
+                music['spawnflags'] = '49'
+        else:
+            # The music track never needs to have repeating managed,
+            # just directly trigger.
+            music_start.add_out(
+                VLib.Output('OnTrigger', music, 'PlaySound'),
+                VLib.Output('OnTrigger', music, 'Volume', '10'),
+            )
 
     if inst:
+        # We assume the instance is setup correct.
         VMF.create_ent(
             classname='func_instance',
             targetname='music',
