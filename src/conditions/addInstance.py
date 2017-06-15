@@ -58,6 +58,7 @@ def res_add_global_inst(res: Property):
 def res_add_overlay_inst(inst: Entity, res: Property):
     """Add another instance on top of this one.
 
+    If a single value, this sets only the filename.
     Values:
         File: The filename.
         Fixup Style: The Fixup style for the instance. '0' (default) is
@@ -78,6 +79,12 @@ def res_add_overlay_inst(inst: Entity, res: Property):
             If the value starts with $, the variable will be copied over.
             If this is present, copy_fixup will be disabled.
     """
+
+    if not res.has_children():
+        # Use all the defaults.
+        res = Property('AddOverlay', [
+            Property('File', res.value)
+        ])
 
     angle = res['angles', inst['angles', '0 0 0']]
 
