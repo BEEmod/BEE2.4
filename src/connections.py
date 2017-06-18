@@ -8,7 +8,7 @@ import conditions
 import instance_traits
 import utils
 
-from typing import Iterable, Dict, List, Set, Tuple
+from typing import Optional, Iterable, Dict, List, Set, Tuple
 
 LOGGER = utils.getLogger(__name__)
 
@@ -22,6 +22,22 @@ class ConnType(Enum):
     SECONDARY = TBEAM_DIR = 2  # B Type, 'alt'
 
     BOTH = 3  # Trigger both simultaneously.
+
+
+class LogicType(Enum):
+    """Indicates simple logic item types implemented by the compiler.
+
+    If set, this implies the instance should be removed - as it is not used.
+    """
+    NONE = 0  # Default, a normal item which does things.
+
+    # An item 'chained' to the next. Inputs should be moved to the output
+    # item in addition to our own output.
+    DAISYCHAIN = 1
+
+    AND = 2  # Activates output when all inputs are on.
+    OR = 3  # Activates output when any inputs are on.
+
 
 CONN_NAMES = {
     ConnType.DEFAULT: '',
@@ -81,6 +97,54 @@ class ShapeSignage:
         yield from self.overlays
 
 
+class IOPair:
+    """Represents the input or output half of a pair of IO connections."""
+    __slots__ = [
+        'act_name', 'deact_name',
+        'act_command', 'deact_command',
+    ]
+    def __init__(
+        self,
+        act_name: Optional[str],
+        deact_name: Optional[str],
+        act_command: Optional[str],
+        deact_command: Optional[str],
+    ):
+        # Name inside the instance.
+        # If none it targets the ent directly.
+        self.act_name = act_name
+        self.deact_name = deact_name
+
+        # Input or output command.
+        # If None only one is present.
+        self.act_command = act_command
+        self.deact_command = deact_command
+
+    @staticmethod
+    def link(inp: 'IOPair', out: 'IOPair', target: Entity) -> Iterable[Output]:
+        """Create VMF Outputs for an input and output set.
+
+        target is the entity they activate.
+        """
+        if inp.act_command is not None and out.act_command is not None:
+            yield Output(
+                out=out.act_command,
+                targ=target,
+                inp=inp.act_command,
+                inst_out=out.act_name,
+                inst_in=inp.act_name,
+            )
+
+        if inp.deact_command is not None and out.deact_command is not None:
+            yield Output(
+                out=out.deact_command,
+                targ=target,
+                inp=inp.deact_command,
+                inst_out=out.deact_name,
+                inst_in=inp.deact_name,
+            )
+
+
 class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
@@ -89,6 +153,7 @@ class Item:
         'antlines', 'shape_signs',
         'timer',
         'inputs', 'outputs',
+        'logic_type',
     ]
 
     def __init__(
@@ -99,6 +164,7 @@ class Item:
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
+        logic_type: LogicType=LogicType.NONE,
     ):
         self.inst = inst
 
@@ -111,6 +177,8 @@ class Item:
 
         # None = Infinite/normal.
         self.timer = timer_count
+
+        self.logic_type = logic_type
 
         # From this item
         self.outputs = set()  # type: Set[Connection]
