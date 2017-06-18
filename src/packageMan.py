@@ -59,9 +59,8 @@ def apply_changes():
         return
 
     if messagebox.askokcancel(
-            title='BEE2 - Restart Required!',
-            message='Changing enabled packages requires a restart.\n'
-                    'Continue?',
+            title=_('BEE2 - Restart Required!'),
+            message=_('Changing enabled packages requires a restart.\nContinue?'),
             master=window,
             ):
         window.withdraw()
@@ -84,7 +83,7 @@ def cancel():
 def make_window():
     """Initialise the window."""
     window.transient(TK_ROOT)
-    window.title('BEE2 - Manage Packages')
+    window.title(_('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -106,12 +105,12 @@ def make_window():
 
     ttk.Button(
         frame,
-        text='Ok',
+        text=_('OK'),
         command=apply_changes,
     ).grid(row=1, column=0, sticky='W')
 
     ttk.Button(
         frame,
-        text='Cancel',
+        text=_('Cancel'),
         command=cancel,
     ).grid(row=1, column=1, sticky='E')

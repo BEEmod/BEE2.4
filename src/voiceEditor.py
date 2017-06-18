@@ -32,13 +32,13 @@ COOP_IMG = img.png('icons/quote_coop')
 
 # Friendly names given to certain response channels.
 RESPONSE_NAMES = {
-    'death_goo': 'Death - Toxic Goo',
-    'death_turret': 'Death - Turrets',
-    'death_crush': 'Death - Crusher',
-    'death_laserfield': 'Death - LaserField',
+    'death_goo': _('Death - Toxic Goo'),
+    'death_turret': _('Death - Turrets'),
+    'death_crush': _('Death - Crusher'),
+    'death_laserfield': _('Death - LaserField'),
 }
 
-config = config_mid = config_resp = None # type: ConfigFile
+config = config_mid = config_resp = None  # type: ConfigFile
 
 
 class TabTypes(Enum):
@@ -47,15 +47,17 @@ class TabTypes(Enum):
     RESPONSE = RESP = 2
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
-win.columnconfigure(0, weight=1)
-win.transient(master=TK_ROOT)
-win.iconbitmap('../BEE2.ico')
-win.protocol("WM_DELETE_WINDOW", win.withdraw)
-win.bind("<Escape>", win.withdraw)
 win.withdraw()
 
 
 def init_widgets():
+    """Make all the window components."""
+    win.columnconfigure(0, weight=1)
+    win.transient(master=TK_ROOT)
+    tk_tools.set_window_icon(win)
+    win.protocol("WM_DELETE_WINDOW", win.withdraw)
+    win.bind("<Escape>", lambda event: win.withdraw())
+
     pane = PanedWindow(
         win,
         orient=VERTICAL,
@@ -78,7 +80,7 @@ def init_widgets():
 
     ttk.Label(
         trans_frame,
-        text='Transcript:',
+        text=_('Transcript:'),
         ).grid(
             row=0,
             column=0,
@@ -90,6 +92,9 @@ def init_widgets():
     trans_inner_frame.rowconfigure(0, weight=1)
     trans_inner_frame.columnconfigure(0, weight=1)
 
+    default_bold_font = font.nametofont('TkDefaultFont').copy()
+    default_bold_font['weight'] = 'bold'
+
     UI['trans'] = Text(
         trans_inner_frame,
         width=10,
@@ -97,7 +102,7 @@ def init_widgets():
         wrap='word',
         relief='flat',
         state='disabled',
-        font=('Helvectia', 10),
+        font='TkDefaultFont',
         )
     UI['trans_scroll'] = tk_tools.HidingScroll(
         trans_inner_frame,
@@ -106,7 +111,7 @@ def init_widgets():
         )
     UI['trans'].tag_config(
         'bold',
-        font=('Helvectia', 10, 'bold'),
+        font=default_bold_font,
     )
     UI['trans']['yscrollcommand'] = UI['trans_scroll'].set
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
@@ -114,7 +119,7 @@ def init_widgets():
 
     ttk.Button(
         win,
-        text='Save',
+        text=_('Save'),
         command=save,
         ).grid(row=2, column=0)
 
@@ -199,7 +204,8 @@ def add_tabs():
                 tab,
                 compound=RIGHT,
                 image=img.png('icons/resp_quote'),
-                text='Resp'
+                #Note: 'response' tab name, should be short.
+                text=_('Resp')
                 )
         else:
             notebook.tab(tab, text=tab.nb_text)
@@ -216,7 +222,7 @@ def show(quote_pack):
 
     voice_item = quote_pack
 
-    win.title('BEE2 - Configure "' + voice_item.selitem_data.name + '"')
+    win.title(_('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
     notebook = UI['tabs']
 
     quote_data = quote_pack.config
@@ -285,24 +291,25 @@ def show(quote_pack):
     add_tabs()
 
     win.deiconify()
-    win.lift(win.winfo_parent())
     utils.center_win(win)  # Center inside the parent
+    win.lift()
 
 
 def make_tab(group, config: ConfigFile, tab_type):
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
-        group_name = 'Mid - Chamber'
+        group_name = _('Mid - Chamber')
         group_id = 'MIDCHAMBER'
-        group_desc = (
+        group_desc = _(
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
     elif tab_type is TabTypes.RESPONSE:
-        group_name = 'Responses'
+        # Note: 'Response' tab header, and description
+        group_name = _('Responses')
         group_id = None
-        group_desc = (
+        group_desc = _(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
@@ -403,7 +410,8 @@ def make_tab(group, config: ConfigFile, tab_type):
 
             group_id = quote.name
         else:
-            name = quote['name', 'No Name!']
+            # note: default for quote names
+            name = quote['name', _('No Name!')]
 
         ttk.Label(
             frame,
@@ -424,7 +432,8 @@ def make_tab(group, config: ConfigFile, tab_type):
                 line_id = line['id', line['name']]
             check = ttk.Checkbutton(
                 frame,
-                text=line['name', 'No Name?'],
+                # note: default voice line name next to checkbox.
+                text=line['name', _('No Name?')],
                 compound=LEFT,
                 image=badge,
             )

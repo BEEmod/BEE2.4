@@ -1,7 +1,7 @@
 """Conditions for randomising instances."""
 import random
 
-from srctools import Property, Vec
+from srctools import Property, Vec, Entity
 import conditions
 import srctools
 
@@ -9,9 +9,10 @@ from conditions import (
     Condition, make_flag,  make_result, make_result_setup, RES_EXHAUSTED,
 )
 
+COND_MOD_NAME = 'Randomisation'
 
 @make_flag('random')
-def flag_random(inst, res: Property):
+def flag_random(inst: Entity, res: Property):
     """Randomly is either true or false."""
     if res.has_children():
         chance = res['chance', '100']
@@ -33,7 +34,7 @@ def flag_random(inst, res: Property):
 
 
 @make_result_setup('random')
-def res_random_setup(res):
+def res_random_setup(res: Property):
     weight = ''
     results = []
     chance = 100
@@ -69,7 +70,7 @@ def res_random_setup(res):
 
 
 @make_result('random')
-def res_random(inst, res):
+def res_random(inst: Entity, res: Property):
     """Randomly choose one of the sub-results to execute.
 
     The "chance" value defines the percentage chance for any result to be
@@ -113,7 +114,7 @@ def res_random(inst, res):
 
 
 @make_result_setup('variant')
-def res_add_variant_setup(res):
+def res_add_variant_setup(res: Property):
     if res.has_children():
         count = srctools.conv_int(res['Number', ''], None)
         if count:
@@ -132,7 +133,7 @@ def res_add_variant_setup(res):
 
 
 @make_result('variant')
-def res_add_variant(inst, res):
+def res_add_variant(inst: Entity, res: Property):
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form "_var4".
@@ -141,7 +142,7 @@ def res_add_variant(inst, res):
         Weights: A comma-separated list of weights for each instance.
     Any variant has a chance of weight/sum(weights) of being chosen:
     A weight of "2, 1, 1" means the first instance has a 2/4 chance of
-    being chosen, and the other 2 have a 1/4 chance of being chosen.
+    being chosen, and the other 2 have a 1/4 chance of being chosen.  
     The chosen variant depends on the position, direction and name of
     the instance.
 
@@ -161,7 +162,7 @@ def res_add_variant(inst, res):
 
 
 @make_result('RandomNum')
-def res_rand_num(inst, res):
+def res_rand_num(inst: Entity, res: Property):
     """Generate a random number and save in a fixup value.
 
     If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
@@ -186,7 +187,7 @@ def res_rand_num(inst, res):
 
 
 @make_result('RandomVec')
-def res_rand_vec(inst, res):
+def res_rand_vec(inst: Entity, res: Property):
     """A modification to RandomNum which generates a random vector instead.
 
     'decimal', 'seed' and 'ResultVar' work like RandomNum. min/max x/y/z
@@ -218,7 +219,7 @@ def res_rand_vec(inst, res):
 
 
 @make_result_setup('randomShift')
-def res_rand_inst_shift_setup(res):
+def res_rand_inst_shift_setup(res: Property):
     min_x = srctools.conv_int(res['min_x', '0'])
     max_x = srctools.conv_int(res['max_x', '0'])
     min_y = srctools.conv_int(res['min_y', '0'])
@@ -234,7 +235,7 @@ def res_rand_inst_shift_setup(res):
 
 
 @make_result('randomShift')
-def res_rand_inst_shift(inst, res):
+def res_rand_inst_shift(inst: Entity, res: Property):
     """Randomly shift a instance by the given amounts.
 
     The positions are local to the instance.

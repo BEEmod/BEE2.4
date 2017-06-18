@@ -3,11 +3,13 @@ from conditions import (
     make_result, RES_EXHAUSTED,
     INST_ANGLE,
 )
-from instanceLocs import resolve as resolve_inst
-from srctools import Vec
+import instanceLocs
+from srctools import Vec, Property
 import conditions
 import utils
 import vbsp
+
+COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__, alias='cond.catwalks')
 
@@ -92,7 +94,7 @@ def place_catwalk_connections(instances, point_a, point_b):
 
 
 @make_result('makeCatwalk')
-def res_make_catwalk(_, res):
+def res_make_catwalk(res: Property):
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.
@@ -112,11 +114,11 @@ def res_make_catwalk(_, res):
         Single_Wall: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
-    marker = resolve_inst(res['markerInst'])
+    marker = instanceLocs.resolve(res['markerInst'])
     output_target = res['output_name', 'MARKER']
 
     instances = {
-        name: resolve_inst(res[name, ''])[0]
+        name: instanceLocs.resolve_one(res[name, ''], error=True)
         for name in
         (
             'straight_128', 'straight_256', 'straight_512',

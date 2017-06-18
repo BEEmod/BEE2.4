@@ -3,21 +3,34 @@ from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
 from tk_tools import TK_ROOT
+from enum import Enum
 
 from BEE2_config import GEN_OPTS
 from tooltip import add_tooltip
 
 import sound
 import utils
+import tk_tools
 import srctools
 import contextWin
 import logWindow
 
+
+class AfterExport(Enum):
+    """Specifies what happens after exporting."""
+    NORMAL = 0  # Stay visible
+    MINIMISE = 1  # Minimise to tray
+    QUIT = 2  # Quit the app.
+
 UI = {}
 PLAY_SOUND = BooleanVar(value=True, name='OPT_play_sounds')
-SHOW_WIP = BooleanVar(value=False, name='OPT_show_wip_items')
 KEEP_WIN_INSIDE = BooleanVar(value=True, name='OPT_keep_win_inside')
 SHOW_LOG_WIN = BooleanVar(value=False, name='OPT_show_log_window')
+LAUNCH_AFTER_EXPORT = BooleanVar(value=True, name='OPT_launch_after_export')
+AFTER_EXPORT_ACTION = IntVar(
+    value=AfterExport.MINIMISE.value,
+    name='OPT_after_export_action',
+)
 
 refresh_callbacks = []  # functions called to apply settings.
 
@@ -33,14 +46,15 @@ def reset_all_win():
 
 win = Toplevel(TK_ROOT)
 win.transient(master=TK_ROOT)
-win.iconbitmap('../BEE2.ico')
-win.title('BEE2 Options')
+tk_tools.set_window_icon(win)
+win.title(_('BEE2 Options'))
 win.withdraw()
 
 
 def show():
+    """Display the option window."""
     win.deiconify()
-    contextWin.hide_context() # Ensure this closes
+    contextWin.hide_context()  # Ensure this closes
     utils.center_win(win)
 
 
@@ -72,15 +86,15 @@ def clear_caches():
     import packageLoader
 
     restart_ok = messagebox.askokcancel(
-        title='Allow Restart?',
-        message='Restart the BEE2 to re-extract packages?',
+        title=_('Allow Restart?'),
+        message=_('Restart the BEE2 to re-extract packages?'),
     )
 
     if not restart_ok:
         return
 
     for game in gameMan.all_games:
-        game.mod_time = 0
+        game.mod_times.clear()
         game.save()
     GEN_OPTS['General']['cache_time'] = '0'
 
@@ -94,7 +108,6 @@ def clear_caches():
     packageLoader.PACK_CONFIG.save_check()
 
     utils.restart_app()
-
 
 
 def make_checkbox(
@@ -173,19 +186,19 @@ def init_widgets():
     UI['fr_general'] = fr_general = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_general, text='General')
+    nbook.add(fr_general, text=_('General'))
     init_gen_tab(fr_general)
 
     UI['fr_win'] = fr_win = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_win, text='Windows')
+    nbook.add(fr_win, text=_('Windows'))
     init_win_tab(fr_win)
 
     UI['fr_dev'] = fr_dev = ttk.Frame(
         nbook,
     )
-    nbook.add(fr_dev, text='Development')
+    nbook.add(fr_dev, text=_('Development'))
     init_dev_tab(fr_dev)
 
     ok_cancel = ttk.Frame(
@@ -209,12 +222,12 @@ def init_widgets():
 
     UI['ok_btn'] = ok_btn = ttk.Button(
         ok_cancel,
-        text='OK',
+        text=_('OK'),
         command=ok,
     )
     UI['cancel_btn'] = cancel_btn = ttk.Button(
         ok_cancel,
-        text='Cancel',
+        text=_('Cancel'),
         command=cancel,
     )
     ok_btn.grid(row=0, column=0)
@@ -225,47 +238,103 @@ def init_widgets():
 
 
 def init_gen_tab(f):
+    """Make widgets in the 'General' tab."""
+    def load_after_export():
+        """Read the 'After Export' radio set."""
+        AFTER_EXPORT_ACTION.set(GEN_OPTS.get_int(
+            'General',
+            'after_export_action',
+            AFTER_EXPORT_ACTION.get()
+        ))
+
+    def save_after_export():
+        """Save the 'After Export' radio set."""
+        GEN_OPTS['General']['after_export_action'] = str(AFTER_EXPORT_ACTION.get())
+
+    after_export_frame = ttk.LabelFrame(
+        f,
+        text=_('After Export:'),
+    )
+    after_export_frame.grid(
+        row=0,
+        rowspan=2,
+        column=0,
+        sticky='NS',
+        padx=(0, 10),
+    )
+
+    VARS['General', 'after_export_action'] = AFTER_EXPORT_ACTION
+    AFTER_EXPORT_ACTION.load = load_after_export
+    AFTER_EXPORT_ACTION.save = save_after_export
+    load_after_export()
+
+    exp_nothing = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Do Nothing'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.NORMAL.value,
+    )
+    exp_minimise = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Minimise BEE2'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.MINIMISE.value,
+    )
+    exp_quit = ttk.Radiobutton(
+        after_export_frame,
+        text=_('Quit BEE2'),
+        variable=AFTER_EXPORT_ACTION,
+        value=AfterExport.QUIT.value,
+    )
+    exp_nothing.grid(row=0, column=0, sticky='w')
+    exp_minimise.grid(row=1, column=0, sticky='w')
+    exp_quit.grid(row=2, column=0, sticky='w')
+
+    add_tooltip(exp_nothing, _('After exports, do nothing and '
+                               'keep the BEE2 in focus.'))
+    add_tooltip(exp_minimise, _('After exports, minimise to the taskbar/dock.'))
+    add_tooltip(exp_minimise, _('After exports, quit the BEE2.'))
+
+    UI['launch_game'] = launch_game = make_checkbox(
+        after_export_frame,
+        section='General',
+        item='launch_Game',
+        var=LAUNCH_AFTER_EXPORT,
+        desc=_('Launch Game'),
+        tooltip=_('After exporting, launch the selected game automatically.'),
+    )
+    launch_game.grid(row=3, column=0, sticky='W', pady=(10, 0))
 
     if sound.initiallised:
         UI['mute'] = mute = make_checkbox(
             f,
             section='General',
             item='play_sounds',
-            desc='Play Sounds',
+            desc=_('Play Sounds'),
             var=PLAY_SOUND,
         )
     else:
         UI['mute'] = mute = ttk.Checkbutton(
             f,
-            text='Play Sounds',
+            text=_('Play Sounds'),
             state='disabled',
         )
         add_tooltip(
             UI['mute'],
-            'PyGame is either not installed or broken.\n'
-            'Sound effects have been disabled.'
+            _('Pyglet is either not installed or broken.\n'
+              'Sound effects have been disabled.')
         )
-    mute.grid(row=0, column=0, sticky=W)
-
-    make_checkbox(
-        f,
-        section='General',
-        item='show_wip_items',
-        desc='Show WIP items',
-        tooltip='Show items and item versions marked Work In Progress. '
-                'These may be buggy or incomplete.',
-        var=SHOW_WIP,
-    ).grid(row=1, column=0, sticky=W)
+    mute.grid(row=0, column=1, sticky='E')
 
     UI['reset_cache'] = reset_cache = ttk.Button(
         f,
-        text='Reset Package Caches',
+        text=_('Reset Package Caches'),
         command=clear_caches,
     )
-    reset_cache.grid(row=2, column=0, columnspan=2, sticky='SEW')
+    reset_cache.grid(row=1, column=1, sticky='EW')
     add_tooltip(
         reset_cache,
-        'Force re-extracting all package resources. This requires a restart.'
+        _('Force re-extracting all package resources. This requires a restart.'),
     )
 
 
@@ -274,16 +343,16 @@ def init_win_tab(f):
         f,
         section='General',
         item='keep_win_inside',
-        desc='Keep windows inside screen',
-        tooltip='Prevent sub-windows from moving outside the screen borders. '
-                'If you have multiple monitors, disable this.',
+        desc=_('Keep windows inside screen'),
+        tooltip=_('Prevent sub-windows from moving outside the screen borders. '
+                  'If you have multiple monitors, disable this.'),
         var=KEEP_WIN_INSIDE,
     )
     keep_inside.grid(row=0, column=0, sticky=W)
 
     UI['reset_win'] = reset_win = ttk.Button(
         f,
-        text='Reset All Window Positions',
+        text=_('Reset All Window Positions'),
         # Indirect reference to allow UI to set this later
         command=lambda: reset_all_win(),
     )
@@ -298,66 +367,57 @@ def init_dev_tab(f):
         f,
         section='Debug',
         item='log_missing_ent_count',
-        desc='Log missing entity counts',
-        tooltip='When loading items, log items with missing entity counts '
-                'in their properties.txt file.',
+        desc=_('Log missing entity counts'),
+        tooltip=_('When loading items, log items with missing entity counts '
+                  'in their properties.txt file.'),
     ).grid(row=0, column=0, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_missing_styles',
-        desc="Log when item doesn't have a style",
-        tooltip='Log items have no applicable version for a particular style.'
-                'This usually means it will look very bad.',
+        desc=_("Log when item doesn't have a style"),
+        tooltip=_('Log items have no applicable version for a particular style.'
+                  'This usually means it will look very bad.'),
     ).grid(row=1, column=0, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_item_fallbacks',
-        desc="Log when item uses parent's style",
-        tooltip='Log when an item reuses a variant from a parent style '
-                '(1970s using 1950s items, for example). This is usually '
-                'fine, but may need to be fixed.',
+        desc=_("Log when item uses parent's style"),
+        tooltip=_('Log when an item reuses a variant from a parent style '
+                  '(1970s using 1950s items, for example). This is usually '
+                  'fine, but may need to be fixed.'),
     ).grid(row=3, column=0, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='log_incorrect_packfile',
-        desc="Log missing packfile resources",
-        tooltip='Log when the resources a PackFile object refers to are not '
-                'present in the zip. This may be fine (in a prerequisite zip),'
-                ' but it often indicates an error.',
+        desc=_("Log missing packfile resources"),
+        tooltip=_('Log when the resources a "PackList" refers to are not '
+                  'present in the zip. This may be fine (in a prerequisite zip),'
+                  ' but it often indicates an error.'),
     ).grid(row=4, column=0, sticky=W)
-
-    make_checkbox(
-        f,
-        section='Debug',
-        item='show_errors',
-        desc="Show detailed error message",
-        tooltip='If an error occurs, show the error and traceback '
-                'before quitting.',
-    ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
         f,
         section='General',
         item='preserve_bee2_resource_dir',
-        desc='Preserve Game Directories',
-        tooltip='When exporting, do not overwrite \n"bee2/" and'
-                '\n"sdk_content/maps/bee2/".\n'
-                'Enable if you\'re'
-                ' developing new content, to ensure it is not '
-                'overwritten.',
-    ).grid(row=1, column=1, sticky=W)
+        desc=_('Preserve Game Directories'),
+        tooltip=_('When exporting, do not overwrite \n"bee2/" and'
+                  '\n"sdk_content/maps/bee2/".\n'
+                  "Enable if you're"
+                  ' developing new content, to ensure it is not '
+                  'overwritten.'),
+    ).grid(row=0, column=1, sticky=W)
 
     make_checkbox(
         f,
         section='Debug',
         item='show_log_win',
-        desc='Show Log Window',
+        desc=_('Show Log Window'),
         var=SHOW_LOG_WIN,
-        tooltip='Show the log file in real-time.',
-    ).grid(row=2, column=1, sticky=W)
+        tooltip=_('Show the log file in real-time.'),
+    ).grid(row=1, column=1, sticky=W)

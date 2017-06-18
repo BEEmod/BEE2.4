@@ -1,13 +1,15 @@
 # coding=utf-8
-import collections
+import collections.abc
+import functools
 import logging
 import os.path
 import stat
+import shutil
+import sys
 from enum import Enum
-from sys import platform
 
 from typing import (
-    Tuple, Iterator,
+    Tuple, List, Union, Iterator,
 )
 
 
@@ -18,12 +20,15 @@ except ImportError:
     # We're running from source!
     BEE_VERSION = "(dev)"
     FROZEN = False
+    DEV_MODE = True
 else:
     FROZEN = True
+    # If blank, in dev mode.
+    DEV_MODE = not BEE_VERSION
 
-WIN = platform.startswith('win')
-MAC = platform.startswith('darwin')
-LINUX = platform.startswith('linux')
+WIN = sys.platform.startswith('win')
+MAC = sys.platform.startswith('darwin')
+LINUX = sys.platform.startswith('linux')
 
 # Formatters for the logger handlers.
 short_log_format = None
@@ -46,13 +51,30 @@ STEAM_IDS = {
     'TWTM': '286080',
     'THINKING WITH TIME MACHINE': '286080',
 
+    'MEL': '317400',  # Note - no workshop
+
+    'DEST_AP': '433970',
+    'DESTROYED_APERTURE': '433970',
+
     # Others:
     # 841: P2 Beta
     # 213630: Educational
     # 247120: Sixense
     # 211480: 'In Motion'
-    # 317400: PS Mel - No workshop
 }
+
+if MAC or LINUX:
+    def fix_cur_directory():
+        """Change directory to the location of the executable.
+
+        Otherwise we can't find our files!
+        The Windows executable does this automatically.
+        """
+        os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
+else:
+    def fix_cur_directory():
+        """No-op on Windows."""
+
 
 if WIN:
     # Some events differ on different systems, so define them here.
@@ -183,20 +205,20 @@ elif LINUX:
         'KEY_SAVE': '<Control-Shift-s>',
     }
     KEY_ACCEL = {
-        'KEY_EXPORT': 'Ctrl-E',
-        'KEY_SAVE': 'Ctrl-S',
-        'KEY_SAVE_AS': 'Ctrl-Shift-S',
+        'KEY_EXPORT': 'Ctrl+E',
+        'KEY_SAVE': 'Ctrl+S',
+        'KEY_SAVE_AS': 'Shift+Ctrl+S',
     }
 
     CURSORS = {
         'regular': 'arrow',
-        'link': 'hand2',
+        'link': 'hand1',
         'wait': 'watch',
-        'stretch_vert': 'sb_v_double_arrow',
-        'stretch_horiz': 'sb_h_double_arrow',
-        'move_item': 'plus',
-        'destroy_item': 'x_cursor',
-        'invalid_drag': 'no',
+        'stretch_vert': 'bottom_side',
+        'stretch_horiz': 'right_side',
+        'move_item': 'crosshair',
+        'destroy_item': 'X_cursor',
+        'invalid_drag': 'circle',
     }
 
     def add_mousewheel(target, *frames, orient='y'):
@@ -220,8 +242,29 @@ elif LINUX:
             frame.bind('<Button-4>', scroll_up, add='+')
             frame.bind('<Button-5>', scroll_down, add='+')
 
+
+def bind_event_handler(bind_func):
+    """Decorator for the bind_click functions.
+
+    This allows calling directly, or decorating a function with just wid and add
+    attributes.
+    """
+    def deco(wid, func=None, add='+'):
+        """Decorator or normal interface, func is optional to be a decorator."""
+        if func is None:
+            def deco_2(func):
+                """Used as a decorator - must be called second with the function."""
+                bind_func(wid, func, add)
+                return func
+            return deco_2
+        else:
+            # Normally, call directly
+            return bind_func(wid, func, add)
+    return functools.update_wrapper(deco, bind_func)
+
 if MAC:
     # On OSX, make left-clicks switch to a rightclick when control is held.
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -234,6 +277,7 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """On OSX, left-clicks are converted to right-clicks
 
@@ -245,19 +289,23 @@ if MAC:
                 func()
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
-    def bind_rightclick(wid, func):
+    @bind_event_handler
+    def bind_rightclick(wid, func, add='+'):
         """On OSX, we need to bind to both rightclick and control-leftclick."""
-        wid.bind(EVENTS['RIGHT'], func)
-        wid.bind(EVENTS['LEFT_CTRL'], func)
+        wid.bind(EVENTS['RIGHT'], func, add=add)
+        wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
+    @bind_event_handler
     def bind_leftclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
+    @bind_event_handler
     def bind_leftclick_double(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
+    @bind_event_handler
     def bind_rightclick(wid, func, add='+'):
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
@@ -308,6 +356,102 @@ CONN_LOOKUP = {
 }
 
 del N, S, E, W
+
+
+class FuncLookup(collections.abc.Mapping):
+    """A dict for holding callback functions.
+
+    Functions are added by using this as a decorator. Positional arguments
+    are aliases, keyword arguments will set attributes on the functions.
+    If casefold is True, this will casefold keys to be case-insensitive.
+    Additionally overwriting names is not allowed.
+    Iteration yields all functions.
+    """
+    def __init__(self, name, *, casefold=True, attrs=()):
+        self.casefold = casefold
+        self.__name__ = name
+        self._registry = {}
+        self.allowed_attrs = set(attrs)
+
+    def __call__(self, *names: str, **kwargs):
+        """Add a function to the dict."""
+        if not names:
+            raise TypeError('No names passed!')
+
+        bad_keywords = kwargs.keys() - self.allowed_attrs
+        if bad_keywords:
+            raise TypeError('Invalid keywords: ' + ', '.join(bad_keywords))
+
+        def callback(func):
+            """Decorator to do the work of adding the function."""
+            # Set the name to <dict['name']>
+            func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+            for name, value in kwargs.items():
+                setattr(func, name, value)
+            self.__setitem__(names, func)
+            return func
+
+        return callback
+
+    def __eq__(self, other):
+        if isinstance(other, FuncLookup):
+            return self._registry == other._registry
+        if not isinstance(other, collections.abc.Mapping):
+            return NotImplemented
+        return self._registry == dict(other.items())
+
+    def __iter__(self):
+        yield from self.values()
+
+    def __len__(self):
+        return len(set(self._registry.values()))
+
+    def __getitem__(self, names: Union[str, Tuple[str]]):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            try:
+                return self._registry[name]
+            except KeyError:
+                pass
+        else:
+            raise KeyError('No function with names {}!'.format(
+                ', '.join(names),
+            ))
+
+    def __setitem__(self, names: Union[str, Tuple[str]], func):
+        if isinstance(names, str):
+            names = names,
+
+        for name in names:
+            if self.casefold:
+                name = name.casefold()
+            if name in self._registry:
+                raise ValueError('Overwrote {!r}!'.format(name))
+            self._registry[name] = func
+
+    def __delitem__(self, name: str):
+        if self.casefold:
+            name = name.casefold()
+        del self._registry[name]
+
+    def __contains__(self, name):
+        if self.casefold:
+            name = name.casefold()
+        return name in self._registry
+
+    def functions(self):
+        """Return the set of functions in this mapping."""
+        return set(self._registry.values())
+
+    values = functions
+
+    def clear(self):
+        """Delete all functions."""
+        self._registry.clear()
 
 
 def get_indent(line: str):
@@ -409,7 +553,6 @@ def restart_app():
 
     This will not return!
     """
-    import os, sys
     # sys.executable is the program which ran us - when frozen,
     # it'll our program.
     # We need to add the program to the arguments list, since python
@@ -422,6 +565,12 @@ def restart_app():
     )
     logging.shutdown()
     os.execv(sys.executable, args)
+
+
+def quit_app(status=0):
+    """Quit the application."""
+    logging.shutdown()
+    sys.exit(status)
 
 
 def set_readonly(file):
@@ -450,6 +599,126 @@ def unset_readonly(file):
         stat.S_IWGRP |
         stat.S_IWOTH
     )
+
+
+def merge_tree(src, dst, copy_function=shutil.copy2):
+    """Recursively copy a directory tree to a destination, which may exist.
+
+    This is a modified version of shutil.copytree(), with the difference that
+    if the directory exists new files will overwrite existing ones.
+
+    If exception(s) occur, a shutil.Error is raised with a list of reasons.
+
+    The optional copy_function argument is a callable that will be used
+    to copy each file. It will be called with the source path and the
+    destination path as arguments. By default, shutil.copy2() is used, but any
+    function that supports the same signature (like shutil.copy()) can be used.
+    """
+    names = os.listdir(src)
+
+    os.makedirs(dst, exist_ok=True)
+    errors = []  # type: List[Tuple[str, str, str]]
+    for name in names:
+        srcname = os.path.join(src, name)
+        dstname = os.path.join(dst, name)
+        try:
+            if os.path.islink(srcname):
+                # Let the copy occur. copy2 will raise an error.
+                if os.path.isdir(srcname):
+                    merge_tree(srcname, dstname, copy_function)
+                else:
+                    copy_function(srcname, dstname)
+            elif os.path.isdir(srcname):
+                merge_tree(srcname, dstname, copy_function)
+            else:
+                # Will raise a SpecialFileError for unsupported file types
+                copy_function(srcname, dstname)
+        # catch the Error from the recursive copytree so that we can
+        # continue with other files
+        except shutil.Error as err:
+            errors.extend(err.args[0])
+        except OSError as why:
+            errors.append((srcname, dstname, str(why)))
+    try:
+        shutil.copystat(src, dst)
+    except OSError as why:
+        # Copying file access times may fail on Windows
+        if getattr(why, 'winerror', None) is None:
+            errors.append((src, dst, str(why)))
+    if errors:
+        raise shutil.Error(errors)
+
+
+def setup_localisations(logger: logging.Logger):
+    """Setup gettext localisations."""
+    from srctools.property_parser import PROP_FLAGS_DEFAULT
+    import gettext
+    import locale
+
+    # Get the 'en_US' style language code
+    lang_code = locale.getdefaultlocale()[0]
+
+    # Allow overriding through command line.
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if arg.casefold().startswith('lang='):
+                lang_code = arg[5:]
+                break
+
+    # Expands single code to parent categories.
+    expanded_langs = gettext._expand_lang(lang_code)
+
+    logger.info('Language: {!r}', lang_code)
+    logger.debug('Language codes: {!r}', expanded_langs)
+
+    # Add these to Property's default flags, so config files can also
+    # be localised.
+    for lang in expanded_langs:
+        PROP_FLAGS_DEFAULT['lang_' + lang] = True
+
+    for lang in expanded_langs:
+        try:
+            file = open('../i18n/{}.mo'.format(lang), 'rb')
+        except FileNotFoundError:
+            pass
+        else:
+            trans = gettext.GNUTranslations(file)
+            break
+    else:
+        # No translations, fallback to English.
+        # That's fine if the user's language is actually English.
+        if 'en' not in expanded_langs:
+            logger.warning(
+                "Can't find translation for codes: {!r}!",
+                expanded_langs,
+            )
+        trans = gettext.NullTranslations()
+    # Add these functions to builtins, plus _=gettext
+    trans.install(['gettext', 'ngettext'])
+
+    # Some lang-specific overrides..
+
+    if trans.gettext('__LANG_USE_SANS_SERIF__') == 'YES':
+        # For Japanese/Chinese, we want a 'sans-serif' / gothic font
+        # style.
+        try:
+            from tkinter import font
+        except ImportError:
+            return
+        font_names = [
+            'TkDefaultFont',
+            'TkHeadingFont',
+            'TkTooltipFont',
+            'TkMenuFont',
+            'TkTextFont',
+            'TkCaptionFont',
+            'TkSmallCaptionFont',
+            'TkIconFont',
+            # Note - not fixed-width...
+        ]
+        for font_name in font_names:
+            font.nametofont(font_name).configure(family='sans-serif')
+
 
 class LogMessage:
     """Allow using str.format() in logging messages.
@@ -497,7 +766,7 @@ class LoggerAdapter(logging.LoggerAdapter):
     """Fix loggers to use str.format().
 
     """
-    def __init__(self, logger: logging.Logger, alias=None):
+    def __init__(self, logger: logging.Logger, alias=None) -> None:
         # Alias is a replacement module name for log messages.
         self.alias = alias
         super(LoggerAdapter, self).__init__(logger, extra={})
@@ -521,10 +790,13 @@ class LoggerAdapter(logging.LoggerAdapter):
             )
 
 
-def init_logging(filename: str=None) -> logging.Logger:
+def init_logging(filename: str=None, main_logger='', on_error=None) -> logging.Logger:
     """Setup the logger and logging handlers.
 
-    If filename is set, all logs will be written to this file.
+    If filename is set, all logs will be written to this file as well.
+    This also sets sys.except_hook, so uncaught exceptions are captured.
+    on_error should be a function to call when this is done
+    (taking type, value, traceback).
     """
     global short_log_format, long_log_format
     global stderr_loghandler, stdout_loghandler
@@ -536,7 +808,7 @@ def init_logging(filename: str=None) -> logging.Logger:
         """Allow passing an alias for log modules."""
         # This breaks %-formatting, so only set when init_logging() is called.
 
-        alias = None
+        alias = None  # type: str
 
         def getMessage(self):
             """We have to hook here to change the value of .module.
@@ -572,12 +844,21 @@ def init_logging(filename: str=None) -> logging.Logger:
         log_handler = handlers.RotatingFileHandler(
             filename,
             maxBytes=500 * 1024,
-            backupCount=10,
+            backupCount=1,
         )
         log_handler.setLevel(logging.DEBUG)
         log_handler.setFormatter(long_log_format)
-
         logger.addHandler(log_handler)
+
+        err_log_handler = handlers.RotatingFileHandler(
+            filename[:-3] + 'error.' + filename[-3:],
+            maxBytes=500 * 1024,
+            backupCount=1,
+        )
+        err_log_handler.setLevel(logging.WARNING)
+        err_log_handler.setFormatter(long_log_format)
+
+        logger.addHandler(err_log_handler)
 
     # This is needed for multiprocessing, since it tries to flush stdout.
     # That'll fail if it is None.
@@ -597,7 +878,7 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stdout:
         stdout_loghandler = logging.StreamHandler(sys.stdout)
         stdout_loghandler.setLevel(logging.INFO)
-        stdout_loghandler.setFormatter(short_log_format)
+        stdout_loghandler.setFormatter(long_log_format)
         logger.addHandler(stdout_loghandler)
 
         if sys.stderr:
@@ -614,30 +895,41 @@ def init_logging(filename: str=None) -> logging.Logger:
     if sys.stderr:
         stderr_loghandler = logging.StreamHandler(sys.stderr)
         stderr_loghandler.setLevel(logging.WARNING)
-        stderr_loghandler.setFormatter(short_log_format)
+        stderr_loghandler.setFormatter(long_log_format)
         logger.addHandler(stderr_loghandler)
     else:
         sys.stderr = NullStream()
 
     # Use the exception hook to report uncaught exceptions, and finalise the
     # logging system.
-    old_except_handler = sys.__excepthook__
+    old_except_handler = sys.excepthook
 
-    def except_handler(*exc_info):
+    def except_handler(exc_type, exc_value, exc_tb):
         """Log uncaught exceptions."""
+        if not issubclass(exc_type, Exception):
+            # It's subclassing BaseException (KeyboardInterrupt, SystemExit),
+            # so we should quit without messages.
+            logging.shutdown()
+            return
+
         logger._log(
             level=logging.ERROR,
             msg='Uncaught Exception:',
             args=(),
-            exc_info=exc_info,
+            exc_info=(exc_type, exc_value, exc_tb),
         )
         logging.shutdown()
+        if on_error is not None:
+            on_error(exc_type, exc_value, exc_tb)
         # Call the original handler - that prints to the normal console.
-        old_except_handler()
+        old_except_handler(exc_type, exc_value, exc_tb)
 
-    sys.__excepthook__ = except_handler
+    sys.excepthook = except_handler
 
-    return LoggerAdapter(logger)
+    if main_logger:
+        return getLogger(main_logger)
+    else:
+        return LoggerAdapter(logger)
 
 
 def getLogger(name: str='', alias: str=None) -> logging.Logger:

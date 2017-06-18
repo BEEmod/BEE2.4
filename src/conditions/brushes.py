@@ -2,17 +2,24 @@
 import random
 from collections import defaultdict
 
+import brushLoc
 import conditions
 import srctools
+import template_brush
 import utils
 import vbsp
 import vbsp_options
 import tiling
+import comp_consts as const
+import instance_traits
 from conditions import (
-    make_result, make_result_setup, SOLIDS, MAT_TYPES, TEMPLATES, TEMP_TYPES
+    make_result, make_result_setup, SOLIDS
 )
-from srctools import Property, NoKeyError, Vec, Output, Entity, conv_bool
+from srctools import Property, NoKeyError, Vec, Output, Entity, Side, conv_bool
 
+from typing import Dict, Tuple
+
+COND_MOD_NAME = 'Brushes'
 
 LOGGER = utils.getLogger(__name__)
 
@@ -52,7 +59,7 @@ FLAG_ROTATING = {
 
 
 @make_result('GenRotatingEnt')
-def res_fix_rotation_axis(ent, res):
+def res_fix_rotation_axis(ent: Entity, res: Property):
     """Generate a `func_rotating`, `func_door_rotating` or any similar entity.
 
     This uses the orientation of the instance to detemine the correct
@@ -62,7 +69,7 @@ def res_fix_rotation_axis(ent, res):
       instance, and will set the `origin` and `targetname` respectively.
     - `Keys` are any other keyvalues to be be set.
     - `Flags` sets additional spawnflags. Multiple values may be
-       separated by '+', and will be added together.
+       separated by `+`, and will be added together.
     - `Classname` specifies which entity will be created, as well as
        which other values will be set to specify the correct orientation.
     - `AddOut` is used to add outputs to the generated entity. It takes
@@ -72,10 +79,10 @@ def res_fix_rotation_axis(ent, res):
        deleted when fired.
 
     Permitted entities:
-     * `func_rotating`
-     * `func_door_rotating`
-     * `func_rot_button`
-     * `func_platrot`
+       * `func_rotating`
+       * `func_door_rotating`
+       * `func_rot_button`
+       * `func_platrot`
     """
     des_axis = res['axis', 'z'].casefold()
     reverse = srctools.conv_bool(res['reversed', '0'])
@@ -88,18 +95,9 @@ def res_fix_rotation_axis(ent, res):
         res['flags', '0'].split('+')
     ))
 
-    name = res['name', '']
-    if not name.startswith('@'):
-        # If a local name is given, add it to the instance targetname.
-        # It the name given is '', set to the instance's name.
-        # If it has an @, don't change it!
-        name = ent['targetname', ''] + (('-' + name) if name else '')
+    name = conditions.local_name(ent, res['name', ''])
 
-    axis = Vec(
-        x=int(des_axis == 'x'),
-        y=int(des_axis == 'y'),
-        z=int(des_axis == 'z'),
-    ).rotate_by_str(ent['angles', '0 0 0'])
+    axis = Vec.with_axes(des_axis, 1).rotate_by_str(ent['angles', '0 0 0'])
 
     pos = Vec.from_str(
         res['Pos', '0 0 0']
@@ -167,7 +165,7 @@ def res_fix_rotation_axis(ent, res):
 
 
 @make_result('AlterTexture', 'AlterTex', 'AlterFace')
-def res_set_texture(inst, res):
+def res_set_texture(inst: Entity, res: Property):
     """Set the brush face at a location to a particular texture.
 
     pos is the position, relative to the instance
@@ -179,8 +177,10 @@ def res_set_texture(inst, res):
     tex is the texture used.
     If tex begins and ends with '<>', certain
     textures will be used based on style:
-    - If tex is '<special>', the brush will be given a special texture
-      like angled and clear panels.
+    - '<delete>' will remove the brush entirely (it should be hollow).
+      Caution should be used to ensure no leaks occur.
+    - '<special>' the brush will be given a special texture
+      like angled and flip panels.
     - '<white>' and '<black>' will use the regular textures for the
       given color.
     - '<white-2x2>', '<white-4x4>', '<black-2x2>', '<black-4x4'> will use
@@ -191,6 +191,10 @@ def res_set_texture(inst, res):
     If tex begins and ends with '[]', it is an option in the 'Textures' list.
     These are composed of a group and texture, separated by '.'. 'white.wall'
     are the white wall textures; 'special.goo' is the goo texture.
+
+    If 'template' is set, the template should be an axis aligned cube. This
+    will be rotated by the instance angles, and then the face with the same
+    orientation will be applied to the face (with the rotation and texture).
     """
     # TODO: reimplement & replace
     return
@@ -221,34 +225,52 @@ def res_set_texture(inst, res):
     if not brush or brush.normal != norm:
         return
 
+    face_to_mod = brush.face  # type: Side
+
+    # Don't allow this to get overwritten later.
+    vbsp.IGNORED_FACES.add(face_to_mod)
+
+    temp = res['template', None]
+    if temp:
+        # Grab the scaling template and apply it to the brush.
+        template_brush.get_scaling_template(temp).rotate(
+            Vec.from_str(inst['angles']),
+            Vec.from_str(inst['origin']),
+        ).apply(face_to_mod)
+        return
+
     tex = res['tex']
 
     if tex.startswith('[') and tex.endswith(']'):
-        brush.face.mat = vbsp.get_tex(tex[1:-1])
+        face_to_mod.mat = vbsp.get_tex(tex[1:-1])
     elif tex.startswith('<') and tex.endswith('>'):
         # Special texture names!
         tex = tex[1:-1].casefold()
+        if tex == 'delete':
+            vbsp.VMF.remove_brush(brush)
+            return
+
         if tex == 'white':
-            brush.face.mat = 'tile/white_wall_tile003a'
+            face_to_mod.mat = 'tile/white_wall_tile003a'
         elif tex == 'black':
-            brush.face.mat = 'metal/black_wall_metal_002c'
+            face_to_mod.mat = 'metal/black_wall_metal_002c'
 
         if tex == 'black' or tex == 'white':
             # For these two, run the regular logic to apply textures
             # correctly.
             vbsp.alter_mat(
-                brush.face,
-                vbsp.face_seed(brush.face),
+                face_to_mod,
+                vbsp.face_seed(face_to_mod),
                 vbsp_options.get(bool, 'tile_texture_lock'),
             )
 
         if tex == 'special':
-            vbsp.set_special_mat(brush.face, str(brush.color))
+            vbsp.set_special_mat(face_to_mod, str(brush.color))
         elif tex == 'special-white':
-            vbsp.set_special_mat(brush.face, 'white')
+            vbsp.set_special_mat(face_to_mod, 'white')
             return
         elif tex == 'special-black':
-            vbsp.set_special_mat(brush.face, 'black')
+            vbsp.set_special_mat(face_to_mod, 'black')
 
         # Do <4x4>, <white-2x4>, etc
         color = str(brush.color)
@@ -257,29 +279,29 @@ def res_set_texture(inst, res):
             color = tex[:5]
         if tex.endswith('2x2') or tex.endswith('4x4'):
             # 4x4 and 2x2 instructions are ignored on floors and ceilings.
-            orient = vbsp.get_face_orient(brush.face)
+            orient = vbsp.get_face_orient(face_to_mod)
             if orient == vbsp.ORIENT.wall:
-                brush.face.mat = vbsp.get_tex(
+                face_to_mod.mat = vbsp.get_tex(
                     color + '.' + tex[-3:]
                 )
             else:
-                brush.face.mat = vbsp.get_tex(
+                face_to_mod.mat = vbsp.get_tex(
                     color + '.' + str(orient)
                 )
     else:
-        brush.face.mat = tex
+        face_to_mod.mat = tex
 
     # Don't allow this to get overwritten later.
     vbsp.IGNORED_FACES.add(brush.face)
 
 
 @make_result('AddBrush')
-def res_add_brush(inst, res):
+def res_add_brush(inst: Entity, res: Property):
     """Spawn in a brush at the indicated points.
 
-    - point1 and point2 are locations local to the instance, with '0 0 0'
+    - point1 and point2 are locations local to the instance, with `0 0 0`
       as the floor-position.
-    - type is either 'black' or 'white'.
+    - type is either `black` or `white`.
     - detail should be set to True/False. If true the brush will be a
       func_detail instead of a world brush.
 
@@ -365,24 +387,24 @@ def res_add_brush(inst, res):
 
 @make_result_setup('TemplateBrush')
 def res_import_template_setup(res: Property):
-    temp_id = res['id'].casefold()
+    temp_id = res['id']
 
     force = res['force', ''].casefold().split()
     if 'white' in force:
-        force_colour = MAT_TYPES.white
+        force_colour = template_brush.MAT_TYPES.white
     elif 'black' in force:
-        force_colour = MAT_TYPES.black
+        force_colour = template_brush.MAT_TYPES.black
     elif 'invert' in force:
         force_colour = 'INVERT'
     else:
         force_colour = None
 
     if 'world' in force:
-        force_type = TEMP_TYPES.world
+        force_type = template_brush.TEMP_TYPES.world
     elif 'detail' in force:
-        force_type = TEMP_TYPES.detail
+        force_type = template_brush.TEMP_TYPES.detail
     else:
-        force_type = TEMP_TYPES.default
+        force_type = template_brush.TEMP_TYPES.default
 
     for size in ('2x2', '4x4', 'wall', 'special'):
         if size in force:
@@ -392,13 +414,15 @@ def res_import_template_setup(res: Property):
         force_grid = None
 
     invert_var = res['invertVar', '']
+    color_var = res['colorVar', '']
 
     replace_tex = defaultdict(list)
     for prop in res.find_key('replace', []):
         replace_tex[prop.name].append(prop.value)
 
     rem_replace_brush = True
-    additional_ids = ()
+    additional_ids = set()
+    transfer_overlays = '1'
     try:
         replace_brush = res.find_key('replaceBrush')
     except NoKeyError:
@@ -406,11 +430,12 @@ def res_import_template_setup(res: Property):
     else:
         if replace_brush.has_children():
             replace_brush_pos = replace_brush['Pos', '0 0 0']
-            additional_ids = list(map(
+            additional_ids = set(map(
                 srctools.conv_int,
                 replace_brush['additionalIDs', ''].split(),
             ))
-            rem_replace_brush = conv_bool(replace_brush['removeBrush', None], True)
+            rem_replace_brush = replace_brush.bool('removeBrush', True)
+            transfer_overlays = replace_brush['transferOverlay', '1']
         else:
             replace_brush_pos = replace_brush.value  # type: str
 
@@ -429,7 +454,7 @@ def res_import_template_setup(res: Property):
 
         # Spawn everything as detail, so they get put into a brush
         # entity.
-        force_type = TEMP_TYPES.detail
+        force_type = template_brush.TEMP_TYPES.detail
     else:
         keys = None
     visgroup_mode = res['visgroup', 'none'].casefold()
@@ -452,9 +477,11 @@ def res_import_template_setup(res: Property):
             """Number = percent chance for each to be added"""
             for group in groups:
                 val = random.uniform(0, 100)
-                LOGGER.info('RAND: {}', locals())
                 if val <= visgroup_mode:
                     yield group
+
+    # If true, force visgroups to all be used.
+    visgroup_force_var = res['forceVisVar', '']
 
     return (
         temp_id,
@@ -464,22 +491,26 @@ def res_import_template_setup(res: Property):
         force_type,
         replace_brush_pos,
         rem_replace_brush,
+        transfer_overlays,
         additional_ids,
         invert_var,
+        color_var,
         visgroup_func,
+        visgroup_force_var,
         keys,
     )
 
 
 @make_result('TemplateBrush')
-def res_import_template(inst: Entity, res):
-    """Import a template VMF file, retexturing it to match orientatation.
+def res_import_template(inst: Entity, res: Property):
+    """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance.
     Options:
-    - ID: The ID of the template to be inserted.
+    - ID: The ID of the template to be inserted. Add visgroups to additionally
+            add after a colon, comma-seperated (temp_id:vis1,vis2)
     - force: a space-seperated list of overrides. If 'white' or 'black' is
-             present, the colour of tiles will be overriden. If 'invert' is
+             present, the colour of tiles will be overridden. If 'invert' is
             added, white/black tiles will be swapped. If a tile size
             ('2x2', '4x4', 'wall', 'special') is included, all tiles will
             be switched to that size (if not a floor/ceiling). If 'world' or
@@ -495,59 +526,109 @@ def res_import_template(inst: Entity, res):
               to also fix for overlays. The surface should have close to a
               vertical normal, to prevent rescaling the overlay.
             - removeBrush: If true, the original brush will not be removed.
+            - transferOverlay: Allow disabling transferring overlays to this
+              template. The IDs will be removed instead. (This can be an instvar).
     - keys/localkeys: If set, a brush entity will instead be generated with
             these values. This overrides force world/detail.
             Specially-handled keys:
             - "origin", offset automatically.
-            - "movedir" on func_movelinear - set a normal surounded by <>,
+            - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
-    - invertVar: If this fixup value is true, tile colour will be swapped to
-            the opposite of the current force option. If it is set to
-            'white' or 'black', that colour will be forced instead.
-    - visgroup: Sets how vigsrouped parts are handled. If 'none' (default),
+    - colorVar: If this fixup var is set
+            to 'white' or 'black', that colour will be forced.
+            If the value is '<editor>', the colour will be chosen based on
+            the color of the surface for ItemButtonFloor, funnels or
+            entry/exit frames.
+    - invertVar: If this fixup value is true, tile colour will be
+            swapped to the opposite of the current force option. This applies
+            after colorVar.
+    - visgroup: Sets how visgrouped parts are handled. If 'none' (default),
             they are ignored. If 'choose', one is chosen. If a number, that
             is the percentage chance for each visgroup to be added.
+    - visgroup_force_var: If set and True, visgroup is ignored and all groups
+            are added.
     """
     (
-        temp_id,
+        orig_temp_id,
         replace_tex,
         force_colour,
         force_grid,
         force_type,
         replace_brush_pos,
         rem_replace_brush,
+        transfer_overlays,
         additional_replace_ids,
         invert_var,
+        color_var,
         visgroup_func,
+        visgroup_force_var,
         key_block,
     ) = res.value
+    temp_id = conditions.resolve_value(inst, orig_temp_id)
 
-    if temp_id not in TEMPLATES:
+    if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+        def visgroup_func(group):
+            """Use all the groups."""
+            yield from group
+
+    temp_name, visgroups = template_brush.parse_temp_name(temp_id)
+    try:
+        template = template_brush.get_template(temp_name)
+    except template_brush.InvalidTemplateName:
         # The template map is read in after setup is performed, so
         # it must be checked here!
         # We don't want an error, just quit
-        LOGGER.warning('"{}" not a valid template!', temp_id)
+        if temp_id != orig_temp_id:
+            LOGGER.warning(
+                '{} -> "{}" is not a valid template!',
+                orig_temp_id,
+                temp_name
+            )
+        else:
+            LOGGER.warning(
+                '"{}" is not a valid template!',
+                temp_name
+            )
         return
 
-    if invert_var != '':
-        invert_val = inst.fixup[invert_var].casefold()
+    if color_var.casefold() == '<editor>':
+        # Check traits for the colour it should be.
+        traits = instance_traits.get(inst)
+        if 'white' in traits:
+            force_colour = template_brush.MAT_TYPES.white
+        elif 'black' in traits:
+            force_colour = template_brush.MAT_TYPES.black
+        else:
+            LOGGER.warning(
+                '"{}": Instance "{}" '
+                "isn't one with inherent color!",
+                temp_id,
+                inst['file'],
+            )
+    elif color_var:
+        color_val = conditions.resolve_value(inst, color_var).casefold()
 
-        if invert_val == 'white':
-            force_colour = conditions.MAT_TYPES.white
-        elif invert_val == 'black':
-            force_colour = conditions.MAT_TYPES.black
-        elif srctools.conv_bool(invert_val):
-            force_colour = conditions.TEMP_COLOUR_INVERT[force_colour]
+        if color_val == 'white':
+            force_colour = template_brush.MAT_TYPES.white
+        elif color_val == 'black':
+            force_colour = template_brush.MAT_TYPES.black
+    # else: no color var
+
+    if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):
+        force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
+    # else: False value, no invert.
 
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles', '0 0 0'])
-    temp_data = conditions.import_template(
-        temp_id,
+    temp_data = template_brush.import_template(
+        template,
         origin,
         angles,
         targetname=inst['targetname', ''],
         force_type=force_type,
         visgroup_choose=visgroup_func,
+        add_to_map=True,
+        additional_visgroups=visgroups,
     )
 
     if key_block is not None:
@@ -584,10 +665,11 @@ def res_import_template(inst: Entity, res):
             temp_data,
             brush_group,
             rem_replace_brush,
-            additional_replace_ids,
+            map(int, additional_replace_ids | template.overlay_faces),
+            conv_bool(conditions.resolve_value(inst, transfer_overlays), True),
         )
 
-    conditions.retexture_template(
+    template_brush.retexture_template(
         temp_data,
         origin,
         inst.fixup,
@@ -598,7 +680,7 @@ def res_import_template(inst: Entity, res):
 
 
 @make_result('HollowBrush')
-def res_hollow_brush(inst, res):
+def res_hollow_brush(inst: Entity, res: Property):
     """Hollow out the attached brush, as if EmbeddedVoxel was set.
 
     This just removes the surface if it's already an embeddedVoxel. This allows
@@ -618,6 +700,80 @@ def res_hollow_brush(inst, res):
         group,
         remove_orig_face=srctools.conv_bool(res['RemoveFace', False])
     )
+
+# Position -> entity
+# We merge ones within 3 blocks of our item.
+CHECKPOINT_TRIG = {}  # type: Dict[Tuple[float, float, float], Entity]
+
+# Approximately a 3-distance from
+# the center.
+#   x
+#  xxx
+# xx xx
+#  xxx
+#   x
+CHECKPOINT_NEIGHBOURS = list(Vec.iter_grid(
+    Vec(-128, -128, 0),
+    Vec(128, 128, 0),
+    stride=128,
+))
+CHECKPOINT_NEIGHBOURS.extend([
+    Vec(-256, 0, 0),
+    Vec(256, 0, 0),
+    Vec(0, -256, 0),
+    Vec(0, 256, 0),
+])
+# Don't include ourself..
+CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
+
+
+@make_result('CheckpointTrigger')
+def res_checkpoint_trigger(inst: Entity, res: Property):
+    """Generate a trigger underneath coop checkpoint items
+
+    """
+
+    if vbsp.GAME_MODE == 'SP':
+        # We can't have a respawn dropper in singleplayer.
+        # Not generating the trigger means it's not going to
+        # do anything.
+        return
+
+    pos = brushLoc.POS.raycast_world(
+        Vec.from_str(inst['origin']),
+        direction=(0, 0, -1),
+    )
+    bbox_min = pos - (192, 192, 64)
+    bbox_max = pos + (192, 192, 64)
+
+    # Find triggers already placed next to ours, and
+    # merge with them if that's the case
+    for offset in CHECKPOINT_NEIGHBOURS:
+        near_pos = pos + offset
+        try:
+            trig = CHECKPOINT_TRIG[near_pos.as_tuple()]
+            break
+        except KeyError:
+            pass
+    else:
+        # None found, make one.
+        trig = inst.map.create_ent(
+            classname='trigger_playerteam',
+            origin=pos,
+        )
+        trig.solids = []
+        CHECKPOINT_TRIG[pos.as_tuple()] = trig
+
+    trig.solids.append(inst.map.make_prism(
+        bbox_min,
+        bbox_max,
+        mat=const.Tools.TRIGGER,
+    ).solid)
+
+    for prop in res:
+        out = Output.parse(prop)
+        out.target = conditions.local_name(inst, out.target)
+        trig.add_out(out)
 
 
 @make_result('SetTile')

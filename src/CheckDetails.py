@@ -15,7 +15,7 @@ from tooltip import add_tooltip
 import utils
 import tk_tools
 
-from typing import List
+from typing import List, Iterator
 
 
 UP_ARROW = '\u25B3'
@@ -220,10 +220,7 @@ class CheckDetails(ttk.Frame):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(
-            self.wid_head_check,
-            "Toggle all checkboxes."
-        )
+        add_tooltip(self.wid_head_check, _("Toggle all checkboxes."))
 
         def checkbox_enter(e):
             """When hovering over the 'all' checkbox, highlight the others."""
@@ -401,7 +398,7 @@ class CheckDetails(ttk.Frame):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, _=None):
+    def refresh(self, e=None):
         """Reposition the widgets.
 
         Must be called when self.items is changed,
@@ -478,7 +475,7 @@ class CheckDetails(ttk.Frame):
 
         self.wid_canvas['scrollregion'] = (0, 0, width, height)
 
-    def sort(self, index, _=None):
+    def sort(self, index, e=None):
         """Click event for headers."""
         if self.sort_ind is not None:
             self.wid_head_sort[self.sort_ind]['text'] = ''
@@ -497,6 +494,14 @@ class CheckDetails(ttk.Frame):
             reverse=self.rev_sort,
         )
         self.refresh()
+
+    def checked(self) -> Iterator[Item]:
+        """Yields enabled check items."""
+        return (item for item in self.items if item.state_var.get())
+
+    def unchecked(self) -> Iterator[Item]:
+        """Yields disabled check items."""
+        return (item for item in self.items if not item.state_var.get())
 
 
 if __name__ == '__main__':

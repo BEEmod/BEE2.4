@@ -27,6 +27,9 @@ def grid_to_world(pos: Vec) -> Vec:
     """Given a grid position, find the center of the real block."""
     return pos * 128 + (64, 64, 64)
 
+w2g = world_to_grid
+g2w = grid_to_world
+
 
 class Block(Enum):
     """Various contents categories for grid positions."""
@@ -98,6 +101,24 @@ class Block(Enum):
         """Is this the base of goo or a bottomless pit?"""
         return self.value in (10, 13, 20, 23)
 
+# Keywords to a set of blocks.
+BLOCK_LOOKUP = {
+    block.name.casefold(): {block}
+    for block in Block
+}
+BLOCK_LOOKUP['goo'] = {
+    Block.GOO_SINGLE,
+    Block.GOO_TOP,
+    Block.GOO_MID,
+    Block.GOO_BOTTOM,
+}
+BLOCK_LOOKUP['pit'] = {
+    Block.PIT_SINGLE,
+    Block.PIT_TOP,
+    Block.PIT_MID,
+    Block.PIT_BOTTOM,
+}
+
 _grid_keys = Union[Vec, Vec_tuple, tuple, slice]
 
 
@@ -121,6 +142,54 @@ class Grid(Dict[_grid_keys, Block]):
         x, y, z = pos
         return x, y, z
 
+    def raycast(
+        self,
+        pos: _grid_keys,
+        direction: Vec,
+        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM}),
+    ) -> Vec:
+        """Move in a direction until hitting a block of a certain type.
+
+        This returns the position just before hitting a block (which might
+        be the start position.)
+
+        The direction vector should be integer numbers (1/0 usually).
+        collide is the set of position types to stop at. The default is all
+        "solid" walls.
+
+        ValueError is raised if VOID is encountered, or this moves outside the
+        map.
+        """
+        start_pos = pos = Vec(*self._conv_key(pos))
+        direction = Vec(direction)
+        collide = frozenset(collide)
+        # 50x50x50 diagonal = 86, so that's the largest distance
+        # you could possibly move.
+        for i in range(90):
+            next_pos = pos + direction
+            block = super().get(next_pos.as_tuple(), Block.VOID)
+            if block is Block.VOID:
+                raise ValueError(
+                    'Reached VOID at ({}) when '
+                    'raycasting from {} with direction {}!'.format(
+                        next_pos, start_pos, direction
+                    )
+                )
+            if block in collide:
+                return pos
+            pos = next_pos
+        else:
+            raise ValueError('Moved too far! (> 90)')
+
+    def raycast_world(
+        self,
+        pos: Vec,
+        direction: Vec,
+        collide=frozenset({Block.SOLID, Block.EMBED, Block.PIT_BOTTOM, Block.PIT_SINGLE}),
+    ) -> Vec:
+        """Like raycast(), but accepts and returns world positions instead."""
+        return g2w(self.raycast(w2g(pos), direction, collide))
+
     def __getitem__(self, pos: _grid_keys):
         return super().get(self._conv_key(pos), Block.VOID)
 
@@ -128,7 +197,9 @@ class Grid(Dict[_grid_keys, Block]):
 
     def __setitem__(self, pos: _grid_keys, value: Block):
         if type(value) is not Block:
-            raise ValueError('Must be set to a Block item!')
+            raise ValueError('Must be set to a Block item, not "{}"!'.format(
+                type(value).__name__,
+            ))
 
         super().__setitem__(self._conv_key(pos), value)
 

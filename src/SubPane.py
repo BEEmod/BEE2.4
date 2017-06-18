@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import ttk
 
 import tooltip
+import tk_tools
 import utils
 import srctools
 import sound as snd
@@ -73,12 +74,12 @@ class SubPane(Toplevel):
         )
         tooltip.add_tooltip(
             self.tool_button,
-            text='Hide/Show the "{}" window.'.format(title))
+            text=_('Hide/Show the "{}" window.').format(title))
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
         self.title(title)
-        self.iconbitmap('../BEE2.ico')
+        tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
         parent.bind('<Configure>', self.follow_main, add='+')
@@ -137,10 +138,10 @@ class SubPane(Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, _=None):
+    def enable_snap(self, e=None):
         self.allow_snap = True
 
-    def snap_win(self, _=None):
+    def snap_win(self, e=None):
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
@@ -151,7 +152,7 @@ class SubPane(Toplevel):
             self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, _=None):
+    def follow_main(self, e=None):
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = utils.adjust_inside_screen(

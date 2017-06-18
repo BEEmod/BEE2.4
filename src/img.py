@@ -4,19 +4,44 @@ The image is saved in the dictionary, so it stays in memory. Otherwise
 it could get deleted, which will make the rendered image vanish.
 """
 
-from PIL import ImageTk, Image
+from PIL import ImageTk, Image, ImageDraw, ImageFont
 import os.path
 
 from srctools import Vec
+from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import utils
+
+from typing import Iterable, Union, Dict, Tuple
 
 LOGGER = utils.getLogger('img')
 
-cached_img = {}
-cached_squares = {}
+cached_img = {}  # type: Dict[Tuple[str, int, int], ImageTk.PhotoImage]
+# r, g, b, size -> image
+cached_squares = {}  # type: Dict[Union[Tuple[float, float, float, int], Tuple[str, int]], ImageTk.PhotoImage]
+
+# Colour of the palette item background
+PETI_ITEM_BG = Vec(229, 232, 233)
+
+filesystem = FileSystemChain(
+    # Highest priority is the in-built UI images.
+    RawFileSystem(os.path.join(os.getcwd(), '../', 'images')),
+)
 
 
-def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
+def load_filesystems(systems: Iterable[FileSystem]):
+    """Load in the filesystems used in packages."""
+    for sys in systems:
+        filesystem.add_sys(sys, 'resources/BEE2/')
+
+
+def tuple_size(size: Union[Tuple[int, int], int]) -> Tuple[int, int]:
+    """Return an xy tuple given a size or tuple."""
+    if isinstance(size, tuple):
+        return size
+    return size, size
+
+
+def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     """Loads in an image for use in TKinter.
 
     - The .png suffix will automatically be added.
@@ -24,50 +49,38 @@ def png(path, resize_to=None, error=None, algo=Image.LANCZOS):
     zip cache.
     - If resize_to is set, the image will be resized to that size using the algo
     algorithm.
+    - This caches images, so it won't be deleted (Tk doesn't keep a reference
+      to the Python object), and subsequent calls don't touch the hard disk.
     """
     if not path.casefold().endswith(".png"):
         path += ".png"
+    path = path.casefold().replace('\\', '/')
     orig_path = path
 
-    if (orig_path, resize_to) in cached_img:
-        return cached_img[orig_path, resize_to]
+    resize_width, resize_height = resize_to = tuple_size(resize_to)
 
-    base_path = os.path.abspath(
-        os.path.join(
-            os.getcwd(),
-            "../",
-            "images",
-            path,
-        )
-    )
-    cache_path = os.path.abspath(
-        os.path.join(
-            os.getcwd(),
-            "../",
-            "images",
-            "cache",
-            path,
-        )
-    )
+    try:
+        return cached_img[path, resize_width, resize_height]
+    except KeyError:
+        pass
 
-    if os.path.isfile(base_path):
-        path = base_path
-    else:
-        # If not in the main folder, load from the zip-cache
-        path = cache_path
+    with filesystem:
+        try:
+            img_file = filesystem[path]
+        except KeyError:
+            LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
+            return error or img_error
+        with img_file.open_bin() as file:
+            image = Image.open(file)
+            image.load()
 
-    if os.path.isfile(path):
-        image = Image.open(path)
-    else:
-        LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
-        return error or img_error
+    if resize_to != (0, 0):
+        image = image.resize(resize_to, algo)
 
-    if resize_to:
-        image = image.resize((resize_to, resize_to), algo)
+    tk_img = ImageTk.PhotoImage(image=image)
 
-    img = ImageTk.PhotoImage(image=image)
-    cached_img[path, resize_to] = img
-    return img
+    cached_img[orig_path, resize_width, resize_height] = tk_img
+    return tk_img
 
 
 def spr(name, error=None):
@@ -82,6 +95,95 @@ def icon(name, error=None):
     return png(os.path.join("items", name), error=error, resize_to=64)
 
 
+def get_app_icon():
+    """On non-Windows, retrieve the application icon."""
+    with open('../bee2.ico', 'rb') as f:
+        return ImageTk.PhotoImage(Image.open(f))
+
+
+def make_splash_screen(
+    max_width: float,
+    max_height: float,
+    base_height: int,
+    text1_bbox: Tuple[int, int, int, int],
+    text2_bbox: Tuple[int, int, int, int],
+):
+    """Create the splash screen image.
+
+    This uses a random screenshot from the splash_screens directory.
+    It then adds the gradients on top.
+    """
+    import random
+    folder = os.path.join('..', 'images', 'splash_screen')
+    path = '<nothing>'
+    try:
+        path = random.choice(os.listdir(folder))
+        with open(os.path.join(folder, path), 'rb') as img_file:
+            image = Image.open(img_file)
+            image.load()
+    except (FileNotFoundError, IndexError, IOError):
+        # Not found, substitute a gray block.
+        LOGGER.warning('No splash screen found (tried "{}")', path)
+        image = Image.new(
+            mode='RGB',
+            size=(round(max_width), round(max_height)),
+            color=(128, 128, 128),
+        )
+    else:
+        if image.height > max_height:
+            image = image.resize((
+                round(image.width / image.height * max_height),
+                round(max_height),
+            ))
+        if image.width > max_width:
+            image = image.resize((
+                round(max_width),
+                round(image.height / image.width * max_width),
+            ))
+
+    draw = ImageDraw.Draw(image, 'RGBA')
+
+    rect_top = image.height - base_height - 40
+    draw.rectangle(
+        (
+            0,
+            rect_top + 40,
+            image.width,
+            image.height,
+         ),
+        fill=(0, 150, 120, 64),
+    )
+    # Add a gradient above the rectangle..
+    for y in range(40):
+        draw.rectangle(
+            (
+                0,
+                rect_top + y,
+                image.width,
+                image.height,
+            ),
+            fill=(0, 150, 120, int(y * 128/40)),
+        )
+
+    # Draw the shadows behind the text.
+    # This is done by progressively drawing smaller rectangles
+    # with a low alpha. The center is overdrawn more making it thicker.
+    for x1, y1, x2, y2 in [text1_bbox, text2_bbox]:
+        for border in reversed(range(5)):
+            draw.rectangle(
+                (
+                    x1 - border,
+                    y1 - border,
+                    x2 + border,
+                    y2 + border,
+                ),
+                fill=(0, 150, 120, 20),
+            )
+
+    tk_img = ImageTk.PhotoImage(image=image)
+    return tk_img, image.width, image.height
+
+
 def color_square(color: Vec, size=16):
     """Create a square image of the given size, with the given color."""
     key = color.x, color.y, color.z, size
@@ -91,14 +193,35 @@ def color_square(color: Vec, size=16):
     except KeyError:
         img = Image.new(
             mode='RGB',
-            size=(size, size),
+            size=tuple_size(size),
             color=(int(color.x), int(color.y), int(color.z)),
         )
         tk_img = ImageTk.PhotoImage(image=img)
-        cached_squares[color.as_tuple(), size] = tk_img
-
+        cached_squares[key] = tk_img
         return tk_img
 
 
+def invis_square(size):
+    """Create a square image of the given size, filled with 0-alpha pixels."""
+
+    try:
+        return cached_squares['alpha', size]
+    except KeyError:
+        img = Image.new(
+            mode='RGBA',
+            size=tuple_size(size),
+            color=(0, 0, 0, 0),
+        )
+        tk_img = ImageTk.PhotoImage(image=img)
+        cached_squares['alpha', size] = tk_img
+
+        return tk_img
+
+BLACK_64 = color_square(Vec(0, 0, 0), size=64)
+BLACK_96 = color_square(Vec(0, 0, 0), size=96)
+PAL_BG_64 = color_square(PETI_ITEM_BG, size=64)
+PAL_BG_96 = color_square(PETI_ITEM_BG, size=96)
+
 # If image is not readable, use this instead
-img_error = png('BEE2/error')
+# If this actually fails, use the black image.
+img_error = png('BEE2/error', error=BLACK_64)

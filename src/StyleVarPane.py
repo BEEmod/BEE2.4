@@ -13,6 +13,7 @@ from SubPane import SubPane
 import packageLoader
 import tooltip
 import utils
+import itemconfig
 
 from typing import Union
 
@@ -25,43 +26,62 @@ styleOptions = [
     # ID, Name, default value
     stylevar(
         id='MultiverseCave',
-        name='Multiverse Cave',
+        name=_('Multiverse Cave'),
         default=1,
-        desc='Play the Workshop Cave Johnson lines on map start.'
+        desc=_('Play the Workshop Cave Johnson lines on map start.')
     ),
 
     stylevar(
         id='FixFizzlerBump',
-        name='Prevent Portal Bump  (fizzler)',
+        name=_('Prevent Portal Bump (fizzler)'),
         default=0,
-        desc='Add portal bumpers to make it more difficult to portal across '
-             'fizzler edges. This can prevent placing portals in tight spaces '
-             'near fizzlers, or fizzle portals on activation.'
+        desc=_('Add portal bumpers to make it more difficult to portal across '
+               'fizzler edges. This can prevent placing portals in tight '
+               'spaces near fizzlers, or fizzle portals on activation.')
     ),
 
     stylevar(
         id='NoMidVoices',
-        name='Suppress Mid-Chamber Dialogue',
+        name=_('Suppress Mid-Chamber Dialogue'),
         default=0,
-        desc='Disable all voicelines other than entry and exit lines.'
+        desc=_('Disable all voicelines other than entry and exit lines.')
     ),
 
     stylevar(
         id='UnlockDefault',
-        name='Unlock Default Items',
+        name=_('Unlock Default Items'),
         default=0,
-        desc='Allow placing and deleting the mandatory Entry/Exit Doors and '
-             'Large Observation Room. Use with caution, this can have weird '
-             'results!'
+        desc=_('Allow placing and deleting the mandatory Entry/Exit Doors and '
+               'Large Observation Room. Use with caution, this can have weird '
+               'results!')
     ),
 
     stylevar(
         id='AllowGooMist',
-        name='Allow Adding Goo Mist',
+        name=_('Allow Adding Goo Mist'),
         default=1,
-        desc='Add mist particles above Toxic Goo in certain styles. This can '
-             'increase the entity count significantly with large, complex '
-             'goo pits, so disable if needed.'
+        desc=_('Add mist particles above Toxic Goo in certain styles. This can '
+               'increase the entity count significantly with large, complex '
+               'goo pits, so disable if needed.')
+    ),
+
+    stylevar(
+        id='FunnelAllowSwitchedLights',
+        name=_('Light Reversible Excursion Funnels'),
+        default=1,
+        desc=_('Funnels emit a small amount of light. However, if multiple funnels '
+               'are near each other and can reverse polarity, this can cause '
+               'lighting issues. Disable this to prevent that by disabling '
+               'lights. Non-reversible Funnels do not have this issue.'),
+    ),
+
+    stylevar(
+        id='EnableShapeSignageFrame',
+        name=_('Enable Shape Framing'),
+        default=1,
+        desc=_('After 10 shape-type antlines are used, the signs repeat. '
+               'With this enabled, colored frames will be added to '
+               'distinguish them.'),
     ),
 ]
 
@@ -117,12 +137,14 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
     else:
         desc = []
 
-    desc.append('Default: {}'.format(
-        'On' if var.default else 'Off'
-    ))
+    desc.append(
+        _('Default: On')
+        if var.default else
+        _('Default: Off')
+    )
 
     if is_hardcoded or var.styles is None:
-        desc.append('Styles: Unstyled')
+        desc.append(_('Styles: Unstyled'))
     else:
         app_styles = [
             style
@@ -132,13 +154,16 @@ def make_desc(var: Union[packageLoader.StyleVar, stylevar], is_hardcoded=False):
         ]
 
         if len(app_styles) == len(STYLES):
-            desc.append('Styles: All')
+            desc.append(_('Styles: All'))
         else:
-            desc.append('Styles: ' + ', '.join(sorted(
+            style_list = sorted(
                 style.selitem_data.short_name
                 for style in
                 app_styles
-            )))
+            )
+            desc.append(
+                ngettext('Style: {}', 'Styles: {}', len(style_list)
+            ).format(', '.join(style_list)))
 
     return '\n'.join(desc)
 
@@ -151,7 +176,7 @@ def refresh(selected_style):
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
-        if var.styles is None:
+        if var.applies_to_all():
             continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
@@ -192,7 +217,7 @@ def make_pane(tool_frame):
     window = SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Style Properties',
+        title=_('Style/Item Properties'),
         name='style',
         resize_y=True,
         tool_frame=tool_frame,
@@ -200,27 +225,39 @@ def make_pane(tool_frame):
         tool_col=3,
     )
 
-    UI['style_can'] = Canvas(window, highlightthickness=0)
+    UI['nbook'] = nbook = ttk.Notebook(window)
+
+    nbook.grid(row=0, column=0, sticky=NSEW)
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+    nbook.enable_traversal()
+
+    stylevar_frame = ttk.Frame(nbook)
+    stylevar_frame.rowconfigure(0, weight=1)
+    stylevar_frame.columnconfigure(0, weight=1)
+    nbook.add(stylevar_frame, text=_('Styles'))
+
+    UI['style_can'] = Canvas(stylevar_frame, highlightthickness=0)
     # need to use a canvas to allow scrolling
     UI['style_can'].grid(sticky='NSEW')
     window.rowconfigure(0, weight=1)
 
     UI['style_scroll'] = ttk.Scrollbar(
-        window,
+        stylevar_frame,
         orient=VERTICAL,
         command=UI['style_can'].yview,
         )
     UI['style_scroll'].grid(column=1, row=0, rowspan=2, sticky="NS")
     UI['style_can']['yscrollcommand'] = UI['style_scroll'].set
 
-    utils.add_mousewheel(UI['style_can'], window)
+    utils.add_mousewheel(UI['style_can'], stylevar_frame)
 
     canvas_frame = ttk.Frame(UI['style_can'])
 
-    frame_all = ttk.Labelframe(canvas_frame, text="All:")
+    frame_all = ttk.Labelframe(canvas_frame, text=_("All:"))
     frame_all.grid(row=0, sticky='EW')
 
-    frm_chosen = ttk.Labelframe(canvas_frame, text="Selected Style:")
+    frm_chosen = ttk.Labelframe(canvas_frame, text=_("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(
@@ -228,18 +265,18 @@ def make_pane(tool_frame):
         orient=HORIZONTAL,
         ).grid(row=2, sticky='EW', pady=(10, 5))
 
-    frm_other = ttk.Labelframe(canvas_frame, text="Other Styles:")
+    frm_other = ttk.Labelframe(canvas_frame, text=_("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
     UI['stylevar_chosen_none'] = ttk.Label(
         frm_chosen,
-        text='No Options!',
+        text=_('No Options!'),
         font='TkMenuFont',
         justify='center',
         )
     UI['stylevar_other_none'] = ttk.Label(
         frm_other,
-        text='None!',
+        text=_('None!'),
         font='TkMenuFont',
         justify='center',
         )
@@ -271,7 +308,7 @@ def make_pane(tool_frame):
             'command': functools.partial(set_stylevar, var.id)
             }
         desc = make_desc(var)
-        if var.styles is None:
+        if var.applies_to_all():
             # Available in all styles - put with the hardcoded variables.
             all_pos += 1
 
@@ -305,3 +342,7 @@ def make_pane(tool_frame):
         ).grid(row=1, column=0)
 
     UI['style_can'].bind('<Configure>', flow_stylevar)
+
+    item_config_frame = ttk.Frame(nbook)
+    nbook.add(item_config_frame, text=_('Items'))
+    itemconfig.make_pane(item_config_frame)

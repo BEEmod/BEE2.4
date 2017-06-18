@@ -1,8 +1,18 @@
 """Various constant values for use by VBSP. (Mainly texture names.)"""
 from enum import Enum, EnumMeta
 
+from srctools import Side as _Side
 
-class ConstGroupMeta(EnumMeta):
+__all__ = [
+    'MaterialGroup',
+
+    'WhitePan', 'BlackPan',
+    'Signage', 'Antlines',
+    'Goo', 'Fizzler',
+    'Special', 'Tools',
+]
+
+class MaterialGroupMeta(EnumMeta):
     @classmethod
     def __prepare__(mcs, cls, bases):
         """Override Enum class-dict type.
@@ -21,9 +31,11 @@ class ConstGroupMeta(EnumMeta):
         return RepDict()
         
     def __contains__(cls, value):
-        """ConstGroup can check if strings are equal to a member."""
+        """MaterialGroup can check if strings are equal to a member."""
         if isinstance(value, str):
             return value.casefold() in cls._value2member_map_
+        elif isinstance(value, _Side):
+            return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
         
     def __call__(cls, value, *args, **kwargs):
@@ -34,26 +46,76 @@ class ConstGroupMeta(EnumMeta):
     __call__.__doc__ = EnumMeta.__call__.__doc__
 
 
-class ConstGroup(str, Enum, metaclass=ConstGroupMeta):
+class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
     """Adds a few useful features to the string enums.
 
     * They are compared case-insensitively.
-    * 'str' in ConstGroup can be done to check if a string is equal
+    * This can be compared to VMF sides to match the material.
+    * 'str' in MaterialGroup can be done to check if a string is equal
       to any members.
     * str(member) == member.value
     """
     def __eq__(self, other):
+        if isinstance(other, _Side):
+            other = other.mat
         return self.value == other.casefold()
 
     def __str__(self):
         return self.value
 
     def __hash__(self):
-        """Allow hashing ConstGroup values."""
+        """Allow hashing MaterialGroup values."""
         return hash(self.value)
 
 
-class WhitePan(ConstGroup):
+class ItemClass(MaterialGroup):
+    """PeTI item classes."""
+    # Default
+    UNCLASSED = 'ItemBase'
+
+    FLOOR_BUTTON = 'ItemButtonFloor'
+    PEDESTAL_BUTTON = 'ItemPedestalButton'
+
+    PANEL_STAIR = 'ItemStairs'
+    PANEL_FLIP = 'ItemPanelFlip'
+    PANEL_ANGLED = 'ItemAngledPanel'  # Both items
+    PISTON_PLATFORM = 'ItemPistonPlatform'
+    TRACK_PLATFORM = 'ItemRailPlatform'
+
+    CUBE = 'ItemCube'
+    GEL = PAINT = 'ItemPaintSplat'
+    FAITH_PLATE = 'ItemCatapult'
+
+    CUBE_DROPPER = 'ItemCubeDropper'
+    GEL_DROPPER = PAINT_DROPPER = 'ItemPaintDropper'
+    FAITH_TARGET = 'ItemCatapultTarget'
+
+    # Input-less items
+    GLASS = 'ItemBarrier'
+    TURRET = 'ItemTurret'
+    LIGHT_STRIP = 'ItemLightStrip'
+    GOO = 'ItemGoo'
+
+    # Items with inputs
+    LASER_EMITTER = 'ItemLaserEmitter'
+    FUNNEL = 'ItemTBeam'
+    FIZZLER = 'ItemBarrierHazard'
+    LIGHT_BRIDGE = 'ItemLightBridge'
+
+    # Extent/handle pseudo-items
+    HANDLE_FIZZLER = 'ItemBarrierHazardExtent'
+    HANDLE_GLASS = 'ItemBarrierExtent'
+    HANDLE_PISTON_PLATFORM = 'ItemPistonPlatformExtent'
+    HANDLE_TRACK_PLATFORM = 'ItemRailPlatformExtent'
+
+    # Entry/Exit corridors
+    DOOR_ENTRY_SP = 'ItemEntranceDoor'
+    DOOR_ENTRY_COOP = 'ItemCoopEntranceDoor'
+    DOOR_EXIT_SP = 'ItemExitDoor'
+    DOOR_EXIT_COOP = 'ItemCoopExitDoor'
+
+
+class WhitePan(MaterialGroup):
     """White tiling."""
     WHITE_FLOOR = "tile/white_floor_tile002a"
     WHITE_1x1 = "tile/white_wall_tile003a"
@@ -62,7 +124,7 @@ class WhitePan(ConstGroup):
     WHITE_4x4 = "tile/white_wall_tile003f"
 
 
-class BlackPan(ConstGroup):
+class BlackPan(MaterialGroup):
     """Black tiling."""
     BLACK_FLOOR = "metal/black_floor_metal_001c"
     BLACK_1x1 = "metal/black_wall_metal_002c"
@@ -71,7 +133,7 @@ class BlackPan(ConstGroup):
     BLACK_4x4 = "metal/black_wall_metal_002b"
 
 
-class Signage(ConstGroup):
+class Signage(MaterialGroup):
     """The various square white signs used in the PeTI."""
     EXIT = "signage/signage_exit"
     ARROW = "signage/signage_overlay_arrow"
@@ -87,7 +149,7 @@ class Signage(ConstGroup):
     SHAPE_WAVY = "signage/signage_shape_wavy"
 
 
-class Special(ConstGroup):
+class Special(MaterialGroup):
     BACKPANELS = "anim_wp/framework/backpanels"
     # Note - this is used in PeTI maps.
     BACKPANELS_CHEAP = "anim_wp/framework/backpanels_cheap"
@@ -98,17 +160,17 @@ class Special(ConstGroup):
     LASERFIELD = "effects/laserplane"
 
 
-class Goo(ConstGroup):
+class Goo(MaterialGroup):
     REFLECTIVE = "nature/toxicslime_a2_bridge_intro"
     CHEAP = "nature/toxicslime_puzzlemaker_cheap"
 
 
-class Antlines(ConstGroup):
+class Antlines(MaterialGroup):
     STRAIGHT = "signage/indicator_lights/indicator_lights_floor"
     CORNER = "signage/indicator_lights/indicator_lights_corner_floor"
 
 
-class Tools(ConstGroup):
+class Tools(MaterialGroup):
     """Tool textures."""
     NODRAW = 'tools/toolsnodraw'
     INVISIBLE = 'tools/toolsinvisible'
@@ -129,7 +191,7 @@ class Tools(ConstGroup):
     BLACK = 'tools/toolsblack'
 
 
-class Fizzler(ConstGroup):
+class Fizzler(MaterialGroup):
     """Fizzler textures."""
     CENTER = "effects/fizzler_center"
     LEFT = "effects/fizzler_l"

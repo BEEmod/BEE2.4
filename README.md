@@ -1,29 +1,35 @@
-[![Join the chat at https://gitter.im/BenVlodgi/BEE2.4](https://badges.gitter.im/BenVlodgi/BEE2.4.svg)](https://gitter.im/BenVlodgi/BEE2.4?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![BEE2.4 Releases](https://img.shields.io/github/downloads/BEEmod/BEE2.4/total.svg?label=App)](https://github.com/BEEmod/BEE2.4/releases)
+[![BEE2-items Releases](https://img.shields.io/github/downloads/BEEmod/BEE2-items/total.svg?label=Packages)](https://github.com/BEEmod/BEE2-items/releases)
+
+Join the Discord [here](https://discord.me/beemod) and the Steam group [here](http://steamcommunity.com/groups/beemod)!
+
+
+![BEE2 Icon](https://raw.githubusercontent.com/BEEmod/BEE2.4/master/bee2.ico)
 # Better Extended Editor 2 version 4 #
-##Portal 2  Mod Tool
+## Portal 2  Mod Tool
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
 different eras, and configure many other aspects. All vanilla items have been upgraded with additional
 bugfixes and improvments.
 
-The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/TeamSpen210/BEE2-items) repository.
+The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
-## Download and Use
+## Download and Use (Recommended)
 Download the latest releases of the BEE2.4 and items from the following pages:
-- [Application](https://github.com/BenVlodgi/BEE2.4/releases)
-- [Item Packages](https://github.com/TeamSpen210/BEE2-items/releases)
+- [Application](https://github.com/BEEmod/BEE2.4/releases)
+- [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
 - Extract the contents of the Application release anywhere you like. _e.g. C:\BEE2.4_
 - Place extracted package folder in the root BEE2 folder. _e.g. C:\BEE2.4\packages_
 - To run, locate the BEE2.exe in the bin folder and execute it. _e.g. C:\BEE2.4\bin\BEE2.exe_
 
-
-## Dependencies: ##
+## Build From Source ##
+### Dependencies ###
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
 - [noise](https://pypi.python.org/pypi/noise/)  (For perlin/simplex noise, as `src/perlin.py`)
 - [markdown](https://pythonhosted.org/Markdown/)
 - TKinter/TTK (Standard Library)
 
-## Compilation: ##
+### Compilation ###
 To build the executable versions of the BEE2, run the `compile_BEE2` and `compile_VBSP_VRAD` scripts with a command-line
 argument of build:
 
@@ -49,7 +55,7 @@ For the release copy, it should include:
 
 The various `cache` folders and `config` folders should not be included.
 
-## Modules: ##
+### Modules ###
 - Common:
 	- `property_parser`: Library to allow reading and writing Valve's KeyValues format.
 	- `utils`: Various utility functions and a Vector class.

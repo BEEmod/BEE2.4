@@ -7,15 +7,20 @@ import io
 import random
 
 from srctools import Property, Vec, parse_vec_str
+from BEE2_config import ConfigFile
 import srctools
 import utils
 
-from typing import T, Type, Optional, Iterator
+from typing import Union, Tuple,  TypeVar, Type, Optional, Iterator
 
 LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
 TEXTURES = {}
+
+# Overwritten by VBSP to get the actual values.
+ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
+
 
 class TYPE(Enum):
     """The types arguments can have."""
@@ -33,9 +38,11 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
+OptionType = TypeVar('OptionType', str, int, float, bool, Vec)
+
 
 class Opt:
-    def __init__(self, id, default, doc, fallback=None):
+    def __init__(self, id: str, default, doc, fallback=None):
         if isinstance(default, TYPE):
             self.type = default
             self.default = None
@@ -46,9 +53,11 @@ class Opt:
         self.name = id
         self.fallback = fallback
         # Remove indentation, and trailing carriage return
-        self.doc = inspect.cleandoc(doc).rstrip('\n').splitlines()
+        self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
-            self.doc += 'If unset, the default is read from `{}`.'.format(default)
+            self.doc.append(
+                'If unset, the default is read from `{}`.'.format(default)
+            )
 
 
 def load_options(opt_blocks: Iterator[Property]):
@@ -108,7 +117,7 @@ def load_options(opt_blocks: Iterator[Property]):
         LOGGER.warning('Extra config options: {}', set_vals)
 
 
-def get(expected_type: Type[T], name) -> Optional[T]:
+def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
@@ -150,25 +159,81 @@ def get_all_tex(name: str) -> list:
     except TypeError:
         raise Exception('No texture "' + name + '"!')
 
+
+def get_itemconf(
+    name: Union[str, Tuple[str, str]],
+    default: Optional[OptionType],
+    timer_delay: int=None,
+) -> Optional[OptionType]:
+    """Get an itemconfig value.
+
+    The name should be an 'ID:Section', or a tuple of the same.
+    The type of the default sets what value it will be converted to.
+    None returns the string, or None if not present.
+    If set, timer_value is the value used for the timer.
+    """
+    if name == '':
+        return default
+
+    try:
+        if isinstance(name, tuple):
+            group_id, wid_id = name
+        else:
+            group_id, wid_id = name.split(':')
+    except ValueError:
+        LOGGER.warning('Invalid item config: {!r}!', name)
+        return default
+
+    wid_id = wid_id.casefold()
+
+    if timer_delay is not None:
+        if timer_delay < 3 or timer_delay > 30:
+            wid_id += '_inf'
+        else:
+            wid_id += '_{}'.format(timer_delay)
+
+    value = ITEM_CONFIG.get_val(group_id, wid_id, '')
+    if not value:
+        return default
+
+    if isinstance(default, str) or default is None:
+        return value
+    elif isinstance(default, Vec):
+        return Vec.from_str(value, default.x, default.y, default.z)
+    elif isinstance(default, bool):
+        return srctools.conv_bool(value, default)
+    elif isinstance(default, float):
+        return srctools.conv_int(value, default)
+    elif isinstance(default, int):
+        return srctools.conv_int(value, default)
+    else:
+        raise TypeError('Invalid default type "{}"!'.format(type(default).__name__))
+
+
 INFO_DUMP_FORMAT = """\
 ## `{id}`{default} ({type})
 {desc}
 
 """
 
+DOC_HEADER = '''\
+<!-- Don't edit. This is generated from text in the compiler code. -->
 
-def dump_info():
-    """Create a Markdown description of all options."""
-    file = io.StringIO()
-    print('*' * 20, file=file)
-    
-    print('# VBSP_config options:', file=file)
+# VBSP_config Options List
+
+This is a list of all current options for the config.
+'''
+
+
+def dump_info(file):
+    """Create the wiki page for item options, given a file to write to."""
+    print(DOC_HEADER, file=file)
     
     for opt in DEFAULTS:
         if opt.default is None:
             default = ''
         elif type(opt.default) is Vec:
-            default =  '(`' + opt.default.join(' ') + '`)' 
+            default = '(`' + opt.default.join(' ') + '`)'
         else:
             default = ' = `' + repr(opt.default) + '`'
         file.write(INFO_DUMP_FORMAT.format(
@@ -177,9 +242,6 @@ def dump_info():
             type=TYPE_NAMES[opt.type],
             desc='\n'.join(opt.doc),
         ))
-    
-    print('*' * 20, file=file)
-    return file.getvalue()
 
 DEFAULTS = [
     Opt('goo_mist', False,
@@ -345,10 +407,6 @@ DEFAULTS = [
 
         This is used for `grating_clip`.
         """),
-    Opt('grating_filter', "@not_paint_bomb",
-        """Filter used on grating `func_vphysics_clips`.
-
-        """),
     Opt('glass_template', TYPE.STR,
         """A template for rotation and scaling of glass.
 
@@ -470,6 +528,9 @@ DEFAULTS = [
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
         """),
+    Opt('skybox', 'sky_black',
+        """The skybox name to use for the map.
+        """),
     Opt('elev_type', "RAND",
         """What type of elevator script to use:
 
@@ -516,5 +577,7 @@ DEFAULTS = [
 
         If set, no bullseye is output with this name in voicelines.
         """),
+    Opt('voice_studio_should_shoot', False,
+        """Should turrets shoot at this character when shown?
+        """),
 ]
-

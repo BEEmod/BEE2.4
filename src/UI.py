@@ -6,20 +6,21 @@ import itertools
 import operator
 import random
 
-import srctools
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
 from itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
-import sound as snd
+from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
 from loadScreen import main_loader as loader
+from srctools.filesys import FileSystem, FileSystemChain
+import sound as snd
 import paletteLoader
+import packageLoader
 import img
+import itemconfig
 import utils
 import tk_tools
 import SubPane
-from selectorWin import selWin, Item as selWinItem, AttrDef as SelAttr
-import extract_packages
 import voiceEditor
 import contextWin
 import gameMan
@@ -28,8 +29,11 @@ import StyleVarPane
 import CompilerPane
 import tagsPane
 import optionWindow
+import helpMenu
 import backup as backup_win
 import tooltip
+
+from typing import Iterable, List
 
 LOGGER = utils.getLogger(__name__)
 
@@ -51,6 +55,8 @@ selected_style = "BEE2_CLEAN"
 selectedPalette = 0
 # fake value the menu radio buttons set
 selectedPalette_radio = IntVar(value=0)
+# Variable used for export button (changes to include game name)
+EXPORT_CMD_VAR = StringVar(value=_('Export...'))
 
 # All the stuff we've loaded in
 item_list = {}
@@ -83,10 +89,7 @@ class Item:
         'pak_id',
         'pak_name',
         'names',
-        'is_dep',
-        'is_wip',
         'url',
-        'can_group',
         ]
 
     def __init__(self, item):
@@ -101,17 +104,22 @@ class Item:
             self.selected_ver = self.item.def_ver['id']
 
         self.item = item
-        self.def_data = self.item.def_ver['def_style']
+        self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
         # These pieces of data are constant, only from the first style.
         self.num_sub = sum(
             1 for _ in
-            self.def_data['editor'].find_all(
+            self.def_data.editor.find_all(
                 "Editor",
                 "Subtype",
                 "Palette",
                 )
             )
-        self.authors = self.def_data['auth']
+        if not self.num_sub:
+            # We need at least one subtype, otherwise something's wrong
+            # with the file.
+            raise Exception('Item {} has no subtypes!'.format(item.id))
+
+        self.authors = self.def_data.authors
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
@@ -127,22 +135,14 @@ class Item:
         self.data = version['styles'].get(
             selected_style,
             self.def_data,
-            )
+            )  # type: packageLoader.ItemVariant
         self.names = [
             gameMan.translate(prop['name', ''])
             for prop in
-            self.data['editor'].find_all("Editor", "Subtype")
+            self.data.editor.find_all("Editor", "Subtype")
             if prop['Palette', None] is not None
         ]
-        self.is_dep = version['is_dep']
-        self.is_wip = version['is_wip']
-        self.url = self.data['url']
-
-        # This checks to see if all the data is present to enable
-        # grouped items
-        self.can_group = ('all' in self.data['icons'] and
-                          self.data['all_name'] is not None and
-                          self.data['all_icon'] is not None)
+        self.url = self.data.url
 
         # attributes used for filtering (tags, authors, packages...)
         self.filter_tags = set()
@@ -150,11 +150,11 @@ class Item:
         # The custom tags set for this item
         self.tags = set()
 
-        for tag in self.data['tags']:
+        for tag in self.data.tags:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.TAG, tag, pretty=tag)
             )
-        for auth in self.data['auth']:
+        for auth in self.data.authors:
             self.filter_tags.add(
                 tagsPane.add_tag(Section.AUTH, auth, pretty=auth)
             )
@@ -170,35 +170,48 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
-        icons = self.data['icons']
+        icons = self.data.icons
         num_picked = sum(
             1 for item in
             pal_picked if
             item.id == self.id
             )
-        if allow_single and self.can_group and num_picked <= single_num:
+        if allow_single and self.data.can_group() and num_picked <= single_num:
             # If only 1 copy of this item is on the palette, use the
             # special icon
-            return img.icon(icons['all'])
+            img_key = 'all'
         else:
-            return img.icon(icons[str(subKey)])
+            img_key = str(subKey)
+
+        if img_key in icons:
+            return img.icon(icons[img_key])
+        else:
+            LOGGER.warning(
+                'Item "{}" in "{}" style has missing PNG '
+                'icon for subtype "{}"!',
+                self.id,
+                selected_style,
+                img_key,
+            )
+            return img.img_error
 
     def properties(self):
         """Iterate through all properties for this item."""
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
-                yield prop.name
+                if not prop.bool('BEE2_ignore'):
+                    yield prop.name
 
     def get_properties(self):
         """Return a dictionary of properties and the current value for them.
 
         """
         result = {}
-        for part in self.data['editor'].find_all("Properties"):
+        for part in self.data.editor.find_all("Properties"):
             for prop in part:
                 name = prop.name
 
-                if srctools.conv_bool(prop['BEE2_ignore', '']):
+                if prop.bool('BEE2_ignore'):
                     continue
 
                 # PROP_TYPES is a dict holding all the modifiable properties.
@@ -249,33 +262,28 @@ class Item:
 
     def get_version_names(self):
         """Get a list of the names and corresponding IDs for the item."""
-        vers = []
-        for ver_id in self.ver_list:
-            ver = self.item.versions[ver_id]
-            name = ver['name']
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.item.versions[ver_id]['styles'][selected_style])
+            for ver_id in self.ver_list
+        }
+        versions = self.ver_list
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = self.ver_list[:1]
 
-            if ver['is_dep']:
-                name = '[DEP] ' + name
-
-            if ver['is_wip']:
-                # We always display the currently selected version, so
-                # it's possible to deselect it.
-                if ver_id != self.selected_ver and not optionWindow.SHOW_WIP.get():
-                    continue
-                name = '[WIP] ' + name
-            vers.append(name)
-        return self.ver_list, vers
+        return versions, [
+            self.item.versions[ver_id]['name']
+            for ver_id in versions
+        ]
 
 
 class PalItem(Label):
     """The icon and associated data for a single subitem."""
     def __init__(self, frame, item, sub, is_pre):
         """Create a label to show an item onscreen."""
-        super().__init__(
-            frame,
-            font=("Courier", 24, "bold"),
-            foreground='red',
-            )
+        super().__init__(frame)
         self.item = item
         self.subKey = sub
         self.id = item.id
@@ -286,22 +294,49 @@ class PalItem(Label):
         self.needs_unlock = item.item.needs_unlock
         self.load_data()
 
-        utils.bind_rightclick(self, contextWin.open_event)
         self.bind(utils.EVENTS['LEFT'], drag_start)
         self.bind(utils.EVENTS['LEFT_SHIFT'], drag_fast)
         self.bind("<Enter>", self.rollover)
         self.bind("<Leave>", self.rollout)
 
+        self.info_btn = Label(
+            self,
+            image=img.png('icons/gear'),
+            relief='ridge',
+            width=12,
+            height=12,
+        )
+
+        click_func = contextWin.open_event(self)
+        utils.bind_rightclick(self, click_func)
+
+        @utils.bind_leftclick(self.info_btn)
+        def info_button_click(e):
+            click_func(e)
+            # Cancel the event sequence, so it doesn't travel up to the main
+            # window and hide the window again.
+            return 'break'
+
+        # Rightclick does the same as the icon.
+        utils.bind_rightclick(self.info_btn, click_func)
+
     def rollover(self, _):
-        """Show the name of a subitem when moused over."""
+        """Show the name of a subitem and info button when moused over."""
         set_disp_name(self)
         self.lift()
         self['relief'] = 'ridge'
+        padding = 2 if utils.WIN else 0
+        self.info_btn.place(
+            x=self.winfo_width() - padding,
+            y=self.winfo_height() - padding,
+            anchor=SE,
+        )
 
     def rollout(self, _):
-        """Reset the item name display when the mouse leaves."""
+        """Reset the item name display and hide the info button when the mouse leaves."""
         clear_disp_name()
         self['relief'] = 'flat'
+        self.info_btn.place_forget()
 
     def change_subtype(self, ind):
         """Change the subtype of this icon.
@@ -336,15 +371,15 @@ class PalItem(Label):
         Call whenever the style changes, so the icons update.
         """
         self.img = self.item.get_icon(self.subKey, self.is_pre)
-        self.name = gameMan.translate(self.item.names[self.subKey])
+        try:
+            self.name = gameMan.translate(self.item.names[self.subKey])
+        except IndexError:
+            LOGGER.warning(
+                'Item <{}> in <{}> style has mismatched subtype count!',
+                self.id, selected_style,
+            )
+            self.name = '??'
         self['image'] = self.img
-        # Put a large D over the item if it's deprecated.
-        if self.item.is_dep:
-            self['text'] = 'OLD'
-            self['compound'] = 'center'
-        else:
-            self['compound'] = 'none'
-            self['text'] = None
 
     def clear(self):
         """Remove any items matching ourselves from the palette.
@@ -398,7 +433,7 @@ def quit_application():
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
     # Destroy the TK windows
-    TK_ROOT.destroy()
+    TK_ROOT.quit()
     sys.exit(0)
 
 gameMan.quit_application = quit_application
@@ -423,7 +458,7 @@ def load_settings():
     optionWindow.load()
 
 
-def load_packages(data):
+def load_packages(data, package_systems: Iterable[FileSystem]):
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -447,11 +482,11 @@ def load_packages(data):
     for editor_sound in data['EditorSound']:
         editor_sounds[editor_sound.id] = editor_sound
 
-    sky_list = []
-    voice_list = []
-    style_list = []
-    music_list = []
-    elev_list = []
+    sky_list   = []  # type: List[selWinItem]
+    voice_list = []  # type: List[selWinItem]
+    style_list = []  # type: List[selWinItem]
+    music_list = []  # type: List[selWinItem]
+    elev_list  = []  # type: List[selWinItem]
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -463,12 +498,15 @@ def load_packages(data):
         }),
         (voice_list, voices, 'QuotePack', {
             'CHAR': 'chars',
+            'MONITOR': 'studio',
+            'TURRET': 'turret_hate',
         }),
         (style_list, styles, 'Style', {
             'VID': 'has_video',
         }),
         (music_list, musics, 'Music', {
             'TBEAM': 'has_tbeam',
+            'TBEAM_SYNC': 'has_synced_tbeam',
             'GEL_BOUNCE': 'has_bouncegel',
             'GEL_SPEED': 'has_speedgel',
         }),
@@ -489,10 +527,9 @@ def load_packages(data):
                 data[name],
                 key=operator.attrgetter('selitem_data.name'),
                 ):
-            selitem_data = obj.selitem_data
             sel_list.append(selWinItem.from_data(
                 obj.id,
-                selitem_data,
+                obj.selitem_data,
                 attrs={
                     key: func(obj)
                     for key, func in
@@ -504,7 +541,7 @@ def load_packages(data):
             loader.step("IMG")
 
     # Set the 'sample' value for music items
-    for sel_item in music_list: # type: selWinItem
+    for sel_item in music_list:  # type: selWinItem
         sel_item.snd_sample = musics[sel_item.name].sample
 
     def win_callback(style_id, win_name):
@@ -541,66 +578,75 @@ def load_packages(data):
     skybox_win = selWin(
         TK_ROOT,
         sky_list,
-        title='Select Skyboxes',
-        desc='The skybox decides what the area outside the chamber is like.'
-             ' It chooses the colour of sky (seen in some items), the style'
-             ' of bottomless pit (if present), as well as color of "fog" (seen'
-             ' in larger chambers.',
+        title=_('Select Skyboxes'),
+        desc=_('The skybox decides what the area outside the chamber is like.'
+               ' It chooses the colour of sky (seen in some items), the style'
+               ' of bottomless pit (if present), as well as color of "fog" '
+               '(seen in larger chambers).'),
         has_none=False,
         callback=win_callback,
         callback_params=['Skybox'],
         attributes=[
-            SelAttr.bool('3D', '3D Skybox', False),
-            SelAttr.color('COLOR', 'Fog Color'),
+            SelAttr.bool('3D', _('3D Skybox'), False),
+            SelAttr.color('COLOR', _('Fog Color')),
         ],
     )
 
     voice_win = selWin(
         TK_ROOT,
         voice_list,
-        title='Select Additional Voice Lines',
-        desc='Voice lines choose which extra voices play as the player enters '
-             'or exits a chamber. They are chosen based on which items are '
-             'present in the map. The additional "Multiverse" Cave lines are'
-             ' controlled seperately in Style Properties.',
+        title=_('Select Additional Voice Lines'),
+        desc=_('Voice lines choose which extra voices play as the player enters'
+               ' or exits a chamber. They are chosen based on which items are'
+               ' present in the map. The additional "Multiverse" Cave lines'
+               ' are controlled separately in Style Properties.'),
         has_none=True,
-        none_desc='Add no extra voice lines.',
+        none_desc=_('Add no extra voice lines.'),
         none_attrs={
-            'CHAR': ['<Multiverse Cave only>'],
+            'CHAR': [_('<Multiverse Cave only>')],
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', 'Characters', ['??']),
+            SelAttr.list('CHAR', _('Characters'), ['??']),
+            SelAttr.bool('TURRET', _('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', _('Monitor Visuals'), False),
         ],
     )
+
+    # Build a chain of the package systems, in the music sample directory
+    # to play sounds from.
+    music_sys = FileSystemChain()
+    for system in package_systems:
+        music_sys.add_sys(system, prefix='resources/music_samp/')
 
     music_win = selWin(
         TK_ROOT,
         music_list,
-        title='Select Background Music',
-        desc='This controls the background music used for a map. Some '
-             'tracks have variations which are played when interacting '
-             'with certain testing elements.',
+        title=_('Select Background Music'),
+        desc=_('This controls the background music used for a map. Some '
+               'tracks have variations which are played when interacting '
+               'with certain testing elements.'),
         has_none=True,
-        has_snd_sample=True,
-        none_desc='Add no music to the map at all.',
+        sound_sys=music_sys,
+        none_desc=_('Add no music to the map at all.'),
         callback=win_callback,
         callback_params=['Music'],
         attributes=[
-            SelAttr.bool('GEL_SPEED', 'Propulsion Gel SFX'),
-            SelAttr.bool('GEL_BOUNCE', 'Repulsion Gel SFX'),
-            SelAttr.bool('TBEAM', 'Excursion Funnel SFX'),
+            SelAttr.bool('GEL_SPEED', _('Propulsion Gel SFX')),
+            SelAttr.bool('GEL_BOUNCE', _('Repulsion Gel SFX')),
+            SelAttr.bool('TBEAM', _('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', _('Synced Funnel Music')),
         ],
     )
 
     style_win = selWin(
         TK_ROOT,
         style_list,
-        title='Select Style',
-        desc='The Style controls many aspects of the map. It decides the '
-             'materials used for walls, the appearance of entrances and '
-             'exits, the design for most items as well as other settings.\n\n'
-             'The style broadly defines the time period a chamber is set in.',
+        title=_('Select Style'),
+        desc=_('The Style controls many aspects of the map. It decides the '
+               'materials used for walls, the appearance of entrances and '
+               'exits, the design for most items as well as other settings.\n\n'
+               'The style broadly defines the time period a chamber is set in.'),
         has_none=False,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
@@ -608,26 +654,26 @@ def load_packages(data):
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
-            SelAttr.bool('VID', 'Elevator Videos', default=True),
+            SelAttr.bool('VID', _('Elevator Videos'), default=True),
         ]
     )
 
     elev_win = selWin(
         TK_ROOT,
         elev_list,
-        title='Select Elevator Video',
-        desc='Set the video played on the video screens in modern Aperture '
-             'elevator rooms. Not all styles feature these. If set to "None", '
-             'a random video will be selected each time the map is played, '
-             'like in the default PeTI.',
-        readonly_desc='This style does not have a elevator video screen.',
+        title=_('Select Elevator Video'),
+        desc=_('Set the video played on the video screens in modern Aperture '
+               'elevator rooms. Not all styles feature these. If set to '
+               '"None", a random video will be selected each time the map is '
+               'played, like in the default PeTI.'),
+        readonly_desc=_('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
-        none_desc='Choose a random video.',
+        none_desc=_('Choose a random video.'),
         callback=win_callback,
         callback_params=['Elevator'],
         attributes=[
-            SelAttr.bool('ORIENT', 'Multiple Orientations'),
+            SelAttr.bool('ORIENT', _('Multiple Orientations')),
         ]
     )
 
@@ -719,10 +765,19 @@ def suggested_refresh():
 
 def refresh_pal_ui():
     """Update the UI to show the correct palettes."""
+    global selectedPalette
+    cur_palette = palettes[selectedPalette]
     palettes.sort(key=str)  # sort by name
-    UI['palette'].delete(0, END)
+    selectedPalette = palettes.index(cur_palette)
+
+    listbox = UI['palette']  # type: Listbox
+    listbox.delete(0, END)
     for i, pal in enumerate(palettes):
-        UI['palette'].insert(i, pal.name)
+        listbox.insert(i, pal.name)
+        if pal.prevent_overwrite:
+            listbox.itemconfig(i, foreground='grey', background='white')
+        else:
+            listbox.itemconfig(i, foreground='black', background='white')
 
     for ind in range(menus['pal'].index(END), 0, -1):
         # Delete all the old radiobuttons
@@ -737,15 +792,10 @@ def refresh_pal_ui():
             value=val,
             command=set_pal_radio,
             )
-    if len(palettes) < 2:
-        UI['pal_remove'].state(('disabled',))
-        menus['pal'].entryconfigure(1, state=DISABLED)
-    else:
-        UI['pal_remove'].state(('!disabled',))
-        menus['pal'].entryconfigure(1, state=NORMAL)
+    selectedPalette_radio.set(selectedPalette)
 
 
-def export_editoritems(_=None):
+def export_editoritems(e=None):
     """Export the selected Items and Style into the chosen game."""
 
     # Convert IntVar to boolean, and only export values in the selected style
@@ -782,10 +832,10 @@ def export_editoritems(_=None):
         item_opts.items()
     }
 
-    success = gameMan.selected_game.export(
+    success, vpk_success = gameMan.selected_game.export(
         style=chosen_style,
         selected_objects={
-            # Specfify the 'chosen item' for each object type
+            # Specify the 'chosen item' for each object type
             'Music': music_win.chosen_id,
             'Skybox': skybox_win.chosen_id,
             'QuotePack': voice_win.chosen_id,
@@ -806,45 +856,76 @@ def export_editoritems(_=None):
     if not success:
         return
 
-    launch_game = messagebox.askyesno(
-        'BEEMOD2',
-        message='Selected Items and Style successfully exported!\n'
-                'Launch game?',
-    )
+    export_filename = 'LAST_EXPORT' + paletteLoader.PAL_EXT
 
     for pal in palettes[:]:
-        if pal.name == '<Last Export>':
+        if pal.filename == export_filename:
             palettes.remove(pal)
-    new_pal = paletteLoader.Palette(
-        '<Last Export>',
-        pal_data,
-        options={},
-        filename='LAST_EXPORT.zip',
-        )
 
-    # Save the configs since we're writing to disk anyway.
-    GEN_OPTS.save_check()
-    item_opts.save_check()
+    new_pal = paletteLoader.Palette(
+        '??',
+        pal_data,
+        # This makes it lookup the translated name
+        # instead of using a configured one.
+        trans_name='LAST_EXPORT',
+        # Use a specific filename - this replaces existing files.
+        filename=export_filename,
+        # And prevent overwrite
+        prevent_overwrite=True,
+        )
+    palettes.append(new_pal)
+    new_pal.save(ignore_readonly=True)
 
     # Update corridor configs for standalone mode..
     CompilerPane.save_corridors()
 
-    # Since last_export is a zip, users won't be able to overwrite it
-    # normally!
-    palettes.append(new_pal)
-    new_pal.save(allow_overwrite=True)
+    # Save the configs since we're writing to disk lots anyway.
+    GEN_OPTS.save_check()
+    item_opts.save_check()
+
+    message = _('Selected Items and Style successfully exported!')
+    if not vpk_success:
+        message += _(
+            '\n\nWarning: VPK files were not exported, quit Portal 2 and '
+            'Hammer to ensure editor wall previews are changed.'
+        )
+
+    chosen_action = optionWindow.AfterExport(
+        optionWindow.AFTER_EXPORT_ACTION.get()
+    )
+
+    messagebox.showinfo('BEEMOD2', message)
+
+    # Launch first so quitting doesn't affect this.
+    if optionWindow.LAUNCH_AFTER_EXPORT.get():
+        gameMan.selected_game.launch()
+
+    # Do the desired action - if quit, we don't bother to update UI.
+    if chosen_action is optionWindow.AfterExport.NORMAL:
+        pass
+    elif chosen_action is optionWindow.AfterExport.MINIMISE:
+        TK_ROOT.iconify()
+    elif chosen_action is optionWindow.AfterExport.QUIT:
+        utils.quit_app()
+    else:
+        raise ValueError('Unknown action "{}"'.format(chosen_action))
+
+    # Select the last_export palette, so reloading loads this item selection.
+    palettes.sort(key=str)
+    selectedPalette_radio.set(palettes.index(new_pal))
+    set_pal_radio()
+
+    # Re-set this, so we clear the '*' on buttons if extracting cache.
+    set_game(gameMan.selected_game)
+
     refresh_pal_ui()
 
-    if launch_game:
-        gameMan.selected_game.launch()
-        TK_ROOT.iconify()
+
+def set_disp_name(item, e=None):
+    UI['pre_disp_name'].configure(text=_('Item: {}').format(item.name))
 
 
-def set_disp_name(item, _=None):
-    UI['pre_disp_name'].configure(text='Item: '+item.name)
-
-
-def clear_disp_name(_=None):
+def clear_disp_name(e=None):
     UI['pre_disp_name'].configure(text='')
 
 
@@ -1008,13 +1089,13 @@ def set_pal_radio():
     set_palette()
 
 
-def set_pal_listbox_selection(_=None):
+def set_pal_listbox_selection(e=None):
     """Select the currently chosen palette in the listbox."""
     UI['palette'].selection_clear(0, len(palettes))
     UI['palette'].selection_set(selectedPalette)
 
 
-def set_palette(_=None):
+def set_palette(e=None):
     """Select a palette."""
     global selectedPalette
     if selectedPalette >= len(palettes) or selectedPalette < 0:
@@ -1025,20 +1106,36 @@ def set_palette(_=None):
     pal_clear()
     menus['pal'].entryconfigure(
         1,
-        label='Delete Palette "'
-        + palettes[selectedPalette].name
-        + '"',
-        )
+        label=_('Delete Palette "{}"').format(palettes[selectedPalette].name),
+    )
     for item, sub in palettes[selectedPalette].pos:
-        if item in item_list.keys():
-            pal_picked.append(PalItem(
-                frames['preview'],
-                item_list[item],
-                sub,
-                is_pre=True
-                ))
-        else:
-            LOGGER.warning('Unknown item "{}"!', item)
+        try:
+            item_group = item_list[item]
+        except KeyError:
+            LOGGER.warning('Unknown item "{}"! for palette', item)
+            continue
+
+        if sub >= item_group.num_sub:
+            LOGGER.warning(
+                'Palette had incorrect subtype for "{}" ({} > {})!',
+                item, sub, item_group.num_sub - 1,
+            )
+            continue
+
+        pal_picked.append(PalItem(
+            frames['preview'],
+            item_list[item],
+            sub,
+            is_pre=True,
+        ))
+
+    if len(palettes) < 2 or palettes[selectedPalette].prevent_overwrite:
+        UI['pal_remove'].state(('disabled',))
+        menus['pal'].entryconfigure(1, state=DISABLED)
+    else:
+        UI['pal_remove'].state(('!disabled',))
+        menus['pal'].entryconfigure(1, state=NORMAL)
+
     flow_preview()
 
 
@@ -1054,16 +1151,16 @@ def pal_shuffle():
     if len(pal_picked) == 32:
         return
 
-    shuff_items = item_list.copy()
+    shuff_item_dict = item_list.copy()
     for palitem in pal_picked:
         # Don't add items that are already on the palette!
         try:
-            del shuff_items[palitem.id]
+            del shuff_item_dict[palitem.id]
         except KeyError:
             # We might try removing it multiple times
             pass
 
-    shuff_items = list(shuff_items.values())
+    shuff_items = list(shuff_item_dict.values())
 
     random.shuffle(shuff_items)
 
@@ -1077,42 +1174,38 @@ def pal_shuffle():
     flow_preview()
 
 
-def pal_save_as(_=None):
+def pal_save_as(e=None):
     name = ""
     while True:
         name = ask_string(
-            "BEE2 - Save Palette",
-            "Enter a name:",
+            _("BEE2 - Save Palette"),
+            _("Enter a name:"),
         )
         if name is None:
             # Cancelled...
             return False
-        # Check for non-basic characters to ensure the filename is valid..
-        elif not srctools.is_plain_text(name):
-            messagebox.showinfo(
-                icon=messagebox.ERROR,
-                title='BEE2',
-                message='Please only use basic characters in palette '
-                        'names.',
-                parent=TK_ROOT,
-            )
         elif paletteLoader.check_exists(name):
             if messagebox.askyesno(
                 icon=messagebox.QUESTION,
                 title='BEE2',
-                message='This palette alread exists. Overwrite?',
+                message=_('This palette already exists. Overwrite?'),
             ):
                 break
         else:
             break
-    paletteLoader.save_pal(pal_picked, name)
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        name,
+    )
     refresh_pal_ui()
 
 
-def pal_save(_=None):
+def pal_save(e=None):
     pal = palettes[selectedPalette]
-    pal.pos = [(it.id, it.subKey) for it in pal_picked]
-    pal.save(allow_overwrite=True)  # overwrite it
+    paletteLoader.save_pal(
+        [(it.id, it.subKey) for it in pal_picked],
+        pal.name,
+    )
     refresh_pal_ui()
 
 
@@ -1122,8 +1215,9 @@ def pal_remove():
         pal = palettes[selectedPalette]
         if messagebox.askyesno(
                 title='BEE2',
-                message='Are you sure you want to delete "'
-                        + pal.name + '"?',
+                message=_('Are you sure you want to delete "{}"?').format(
+                    pal.name,
+                ),
                 parent=TK_ROOT,
                 ):
             pal.delete_from_disk()
@@ -1148,18 +1242,22 @@ def init_palette(f):
 
     ttk.Button(
         f,
-        text='Clear Palette',
+        text=_('Clear Palette'),
         command=pal_clear,
         ).grid(row=0, sticky="EW")
 
     UI['palette'] = Listbox(f, width=10)
     UI['palette'].grid(row=1, sticky="NSEW")
 
-    def set_pal_listbox(_=None):
+    def set_pal_listbox(e=None):
         global selectedPalette
-        selectedPalette = int(UI['palette'].curselection()[0])
-        selectedPalette_radio.set(selectedPalette)
-        set_palette()
+        cur_selection = UI['palette'].curselection()
+        if cur_selection: # Might be blank if none selected
+            selectedPalette = int(cur_selection[0])
+            selectedPalette_radio.set(selectedPalette)
+            set_palette()
+        else:
+            UI['palette'].selection_set(selectedPalette, selectedPalette)
     UI['palette'].bind("<<ListboxSelect>>", set_pal_listbox)
     UI['palette'].bind("<Enter>", set_pal_listbox_selection)
     # Set the selected state when hovered, so users can see which is
@@ -1174,7 +1272,11 @@ def init_palette(f):
     pal_scroll.grid(row=1, column=1, sticky="NS")
     UI['palette']['yscrollcommand'] = pal_scroll.set
 
-    UI['pal_remove'] = ttk.Button(f, text='Delete Palette', command=pal_remove)
+    UI['pal_remove'] = ttk.Button(
+        f,
+        text=_('Delete Palette'),
+        command=pal_remove,
+    )
     UI['pal_remove'].grid(row=2, sticky="EW")
 
     if utils.USE_SIZEGRIP:
@@ -1192,32 +1294,21 @@ def init_option(f):
 
     ttk.Button(
         frame,
-        text="Save Palette...",
+        text=_("Save Palette..."),
         command=pal_save,
-        ).grid(row=0, sticky="EW", padx=5)
+    ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
         frame,
-        text="Save Palette As...",
+        text=_("Save Palette As..."),
         command=pal_save_as,
-        ).grid(row=1, sticky="EW", padx=5)
-    UI['export_button'] = ttk.Button(
+    ).grid(row=1, sticky="EW", padx=5)
+    ttk.Button(
         frame,
-        textvariable=extract_packages.export_btn_text,
+        textvariable=EXPORT_CMD_VAR,
         command=export_editoritems,
-    )
-    extract_packages.export_btn_text.set('Export...')
-    UI['export_button'].state(['disabled'])
-    UI['export_button'].grid(row=2, sticky="EW", padx=5)
+    ).grid(row=2, sticky="EW", padx=5)
 
-    UI['extract_progress'] = ttk.Progressbar(
-        frame,
-        length=200,
-        maximum=1000,
-        variable=extract_packages.progress_var,
-    )
-    UI['extract_progress'].grid(row=3, sticky="EW", padx=10, pady=(0, 10))
-
-    props = ttk.LabelFrame(frame, text="Properties", width="50")
+    props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=4, sticky="EW")
 
@@ -1244,7 +1335,7 @@ def init_option(f):
     UI['suggested_style'] = ttk.Button(
         props,
         # '\u2193' is the downward arrow symbol.
-        text="\u2193 Use Suggested \u2193",
+        text=_("{arr} Use Suggested {arr}").format(arr='\u2193'),
         command=suggested_style_set,
         )
     UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW")
@@ -1257,17 +1348,17 @@ def init_option(f):
         if chosen is not None:
             voiceEditor.show(chosen)
     for ind, name in enumerate([
-            "Style",
+            _("Style: "),
             None,
-            "Music",
-            "Voice",
-            "Skybox",
-            "Elev Vid",
+            _("Music: "),
+            _("Voice: "),
+            _("Skybox: "),
+            _("Elev Vid: "),
             ]):
         if name is None:
             # This is the "Suggested" button!
             continue
-        ttk.Label(props, text=name+': ').grid(row=ind)
+        ttk.Label(props, text=name).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1280,8 +1371,8 @@ def init_option(f):
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
     tooltip.add_tooltip(
         UI['conf_voice'],
-        'Enable or disable particular voice lines, to prevent them from '
-        'being added.',
+        _('Enable or disable particular voice lines, to prevent them from '
+          'being added.'),
     )
 
     # Make all the selector window textboxes
@@ -1343,7 +1434,7 @@ def init_preview(f):
 
     UI['pre_disp_name'] = ttk.Label(
         f,
-        text="Item: Button",
+        text="",
         style='BG.TLabel',
         )
     UI['pre_disp_name'].place(x=10, y=552)
@@ -1355,11 +1446,10 @@ def init_preview(f):
         borderwidth=0,
         relief="solid",
         )
-    blank = img.png('BEE2/blank')
     pal_picked_fake = [
         ttk.Label(
             frames['preview'],
-            image=blank,
+            image=img.PAL_BG_64,
             )
         for _ in range(32)
         ]
@@ -1376,7 +1466,7 @@ def init_picker(f):
     global frmScroll, pal_canvas
     ttk.Label(
         f,
-        text="All Items: ",
+        text=_("All Items: "),
         anchor="center",
     ).grid(
         row=0,
@@ -1423,7 +1513,7 @@ def init_picker(f):
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(_=None):
+def flow_picker(e=None):
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1467,12 +1557,10 @@ def flow_picker(_=None):
     )
     frmScroll['height'] = height
 
-    # this adds extra blank items on the end to finish the grid nicely.
-    blank_img = img.png('BEE2/blank')
-
+    # This adds extra blank items on the end to finish the grid nicely.
     for i in range(width):
         if i not in pal_items_fake:
-            pal_items_fake.append(ttk.Label(frmScroll, image=blank_img))
+            pal_items_fake.append(ttk.Label(frmScroll, image=img.PAL_BG_64))
         if (num_items % width) <= i < width:  # if this space is empty
             pal_items_fake[i].place(
                 x=((i % width)*65 + 1),
@@ -1495,7 +1583,7 @@ def init_drag_icon():
     drag_win.bind(utils.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = Label(
         drag_win,
-        image=img.png('BEE2/blank'),
+        image=img.PAL_BG_64,
         )
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
@@ -1505,13 +1593,24 @@ def init_drag_icon():
     drag_win.drag_item = None  # the item currently being moved
 
 
-def set_game(game):
+def set_game(game: gameMan.Game):
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
     """
     TK_ROOT.title('BEEMOD {} - {}'.format(utils.BEE_VERSION, game.name))
     GEN_OPTS['Last_Selected']['game'] = game.name
+    text = _('Export to "{}"...').format(game.name)
+
+    if game.cache_invalid():
+        # Mark that it needs extractions
+        text += ' *'
+
+    menus['file'].entryconfigure(
+        menus['file'].export_btn_index,
+        label=text,
+    )
+    EXPORT_CMD_VAR.set(text)
 
 
 def init_menu_bar(win):
@@ -1525,43 +1624,41 @@ def init_menu_bar(win):
     else:
         file_menu = menus['file'] = Menu(bar)
 
-    bar.add_cascade(menu=file_menu, label='File')
+    bar.add_cascade(menu=file_menu, label=_('File'))
 
     win['menu'] = bar  # Must be done after creating the apple menu
 
     file_menu.add_command(
-        label="Export",
+        label=_("Export"),
         command=export_editoritems,
         accelerator=utils.KEY_ACCEL['KEY_EXPORT'],
-        # This will be enabled when the resources have been unpacked
-        state=DISABLED,
         )
     file_menu.export_btn_index = 0  # Change this if the menu is reordered
 
     file_menu.add_command(
-        label="Add Game",
+        label=_("Add Game"),
         command=gameMan.add_game,
     )
     file_menu.add_command(
-        label="Remove Selected Game",
+        label=_("Uninstall from Selected Game"),
         command=gameMan.remove_game,
         )
     file_menu.add_command(
-        label="Backup/Restore Puzzles...",
+        label=_("Backup/Restore Puzzles..."),
         command=backup_win.show_window,
     )
     file_menu.add_command(
-        label="Manage Packages...",
+        label=_("Manage Packages..."),
         command=packageMan.show,
     )
     file_menu.add_separator()
     file_menu.add_command(
-        label="Options",
+        label=_("Options"),
         command=optionWindow.show,
     )
     if not utils.MAC:
         file_menu.add_command(
-            label="Quit",
+            label=_("Quit"),
             command=quit_application,
             )
     file_menu.add_separator()
@@ -1571,26 +1668,28 @@ def init_menu_bar(win):
 
     menus['pal'] = Menu(bar)
     pal_menu = menus['pal']
-    bar.add_cascade(menu=pal_menu, label='Palette')
+    # Menu name
+    bar.add_cascade(menu=pal_menu, label=_('Palette'))
     pal_menu.add_command(
-        label='Clear',
+        label=_('Clear'),
         command=pal_clear,
         )
     pal_menu.add_command(
-        label='Delete Palette', # This name is overwritten later
+        # Placeholder..
+        label=_('Delete Palette'), # This name is overwritten later
         command=pal_remove,
         )
     pal_menu.add_command(
-        label='Fill Palette',
+        label=_('Fill Palette'),
         command=pal_shuffle,
     )
     pal_menu.add_command(
-        label='Save Palette',
+        label=_('Save Palette'),
         command=pal_save,
         accelerator=utils.KEY_ACCEL['KEY_SAVE_AS'],
         )
     pal_menu.add_command(
-        label='Save Palette As...',
+        label=_('Save Palette As...'),
         command=pal_save_as,
         accelerator=utils.KEY_ACCEL['KEY_SAVE'],
         )
@@ -1601,10 +1700,9 @@ def init_menu_bar(win):
 
     win.bind_all(utils.EVENTS['KEY_SAVE'], pal_save)
     win.bind_all(utils.EVENTS['KEY_SAVE_AS'], pal_save_as)
+    win.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
 
-    menus['help'] = Menu(bar, name='help')  # Name for Mac-specific stuff
-    bar.add_cascade(menu=menus['help'], label='Help')
-    menus['help'].add_command(label='About')  # Authors etc
+    helpMenu.make_help_menu(bar)
 
 
 def init_windows():
@@ -1617,7 +1715,6 @@ def init_windows():
         height=TK_ROOT.winfo_screenheight(),
         )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    TK_ROOT.iconbitmap('../BEE2.ico')  # set the window icon
 
     if utils.MAC:
         # OS X has a special quit menu item.
@@ -1714,7 +1811,7 @@ def init_windows():
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Palettes',
+        title=_('Palettes'),
         name='pal',
         resize_x=True,
         resize_y=True,
@@ -1739,7 +1836,7 @@ def init_windows():
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
         options=GEN_OPTS,
-        title='Export Options',
+        title=_('Export Options'),
         name='opt',
         resize_x=True,
         tool_frame=frames['toolMenu'],
@@ -1770,7 +1867,7 @@ def init_windows():
     )
     tooltip.add_tooltip(
         UI['shuffle_pal'],
-        'Fill empty spots in the palette with random items.',
+        _('Fill empty spots in the palette with random items.'),
     )
 
     # Make scrollbar work globally
@@ -1853,8 +1950,6 @@ def init_windows():
     windows['opt'].load_conf()
     windows['pal'].load_conf()
 
-    refresh_pal_ui()
-
     def style_select_callback(style_id):
         """Callback whenever a new style is chosen."""
         global selected_style
@@ -1865,6 +1960,10 @@ def init_windows():
 
         for item in itertools.chain(item_list.values(), pal_picked, pal_items):
             item.load_data()  # Refresh everything
+
+        # Update variant selectors on the itemconfig pane
+        for func in itemconfig.ITEM_VARIANT_LOAD:
+            func()
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
@@ -1882,24 +1981,8 @@ def init_windows():
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
 
-    def copy_done_callback():
-        """Callback run when all resources have been extracted."""
-
-        UI['export_button'].state(['!disabled'])
-        UI['extract_progress'].grid_remove()
-        windows['opt'].update_idletasks()
-        # Reload the option window's position and sizing configuration,
-        # that way it resizes automatically.
-        windows['opt'].save_conf()
-        windows['opt'].load_conf()
-        menus['file'].entryconfigure(
-            menus['file'].export_btn_index,
-            state=NORMAL,
-        )
-        TK_ROOT.bind_all(utils.EVENTS['KEY_EXPORT'], export_editoritems)
-        LOGGER.info('Done extracting resources!')
-    extract_packages.done_callback = copy_done_callback
-
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     set_palette()
+    # Set_palette needs to run first, so it can fix invalid palette indexes.
+    refresh_pal_ui()
