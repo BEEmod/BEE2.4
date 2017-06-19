@@ -19,6 +19,7 @@ LOGGER = utils.getLogger(__name__)
 
 
 class TexCat(str, Enum):
+    """Types of textures that can exist."""
     TILE_1x1 = '1x1'  # Full block
     TILE_4x4 = '4x4'  # 1/4 of a block
     TILE_2x2 = '2x2'  # 1/2 of a block
@@ -26,9 +27,6 @@ class TexCat(str, Enum):
 
     CLUMP_GAP = 'gap'  # For clumping, spaces without a clump.
 
-    SPECIAL_1x1 = 'special_1x1'  # Checkered or similar, full block
-    SPECIAL_4x4 = 'special_4x4'  # Checkered variant, always 4x4
-    BULLSEYE = 'bullseye'  # With integrated bullseye decal - must match 4x4 texture.
     GOO_SIDE = 'goo'  # For on sides of goo - invalid for roof..
 
     def __str__(self): return self.value
@@ -38,8 +36,6 @@ TILE_MERGE = [
     (TexCat.TILE_4x4, TexCat.TILE_2x2),
     (TexCat.TILE_2x2, TexCat.TILE_2x1),
     (TexCat.TILE_2x1, TexCat.TILE_1x1),
-
-    (TexCat.SPECIAL_4x4, TexCat.SPECIAL_1x1),
 ]
 
 
