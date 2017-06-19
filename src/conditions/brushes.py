@@ -777,7 +777,7 @@ def res_checkpoint_trigger(inst: Entity, res: Property):
 
 
 @make_result('SetTile')
-def res_set_tile(inst, res: Property):
+def res_set_tile(inst: Entity, res: Property):
     """Set 4x4 parts of a tile to the given values."""
     origin = Vec.from_str(inst['origin'])
     angles = Vec.from_str(inst['angles'])
