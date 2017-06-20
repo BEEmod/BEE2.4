@@ -28,6 +28,7 @@ import instance_traits
 import template_brush
 import comp_consts as consts
 import conditions.globals
+import conditions.cubes
 
 from typing import (
     Dict, Tuple, List
@@ -372,6 +373,9 @@ def load_settings():
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
+
+    # Data for different cube types.
+    conditions.cubes.parse_cubes(conf)
 
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
