@@ -15,7 +15,12 @@ COND_MOD_NAME = 'Cubes/Droppers'
 # All the cube types we have loaded
 CUBE_TYPES = {}  # type: Dict[str, CubeType]
 # All the cubes/droppers
-CUBES = []  # type: List[CubeData]
+CUBES = {}  # type: Dict[Tuple[float, float, float], CubeData]
+
+# By position.
+# These won't overlap - droppers occupy space, and dropperless cubes
+# also do. Dropper+cube items only give the dropper.
+CUBE_POS = {}  # type: Dict[Tuple[float, float, float], CubeData]
 
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
@@ -38,6 +43,7 @@ class CubeEntType(Enum):
     sphere = 'SPHERE'
     antique = 'ANTIQUE'
     franken = 'FRANKEN'  # prop_monster_box
+
 
 class CubeOutputs(Enum):
     """Inputs/outputs for cubes which can be configured."""
@@ -165,6 +171,13 @@ class CubeData:
         self.dropper = dropper
         self.cube = cube
         self.tint = tint  # If set, Colorizer color to use.
+
+        # Write outselves into the entities as well.
+        dropper.bee2_cube_data = self
+        cube.bee2_cube_data = self
+        # And also so we can find by position:
+        CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
+        CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
     def __repr__(self):
         drop = cube = ''
