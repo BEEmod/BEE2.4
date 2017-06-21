@@ -15,6 +15,7 @@ from srctools import Property, Vec, VMF, Output
 
 
 LOGGER = utils.getLogger(__name__)
+COND_MOD_NAME = 'Voice Lines'
 
 map_attr = {}
 style_vars = {}
