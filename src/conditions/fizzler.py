@@ -516,8 +516,6 @@ def fizzler_out_relay():
 
     marker_inst = []  # type: List[Entity]
 
-    LOGGER.info('Fizzler data: {}', locals())
-
     for inst in vbsp.VMF.by_class['func_instance']:
         filename = inst['file'].casefold()
         name = inst['targetname']
