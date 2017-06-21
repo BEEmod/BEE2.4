@@ -32,6 +32,29 @@ VALVE_CUBE_IDS = {
 }
 
 
+# The colours used for colorizers, indexed by timer delay - 3.
+# Don't use max/min exactly, this helps make it look a bit more natural.
+L, M, H = 25, 128, 230
+COLORS = [
+    (L, L, H), (H, L, L), (L, H, L),
+    (H, H, L), (H, L, H), (L, H, H),
+
+    (L, L, L), (M, M, M), (H, H, H),
+
+    (L, L, M), (L, M, L),
+
+    (L, M, M), (L, M, H), (L, H, M),
+    (M, L, L), (M, L, M), (M, L, H),
+    (M, M, L), (M, M, H), (M, H, L),
+    (M, H, M), (M, H, H), (H, L, M),
+    (H, M, L), (H, M, M), (H, M, H),
+    (H, H, M),
+    # We have one left after all those combinations,
+    # put another colour there.
+    (32, 192, 32),
+]
+del L, M, H
+
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
 
@@ -226,6 +249,48 @@ def flag_cube_type(inst: Entity, res: Property):
         return True
 
     return data.type.id == res.value.upper()
+@make_result('_CubeColoriser')
+def res_cube_coloriser(inst: Entity):
+    """Allows recoloring cubes placed at a position.
+
+    Specific for the coloriser item - don't use.
+    """
+    origin = Vec.from_str(inst['origin'])
+    # Provided from the timer value directly.
+    timer_delay = inst.fixup.int('$timer_delay')
+
+    # Provided from item config panel
+    color_override = inst.fixup.vec('$color')
+
+    if color_override != (0, 0, 0):
+        color = color_override
+    elif 3 <= timer_delay <= 30:
+        color = Vec(COLORS[timer_delay - 3])
+    else:
+        LOGGER.warning('Unknown timer value "{}"!', timer_delay)
+        return
+    inst.remove()
+
+    try:
+        cube = CUBE_POS[origin.as_tuple()]
+    except KeyError:
+        pass
+    else:
+        cube.tint = color
+
+    # If pointing up, check the ceiling too, so droppers can find a colorizer
+    # placed on the illusory cube item under them.
+    if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
+        pos = brushLoc.POS.raycast_world(
+            origin,
+            direction=(0, 0, 1),
+        )
+        try:
+            dropper = CUBE_POS[pos.as_tuple()]
+        except KeyError:
+            pass
+        else:
+            dropper.tint = color
 
 
 @meta_cond(priority=-1000, only_once=True)
