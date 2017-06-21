@@ -802,6 +802,15 @@ class Game:
         if TRANS_DATA:
             return
 
+        # Allow overriding.
+        try:
+            lang = os.environ['BEE2_P2_LANG']
+        except KeyError:
+            pass
+        else:
+            self.load_trans(lang)
+            return
+
         # We need to first figure out what language is used (if not English),
         # then load in the file. This is saved in the 'appmanifest',
 
@@ -810,11 +819,20 @@ class Game:
         except FileNotFoundError:
             # Portal 2 isn't here...
             return
+
         with appman_file:
             appman = Property.parse(appman_file, 'appmanifest_620.acf')
         try:
             lang = appman.find_key('AppState').find_key('UserConfig')['language']
         except NoKeyError:
+            return
+
+        self.load_trans(lang)
+
+    def load_trans(self, lang):
+        """Actually load the translation."""
+        # Already loaded
+        if TRANS_DATA:
             return
 
         basemod_loc = self.abs_path(
