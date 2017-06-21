@@ -375,7 +375,7 @@ def load_settings():
         conditions.add(cond)
 
     # Data for different cube types.
-    conditions.cubes.parse_cubes(conf)
+    conditions.cubes.parse_conf(conf)
 
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
