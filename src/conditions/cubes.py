@@ -1,12 +1,18 @@
 """Implement cubes and droppers."""
+import itertools
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
 import brushLoc
 from conditions import meta_cond, make_result, make_flag
 from instanceLocs import resolve as resolve_inst, resolve_one
-from srctools import Property, NoKeyError, VMF, Entity, Vec, Output
+from srctools import (
+    Property, NoKeyError, VMF, Entity, Vec, Output,
+    parse_vec_str
+)
 import utils
+import conditions
+import vbsp
 
 LOGGER = utils.getLogger(__name__, 'cond.cubes')
 
@@ -14,13 +20,19 @@ COND_MOD_NAME = 'Cubes/Droppers'
 
 # All the cube types we have loaded
 CUBE_TYPES = {}  # type: Dict[str, CubeType]
+DROPPER_TYPES = {} # type: Dict[str, DropperType]
+
 # All the cubes/droppers
-CUBES = {}  # type: Dict[Tuple[float, float, float], CubeData]
+PAIRS = []  # type: List[CubePair]
+
+# Distance from the floor to the bottom of dropperless cubes.
+# That's needed for light bridges and things like that.
+DROPPERLESS_OFFSET = 22
 
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
-CUBE_POS = {}  # type: Dict[Tuple[float, float, float], CubeData]
+CUBE_POS = {}  # type: Dict[Tuple[float, float, float], CubePair]
 
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
@@ -68,6 +80,16 @@ class CubeEntType(Enum):
     franken = 'FRANKEN'  # prop_monster_box
 
 
+# CubeType keyvalue for each of the types.
+ENT_TYPE_INDEX = {
+    CubeEntType.norm: 0,
+    CubeEntType.comp: 1,
+    CubeEntType.reflect: 2,
+    CubeEntType.sphere: 3,
+    CubeEntType.antique: 4,
+}
+
+
 class CubeOutputs(Enum):
     """Inputs/outputs for cubes which can be configured."""
     # !self is replaced by the cube ent
@@ -77,6 +99,38 @@ class CubeOutputs(Enum):
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
 
 
+class DropperType:
+    """A type of dropper that makes cubes."""
+    def __init__(
+        self,
+        id: str,
+        item_id: str,
+        cube_pos: Vec,
+        cube_direction: Vec,
+    ):
+        self.id = id
+        self.instances = resolve_inst(item_id)
+        self.cube_pos = cube_pos
+        # Normal in the 'front' direction for reflection/frankencubes.
+        self.cube_direction = cube_direction
+
+    @classmethod
+    def parse(cls, conf: Property):
+        """Parse from vbsp_config."""
+        cube_dir = conf['cube_dir', '+x']
+        try:
+            cube_dir = Vec(conditions.DIRECTIONS[cube_dir])
+        except KeyError:
+            cube_dir = Vec.from_str(cube_dir, x=1)
+
+        return cls(
+            conf['id'].upper(),
+            conf['itemid'],
+            conf.vec('cube_pos'),
+            cube_dir,
+        )
+
+
 class CubeType:
     """A type of cube that can be spawned from droppers."""
     def __init__(
@@ -84,7 +138,7 @@ class CubeType:
         id: str,
         cube_type: CubeEntType,
         has_name: str,
-        cube_item_id: Optional[str],
+        cube_item_id: str,
         model: Optional[str],
         model_color: Optional[str],
         pack: Union[str, List[str]],
@@ -93,8 +147,7 @@ class CubeType:
         outputs: Dict[CubeOutputs, List[Output]],
     ):
         self.id = id
-        # If set, the custom item representing this item ID.
-        self.item_id = cube_item_id
+        self.instances = resolve_inst(cube_item_id)
 
         # Suffix for voice attributes.
         self.has_name = has_name.casefold()
@@ -120,13 +173,13 @@ class CubeType:
         self.outputs = outputs
 
     @classmethod
-    def parse(cls, info: Property):
+    def parse(cls, conf: Property):
         """Parse from vbsp_config."""
-        cube_id = info['id'].upper()
+        cube_id = conf['id'].upper()
 
-        cube_item_id = info['itemid', ''].upper() or None
+        cube_item_id = conf['itemid']
 
-        packlist = info.find_key('Pack', '')
+        packlist = conf.find_key('Pack', '')
         if packlist.has_children():
             # Each file individually
             packlist = [
@@ -136,7 +189,7 @@ class CubeType:
             # One value - packlist ID
             packlist = packlist.value
 
-        packlist_color = info.find_key('PackColor', '')
+        packlist_color = conf.find_key('PackColor', '')
         if packlist_color.has_children():
             packlist_color = [
                 prop.value for prop in packlist_color
@@ -145,10 +198,10 @@ class CubeType:
             packlist_color = packlist_color.value
 
         try:
-            cube_type = CubeEntType(info['cubetype'].upper())
+            cube_type = CubeEntType(conf['cubetype'].upper())
         except ValueError:
             raise ValueError('Bad cube type "{}" for {}'.format(
-                info['cubetype'], cube_id)
+                conf['cubetype'], cube_id)
             ) from None
         except NoKeyError:
             raise ValueError('No cube type for "{}"!'.format(cube_id)) from None
@@ -157,63 +210,74 @@ class CubeType:
             # Frankenturrets can't swap their model.
             cust_model = cust_model_color = None
         else:
-            cust_model = info['model', None]
-            cust_model_color = info['modelColor', None]
+            cust_model = conf['model', None]
+            cust_model_color = conf['modelColor', None]
 
         outputs = {}
 
         for out_type in CubeOutputs:
             outputs[out_type] = out_list = []
-            for prop in info.find_all(out_type.value):
+            for prop in conf.find_all(out_type.value):
                 out_list.append(Output.parse(prop))
 
-        return CubeType(
+        return cls(
             cube_id,
             cube_type,
-            info['hasName'],
+            conf['hasName'],
             cube_item_id,
             cust_model,
             cust_model_color,
             packlist,
             packlist_color,
-            info.float('offset', 20),
+            conf.float('offset', 20),
             outputs,
         )
 
+make_flag('ColoredCube')(lambda: False)
 
-class CubeData:
+
+class CubePair:
     """Represents a single cube/dropper pair."""
     def __init__(
         self,
-        type: CubeType,
-        dropper: Optional[Entity],
-        cube: Optional[Entity],
+        cube_type: CubeType,
+        drop_type: DropperType=None,
+        dropper: Entity=None,
+        cube: Entity=None,
         tint: Tuple[int, int, int]=None,
     ):
-        self.type = type
-        self.dropper = dropper
+        self.cube_type = cube_type
         self.cube = cube
+
+        # May be None for dropperless!
+        self.drop_type = drop_type
+        self.dropper = dropper
+
         self.tint = tint  # If set, Colorizer color to use.
 
-        # Write outselves into the entities as well.
-        dropper.bee2_cube_data = self
-        cube.bee2_cube_data = self
-        # And also so we can find by position:
-        CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
-        CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
+        # Write outselves into the entities to allow retriving this
+        # from them, and also via origin.
+        if dropper is not None:
+            dropper.bee2_cube_data = self
+            CUBE_POS[Vec.from_str(dropper['origin']).as_tuple()] = self
+        if cube is not None:
+            cube.bee2_cube_data = self
+            CUBE_POS[Vec.from_str(cube['origin']).as_tuple()] = self
 
     def __repr__(self):
-        drop = cube = ''
+        drop_id = drop = cube = ''
         if self.dropper:
             drop = self.dropper['targetname']
         if self.cube:
             cube = self.cube['targetname']
-        return '<CubeData "{}" {!r} -> {!r}>'.format(
-            self.type.id, drop, cube,
+        if self.drop_type:
+            drop_id = '"{}"'.format(self.drop_type.id)
+        return '<CubePair {} -> "{}": {!r} -> {!r}, {!s}>'.format(
+            drop_id, self.cube_type.id, drop, cube, self.tint,
         )
 
 
-def parse_cubes(conf: Property):
+def parse_conf(conf: Property):
     """Parse the config file for cube info."""
     for cube_conf in conf.find_all('DropperItems', 'Cube'):
         cube = CubeType.parse(cube_conf)
@@ -223,7 +287,19 @@ def parse_cubes(conf: Property):
 
         CUBE_TYPES[cube.id] = cube
 
-    LOGGER.info('Parsed {} cube types.', len(CUBE_TYPES))
+    for dropper_conf in conf.find_all('DropperItems', 'Dropper'):
+        dropp = DropperType.parse(dropper_conf)
+
+        if dropp.id in DROPPER_TYPES:
+            raise ValueError('Duplicate dropper ID "{}"'.format(dropp.id))
+
+        DROPPER_TYPES[dropp.id] = dropp
+
+    LOGGER.info(
+        'Parsed {} cube types and {} dropper types.',
+        len(CUBE_TYPES),
+        len(DROPPER_TYPES),
+    )
 
     # Check we have the Valve cube definitions - if we don't, something's
     # wrong.
@@ -241,14 +317,16 @@ def flag_cube_type(inst: Entity, res: Property):
     The value should be the ID of a cube type, or <any>/<none>.
     """
     try:
-        data = inst.bee2_cube_data  # type: CubeData
+        data = inst.bee2_cube_data  # type: CubePair
     except AttributeError:
         return res.value.casefold() == '<none>'
 
     if res.value.casefold() == '<any>':
         return True
 
-    return data.type.id == res.value.upper()
+    return data.cube_type.id == res.value.upper()
+
+
 @make_result('_CubeColoriser')
 def res_cube_coloriser(inst: Entity):
     """Allows recoloring cubes placed at a position.
@@ -293,27 +371,25 @@ def res_cube_coloriser(inst: Entity):
             dropper.tint = color
 
 
-@meta_cond(priority=-1000, only_once=True)
+@meta_cond(priority=-750, only_once=True)
 def link_cubes(vmf: VMF):
     """Determine the cubes set based on instance settings.
 
     This sets data, but doesn't implement the changes.
     """
-    # Dropperless cube -> cubetype value.
-    inst_to_type = {}  # type: Dict[str, CubeType]
+    # cube or dropper -> cubetype or droppertype value.
+    inst_to_type = {}  # type: Dict[str, Union[CubeType, DropperType]]
 
-    for cube_type in CUBE_TYPES.values():
-        if not cube_type.item_id:
+    for obj_type in itertools.chain(CUBE_TYPES.values(), DROPPER_TYPES.values()):
+        if not obj_type.instances:
             continue
-        for inst in resolve_inst(cube_type.item_id):
-            inst_to_type[inst] = cube_type
-
-    valve_dropper = resolve_one('<ITEM_DROPPER_CUBE>', error=True)
+        for inst in obj_type.instances:
+            inst_to_type[inst] = obj_type
 
     # Origin -> instances
-    dropper_pos = {}  # type: Dict[Tuple[float, float, float], Entity]
+    dropper_pos = {}  # type: Dict[Tuple[float, float, float], Tuple[Entity, DropperType]]
     # Timer value -> instances if not 0.
-    dropper_timer = {}  # type: Dict[int, Entity]
+    dropper_timer = {}  # type: Dict[int, Tuple[Entity, DropperType]]
     # Instance -> has a cube linked to this yet?
     used_droppers = {}  # type: Dict[Entity, bool]
 
@@ -321,10 +397,14 @@ def link_cubes(vmf: VMF):
     cubes = []  # type: List[Tuple[Entity, CubeType]]
 
     for inst in vmf.by_class['func_instance']:
-        filename = inst['file'].casefold()
+        try:
+            inst_type = inst_to_type[inst['file'].casefold()]
+        except KeyError:
+            # Not a cube or dropper!
+            continue
 
         # A dropper.
-        if filename == valve_dropper:
+        if isinstance(inst_type, DropperType):
             timer = inst.fixup.int('$timer_delay', 0)
             # Infinite and 3 (default) are treated as off.
             if 3 < timer <= 30:
@@ -333,19 +413,15 @@ def link_cubes(vmf: VMF):
                         'Two droppers with the same '
                         'timer value: ' + str(timer)
                     )
-                dropper_timer[timer] = inst
+                dropper_timer[timer] = inst, inst_type
             # For setup later.
-            dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst
+            dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, inst_type
             used_droppers[inst] = False
-        else:
-            try:
-                cube_type = inst_to_type[filename]
-            except KeyError:
-                # Not a cube of any kind!
-                continue
-            else:
-                # A dropperless cube.
-                cubes.append((inst, cube_type))
+
+        # A cube.
+        elif isinstance(inst_type, CubeType):
+            # A dropperless cube.
+            cubes.append((inst, inst_type))
 
     # Now link and match up all the cubes.
     for cube, cube_type in cubes:
@@ -354,7 +430,7 @@ def link_cubes(vmf: VMF):
         # Infinite and 3 (default) are treated as off.
         if 3 < timer <= 30:
             try:
-                dropper = dropper_timer[timer]
+                dropper, drop_type = dropper_timer[timer]
             except KeyError:
                 raise ValueError(
                     'Unknown cube "linkage" value ({}) in cube!\n'
@@ -368,7 +444,7 @@ def link_cubes(vmf: VMF):
                     )) from None
             used_droppers[dropper] = True
 
-            CUBES.append(CubeData(cube_type, dropper, cube))
+            PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
             continue
 
         # Next try to link to a dropper on the ceiling.
@@ -380,7 +456,7 @@ def link_cubes(vmf: VMF):
                 direction=(0, 0, 1),
             )
             try:
-                dropper = dropper_pos[ceil_pos]
+                dropper, drop_type = dropper_pos[ceil_pos]
             except KeyError:
                 pass  # Drop out of if
             else:
@@ -391,11 +467,11 @@ def link_cubes(vmf: VMF):
                         'Cube type: {}'.format(cube_type.id)
                     ) from None
                 used_droppers[dropper] = True
-                CUBES.append(CubeData(cube_type, dropper, cube))
+                PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
                 continue
 
         # Otherwise, both cases fail - the cube is dropperless.
-        CUBES.append(CubeData(cube_type, cube=cube, dropper=None))
+        PAIRS.append(CubePair(cube_type, cube=cube))
 
     # Now cubes are done, loop through the remaining droppers and assign
     # Valve cube types to those.
@@ -409,14 +485,19 @@ def link_cubes(vmf: VMF):
             raise ValueError('Bad cube type "{}"!'.format(
                 dropper.fixup['$cube_type']
             )) from None
-        CUBES.append(CubeData(cube_type, dropper=dropper, cube=None))
+        PAIRS.append(CubePair(
+            cube_type,
+            inst_to_type[dropper['file'].casefold()],
+            dropper=dropper,
+            cube=None,
+        ))
 
     # Setup Voice 'Has' attrs.
     from vbsp import settings
     voice_attr = settings['has_attr']  # type: Dict[str, bool]
 
-    for data in CUBES:
-        has_name = data.type.has_name
+    for data in PAIRS:
+        has_name = data.cube_type.has_name
         voice_attr['cube'] = True
         voice_attr['cube' + has_name] = True
         if data.dropper:
@@ -426,7 +507,97 @@ def link_cubes(vmf: VMF):
             voice_attr['cubedropperless' + has_name] = True
 
 
+def make_cube(
+    vmf: VMF,
+    pair: CubePair,
+    floor_pos: Vec,
+    in_dropper: bool,
+) -> Entity:
+    """Place a cube on the specified floor location.
+
+    floor_pos is the location of the bottom of the cube.
+    """
+    cube_type = pair.cube_type
+    drop_type = pair.drop_type
+
+    origin = floor_pos.copy()
+
+    if cube_type.type is CubeEntType.franken:
+        # If in droppers, frankenturrets are in box
+        # form, so they're flat. If dropperless
+        # they're standing up and so are higher up.
+        origin.z += 20 if in_dropper else 24
+    else:
+        origin.z += cube_type.base_offset
+
+    ent = vmf.create_ent(
+        classname='prop_weighted_cube',
+        rendercolor='255 255 255',
+        origin=origin,
+    )
+
+    if in_dropper:
+        if not pair.drop_type:
+            raise ValueError('Cube in dropper without dropper!')
+
+        norm = pair.drop_type.cube_direction.copy().rotate_by_str(
+            pair.dropper['angles']
+        )
+    else:
+        norm = Vec(x=-1).rotate_by_str(pair.cube['angles'])
+
+    yaw = norm.to_angle().y
+
+    cust_model = cube_type.model
+    pack = cube_type.pack
+
+    if pair.tint:
+        cust_model = cube_type.model_color
+        pack = cube_type.pack_color
+        ent['rendercolor'] = pair.tint
+
+    if cube_type.type is CubeEntType.franken:
+        ent['classname'] = 'prop_monster_box'
+        ent['angles'] = Vec((25.5 if in_dropper else 0), yaw, 0)
+        ent['StartAsBox'] = in_dropper
+        ent['AllowSilentDissolve'] = 1
+    else:
+        # A prop_weighted_cube
+
+        ent['NewSkins'] = '1'
+        ent['SkinType'] = '0'
+        ent['angles'] = Vec(0, yaw, 0)
+        ent['PaintPower'] = 4
+
+        # Type = 6 bugs out, and uses the 'model' cube type.
+        if cust_model:
+            ent['CubeType'] = 6
+            ent['model'] = cust_model
+
+            if isinstance(pack, list):
+                vbsp.PACK_FILES.update(pack)
+            elif isinstance(pack, str):
+                vbsp.TO_PACK.add(pack)
+        else:
+            ent['CubeType'] = ENT_TYPE_INDEX[cube_type.type]
+
+    return ent
+
+
 @meta_cond(priority=750, only_once=True)
 def generate_cubes(vmf: VMF):
     """After other conditions are run, generate cubes."""
-    pass
+    for pair in PAIRS:
+        LOGGER.info('Cube: {!r}', pair)
+        if pair.cube:
+            pair.cube.remove()
+
+        if pair.dropper:
+            pos = Vec.from_str(pair.dropper['origin'])
+            pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
+            make_cube(vmf, pair, pos, True)
+
+        if pair.cube:
+            pos = Vec.from_str(pair.cube['origin'])
+            pos -= Vec(z=+DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
+            make_cube(vmf, pair, pos, False)
