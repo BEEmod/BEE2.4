@@ -281,8 +281,6 @@ class CubeType:
             outputs,
         )
 
-make_flag('ColoredCube')(lambda: False)
-
 
 class CubePair:
     """Represents a single cube/dropper pair."""
