@@ -657,6 +657,12 @@ def make_cube(
             ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
             ent['model'] = cust_model
 
+            if cube_type.type is CubeEntType.comp:
+                # Since we're not using the real cube type, Companion
+                # cubes don't swap to the right skin.
+                # We need to set that manually.
+                ent['skin'] = 1
+
             if isinstance(pack, list):
                 vbsp.PACK_FILES.update(pack)
             elif isinstance(pack, str):
