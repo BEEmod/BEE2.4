@@ -4,13 +4,9 @@ from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
 import brushLoc
-import vbsp_options
 from conditions import meta_cond, make_result, make_flag
-from instanceLocs import resolve as resolve_inst, resolve_one
-from srctools import (
-    Property, NoKeyError, VMF, Entity, Vec, Output,
-    parse_vec_str
-)
+from instanceLocs import resolve as resolve_inst
+from srctools import Property, NoKeyError, VMF, Entity, Vec, Output
 import utils
 import conditions
 import vbsp
@@ -76,6 +72,7 @@ COLORS = [
 ]
 del L, M, H
 
+
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
 
@@ -87,6 +84,32 @@ class CubeEntType(Enum):
     sphere = 'SPHERE'
     antique = 'ANTIQUE'
     franken = 'FRANKEN'  # prop_monster_box
+
+
+class CubeVoiceEvents(Enum):
+    """Certain dropper events can trigger dialogue."""
+    # Replace a cube:
+    RESPAWN_NORM = '@voice_cube_redrop'  # Non-companion
+    RESPAWN_CCUBE = '@voice_ccube_redrop'  # Companion only
+
+    # Destroy forever (dropperless) a cube
+    DESTROY_NORM = '@voice_cube_dest'
+    DESTROY_CCUBE = '@voice_ccube_dest'
+
+    # Pickup a Frankenturret.
+    PICKUP_FRANKEN = '@voice_franken_pickup'
+    # Pickup any type
+    PICKUP_ANY = '@voice_anycube_pickup'
+
+    def __call__(self, ent: Entity, output: str):
+        """Add the output to this cube."""
+        ent.add_out(Output(
+            output,
+            self.value,
+            'FireUser1',  # Forwards to the proper input.
+            # Ent will ensure it never re-fires, but clean up the output.
+            only_once=True,
+        ))
 
 
 # CubeType keyvalue for each of the types.
@@ -470,11 +493,23 @@ def link_cubes(vmf: VMF):
             used_droppers[dropper] = True
 
             PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
+
+            # Autodrop on the dropper shouldn't be on - that makes
+            # linking useless since the cube immediately fizzles.
+
+            # Valve's dropper inverts the value, so it needs to be 1 to disable.
+            # Custom items need 0 to disable.
+            dropper.fixup['$disable_autodrop'] = (
+                drop_type.id == VALVE_DROPPER_ID
+            )
             continue
 
         # Next try to link to a dropper on the ceiling.
         # We don't do this for Valve cubes, since those
         # already can set their types.
+
+        # In this case, the cube is removed from the map.
+        # It's only used to set what cube the dropper is.
         if not cube_type.is_valve_cube:
             ceil_pos = brushLoc.POS.raycast_world(
                 Vec.from_str(cube['origin']),
@@ -492,7 +527,8 @@ def link_cubes(vmf: VMF):
                         'Cube type: {}'.format(cube_type.id)
                     ) from None
                 used_droppers[dropper] = True
-                PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
+                cube.remove()
+                PAIRS.append(CubePair(cube_type, drop_type, dropper))
                 continue
 
         # Otherwise, both cases fail - the cube is dropperless.
@@ -530,6 +566,9 @@ def link_cubes(vmf: VMF):
             voice_attr['cubedropper' + has_name] = True
         else:
             voice_attr['cubedropperless' + has_name] = True
+
+        if data.cube_type.type is not CubeEntType.comp:
+            voice_attr['cubenotcompanion'] = True
 
 
 def setup_output(
@@ -640,16 +679,22 @@ def generate_cubes(vmf: VMF):
     dropperless_temp = None
     dropperless_temp_count = 16
 
+
     for pair in PAIRS:
         if pair.cube:
             pair.cube.remove()
 
         drop_cube = cube = should_respawn = None
 
+        # One or both of the cube ents we make.
+        cubes = []  # type: List[Entity]
+
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
             drop_cube = make_cube(vmf, pair, pos, True)
+            cubes.append(drop_cube)
+
             # We can't refer to this directly because of the template name
             # mangling.
             drop_cube['targetname'] = conditions.local_name(
@@ -731,10 +776,17 @@ def generate_cubes(vmf: VMF):
                     drop_respawn_command,
                 ))
 
+                # Voice outputs for when cubes are to be replaced.
+                if pair.cube_type.type is CubeEntType.comp:
+                    CubeVoiceEvents.RESPAWN_CCUBE(drop_cube, 'OnFizzled')
+                else:
+                    CubeVoiceEvents.RESPAWN_NORM(drop_cube, 'OnFizzled')
+
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
             pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
             cube = make_cube(vmf, pair, pos, False)
+            cubes.append(cube)
             cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'cube')
 
             if dropperless_temp_count == 16:
@@ -773,6 +825,14 @@ def generate_cubes(vmf: VMF):
                     'CubeType ' + str(ENT_TYPE_INDEX[pair.cube_type.type]),
                 ))
 
+            # Voice event for when the cube is destroyed, and
+            # it won't be replaced.
+            if pair.dropper is None:
+                if pair.cube_type.type is CubeEntType.comp:
+                    CubeVoiceEvents.DESTROY_CCUBE(cube, 'OnFizzled')
+                else:
+                    CubeVoiceEvents.DESTROY_NORM(cube, 'OnFizzled')
+
         if drop_cube is not None and cube is not None:
             # We have both - it's a linked cube and dropper.
             # We need to trigger commands back and forth for this.
@@ -786,6 +846,12 @@ def generate_cubes(vmf: VMF):
                     drop_respawn_command,
                 ))
 
+                # It is getting replaced.
+                if pair.cube_type.type is CubeEntType.comp:
+                    CubeVoiceEvents.RESPAWN_CCUBE(drop_cube, 'OnFizzled')
+                else:
+                    CubeVoiceEvents.RESPAWN_NORM(drop_cube, 'OnFizzled')
+
             # Fizzle the cube when triggering the dropper.
             drop_fizzle_name, drop_fizzle_command = pair.drop_type.out_start_drop
             pair.dropper.add_out(Output(
@@ -795,3 +861,9 @@ def generate_cubes(vmf: VMF):
                 only_once=True,
                 inst_out=drop_fizzle_name
             ))
+
+        # Voice events to add to all cubes.
+        for cube in cubes:
+            if pair.cube_type.type is CubeEntType.franken:
+                CubeVoiceEvents.PICKUP_FRANKEN(cube, 'OnPlayerPickup')
+            CubeVoiceEvents.PICKUP_ANY(cube, 'OnPlayerPickup')
