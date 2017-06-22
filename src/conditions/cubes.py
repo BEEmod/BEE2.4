@@ -44,6 +44,12 @@ VALVE_CUBE_IDS = {
     6: 'VALVE_CUBE_FRANKEN',
 }
 
+# A cube type of 6 tricks the prop_weighted_cube,
+# making it use the default model (set in the model keyvalue).
+# This lets us have custom models - since those are saved and
+# loaded in the base-entity machinery.
+CUBE_ID_CUSTOM_MODEL_HACK = '6'
+
 
 # The colours used for colorizers, indexed by timer delay - 3.
 # Don't use max/min exactly, this helps make it look a bit more natural.
@@ -96,7 +102,6 @@ class CubeOutputs(Enum):
     # !self is replaced by the cube ent
     SPAWN = 'OnSpawn'  # When created - !self replaced by cube.
     FIZZLED = 'OnFizzle'  # When dissolved...
-    DROP_START = 'OnStartDrop'  # When starting to drop.
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
 
 
@@ -108,12 +113,18 @@ class DropperType:
         item_id: str,
         cube_pos: Vec,
         cube_direction: Vec,
+        out_finish_drop: Tuple[Optional[str], str],
     ):
         self.id = id
         self.instances = resolve_inst(item_id)
         self.cube_pos = cube_pos
         # Normal in the 'front' direction for reflection/frankencubes.
         self.cube_direction = cube_direction
+
+        # Instance output fired when finishing dropping. !activator
+        # should be the cube!
+        self.out_finish_drop = out_finish_drop
+
 
     @classmethod
     def parse(cls, conf: Property):
@@ -129,6 +140,7 @@ class DropperType:
             conf['itemid'],
             conf.vec('cube_pos'),
             cube_dir,
+            out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
         )
 
 
@@ -508,6 +520,26 @@ def link_cubes(vmf: VMF):
             voice_attr['cubedropperless' + has_name] = True
 
 
+def setup_output(
+    template: Output,
+    inst: Entity,
+    output: str,
+    self_name: str='!self',
+):
+    """Modify parts of an output.
+
+    inst is the instance to fixup names to fire into.
+    self_name is the entity to replace '!self' with.
+    """
+    out = template.copy()
+    out.output = output
+    if out.target == '!self':
+        out.target = self_name
+    else:
+        out.target = conditions.local_name(inst, out.target)
+    return out
+
+
 def make_cube(
     vmf: VMF,
     pair: CubePair,
@@ -569,10 +601,11 @@ def make_cube(
         ent['SkinType'] = '0'
         ent['angles'] = Vec(0, yaw, 0)
         ent['PaintPower'] = 4
+        # If in droppers, disable portal funnelling until it falls out.
+        ent['AllowFunnel'] = not in_dropper
 
-        # Type = 6 bugs out, and uses the 'model' cube type.
         if cust_model:
-            ent['CubeType'] = 6
+            ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
             ent['model'] = cust_model
 
             if isinstance(pack, list):
@@ -595,17 +628,77 @@ def generate_cubes(vmf: VMF):
     dropperless_temp = None
     dropperless_temp_count = 16
 
-    globals_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
-
     for pair in PAIRS:
-        LOGGER.info('Cube: {!r}', pair)
         if pair.cube:
             pair.cube.remove()
+
+        drop_cube = cube = None
 
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
             drop_cube = make_cube(vmf, pair, pos, True)
+            drop_cube['targetname'] = drop_cube_name = conditions.local_name(
+                pair.dropper, 'cube',
+            )
+
+            # Implement the outputs.
+
+            for temp_out in pair.cube_type.outputs[CubeOutputs.FIZZLED]:
+                drop_cube.add_out(setup_output(temp_out, pair.dropper, 'OnFizzled'))
+
+            drop_done_name, drop_done_command = pair.drop_type.out_finish_drop
+            for temp_out in pair.cube_type.outputs[CubeOutputs.DROP_DONE]:
+                out = setup_output(
+                    temp_out,
+                    pair.cube,
+                    drop_done_command,
+                    self_name='!activator',
+                )
+                out.inst_out = drop_done_name
+                out.only_once = True
+                pair.dropper.add_out(out)
+
+            # We always enable portal funnelling after dropping,
+            # since we turn it off inside.
+            pair.dropper.add_out(Output(
+                drop_done_command,
+                '!activator',
+                'EnablePortalFunnel',
+                inst_out=drop_done_name,
+            ))
+
+            # We FireUser4 after the template ForceSpawns.
+            for temp_out in pair.cube_type.outputs[CubeOutputs.SPAWN]:
+                out = setup_output(
+                    temp_out,
+                    pair.cube,
+                    'OnUser4',
+                )
+                # After first firing, it deletes so it doesn't trigger after.
+                out.only_once = True
+                drop_cube.add_out(out)
+
+            # After it spawns, swap the cube type back to the actual value
+            # for the item. Then it'll properly behave with gel, buttons,
+            # etc.
+            if drop_cube['CubeType'] == CUBE_ID_CUSTOM_MODEL_HACK:
+                drop_cube.add_out(Output(
+                    'OnUser4',
+                    '!self',
+                    'AddOutput',
+                    'CubeType ' + str(ENT_TYPE_INDEX[pair.cube_type.type]),
+                    only_once=True,
+                ))
+
+            # For frankenTurrets, we need to disable funnelling via input.
+            if pair.cube_type.type is CubeEntType.franken:
+                drop_cube.add_out(Output(
+                    'OnUser4',
+                    '!self',
+                    'DisablePortalFunnel',
+                    only_once=True,
+                ))
 
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
@@ -618,6 +711,7 @@ def generate_cubes(vmf: VMF):
                     classname='point_template',
                     targetname='@template_spawn_3',
                     spawnflags=2,
+                    # Put it above the cube for aesthetics.
                     origin=pos + (0, 0, 48),
                 )
                 dropperless_temp_count = 0
@@ -625,3 +719,30 @@ def generate_cubes(vmf: VMF):
             dropperless_temp[
                 'Template{:02g}'.format(dropperless_temp_count)
             ] = cube_name
+
+            for temp_out in pair.cube_type.outputs[CubeOutputs.FIZZLED]:
+                cube.add_out(setup_output(temp_out, pair.cube, 'OnFizzled'))
+
+            for temp_out in pair.cube_type.outputs[CubeOutputs.DROP_DONE]:
+                dropperless_temp.add_out(setup_output(
+                    temp_out,
+                    pair.cube,
+                    'OnEntitySpawned',
+                    self_name=cube_name,
+                ))
+
+            # After it spawns, swap the cube type back to the actual value
+            # for the item. Then it'll properly behave with gel, buttons,
+            # etc.
+            if cube['CubeType'] == CUBE_ID_CUSTOM_MODEL_HACK:
+                dropperless_temp.add_out(Output(
+                    'OnEntitySpawned',
+                    cube_name,
+                    'AddOutput',
+                    'CubeType ' + str(ENT_TYPE_INDEX[pair.cube_type.type]),
+                ))
+
+        if drop_cube is not None and cube is not None:
+            # We have both - it's a linked cube and dropper.
+            # We need to trigger commands back and forth for this.
+            pass
