@@ -43,6 +43,8 @@ VALVE_CUBE_IDS = {
     3: 'VALVE_CUBE_SPHERE',
     6: 'VALVE_CUBE_FRANKEN',
 }
+# The ItemBoxDropper class does some unusual stuff.
+VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 
 # A cube type of 6 tricks the prop_weighted_cube,
 # making it use the default model (set in the model keyvalue).
@@ -113,7 +115,9 @@ class DropperType:
         item_id: str,
         cube_pos: Vec,
         cube_direction: Vec,
+        out_start_drop: Tuple[Optional[str], str],
         out_finish_drop: Tuple[Optional[str], str],
+        in_respawn: Tuple[Optional[str], str],
     ):
         self.id = id
         self.instances = resolve_inst(item_id)
@@ -124,6 +128,12 @@ class DropperType:
         # Instance output fired when finishing dropping. !activator
         # should be the cube!
         self.out_finish_drop = out_finish_drop
+
+        # Instance output fired when dropper starts spawning.
+        self.out_start_drop = out_start_drop
+
+        # Instance input to respawn the cube.
+        self.in_respawn = in_respawn
 
 
     @classmethod
@@ -140,7 +150,9 @@ class DropperType:
             conf['itemid'],
             conf.vec('cube_pos'),
             cube_dir,
+            out_start_drop=Output.parse_name(conf['OutStartDrop']),
             out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
+            in_respawn=Output.parse_name(conf['InputRespawn']),
         )
 
 
@@ -268,7 +280,7 @@ class CubePair:
 
         self.tint = tint  # If set, Colorizer color to use.
 
-        # Write outselves into the entities to allow retriving this
+        # Write ourselves into the entities to allow retrieving this
         # from them, and also via origin.
         if dropper is not None:
             dropper.bee2_cube_data = self
@@ -632,14 +644,16 @@ def generate_cubes(vmf: VMF):
         if pair.cube:
             pair.cube.remove()
 
-        drop_cube = cube = None
+        drop_cube = cube = should_respawn = None
 
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
             drop_cube = make_cube(vmf, pair, pos, True)
-            drop_cube['targetname'] = drop_cube_name = conditions.local_name(
-                pair.dropper, 'cube',
+            # We can't refer to this directly because of the template name
+            # mangling.
+            drop_cube['targetname'] = conditions.local_name(
+                pair.dropper, 'box',
             )
 
             # Implement the outputs.
@@ -700,6 +714,23 @@ def generate_cubes(vmf: VMF):
                     only_once=True,
                 ))
 
+            # Add output to respawn the cube.
+
+            should_respawn = pair.dropper.fixup.bool('$disable_autorespawn')
+            if pair.drop_type.id == VALVE_DROPPER_ID:
+                # Valve's dropper makes these match the name (inverted to
+                # the checkboxes in the editor), but in custom items they
+                # match the checkboxes.
+                should_respawn = not should_respawn
+
+            if should_respawn:
+                drop_respawn_name, drop_respawn_command = pair.drop_type.in_respawn
+                drop_cube.add_out(Output(
+                    'OnFizzled',
+                    conditions.local_name(pair.dropper, drop_respawn_name),
+                    drop_respawn_command,
+                ))
+
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
             pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
@@ -745,4 +776,22 @@ def generate_cubes(vmf: VMF):
         if drop_cube is not None and cube is not None:
             # We have both - it's a linked cube and dropper.
             # We need to trigger commands back and forth for this.
-            pass
+
+            # Trigger the dropper when fizzling a cube.
+            if should_respawn:
+                drop_respawn_name, drop_respawn_command = pair.drop_type.in_respawn
+                cube.add_out(Output(
+                    'OnFizzled',
+                    conditions.local_name(pair.dropper, drop_respawn_name),
+                    drop_respawn_command,
+                ))
+
+            # Fizzle the cube when triggering the dropper.
+            drop_fizzle_name, drop_fizzle_command = pair.drop_type.out_start_drop
+            pair.dropper.add_out(Output(
+                drop_fizzle_command,
+                cube['targetname'],
+                'Dissolve',
+                only_once=True,
+                inst_out=drop_fizzle_name
+            ))
