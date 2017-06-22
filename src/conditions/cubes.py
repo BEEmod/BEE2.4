@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
 import brushLoc
+import vbsp_options
 from conditions import meta_cond, make_result, make_flag
 from instanceLocs import resolve as resolve_inst, resolve_one
 from srctools import (
@@ -27,7 +28,7 @@ PAIRS = []  # type: List[CubePair]
 
 # Distance from the floor to the bottom of dropperless cubes.
 # That's needed for light bridges and things like that.
-DROPPERLESS_OFFSET = 22
+DROPPERLESS_OFFSET = 22 - 64
 
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
@@ -540,7 +541,7 @@ def make_cube(
         if not pair.drop_type:
             raise ValueError('Cube in dropper without dropper!')
 
-        norm = pair.drop_type.cube_direction.copy().rotate_by_str(
+        norm = drop_type.cube_direction.copy().rotate_by_str(
             pair.dropper['angles']
         )
     else:
@@ -587,6 +588,15 @@ def make_cube(
 @meta_cond(priority=750, only_once=True)
 def generate_cubes(vmf: VMF):
     """After other conditions are run, generate cubes."""
+
+    # point_template for spawning dropperless cubes.
+    # We can fit 16 in each, start with the count = 16 so
+    # we make one immediately.
+    dropperless_temp = None
+    dropperless_temp_count = 16
+
+    globals_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
     for pair in PAIRS:
         LOGGER.info('Cube: {!r}', pair)
         if pair.cube:
@@ -595,9 +605,23 @@ def generate_cubes(vmf: VMF):
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
-            make_cube(vmf, pair, pos, True)
+            drop_cube = make_cube(vmf, pair, pos, True)
 
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
-            pos -= Vec(z=+DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
-            make_cube(vmf, pair, pos, False)
+            pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
+            cube = make_cube(vmf, pair, pos, False)
+            cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'cube')
+
+            if dropperless_temp_count == 16:
+                dropperless_temp = vmf.create_ent(
+                    classname='point_template',
+                    targetname='@template_spawn_3',
+                    spawnflags=2,
+                    origin=pos + (0, 0, 48),
+                )
+                dropperless_temp_count = 0
+            dropperless_temp_count += 1
+            dropperless_temp[
+                'Template{:02g}'.format(dropperless_temp_count)
+            ] = cube_name
