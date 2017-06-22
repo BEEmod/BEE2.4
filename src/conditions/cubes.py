@@ -846,9 +846,9 @@ def generate_cubes(vmf: VMF):
 
                 # It is getting replaced.
                 if pair.cube_type.type is CubeEntType.comp:
-                    CubeVoiceEvents.RESPAWN_CCUBE(drop_cube, 'OnFizzled')
+                    CubeVoiceEvents.RESPAWN_CCUBE(cube, 'OnFizzled')
                 else:
-                    CubeVoiceEvents.RESPAWN_NORM(drop_cube, 'OnFizzled')
+                    CubeVoiceEvents.RESPAWN_NORM(cube, 'OnFizzled')
 
             # Fizzle the cube when triggering the dropper.
             drop_fizzle_name, drop_fizzle_command = pair.drop_type.out_start_drop
