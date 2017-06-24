@@ -373,6 +373,24 @@ def flag_cube_type(inst: Entity, res: Property):
     return data.cube_type.id == res.value.upper()
 
 
+@make_flag('DropperColor')
+def flag_dropper_color(inst: Entity, res: Property):
+    """Detect the color of a cube on droppers.
+
+    This is True if the cube is coloured. The value should be a $fixup
+    which will have the tint copied into it.
+    """
+    try:
+        data = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        return False
+
+    if res.value:
+        inst.fixup[res.value] = data.tint
+
+    return bool(data.tint)
+
+
 @make_result('_CubeColoriser')
 def res_cube_coloriser(inst: Entity):
     """Allows recoloring cubes placed at a position.
