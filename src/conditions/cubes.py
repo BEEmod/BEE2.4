@@ -121,6 +121,15 @@ ENT_TYPE_INDEX = {
     CubeEntType.antique: 4,
 }
 
+# The models to show for each cube type.
+DEFAULT_MODELS = {
+    CubeEntType.norm:    'models/props/metal_box.mdl',
+    CubeEntType.comp:    'models/props/metal_box.mdl',
+    CubeEntType.reflect: 'models/props/reflection_cube.mdl',
+    CubeEntType.sphere:  'models/props_gameplay/mp_ball.mdl',
+    CubeEntType.antique: 'models/props_underground/underground_weighted_cube.mdl',
+}
+
 
 class CubeOutputs(Enum):
     """Inputs/outputs for cubes which can be configured."""
@@ -187,11 +196,13 @@ class CubeType:
         cube_type: CubeEntType,
         has_name: str,
         cube_item_id: str,
+        is_companion: bool,
         model: Optional[str],
         model_color: Optional[str],
         pack: Union[str, List[str]],
         pack_color: Union[str, List[str]],
         base_offset: float,
+        base_tint: Vec,
         outputs: Dict[CubeOutputs, List[Output]],
     ):
         self.id = id
@@ -213,6 +224,13 @@ class CubeType:
         # List of files, or a str packlist ID.
         self.pack = pack
         self.pack_color = pack_color
+
+        # Tint rendercolour by this value.
+        # This is applied before colour tints, if any.
+        self.base_tint = base_tint
+
+        # Conceptually - is it 'companion'-like -> voiceline
+        self.is_companion = is_companion
 
         # Distance from model origin to the 'floor'.
         self.base_offset = base_offset
@@ -273,11 +291,13 @@ class CubeType:
             cube_type,
             conf['hasName'],
             cube_item_id,
+            cube_type is CubeEntType.comp or conf.bool('isCompanion'),
             cust_model,
             cust_model_color,
             packlist,
             packlist_color,
             conf.float('offset', 20),
+            conf.vec('baseTint', 255, 255, 255),
             outputs,
         )
 
@@ -290,7 +310,7 @@ class CubePair:
         drop_type: DropperType=None,
         dropper: Entity=None,
         cube: Entity=None,
-        tint: Tuple[int, int, int]=None,
+        tint: Vec=None,
     ):
         self.cube_type = cube_type
         self.cube = cube
@@ -632,7 +652,6 @@ def make_cube(
 
     ent = vmf.create_ent(
         classname='prop_weighted_cube',
-        rendercolor='255 255 255',
         origin=origin,
     )
 
@@ -654,7 +673,15 @@ def make_cube(
     if pair.tint:
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
-        ent['rendercolor'] = pair.tint
+        # Multiply the two tints together.
+        ent['rendercolor'] = round(Vec(
+            # a/255 * b/255 * 255 -> a*b/255
+            cube_type.base_tint.x * pair.tint.x,
+            cube_type.base_tint.y * pair.tint.y,
+            cube_type.base_tint.z * pair.tint.z,
+        ) / 255)
+    else:
+        ent['rendercolor'] = cube_type.base_tint
 
     if cube_type.type is CubeEntType.franken:
         ent['classname'] = 'prop_monster_box'
@@ -687,6 +714,8 @@ def make_cube(
                 vbsp.TO_PACK.add(pack)
         else:
             ent['CubeType'] = ENT_TYPE_INDEX[cube_type.type]
+            # The model is unused, but set it so it looks nicer.
+            ent['model'] = DEFAULT_MODELS[cube_type.type]
 
     return ent
 
@@ -781,8 +810,16 @@ def generate_cubes(vmf: VMF):
                     only_once=True,
                 ))
 
-            # Add output to respawn the cube.
+                # For FrankenTurrets, we also pop it out after finishing
+                # spawning.
+                pair.dropper.add_out(Output(
+                    drop_done_command,
+                    '!activator',
+                    'BecomeMonster',
+                    inst_out=drop_done_name,
+                ))
 
+            # Add output to respawn the cube.
             should_respawn = pair.dropper.fixup.bool('$disable_autorespawn')
             if pair.drop_type.id == VALVE_DROPPER_ID:
                 # Valve's dropper makes these match the name (inverted to
@@ -799,7 +836,7 @@ def generate_cubes(vmf: VMF):
                 ))
 
                 # Voice outputs for when cubes are to be replaced.
-                if pair.cube_type.type is CubeEntType.comp:
+                if pair.cube_type.is_companion:
                     CubeVoiceEvents.RESPAWN_CCUBE(drop_cube, 'OnFizzled')
                 else:
                     CubeVoiceEvents.RESPAWN_NORM(drop_cube, 'OnFizzled')
@@ -850,7 +887,7 @@ def generate_cubes(vmf: VMF):
             # Voice event for when the cube is destroyed, and
             # it won't be replaced.
             if pair.dropper is None:
-                if pair.cube_type.type is CubeEntType.comp:
+                if pair.cube_type.is_companion:
                     CubeVoiceEvents.DESTROY_CCUBE(cube, 'OnFizzled')
                 else:
                     CubeVoiceEvents.DESTROY_NORM(cube, 'OnFizzled')
@@ -869,7 +906,7 @@ def generate_cubes(vmf: VMF):
                 ))
 
                 # It is getting replaced.
-                if pair.cube_type.type is CubeEntType.comp:
+                if pair.cube_type.is_companion:
                     CubeVoiceEvents.RESPAWN_CCUBE(cube, 'OnFizzled')
                 else:
                     CubeVoiceEvents.RESPAWN_NORM(cube, 'OnFizzled')
