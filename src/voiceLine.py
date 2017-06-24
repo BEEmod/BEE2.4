@@ -4,6 +4,7 @@ import os
 import random
 from collections import namedtuple
 from decimal import Decimal
+from typing import List
 
 import conditions.monitor
 import srctools
@@ -11,7 +12,7 @@ import utils
 import vbsp
 import vbsp_options
 from BEE2_config import ConfigFile
-from srctools import Property, Vec, VMF, Output
+from srctools import Property, Vec, VMF, Output, Entity
 
 
 LOGGER = utils.getLogger(__name__)
@@ -240,14 +241,15 @@ def add_choreo(
     return choreo
 
 
-def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
+def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
     """Add a quote to the map."""
     LOGGER.info('Adding quote: {}', quote)
 
-    only_once = False
+    only_once = atomic = False
     cc_emit_name = None
-    added_ents = []
+    start_ents = []  # type: List[Entity]
     end_commands = []
+    start_names = []
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
@@ -256,19 +258,19 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
         name = prop.name.casefold()
 
         if name == 'file':
-            added_ents.append(vmf_file.create_ent(
+            vmf_file.create_ent(
                 classname='func_instance',
                 targetname='',
                 file=INST_PREFIX + prop.value,
                 origin=quote_loc,
                 fixup_style='2',  # No fixup
-            ))
+            )
         elif name == 'choreo':
             # If the property has children, the children are a set of sequential
             # voice lines.
             # If the name is set to '@glados_line', the ents will be named
             # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
-            LOGGER.info('End-commands: {}', '\n'.join(map(str,end_commands)))
+            start_names.append(targetname)
             if prop.has_children():
                 secondary_name = targetname.lstrip('@') + '_'
                 # Evenly distribute the choreo ents across the width of the
@@ -301,7 +303,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                             delay=0.1,
                         ))
                     if is_first:  # Ensure this works with cc_emit
-                        added_ents.append(choreo)
+                        start_ents.append(choreo)
                     if is_last:
                         for out in end_commands:
                             choreo.add_out(out.copy())
@@ -315,11 +317,13 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                     use_dings=use_dings,
                     only_once=only_once,
                 )
-                added_ents.append(choreo)
+                start_ents.append(choreo)
                 for out in end_commands:
                     choreo.add_out(out.copy())
                 end_commands.clear()
         elif name == 'snd':
+            start_names.append(targetname)
+
             snd = vmf_file.create_ent(
                 classname='ambient_generic',
                 spawnflags='49',  # Infinite Range, Starts Silent
@@ -336,7 +340,7 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
                     only_once=only_once,
                 )
             )
-            added_ents.append(snd)
+            start_ents.append(snd)
         elif name == 'bullseye':
             add_bullseye(quote_loc, prop.value)
         elif name == 'cc_emit':
@@ -366,6 +370,8 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             targetname = prop.value
         elif name == 'onlyonce':
             only_once = srctools.conv_bool(prop.value)
+        elif name == 'atomic':
+            atomic = srctools.conv_bool(prop.value)
         elif name == 'endcommand':
             end_commands.append(Output(
                 'OnCompletion',
@@ -378,13 +384,28 @@ def add_quote(quote: Property, targetname, quote_loc, use_dings=False):
             ))
 
     if cc_emit_name:
-        for ent in added_ents:
+        for ent in start_ents:
             ent.add_out(Output(
                 'OnUser1',
                 '@command',
                 'Command',
                 param='cc_emit ' + cc_emit_name,
             ))
+
+    # If Atomic is true, after a line is started all variants
+    # are blocked from playing.
+    if atomic:
+        for ent in start_ents:
+            for name in start_names:
+                if ent['targetname'] == name:
+                    # Don't block yourself.
+                    continue
+                ent.add_out(Output(
+                    'OnUser1',
+                    name,
+                    'Kill',
+                    only_once=True,
+                ))
 
 
 def sort_func(quote: PossibleQuote):
@@ -464,7 +485,7 @@ def add_voice(
             onplayerdeath='0',
         )
 
-    # QuoteEvents allows specifiying an instance for particular items,
+    # QuoteEvents allows specifying an instance for particular items,
     # so a voice line can be played at a certain time. It's only active
     # in certain styles, but uses the default if not set.
     for event in QUOTE_DATA.find_all('QuoteEvents', 'Event'):
