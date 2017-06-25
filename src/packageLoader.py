@@ -2755,6 +2755,12 @@ class BrushTemplate(PakObject, has_img=False):
 
         self.temp_overlays = []
 
+        # Transfer this configuration ent over.
+        for color_picker in vmf_file.by_class['bee2_template_colorpicker']:
+            new_ent = color_picker.copy(map=TEMPLATE_FILE, keep_vis=False)
+            new_ent['template_id'] = temp_id
+            TEMPLATE_FILE.add_ent(new_ent)
+
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             visgroups = [
                 visgroup_names[id]

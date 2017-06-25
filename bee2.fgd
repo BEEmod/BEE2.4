@@ -56,7 +56,7 @@
 	s_tex(material): "South Texture" : "" : "Texture for the south-pointing face."
 	s_uaxis(string): "South (U)"  : "" : "Uaxis data for the south-pointing face."
 	s_vaxis(string): "South (V)"  : "" : "Vaxis data for the south-pointing face."
-	s_rotation(float): "Sout Rotation" : 0 : "Rotation value for the south-pointing face."
+	s_rotation(float): "South Rotation" : 0 : "Rotation value for the south-pointing face."
 	
 	_sep3(string) readonly: "---------" : ""
 	
@@ -99,6 +99,19 @@
 	"Set this to discard excess data."
 	discard_brushes(boolean): "Discard Brushes" : 0 : "Don't keep brushes, for templates used to position overlays only."
 	detail_auto_visgroup(boolean): "Group Detail Entities" : 0 : "If True, each func_detail entity will be put into a auto_xx visgroup. Otherwise, all func_detail will be ungrouped. World brushes stay ungrouped regardless."
+	]
+	
+@PointClass
+	base(Angles)
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+	studioprop("models/editor/angle_helper.mdl")
+	sidelist(faces)
+	= bee2_template_colorpicker:
+	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
+	[
+	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
+	faces(sidelist): "Faces" : : "The faces this position is applied to."
+	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
 	]
 
 // --------
