@@ -112,6 +112,7 @@
 	template_id(string): "Template ID" : "" : "The unique ID this template has (in the combined file)."
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
+	grid_snap(boolean): "Snap To Grid" : 0 : "For items like fizzlers, snap to the closest grid position in side directions."
 	]
 
 // --------

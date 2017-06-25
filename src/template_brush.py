@@ -65,7 +65,13 @@ class TEMP_TYPES(Enum):
     world = 1  # Import and add to world
     detail = 2  # Import as a func_detail
 
-ColorPicker = namedtuple('ColorPicker', ['priority', 'offset', 'normal', 'sides'])
+ColorPicker = namedtuple('ColorPicker', [
+    'priority',
+    'offset',
+    'normal',
+    'sides',
+    'grid_snap',
+])
 
 
 B = MAT_TYPES.black
@@ -378,6 +384,7 @@ def load_templates():
             offset=Vec.from_str(ent['origin']),
             normal=Vec(x=1).rotate_by_str(ent['angles']),
             sides=ent['faces'].split(' '),
+            grid_snap=srctools.conv_bool(ent['grid_snap']),
         ))
 
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
@@ -655,13 +662,20 @@ def retexture_template(
     }
 
     # For each face, if it needs to be forced to a colour, or None if not.
-    force_colour_face = dict.fromkeys(rev_id_mapping.values(), None)
+    force_colour_face = defaultdict(lambda: None)
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
         picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
         picker_pos += template_data.origin
         picker_norm = color_picker.normal.copy().rotate(*template_data.angles)
+
+        if color_picker.grid_snap:
+            for axis in 'xyz':
+                # Don't realign things in the normal's axis -
+                # those are already fine.
+                if not picker_norm[axis]:
+                    picker_pos[axis] = picker_pos[axis] // 128 * 128 + 64
 
         brush = conditions.SOLIDS.get(picker_pos.as_tuple(), None)
 
@@ -673,7 +687,6 @@ def retexture_template(
             # Only do the highest priority successful one.
             if force_colour_face[side] is None:
                 force_colour_face[side] = brush.color
-
 
     for brush in all_brushes:
         for face in brush:
