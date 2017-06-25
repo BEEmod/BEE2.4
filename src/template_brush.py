@@ -66,11 +66,12 @@ class TEMP_TYPES(Enum):
     detail = 2  # Import as a func_detail
 
 ColorPicker = namedtuple('ColorPicker', [
-    'priority',
+    'priority',  # Decimal order to do them in.
     'offset',
-    'normal',
+    'normal',  # Normal of the surface.
     'sides',
-    'grid_snap',
+    'grid_snap',  # Snap to grid on non-normal axes
+    'remove_brush',  # Remove the brush after
 ])
 
 
@@ -385,6 +386,7 @@ def load_templates():
             normal=Vec(x=1).rotate_by_str(ent['angles']),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
+            remove_brush=srctools.conv_bool(ent['remove_brush']),
         ))
 
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
@@ -682,6 +684,9 @@ def retexture_template(
         if brush is None or abs(brush.normal) != abs(picker_norm):
             # Doesn't exist.
             continue
+
+        if color_picker.remove_brush and brush.solid in vbsp.VMF.brushes:
+            brush.solid.remove()
 
         for side in color_picker.sides:
             # Only do the highest priority successful one.

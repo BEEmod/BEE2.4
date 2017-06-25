@@ -113,6 +113,7 @@
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
 	grid_snap(boolean): "Snap To Grid" : 0 : "For items like fizzlers, snap to the closest grid position in side directions."
+	remove_brush(boolean): "Remove Brush" : 0 : "After grabbing the surface, remove the brush. Should only be done when you know the brush isn't shared with other faces."
 	]
 
 // --------
@@ -196,5 +197,6 @@
 	"Configuration"
 		[
 		"bee2_template_conf"
+		"bee2_template_colorpicker"
 		]
 	]
