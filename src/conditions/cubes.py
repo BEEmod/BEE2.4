@@ -1,12 +1,17 @@
 """Implement cubes and droppers."""
 import itertools
+from collections import namedtuple
+
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple
 
 import brushLoc
 from conditions import meta_cond, make_result, make_flag
 from instanceLocs import resolve as resolve_inst
-from srctools import Property, NoKeyError, VMF, Entity, Vec, Output
+from srctools import (
+    Property, NoKeyError, VMF, Entity, Vec, Output,
+    EmptyMapping
+)
 import utils
 import conditions
 import vbsp
@@ -15,9 +20,10 @@ LOGGER = utils.getLogger(__name__, 'cond.cubes')
 
 COND_MOD_NAME = 'Cubes/Droppers'
 
-# All the cube types we have loaded
+# All the types we have loaded
 CUBE_TYPES = {}  # type: Dict[str, CubeType]
-DROPPER_TYPES = {} # type: Dict[str, DropperType]
+DROPPER_TYPES = {}  # type: Dict[str, DropperType]
+ADDON_TYPES = {}  # type: Dict[str, CubeAddon]
 
 # All the cubes/droppers
 PAIRS = []  # type: List[CubePair]
@@ -139,6 +145,56 @@ class CubeOutputs(Enum):
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
 
 
+# Things that get attached to a cube.
+class CubeAddon:
+    """A thing that can be attached to a cube."""
+    def __init__(
+        self,
+        id: str,
+        inst='',
+        pack='',
+        vscript='',
+        outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
+    ):
+        self.id = id
+        self.inst = inst
+        self.pack = pack
+        self.vscript = vscript  # Entity script(s)s to add to the cube.
+        self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
+        for out_type in CubeOutputs:
+            self.outputs[out_type] = list(outputs.get(out_type, ()))
+
+
+    @classmethod
+    def parse(cls, props: Property):
+        outputs = {}
+
+        for out_type in CubeOutputs:
+            outputs[out_type] = out_list = []
+            for prop in props.find_all(out_type.value):
+                out_list.append(Output.parse(prop))
+
+        addon = cls(
+            props['id'],
+            props['instance', ''],
+            props['packlist', ''],
+            props['vscript', ''],
+            outputs,
+        )
+        return addon
+
+    @classmethod
+    def base_parse(cls, cube_id: str, props: Property):
+        """Parse from the config for cube types."""
+        inst = props['overlay_inst', '']
+        pack = props['overlay_pack', '']
+        script = props['vscript', '']
+        if inst or pack or script:
+            return cls(cube_id, inst, pack, script, {})
+        else:
+            return None
+
+
 class DropperType:
     """A type of dropper that makes cubes."""
     def __init__(
@@ -204,6 +260,7 @@ class CubeType:
         base_offset: float,
         base_tint: Vec,
         outputs: Dict[CubeOutputs, List[Output]],
+        overlay_addon: Optional[CubeAddon],
     ):
         self.id = id
         self.instances = resolve_inst(cube_item_id)
@@ -236,7 +293,10 @@ class CubeType:
         self.base_offset = base_offset
 
         # Configurable outputs for the cube/dropper.
-        self.outputs = outputs
+        self.base_outputs = outputs
+
+        # If set, an instance to attach onto the cube.
+        self.overlay_addon = overlay_addon
 
     @classmethod
     def parse(cls, conf: Property):
@@ -299,6 +359,7 @@ class CubeType:
             conf.float('offset', 20),
             conf.vec('baseTint', 255, 255, 255),
             outputs,
+            CubeAddon.base_parse(cube_id, conf),
         )
 
 
@@ -320,6 +381,22 @@ class CubePair:
         self.dropper = dropper
 
         self.tint = tint  # If set, Colorizer color to use.
+
+        # Addons to attach to the cubes.
+        # Use a set to ensure it doesn't have two copies.
+        self.addons = set()  # type: Set[CubeAddon]
+
+        if cube_type.overlay_addon is not None:
+            self.addons.add(cube_type.overlay_addon)
+
+        # Outputs to fire on the cubes.
+        self.outputs = outputs = {}  # type: Dict[CubeOutputs, List[Output]]
+        # Copy the initial outputs the base cube type needs.
+        for out_type in CubeOutputs:
+            outputs[out_type] = [
+                out.copy()
+                for out in cube_type.base_outputs[out_type]
+            ]
 
         # Write ourselves into the entities to allow retrieving this
         # from them, and also via origin.
@@ -361,10 +438,19 @@ def parse_conf(conf: Property):
 
         DROPPER_TYPES[dropp.id] = dropp
 
+    for addon_conf in conf.find_all('DropperItems', 'CubeAddon'):
+        addon = CubeAddon.parse(addon_conf)
+
+        if addon.id in ADDON_TYPES:
+            raise ValueError('Duplicate cube addon ID "{}"'.format(addon.id))
+
+        ADDON_TYPES[addon.id] = addon
+
     LOGGER.info(
-        'Parsed {} cube types and {} dropper types.',
+        'Parsed {} cube types, {} dropper types and {} addons.',
         len(CUBE_TYPES),
         len(DROPPER_TYPES),
+        len(ADDON_TYPES)
     )
 
     # Check we have the Valve cube definitions - if we don't, something's
@@ -409,6 +495,24 @@ def flag_dropper_color(inst: Entity, res: Property):
         inst.fixup[res.value] = data.tint
 
     return bool(data.tint)
+
+
+@make_result('CubeAddon', 'DropperAddon')
+def res_dropper_addon(inst: Entity, res: Property):
+    """Attach an addon to an item."""
+    try:
+        addon = ADDON_TYPES[res.value]
+    except KeyError:
+        raise ValueError('Invalid Cube Addon: {}'.format(res.value))
+
+    try:
+        pair = inst.bee2_cube_data  # type: CubePair
+    except AttributeError:
+        LOGGER.warning('Cube Addon applied to non cube ("{}")', res.value)
+        return
+
+    LOGGER.info('ADDING "{}" TO {}', res.value, pair)
+    pair.addons.add(addon)
 
 
 @make_result('_CubeColoriser')
@@ -586,7 +690,6 @@ def link_cubes(vmf: VMF):
             cube_type,
             inst_to_type[dropper['file'].casefold()],
             dropper=dropper,
-            cube=None,
         ))
 
     # Setup Voice 'Has' attrs.
@@ -632,7 +735,7 @@ def make_cube(
     pair: CubePair,
     floor_pos: Vec,
     in_dropper: bool,
-) -> Entity:
+) -> Tuple[bool, Entity]:
     """Place a cube on the specified floor location.
 
     floor_pos is the location of the bottom of the cube.
@@ -642,7 +745,9 @@ def make_cube(
 
     origin = floor_pos.copy()
 
-    if cube_type.type is CubeEntType.franken:
+    is_frank = cube_type.type is CubeEntType.franken
+
+    if is_frank:
         # If in droppers, frankenturrets are in box
         # form, so they're flat. If dropperless
         # they're standing up and so are higher up.
@@ -662,13 +767,38 @@ def make_cube(
         norm = drop_type.cube_direction.copy().rotate_by_str(
             pair.dropper['angles']
         )
+        targ_inst = pair.dropper
     else:
         norm = Vec(x=-1).rotate_by_str(pair.cube['angles'])
+        targ_inst = pair.cube
 
     yaw = norm.to_angle().y
 
     cust_model = cube_type.model
     pack = cube_type.pack
+
+    has_addon_inst = False
+    vscripts = []
+    for addon in pair.addons:
+        if addon.inst:
+            has_addon_inst = True
+            inst = vmf.create_ent(
+                classname='func_instance',
+                targetname=targ_inst['targetname'],
+                origin=origin,
+                # If out of dropper, spin to match the frankenturret box position.
+                angles=Vec(
+                    -25.5 if is_frank and not in_dropper else 0, yaw, 0,
+                ),
+                file=addon.inst,
+            )
+            inst.fixup.update(targ_inst.fixup)
+        if addon.pack:
+            vbsp.TO_PACK.add(addon.pack)
+        if addon.vscript:
+            vscripts.append(addon.vscript.strip())
+
+    ent['vscripts'] = ' '.join(vscripts)
 
     if pair.tint:
         cust_model = cube_type.model_color
@@ -683,7 +813,7 @@ def make_cube(
     else:
         ent['rendercolor'] = cube_type.base_tint
 
-    if cube_type.type is CubeEntType.franken:
+    if is_frank:
         ent['classname'] = 'prop_monster_box'
         ent['angles'] = Vec((25.5 if in_dropper else 0), yaw, 0)
         ent['StartAsBox'] = in_dropper
@@ -717,7 +847,7 @@ def make_cube(
             # The model is unused, but set it so it looks nicer.
             ent['model'] = DEFAULT_MODELS[cube_type.type]
 
-    return ent
+    return has_addon_inst, ent
 
 
 @meta_cond(priority=750, only_once=True)
@@ -730,7 +860,6 @@ def generate_cubes(vmf: VMF):
     dropperless_temp = None
     dropperless_temp_count = 16
 
-
     for pair in PAIRS:
         if pair.cube:
             pair.cube.remove()
@@ -740,10 +869,15 @@ def generate_cubes(vmf: VMF):
         # One or both of the cube ents we make.
         cubes = []  # type: List[Entity]
 
+        # Transfer addon outputs to the pair data.
+        for addon in pair.addons:
+            for out_type, out_list in addon.outputs.items():
+                pair.outputs[out_type].extend(out_list)
+
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
-            drop_cube = make_cube(vmf, pair, pos, True)
+            has_addon, drop_cube = make_cube(vmf, pair, pos, True)
             cubes.append(drop_cube)
 
             # We can't refer to this directly because of the template name
@@ -754,11 +888,11 @@ def generate_cubes(vmf: VMF):
 
             # Implement the outputs.
 
-            for temp_out in pair.cube_type.outputs[CubeOutputs.FIZZLED]:
+            for temp_out in pair.outputs[CubeOutputs.FIZZLED]:
                 drop_cube.add_out(setup_output(temp_out, pair.dropper, 'OnFizzled'))
 
             drop_done_name, drop_done_command = pair.drop_type.out_finish_drop
-            for temp_out in pair.cube_type.outputs[CubeOutputs.DROP_DONE]:
+            for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
                 out = setup_output(
                     temp_out,
                     pair.cube,
@@ -779,7 +913,7 @@ def generate_cubes(vmf: VMF):
             ))
 
             # We FireUser4 after the template ForceSpawns.
-            for temp_out in pair.cube_type.outputs[CubeOutputs.SPAWN]:
+            for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 out = setup_output(
                     temp_out,
                     pair.cube,
@@ -817,6 +951,7 @@ def generate_cubes(vmf: VMF):
                     '!activator',
                     'BecomeMonster',
                     inst_out=drop_done_name,
+                    delay=0.2,
                 ))
 
             # Add output to respawn the cube.
@@ -844,29 +979,45 @@ def generate_cubes(vmf: VMF):
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
             pos += Vec(z=DROPPERLESS_OFFSET).rotate_by_str(pair.cube['angles'])
-            cube = make_cube(vmf, pair, pos, False)
+            has_addon, cube = make_cube(vmf, pair, pos, False)
             cubes.append(cube)
-            cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'cube')
+            cube_name = cube['targetname'] = conditions.local_name(pair.cube, 'box')
 
-            if dropperless_temp_count == 16:
-                dropperless_temp = vmf.create_ent(
+            if has_addon:
+                # Addon items for safety get one template each.
+                cube_temp = vmf.create_ent(
                     classname='point_template',
                     targetname='@template_spawn_3',
                     spawnflags=2,
-                    # Put it above the cube for aesthetics.
                     origin=pos + (0, 0, 48),
+                    Template01=cube_name,
+                    Template02=conditions.local_name(pair.cube, 'cube_addon_*'),
                 )
-                dropperless_temp_count = 0
-            dropperless_temp_count += 1
-            dropperless_temp[
-                'Template{:02g}'.format(dropperless_temp_count)
-            ] = cube_name
+            else:
+                if dropperless_temp_count == 16:
+                    dropperless_temp = vmf.create_ent(
+                        classname='point_template',
+                        targetname='@template_spawn_3',
+                        spawnflags=2,
+                        # Put it above the cube for aesthetics.
+                        origin=pos + (0, 0, 48),
+                    )
+                    dropperless_temp_count = 0
+                dropperless_temp_count += 1
+                dropperless_temp[
+                    'Template{:02g}'.format(dropperless_temp_count)
+                ] = cube_name
+                cube_temp = dropperless_temp
 
-            for temp_out in pair.cube_type.outputs[CubeOutputs.FIZZLED]:
+            for temp_out in pair.outputs[CubeOutputs.FIZZLED]:
                 cube.add_out(setup_output(temp_out, pair.cube, 'OnFizzled'))
 
-            for temp_out in pair.cube_type.outputs[CubeOutputs.DROP_DONE]:
-                dropperless_temp.add_out(setup_output(
+            # For consistency with the dropped cube, add a User1 output
+            # that fizzles it.
+            cube.add_out(Output('OnUser1', '!self', 'Dissolve'))
+
+            for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
+                cube_temp.add_out(setup_output(
                     temp_out,
                     pair.cube,
                     'OnEntitySpawned',
@@ -877,7 +1028,7 @@ def generate_cubes(vmf: VMF):
             # for the item. Then it'll properly behave with gel, buttons,
             # etc.
             if cube['CubeType'] == CUBE_ID_CUSTOM_MODEL_HACK:
-                dropperless_temp.add_out(Output(
+                cube_temp.add_out(Output(
                     'OnEntitySpawned',
                     cube_name,
                     'AddOutput',
