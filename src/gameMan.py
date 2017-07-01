@@ -557,7 +557,7 @@ class Game:
             'StyleVars',
             'DropperItems',
             'Conditions',
-            'Voice',
+            'Quotes',
             'PackTriggers',
         )
 
