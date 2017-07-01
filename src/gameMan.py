@@ -555,6 +555,7 @@ class Game:
             'Fizzler',
             'Options',
             'StyleVars',
+            'DropperItems',
             'Conditions',
             'Voice',
             'PackTriggers',
