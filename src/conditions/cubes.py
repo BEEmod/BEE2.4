@@ -466,17 +466,45 @@ def flag_cube_type(inst: Entity, res: Property):
 
     This is only valid on ITEM_BOX_DROPPER, ITEM_CUBE, and items marked as
     a custom dropperless cube.
-    The value should be the ID of a cube type, or <any>/<none>.
+    The value should be the ID of a cube type, or the following special values:
+
+    * `<any>`: Any kind of cube item
+    * `<none>`: Not a cube item
+    * `<companion>`: A cube marked as companion-like.
+    * `<dropper>`: The dropper half of a pair.
+    * `<cube>`: The cube half of a pair.
     """
     try:
-        data = inst.bee2_cube_data  # type: CubePair
+        pair = inst.bee2_cube_data  # type: CubePair
     except AttributeError:
+        # None checks for if the instance *isn't* a cube.
         return res.value.casefold() == '<none>'
 
-    if res.value.casefold() == '<any>':
-        return True
+    cube_type = res.value
 
-    return data.cube_type.id == res.value.upper()
+    if not cube_type:
+        raise ValueError('No value?')
+
+    if cube_type[0] == '<' and cube_type[-1] == '>':
+        # Special checks.
+        cube_type = cube_type[1:-1].casefold()
+
+        if cube_type == 'any':
+            # Any cube.
+            return True
+        elif cube_type == 'none':
+            # Not a cube.
+            return False
+        elif cube_type == 'companion':
+            return pair.cube_type.is_companion
+        elif cube_type == 'dropper':
+            return inst is pair.dropper
+        elif cube_type == 'cube':
+            return inst is pair.cube
+        else:
+            raise ValueError('Unreckognised value ' + repr(res.value))
+
+    return pair.cube_type.id == cube_type.upper()
 
 
 @make_flag('DropperColor')
@@ -511,7 +539,6 @@ def res_dropper_addon(inst: Entity, res: Property):
         LOGGER.warning('Cube Addon applied to non cube ("{}")', res.value)
         return
 
-    LOGGER.info('ADDING "{}" TO {}', res.value, pair)
     pair.addons.add(addon)
 
 
@@ -656,7 +683,7 @@ def link_cubes(vmf: VMF):
                 direction=(0, 0, 1),
             )
             try:
-                dropper, drop_type = dropper_pos[ceil_pos]
+                dropper, drop_type = dropper_pos[ceil_pos.as_tuple()]
             except KeyError:
                 pass  # Drop out of if
             else:
@@ -723,6 +750,7 @@ def setup_output(
     """
     out = template.copy()
     out.output = output
+    out.comma_sep = False
     if out.target == '!self':
         out.target = self_name
     else:
@@ -897,12 +925,11 @@ def generate_cubes(vmf: VMF):
             for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
                 out = setup_output(
                     temp_out,
-                    pair.cube,
+                    pair.dropper,
                     drop_done_command,
                     self_name='!activator',
                 )
                 out.inst_out = drop_done_name
-                out.only_once = True
                 pair.dropper.add_out(out)
 
             # We always enable portal funnelling after dropping,
@@ -918,7 +945,7 @@ def generate_cubes(vmf: VMF):
             for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 out = setup_output(
                     temp_out,
-                    pair.cube,
+                    pair.dropper,
                     'OnUser4',
                 )
                 # After first firing, it deletes so it doesn't trigger after.
