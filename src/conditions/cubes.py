@@ -792,7 +792,9 @@ def make_cube(
                 ),
                 file=addon.inst,
             )
-            inst.fixup.update(targ_inst.fixup)
+            # Copy the cube stuff to the addon, since it's specific to the cube.
+            if pair.cube is not None:
+                inst.fixup.update(pair.cube.fixup)
         if addon.pack:
             vbsp.TO_PACK.add(addon.pack)
         if addon.vscript:
