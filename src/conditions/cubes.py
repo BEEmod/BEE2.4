@@ -64,30 +64,6 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 
-# The colours used for colorizers, indexed by timer delay - 3.
-# Don't use max/min exactly, this helps make it look a bit more natural.
-L, M, H = 25, 128, 230
-COLORS = [
-    (L, L, H), (H, L, L), (L, H, L),
-    (H, H, L), (H, L, H), (L, H, H),
-
-    (L, L, L), (M, M, M), (H, H, H),
-
-    (L, L, M), (L, M, L),
-
-    (L, M, M), (L, M, H), (L, H, M),
-    (M, L, L), (M, L, M), (M, L, H),
-    (M, M, L), (M, M, H), (M, H, L),
-    (M, H, M), (M, H, H), (H, L, M),
-    (H, M, L), (H, M, M), (H, M, H),
-    (H, H, M),
-    # We have one left after all those combinations,
-    # put another colour there.
-    (32, 192, 32),
-]
-del L, M, H
-
-
 class CubeEntType(Enum):
     """Cube types, as set on prop_weighted_cube.
 
@@ -308,7 +284,9 @@ class CubeType:
         self.overlay_addon = overlay_addon
 
         # Set to true if in the map.
-        self.is_present = False
+        self.in_map = False
+        # Same for colorized version.
+        self.color_in_map = False
 
     @classmethod
     def parse(cls, conf: Property):
@@ -401,8 +379,6 @@ class CubePair:
         if cube_type.overlay_addon is not None:
             self.addons.add(cube_type.overlay_addon)
 
-        self.cube_type.is_present = True
-
         # Outputs to fire on the cubes.
         self.outputs = outputs = {}  # type: Dict[CubeOutputs, List[Output]]
         # Copy the initial outputs the base cube type needs.
@@ -492,7 +468,11 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     inclusions = set()
     exclusions = set()
 
-    all_cubes = {cube for cube in CUBE_TYPES.values() if cube.is_present}
+    all_cubes = {
+        cube
+        for cube in CUBE_TYPES.values()
+        if cube.in_map or cube.color_in_map
+    }
 
     for cube_id in cubes:
         if cube_id[:1] == '!':
@@ -534,8 +514,18 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     # This also means inclusions represents everything we need to worry about.
     inclusions -= exclusions
 
+    # Special case - no cubes at all.
     if not inclusions:
-        raise ValueError('No cubes are valid!')
+        try:
+            return CUBE_FILTERS[None]
+        except KeyError:
+            CUBE_FILTERS[None] = filter_name = vmf.create_ent(
+                # Parent class which is True for everything.
+                classname='filter_base',
+                targetname='@filter_nothing',
+                negated=True,
+            )['targetname']
+            return filter_name
 
     if len(inclusions) > len(CUBE_TYPES) / 2:
         # If more than half of cubes are included, it's better to exclude
@@ -571,14 +561,15 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
                 names.add(filter_name)
             continue
         # If we have a coloured version, we might need that too.
-        if cube_type.model_color:
+        if cube_type.model_color and cube_type.color_in_map:
             models[cube_type.model_color] = cube_type.has_name + '_color'
 
-        if cube_type.model:
-            models[cube_type.model] = cube_type.has_name
-        else:
-            # No custom model - it's default.
-            models[DEFAULT_MODELS[cube_type.type]] = cube_type.has_name
+        if cube_type.in_map:
+            if cube_type.model:
+                models[cube_type.model] = cube_type.has_name
+            else:
+                # No custom model - it's default.
+                models[DEFAULT_MODELS[cube_type.type]] = cube_type.has_name
 
     for model, filter_name in models.items():
         # Make a filter for each model name.
@@ -586,7 +577,7 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
             names.add(CUBE_FILTERS[model])
         except KeyError:
             # We need to make one.
-            filter_name = name_start + '_mdl_' + filter_name
+            filter_name = name_start + 'mdl_' + filter_name
             vmf.create_ent(
                 classname='filter_activator_model',
                 targetname=filter_name,
@@ -721,50 +712,6 @@ def res_dropper_addon(inst: Entity, res: Property):
         return
 
     pair.addons.add(addon)
-
-
-@make_result('_CubeColoriser')
-def res_cube_coloriser(inst: Entity):
-    """Allows recoloring cubes placed at a position.
-
-    Specific for the coloriser item - don't use.
-    """
-    origin = Vec.from_str(inst['origin'])
-    # Provided from the timer value directly.
-    timer_delay = inst.fixup.int('$timer_delay')
-
-    # Provided from item config panel
-    color_override = inst.fixup.vec('$color')
-
-    if color_override != (0, 0, 0):
-        color = color_override
-    elif 3 <= timer_delay <= 30:
-        color = Vec(COLORS[timer_delay - 3])
-    else:
-        LOGGER.warning('Unknown timer value "{}"!', timer_delay)
-        return
-    inst.remove()
-
-    try:
-        cube = CUBE_POS[origin.as_tuple()]
-    except KeyError:
-        pass
-    else:
-        cube.tint = color
-
-    # If pointing up, check the ceiling too, so droppers can find a colorizer
-    # placed on the illusory cube item under them.
-    if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
-        pos = brushLoc.POS.raycast_world(
-            origin,
-            direction=(0, 0, 1),
-        )
-        try:
-            dropper = CUBE_POS[pos.as_tuple()]
-        except KeyError:
-            pass
-        else:
-            dropper.tint = color
 
 
 @make_result('CubeFilter')
@@ -922,22 +869,74 @@ def link_cubes(vmf: VMF):
             dropper=dropper,
         ))
 
-    # Setup Voice 'Has' attrs.
+    # Check for colorizers in the map, and apply those.
+    colorizer_inst = resolve_inst('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
+    for inst in vmf.by_class['func_instance']:
+        if inst['file'].casefold() not in colorizer_inst:
+            continue
+
+        color = Vec.from_str(vbsp_options.get_itemconf(
+            ('BEE2_CUBE_COLORISER', 'COLOR'),
+            '255 255 255',
+            timer_delay=inst.fixup.int('$timer_delay'),
+        ))
+
+        # The instance is useless now we know about it.
+        inst.remove()
+
+        origin = Vec.from_str(inst['origin'])
+
+        try:
+            cube = CUBE_POS[origin.as_tuple()]
+        except KeyError:
+            pass
+        else:
+            cube.tint = color
+
+        # If pointing up, check the ceiling too, so droppers can find a
+        # colorizer
+        # placed on the illusory cube item under them.
+        if Vec(z=1).rotate_by_str(inst['angles']) == (0, 0, 1):
+            pos = brushLoc.POS.raycast_world(
+                origin,
+                direction=(0, 0, 1),
+            )
+            try:
+                dropper = CUBE_POS[pos.as_tuple()]
+            except KeyError:
+                pass
+            else:
+                dropper.tint = color
+
+    # After that's done, save what cubes are present for filter optimisation,
+    # and set Voice 'Has' attrs.
+
     from vbsp import settings
     voice_attr = settings['has_attr']  # type: Dict[str, bool]
 
-    for data in PAIRS:
-        has_name = data.cube_type.has_name
+    if PAIRS:
         voice_attr['cube'] = True
+
+    for pair in PAIRS:
+        if pair.tint:
+            pair.cube_type.color_in_map = True
+        else:
+            pair.cube_type.in_map = True
+
+        has_name = pair.cube_type.has_name
         voice_attr['cube' + has_name] = True
-        if data.dropper:
+        if pair.dropper:
             voice_attr['cubedropper'] = True
             voice_attr['cubedropper' + has_name] = True
         else:
             voice_attr['cubedropperless' + has_name] = True
 
-        if data.cube_type.type is not CubeEntType.comp:
+        if not pair.cube_type.is_companion:
             voice_attr['cubenotcompanion'] = True
+
+        # Any spherical item, not specifically edgeless cubes.
+        if pair.cube_type.type is CubeEntType.sphere:
+            voice_attr['cubesphereshaped'] = True
 
 
 def setup_output(
