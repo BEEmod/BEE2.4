@@ -1,11 +1,11 @@
 """Implement cubes and droppers."""
 import itertools
-from collections import namedtuple
 
 from enum import Enum
-from typing import Dict, Optional, List, Union, Tuple
+from typing import Dict, Optional, List, Union, Tuple, Any, Set, FrozenSet
 
 import brushLoc
+import vbsp_options
 from conditions import meta_cond, make_result, make_flag
 from instanceLocs import resolve as resolve_inst
 from srctools import (
@@ -36,6 +36,15 @@ DROPPERLESS_OFFSET = 22 - 64
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
 CUBE_POS = {}  # type: Dict[Tuple[float, float, float], CubePair]
+
+# Prevents duplicating different filter entities.
+# It's either a frozenset of filter names, or a single model.
+CUBE_FILTERS = {}  # type: Dict[Union[str, FrozenSet[str]], str]
+# Multi-filters are sequentially named.
+CUBE_FILTER_MULTI_IND = 0
+
+# Max number of ents in a multi filter.
+MULTI_FILTER_COUNT = 10
 
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
@@ -298,6 +307,9 @@ class CubeType:
         # If set, an instance to attach onto the cube.
         self.overlay_addon = overlay_addon
 
+        # Set to true if in the map.
+        self.is_present = False
+
     @classmethod
     def parse(cls, conf: Property):
         """Parse from vbsp_config."""
@@ -389,6 +401,8 @@ class CubePair:
         if cube_type.overlay_addon is not None:
             self.addons.add(cube_type.overlay_addon)
 
+        self.cube_type.is_present = True
+
         # Outputs to fire on the cubes.
         self.outputs = outputs = {}  # type: Dict[CubeOutputs, List[Output]]
         # Copy the initial outputs the base cube type needs.
@@ -458,6 +472,173 @@ def parse_conf(conf: Property):
     for cube_id in VALVE_CUBE_IDS.values():
         if cube_id not in CUBE_TYPES:
             raise Exception('Cube type "{}" is missing!'.format(cube_id))
+
+
+def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
+    """Given a set of cube-type IDs, generate a filter for them.
+
+    Each cube should be the name of an ID, with '!' before to exclude it.
+    It succeeds if a target is any of the included types, and not any of the
+    excluded types (exclusions override inclusion).
+    The IDs may also be:
+    * <any> to detect all cube types (including franken)
+    * <companion> to detect 'companion' items.
+    * <sphere> to detect sphere-type items.
+
+    The filter will be made if needed, and the targetname to use returned.
+    """
+    # We just parse it here, then pass on to an internal method recursively
+    # to build all the ents.
+    inclusions = set()
+    exclusions = set()
+
+    all_cubes = {cube for cube in CUBE_TYPES.values() if cube.is_present}
+
+    for cube_id in cubes:
+        if cube_id[:1] == '!':
+            cube_id = cube_id[1:]
+            invert = True
+            targ_set = exclusions
+        else:
+            invert = False
+            targ_set = inclusions
+
+        if cube_id[:1] == '<' and cube_id[-1:] == '>':
+            # Special name.
+            cube_id = cube_id[1:-1].casefold()
+            if cube_id == 'any':
+                # All cubes.
+                if invert:
+                    raise ValueError("Can't exclude everything!")
+                targ_set |= all_cubes
+            elif cube_id == 'companion':
+                for cube in all_cubes:
+                    if cube.is_companion:
+                        targ_set.add(cube)
+            elif cube_id in ('ball', 'sphere'):
+                for cube in all_cubes:
+                    if cube.type is CubeEntType.sphere:
+                        targ_set.add(cube)
+        else:
+            try:
+                cube = CUBE_TYPES[cube_id]
+            except KeyError:
+                raise KeyError('Unknown cube type "{}"!'.format(cube_id))
+            targ_set.add(cube)
+
+    if not inclusions and exclusions:
+        # We just exclude, so first include everything implicitly.
+        inclusions |= all_cubes
+
+    # If excluded, it can't be included.
+    # This also means inclusions represents everything we need to worry about.
+    inclusions -= exclusions
+
+    if not inclusions:
+        raise ValueError('No cubes are valid!')
+
+    if len(inclusions) > len(CUBE_TYPES) / 2:
+        # If more than half of cubes are included, it's better to exclude
+        # the missing ones.
+        invert = True
+        name_start = '@filter_bee2_not_'
+        children = all_cubes - inclusions
+    else:
+        name_start = '@filter_bee2_'
+        invert = False
+        children = inclusions
+
+    # Models we need to include in the multi-filter -> name to use.
+    models = {}  # type: Dict[str, str]
+    # Names to use in the final filter
+    names = set()
+
+    for cube_type in children:  # type: CubeType
+        # Special case - no model, just by class.
+        if cube_type.type is CubeEntType.franken:
+            # We use the cube type instance as a unique key.
+            try:
+                names.add(CUBE_FILTERS[cube_type])
+            except KeyError:
+                # We need to make it.
+                filter_name = name_start + cube_type.has_name
+                vmf.create_ent(
+                    classname='filter_activator_class',
+                    targetname=filter_name,
+                    filterclass='prop_monster_box',
+                )
+                CUBE_FILTERS[cube_type] = filter_name
+                names.add(filter_name)
+            continue
+        # If we have a coloured version, we might need that too.
+        if cube_type.model_color:
+            models[cube_type.model_color] = cube_type.has_name + '_color'
+
+        if cube_type.model:
+            models[cube_type.model] = cube_type.has_name
+        else:
+            # No custom model - it's default.
+            models[DEFAULT_MODELS[cube_type.type]] = cube_type.has_name
+
+    for model, filter_name in models.items():
+        # Make a filter for each model name.
+        try:
+            names.add(CUBE_FILTERS[model])
+        except KeyError:
+            # We need to make one.
+            filter_name = name_start + '_mdl_' + filter_name
+            vmf.create_ent(
+                classname='filter_activator_model',
+                targetname=filter_name,
+                origin=pos,
+                model=model,
+            )
+            CUBE_FILTERS[model] = filter_name
+            names.add(filter_name)
+
+    # Special case, no invert and a single name - we don't need a _multi.
+    if len(names) == 1 and not invert:
+        return next(iter(names))
+
+    return _make_multi_filter(vmf, pos, list(names), invert)
+
+
+def _make_multi_filter(vmf: VMF, pos: Vec, names: List[str], invert: bool) -> str:
+    """Generate the multi-filter for cube filtering.
+
+    This reuses ents for duplicate calls, and recurses if needed.
+    """
+    global CUBE_FILTER_MULTI_IND
+
+    # Check for existing ents of the same type.
+    key = frozenset(names), invert
+    try:
+        return CUBE_FILTERS[key]
+    except KeyError:
+        pass
+
+    if len(names) > MULTI_FILTER_COUNT:
+        # 5 is the maximum number in a filter_multi, we need more than one.
+        names, extra_names = names[:MULTI_FILTER_COUNT], names[MULTI_FILTER_COUNT:]
+        names.append(_make_multi_filter(vmf, pos, extra_names, invert))
+
+    # Names must now be 5 or less.
+
+    CUBE_FILTER_MULTI_IND += 1
+    filter_ent = vmf.create_ent(
+        classname='filter_multi',
+        origin=pos,
+        targetname='@filter_multi_{:02}'.format(CUBE_FILTER_MULTI_IND),
+        negated=invert,
+        # If not inverted - OR (1), if inverted AND (0).
+        filtertype=not invert,
+    )
+
+    for ind, name in enumerate(names, start=1):
+        filter_ent['Filter{:02}'.format(ind)] = name
+
+    CUBE_FILTERS[key] = filter_ent['targetname']
+    return filter_ent['targetname']
 
 
 @make_flag('CubeType')
@@ -584,6 +765,28 @@ def res_cube_coloriser(inst: Entity):
             pass
         else:
             dropper.tint = color
+
+
+@make_result('CubeFilter')
+def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
+    """Given a set of cube-type IDs, generate a filter for them.
+
+    Each cube should be the name of an ID, with '!' before to exclude it.
+    It succeeds if a target is any of the included types, and not any of the
+    excluded types (exclusions override inclusion).
+    The IDs may also be:
+    * <any> to detect all cube types (including franken)
+    * <companion> to detect 'companion' items.
+    * <sphere> to detect sphere-type items.
+
+    The 'resultvar' fixup will be set to the name to use.
+    """
+    inst.fixup[res['ResultVar']] = cube_filter(
+        vmf,
+        Vec.from_str(inst['origin']), [
+            prop.value for prop in res.find_all('Cube')
+        ],
+    )
 
 
 @meta_cond(priority=-750, only_once=True)
