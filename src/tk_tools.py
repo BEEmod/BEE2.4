@@ -48,6 +48,7 @@ elif utils.MAC:
     # Call OS-X's specific api for setting the window icon.
     TK_ROOT.tk.call(
         'tk::mac::iconBitmap',
+        'BEE2',
         256,  # largest size in the .ico
         256,
         '-imageFile',
