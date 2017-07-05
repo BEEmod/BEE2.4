@@ -27,6 +27,7 @@ from typing import (
     Union, Optional, Any, TYPE_CHECKING,
     Iterator, Iterable, Type,
     Dict, List, Tuple, NamedTuple,
+    Match
 )
 
 if TYPE_CHECKING:
@@ -93,6 +94,8 @@ UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
     ('config', Property),  # Config for editing
 ])
 
+# Finds names surrounded by %s
+RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
@@ -746,6 +749,41 @@ def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
         set_cond_source(conf, folders[fold].source)
 
 
+def apply_replacements(conf: Property) -> Property:
+    """Apply a set of replacement values to a config file, returning a new copy.
+
+    The replacements are found in a 'Replacements' block in the property.
+    These replace %values% starting and ending with percents. A double-percent
+    allows literal percents. Unassigned values are an error.
+    """
+    replace = {}
+    new_conf = Property(conf.real_name, [])
+
+    # Strip the replacement blocks from the config, and save the values.
+    for prop in conf:
+        if prop.name == 'replacements':
+            for rep_prop in prop:
+                replace[rep_prop.name.strip('%')] = rep_prop.value
+        else:
+            new_conf.append(prop)
+
+    def rep_func(match: Match):
+        """Does the replacement."""
+        var = match.group(1)
+        if not var:  # %% becomes %.
+            return '%'
+        try:
+            return replace[var.casefold()]
+        except KeyError:
+            raise ValueError('Unresolved variable: {!r}\n{}'.format(var, replace))
+
+    for prop in new_conf.iter_tree(blocks=True):
+        prop.name = RE_PERCENT_VAR.sub(rep_func, prop.real_name)
+        if not prop.has_children():
+            prop.value = RE_PERCENT_VAR.sub(rep_func, prop.value)
+
+    return new_conf
+
 class ItemVariant:
     """Data required for an item in a particular style."""
 
@@ -1386,9 +1424,9 @@ class Item(PakObject):
             ) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
-            editoritems += item_block.copy()
-            editoritems += editor_parts.copy()
-            vbsp_config += config_part.copy()
+            editoritems += apply_replacements(item_block)
+            editoritems += apply_replacements(editor_parts)
+            vbsp_config += apply_replacements(config_part)
 
             # Add auxiliary configs as well.
             try:
@@ -1396,9 +1434,9 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += aux_conf.all_conf.copy()
+                vbsp_config += apply_replacements(aux_conf.all_conf)
                 try:
-                    version_data = aux_conf.versions[ver_id].copy()
+                    version_data = aux_conf.versions[ver_id]
                 except KeyError:
                     pass  # No override.
                 else:
@@ -1406,7 +1444,9 @@ class Item(PakObject):
                     # that's defined for this config
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
-                            vbsp_config += version_data[poss_style.id].copy()
+                            vbsp_config += apply_replacements(
+                                version_data[poss_style.id]
+                            )
                             break
 
     def _get_export_data(
