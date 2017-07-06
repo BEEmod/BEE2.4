@@ -12,7 +12,6 @@ from collections import defaultdict
 import srctools
 import tkMarkdown
 import utils
-from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
 from srctools import (
@@ -32,6 +31,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from gameMan import Game
+    from loadScreen import BaseLoadScreen
 
 LOGGER = utils.getLogger(__name__)
 
@@ -338,6 +338,7 @@ def close_filesystems():
 
 def load_packages(
         pak_dir,
+        loader: 'BaseLoadScreen',
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
