@@ -423,6 +423,9 @@ def load_settings():
         'height_density': fog_config['height_density', '0'],
         'height_max_density': fog_config['height_max_density', '1'],
 
+        # Shadow background
+        'shadow': fog_config['shadowColor', '98 102 106'],
+
         'tonemap_rate': fog_config['tonemap_rate', '0.25'],
         'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
         'tonemap_bloom_scale': fog_config['tonemap_bloom_scale', ''],
@@ -1007,7 +1010,7 @@ def set_player_portalgun():
         inst = VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),  # Reuse this location
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/pgun_single.vmf',
         )
@@ -1023,7 +1026,7 @@ def set_player_portalgun():
         VMF.create_ent(
             classname='func_instance',
             targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
             file='instances/BEE2/logic/pgun/no_pgun.vmf',
         )
@@ -1051,11 +1054,11 @@ def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO':
+    ).upper() == 'AUTO' and IS_PREVIEW:
         VMF.create_ent(
             classname='func_instance',
             file='instances/BEE2/logic/screenshot_logic.vmf',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
@@ -1064,7 +1067,7 @@ def add_screenshot_logic():
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    pos = vbsp_options.get(Vec, 'global_ents_loc')
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -1072,6 +1075,18 @@ def add_fog_ents():
     )
 
     fog_opt = settings['fog']
+
+    random.seed(MAP_RAND_SEED + '_shadow_angle')
+    VMF.create_ent(
+        classname='shadow_control',
+        # Slight variations around downward direction.
+        angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
+        origin=pos + (0, 16, 0),
+        distance=100,
+        color=fog_opt['shadow'],
+        disableallshadows=0,
+        enableshadowsfromlocallights=1,
+    )
 
     fog_controller = VMF.create_ent(
         classname='env_fog_controller',
@@ -2743,19 +2758,45 @@ def add_extra_ents(mode):
             fixup_style='0',
         )
 
+    LOGGER.info('Adding global ents...')
+
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
-
+    global_ents_pos = vbsp_options.get(Vec, 'global_ents_loc')
     pti_file = vbsp_options.get(str, 'global_pti_ents')
     pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    # Add a nodraw box around the global entity location, to seal it.
+    VMF.add_brushes(VMF.make_hollow(
+        global_ents_pos + (128, 128, 128),
+        global_ents_pos - (128, 128, 64),
+    ))
 
     # Add a cubemap into the map, so materials get a blank one generated.
     # If none are present this doesn't happen...
     VMF.create_ent(
         classname='env_cubemap',
-        cubemapsize=1, # Make as small as possible..
-        origin=pti_loc,
+        cubemapsize=1,  # Make as small as possible..
+        origin=global_ents_pos,
     )
+
+    # So we have one in the map.
+    VMF.create_ent(
+        classname='info_node',
+        origin=global_ents_pos - (0, 0, 64),
+        nodeid=1,
+        spawnflags=0,
+        angles='0 0 0',
+    )
+
+    if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
+        # If we have light bridges, make sure we precache the particle.
+        VMF.create_ent(
+            classname='info_particle_system',
+            origin=global_ents_pos,
+            effect_name='projected_wall_impact',
+            start_active=0,
+        )
 
     if pti_file:
         LOGGER.info('Adding Global PTI Ents')
@@ -2792,7 +2833,7 @@ def add_extra_ents(mode):
     logic_auto = VMF.create_ent(
         classname='logic_auto',
         spawnflags='0',  # Don't remove on fire
-        origin=pti_loc + (0, 0, 16),
+        origin=global_ents_pos + (0, 0, 16),
     )
     logic_auto.outputs = GLOBAL_OUTPUTS
 

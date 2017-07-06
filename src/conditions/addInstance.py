@@ -8,10 +8,11 @@ import vbsp
 import vbsp_options
 import utils
 from conditions import (
-    make_result, RES_EXHAUSTED,
+    make_result, meta_cond, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
 )
-from srctools import Vec, Entity, Property
+from srctools import Vec, Entity, Property, NoKeyError, VMF
+
 
 COND_MOD_NAME = 'Instance Generation'
 
@@ -20,7 +21,7 @@ LOGGER = utils.getLogger(__name__, 'cond.addInstance')
 
 @make_result('addGlobal')
 def res_add_global_inst(res: Property):
-    """Add one instance in a location.
+    """Add one instance in a specific location.
 
     Options:
         allow_multiple: Allow multiple copies of this instance. If 0, the
@@ -29,9 +30,11 @@ def res_add_global_inst(res: Property):
               be given a name of the form 'inst_1234'.
         file: The filename for the instance.
         Angles: The orientation of the instance (defaults to '0 0 0').
-        Origin: The location of the instance (defaults to '0 0 -10000').
         Fixup_style: The Fixup style for the instance. '0' (default) is
             Prefix, '1' is Suffix, and '2' is None.
+        Position: The location of the instance. If not set, it will be placed
+            in a 128x128 nodraw room somewhere in the map. Objects which can
+            interact with nearby object should not be placed there.
     """
     if res.value is not None:
         if res.bool('allow_multiple') or res['file'] not in GLOBAL_INSTANCES:
@@ -44,9 +47,12 @@ def res_add_global_inst(res: Property):
                 targetname=res['name', ''],
                 file=instanceLocs.resolve_one(res['file'], error=True),
                 angles=res['angles', '0 0 0'],
-                origin=res['position', '0 0 -10000'],
                 fixup_style=res['fixup_style', '0'],
             )
+            try:
+                new_inst['origin'] = res['position']
+            except IndexError:
+                new_inst['origin'] = vbsp_options.get(Vec, 'global_ents_loc')
             GLOBAL_INSTANCES.add(res['file'])
             if new_inst['targetname'] == '':
                 new_inst['targetname'] = "inst_"

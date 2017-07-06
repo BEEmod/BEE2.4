@@ -35,7 +35,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionType = TypeVar('OptionType', str, int, float, bool, Vec)
+OptionType = Union[str, int, float, bool, Vec]
 
 
 class Opt:
@@ -481,6 +481,12 @@ DEFAULTS = [
 
     Opt('model_changer_loc', Vec(-2400, -2800, -256),
         """Location of the model changer instance (if used).
+        """),
+
+    Opt('global_ents_loc', Vec(-2400, 0, 0),
+        """Location of global entities.
+
+        A 128x128 room is added there, and logic ents are added inside.
         """),
 
     ######
