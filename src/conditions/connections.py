@@ -54,14 +54,14 @@ def res_add_output(inst: Entity, res: Property):
     """Add an output from an instance to a global or local name.
 
     Values:
-    - output: The output name.Can be <ITEM_ID:activate> or <ITEM_ID:deactivate>
+    - `output`: The output name. Can be `<ITEM_ID:activate>` or `<ITEM_ID:deactivate>`
       to lookup that item type.
-    - target: The name of the target entity
-    - input: The input to give
-    - parm: Parameters for the input
-    - delay: Delay for the output
-    - only_once: True to make the input last only once (overrides times)
-    - times: The number of times to trigger the input
+    - `target`: The name of the target entity
+    - `input`: The input to give
+    - `parm`: Parameters for the input
+    - `delay`: Delay for the output
+    - `only_once`: True to make the input last only once (overrides times)
+    - `times`: The number of times to trigger the input
     """
     (
         out_type,

@@ -636,7 +636,7 @@ def _make_multi_filter(vmf: VMF, pos: Vec, names: List[str], invert: bool) -> st
 def flag_cube_type(inst: Entity, res: Property):
     """Check if an instance is/should be a cube.
 
-    This is only valid on ITEM_BOX_DROPPER, ITEM_CUBE, and items marked as
+    This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and items marked as
     a custom dropperless cube.
     The value should be the ID of a cube type, or the following special values:
 
@@ -683,7 +683,7 @@ def flag_cube_type(inst: Entity, res: Property):
 def flag_dropper_color(inst: Entity, res: Property):
     """Detect the color of a cube on droppers.
 
-    This is True if the cube is coloured. The value should be a $fixup
+    This is `True` if the cube is coloured. The value should be a `$fixup`
     which will have the tint copied into it.
     """
     try:
@@ -718,13 +718,13 @@ def res_dropper_addon(inst: Entity, res: Property):
 def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
     """Given a set of cube-type IDs, generate a filter for them.
 
-    Each cube should be the name of an ID, with '!' before to exclude it.
+    Each cube should be the name of an ID, with `!` before to exclude it.
     It succeeds if a target is any of the included types, and not any of the
     excluded types (exclusions override inclusion).
     The IDs may also be:
-    * <any> to detect all cube types (including franken)
-    * <companion> to detect 'companion' items.
-    * <sphere> to detect sphere-type items.
+    * `<any>` to detect all cube types (including franken)
+    * `<companion>` to detect 'companion' items.
+    * `<sphere>` to detect sphere-type items.
 
     The 'resultvar' fixup will be set to the name to use.
     """

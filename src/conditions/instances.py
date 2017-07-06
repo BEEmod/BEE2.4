@@ -61,10 +61,10 @@ INSTVAR_COMP = {
 def flag_instvar(inst: Entity, flag: Property):
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form "$start_enabled == 1", with or without
-    the $.
-    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
-    If ommitted, the operation is assumed to be ==.
+    The flag value follows the form `$start_enabled == 1`, with or without
+    the `$`.
+    The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
+    If omitted, the operation is assumed to be `==`.
     """
     values = flag.value.split(' ', 3)
     if len(values) == 3:
@@ -126,8 +126,8 @@ def res_add_inst_var(inst: Entity, res: Property):
 def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
-    Values follow the format "$start_enabled 1", with or without the $.
-    "$out $in" will copy the value of $in into $out.
+    Values follow the format `$start_enabled 1`, with or without the `$`.
+    `$out $in` will copy the value of `$in` into `$out`.
     """
     var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = conditions.resolve_value(inst, val)
@@ -177,7 +177,7 @@ def res_local_targetname(inst: Entity, res: Property):
 
     Useful with AddOutput commands, or other values which use
     targetnames in the parameter.
-    The result takes the form "<prefix><instance name>[-<local>]<suffix>".
+    The result takes the form `<prefix><instance name>[-<local>]<suffix>`.
     """
     local_name = res['name', '']
     if local_name:
@@ -191,10 +191,10 @@ def res_local_targetname(inst: Entity, res: Property):
 def res_replace_instance(inst: Entity, res: Property):
     """Replace an instance with another entity.
 
-    'keys' and 'localkeys' defines the new keyvalues used.
-    'targetname' and 'angles' are preset, and 'origin' will be used to offset
+    `keys` and `localkeys` defines the new keyvalues used.
+    `targetname` and `angles` are preset, and `origin` will be used to offset
     the given amount from the current location.
-    If 'keep_instance' is true, the instance entity will be kept instead of
+    If keep_instance` is true, the instance entity will be kept instead of
     removed.
     """
     import vbsp
@@ -206,7 +206,7 @@ def res_replace_instance(inst: Entity, res: Property):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
-    # We copy to allow us to still acess the $fixups and other values.
+    # We copy to allow us to still access the $fixups and other values.
     new_ent = inst.copy(des_id=inst.id)
     new_ent.clear_keys()
     # Ensure there's a classname, just in case.
@@ -241,15 +241,16 @@ def res_global_input_setup(res: Property):
 def res_global_input(inst: Entity, res: Property):
     """Trigger an input either on map spawn, or when a relay is triggered.
 
-    Arguments:
-        - "Input": the input to use, either a name or an instance: command.
-        - "Target": If set, a local name to send commands to.
-        - "Delay": Number of seconds to delay the input.
-        - "Name": If set the name of the logic_relay which must be triggered.
-            If not set the output will fire OnMapSpawn.
-        - "Output": The name of the output, defaulting to OnTrigger. Ignored
-            if Name is not set.
-        - "Param": The parameter for the output.
+    Arguments:  
+    
+    - `Input`: the input to use, either a name or an `instance:` command.
+    - `Target`: If set, a local name to send commands to.
+    - `Delay`: Number of seconds to delay the input.
+    - `Name`: If set the name of the `logic_relay` which must be triggered.
+        If not set the output will fire `OnMapSpawn`.
+    - `Output`: The name of the output, defaulting to `OnTrigger`. Ignored
+        if Name is not set.
+    - `Param`: The parameter for the output.
     """
     name, proxy_name, command, output, delay, param, target = res.value
 

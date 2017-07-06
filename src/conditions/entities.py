@@ -45,11 +45,12 @@ def res_insert_overlay(inst: Entity, res: Property):
     """Use a template to insert one or more overlays on a surface.
 
     Options:
-        - ID: The template ID. Brushes will be ignored.
-        - Replace: old -> new material replacements
-        - Face_pos: The offset of the brush face.
-        - Normal: The direction of the brush face.
-        - Offset: An offset to move the overlays by.
+
+    - ID: The template ID. Brushes will be ignored.
+    - Replace: old -> new material replacements.
+    - Face_pos: The offset of the brush face.
+    - Normal: The direction of the brush face.
+    - Offset: An offset to move the overlays by.
     """
     (
         temp_id,
