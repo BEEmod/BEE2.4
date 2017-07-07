@@ -3,11 +3,15 @@ from typing import Dict, List, Optional
 
 from enum import Enum
 
-from srctools import Output, Vec, VMF, Solid, Entity
+from srctools import Output, Vec, VMF, Solid, Entity, Side
 import comp_consts as const
 
 # The tint colours used in the map, that VRAD has to generate and pack.
 SIDE_TINTS = set()
+
+# Fizzler textures are higher-res than laserfields.
+FIZZLER_TEX_SIZE = 1024
+LASER_TEX_SIZE = 512
 
 class TexGroup(Enum):
     """Types of textures used for fizzlers."""
@@ -102,6 +106,7 @@ class FizzlerBrush:
         inst_name: str,
     ):
         """Generate the actual brush."""
+        global brush_center
         brush_ent = Entity(vmf, self.keys)
         vmf.add_ent(brush_ent)
         brush_ent['targetname'] = inst_name + '-' + self.name
@@ -122,10 +127,10 @@ class FizzlerBrush:
         fitted_tex = self.textures[TexGroup.FITTED]
 
         if trigger_tex or fitted_tex:
-            tex_size = 512
+            tex_size = LASER_TEX_SIZE
         else:
             # Fizzlers are larger resolution..
-            tex_size = 1024
+            tex_size = FIZZLER_TEX_SIZE
 
         if field_length == 128 or trigger_tex or fitted_tex:
             # We need only one brush.
@@ -155,28 +160,124 @@ class FizzlerBrush:
                         continue
                     side.mat = mat
 
-                    # Now calculate the texture offsets we need.
-                    if fizz_set.up_axis.z == 0:
-                        side.vaxis, side.uaxis = side.uaxis, side.vaxis
-
-                    side.uaxis.offset = (tex_size / field_length) * fizz_set.neg.dot(field_axis)
-                    side.uaxis.scale = field_length / tex_size
-
-                    side.vaxis.offset = (tex_size/128) * fizz_set.neg.dot(fizz_set.up_axis)
-                    # We need to offset over laserfields by half, and if vertical
-                    # we also need to offset. those cancel each out though.
-                    if fizz_set.up_axis.z == 0 and not fitted_tex:
-                        side.vaxis.offset += tex_size/2
-
-                    side.vaxis.scale = 128 / tex_size
-
-                    side.uaxis.offset %= tex_size
-                    side.vaxis.offset %= tex_size
+                    self._texture_fit(
+                        side,
+                        tex_size,
+                        field_length,
+                        fizz_set,
+                        bool(fitted_tex),
+                    )
 
             brush_ent.solids.append(brush)
         else:
             # Generate the three brushes for fizzlers.
-            brush_ent.remove()
+            if field_length < 128:
+                side_len = field_length / 2
+                center_len = 0
+            else:
+                # Bugfix - the boundary texture wrapping causes
+                # artifacts to appear at the join, we need to avoid a small
+                # amount of that texture.
+                side_len = 63
+                center_len = field_length - 126
+
+            brush_left = vmf.make_prism(
+                p1=(origin
+                    - (self.thickness / 2) * normal
+                    - 64 * fizz_set.up_axis
+                    - (side_len - field_length/2) * field_axis
+                    ),
+                p2=(origin
+                    + (self.thickness / 2) * normal
+                    + 64 * fizz_set.up_axis
+                    + (field_length / 2) * field_axis
+                    ),
+            ).solid  # type: Solid
+
+            brush_right = vmf.make_prism(
+                p1=(origin
+                    - (self.thickness / 2) * normal
+                    - 64 * fizz_set.up_axis
+                    - (field_length / 2) * field_axis
+                    ),
+                p2=(origin
+                    + (self.thickness / 2) * normal
+                    + 64 * fizz_set.up_axis
+                    + (side_len - field_length/2) * field_axis
+                    ),
+            ).solid  # type: Solid
+
+            if center_len:
+                brush_center = vmf.make_prism(
+                    p1=(origin
+                        - (self.thickness / 2) * normal
+                        - 64 * fizz_set.up_axis
+                        - (center_len / 2) * field_axis
+                        ),
+                    p2=(origin
+                        + (self.thickness / 2) * normal
+                        + 64 * fizz_set.up_axis
+                        + (center_len/2) * field_axis
+                        ),
+                ).solid  # type: Solid
+
+                brushes = [
+                    (brush_left, TexGroup.LEFT, 64),
+                    (brush_center, TexGroup.CENTER, center_len),
+                    (brush_right, TexGroup.RIGHT, 64),
+                ]
+            else:
+                brushes = [
+                    (brush_left, TexGroup.LEFT, side_len),
+                    (brush_right, TexGroup.RIGHT, side_len),
+                ]
+
+            for brush, tex_group, brush_length in brushes:
+                brush_ent.solids.append(brush)
+                for side in brush.sides:
+                    side_norm = abs(side.normal())
+                    if side_norm == abs(fizz_set.up_axis):
+                        side.mat = self._side_tint_mat()
+
+                    if side_norm != abs(normal):
+                        continue
+                    side.mat = self.textures[tex_group]
+
+                    self._texture_fit(
+                        side,
+                        FIZZLER_TEX_SIZE,
+                        brush_length,
+                        fizz_set,
+                    )
+
+
+    def _texture_fit(
+        self,
+        side: Side,
+        tex_size: float,
+        field_length: float,
+        fizz_set: FizzlerSet,
+        is_laserfield=False,
+    ):
+        """Calculate the texture offsets required for fitting a texture."""
+
+        if fizz_set.up_axis.z == 0:
+            side.vaxis, side.uaxis = side.uaxis, side.vaxis
+
+        side.uaxis.offset = -(tex_size / field_length) * fizz_set.neg.dot(side.uaxis.vec())
+
+        side.vaxis.offset = -(tex_size / 128) * fizz_set.neg.dot(side.vaxis.vec())
+
+        #  The above fits it correctly, except it's vertically half-offset.
+        # For laserfields that's what we want, for fizzlers we want it normal.
+        if not is_laserfield:
+            side.vaxis.offset += tex_size / 2
+
+        side.uaxis.scale = field_length / tex_size
+        side.vaxis.scale = 128 / tex_size
+
+        # side.uaxis.offset %= tex_size * 2
+        # side.vaxis.offset %= tex_size * 2
 
 
 if __name__ == '__main__':
@@ -220,7 +321,7 @@ if __name__ == '__main__':
                 'classname': 'trigger_hurt',
             }
         ),
-    ]
+    ][:1]
 
     for fizz in _vmf.by_class['env_beam']:
         print('Making', fizz['targetname'])
