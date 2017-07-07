@@ -250,7 +250,6 @@ class FizzlerBrush:
                         fizz_set,
                     )
 
-
     def _texture_fit(
         self,
         side: Side,
@@ -278,62 +277,3 @@ class FizzlerBrush:
 
         # side.uaxis.offset %= tex_size * 2
         # side.vaxis.offset %= tex_size * 2
-
-
-if __name__ == '__main__':
-    import os
-    _vmf = VMF.parse(os.environ['PORTAL_2_LOC'] +
-                     '/sdk_content/maps/fizzler_test.vmf')
-
-    _brushes = [
-        FizzlerBrush(
-            'fizzler',
-            outputs=[],
-            side_tint=Vec(55, 100, 110),
-            textures={
-                TexGroup.LEFT: 'effects/fizzler_l',
-                TexGroup.CENTER: 'effects/fizzler_center',
-                TexGroup.RIGHT: 'effects/fizzler_r',
-                TexGroup.SHORT: 'effects/fizzler',
-            },
-            keys={
-                'classname': 'trigger_portal_cleanser',
-            }
-        ),
-        FizzlerBrush(
-            'laserfield',
-            outputs=[],
-            side_tint=Vec(255, 0, 0),
-            textures={
-                TexGroup.FITTED: 'effects/laserplane',
-            },
-            keys={
-                'classname': 'func_brush',
-            }
-        ),
-        FizzlerBrush(
-            'trigger',
-            outputs=[],
-            textures={
-                TexGroup.TRIGGER: 'tools/toolstrigger',
-            },
-            keys={
-                'classname': 'trigger_hurt',
-            }
-        ),
-    ][:1]
-
-    for fizz in _vmf.by_class['env_beam']:
-        print('Making', fizz['targetname'])
-        neg, pos = sorted([
-            Vec.from_str(fizz['targetpoint']),
-            Vec.from_str(fizz['origin']),
-        ])
-        fizz_set = FizzlerSet(Vec.from_str(fizz.comments), neg, pos)
-        for br in _brushes:
-            print('  Brush = ', br.name)
-            br.generate(_vmf, fizz_set, fizz['targetname'])
-
-    with open(os.environ['PORTAL_2_LOC'] +
-              '/sdk_content/maps/fizzler_test_2.vmf', 'w') as f:
-        _vmf.export(f)
