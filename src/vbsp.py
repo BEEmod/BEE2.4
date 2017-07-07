@@ -1,4 +1,4 @@
-
+import fizzler
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -376,6 +376,9 @@ def load_settings():
 
     # Data for different cube types.
     conditions.cubes.parse_conf(conf)
+
+    # Fizzler data
+    fizzler.read_configs(conf)
 
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)

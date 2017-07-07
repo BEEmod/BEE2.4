@@ -3,11 +3,16 @@ from typing import Dict, List, Optional
 
 from enum import Enum
 
-from srctools import Output, Vec, VMF, Solid, Entity, Side
+import utils
+from srctools import Output, Vec, VMF, Solid, Entity, Side, Property
 import comp_consts as const
+
+LOGGER = utils.getLogger(__name__)
 
 # The tint colours used in the map, that VRAD has to generate and pack.
 SIDE_TINTS = set()
+
+FIZZ_TYPES = {}  # type: Dict[str, FizzlerType]
 
 # Fizzler textures are higher-res than laserfields.
 FIZZLER_TEX_SIZE = 1024
@@ -27,6 +32,19 @@ class TexGroup(Enum):
     TRIGGER = 'trigger'
 
 
+def read_configs(conf: Property):
+    """Read in the fizzler data."""
+    for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
+        fizz = FizzlerType.parse(fizz_conf)
+
+        if fizz.id in FIZZ_TYPES:
+            raise ValueError('Duplicate fizzler ID "{}"'.format(fizz.id))
+
+        FIZZ_TYPES[fizz.id] = fizz
+
+    LOGGER.info('Loaded "{}" fizzlers.', len(FIZZ_TYPES))
+
+
 class FizzlerType:
     """Implements a specific fizzler type."""
     def __init__(
@@ -42,6 +60,19 @@ class FizzlerType:
         # type.
         self.item_id = item_id
 
+    @classmethod
+    def parse(cls, conf: Property):
+        """Read in a fizzler from a config."""
+        fizz_id = conf['id']
+        item_id = conf['item_id']
+
+        brushes = [
+            FizzlerBrush.parse(prop)
+            for prop in
+            conf.find_all('Brush')
+        ]
+        return FizzlerType(fizz_id, brushes, item_id)
+
 
 class FizzlerSet:
     """Represents a specific pair of emitters and a field."""
@@ -52,8 +83,8 @@ class FizzlerSet:
         pos: Vec,
     ):
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
-        self.neg = neg # Position of the left side of the brush
-        self.pos = pos # Position of the right side of the brush.
+        self.neg = neg  # Position of the left side of the brush
+        self.pos = pos  # Position of the right side of the brush.
 
 
 class FizzlerBrush:
@@ -63,6 +94,7 @@ class FizzlerBrush:
         name: str,
         textures: Dict[TexGroup, Optional[str]],
         keys: Dict[str, str],
+        local_keys: Dict[str, str],
         outputs: List[Output],
         thickness=2.0,
         side_tint: Vec=None,
@@ -70,6 +102,7 @@ class FizzlerBrush:
         mat_mod_var: str=None,
     ):
         self.keys = keys
+        self.local_keys = local_keys
         self.name = name  # Local name of the fizzler brush.
         self.outputs = list(outputs)
         # Width of the brush.
@@ -85,19 +118,70 @@ class FizzlerBrush:
         for group in TexGroup:
             self.textures[group] = textures.get(group, None)
 
-    def _side_tint_mat(self):
-        """Output the side texture for fields."""
-        if self.side_tint:
-            # Produce a hex colour string, and use that as the material name.
-            SIDE_TINTS.add(self.side_tint.as_tuple())
-            return 'BEE2/fizz/side_color_{:02X}{:02X}{:02X}'.format(
-                int(self.side_tint.x),
-                int(self.side_tint.y),
-                int(self.side_tint.z),
-            )
+    @classmethod
+    def parse(cls, conf: Property):
+        """Parse from a config file."""
+        if 'side_tint' in conf:
+            side_tint = conf.vec('side_tint')
         else:
+            side_tint = None
+
+        outputs = [
+            Output.parse(prop)
+            for prop in
+            conf.find_children('Outputs')
+        ]
+
+        textures = {}
+        for group in TexGroup:
+            textures[group] = conf[group.value, None]
+
+        keys = {
+            prop.real_name: prop.value
+            for prop in
+            conf.find_all('keys')
+        }
+
+        local_keys = {
+            prop.real_name: prop.value
+            for prop in
+            conf.find_all('localkeys')
+        }
+
+        return FizzlerBrush(
+            conf['name'],
+            textures,
+            keys,
+            local_keys,
+            outputs,
+            conf.float('thickness', 2.0),
+            side_tint,
+            conf['mat_mod_name', None],
+            conf['mat_mod_var', None],
+        )
+
+    def _side_tint(self, side: Side, normal: Vec, min_pos: Vec):
+        """Output the side texture for fields."""
+        if not self.side_tint:
             # Just apply nodraw.
-            return const.Tools.NODRAW
+            side.mat = const.Tools.NODRAW
+            return
+
+        # Produce a hex colour string, and use that as the material name.
+        side.mat = 'BEE2/fizz/side_color_{:02X}{:02X}{:02X}'.format(
+            int(self.side_tint.x),
+            int(self.side_tint.y),
+            int(self.side_tint.z),
+        )
+        # Record that we need to make that material in VRAD.
+        SIDE_TINTS.add(self.side_tint.as_tuple())
+
+        # FLip orientation if needed.
+        if not side.uaxis.vec().dot(normal):
+            side.vaxis, side.uaxis = side.uaxis, side.vaxis
+        # The texture width is 32 pixels.
+        side.scale = self.thickness / 32
+        side.uaxis.offset = 16 + 2 * self.thickness * side.uaxis.vec().dot(min_pos) % 32
 
     def generate(
         self,
@@ -106,7 +190,6 @@ class FizzlerBrush:
         inst_name: str,
     ):
         """Generate the actual brush."""
-        global brush_center
         brush_ent = Entity(vmf, self.keys)
         vmf.add_ent(brush_ent)
         brush_ent['targetname'] = inst_name + '-' + self.name
@@ -154,7 +237,7 @@ class FizzlerBrush:
                 for side in brush.sides:
                     side_norm = abs(side.normal())
                     if side_norm == abs(fizz_set.up_axis):
-                        side.mat = self._side_tint_mat()
+                        self._side_tint(side, normal, fizz_set.neg)
 
                     if side_norm != abs(normal):
                         continue
@@ -237,7 +320,7 @@ class FizzlerBrush:
                 for side in brush.sides:
                     side_norm = abs(side.normal())
                     if side_norm == abs(fizz_set.up_axis):
-                        side.mat = self._side_tint_mat()
+                        self._side_tint(side, normal, fizz_set.neg)
 
                     if side_norm != abs(normal):
                         continue
@@ -275,5 +358,5 @@ class FizzlerBrush:
         side.uaxis.scale = field_length / tex_size
         side.vaxis.scale = 128 / tex_size
 
-        # side.uaxis.offset %= tex_size * 2
-        # side.vaxis.offset %= tex_size * 2
+        side.uaxis.offset %= tex_size
+        side.vaxis.offset %= tex_size
