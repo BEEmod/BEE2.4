@@ -979,8 +979,7 @@ def set_player_portalgun():
     - If there are only orange portal spawners, the player gets a blue-
       only gun (Regular single portal device)
     - If there are both spawner types, the player doesn't get a gun.
-    - The two relays '@player_has_blue' and '@player_has_oran' will be
-      triggered OnMapSpawn if the player has those portals.
+    - 'PortalGunOnOff' will also be checked to activate that logic.
     """
     if GAME_MODE == 'COOP':
         return  # Don't change portalgun in Portal 2 Coop
@@ -993,8 +992,10 @@ def set_player_portalgun():
 
     blue_portal = not has['blueportal']
     oran_portal = not has['orangeportal']
+    has_btn_onoff = has['portalgunonoff']
 
-    LOGGER.info('Blue: {}, Orange: {!s}',
+    LOGGER.info(
+        'Blue: {}, Orange: {!s}',
         'Y' if blue_portal else 'N',
         'Y' if oran_portal else 'N',
     )
@@ -1007,29 +1008,73 @@ def set_player_portalgun():
         has['spawn_dual'] = False
         has['spawn_single'] = True
         has['spawn_nogun'] = False
-        inst = VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_ents_loc'),
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/pgun_single.vmf',
-        )
-        # Set which portals this weapon_portalgun can fire
-        inst.fixup['blue_portal'] = srctools.bool_as_int(blue_portal)
-        inst.fixup['oran_portal'] = srctools.bool_as_int(oran_portal)
     else:
         has['spawn_dual'] = False
         has['spawn_single'] = False
         has['spawn_nogun'] = True
-        has_gun = False
-        # This instance only has a trigger_weapon_strip.
+
+    ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    if not blue_portal or not oran_portal or has_btn_onoff:
         VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_ents_loc'),
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/no_pgun.vmf',
+            classname='point_template',
+            targetname='@portalgun',
+            Template01='__pgun_template',
+            vscripts='bee2/portal_man.nut',
+            spawnflags=2,
+            origin=ent_pos,
         )
+        PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
+        VMF.create_ent(
+            classname='weapon_portalgun',
+            targetname='__pgun_template',
+            CanFirePortal1=0,
+            CanFirePortal2=0,
+            spawnflags=0,
+            origin=ent_pos - (12, 0, 0),
+        )
+        trig_cube = VMF.create_ent(
+            targetname='__pgun_held_trig',
+            classname='trigger_multiple',
+            origin=ent_pos,
+            filtername='@filter_held',
+            startdisabled=1,
+            spawnflags=8,  # Physics
+            wait=0.01,
+        )
+        trig_stripper = VMF.create_ent(
+            targetname='__pgun_weapon_strip',
+            classname='trigger_weapon_strip',
+            origin=ent_pos,
+            startdisabled=1,
+            spawnflags=1,  # Players
+            KillWeapons=1,
+        )
+        whole_map = VMF.make_prism(
+            Vec(-4096, -4096, -4096),
+            Vec(4096, 4096, 4096),
+            mat=consts.Tools.TRIGGER,
+        ).solid
+        trig_cube.solids = [whole_map.copy()]
+        trig_stripper.solids = [whole_map]
+        trig_cube.add_out(VLib.Output(
+            'OnStartTouch',
+            '@portalgun',
+            'RunScriptCode',
+            '_mark_held_cube()',
+        ))
+
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@portalgun',
+            'RunScriptCode',
+            'init({}, {}, {})'.format(
+                'true' if blue_portal else 'false',
+                'true' if oran_portal else 'false',
+                'true' if has_btn_onoff else 'false',
+            ),
+            delay=0.1,
+        ))
 
     if blue_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
