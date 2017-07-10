@@ -77,6 +77,7 @@ def check_file(file: Path, portal2: Path, packages: Path):
             else:
                 dest = portal2 / 'bee2' / res_path
         LOGGER.info('"{}" -> "{}"', file, dest)
+        os.makedirs(str(dest.parent), exist_ok=True)
         shutil.copy(str(file), str(dest))
     else:
         # In Portal 2, copy to each matching package.
@@ -96,6 +97,7 @@ def check_file(file: Path, portal2: Path, packages: Path):
             if str(rel_loc) in package.fsys:
                 full_loc = package.fsys.path / rel_loc
                 LOGGER.info('"{}" -> "{}"', file, full_loc)
+                os.makedirs(str(full_loc.parent), exist_ok=True)
                 shutil.copy(str(file), str(full_loc))
 
 
@@ -126,8 +128,9 @@ def main(files: List[str]):
     for file in files:
         file_path = Path(file)
         if file_path.is_dir():
-            for sub_file in file_path.glob('**/*'):
-                check_file(sub_file, portal2_loc, package_loc)
+            for sub_file in file_path.glob('**/*'):  # type: Path
+                if sub_file.is_file():
+                    check_file(sub_file, portal2_loc, package_loc)
         else:
             check_file(file_path, portal2_loc, package_loc)
 
