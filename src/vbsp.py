@@ -1076,6 +1076,15 @@ def set_player_portalgun():
             delay=0.1,
         ))
 
+        # Shuts down various parts when you've reached the exit.
+        import conditions.instances
+        conditions.instances.global_input(VMF, ent_pos, VLib.Output(
+            'OnTrigger',
+            '@portalgun',
+            'RunScriptCode',
+            'map_won()',
+        ), relay_name='@map_won')
+
     if blue_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
             'OnMapSpawn',
