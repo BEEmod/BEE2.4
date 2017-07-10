@@ -899,6 +899,7 @@ def scan_music_locs():
     If successful we can export the music to games.
     """
     global MUSIC_TAG_LOC, MUSIC_MEL_VPK
+    found_tag = False
     steamapp_locs = set()
     for gm in all_games:
         steamapp_locs.add(os.path.normpath(gm.abs_path('../')))
@@ -906,16 +907,28 @@ def scan_music_locs():
     for loc in steamapp_locs:
         tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
         mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
-        if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
-            make_tag_coop_inst(loc)
-            MUSIC_TAG_LOC = tag_loc
-            LOGGER.info('Ap-Tag dir: {}', tag_loc)
+        if os.path.exists(tag_loc) and not found_tag:
+            found_tag = True
+            try:
+                make_tag_coop_inst(loc)
+            except FileNotFoundError:
+                messagebox.showinfo(
+                    message=_('Ap-Tag Coop gun instance not found!\n'
+                              'Coop guns will not work - verify cache to fix.'),
+                    parent=TK_ROOT,
+                    icon=messagebox.ERROR,
+                    title=_('BEE2 - Aperture Tag Files Missing'),
+                )
+                MUSIC_TAG_LOC = None
+            else:
+                MUSIC_TAG_LOC = tag_loc
+                LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
         if os.path.exists(mel_loc) and MUSIC_MEL_VPK is None:
             MUSIC_MEL_VPK = VPK(mel_loc)
             LOGGER.info('PS-Mel dir: {}', mel_loc)
 
-        if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
+        if MUSIC_MEL_VPK is not None and found_tag:
             break
 
 
