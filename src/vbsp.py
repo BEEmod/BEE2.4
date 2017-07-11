@@ -1535,8 +1535,8 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
             color='white' if is_white else 'black',
         )
     )
-    if replace:
-        inst['file'] = replace[0]
+    if replace is not None:
+        inst['file'] = replace
 
 
 def calc_rand_seed():
