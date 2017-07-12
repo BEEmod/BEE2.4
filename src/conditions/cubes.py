@@ -246,6 +246,7 @@ class CubeType:
         base_tint: Vec,
         outputs: Dict[CubeOutputs, List[Output]],
         overlay_addon: Optional[CubeAddon],
+        overlay_think: Optional[str],
     ):
         self.id = id
         self.instances = resolve_inst(cube_item_id)
@@ -282,6 +283,8 @@ class CubeType:
 
         # If set, an instance to attach onto the cube.
         self.overlay_addon = overlay_addon
+        # Only the base cube option can have a think script.
+        self.overlay_think = overlay_think
 
         # Set to true if in the map.
         self.in_map = False
@@ -350,6 +353,7 @@ class CubeType:
             conf.vec('baseTint', 255, 255, 255),
             outputs,
             CubeAddon.base_parse(cube_id, conf),
+            conf['thinkFunc', None],
         )
 
 
@@ -771,6 +775,8 @@ def link_cubes(vmf: VMF):
         # A dropper.
         if isinstance(inst_type, DropperType):
             timer = inst.fixup.int('$timer_delay', 0)
+            # Don't allow others access to this value.
+            del inst.fixup['$timer_delay']
             # Infinite and 3 (default) are treated as off.
             if 3 < timer <= 30:
                 if timer in dropper_timer:
@@ -792,6 +798,10 @@ def link_cubes(vmf: VMF):
     for cube, cube_type in cubes:
         # First look for a timer value, for linking cubes specifically.
         timer = cube.fixup.int('$timer_delay', 0)
+
+        # Don't allow others access to this value.
+        del cube.fixup['$timer_delay']
+
         # Infinite and 3 (default) are treated as off.
         if 3 < timer <= 30:
             try:
@@ -809,8 +819,6 @@ def link_cubes(vmf: VMF):
                     )) from None
             used_droppers[dropper] = True
 
-            PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
-
             # Autodrop on the dropper shouldn't be on - that makes
             # linking useless since the cube immediately fizzles.
 
@@ -819,6 +827,8 @@ def link_cubes(vmf: VMF):
             dropper.fixup['$disable_autodrop'] = (
                 drop_type.id == VALVE_DROPPER_ID
             )
+
+            PAIRS.append(CubePair(cube_type, drop_type, dropper, cube))
             continue
 
         # Next try to link to a dropper on the ceiling.
@@ -928,6 +938,9 @@ def link_cubes(vmf: VMF):
         if pair.dropper:
             voice_attr['cubedropper'] = True
             voice_attr['cubedropper' + has_name] = True
+
+            # Remove this since it's not useful, with our changes.
+            del pair.dropper.fixup['$cube_type']
         else:
             voice_attr['cubedropperless' + has_name] = True
 
@@ -1031,6 +1044,8 @@ def make_cube(
             vscripts.append(addon.vscript.strip())
 
     ent['vscripts'] = ' '.join(vscripts)
+    if vscripts and cube_type.overlay_think:
+        ent['thinkfunction'] = cube_type.overlay_think
 
     if pair.tint:
         cust_model = cube_type.model_color
