@@ -1,5 +1,6 @@
 """Implement cubes and droppers."""
 import itertools
+from collections import namedtuple
 
 from enum import Enum
 from typing import Dict, Optional, List, Union, Tuple, Any, Set, FrozenSet
@@ -15,6 +16,8 @@ from srctools import (
 import utils
 import conditions
 import vbsp
+from srctools.vmf import EntityFixup
+
 
 LOGGER = utils.getLogger(__name__, 'cond.cubes')
 
@@ -62,6 +65,8 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 # This lets us have custom models - since those are saved and
 # loaded in the base-entity machinery.
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
+
+ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
 
 
 class CubeEntType(Enum):
@@ -139,6 +144,7 @@ class CubeAddon:
         inst='',
         pack='',
         vscript='',
+        script_vars: List[ScriptVar]=(),
         outputs: Dict[CubeOutputs, List[Output]]=EmptyMapping,
     ):
         self.id = id
@@ -146,25 +152,23 @@ class CubeAddon:
         self.pack = pack
         self.vscript = vscript  # Entity script(s)s to add to the cube.
         self.outputs = {}  # type: Dict[CubeOutputs, List[Output]]
+
+        # Fire inputs to functions with instance vars.
+        self.script_vars = list(script_vars)
+
         for out_type in CubeOutputs:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
 
 
     @classmethod
     def parse(cls, props: Property):
-        outputs = {}
-
-        for out_type in CubeOutputs:
-            outputs[out_type] = out_list = []
-            for prop in props.find_all(out_type.value):
-                out_list.append(Output.parse(prop))
 
         addon = cls(
             props['id'],
             props['instance', ''],
             props['packlist', ''],
             props['vscript', ''],
-            outputs,
+            cls._parse_outputs(props),
         )
         return addon
 
@@ -174,10 +178,40 @@ class CubeAddon:
         inst = props['overlay_inst', '']
         pack = props['overlay_pack', '']
         script = props['vscript', '']
-        if inst or pack or script:
-            return cls(cube_id, inst, pack, script, {})
+        outputs = cls._parse_outputs(props)
+        script_vars = cls._parse_scriptvar(props)
+        if inst or pack or script or script_vars or any(outputs.values()):
+            return cls(cube_id, inst, pack, script, script_vars, outputs)
         else:
             return None
+
+    @staticmethod
+    def _parse_outputs(props: Property) -> Dict[CubeOutputs, List[Output]]:
+        outputs = {}
+
+        for out_type in CubeOutputs:
+            outputs[out_type] = out_list = []
+            for prop in props.find_all(out_type.value):
+                out_list.append(Output.parse(prop))
+
+        return outputs
+
+    @staticmethod
+    def _parse_scriptvar(props: Property):
+        script_vars = []
+        for prop in props.find_children('ScriptVars'):
+            func, args = prop.value.split('(')
+
+            # Allow this to be used.
+            if prop.name == '!self':
+                prop.name = 'box'
+
+            script_vars.append(ScriptVar(
+                prop.real_name,
+                func,
+                list(map(str.strip, args.rstrip(')').split(','))),
+            ))
+        return script_vars
 
 
 class DropperType:
@@ -207,7 +241,6 @@ class DropperType:
 
         # Instance input to respawn the cube.
         self.in_respawn = in_respawn
-
 
     @classmethod
     def parse(cls, conf: Property):
@@ -365,6 +398,7 @@ class CubePair:
         drop_type: DropperType=None,
         dropper: Entity=None,
         cube: Entity=None,
+        cube_fixup: EntityFixup=None,
         tint: Vec=None,
     ):
         self.cube_type = cube_type
@@ -373,6 +407,19 @@ class CubePair:
         # May be None for dropperless!
         self.drop_type = drop_type
         self.dropper = dropper
+
+        # Fixup values from the cube's instance.
+        if cube_fixup is None:
+            if cube is not None:
+                # Grab from the cube instance.
+                cube_fixup = cube.fixup
+            else:
+                # This can only be None for Valve's cubes!
+                if not self.cube_type.is_valve_cube:
+                    LOGGER.warning('Cube "{}" has no fixup values!')
+                cube_fixup = EntityFixup()
+
+        self.cube_fixup = cube_fixup
 
         self.tint = tint  # If set, Colorizer color to use.
 
@@ -855,7 +902,7 @@ def link_cubes(vmf: VMF):
                     ) from None
                 used_droppers[dropper] = True
                 cube.remove()
-                PAIRS.append(CubePair(cube_type, drop_type, dropper))
+                PAIRS.append(CubePair(cube_type, drop_type, dropper, cube_fixup=cube.fixup))
                 continue
 
         # Otherwise, both cases fail - the cube is dropperless.
@@ -973,6 +1020,39 @@ def setup_output(
     return out
 
 
+def add_scriptvar(
+    out_name: str,
+    fixup: EntityFixup,
+    inst: Entity,
+    vars: List[ScriptVar],
+) -> List[Output]:
+    """Apply "scriptvars" to a cube. All values must be float/integer.
+
+    If blank or invalid Null will be used.
+    """
+    out = []
+    for var in vars:
+        args = []
+        for arg in var.vars:
+            value = fixup[arg]
+            if value:
+                try:
+                    value = format(float(value), 'g')
+                except ValueError:
+                    LOGGER.warning('Argument ${}={!r} is not an integer!', arg, value)
+                    value = 'null'
+            else:
+                value = 'null'
+            args.append(value)
+        out.append(Output(
+            out_name,
+            conditions.local_name(inst, var.local_name),
+            'RunScriptCode',
+            '{}({})'.format(var.function, ', '.join(args)),
+        ))
+    return out
+
+
 def make_cube(
     vmf: VMF,
     pair: CubePair,
@@ -1036,8 +1116,7 @@ def make_cube(
                 file=addon.inst,
             )
             # Copy the cube stuff to the addon, since it's specific to the cube.
-            if pair.cube is not None:
-                inst.fixup.update(pair.cube.fixup)
+            inst.fixup.update(pair.cube_fixup)
         if addon.pack:
             vbsp.TO_PACK.add(addon.pack)
         if addon.vscript:
@@ -1116,10 +1195,13 @@ def generate_cubes(vmf: VMF):
         # One or both of the cube ents we make.
         cubes = []  # type: List[Entity]
 
-        # Transfer addon outputs to the pair data.
+        # Transfer addon outputs to the pair data, and accumulate all the script
+        # vars.
+        script_vars = []
         for addon in pair.addons:
             for out_type, out_list in addon.outputs.items():
                 pair.outputs[out_type].extend(out_list)
+            script_vars.extend(addon.script_vars)
 
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
@@ -1168,6 +1250,13 @@ def generate_cubes(vmf: VMF):
                 # After first firing, it deletes so it doesn't trigger after.
                 out.only_once = True
                 drop_cube.add_out(out)
+
+            drop_cube.add_out(*add_scriptvar(
+                'OnUser4',
+                pair.cube_fixup,
+                pair.dropper,
+                script_vars,
+            ))
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
@@ -1261,6 +1350,14 @@ def generate_cubes(vmf: VMF):
             # For consistency with the dropped cube, add a User1 output
             # that fizzles it.
             cube.add_out(Output('OnUser1', '!self', 'Dissolve'))
+
+            # Add script-var setup inputs.
+            cube_temp.add_out(*add_scriptvar(
+                'OnEntitySpawned',
+                pair.cube_fixup,
+                pair.cube,
+                script_vars,
+            ))
 
             for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
                 cube_temp.add_out(setup_output(
