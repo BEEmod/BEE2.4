@@ -30,11 +30,53 @@ import shutil
 
 from BEE2_config import GEN_OPTS
 from packageLoader import (
-    PACKAGE_SYS,
     packages as PACKAGES,
     Package,
     find_packages
 )
+
+# If true, user said * for packages - use last for all.
+PACKAGE_REPEAT = None  # type: RawFileSystem
+
+
+def get_package(file: Path) -> RawFileSystem:
+    """Get the package desired for a file."""
+    global PACKAGE_REPEAT
+    last_package = GEN_OPTS.get_val('Last_Selected', 'Package_sync_id', '')
+    if last_package:
+        if PACKAGE_REPEAT:
+            return PACKAGE_REPEAT
+
+        message = ('Choose package ID for "{}", or '
+                   'blank to assume {}: '.format(file, last_package))
+    else:
+        message = 'Choose package ID for "{}": '.format(file)
+
+    error_message = 'Invalid package!\n' + message
+
+    while True:
+        pack_id = input(message)
+
+        # After first time, always use the 'invalid package' warning.
+        message = error_message
+
+        if pack_id == '*' and last_package:
+            try:
+                PACKAGE_REPEAT = PACKAGES[last_package].fsys
+            except KeyError:
+                continue
+            return PACKAGE_REPEAT
+        elif not pack_id and last_package:
+            pack_id = last_package
+
+        try:
+            fsys = PACKAGES[pack_id].fsys
+        except KeyError:
+            continue
+        else:
+            GEN_OPTS['Last_Selected']['Package_sync_id'] = pack_id
+            GEN_OPTS.save_check()
+            return fsys
 
 
 def check_file(file: Path, portal2: Path, packages: Path):
@@ -90,15 +132,25 @@ def check_file(file: Path, portal2: Path, packages: Path):
                 'bee2_dev' if (portal2 / 'bee2_dev').exists() else 'bee2'
             )
 
+
+        target_systems = []
+
         for package in PACKAGES.values():
             if not isinstance(package.fsys, RawFileSystem):
                 # In a zip or the like.
                 continue
             if str(rel_loc) in package.fsys:
-                full_loc = package.fsys.path / rel_loc
-                LOGGER.info('"{}" -> "{}"', file, full_loc)
-                os.makedirs(str(full_loc.parent), exist_ok=True)
-                shutil.copy(str(file), str(full_loc))
+                target_systems.append(package.fsys)
+
+        if not target_systems:
+            # This file is totally new.
+            target_systems.append(get_package(rel_loc))
+
+        for fsys in target_systems:
+            full_loc = fsys.path / rel_loc
+            LOGGER.info('"{}" -> "{}"', file, full_loc)
+            os.makedirs(str(full_loc.parent), exist_ok=True)
+            shutil.copy(str(file), str(full_loc))
 
 
 def main(files: List[str]):
@@ -136,5 +188,5 @@ def main(files: List[str]):
 
 
 if __name__ == '__main__':
-    LOGGER.info('BEE{} packages syncer, args=', utils.BEE_VERSION, sys.argv[1:])
+    LOGGER.info('BEE{} packages syncer, args={}', utils.BEE_VERSION, sys.argv[1:])
     sys.exit(main(sys.argv[1:]))
