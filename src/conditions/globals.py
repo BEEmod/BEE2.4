@@ -33,7 +33,7 @@ def flag_voice_has(flag: Property):
 def flag_music(flag: Property):
     """Checks the selected music ID.
 
-    Use "<NONE>" for no music.
+    Use `<NONE>` for no music.
     """
     return vbsp_options.get(str, 'music_id') == flag.value
 
@@ -43,15 +43,15 @@ def flag_game(flag: Property):
     """Checks which game is being modded.
 
     Accepts the following aliases instead of a Steam ID:
-     - PORTAL2
-     - APTAG
-     - ALATAG
-     - TAG
-     - Aperture Tag
-     - TWTM,
-     - Thinking With Time Machine
-     - DEST_AP
-     - Destroyed Aperture
+    - PORTAL2
+    - APTAG
+    - ALATAG
+    - TAG
+    - Aperture Tag
+    - TWTM,
+    - Thinking With Time Machine
+    - DEST_AP
+    - Destroyed Aperture
     """
     return vbsp_options.get(str, 'game_id') == utils.STEAM_IDS.get(
         flag.value.upper(),
@@ -63,7 +63,7 @@ def flag_game(flag: Property):
 def flag_voice_char(flag: Property):
     """Checks to see if the given charcter is present in the voice pack.
 
-    "<NONE>" means no voice pack is chosen.
+    `<NONE>` means no voice pack is chosen.
     This is case-insensitive, and allows partial matches - 'Cave' matches
     a voice pack with 'Cave Johnson'.
     """
@@ -80,14 +80,14 @@ def flag_voice_char(flag: Property):
 def res_cave_portrait():
     """Checks to see if the Cave Portrait option is set for the given
 
-    skin pack.
+    voice pack.
     """
     return vbsp_options.get(int, 'cave_port_skin') is not None
 
 
 @make_flag('ifMode', 'iscoop', 'gamemode')
 def flag_game_mode(flag: Property):
-    """Checks if the game mode is "SP" or "COOP".
+    """Checks if the game mode is `SP` or `COOP`.
     """
     import vbsp
     return vbsp.GAME_MODE.casefold() == flag.value.casefold()
@@ -98,10 +98,10 @@ def flag_is_preview(flag: Property):
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
-    door, and restart the map after reaching the exit door. If false,
+    door, and restart the map after reaching the exit door. If `False`,
     they start in the elevator.
 
-    Preview mode is always False when publishing.
+    Preview mode is always `False` when publishing.
     """
     import vbsp
     return vbsp.IS_PREVIEW == conv_bool(flag.value, False)
@@ -116,13 +116,26 @@ def flag_has_exit_signage():
     return False
 
 
+@make_result('setOption')
+def res_set_option(res: Property):
+    """Set a value in the "options" part of VBSP_config.
+
+    Each child property will be set.
+    """
+    for opt in res.value:
+        vbsp_options.set_opt(opt.name, opt.value)
+    return RES_EXHAUSTED
+
+
+
 @make_flag('ItemConfig')
 def res_get_item_config(inst: Entity, res: Property):
     """Check if an item config panel value matches another value.
 
-    ID is the ID of the group. Name is the name of the widget.
-    If UseTimer is true, it uses $timer_delay to choose the value to use.
-    Value is the value to compare to.
+    * `ID` is the ID of the group.
+    * `Name` is the name of the widget.
+    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * `Value` is the value to compare to.
     """
     group_id = res['ID']
     wid_name = res['Name'].casefold()
@@ -143,7 +156,7 @@ def res_get_item_config(inst: Entity, res: Property):
 def res_set_style_var(res: Property):
     """Set Style Vars.
 
-    The value should be set of "SetTrue" and "SetFalse" keyvalues.
+    The value should be a set of `SetTrue` and `SetFalse` keyvalues.
     """
     for opt in res.value:
         if opt.name == 'settrue':
@@ -157,8 +170,8 @@ def res_set_style_var(res: Property):
 def res_set_voice_attr(res: Property):
     """Sets a number of Voice Attributes.
 
-        Each child property will be set. The value is ignored, but must
-        be present for syntax reasons.
+    Each child property will be set. The value is ignored, but must
+    be present for syntax reasons.
     """
     if res.has_children():
         for opt in res.value:
@@ -174,7 +187,7 @@ CACHED_MODELS = set()
 def res_pre_cache_model(res: Property):
     """Precache the given model for switching.
 
-    This places it as a prop_dynamic_override.
+    This places it as a `prop_dynamic_override`.
     """
     mdl_name = res.value.casefold()
     if not mdl_name.startswith('models/'):
@@ -188,7 +201,7 @@ def res_pre_cache_model(res: Property):
     vbsp.VMF.create_ent(
         classname='prop_dynamic_override',
         targetname='@precache',
-        origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+        origin=vbsp_options.get(Vec, 'global_ents_loc'),
         model=mdl_name,
 
         # Disable shadows and similar things, it shouldn't ever be in
@@ -206,10 +219,11 @@ def res_pre_cache_model(res: Property):
 def res_get_item_config(inst: Entity, res: Property):
     """Load a config from the item config panel onto a fixup.
 
-    ID is the ID of the group. Name is the name of the widget, and resultVar
-    is the location to store. If UseTimer is true, it uses $timer_delay to
-    choose the value to use. Default is the default value, if the config
-    isn't found.
+    * `ID` is the ID of the group.
+    * `Name` is the name of the widget.
+    * `resultVar` is the location to store the value into.
+    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * `Default` is the default value, if the config isn't found.
     """
     group_id = res['ID']
     wid_name = res['Name']

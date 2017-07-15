@@ -38,7 +38,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionType = TypeVar('OptionType', str, int, float, bool, Vec)
+OptionType = Union[str, int, float, bool, Vec]
 
 
 class Opt:
@@ -115,6 +115,31 @@ def load_options(opt_blocks: Iterator[Property]):
 
     if set_vals:
         LOGGER.warning('Extra config options: {}', set_vals)
+
+
+def set_opt(opt_name: str, value: str):
+    """Set an option to a specific value."""
+    folded_name = opt_name.casefold()
+    for opt in DEFAULTS:
+        if folded_name == opt.id:
+            break
+    else:
+        LOGGER.warning('Invalid option name "{}"!', opt_name)
+        return
+
+    if opt.type is TYPE.VEC:
+        # Pass nones so we can check if it failed..
+        parsed_vals = parse_vec_str(value, x=None)
+        if parsed_vals[0] is None:
+            return
+        SETTINGS[opt.id] = Vec(*parsed_vals)
+    elif opt.type is TYPE.BOOL:
+        SETTINGS[opt.id] = srctools.conv_bool(value, SETTINGS[opt.id])
+    else:  # int, float, str - no special handling...
+        try:
+            SETTINGS[opt.id] = opt.type.value(value)
+        except (ValueError, TypeError):
+            pass
 
 
 def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
@@ -505,6 +530,12 @@ DEFAULTS = [
 
     Opt('model_changer_loc', Vec(-2400, -2800, -256),
         """Location of the model changer instance (if used).
+        """),
+
+    Opt('global_ents_loc', Vec(-2400, 0, 0),
+        """Location of global entities.
+
+        A 128x128 room is added there, and logic ents are added inside.
         """),
 
     ######

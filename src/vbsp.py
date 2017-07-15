@@ -29,6 +29,7 @@ import instance_traits
 import template_brush
 import comp_consts as consts
 import conditions.globals
+import conditions.cubes
 
 from typing import (
     Dict, Tuple, List
@@ -357,6 +358,9 @@ def load_settings():
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
+    # Data for different cube types.
+    conditions.cubes.parse_conf(conf)
+
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
     for trigger in conf.find_all('PackTriggers', 'material'):
@@ -402,6 +406,9 @@ def load_settings():
         'height_start': fog_config['height_start', '0'],
         'height_density': fog_config['height_density', '0'],
         'height_max_density': fog_config['height_max_density', '1'],
+
+        # Shadow background
+        'shadow': fog_config['shadowColor', '98 102 106'],
 
         'tonemap_rate': fog_config['tonemap_rate', '0.25'],
         'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
@@ -950,8 +957,7 @@ def set_player_portalgun():
     - If there are only orange portal spawners, the player gets a blue-
       only gun (Regular single portal device)
     - If there are both spawner types, the player doesn't get a gun.
-    - The two relays '@player_has_blue' and '@player_has_oran' will be
-      triggered OnMapSpawn if the player has those portals.
+    - 'PortalGunOnOff' will also be checked to activate that logic.
     """
     if GAME_MODE == 'COOP':
         return  # Don't change portalgun in Portal 2 Coop
@@ -964,8 +970,10 @@ def set_player_portalgun():
 
     blue_portal = not has['blueportal']
     oran_portal = not has['orangeportal']
+    has_btn_onoff = has['portalgunonoff']
 
-    LOGGER.info('Blue: {}, Orange: {!s}',
+    LOGGER.info(
+        'Blue: {}, Orange: {!s}',
         'Y' if blue_portal else 'N',
         'Y' if oran_portal else 'N',
     )
@@ -978,29 +986,82 @@ def set_player_portalgun():
         has['spawn_dual'] = False
         has['spawn_single'] = True
         has['spawn_nogun'] = False
-        inst = VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),  # Reuse this location
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/pgun_single.vmf',
-        )
-        # Set which portals this weapon_portalgun can fire
-        inst.fixup['blue_portal'] = srctools.bool_as_int(blue_portal)
-        inst.fixup['oran_portal'] = srctools.bool_as_int(oran_portal)
     else:
         has['spawn_dual'] = False
         has['spawn_single'] = False
         has['spawn_nogun'] = True
-        has_gun = False
-        # This instance only has a trigger_weapon_strip.
+
+    ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    if not blue_portal or not oran_portal or has_btn_onoff:
         VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/no_pgun.vmf',
+            classname='point_template',
+            targetname='@portalgun',
+            Template01='__pgun_template',
+            vscripts='bee2/portal_man.nut',
+            spawnflags=2,
+            origin=ent_pos,
         )
+        PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
+        VMF.create_ent(
+            classname='weapon_portalgun',
+            targetname='__pgun_template',
+            CanFirePortal1=0,
+            CanFirePortal2=0,
+            spawnflags=0,
+            origin=ent_pos - (12, 0, 0),
+        )
+        trig_cube = VMF.create_ent(
+            targetname='__pgun_held_trig',
+            classname='trigger_multiple',
+            origin=ent_pos,
+            filtername='@filter_held',
+            startdisabled=1,
+            spawnflags=8,  # Physics
+            wait=0.01,
+        )
+        trig_stripper = VMF.create_ent(
+            targetname='__pgun_weapon_strip',
+            classname='trigger_weapon_strip',
+            origin=ent_pos,
+            startdisabled=1,
+            spawnflags=1,  # Players
+            KillWeapons=1,
+        )
+        whole_map = VMF.make_prism(
+            Vec(-4096, -4096, -4096),
+            Vec(4096, 4096, 4096),
+            mat=consts.Tools.TRIGGER,
+        ).solid
+        trig_cube.solids = [whole_map.copy()]
+        trig_stripper.solids = [whole_map]
+        trig_cube.add_out(VLib.Output(
+            'OnStartTouch',
+            '@portalgun',
+            'RunScriptCode',
+            '_mark_held_cube()',
+        ))
+
+        GLOBAL_OUTPUTS.append(VLib.Output(
+            'OnMapSpawn',
+            '@portalgun',
+            'RunScriptCode',
+            'init({}, {}, {})'.format(
+                'true' if blue_portal else 'false',
+                'true' if oran_portal else 'false',
+                'true' if has_btn_onoff else 'false',
+            ),
+            delay=0.1,
+        ))
+
+        # Shuts down various parts when you've reached the exit.
+        import conditions.instances
+        conditions.instances.global_input(VMF, ent_pos, VLib.Output(
+            'OnTrigger',
+            '@portalgun',
+            'RunScriptCode',
+            'map_won()',
+        ), relay_name='@map_won')
 
     if blue_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
@@ -1025,11 +1086,11 @@ def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO':
+    ).upper() == 'AUTO' and IS_PREVIEW:
         VMF.create_ent(
             classname='func_instance',
             file='instances/BEE2/logic/screenshot_logic.vmf',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
@@ -1038,7 +1099,7 @@ def add_screenshot_logic():
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    pos = vbsp_options.get(Vec, 'global_ents_loc')
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -1046,6 +1107,18 @@ def add_fog_ents():
     )
 
     fog_opt = settings['fog']
+
+    random.seed(MAP_RAND_SEED + '_shadow_angle')
+    VMF.create_ent(
+        classname='shadow_control',
+        # Slight variations around downward direction.
+        angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
+        origin=pos + (0, 16, 0),
+        distance=100,
+        color=fog_opt['shadow'],
+        disableallshadows=0,
+        enableshadowsfromlocallights=1,
+    )
 
     fog_controller = VMF.create_ent(
         classname='env_fog_controller',
@@ -1494,8 +1567,8 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
             color='white' if is_white else 'black',
         )
     )
-    if replace:
-        inst['file'] = replace[0]
+    if replace is not None:
+        inst['file'] = replace
 
 
 def calc_rand_seed():
@@ -2717,19 +2790,45 @@ def add_extra_ents(mode):
             fixup_style='0',
         )
 
+    LOGGER.info('Adding global ents...')
+
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
-
+    global_ents_pos = vbsp_options.get(Vec, 'global_ents_loc')
     pti_file = vbsp_options.get(str, 'global_pti_ents')
     pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    # Add a nodraw box around the global entity location, to seal it.
+    VMF.add_brushes(VMF.make_hollow(
+        global_ents_pos + (128, 128, 128),
+        global_ents_pos - (128, 128, 64),
+    ))
 
     # Add a cubemap into the map, so materials get a blank one generated.
     # If none are present this doesn't happen...
     VMF.create_ent(
         classname='env_cubemap',
-        cubemapsize=1, # Make as small as possible..
-        origin=pti_loc,
+        cubemapsize=1,  # Make as small as possible..
+        origin=global_ents_pos,
     )
+
+    # So we have one in the map.
+    VMF.create_ent(
+        classname='info_node',
+        origin=global_ents_pos - (0, 0, 64),
+        nodeid=1,
+        spawnflags=0,
+        angles='0 0 0',
+    )
+
+    if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
+        # If we have light bridges, make sure we precache the particle.
+        VMF.create_ent(
+            classname='info_particle_system',
+            origin=global_ents_pos,
+            effect_name='projected_wall_impact',
+            start_active=0,
+        )
 
     if pti_file:
         LOGGER.info('Adding Global PTI Ents')
@@ -2766,7 +2865,7 @@ def add_extra_ents(mode):
     logic_auto = VMF.create_ent(
         classname='logic_auto',
         spawnflags='0',  # Don't remove on fire
-        origin=pti_loc + (0, 0, 16),
+        origin=global_ents_pos + (0, 0, 16),
     )
     logic_auto.outputs = GLOBAL_OUTPUTS
 

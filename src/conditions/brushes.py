@@ -535,8 +535,8 @@ def res_import_template(inst: Entity, res: Property):
             - "movedir" on func_movelinear - set a normal surrounded by <>,
               this gets replaced with angles.
     - colorVar: If this fixup var is set
-            to 'white' or 'black', that colour will be forced.
-            If the value is '<editor>', the colour will be chosen based on
+            to `white` or `black`, that colour will be forced.
+            If the value is `<editor>`, the colour will be chosen based on
             the color of the surface for ItemButtonFloor, funnels or
             entry/exit frames.
     - invertVar: If this fixup value is true, tile colour will be

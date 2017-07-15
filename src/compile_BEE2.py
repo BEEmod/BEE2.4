@@ -129,7 +129,9 @@ INCLUDE_LIBS = [
 if utils.WIN:
     base = 'Win32GUI'
     INCLUDE_LIBS.extend(['tcl86t.dll', 'tk86t.dll'])
+    ext = '.exe'
 else:
+    ext = ''
     base = None
 
 # Filter out files for other platforms
@@ -164,20 +166,25 @@ setup(
             'BEE2_launch.pyw',
             base=base,
             icon=ico_path,
-            targetName='BEE2' + ('.exe' if utils.WIN else ''),
+            targetName='BEE2' + ext,
         ),
         Executable(
             'backup.py',
             base=base,
             icon=ico_path,
-            targetName='backup_tool' + ('.exe' if utils.WIN else ''),
+            targetName='backup_tool' + ext,
         ),
         Executable(
             'CompilerPane.py',
             base=base,
             icon=ico_path,
-            targetName='compiler_options' + ('.exe' if utils.WIN else ''),
-        )
+            targetName='compiler_options' + ext,
+        ),
+        Executable(
+            'packages_sync.py',
+            icon=ico_path,
+            targetName='packages_sync' + ext,
+        ),
     ],
 )
 

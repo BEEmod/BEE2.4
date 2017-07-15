@@ -1,7 +1,9 @@
 """Templates are sets of brushes which can be copied into the map."""
 import random
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from collections.abc import Mapping
+
+from decimal import Decimal
 from enum import Enum
 
 import srctools
@@ -10,6 +12,7 @@ import vbsp_options
 from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec, VMF
 import comp_consts as consts
 import utils
+import conditions
 
 from typing import (
     Iterable, Union, Callable,
@@ -61,6 +64,15 @@ class TEMP_TYPES(Enum):
     default = 0  # Based on the original VMF settings
     world = 1  # Import and add to world
     detail = 2  # Import as a func_detail
+
+ColorPicker = namedtuple('ColorPicker', [
+    'priority',  # Decimal order to do them in.
+    'offset',
+    'normal',  # Normal of the surface.
+    'sides',
+    'grid_snap',  # Snap to grid on non-normal axes
+    'remove_brush',  # Remove the brush after
+])
 
 
 B = MAT_TYPES.black
@@ -126,6 +138,8 @@ ExportedTemplate = NamedTuple('ExportedTemplate', [
     ('overlay', List[Entity]),
     ('orig_ids', Dict[str, str]),
     ('template', 'Template'),
+    ('origin', Vec),
+    ('angles', Vec),
 ])
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
@@ -149,6 +163,7 @@ class Template:
         realign_faces: Iterable[str]=(),
         overlay_transfer_faces: Iterable[str]=(),
         vertical_faces: Iterable[str]=(),
+        color_pickers: Iterable[ColorPicker]=(),
     ):
         """Make an overlay.
 
@@ -172,6 +187,12 @@ class Template:
         self.overlay_faces = set(overlay_transfer_faces)
         self.vertical_faces = set(vertical_faces)
         self.skip_faces = set(skip_faces)
+        # Sort so high IDs are first.
+        self.color_pickers = sorted(
+            color_pickers,
+            key=ColorPicker.priority.__get__,
+            reverse=True,
+        )
 
     @property
     def visgroups(self):
@@ -318,6 +339,8 @@ def load_templates():
     overlay_ents = defaultdict(make_subdict)
     conf_ents = {}
 
+    color_pickers = defaultdict(list)
+
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[
             ent['template_id'].casefold()
@@ -346,6 +369,26 @@ def load_templates():
         temp = ScalingTemplate.parse(ent)
         TEMPLATES[temp.id.casefold()] = temp
 
+    for ent in vmf.by_class['bee2_template_colorpicker']:
+        # Parse the colorpicker data.
+        temp_id = ent['template_id'].casefold()
+        try:
+            priority = Decimal(ent['priority'])
+        except ValueError:
+            LOGGER.warning(
+                'Bad priority for colorpicker in "{}" template!',
+                temp_id.upper(),
+            )
+            priority = Decimal(0)
+        color_pickers[temp_id].append(ColorPicker(
+            priority,
+            offset=Vec.from_str(ent['origin']),
+            normal=Vec(x=1).rotate_by_str(ent['angles']),
+            sides=ent['faces'].split(' '),
+            grid_snap=srctools.conv_bool(ent['grid_snap']),
+            remove_brush=srctools.conv_bool(ent['remove_brush']),
+        ))
+
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
         try:
             conf = conf_ents[temp_id]
@@ -369,6 +412,7 @@ def load_templates():
             realign_faces,
             overlay_faces,
             vertical_faces,
+            color_pickers[temp_id],
         )
 
 
@@ -510,6 +554,8 @@ def import_template(
         new_over,
         id_mapping,
         template,
+        origin,
+        angles or Vec(0, 0, 0),
     )
 
 
@@ -617,6 +663,36 @@ def retexture_template(
         replace_tex.items()
     }
 
+    # For each face, if it needs to be forced to a colour, or None if not.
+    force_colour_face = defaultdict(lambda: None)
+
+    # Already sorted by priority.
+    for color_picker in template.color_pickers:
+        picker_pos = color_picker.offset.copy().rotate(*template_data.angles)
+        picker_pos += template_data.origin
+        picker_norm = color_picker.normal.copy().rotate(*template_data.angles)
+
+        if color_picker.grid_snap:
+            for axis in 'xyz':
+                # Don't realign things in the normal's axis -
+                # those are already fine.
+                if not picker_norm[axis]:
+                    picker_pos[axis] = picker_pos[axis] // 128 * 128 + 64
+
+        brush = conditions.SOLIDS.get(picker_pos.as_tuple(), None)
+
+        if brush is None or abs(brush.normal) != abs(picker_norm):
+            # Doesn't exist.
+            continue
+
+        if color_picker.remove_brush and brush.solid in vbsp.VMF.brushes:
+            brush.solid.remove()
+
+        for side in color_picker.sides:
+            # Only do the highest priority successful one.
+            if force_colour_face[side] is None:
+                force_colour_face[side] = brush.color
+
     for brush in all_brushes:
         for face in brush:
             orig_id = rev_id_mapping[face.id]
@@ -686,7 +762,9 @@ def retexture_template(
             # It's a regular wall type!
             tex_colour, grid_size = tex_type
 
-            if force_colour == 'INVERT':
+            if force_colour_face[orig_id] is not None:
+                tex_colour = force_colour_face[orig_id]
+            elif force_colour == 'INVERT':
                 # Invert the texture
                 tex_colour = (
                     MAT_TYPES.white

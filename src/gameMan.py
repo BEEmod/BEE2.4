@@ -555,8 +555,9 @@ class Game:
             'Fizzler',
             'Options',
             'StyleVars',
+            'DropperItems',
             'Conditions',
-            'Voice',
+            'Quotes',
             'PackTriggers',
         )
 
@@ -802,6 +803,15 @@ class Game:
         if TRANS_DATA:
             return
 
+        # Allow overriding.
+        try:
+            lang = os.environ['BEE2_P2_LANG']
+        except KeyError:
+            pass
+        else:
+            self.load_trans(lang)
+            return
+
         # We need to first figure out what language is used (if not English),
         # then load in the file. This is saved in the 'appmanifest',
 
@@ -810,11 +820,20 @@ class Game:
         except FileNotFoundError:
             # Portal 2 isn't here...
             return
+
         with appman_file:
             appman = Property.parse(appman_file, 'appmanifest_620.acf')
         try:
             lang = appman.find_key('AppState').find_key('UserConfig')['language']
         except NoKeyError:
+            return
+
+        self.load_trans(lang)
+
+    def load_trans(self, lang):
+        """Actually load the translation."""
+        # Already loaded
+        if TRANS_DATA:
             return
 
         basemod_loc = self.abs_path(
@@ -880,6 +899,7 @@ def scan_music_locs():
     If successful we can export the music to games.
     """
     global MUSIC_TAG_LOC, MUSIC_MEL_VPK
+    found_tag = False
     steamapp_locs = set()
     for gm in all_games:
         steamapp_locs.add(os.path.normpath(gm.abs_path('../')))
@@ -887,16 +907,28 @@ def scan_music_locs():
     for loc in steamapp_locs:
         tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
         mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
-        if os.path.exists(tag_loc) and MUSIC_TAG_LOC is None:
-            make_tag_coop_inst(loc)
-            MUSIC_TAG_LOC = tag_loc
-            LOGGER.info('Ap-Tag dir: {}', tag_loc)
+        if os.path.exists(tag_loc) and not found_tag:
+            found_tag = True
+            try:
+                make_tag_coop_inst(loc)
+            except FileNotFoundError:
+                messagebox.showinfo(
+                    message=_('Ap-Tag Coop gun instance not found!\n'
+                              'Coop guns will not work - verify cache to fix.'),
+                    parent=TK_ROOT,
+                    icon=messagebox.ERROR,
+                    title=_('BEE2 - Aperture Tag Files Missing'),
+                )
+                MUSIC_TAG_LOC = None
+            else:
+                MUSIC_TAG_LOC = tag_loc
+                LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
         if os.path.exists(mel_loc) and MUSIC_MEL_VPK is None:
             MUSIC_MEL_VPK = VPK(mel_loc)
             LOGGER.info('PS-Mel dir: {}', mel_loc)
 
-        if MUSIC_MEL_VPK is not None and MUSIC_TAG_LOC is not None:
+        if MUSIC_MEL_VPK is not None and found_tag:
             break
 
 
