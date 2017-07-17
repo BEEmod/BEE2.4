@@ -238,12 +238,6 @@ IND_ITEM_NAMES = set() # And both combined
 
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
-##################
-# UTIL functions #
-##################
-
-get_tex = vbsp_options.get_tex
-
 
 def alter_mat(face, seed=None, texture_lock=True):
     """Randomise the texture used for a face, based on configured textures.
@@ -255,26 +249,7 @@ def alter_mat(face, seed=None, texture_lock=True):
     If texture_lock is false, the offset of the texture will be reset to 0,0.
     That ensures embedface will have aligned textures.
     """
-    mat = face.mat.casefold()
-    if seed:
-        random.seed(seed)
-
-    if mat in TEX_VALVE:  # should we convert it?
-        group, name = TEX_VALVE[mat]
-        face.mat = texturing.GROUPS[group].rand(name)
-        return True
-    elif mat in consts.BlackPan or mat in consts.WhitePan:
-        orient = get_face_orient(face)
-        face.mat = get_tex(get_tile_type(mat, orient))
-
-        if not texture_lock:
-            face.offset = 0
-
-        return True
-    elif mat in TEX_FIZZLER:
-        face.mat = texturing.fizzler.rand(TEX_FIZZLER[mat])
-    else:
-        return False
+    raise NotImplementedError("Don't use!")
 
 
 def get_tile_type(mat, orient):

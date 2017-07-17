@@ -16,7 +16,6 @@ from typing import Union, Tuple,  TypeVar, Type, Optional, Iterator
 LOGGER = utils.getLogger(__name__)
 
 SETTINGS = {}
-TEXTURES = {}
 
 # Overwritten by VBSP to get the actual values.
 ITEM_CONFIG = ConfigFile('', root='', auto_load=False)
@@ -167,22 +166,6 @@ def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
         return val.copy()
     else:
         return val
-
-
-def get_tex(name: str) -> str:
-    try:
-        return random.choice(TEXTURES[name])
-    except TypeError:
-        raise Exception('No texture "{}"!'.format(name))
-    except IndexError:
-        raise Exception('Empty texture definition for "{}"!'.format(name))
-
-
-def get_all_tex(name: str) -> list:
-    try:
-        return TEXTURES[name]
-    except TypeError:
-        raise Exception('No texture "' + name + '"!')
 
 
 def get_itemconf(
