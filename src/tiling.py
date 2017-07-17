@@ -8,12 +8,12 @@ from typing import Tuple, Dict, List, Optional
 
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
-from brushLoc import POS as BLOCK_POS, Block, grid_to_world, world_to_grid
+from brushLoc import POS as BLOCK_POS, Block
 import comp_consts as consts
 import utils
-import conditions
+import template_brush
 import texturing
-from texturing import TileType as TileSize
+from texturing import TileSize
 
 LOGGER = utils.getLogger(__name__)
 
@@ -98,9 +98,9 @@ class TileType(Enum):
     @property
     def color(self):
         if self.value in (0, 1):
-            return 'white'
+            return texturing.Portalable.WHITE
         elif self.value in (2, 3):
-            return 'black'
+            return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
     @property
@@ -110,7 +110,7 @@ class TileType(Enum):
         else:
             return TileSize.TILE_1x1
 
-# Symbols that represent TileType values.
+# Symbols that represent TileSize values.
 TILETYPE_TO_CHAR = {
     TileType.WHITE: 'W',
     TileType.WHITE_4x4: 'w',
@@ -166,7 +166,7 @@ class Pattern:
     def __init__(
         self,
         tex: TileSize,
-        *tiles: Tuple[Tuple[int, int, int, int], ...],
+        *tiles: Tuple[int, int, int, int],
         wall_only=False
     ):
         self.tex = tex
@@ -257,9 +257,9 @@ class TileDef:
         brush_faces: A list of off-grid brushes that this block uses.
           When exporting, this contains the used brushes.
         brush_type: BrushType - what sort of brush this is.
-        base_type: TileType this tile started with.
+        base_type: TileSize this tile started with.
         override_tex: If set, a specific texture to use (skybox, light, backpanels etc)
-        sub_tiles: None or a Dict[(u,v): TileType]. u/v are either xz, yz or xy.
+        sub_tiles: None or a Dict[(u,v): TileSize]. u/v are either xz, yz or xy.
           If None or a point is not in the dict, it's the same as base_type. (None=1x1 tile).
         is_bullseye: If this tile has a bullseye attached to it (the instance is destroyed.)
         panel_inst: The instance for this panel, if it's a panel brush_type.
@@ -369,7 +369,7 @@ class TileDef:
         for pattern in PATTERNS['clean']:
             if pattern.wall_only and not is_wall:
                 continue
-            for (umin, vmin, umax, vmax) in pattern.tiles:
+            for umin, vmin, umax, vmax in pattern.tiles:
                 tile_type = tiles[umin, vmin]
                 if not tile_type.is_tile:
                     continue
@@ -384,8 +384,7 @@ class TileDef:
         # All unfilled spots are single 4x4 tiles.
         for (u, v), tile_type in tiles.items():
             if tile_type is not TileType.VOID:
-                yield u, u + 1, v, v + 1, '4x4', tile_type
-
+                yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 
     def export(self, vmf: VMF):
         """Create the solid for this."""
@@ -393,14 +392,6 @@ class TileDef:
             BLOCK_POS['world': self.uv_offset(u, v, 0)].value not in (1, 2)
             for u, v in UV_NORMALS
         ]
-
-        if self.normal == (0, 0, 1):
-            orient = 'floor'
-        elif self.normal == (0, 0, -1):
-            orient = 'ceiling'
-        else:
-            orient = 'wall'
-
         front_pos = self.pos + 64 * self.normal
 
         if self.sub_tiles is None:
@@ -422,12 +413,11 @@ class TileDef:
             if full_type.is_nodraw:
                 tex = consts.Tools.NODRAW
             else:
-                tex = get_tile_tex(
+                tex = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    self.normal,
                     full_type.color,
-                    orient,
-                    full_type.tile_size,
-                    front_pos,
-                )
+                ).get(front_pos, full_type.tile_size)
             brush, face = make_tile(
                 vmf,
                 self.pos + self.normal * 64,
@@ -436,7 +426,7 @@ class TileDef:
                 width=128,
                 height=128,
                 bevels=bevels,
-                back_surf=texturing.special.rand('behind'),
+                back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
             )
             self.brush_faces.append(face)
             yield brush
@@ -445,7 +435,7 @@ class TileDef:
         assert self.sub_tiles is not None
 
         # Multiple tile types in the block - figure out the tile patterns to use.
-        patterns = list(self.calc_patterns(orient == 'wall'))
+        patterns = list(self.calc_patterns(True))
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
             # We bevel only the grid-edge tiles.
             bevels = [a and b for a, b in zip(bevels, [
@@ -458,7 +448,11 @@ class TileDef:
             )
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
-                tex = get_tile_tex(tile_type.color, orient, grid_size, front_pos)
+                tex = texturing.gen(
+                    texturing.GenCat.NORMAL,
+                    self.normal,
+                    tile_type.color,
+                ).get(tile_center, tile_type.tile_size)
                 brush, face = make_tile(
                     vmf,
                     tile_center,
@@ -467,7 +461,7 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
-                    back_surf=texturing.special.rand('behind'),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                 )
@@ -482,7 +476,7 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
-                    back_surf=texturing.special.rand('behind'),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                 )
                 self.brush_faces.append(face)
                 yield brush
@@ -496,15 +490,10 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
-                    back_surf=texturing.special.rand('behind'),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                 )
                 self.brush_faces.append(face)
                 yield brush
-
-
-def get_tile_tex(color, orient, grid_size, pos):
-    """Get the appropriate texture name for a tile."""
-    return texturing.GROUPS[color, orient].get_tex(grid_size, pos)
 
 
 def make_tile(
@@ -594,11 +583,11 @@ def gen_tile_temp():
      with each side identified.
     """
     try:
-        template = conditions.get_template('__TILING_TEMPLATE__')
+        template = template_brush.get_template('__TILING_TEMPLATE__')
         # Template -> world -> first solid
         # We restrict what templates can be used here.
-        bevel_temp = template['bevel'][0][0]
-        flat_temp = template['flat'][0][0]
+        bevel_temp = template.visgrouped('bevel')[0][0]
+        flat_temp = template.visgrouped('flat')[0][0]
     except KeyError:
         raise Exception('Bad Tiling Template!')
 
@@ -617,12 +606,12 @@ def gen_tile_temp():
         bevel_sides = {}
 
         for face in rotated_bevel:
-            if face.mat in consts.BlackPan or face.mat in consts.WhitePan:
-                temp_part['front'] = face
-                face.translate(-2 * norm)
-            elif face.mat == consts.Special.BACKPANELS:
+            if face.mat == consts.Special.BACKPANELS:
                 temp_part['back'] = face
                 face.translate(2 * norm)
+            elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
+                temp_part['front'] = face
+                face.translate(-2 * norm)
             else:
                 # Squarebeams
                 face_norm = round(face.get_origin().norm())  # type: Vec
