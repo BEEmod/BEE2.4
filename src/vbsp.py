@@ -3648,6 +3648,8 @@ def main():
 
         MAP_RAND_SEED = calc_rand_seed()
 
+        texturing.set_seeds(MAP_RAND_SEED)
+
         all_inst = get_map_info()
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])

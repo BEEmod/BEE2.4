@@ -23,7 +23,7 @@ GEN_CLASSES = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
 SPECIAL = None  # type: Generator
-OVERLAY = None  # type: Generator
+OVERLAYS = None  # type: Generator
 
 class GenCat(Enum):
     """Categories of textures, each with a generator."""
@@ -92,9 +92,10 @@ TEX_DEFAULTS = {
         'slash': consts.Signage.SHAPE_SLASH, 
         'star': consts.Signage.SHAPE_STAR, 
         'wavy': consts.Signage.SHAPE_WAVY,
-        
-        # If set, overlays to add on top for successive sets of signage.
-        'shape_frame': (), 
+
+        # If set and enabled, adds frames for >10 sign pairs
+        # to distinguish repeats.
+        'shapeframe': (),
     },
     # Misc textures.
     GenCat.SPECIAL: {
@@ -216,7 +217,7 @@ def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generato
 
 def load_config(conf: Property):
     """Setup all the generators from the config data."""
-    global SPECIAL, OVERLAY
+    global SPECIAL, OVERLAYS
     global_options = {
         prop.name: prop.value
         for prop in
@@ -235,9 +236,20 @@ def load_config(conf: Property):
             gen_cat, gen_orient, gen_portal = gen_key
             gen_conf = conf.find_key('{}.{}.{}'.format(
                 gen_cat.value,
-                gen_orient,
                 gen_portal.value,
+                gen_orient,
             ), [])
+
+            if not gen_conf.has_children():
+                # Special case - using a single value to indicate that all
+                # textures are the same.
+                gen_conf = Property(gen_conf.real_name, [
+                    Property('4x4', gen_conf.value),
+                    Property('Options', [
+                        # Clumping isn't useful since it's all the same.
+                        Property('Algorithm', 'RAND'),
+                    ])
+                ])
 
         options = {}
         textures = {}
@@ -330,7 +342,19 @@ def load_config(conf: Property):
         GENERATORS[gen_key] = generator(options, textures)
 
     SPECIAL = GENERATORS[GenCat.SPECIAL]
-    OVERLAY = GENERATORS[GenCat.OVERLAYS]
+    OVERLAYS = GENERATORS[GenCat.OVERLAYS]
+
+
+def set_seeds(global_seed):
+    """Set randomisation seed on all the generators."""
+    for gen_key, generator in GENERATORS.items():
+        if isinstance(gen_key, tuple):
+            gen_key = '{}.{}.{}'.format(
+                gen_key[0].value,
+                gen_key[1],
+                gen_key[2].value,
+            )
+        generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key)
 
 
 class Generator(abc.ABC):
@@ -357,10 +381,16 @@ class Generator(abc.ABC):
         try:
             return self._get(loc, tex_name)
         except KeyError as exc:
-            raise ValueError('Bad texture name: ' + repr(exc.args[0]))
+            raise self._missing_error(repr(exc.args[0]))
 
     def setup(self):
         """Scan tiles in the map and setup the generator."""
+
+    def _missing_error(self, tex_name: str):
+        return ValueError('Bad texture name: {}\n Allowed: {!r}'.format(
+            tex_name,
+            list(self.textures.keys()),
+        ))
 
     @abc.abstractmethod
     def _get(self, loc: Vec, tex_name: str) -> str:
@@ -368,6 +398,21 @@ class Generator(abc.ABC):
 
         If KeyError is raised, an appropriate exception is raised from that.
         """
+
+    def get_all(self, tex_name: str) -> List[str]:
+        """Return all the textures possible for a given name."""
+        try:
+            return list(self.textures[tex_name])
+        except KeyError:
+            raise self._missing_error(tex_name) from None
+
+    def __contains__(self, tex_name: str) -> bool:
+        """Return True if the texture is defined."""
+        try:
+            return bool(self.textures[tex_name])
+        except KeyError:
+            return False
+
 
 
 @GEN_CLASSES('RAND')
@@ -397,8 +442,6 @@ class GenClump(Generator):
         # We only do this once, as it applies to all generators.
         if GenClump.clump_locs:
             return
-
-
 
     def _get(self, loc: Vec, tex_name: str):
         return self._random.choice(self.textures[tex_name])
