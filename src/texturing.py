@@ -10,17 +10,20 @@ from srctools import Vec
 
 import comp_consts as consts
 
-from typing import Dict, List, Type, Any
+from typing import Dict, List, Type, Any, Tuple, Union
 
 import utils
 
 
 LOGGER = utils.getLogger(__name__)
 
-GENERATORS = {}
+GENERATORS = {}  # type: Dict[Union[GenCat, Tuple[GenCat, Orient, Portalable]], Generator]
 # Algorithms to use.
 GEN_CLASSES = utils.FuncLookup('Generators')
 
+# These can just be looked up directly.
+SPECIAL = None  # type: Generator
+OVERLAY = None  # type: Generator
 
 class GenCat(Enum):
     """Categories of textures, each with a generator."""
@@ -143,6 +146,22 @@ TEX_DEFAULTS = {
         TileType.TILE_2x2: consts.BlackPan.BLACK_2x2,
         TileType.TILE_4x4: consts.BlackPan.BLACK_4x4,
     },
+
+    # Panel:
+    (GenCat.PANEL, Orient.FLOOR, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.FLOOR, Portalable.BLACK): {},
+    (GenCat.PANEL, Orient.CEIL, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.CEIL, Portalable.BLACK): {},
+    (GenCat.PANEL, Orient.WALL, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.WALL, Portalable.BLACK): {},
+
+    # Bullseye:
+    (GenCat.PANEL, Orient.FLOOR, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.FLOOR, Portalable.BLACK): {},
+    (GenCat.PANEL, Orient.CEIL, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.CEIL, Portalable.BLACK): {},
+    (GenCat.PANEL, Orient.WALL, Portalable.WHITE): {},
+    (GenCat.PANEL, Orient.WALL, Portalable.BLACK): {},
 }
 
 # Default values for tile options.
@@ -168,11 +187,17 @@ TILE_INHERIT = [
 ]
 
 
-def gen(cat: GenCat, normal: Vec, portalable: Portalable) -> 'Generator':
+def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generator':
     """Given a category, normal, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
         return GENERATORS[cat]
+
+    if normal is None:
+        raise TypeError('Normal not provided!')
+
+    if portalable is None:
+        raise TypeError('Portalability not provided!')
 
     # Even if not axis-aligned, make mostly-flat surfaces
     # floor/ceiling (+-40 degrees)
@@ -191,19 +216,22 @@ def gen(cat: GenCat, normal: Vec, portalable: Portalable) -> 'Generator':
 
 def load_config(conf: Property):
     """Setup all the generators from the config data."""
+    global SPECIAL, OVERLAY
     global_options = {
         prop.name: prop.value
         for prop in
         conf.find_children('Options')
     }
 
+    data = {}  # type: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]]
+
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         if isinstance(gen_key, GenCat):
-            is_tile = False
+            # It's a non-tile generator.
             gen_cat = gen_key
             gen_conf = conf.find_key(gen_cat.value, [])
         else:
-            is_tile = True
+            # Tile-type generator
             gen_cat, gen_orient, gen_portal = gen_key
             gen_conf = conf.find_key('{}.{}.{}'.format(
                 gen_cat.value,
@@ -243,22 +271,7 @@ def load_config(conf: Property):
             else:
                 raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
 
-        if is_tile:
-            # Check the algorithm to use.
-            algo = options['algorithm']
-            try:
-                generator = GEN_CLASSES[algo]  # type: Type[Generator]
-            except KeyError:
-                raise ValueError('Invalid algorithm "{}" for "{}"!'.format(
-                    algo, gen_conf.real_name,
-                ))
-        else:
-            # Signage, Overlays always use the Random generator.
-            generator = GenRandom
-
         # Now do textures.
-        # If it's a tile generator we need to do inheritance, otherwise
-        # it's direct.
         for tex_name, tex_default in tex_defaults.items():
             textures[tex_name] = tex = [
                 prop.value for prop in
@@ -266,32 +279,71 @@ def load_config(conf: Property):
             ]
             if not tex and tex_default:
                 tex.append(tex_default)
-        if is_tile:
-            if TileType.TILE_4x4 not in textures or not textures[TileType.TILE_4x4]:
-                raise ValueError('No 4x4 tile set for "{}"!'.format(gen_conf.real_name))
 
-            # We need to do more processing.
-            for orig, targ in TILE_INHERIT:
-                # The order ensures orig always exists.
-                if targ not in textures:
-                    textures[targ] = []
-                if not textures[targ]:
-                    textures[targ] = textures[orig].copy()
+        data[gen_key] = options, textures
+
+    # If it's a tile generator we need to do inheritance, otherwise
+    # it's direct.
+
+    # Now do textures.
+    for gen_key, tex_defaults in TEX_DEFAULTS.items():
+        if isinstance(gen_key, GenCat):
+            continue
+        gen_cat, gen_orient, gen_portal = gen_key
+
+        options, textures = data[gen_key]
+
+        if not textures and gen_cat is not GenCat.NORMAL:
+            # For the additional categories of tiles, we copy the entire
+            # NORMAL one over if it's not set.
+            textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
+
+        if TileType.TILE_4x4 not in textures or not textures[TileType.TILE_4x4]:
+            raise ValueError(
+                'No 4x4 tile set for "{}"!'.format(gen_key))
+
+        # We need to do more processing.
+        for orig, targ in TILE_INHERIT:
+            # The order ensures orig always exists.
+            if targ not in textures:
+                textures[targ] = []
+            if not textures[targ]:
+                textures[targ] = textures[orig].copy()
+
+    # Now finally create the generators.
+    for gen_key, tex_defaults in TEX_DEFAULTS.items():
+        options, textures = data[gen_key]
+
+        if isinstance(gen_key, tuple):
+            # Check the algorithm to use.
+            algo = options['algorithm']
+            try:
+                generator = GEN_CLASSES[algo]  # type: Type[Generator]
+            except KeyError:
+                raise ValueError('Invalid algorithm "{}" for {}!'.format(
+                    algo, gen_key
+                ))
+        else:
+            # Signage, Overlays always use the Random generator.
+            generator = GenRandom
 
         GENERATORS[gen_key] = generator(options, textures)
+
+    SPECIAL = GENERATORS[GenCat.SPECIAL]
+    OVERLAY = GENERATORS[GenCat.OVERLAYS]
 
 
 class Generator(abc.ABC):
     """Base for different texture generators."""
     def __init__(self, options: Dict[str, Any], textures: Dict[str, List[str]]):
-        self._options = options
-        self._textures = textures
+        self.options = options
+        self.textures = textures
 
         self._random = random.Random()
         # When set, add the position to that and use to seed the RNG.
         self.map_seed = None
 
-    def get_one(self, loc: Vec, tex_name: str) -> str:
+    def get(self, loc: Vec, tex_name: str) -> str:
         """Get one texture for a position."""
         loc = loc // 128
         loc *= 128
@@ -299,6 +351,8 @@ class Generator(abc.ABC):
 
         if self.map_seed:
             self._random.seed(self.map_seed + str(loc))
+        else:
+            LOGGER.warning('Choosing texture ("{}") without seed!', tex_name)
 
         try:
             return self._get(loc, tex_name)
@@ -321,6 +375,30 @@ class GenRandom(Generator):
     """Basic random generator.
 
     Each texture will be randomly chosen whenever asked.
+    This is used for Overlay and Signage as well.
     """
+
     def _get(self, loc: Vec, tex_name: str):
-        return self._random.choice(self._textures[tex_name])
+        return self._random.choice(self.textures[tex_name])
+
+
+@GEN_CLASSES('CLUMP')
+class GenClump(Generator):
+    """The clumping generator for tiles.
+
+    This creates groups of the same texture in roughly rectangular sections.
+    """
+
+    # The clump locations are shared among all generators.
+    clump_locs = []
+
+    def setup(self):
+        """Build the list of clump locations."""
+        # We only do this once, as it applies to all generators.
+        if GenClump.clump_locs:
+            return
+
+
+
+    def _get(self, loc: Vec, tex_name: str):
+        return self._random.choice(self.textures[tex_name])
