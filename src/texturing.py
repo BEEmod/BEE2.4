@@ -59,7 +59,7 @@ class Orient(Enum):
             return 'ceiling'
 
 
-class TileType(str, Enum):
+class TileSize(str, Enum):
     """Types of textures that can exist, for tile-type generators."""
     TILE_1x1 = '1x1'  # Full block
     TILE_4x4 = '4x4'  # 1/4 of a block
@@ -118,33 +118,33 @@ TEX_DEFAULTS = {
     # Tile-type generators:
 
     (GenCat.NORMAL, Orient.FLOOR, Portalable.WHITE): {
-        TileType.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
+        TileSize.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
         # Swap to black in goo.
-        TileType.GOO_SIDE: consts.BlackPan.BLACK_FLOOR,
+        TileSize.GOO_SIDE: consts.BlackPan.BLACK_FLOOR,
     },
     (GenCat.NORMAL, Orient.FLOOR, Portalable.BLACK): {
-        TileType.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
+        TileSize.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
     },
 
     (GenCat.NORMAL, Orient.CEIL, Portalable.WHITE): {
-        TileType.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
+        TileSize.TILE_4x4: consts.WhitePan.WHITE_FLOOR,
     },
     (GenCat.NORMAL, Orient.CEIL, Portalable.BLACK): {
-        TileType.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
+        TileSize.TILE_4x4: consts.BlackPan.BLACK_FLOOR,
     },
 
     (GenCat.NORMAL, Orient.WALL, Portalable.WHITE): {
-        TileType.TILE_1x1: consts.WhitePan.WHITE_1x1,
-        TileType.TILE_2x1: consts.WhitePan.WHITE_2x1,
-        TileType.TILE_2x2: consts.WhitePan.WHITE_2x2,
-        TileType.TILE_4x4: consts.WhitePan.WHITE_4x4,
+        TileSize.TILE_1x1: consts.WhitePan.WHITE_1x1,
+        TileSize.TILE_2x1: consts.WhitePan.WHITE_2x1,
+        TileSize.TILE_2x2: consts.WhitePan.WHITE_2x2,
+        TileSize.TILE_4x4: consts.WhitePan.WHITE_4x4,
 
-        TileType.GOO_SIDE: consts.BlackPan.BLACK_4x4,
+        TileSize.GOO_SIDE: consts.BlackPan.BLACK_4x4,
     },
     (GenCat.NORMAL, Orient.WALL, Portalable.BLACK): {
-        TileType.TILE_1x1: consts.BlackPan.BLACK_1x1,
-        TileType.TILE_2x2: consts.BlackPan.BLACK_2x2,
-        TileType.TILE_4x4: consts.BlackPan.BLACK_4x4,
+        TileSize.TILE_1x1: consts.BlackPan.BLACK_1x1,
+        TileSize.TILE_2x2: consts.BlackPan.BLACK_2x2,
+        TileSize.TILE_4x4: consts.BlackPan.BLACK_4x4,
     },
 
     # Panel:
@@ -178,12 +178,12 @@ OPTION_DEFAULTS = {
 
 # Copy left to right if right isn't set.
 TILE_INHERIT = [
-    (TileType.TILE_4x4, TileType.TILE_2x2),
-    (TileType.TILE_2x2, TileType.TILE_2x1),
-    (TileType.TILE_2x1, TileType.TILE_1x1),
+    (TileSize.TILE_4x4, TileSize.TILE_2x2),
+    (TileSize.TILE_2x2, TileSize.TILE_2x1),
+    (TileSize.TILE_2x1, TileSize.TILE_1x1),
 
-    (TileType.TILE_4x4, TileType.CLUMP_GAP),
-    (TileType.TILE_4x4, TileType.GOO_SIDE),
+    (TileSize.TILE_4x4, TileSize.CLUMP_GAP),
+    (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
 
 
@@ -298,7 +298,7 @@ def load_config(conf: Property):
             # NORMAL one over if it's not set.
             textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
 
-        if TileType.TILE_4x4 not in textures or not textures[TileType.TILE_4x4]:
+        if TileSize.TILE_4x4 not in textures or not textures[TileSize.TILE_4x4]:
             raise ValueError(
                 'No 4x4 tile set for "{}"!'.format(gen_key))
 
