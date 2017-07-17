@@ -13,7 +13,7 @@ import comp_consts as consts
 import utils
 import conditions
 import texturing
-from texturing import TexCat as TileSize
+from texturing import TileType as TileSize
 
 LOGGER = utils.getLogger(__name__)
 

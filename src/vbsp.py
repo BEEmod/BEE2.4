@@ -314,7 +314,7 @@ def load_settings():
         conf = Property(None, [])
         # All the find_all commands will fail, and we will use the defaults.
 
-    texturing.load_config(conf.find_children('textures'))
+    texturing.load_config(conf.find_key('textures', []))
 
     # Load in our main configs..
     vbsp_options.load_options(conf.find_all('Options'))
