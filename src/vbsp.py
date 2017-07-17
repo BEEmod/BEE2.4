@@ -129,9 +129,6 @@ TEX_DEFAULTS = [
     ('', 'overlay.antlinebrokenfloor'),
     ('', 'overlay.antlinebrokenfloorcorner'),
 
-    # If set and enabled, adds frames for >10 sign pairs
-    # to distinguish repeats.
-    ('', 'overlay.shapeframe'),
 
     # Only used if set - replace the decals with textures
     ('', 'special.bullseye_white_wall'),
@@ -294,17 +291,6 @@ def load_settings():
     # Load in our main configs..
     vbsp_options.load_options(conf.find_all('Options'))
 
-    # Load in fizzler options and textures. This works similarly to the normal
-    # textures/options.
-
-    fizz_defaults = list(TEX_FIZZLER.items()) + FIZZ_OPTIONS
-    for item, key in fizz_defaults:
-        settings['fizzler'][key] = item
-
-    for fizz_block in conf.find_all('fizzler'):
-        for default, key in fizz_defaults:
-            settings['fizzler'][key] = fizz_block[key, settings['fizzler'][key]]
-
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
         voiceLine.QUOTE_DATA += quote_block.value
@@ -439,8 +425,7 @@ def add_fizz_borders():
 
     This is used in 50s and BTS styles.
     """
-    tex = texturing.special.all('fizz_border')
-    if not tex:
+    if 'fizz_border' not in texturing.SPECIAL:
         # No textures were defined!
         return
 
@@ -635,16 +620,6 @@ def find_panel_locs():
                 white_face,
                 black_face,
             )
-
-
-@conditions.make_result_setup('FaithBullseye')
-def res_faith_bullseye_check(res: Property):
-    """Do a check to ensure there are actually textures available."""
-    for col in ('white', 'black'):
-        for orient in ('wall', 'floor', 'ceiling'):
-            if texturing.GROUPS[col, orient].all('bullseye'):
-                return res.value
-    return None  # No textures!
 
 
 @conditions.make_result('FaithBullseye')
@@ -1656,6 +1631,8 @@ def fixup_goo_sides():
     For goo these can use special textures, or black 4x4 walls.
     For pits sides use normal black walls.
     """
+    # TODO: Reimplement this
+    return
 
     if vbsp_options.get(str, 'goo_wall_scale_temp'):
         scale = template_brush.get_scaling_template(
@@ -1935,10 +1912,12 @@ def change_brush():
                 # Use fancy goo on the level with the
                 # highest number of blocks.
                 # All plane z are the same.
-                face.mat = get_tex(
-                    'special.goo' if
-                    face.planes[0].z == best_goo
-                    else 'special.goo_cheap'
+                face.mat = texturing.SPECIAL.get(
+                    face.get_origin(), (
+                        'goo' if
+                        face.planes[0].z == best_goo
+                        else 'goo_cheap'
+                    ),
                 )
             if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
@@ -2533,20 +2512,6 @@ def change_overlays():
 
     # Grab all the textures we're using...
 
-    special_group = texturing.overlay
-    ant_str = special_group.all('antline')
-    ant_str_floor = special_group.all('antlinefloor')
-    ant_corn = special_group.all('antlinecorner')
-    ant_corn_floor = special_group.all('antlinecornerfloor')
-
-    broken_ant_str = special_group.all('antlinebroken')
-    broken_ant_corn = special_group.all('antlinebrokencorner')
-    broken_ant_str_floor = special_group.all('antlinebrokenfloor')
-    broken_ant_corn_floor = special_group.all('antlinebrokenfloorcorner')
-
-    broken_chance = vbsp_options.get(float, 'broken_antline_chance')
-    broken_dist = vbsp_options.get(int, 'broken_antline_distance')
-
     for over in VMF.by_class['info_overlay']:
         if over in IGNORED_OVERLAYS:
             # Overlays added by us, or conditions. These are styled aleady,
@@ -2584,7 +2549,7 @@ def change_overlays():
             # instances.
             del over['targetname']
 
-            over['material'] = texturing.overlay.rand(sign_type)
+            over['material'] = texturing.OVERLAYS.get(over.get_origin(), sign_type)
             if sign_size != 16:
                 # Resize the signage overlays
                 # These are the 4 vertex locations
@@ -2594,27 +2559,7 @@ def change_overlays():
                     val /= 16
                     val *= sign_size
                     over[prop] = val.join(' ')
-        if case_mat == consts.Antlines.STRAIGHT:
-            set_antline_mat(
-                over,
-                ant_str,
-                ant_str_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_str,
-                broken_ant_str_floor,
-            )
-        elif case_mat == consts.Antlines.CORNER:
-            set_antline_mat(
-                over,
-                ant_corn,
-                ant_corn_floor,
-                broken_chance,
-                broken_dist,
-                broken_ant_corn,
-                broken_ant_corn_floor,
-            )
-
+        # TODO: Remake antlines.
 
 def change_trig():
     """Check the triggers and fizzlers."""
@@ -3088,16 +3033,7 @@ def set_special_mat(face, side_type):
     and angled panels.
     side_type should be either 'white' or 'black'.
     """
-    # We use a wall-specific texture, or the floor texture,
-    # or fallback to regular textures
-    rep_texture = 'special.' + side_type
-    orient = get_face_orient(face)
-    if orient is ORIENT.wall and get_tex(rep_texture + '_wall'):
-        face.mat = get_tex(rep_texture + '_wall')
-    elif get_tex(rep_texture):
-        face.mat = get_tex(rep_texture)
-    elif not alter_mat(face):
-        face.mat = get_tex(side_type + '.' + str(orient))
+    raise NotImplementedError
 
 
 def make_static_pan(ent, pan_type, is_bullseye=False):
@@ -3706,7 +3642,7 @@ def main():
         # Requires instance traits!
         connections.calc_connections(
             VMF,
-            settings['textures']['overlay.shapeframe'],
+            texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
         )
 
@@ -3732,7 +3668,7 @@ def main():
 
         change_ents()
         fixup_goo_sides()  # Must be done before change_brush()!
-        change_brush()
+        #change_brush()
         tiling.generate_brushes(VMF)
         change_overlays()
         change_trig()
