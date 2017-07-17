@@ -452,7 +452,7 @@ class TileDef:
                     texturing.GenCat.NORMAL,
                     self.normal,
                     tile_type.color,
-                ).get(tile_center, tile_type.tile_size)
+                ).get(tile_center, grid_size)
                 brush, face = make_tile(
                     vmf,
                     tile_center,
@@ -586,8 +586,8 @@ def gen_tile_temp():
         template = template_brush.get_template('__TILING_TEMPLATE__')
         # Template -> world -> first solid
         # We restrict what templates can be used here.
-        bevel_temp = template.visgrouped('bevel')[0][0]
-        flat_temp = template.visgrouped('flat')[0][0]
+        bevel_temp = template.visgrouped(['bevel'])[0][0]
+        flat_temp = template.visgrouped(['flat'])[0][0]
     except KeyError:
         raise Exception('Bad Tiling Template!')
 
