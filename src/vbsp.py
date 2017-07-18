@@ -3648,7 +3648,6 @@ def main():
 
         MAP_RAND_SEED = calc_rand_seed()
 
-        texturing.set_seeds(MAP_RAND_SEED)
 
         all_inst = get_map_info()
 
@@ -3663,10 +3662,11 @@ def main():
         tiling.gen_tile_temp()
         tiling.analyse_map(VMF)
 
+        texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
+
         alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
-
 
         change_ents()
         fixup_goo_sides()  # Must be done before change_brush()!

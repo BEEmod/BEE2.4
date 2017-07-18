@@ -1,18 +1,29 @@
 """Manages the list of textures used for brushes, and how they are applied."""
+from collections import namedtuple
 from enum import Enum
 
 import random
 import abc
+import hashlib
 
 import srctools
-from srctools import Property
+from srctools import Property, Side
 from srctools import Vec
 
 import comp_consts as consts
 
-from typing import Dict, List, Type, Any, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Union, Type, Any,
+    Dict, List, Tuple,
+    Collection,
+    Optional
+)
 
 import utils
+
+if TYPE_CHECKING:
+    from tiling import TileDef
 
 
 LOGGER = utils.getLogger(__name__)
@@ -24,6 +35,9 @@ GEN_CLASSES = utils.FuncLookup('Generators')
 # These can just be looked up directly.
 SPECIAL = None  # type: Generator
 OVERLAYS = None  # type: Generator
+
+Clump = namedtuple('Clump', 'x1 y1 z1 x2 y2 z2 seed')
+
 
 class GenCat(Enum):
     """Categories of textures, each with a generator."""
@@ -167,7 +181,7 @@ TEX_DEFAULTS = {
 
 # Default values for tile options.
 OPTION_DEFAULTS = {
-    'MixTiles': False,  # Apply 2x2 to 1x1 space sometimes...
+    'MixTiles': False,  # Apply the smaller tile textures to 1x1 as well.
     'ScaleUp256': False,  # In addition to TILE_DOUBLE, use 1x1 at 2x scale.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
 
@@ -178,6 +192,8 @@ OPTION_DEFAULTS = {
 }
 
 # Copy left to right if right isn't set.
+# The order is important, this ensures all tiles will be set
+# if only 4x4 is.
 TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.TILE_2x2),
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
@@ -186,6 +202,32 @@ TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.CLUMP_GAP),
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
+
+def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse the options for a generator block."""
+    options = {}
+    for opt, default in OPTION_DEFAULTS.items():
+        opt = opt.casefold()
+        try:
+            value = settings[opt]
+        except KeyError:
+            try:
+                value = global_settings[opt]
+            except KeyError:
+                options[opt] = default
+                continue
+
+        if isinstance(default, str):
+            options[opt] = value
+        elif isinstance(default, bool):
+            options[opt] = srctools.conv_bool(value, default)
+        elif isinstance(default, int):
+            options[opt] = srctools.conv_int(value, default)
+        elif isinstance(default, float):
+            options[opt] = srctools.conv_float(value, default)
+        else:
+            raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
+    return options
 
 
 def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generator':
@@ -215,6 +257,28 @@ def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generato
     return GENERATORS[cat, orient, portalable]
 
 
+def apply(
+    cat: GenCat,
+    face: Side,
+    tex_name: str,
+    portalable: Portalable=None,
+    normal: Vec=None,
+    loc: Vec=None
+):
+    """Apply directly to a face, optionally using that to retrieve the location."""
+    if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
+        generator = GENERATORS[cat]
+    else:
+        if normal is None:
+            normal = face.normal()
+        generator = gen(cat, portalable, normal)
+
+    if loc is None:
+        loc = face.get_origin()
+
+    face.mat = generator.get(loc, tex_name)
+
+
 def load_config(conf: Property):
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
@@ -223,16 +287,23 @@ def load_config(conf: Property):
         for prop in
         conf.find_children('Options')
     }
+    # Give generators access to the global settings.
+    Generator.global_settings.update(parse_options(
+        # Pass it to both, the second will fail too.
+        global_options, global_options,
+    ))
 
     data = {}  # type: Dict[Any, Tuple[Dict[str, Any], Dict[str, List[str]]]]
 
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
+            is_tile = False
             gen_cat = gen_key
             gen_conf = conf.find_key(gen_cat.value, [])
         else:
             # Tile-type generator
+            is_tile = True
             gen_cat, gen_orient, gen_portal = gen_key
             gen_conf = conf.find_key('{}.{}.{}'.format(
                 gen_cat.value,
@@ -250,52 +321,38 @@ def load_config(conf: Property):
                         Property('Algorithm', 'RAND'),
                     ])
                 ])
-
-        options = {}
         textures = {}
 
         # First parse the options.
-        parsed_options = {
+        options = parse_options({
             prop.name: prop.value
             for prop in
             gen_conf.find_children('Options')
-        }
-
-        for opt, default in OPTION_DEFAULTS.items():
-            opt = opt.casefold()
-            try:
-                value = parsed_options[opt]
-            except KeyError:
-                try:
-                    value = global_options[opt]
-                except KeyError:
-                    options[opt] = default
-                    continue
-
-            if isinstance(default, str):
-                options[opt] = value
-            elif isinstance(default, bool):
-                options[opt] = srctools.conv_bool(value, default)
-            elif isinstance(default, int):
-                options[opt] = srctools.conv_int(value, default)
-            elif isinstance(default, float):
-                options[opt] = srctools.conv_float(value, default)
-            else:
-                raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
+        }, global_options)
 
         # Now do textures.
-        for tex_name, tex_default in tex_defaults.items():
-            textures[tex_name] = tex = [
-                prop.value for prop in
-                gen_conf.find_all(str(tex_name))
-            ]
-            if not tex and tex_default:
-                tex.append(tex_default)
+        if is_tile:
+            # Tile generator, always have all tile sizes, and
+            # only use the defaults if no textures were specified.
+            for tex_name in TileSize:
+                textures[tex_name] = [
+                    prop.value for prop in
+                    gen_conf.find_all(str(tex_name))
+                ]
+            if not any(textures.values()):
+                for tex_name, tex_default in tex_defaults.items():
+                    textures[tex_name] = [tex_default]
+        else:
+            # Non-tile generator, use defaults for each value
+            for tex_name, tex_default in tex_defaults.items():
+                textures[tex_name] = tex = [
+                    prop.value for prop in
+                    gen_conf.find_all(str(tex_name))
+                ]
+                if not tex and tex_default:
+                    tex.append(tex_default)
 
         data[gen_key] = options, textures
-
-    # If it's a tile generator we need to do inheritance, otherwise
-    # it's direct.
 
     # Now do textures.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
@@ -310,15 +367,20 @@ def load_config(conf: Property):
             # NORMAL one over if it's not set.
             textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
 
-        if TileSize.TILE_4x4 not in textures or not textures[TileSize.TILE_4x4]:
+        if not textures[TileSize.TILE_4x4]:
             raise ValueError(
                 'No 4x4 tile set for "{}"!'.format(gen_key))
 
+        # Copy 4x4, 2x2, 2x1 textures to the 1x1 size if the option was set.
+        # Do it before inheriting tiles, so there won't be duplicates.
+        if options['mixtiles']:
+            block_tex = textures[TileSize.TILE_1x1]
+            block_tex += textures[TileSize.TILE_4x4]
+            block_tex += textures[TileSize.TILE_2x2]
+            block_tex += textures[TileSize.TILE_2x1]
+
         # We need to do more processing.
         for orig, targ in TILE_INHERIT:
-            # The order ensures orig always exists.
-            if targ not in textures:
-                textures[targ] = []
             if not textures[targ]:
                 textures[targ] = textures[orig].copy()
 
@@ -329,6 +391,7 @@ def load_config(conf: Property):
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
             algo = options['algorithm']
+            gen_cat, gen_orient, gen_portal = gen_key
             try:
                 generator = GEN_CLASSES[algo]  # type: Type[Generator]
             except KeyError:
@@ -338,34 +401,56 @@ def load_config(conf: Property):
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
+            gen_cat = gen_key
+            gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = generator(options, textures)
+        GENERATORS[gen_key] = generator(gen_cat, gen_orient, gen_portal, options, textures)
 
     SPECIAL = GENERATORS[GenCat.SPECIAL]
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def set_seeds(global_seed):
-    """Set randomisation seed on all the generators."""
+def setup(global_seed, tiles: List['TileDef']):
+    """Set randomisation seed on all the generators, and build clumps."""
     for gen_key, generator in GENERATORS.items():
         if isinstance(gen_key, tuple):
+            gen_cat, gen_orient, gen_portal = gen_key
             gen_key = '{}.{}.{}'.format(
-                gen_key[0].value,
-                gen_key[1],
-                gen_key[2].value,
+                gen_cat.value,
+                gen_portal.value,
+                gen_orient,
             )
+
         generator.map_seed = '{}_tex_{}_'.format(global_seed, gen_key)
+        generator.setup(global_seed, tiles)
 
 
 class Generator(abc.ABC):
     """Base for different texture generators."""
-    def __init__(self, options: Dict[str, Any], textures: Dict[str, List[str]]):
+
+    # The settings which apply to all generators.
+    # Since they're here all subclasses and instances can access this.
+    global_settings = {}  # type: Dict[str, Any]
+
+    def __init__(
+        self,
+        category: GenCat,
+        orient: Optional[Orient],
+        portal: Optional[Portalable],
+        options: Dict[str, Any],
+        textures: Dict[str, List[str]],
+    ):
         self.options = options
         self.textures = textures
 
         self._random = random.Random()
         # When set, add the position to that and use to seed the RNG.
-        self.map_seed = None
+        self.map_seed = None  # type: str
+
+        # Tells us the category each generator matches to.
+        self.category = category
+        self.orient = orient
+        self.portal = portal
 
     def get(self, loc: Vec, tex_name: str) -> str:
         """Get one texture for a position."""
@@ -383,7 +468,7 @@ class Generator(abc.ABC):
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0]))
 
-    def setup(self):
+    def setup(self, global_seed: str, tiles: List['TileDef']):
         """Scan tiles in the map and setup the generator."""
 
     def _missing_error(self, tex_name: str):
@@ -414,7 +499,6 @@ class Generator(abc.ABC):
             return False
 
 
-
 @GEN_CLASSES('RAND')
 class GenRandom(Generator):
     """Basic random generator.
@@ -437,11 +521,97 @@ class GenClump(Generator):
     # The clump locations are shared among all generators.
     clump_locs = []
 
-    def setup(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # A seed only unique to this generator, in int form.
+        self.gen_seed = 0
+
+    def setup(self, global_seed: str, tiles: List['TileDef']):
         """Build the list of clump locations."""
+
+        # Convert the generator key to a generator-specific seed.
+        # That ensures different surfaces don't end up reusing the same
+        # texture indexes.
+        self.gen_seed = int.from_bytes(
+            self.category.name.encode() +
+            self.portal.name.encode() +
+            self.orient.name.encode(),
+            'big',
+        )
+
         # We only do this once, as it applies to all generators.
         if GenClump.clump_locs:
             return
 
+        LOGGER.info('Generating texture clumps...')
+
+        clump_length = self.global_settings['clump_length']  # type: int
+        clump_width = self.global_settings['clump_width']  # type: int
+        clump_number = self.global_settings['clump_number']  # type: int
+
+        # Clump_number adjusts the amount of clumps in the map, to control
+        # how much they overlap each other.
+        clump_numb = len(tiles) // (clump_length * clump_width * clump_width)
+        clump_numb *= clump_number
+
+        # A global RNG for picking clump positions.
+        clump_rand = random.Random(global_seed + '_clumping')
+
+        LOGGER.info('{} Clumps for {} tiles', clump_numb, len(tiles))
+
+        pos_min = Vec()
+        pos_max = Vec()
+
+        for _ in range(clump_numb):
+            # Picking out of the map origins helps ensure at least 1 texture is
+            # modded by a clump
+            tile = clump_rand.choice(tiles)  # type: TileDef
+            pos = tile.pos // 128 * 128  # type: Vec
+
+            # Clumps are long strips mainly extended in one direction
+            # In the other directions extend by 'width'. It can point any axis.
+            direction = clump_rand.choice('xyz')
+            for axis in 'xyz':
+                if axis == direction:
+                    dist = clump_length
+                else:
+                    dist = clump_width
+                pos_min[axis] = pos[axis] - clump_rand.randint(0, dist) * 128
+                pos_max[axis] = pos[axis] + clump_rand.randint(0, dist) * 128
+
+                self.clump_locs.append(Clump(
+                    pos_min.x, pos_min.y, pos_min.z,
+                    pos_max.x, pos_max.y, pos_max.z,
+                    # We use this to reseed an RNG, giving us the same textures
+                    # each time for the same clump.
+                    clump_rand.getrandbits(32),
+                ))
+
     def _get(self, loc: Vec, tex_name: str):
+        clump_seed = self._find_clump(loc)
+
+        if clump_seed is None:
+            # No clump found - return the gap texture.
+            return self._random.choice(self.textures[TileSize.CLUMP_GAP])
+
+        # Mix these two values together to determine the texture.
+        # The clump seed makes each clump different, and adding the texture
+        # name makes sure each surface
+        self._random.seed(
+            self.gen_seed ^
+            int.from_bytes(tex_name.encode(), 'big') ^
+            clump_seed
+        )
         return self._random.choice(self.textures[tex_name])
+
+    def _find_clump(self, loc: Vec) -> int:
+        """Return the clump seed matching a location."""
+        for clump in self.clump_locs:
+            if (
+                clump.x1 <= loc.x <= clump.x2 and
+                clump.y1 <= loc.y <= clump.y2 and
+                clump.z1 <= loc.z <= clump.z2
+            ):
+                return clump.seed
+
