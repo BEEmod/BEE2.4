@@ -49,11 +49,26 @@ class GenCat(Enum):
     SPECIAL = 'special'    # Assorted textures for various purposes.
     OVERLAYS = 'overlays'  # info_overlay materials.
 
+    @property
+    def is_tile(self):
+        return self.value in ('normal', 'panel', 'bullseye')
+
 
 class Portalable(Enum):
     """Is the surface portalable?"""
     WHITE = 'white'
     BLACK = 'black'
+    white = WHITE
+    black = BLACK
+
+    def __str__(self):
+        return self.value
+
+    def __invert__(self) -> 'Portalable':
+        if self.value == 'white':
+            return Portalable.BLACK
+        else:
+            return Portalable.WHITE
 
 
 class Orient(Enum):

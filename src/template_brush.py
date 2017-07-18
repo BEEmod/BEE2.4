@@ -9,10 +9,14 @@ from enum import Enum
 import srctools
 import vbsp_options
 
-from srctools import Entity, Solid, Side, Property, Vec_tuple, UVAxis, Vec, VMF
+from srctools import Entity, Solid, Side, Property, UVAxis, Vec, VMF
+from texturing import Portalable as MAT_TYPES, Portalable, GenCat, TileSize
+from tiling import TileType
 import comp_consts as consts
 import utils
 import conditions
+import tiling
+import texturing
 
 from typing import (
     Iterable, Union, Callable,
@@ -46,18 +50,6 @@ class InvalidTemplateName(LookupError):
         )
 
 
-class MAT_TYPES(Enum):
-    """Represents Black vs White."""
-    black = 0
-    white = 1
-
-    def __str__(self):
-        if self is MAT_TYPES.black:
-            return 'black'
-        if self is MAT_TYPES.white:
-            return 'white'
-
-
 class TEMP_TYPES(Enum):
     """Value used for import_template()'s force_type parameter.
     """
@@ -67,6 +59,7 @@ class TEMP_TYPES(Enum):
 
 ColorPicker = namedtuple('ColorPicker', [
     'priority',  # Decimal order to do them in.
+    'name',  # Name to reference from other ents.
     'offset',
     'normal',  # Normal of the surface.
     'sides',
@@ -74,37 +67,57 @@ ColorPicker = namedtuple('ColorPicker', [
     'remove_brush',  # Remove the brush after
 ])
 
+TileSetter = namedtuple('TileSetter', [
+    'offset',
+    'normal',
+    'color',
+    'tile_type',
+    'picker_name',
+])
 
-B = MAT_TYPES.black
-W = MAT_TYPES.white
+TILE_SETTER_SKINS = [
+    # The first two are swapped to white if needed.
+    TileType.BLACK,
+    TileType.BLACK_4x4,
+    TileType.NODRAW,
+    TileType.VOID,
+    TileType.CUTOUT_TILE_BROKEN,
+    TileType.CUTOUT_TILE_PARTIAL,
+]
+
+
+B = Portalable.BLACK
+W = Portalable.WHITE
 TEMPLATE_RETEXTURE = {
     # textures map -> surface types for template brushes.
     # It's mainly for grid size and colour - floor/ceiling textures
     # will be used instead at those orientations
 
-    'metal/black_wall_metal_002c': (B, 'wall'),
-    'metal/black_wall_metal_002a': (B, '2x2'),
-    'metal/black_wall_metal_002b': (B, '4x4'),
+    'metal/black_wall_metal_002a': (GenCat.NORMAL, TileSize.TILE_2x2, B),
+    'metal/black_wall_metal_002b': (GenCat.NORMAL, TileSize.TILE_4x4, B),
+    'metal/black_wall_metal_002c': (GenCat.NORMAL, TileSize.TILE_1x1, B),
+    'metal/black_wall_metal_002e': (GenCat.NORMAL, TileSize.TILE_2x1, B),
 
-    'tile/white_wall_tile001a': (W, 'wall'),
-    'tile/white_wall_tile003a': (W, 'wall'),
-    'tile/white_wall_tile003b': (W, 'wall'),
-    'tile/white_wall_tile003c': (W, '2x2'),
-    'tile/white_wall_tile003h': (W, 'wall'),
-    'tile/white_wall_state': (W, '2x2'),
-    'tile/white_wall_tile003f': (W, '4x4'),
+    'tile/white_wall_tile001a': (GenCat.NORMAL, TileSize.TILE_1x1, W),
+    'tile/white_wall_tile003a': (GenCat.NORMAL, TileSize.TILE_1x1, W),
+    'tile/white_wall_tile003b': (GenCat.NORMAL, TileSize.TILE_1x1, W),
+    'tile/white_wall_tile003c': (GenCat.NORMAL, TileSize.TILE_2x2, W),
+    'tile/white_wall_tile003h': (GenCat.NORMAL, TileSize.TILE_1x1, W),
+    'tile/white_wall_state': (GenCat.NORMAL, TileSize.TILE_2x2, W),
+    'tile/white_wall_tile003f': (GenCat.NORMAL, TileSize.TILE_4x4, W),
 
+    'tile/white_wall_tile004j': (GenCat.PANEL, TileSize.TILE_1x1, W),
+    
     # No black portal-placement texture, so use the bullseye instead
-    'metal/black_floor_metal_bullseye_001': (B, 'special'),
-    'tile/white_wall_tile004j': (W, 'special'),
-    'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
+    'metal/black_floor_metal_bullseye_001': (GenCat.PANEL, TileSize.TILE_1x1, B),
+    'tile/white_wall_tile_bullseye': (GenCat.PANEL, TileSize.TILE_1x1, W),
 
-    consts.Special.BACKPANELS: 'special.behind',
-    consts.Special.SQUAREBEAMS: 'special.edge',
-    consts.Special.GLASS: 'special.glass',
-    consts.Special.GRATING: 'special.grating',
+    consts.Special.BACKPANELS: (GenCat.SPECIAL, 'behind', None),
+    consts.Special.SQUAREBEAMS: (GenCat.SPECIAL, 'edge', None),
+    consts.Special.GLASS: (GenCat.SPECIAL, 'glass', None),
+    consts.Special.GRATING: (GenCat.SPECIAL, 'grating', None),
 
-    consts.Goo.CHEAP: 'special.goo_cheap',
+    consts.Goo.CHEAP: (GenCat.SPECIAL, 'goo_cheap', None),
 }
 del B, W
 
@@ -164,6 +177,7 @@ class Template:
         overlay_transfer_faces: Iterable[str]=(),
         vertical_faces: Iterable[str]=(),
         color_pickers: Iterable[ColorPicker]=(),
+        tile_setters: List[TileSetter]=(),
     ):
         """Make an overlay.
 
@@ -193,6 +207,7 @@ class Template:
             key=ColorPicker.priority.__get__,
             reverse=True,
         )
+        self.tile_setters = list(tile_setters)
 
     @property
     def visgroups(self):
@@ -333,6 +348,7 @@ def load_templates():
 
     def make_subdict():
         return defaultdict(list)
+
     # detail_ents[temp_id][visgroup]
     detail_ents = defaultdict(make_subdict)
     world_ents = defaultdict(make_subdict)
@@ -340,6 +356,7 @@ def load_templates():
     conf_ents = {}
 
     color_pickers = defaultdict(list)
+    tile_setters = defaultdict(list)
 
     for ent in vmf.by_class['bee2_template_world']:
         world_ents[
@@ -382,11 +399,36 @@ def load_templates():
             priority = Decimal(0)
         color_pickers[temp_id].append(ColorPicker(
             priority,
+            name=ent['targetname'],
             offset=Vec.from_str(ent['origin']),
             normal=Vec(x=1).rotate_by_str(ent['angles']),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
             remove_brush=srctools.conv_bool(ent['remove_brush']),
+        ))
+
+    for ent in vmf.by_class['bee2_template_tilesetter']:
+        # Parse the tile setter data.
+        temp_id = ent['template_id'].casefold()
+        tile_type = TILE_SETTER_SKINS[srctools.conv_int(ent['skin'])]
+        color = ent['color']
+        if color == 'white':
+            color = Portalable.WHITE
+        elif color == 'black':
+            color = Portalable.BLACK
+        elif color == 'invert':
+            color = 'INVERT'
+        elif color == 'match':
+            color = None
+        else:
+            raise ValueError('Invalid TileSetter color "{}"'.format(color))
+
+        tile_setters[temp_id].append(TileSetter(
+            offset=Vec.from_str(ent['origin']),
+            normal=Vec(z=1).rotate_by_str(ent['angles']),
+            color=color,
+            tile_type=tile_type,
+            picker_name=ent['color_picker'],
         ))
 
     for temp_id in set(detail_ents).union(world_ents, overlay_ents):
@@ -413,6 +455,7 @@ def load_templates():
             overlay_faces,
             vertical_faces,
             color_pickers[temp_id],
+            tile_setters[temp_id],
         )
 
 
@@ -665,6 +708,8 @@ def retexture_template(
 
     # For each face, if it needs to be forced to a colour, or None if not.
     force_colour_face = defaultdict(lambda: None)
+    # Picker names to their results.
+    picker_results = {}
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
@@ -683,7 +728,13 @@ def retexture_template(
 
         if brush is None or abs(brush.normal) != abs(picker_norm):
             # Doesn't exist.
+
+            if color_picker.name:
+                picker_results[color_picker.name] = None
             continue
+
+        if color_picker.name:
+            picker_results[color_picker.name] = brush.color
 
         if color_picker.remove_brush and brush.solid in vbsp.VMF.brushes:
             brush.solid.remove()
@@ -692,6 +743,40 @@ def retexture_template(
             # Only do the highest priority successful one.
             if force_colour_face[side] is None:
                 force_colour_face[side] = brush.color
+
+    for tile_setter in template.tile_setters:
+        setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
+        setter_pos += template_data.origin
+        setter_norm = tile_setter.normal.copy().rotate(*template_data.angles)
+        setter_type = tile_setter.tile_type
+
+        if isinstance(tile_setter.color, Portalable):
+            # The color was specifically set. Inverting
+            # is the only thing that has an effect.
+            if force_colour == 'INVERT':
+                setter_color = ~tile_setter.color
+            else:
+                setter_color = tile_setter.color
+        # Otherwise it copies the forced colour - it needs to be white or black.
+        elif isinstance(force_colour, Portalable):
+            if tile_setter.color == 'INVERT':
+                setter_color = ~force_colour
+            else:
+                setter_color = force_colour
+        else:
+            raise ValueError('"{}": Tile Setter requires a valid color value!')
+
+        if setter_color is Portalable.BLACK:
+            if setter_type is TileType.WHITE:
+                setter_type = TileType.BLACK
+            elif setter_type is TileType.WHITE_4x4:
+                setter_type = TileType.BLACK_4x4
+
+        tiling.edit_quarter_tile(
+            setter_pos,
+            setter_norm,
+            setter_type,
+        )
 
     for brush in all_brushes:
         for face in brush:
@@ -730,17 +815,22 @@ def retexture_template(
                 face.mat = mat
                 continue
 
+            if folded_mat == 'tile/white_wall_tile003b':
+                LOGGER.warning('"{}": white_wall_tile003b has changed definitions.', template.id)
+
             tex_type = TEMPLATE_RETEXTURE.get(folded_mat)
 
             if tex_type is None:
                 continue  # It's nodraw, or something we shouldn't change
 
-            if isinstance(tex_type, str):
-                # It's something like squarebeams or backpanels, just look
-                # it up
-                face.mat = vbsp.get_tex(tex_type)
+            gen_type, tex_name, tex_colour = tex_type
 
-                if tex_type == 'special.goo_cheap':
+            if not gen_type.is_tile:
+                # It's something like squarebeams or backpanels, so
+                # we don't need much special handling.
+                texturing.apply(gen_type, face, tex_name)
+
+                if tex_name in ('goo', 'goo_cheap'):
                     if norm != (0, 0, 1):
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
@@ -759,102 +849,20 @@ def retexture_template(
                             scale=vbsp_options.get(float, 'goo_scale'),
                         )
                 continue
-            # It's a regular wall type!
-            tex_colour, grid_size = tex_type
+            # Otherwise, it's a panel wall or the like
 
             if force_colour_face[orig_id] is not None:
                 tex_colour = force_colour_face[orig_id]
             elif force_colour == 'INVERT':
                 # Invert the texture
-                tex_colour = (
-                    MAT_TYPES.white
-                    if tex_colour is MAT_TYPES.black else
-                    MAT_TYPES.black
-                )
+                tex_colour = ~tex_colour
             elif force_colour is not None:
                 tex_colour = force_colour
 
             if force_grid is not None:
-                grid_size = force_grid
+                tex_name = force_grid
 
-            if 1 in norm or -1 in norm:  # Facing NSEW or up/down
-                # If axis-aligned, make the orientation aligned to world
-                # That way multiple items merge well, and walls are upright.
-                # We allow offsets < 1 grid tile, so items can be offset.
-                face.uaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
-                face.vaxis.offset %= TEMP_TILE_PIX_SIZE[grid_size]
-
-            if use_bullseye:
-                # We want to use the bullseye textures, instead of normal
-                # ones
-                if norm.z < -floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_floor'.format(tex_colour)
-                    )
-                elif norm.z > floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_ceiling'.format(tex_colour)
-                    )
-                else:
-                    face.mat = ''  # Ensure next if statement triggers
-
-                # If those aren't defined, try the wall texture..
-                if face.mat == '':
-                    face.mat = vbsp.get_tex(
-                        'special.bullseye_{}_wall'.format(tex_colour)
-                    )
-                if face.mat != '':
-                    continue  # Set to a bullseye texture,
-                    # don't use the wall one
-
-            if grid_size == 'special':
-                # Don't use wall on faces similar to floor/ceiling:
-                if -floor_tolerance < norm.z < floor_tolerance:
-                    face.mat = vbsp.get_tex(
-                        'special.{!s}_wall'.format(tex_colour)
-                    )
-                else:
-                    face.mat = ''  # Ensure next if statement triggers
-
-                # Various fallbacks if not defined
-                if face.mat == '':
-                    face.mat = vbsp.get_tex(
-                        'special.{!s}'.format(tex_colour)
-                    )
-                if face.mat == '':
-                    # No special texture - use a wall one.
-                    grid_size = 'wall'
-                else:
-                    # Set to a special texture,
-                    continue # don't use the wall one
-
-            if norm.z > floor_tolerance:
-                grid_size = 'ceiling'
-            if norm.z < -floor_tolerance:
-                grid_size = 'floor'
-
-            if can_clump:
-                # For the clumping algorithm, set to Valve PeTI and let
-                # clumping handle retexturing.
-                vbsp.IGNORED_FACES.remove(face)
-                if tex_colour is MAT_TYPES.white:
-                    if grid_size == '4x4':
-                        face.mat = 'tile/white_wall_tile003f'
-                    elif grid_size == '2x2':
-                        face.mat = 'tile/white_wall_tile003c'
-                    else:
-                        face.mat = 'tile/white_wall_tile003h'
-                elif tex_colour is MAT_TYPES.black:
-                    if grid_size == '4x4':
-                        face.mat = 'metal/black_wall_metal_002b'
-                    elif grid_size == '2x2':
-                        face.mat = 'metal/black_wall_metal_002a'
-                    else:
-                        face.mat = 'metal/black_wall_metal_002e'
-            else:
-                face.mat = vbsp.get_tex(
-                    '{!s}.{!s}'.format(tex_colour, grid_size)
-                )
+            texturing.apply(gen_type, face, tex_name, tex_colour)
 
     for over in template_data.overlay[:]:
         random.seed('TEMP_OVERLAY_' + over['basisorigin'])
@@ -864,12 +872,16 @@ def retexture_template(
             if mat[:1] == '$':
                 mat = fixup[mat]
             if mat.startswith('<') or mat.endswith('>'):
+                # TODO: Getting Valve textures
                 # Lookup in the style data.
-                mat = vbsp.get_tex(mat[1:-1])
+                pass #mat = vbsp.get_tex(mat[1:-1])
         elif mat in vbsp.TEX_VALVE:
-            mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
+            # TODO: Getting Valve textures
+            pass  #mat = vbsp.get_tex(vbsp.TEX_VALVE[mat])
         else:
+            # No need to edit.
             continue
+
         if mat == '':
             # If blank, remove the overlay from the map and the list.
             # (Since it's inplace, this can affect the tuple.)

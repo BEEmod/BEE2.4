@@ -4,7 +4,7 @@ It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
 from enum import Enum
-from typing import Tuple, Dict, List, Optional
+from typing import Tuple, Dict, List
 
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
@@ -24,12 +24,12 @@ TILE_TEMP = {}  # Face surfaces used to generate tiles.
 # Maps normals to the index in PrismFace.
 PRISM_NORMALS = {
     # 0 = solid
-    ( 0,  0,  1): 1,  # Top
-    ( 0,  0, -1): 2,  # Bottom
-    ( 0,  1,  0): 3,  # North
-    ( 0, -1,  0): 4,  # South
-    ( 1,  0,  0): 5,  # East
-    (-1,  0,  0): 6,  # West
+    Vec.top: 1,
+    Vec.bottom: 2,
+    Vec.north: 3,
+    Vec.south: 4,
+    Vec.east: 5,
+    Vec.west: 6,
 }
 
 NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
@@ -62,9 +62,6 @@ class TileType(Enum):
 
     # Air - used for embedFace sections.
     VOID = 11
-    
-    # Clean light strips which have a 3-unit recess with nodraw.
-    LIGHT_STRIP_CLEAN = 21
 
     # 3 unit recess,  with backpanels or props/plastic behind. 
     # _BROKEN is ignored when allocating patterns - it wasn't there when the 
@@ -76,15 +73,18 @@ class TileType(Enum):
     
     @property
     def is_recess(self):
-        return self.value in (21, 22, 23)
+        """Should this recess the surface?"""
+        return self.value in (22, 23)
      
     @property   
     def is_nodraw(self):
-        return self.value in (10, 21)
+        """Should this swap to nodraw?"""
+        return self.value == 10
         
     @property
     def blocks_pattern(self):
-        return self.value in (10, 11, 21, 23)
+        """Does this affect patterns?"""
+        return self.value != 22
         
     @property
     def is_tile(self):
@@ -93,10 +93,12 @@ class TileType(Enum):
         
     @property
     def is_white(self):
+        """Is this portalable?"""
         return self.value in (0, 1)
-        
+
     @property
     def color(self):
+        """The portalability of the tile."""
         if self.value in (0, 1):
             return texturing.Portalable.WHITE
         elif self.value in (2, 3):
@@ -104,7 +106,17 @@ class TileType(Enum):
         raise ValueError('No colour for ' + self.name + '!')
 
     @property
+    def inverted(self):
+        """Swap the color of a type."""
+        if self.value in (0, 1):
+            return texturing.Portalable.BLACK
+        elif self.value in (2, 3):
+            return texturing.Portalable.WHITE
+        return self
+
+    @property
     def tile_size(self):
+        """The size of the tile this should force."""
         if self.value in (1, 3):
             return TileSize.TILE_4x4
         else:
@@ -118,7 +130,6 @@ TILETYPE_TO_CHAR = {
     TileType.BLACK_4x4: 'b',
     TileType.NODRAW: 'n',
     TileType.VOID: '.',
-    TileType.LIGHT_STRIP_CLEAN: '*',
     TileType.CUTOUT_TILE_BROKEN: 'x',
     TileType.CUTOUT_TILE_PARTIAL: 'o',
 }
@@ -126,7 +137,7 @@ TILETYPE_FROM_CHAR = {
     v: k
     for k, v in
     TILETYPE_TO_CHAR.items()
-}
+}  # type: Dict[str, TileType]
 
 
 class BrushType(Enum):
@@ -298,7 +309,7 @@ class TileDef:
         self.brush_faces = []
         self.override_tex = override_tex
         self.base_type = base_type
-        self.sub_tiles = subtiles  # type: Optional[Dict[Tuple[int, int], TileType]]
+        self.sub_tiles = subtiles
         self.is_bullseye = is_bullseye
         self.panel_inst = panel_inst
         self.panel_ent = panel_ent
@@ -332,14 +343,16 @@ class TileDef:
         tile.get_subtiles()
         return tile
 
-    def get_subtiles(self):
+    def get_subtiles(self) -> Dict[Tuple[int, int], TileType]:
         """Returns subtiles, creating it if not present."""
         if self.sub_tiles is None:
-            self.sub_tiles = {
+            self.sub_tiles = tile = {
                 (x, y): self.base_type
                 for x in range(4) for y in range(4)
             }
-        return self.sub_tiles
+            return tile
+        else:
+            return self.sub_tiles
 
     def uv_offset(self, u, v, norm):
         """Return a u/v offset from our position.
@@ -494,6 +507,51 @@ class TileDef:
                 )
                 self.brush_faces.append(face)
                 yield brush
+
+
+def edit_quarter_tile(
+    origin: Vec,
+    normal: Vec,
+    tile_type: TileType,
+    force=False,
+):
+    """Alter a 1/4 tile section of a tile."""
+    norm_axis = normal.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+
+    grid_pos = round_grid(origin - normal)
+
+    uv_pos = (origin - grid_pos + 64 - 16)
+    u = uv_pos[u_axis] // 32 % 4
+    v = uv_pos[v_axis] // 32 % 4
+
+    if u != round(u) or v != round(v):
+        return
+
+    try:
+        tile = TILES[grid_pos.as_tuple(), normal.as_tuple()]
+    except KeyError:
+        LOGGER.warning('Expected tile, but none found: {}, {}', origin, normal)
+        return
+
+    subtiles = tile.get_subtiles()
+
+    old_tile = subtiles[u, v]
+
+    if force:
+        subtiles[u, v] = tile_type
+        return
+
+    # Don't replace void spaces with other things
+    if old_tile is TileType.VOID:
+        return
+
+    # If nodrawed, don't revert for tiles.
+    if old_tile is TileType.NODRAW:
+        if tile_type.is_tile:
+            return
+
+    subtiles[u, v] = tile_type
 
 
 def make_tile(
