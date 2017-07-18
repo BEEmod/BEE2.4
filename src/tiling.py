@@ -502,13 +502,15 @@ def make_tile(
     normal: Vec, 
     top_surf: str,
     back_surf: str=consts.Tools.NODRAW.value,
+    *,
     recess_dist=0,
     thickness=4,
     width=16,
     height=16,
     bevels=(False, False, False, False),
+    panel_edge=False,
     u_align=512,
-    v_align=512,
+    v_align=512
 ) -> Tuple[Solid, Side]:
     """Generate a tile. 
     
@@ -524,6 +526,9 @@ def make_tile(
         * width: size in the U-direction. Must be > 8.
         * height: size in the V-direction. Must be > 8.
         * bevels: If that side should be 45° angled - in order, umin/max, vmin/max.
+        * panel_edge: If True, use the panel-type squarebeams.
+        * u_align: Wrap offsets to this much at maximum.
+        * v_align: Wrap offsets to this much at maximum.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
@@ -549,7 +554,7 @@ def make_tile(
     back_side = template['back'].copy(map=vmf)  # type: Side
     back_side.mat = back_surf
     back_side.translate(origin - thickness * normal)
-    back_side.offset = 0 # Todo: calc offset and scale to fit bevels.
+    back_side.offset = 0  # Todo: calc offset and scale to fit bevels.
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
@@ -568,6 +573,13 @@ def make_tile(
     for face in [back_side, umin_side, umax_side, vmin_side, vmax_side]:
         face.uaxis.offset %= 512
         face.vaxis.offset %= 512
+
+    edge_name = 'panel_edge' if panel_edge else 'edge'
+
+    umin_side.mat = texturing.SPECIAL.get(origin, edge_name)
+    umax_side.mat = texturing.SPECIAL.get(origin, edge_name)
+    vmin_side.mat = texturing.SPECIAL.get(origin, edge_name)
+    vmax_side.mat = texturing.SPECIAL.get(origin, edge_name)
 
     return Solid(vmf, sides=[
         top_side, back_side,
