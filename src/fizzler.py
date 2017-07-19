@@ -1,11 +1,14 @@
 """Implements fizzler/laserfield generation and customisation."""
-from typing import Dict, List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from enum import Enum
 
 import utils
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property
 import comp_consts as const
+import instance_traits
+import instanceLocs
 
 LOGGER = utils.getLogger(__name__)
 
@@ -14,9 +17,12 @@ SIDE_TINTS = set()
 
 FIZZ_TYPES = {}  # type: Dict[str, FizzlerType]
 
+FIZZLERS = {}  # type: Dict[str, Fizzler]
+
 # Fizzler textures are higher-res than laserfields.
 FIZZLER_TEX_SIZE = 1024
 LASER_TEX_SIZE = 512
+
 
 class TexGroup(Enum):
     """Types of textures used for fizzlers."""
@@ -74,17 +80,19 @@ class FizzlerType:
         return FizzlerType(fizz_id, brushes, item_id)
 
 
-class FizzlerSet:
+class Fizzler:
     """Represents a specific pair of emitters and a field."""
     def __init__(
         self,
+        fizz_type: FizzlerType,
         up_axis: Vec,
-        neg: Vec,
-        pos: Vec,
+        base_inst: Entity,
+        emitters: List[Tuple[Vec, Vec]]
     ):
+        self.fizz_type = fizz_type
+        self.base_inst = base_inst
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
-        self.neg = neg  # Position of the left side of the brush
-        self.pos = pos  # Position of the right side of the brush.
+        self.emitters = emitters  # Pairs of left, right positions.
 
 
 class FizzlerBrush:
@@ -134,7 +142,7 @@ class FizzlerBrush:
 
         textures = {}
         for group in TexGroup:
-            textures[group] = conf[group.value, None]
+            textures[group] = conf['tex_' + group.value, None]
 
         keys = {
             prop.real_name: prop.value
@@ -186,7 +194,9 @@ class FizzlerBrush:
     def generate(
         self,
         vmf: VMF,
-        fizz_set: FizzlerSet,
+        fizz: Fizzler,
+        neg: Vec,
+        pos: Vec,
         inst_name: str,
     ):
         """Generate the actual brush."""
@@ -194,16 +204,16 @@ class FizzlerBrush:
         vmf.add_ent(brush_ent)
         brush_ent['targetname'] = inst_name + '-' + self.name
 
-        diff = fizz_set.neg - fizz_set.pos
+        diff = neg - pos
         # Size of fizzler
         field_length = diff.mag()
         # Direction it extends across.
         field_axis = diff.norm()
 
         # Out of the fizzler.
-        normal = fizz_set.up_axis.cross(field_axis)
+        normal = fizz.up_axis.cross(field_axis)
 
-        origin = (fizz_set.pos + fizz_set.neg)/2
+        origin = (pos + neg)/2
 
         # If either of these, we only need 1 brush.
         trigger_tex = self.textures[TexGroup.TRIGGER]
@@ -220,12 +230,12 @@ class FizzlerBrush:
             brush = vmf.make_prism(
                 p1=(origin
                     + (self.thickness/2) * normal
-                    + 64 * fizz_set.up_axis
+                    + 64 * fizz.up_axis
                     + (field_length/2) * field_axis
                 ),
                 p2=(origin
                     - (self.thickness / 2) * normal
-                    - 64 * fizz_set.up_axis
+                    - 64 * fizz.up_axis
                     - (field_length / 2) * field_axis
                 ),
             ).solid  # type: Solid
@@ -236,8 +246,8 @@ class FizzlerBrush:
                 mat = fitted_tex or self.textures[TexGroup.SHORT]
                 for side in brush.sides:
                     side_norm = abs(side.normal())
-                    if side_norm == abs(fizz_set.up_axis):
-                        self._side_tint(side, normal, fizz_set.neg)
+                    if side_norm == abs(fizz.up_axis):
+                        self._side_tint(side, normal, neg)
 
                     if side_norm != abs(normal):
                         continue
@@ -247,7 +257,9 @@ class FizzlerBrush:
                         side,
                         tex_size,
                         field_length,
-                        fizz_set,
+                        fizz,
+                        neg,
+                        pos,
                         bool(fitted_tex),
                     )
 
@@ -267,12 +279,12 @@ class FizzlerBrush:
             brush_left = vmf.make_prism(
                 p1=(origin
                     - (self.thickness / 2) * normal
-                    - 64 * fizz_set.up_axis
+                    - 64 * fizz.up_axis
                     - (side_len - field_length/2) * field_axis
                     ),
                 p2=(origin
                     + (self.thickness / 2) * normal
-                    + 64 * fizz_set.up_axis
+                    + 64 * fizz.up_axis
                     + (field_length / 2) * field_axis
                     ),
             ).solid  # type: Solid
@@ -280,12 +292,12 @@ class FizzlerBrush:
             brush_right = vmf.make_prism(
                 p1=(origin
                     - (self.thickness / 2) * normal
-                    - 64 * fizz_set.up_axis
+                    - 64 * fizz.up_axis
                     - (field_length / 2) * field_axis
                     ),
                 p2=(origin
                     + (self.thickness / 2) * normal
-                    + 64 * fizz_set.up_axis
+                    + 64 * fizz.up_axis
                     + (side_len - field_length/2) * field_axis
                     ),
             ).solid  # type: Solid
@@ -294,12 +306,12 @@ class FizzlerBrush:
                 brush_center = vmf.make_prism(
                     p1=(origin
                         - (self.thickness / 2) * normal
-                        - 64 * fizz_set.up_axis
+                        - 64 * fizz.up_axis
                         - (center_len / 2) * field_axis
                         ),
                     p2=(origin
                         + (self.thickness / 2) * normal
-                        + 64 * fizz_set.up_axis
+                        + 64 * fizz.up_axis
                         + (center_len/2) * field_axis
                         ),
                 ).solid  # type: Solid
@@ -319,8 +331,8 @@ class FizzlerBrush:
                 brush_ent.solids.append(brush)
                 for side in brush.sides:
                     side_norm = abs(side.normal())
-                    if side_norm == abs(fizz_set.up_axis):
-                        self._side_tint(side, normal, fizz_set.neg)
+                    if side_norm == abs(fizz.up_axis):
+                        self._side_tint(side, normal, neg)
 
                     if side_norm != abs(normal):
                         continue
@@ -330,7 +342,9 @@ class FizzlerBrush:
                         side,
                         FIZZLER_TEX_SIZE,
                         brush_length,
-                        fizz_set,
+                        fizz,
+                        neg,
+                        pos,
                     )
 
     def _texture_fit(
@@ -338,7 +352,9 @@ class FizzlerBrush:
         side: Side,
         tex_size: float,
         field_length: float,
-        fizz_set: FizzlerSet,
+        fizz_set: Fizzler,
+        neg: Vec,
+        pos: Vec,
         is_laserfield=False,
     ):
         """Calculate the texture offsets required for fitting a texture."""
@@ -346,9 +362,9 @@ class FizzlerBrush:
         if fizz_set.up_axis.z == 0:
             side.vaxis, side.uaxis = side.uaxis, side.vaxis
 
-        side.uaxis.offset = -(tex_size / field_length) * fizz_set.neg.dot(side.uaxis.vec())
+        side.uaxis.offset = -(tex_size / field_length) * neg.dot(side.uaxis.vec())
 
-        side.vaxis.offset = -(tex_size / 128) * fizz_set.neg.dot(side.vaxis.vec())
+        side.vaxis.offset = -(tex_size / 128) * neg.dot(side.vaxis.vec())
 
         #  The above fits it correctly, except it's vertically half-offset.
         # For laserfields that's what we want, for fizzlers we want it normal.
@@ -360,3 +376,110 @@ class FizzlerBrush:
 
         side.uaxis.offset %= tex_size
         side.vaxis.offset %= tex_size
+
+
+def parse_map(vmf: VMF):
+    """Analyse fizzler instances to assign fizzler types.
+
+    Instance traits are required.
+    The model instances and brushes will be removed from the map.
+    """
+
+    # Item ID and model skin -> fizzler type
+    fizz_types = {}  # type: Dict[Tuple[str, int], FizzlerType]
+
+    for fizz_type in FIZZ_TYPES.values():
+        if ':' in fizz_type.item_id:
+            item_id, barrier_type = fizz_type.item_id.casefold().split(':')
+            if barrier_type == 'laserfield':
+                barrier_skin = 2
+            elif barrier_type == 'fizzler':
+                barrier_skin = 0
+            else:
+                LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
+                fizz_types[item_id, 0] = fizz_type
+                fizz_types[item_id, 2] = fizz_type
+                continue
+            fizz_types[item_id, barrier_skin] = fizz_type
+        else:
+            item_id = fizz_type.item_id.casefold()
+            fizz_types[item_id, 0] = fizz_type
+            fizz_types[item_id, 2] = fizz_type
+
+    fizz_bases = {}  # type: Dict[str, Entity]
+    fizz_models = defaultdict(list)  # type: Dict[str, List[Entity]]
+
+    # First use traits to gather up all the instances.
+    for inst in vmf.by_class['func_instance']:
+        traits = instance_traits.get(inst)
+        if 'fizzler' not in traits:
+            continue
+
+        name = inst['targetname']
+        if 'fizzler_model' in traits:
+            name = name.rsplit('_model', 1)[0]
+            fizz_models[name].append(inst)
+            inst.remove()
+        elif 'fizzler_base' in traits:
+            fizz_bases[name] = inst
+        else:
+            LOGGER.warning('Fizzler "{}" has non-base, non-model instance?', name)
+
+    for name, base_inst in fizz_bases.items():
+        models = fizz_models[name]
+        up_axis = Vec(y=1).rotate_by_str(base_inst['angles'])
+
+        base_inst.outputs.clear()
+
+        # Now match the pairs of models to each other.
+        # The length axis is the line between them.
+        # We don't care about the instances after this, so don't keep track.
+        length_axis = Vec(z=1).rotate_by_str(base_inst['angles']).axis()
+
+        emitters = []  # type: List[Tuple[Vec, Vec]]
+
+        model_pairs = {}  # type: Dict[Tuple[float, float], Vec]
+
+        model_skin = models[0].fixup.int('$skin')
+
+        try:
+            item_id, item_subtype = instanceLocs.ITEM_FOR_FILE[base_inst['file'].casefold()]
+            fizz_type = fizz_types[item_id, model_skin]
+        except KeyError:
+            raise ValueError('No fizzler type for "{}"!'.format(
+                base_inst['file']
+            ))
+
+        for model in models:
+            pos = Vec.from_str(model['origin'])
+            try:
+                other_pos = model_pairs.pop(pos.other_axes(length_axis))
+            except KeyError:
+                # No other position yet, we need to find that.
+                model_pairs[pos.other_axes(length_axis)] = pos
+                continue
+
+            min_pos, max_pos = Vec.bbox(pos, other_pos)
+
+            # Move positions to the wall surface.
+            min_pos[length_axis] -= 64
+            max_pos[length_axis] += 64
+            emitters.append((min_pos, max_pos))
+
+        FIZZLERS[name] = Fizzler(fizz_type, up_axis, base_inst, emitters)
+
+        base_inst.comments = fizz_type.id
+
+    # Delete all the old brushes associated with fizzlers
+    for brush in (
+        vmf.by_class['trigger_portal_cleanser'] |
+        vmf.by_class['trigger_hurt'] |
+        vmf.by_class['func_brush']
+    ):
+        name = brush['targetname']
+        if not name:
+            continue
+        name = name.rsplit('_brush')[0]
+        if name in FIZZLERS:
+            brush.remove()
+
