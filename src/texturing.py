@@ -286,7 +286,7 @@ def apply(
     else:
         if normal is None:
             normal = face.normal()
-        generator = gen(cat, portalable, normal)
+        generator = gen(cat, normal, portalable)
 
     if loc is None:
         loc = face.get_origin()
