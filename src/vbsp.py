@@ -477,7 +477,6 @@ def add_voice():
     )
 
 
-@conditions.meta_cond(priority=-250)
 def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
@@ -588,37 +587,6 @@ def add_fizz_borders():
                 v_repeat=v_rep,
                 swap=flip_uv,
             )
-
-
-@conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst: Entity):
-    """Fix some bugs with fizzler model instances.
-    This removes extra numbers from model instances, which prevents
-    inputs from being read correctly.
-    It also rotates fizzler models so they are both facing the same way.
-    """
-    # Fizzler model names end with this special string
-    if ("_modelStart" in inst['targetname', ''] or
-            "_modelEnd" in inst['targetname', '']):
-
-        # strip off the extra numbers on the end, so fizzler
-        # models recieve inputs correctly (Valve bug!)
-        if "_modelStart" in inst['targetname', '']:
-
-            inst['targetname'] = (
-                inst['targetname'].split("_modelStart")[0] +
-                "_modelStart"
-                )
-        else:
-            inst['targetname'] = (
-                inst['targetname'].split("_modelEnd")[0] +
-                "_modelEnd"
-                )
-
-        # one side of the fizzler models are rotated incorrectly
-        # (upsidown), fix that...
-        if inst['angles'] in FIZZLER_ANGLE_FIX:
-            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
