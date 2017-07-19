@@ -27,6 +27,7 @@ import texturing
 import connections
 import instance_traits
 import template_brush
+import antlines
 import comp_consts as consts
 import conditions.globals
 import conditions.cubes
@@ -3494,6 +3495,8 @@ def main():
 
         load_map(path)
         instance_traits.set_traits(VMF)
+
+        ant, side_to_antline = antlines.parse_antlines(VMF)
 
         # Requires instance traits!
         connections.calc_connections(
