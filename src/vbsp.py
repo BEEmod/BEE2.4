@@ -3501,6 +3501,7 @@ def main():
         # Requires instance traits!
         connections.calc_connections(
             VMF,
+            ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
         )

@@ -2,6 +2,7 @@
 from enum import Enum
 from collections import defaultdict
 from srctools import VMF, Entity, Output
+from antlines import Antline
 import comp_consts as const
 import instanceLocs
 import conditions
@@ -96,17 +97,16 @@ class Item:
         inst: Entity,
         toggle: Entity = None,
         panels: Iterable[Entity]=(),
-        antlines: Iterable[Entity]=(),
+        antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
     ):
         self.inst = inst
 
         # Associated indicator panels
-        self.ind_panels = set(panels)  # type: Set[Entity]
+        self.ind_panels = set(panels)
         self.ind_toggle = toggle
-        # Overlays
-        self.antlines = set(antlines)  # type: Set[Entity]
+        self.antlines = list(antlines)
         self.shape_signs = list(shape_signs)
 
         # None = Infinite/normal.
@@ -189,6 +189,7 @@ class Connection:
 
 def calc_connections(
     vmf: VMF,
+    antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
 ):
@@ -200,7 +201,6 @@ def calc_connections(
     """
     # First we want to match targetnames to item types.
     toggles = {}  # type: Dict[str, Entity]
-    overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
     sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
@@ -235,9 +235,6 @@ def calc_connections(
         mat = over['material']
         if mat in SIGN_ORDER_LOOKUP:
             sign_shape_overlays[name, mat.casefold()].append(over)
-        else:
-            # Antlines
-            overlays[name].add(over)
 
     # Name -> signs pairs
     sign_shapes = defaultdict(list)  # type: Dict[str, List[ShapeSignage]]
@@ -268,7 +265,12 @@ def calc_connections(
 
             if out_name in toggles:
                 inst_toggle = toggles[out_name]
-                item.antlines |= overlays[inst_toggle.fixup['indicator_name']]
+                try:
+                    item.antlines.extend(
+                        antlines[inst_toggle.fixup['indicator_name']]
+                    )
+                except KeyError:
+                    pass
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
