@@ -3,7 +3,7 @@
 """
 import operator
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import conditions
 import srctools
@@ -12,7 +12,8 @@ from conditions import (
     ALL_INST,
 )
 import instanceLocs
-from srctools import Property, Vec, Entity, Output
+from srctools import Property, Vec, Entity, Output, VMF
+
 
 COND_MOD_NAME = 'Instances'
 
@@ -238,7 +239,7 @@ def res_global_input_setup(res: Property):
 
 
 @make_result('GlobalInput')
-def res_global_input(inst: Entity, res: Property):
+def res_global_input(vmf: VMF, inst: Entity, res: Property):
     """Trigger an input either on map spawn, or when a relay is triggered.
 
     Arguments:  
@@ -252,45 +253,15 @@ def res_global_input(inst: Entity, res: Property):
         if Name is not set.
     - `Param`: The parameter for the output.
     """
-    name, proxy_name, command, output, delay, param, target = res.value
-
-    global_input(inst, command, proxy_name, name, output, target, param, delay)
-
-
-def global_input(
-    inst: Entity,
-    command: str,
-    proxy_name: str=None,
-    relay_name: str=None,
-    relay_out: str='OnTrigger',
-    target: str=None,
-    param='',
-    delay=0.0,
-):
-    """Create a global input."""
+    relay_name, proxy_name, command, relay_out, delay, param, target = res.value
 
     if relay_name is not None:
         relay_name = conditions.resolve_value(inst, relay_name)
     if target is not None:
         target = conditions.resolve_value(inst, target)
 
-    try:
-        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
-    except KeyError:
-        if relay_name is None:
-            glob_ent = GLOBAL_INPUT_ENTS[None] = inst.map.create_ent(
-                classname='logic_auto',
-                origin=inst['origin'],
-            )
-        else:
-            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = inst.map.create_ent(
-                classname='logic_relay',
-                targetname=relay_name,
-                origin=inst['origin'],
-            )
-
-    out = Output(
-        out=('OnMapSpawn' if relay_name is None else relay_out),
+    output = Output(
+        out=relay_out,
         targ=(
             conditions.local_name(inst, target)
             if target else
@@ -301,11 +272,38 @@ def global_input(
         delay=delay,
         param=conditions.resolve_value(inst, param),
     )
-    glob_ent.add_out(out)
+
+    global_input(vmf, inst['origin'], output, relay_name)
+
+
+def global_input(
+    vmf: VMF,
+    pos: Union[Vec, str],
+    output: Output,
+    relay_name: str=None,
+):
+    """Create a global input."""
+    try:
+        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
+    except KeyError:
+        if relay_name is None:
+            glob_ent = GLOBAL_INPUT_ENTS[None] = vmf.create_ent(
+                classname='logic_auto',
+                origin=pos,
+            )
+        else:
+            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = vmf.create_ent(
+                classname='logic_relay',
+                targetname=relay_name,
+                origin=pos,
+            )
+    if relay_name is None:
+        output.output = 'OnMapSpawn'
+    glob_ent.add_out(output)
 
 
 @make_result('ScriptVar')
-def res_script_var(inst: Entity, res: Property):
+def res_script_var(vmf: VMF, inst: Entity, res: Property):
     """Set a variable on a script, via a logic_auto.
 
     Name is the local name for the script entity.
@@ -313,11 +311,15 @@ def res_script_var(inst: Entity, res: Property):
     Value is the value to set.
     """
     global_input(
-        inst,
-        command='RunScriptCode',
-        target=res['name'],
-        param='{} <- {}'.format(
-            res['var'],
-            conditions.resolve_value(inst, res['value']),
+        vmf,
+        inst['origin'],
+        Output(
+            'OnMapSpawn',
+            conditions.local_name(inst, res['name']),
+            'RunScriptCode',
+            param='{} <- {}'.format(
+                res['var'],
+                conditions.resolve_value(inst, res['value']),
+            ),
         ),
     )

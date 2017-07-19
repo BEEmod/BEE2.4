@@ -116,6 +116,18 @@ def flag_has_exit_signage():
     return False
 
 
+@make_result('setOption')
+def res_set_option(res: Property):
+    """Set a value in the "options" part of VBSP_config.
+
+    Each child property will be set.
+    """
+    for opt in res.value:
+        vbsp_options.set_opt(opt.name, opt.value)
+    return RES_EXHAUSTED
+
+
+
 @make_flag('ItemConfig')
 def res_get_item_config(inst: Entity, res: Property):
     """Check if an item config panel value matches another value.
