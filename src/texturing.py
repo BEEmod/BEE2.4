@@ -377,7 +377,7 @@ def load_config(conf: Property):
 
         options, textures = data[gen_key]
 
-        if not textures and gen_cat is not GenCat.NORMAL:
+        if not any(textures.values()) and gen_cat is not GenCat.NORMAL:
             # For the additional categories of tiles, we copy the entire
             # NORMAL one over if it's not set.
             textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
