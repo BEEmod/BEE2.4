@@ -3507,7 +3507,6 @@ def main():
 
         MAP_RAND_SEED = calc_rand_seed()
 
-
         all_inst = get_map_info()
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
@@ -3519,7 +3518,9 @@ def main():
         )
 
         tiling.gen_tile_temp()
-        tiling.analyse_map(VMF)
+        tiling.analyse_map(VMF, side_to_antline)
+
+        del side_to_antline
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
