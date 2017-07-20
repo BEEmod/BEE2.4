@@ -61,6 +61,16 @@ _UNLOCK_ITEMS = [
     'ITEM_OBSERVATION_ROOM'
     ]
 
+# Material file used for fizzler sides.
+FIZZLER_EDGE_MAT = '''\
+UnlitGeneric
+\t{{
+\t$basetexture "sprites/laserbeam"
+\t$additive 1
+\t$color "{{{:g} {:g} {:g}}}"
+\t}}
+'''
+
 # The location of all the instances in the game directory
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
@@ -552,7 +562,7 @@ class Game:
         # They will end up in this order.
         vbsp_config.merge_children(
             'Textures',
-            'Fizzler',
+            'Fizzlers',
             'Options',
             'StyleVars',
             'DropperItems',
@@ -560,6 +570,8 @@ class Game:
             'Quotes',
             'PackTriggers',
         )
+
+        self.generate_fizzler_sides(vbsp_config)
 
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
@@ -751,6 +763,20 @@ class Game:
                 commands.append(comm_block)
 
         return root_block.export()
+
+    def generate_fizzler_sides(self, conf: Property):
+        fizz_colors = set()
+        mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
+        for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
+            fizz_color = brush_conf['Side_tint', '']
+            if fizz_color:
+                fizz_colors.add(Vec.from_str(fizz_color).as_tuple())
+        if fizz_colors:
+            os.makedirs(self.abs_path('bee2/materials/BEE2/fizz_sides/'), exist_ok=True)
+        for fizz_color in fizz_colors:
+            file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(*map(int, fizz_color))
+            with open(file_path, 'w') as f:
+                f.write(FIZZLER_EDGE_MAT.format(*fizz_color))
 
     def launch(self):
         """Try and launch the game."""

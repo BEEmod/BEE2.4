@@ -176,7 +176,7 @@ class FizzlerBrush:
             return
 
         # Produce a hex colour string, and use that as the material name.
-        side.mat = 'BEE2/fizz/side_color_{:02X}{:02X}{:02X}'.format(
+        side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
             int(self.side_tint.x),
             int(self.side_tint.y),
             int(self.side_tint.z),
