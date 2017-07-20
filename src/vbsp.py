@@ -1,4 +1,3 @@
-import fizzler
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -26,6 +25,7 @@ import conditions
 import connections
 import instance_traits
 import template_brush
+import fizzler
 import comp_consts as consts
 import conditions.globals
 import conditions.cubes
