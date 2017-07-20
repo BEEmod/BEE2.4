@@ -656,19 +656,23 @@ def generate_fizzlers(vmf: VMF):
         model_index = 0
         if fizz_type.model_naming is ModelName.SAME:
             def get_model_name(ind):
+                """Give every emitter the base's name."""
                 return fizz_name
         elif fizz_type.model_naming is ModelName.LOCAL:
             def get_model_name(ind):
+                """Give every emitter a name local to the base."""
                 return fizz_name + '-' + fizz_type.model_name
         elif fizz_type.model_naming is ModelName.PAIRED:
             def get_model_name(ind):
+                """Give each pair of emitters the same unique name."""
                 return '{}-{}{:02}'.format(
                     fizz_name,
                     fizz_type.model_name,
                     ind,
                 )
         elif fizz_type.model_naming is ModelName.UNIQUE:
-            def get_mode_name(ind):
+            def get_model_name(ind):
+                """Give every model a unique name."""
                 nonlocal model_index
                 model_index += 1
                 return '{}-{}{:02}'.format(
