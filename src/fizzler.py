@@ -52,7 +52,7 @@ class ModelName(Enum):
     LOCAL = 'local'  # Use a base_inst-suffix combo.
 
 
-class ModelCat(Enum):
+class FizzInst(Enum):
     """Categories of model instances.
 
     For all instances, Z is along the fizzler (out of the wall), x is the
@@ -63,6 +63,8 @@ class ModelCat(Enum):
     PAIR_MAX = 'model_right'  # max side
     PAIR_SINGLE = 'model_single'  # Replaces min and max for single case
     GRID = 'model_mid'  # One in each block the fizzler is in.
+
+    BASE = 'base_inst'  # If set, swap the instance to this.
 
 
 def read_configs(conf: Property):
@@ -107,7 +109,7 @@ class FizzlerType:
         model_local_name: str,
         model_name_type: ModelName,
         brushes: List['FizzlerBrush'],
-        models: Dict[ModelCat, List[str]],
+        inst: Dict[FizzInst, List[str]],
     ):
         self.id = fizz_id
         # The brushes to generate.
@@ -118,7 +120,8 @@ class FizzlerType:
         # The method used to name the models.
         self.model_naming = model_name_type
         self.model_name = model_local_name
-        self.models = models
+        # Instances to use.
+        self.inst = inst
 
         # The item ID this fizzler is produced from, optionally
         # with a :laserfield or :fizzler suffix to choose a specific
@@ -142,11 +145,11 @@ class FizzlerType:
             # We can't rename without a local name.
             model_name_type = ModelName.SAME
 
-        models = {}
-        for model_type in ModelCat:
-            models[model_type] = [
+        inst = {}
+        for inst_type in FizzInst:
+            inst[inst_type] = [
                 file
-                for prop in conf.find_all(model_type.value)
+                for prop in conf.find_all(inst_type.value)
                 for file in instanceLocs.resolve(prop.value)
             ]
 
@@ -169,7 +172,7 @@ class FizzlerType:
             model_local_name,
             model_name_type,
             brushes,
-            models,
+            inst,
         )
 
 
@@ -304,7 +307,7 @@ class FizzlerBrush:
         field_axis = diff.norm()
 
         # Out of the fizzler.
-        normal = fizz.up_axis.cross(field_axis)
+        normal = abs(fizz.up_axis.cross(field_axis))  # type: Vec
 
         origin = (pos + neg)/2
 
@@ -343,7 +346,7 @@ class FizzlerBrush:
                     if side_norm == abs(fizz.up_axis):
                         self._side_tint(side, normal, neg)
 
-                    if side_norm != abs(normal):
+                    if side_norm != normal:
                         continue
                     side.mat = mat
 
@@ -358,6 +361,7 @@ class FizzlerBrush:
                     )
         else:
             # Generate the three brushes for fizzlers.
+
             if field_length < 128:
                 side_len = field_length / 2
                 center_len = 0
@@ -412,17 +416,18 @@ class FizzlerBrush:
                 yield brush_center
 
                 brushes = [
-                    (brush_left, TexGroup.LEFT, 64),
-                    (brush_center, TexGroup.CENTER, center_len),
-                    (brush_right, TexGroup.RIGHT, 64),
+                    (brush_left, field_axis, 64),
+                    (brush_center, None, center_len),
+                    (brush_right, -field_axis, 64),
                 ]
             else:
+                brush_center = None
                 brushes = [
-                    (brush_left, TexGroup.LEFT, side_len),
-                    (brush_right, TexGroup.RIGHT, side_len),
+                    (brush_left, field_axis, side_len),
+                    (brush_right, -field_axis, side_len),
                 ]
 
-            for brush, tex_group, brush_length in brushes:
+            for brush, model_normal, brush_length in brushes:
                 yield brush
                 for side in brush.sides:
                     side_norm = abs(side.normal())
@@ -431,7 +436,9 @@ class FizzlerBrush:
 
                     if side_norm != abs(normal):
                         continue
-                    side.mat = self.textures[tex_group]
+
+                    if model_normal is None:
+                        side.mat = self.textures[TexGroup.CENTER]
 
                     self._texture_fit(
                         side,
@@ -440,23 +447,40 @@ class FizzlerBrush:
                         fizz,
                         neg,
                         pos,
+                        model_normal=model_normal,
                     )
-
 
     def _texture_fit(
         self,
         side: Side,
         tex_size: float,
         field_length: float,
-        fizz_set: Fizzler,
+        fizz: Fizzler,
         neg: Vec,
         pos: Vec,
         is_laserfield=False,
+        model_normal: Vec=None,
     ):
         """Calculate the texture offsets required for fitting a texture."""
+        if side.vaxis.vec() != -fizz.up_axis:
+            # Rotate it
+            rot_angle = side.normal().rotation_around()
+            for _ in range(4):
+                side.uaxis = side.uaxis.rotate(rot_angle)
+                side.vaxis = side.vaxis.rotate(rot_angle)
+                if side.vaxis.vec() == -fizz.up_axis:
+                    break
+            else:
+                LOGGER.warning("Can't fix rotation for {} -> {}", side.vaxis, fizz.up_axis)
 
-        if fizz_set.up_axis.z == 0:
-            side.vaxis, side.uaxis = side.uaxis, side.vaxis
+        # For left and right, we need to figure out what direction the texture
+        # should be in. uaxis is in the direction of the surface.
+        if model_normal is not None:
+            uaxis_dir = side.uaxis.vec()
+            if uaxis_dir == model_normal:
+                side.mat = self.textures[TexGroup.RIGHT]
+            else:
+                side.mat = self.textures[TexGroup.LEFT]
 
         side.uaxis.offset = -(tex_size / field_length) * neg.dot(side.uaxis.vec())
 
@@ -603,6 +627,10 @@ def generate_fizzlers(vmf: VMF):
         fizz_name = fizz.base_inst['targetname']
         fizz_type = fizz.fizz_type
 
+        if fizz_type.inst[FizzInst.BASE]:
+            random.seed('{}_fizz_base_{}'.format(MAP_RAND_SEED, fizz_name))
+            fizz.base_inst['file'] = random.choice(fizz_type.inst[FizzInst.BASE])
+
         if not fizz.emitters:
             LOGGER.warning('No emitters for fizzler "{}"!', fizz_name)
             continue
@@ -616,8 +644,8 @@ def generate_fizzlers(vmf: VMF):
         min_angles = FIZZ_ANGLES[forward.as_tuple(), up_dir.as_tuple()]
         max_angles = FIZZ_ANGLES[(-forward).as_tuple(), up_dir.as_tuple()]
 
-        model_min = fizz_type.models[ModelCat.PAIR_MIN] or fizz_type.models[ModelCat.ALL]
-        model_max = fizz_type.models[ModelCat.PAIR_MAX] or fizz_type.models[ModelCat.ALL]
+        model_min = fizz_type.inst[FizzInst.PAIR_MIN] or fizz_type.inst[FizzInst.ALL]
+        model_max = fizz_type.inst[FizzInst.PAIR_MAX] or fizz_type.inst[FizzInst.ALL]
         if not model_min or not model_max:
             raise ValueError(
                 'No model specified a side of "{}"'
@@ -654,11 +682,11 @@ def generate_fizzlers(vmf: VMF):
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
             random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
-            if length == 128 and fizz_type.models[ModelCat.PAIR_SINGLE]:
+            if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE]:
                 min_inst = vmf.create_ent(
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
-                    file=random.choice(fizz_type.models[ModelCat.PAIR_SINGLE]),
+                    file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE]),
                     origin=seg_min + 64 * forward,
                     angles=min_angles,
                 )
