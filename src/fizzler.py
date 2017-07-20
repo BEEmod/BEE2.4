@@ -103,6 +103,7 @@ class FizzlerType:
         self,
         fizz_id: str,
         item_id: str,
+        voice_attrs: List[str],
         model_local_name: str,
         model_name_type: ModelName,
         brushes: List['FizzlerBrush'],
@@ -111,6 +112,8 @@ class FizzlerType:
         self.id = fizz_id
         # The brushes to generate.
         self.brushes = brushes
+
+        self.voice_attrs = voice_attrs
 
         # The method used to name the models.
         self.model_naming = model_name_type
@@ -147,6 +150,13 @@ class FizzlerType:
                 for file in instanceLocs.resolve(prop.value)
             ]
 
+        voice_attrs = []
+        for prop in conf.find_all('Has'):
+            if prop.has_children():
+                for child in prop:
+                    voice_attrs.append(child.name)
+            voice_attrs.append(prop.name)
+
         brushes = [
             FizzlerBrush.parse(prop)
             for prop in
@@ -155,6 +165,7 @@ class FizzlerType:
         return FizzlerType(
             fizz_id,
             item_id,
+            voice_attrs,
             model_local_name,
             model_name_type,
             brushes,
@@ -463,7 +474,7 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF):
+def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]):
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
@@ -538,6 +549,9 @@ def parse_map(vmf: VMF):
             raise ValueError('No fizzler type for "{}"!'.format(
                 base_inst['file']
             ))
+
+        for attr_name in fizz_type.voice_attrs:
+            voice_attrs[attr_name] = True
 
         for model in models:
             pos = Vec.from_str(model['origin'])
