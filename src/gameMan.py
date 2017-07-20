@@ -62,13 +62,15 @@ _UNLOCK_ITEMS = [
     ]
 
 # Material file used for fizzler sides.
+# We use $decal because that ensures it's displayed over brushes,
+# if there's base slabs or the like.
 FIZZLER_EDGE_MAT = '''\
 UnlitGeneric
-\t{{
-\t$basetexture "sprites/laserbeam"
-\t$additive 1
-\t$color "{{{:g} {:g} {:g}}}"
-\t}}
+{{
+$basetexture "sprites/laserbeam"
+$additive 1
+$decal 1
+$color "{{{:g} {:g} {:g}}}"
 '''
 
 # The location of all the instances in the game directory
@@ -765,18 +767,22 @@ class Game:
         return root_block.export()
 
     def generate_fizzler_sides(self, conf: Property):
-        fizz_colors = set()
+        fizz_colors = {}
         mat_path = self.abs_path('bee2/materials/BEE2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_tint', '']
             if fizz_color:
-                fizz_colors.add(Vec.from_str(fizz_color).as_tuple())
+                fizz_colors[Vec.from_str(fizz_color).as_tuple()] = brush_conf.float('side_alpha', 1)
         if fizz_colors:
             os.makedirs(self.abs_path('bee2/materials/BEE2/fizz_sides/'), exist_ok=True)
-        for fizz_color in fizz_colors:
+        for fizz_color, alpha in fizz_colors.items():
             file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(*map(int, fizz_color))
             with open(file_path, 'w') as f:
                 f.write(FIZZLER_EDGE_MAT.format(*fizz_color))
+                if alpha != 1:
+                    # Add the alpha value, but replace 0.5 -> .5 to save a char.
+                    f.write('$alpha {}\n'.format(format(alpha, 'g').replace('0.', '.')))
+                f.write('}')
 
     def launch(self):
         """Try and launch the game."""
