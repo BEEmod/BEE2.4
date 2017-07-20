@@ -1,9 +1,12 @@
 """Implements fizzler/laserfield generation and customisation."""
+import random
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Iterator
 
+import itertools
 from enum import Enum
 
+import conditions
 import utils
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property
 import comp_consts as const
@@ -23,6 +26,9 @@ FIZZLERS = {}  # type: Dict[str, Fizzler]
 FIZZLER_TEX_SIZE = 1024
 LASER_TEX_SIZE = 512
 
+# Given a normal and the up-axis, the angle used for the instance.
+FIZZ_ANGLES  = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], Vec]
+
 
 class TexGroup(Enum):
     """Types of textures used for fizzlers."""
@@ -38,6 +44,27 @@ class TexGroup(Enum):
     TRIGGER = 'trigger'
 
 
+class ModelName(Enum):
+    """The method used to give names for models."""
+    SAME = 'same'  # The same as the base
+    UNIQUE = 'unique'  # Add the local suffix + a random number
+    PAIRED = 'paired'  # Each pair gets the same number.
+    LOCAL = 'local'  # Use a base_inst-suffix combo.
+
+
+class ModelCat(Enum):
+    """Categories of model instances.
+
+    For all instances, Z is along the fizzler (out of the wall), x is the
+    surface normal, and Y is 'upward'.
+    """
+    ALL = 'model'  # Used for all positions like normal.
+    PAIR_MIN = 'model_left'  # min side
+    PAIR_MAX = 'model_right'  # max side
+    PAIR_SINGLE = 'model_single'  # Replaces min and max for single case
+    GRID = 'model_mid'  # One in each block the fizzler is in.
+
+
 def read_configs(conf: Property):
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
@@ -51,16 +78,45 @@ def read_configs(conf: Property):
     LOGGER.info('Loaded "{}" fizzlers.', len(FIZZ_TYPES))
 
 
+def _calc_fizz_angles():
+    """Generate FIZZ_ANGLES."""
+    it = itertools.product('xyz', (-1, 1), 'xyz', (-1, 1))
+    for norm_axis, norm_mag, roll_axis, roll_mag in it:
+        if norm_axis == roll_axis:
+            # They can't both be the same...
+            continue
+        norm = Vec.with_axes(norm_axis, norm_mag)
+        roll = Vec.with_axes(roll_axis, roll_mag)
+
+        # Norm is Z, roll is X,  we want y.
+        angle = roll.to_angle_roll(norm)
+        up_dir = norm.cross(roll)
+        FIZZ_ANGLES[norm.as_tuple(), up_dir.as_tuple()] = angle
+
+_calc_fizz_angles()
+del _calc_fizz_angles
+
+
 class FizzlerType:
     """Implements a specific fizzler type."""
     def __init__(
         self,
         fizz_id: str,
-        brushes: List['FizzlerBrush'],
         item_id: str,
+        model_local_name: str,
+        model_name_type: ModelName,
+        brushes: List['FizzlerBrush'],
+        models: Dict[ModelCat, List[str]],
     ):
         self.id = fizz_id
+        # The brushes to generate.
         self.brushes = brushes
+
+        # The method used to name the models.
+        self.model_naming = model_name_type
+        self.model_name = model_local_name
+        self.models = models
+
         # The item ID this fizzler is produced from, optionally
         # with a :laserfield or :fizzler suffix to choose a specific
         # type.
@@ -72,12 +128,38 @@ class FizzlerType:
         fizz_id = conf['id']
         item_id = conf['item_id']
 
+        try:
+            model_name_type = ModelName(conf['NameType', 'same'].casefold())
+        except ValueError:
+            LOGGER.warning('Bad model name type: "{}"', conf['NameType'])
+            model_name_type = ModelName.SAME
+
+        model_local_name = conf['ModelName', '']
+        if not model_local_name:
+            # We can't rename without a local name.
+            model_name_type = ModelName.SAME
+
+        models = {}
+        for model_type in ModelCat:
+            models[model_type] = [
+                file
+                for prop in conf.find_all(model_type.value)
+                for file in instanceLocs.resolve(prop.value)
+            ]
+
         brushes = [
             FizzlerBrush.parse(prop)
             for prop in
             conf.find_all('Brush')
         ]
-        return FizzlerType(fizz_id, brushes, item_id)
+        return FizzlerType(
+            fizz_id,
+            item_id,
+            model_local_name,
+            model_name_type,
+            brushes,
+            models,
+        )
 
 
 class Fizzler:
@@ -106,6 +188,7 @@ class FizzlerBrush:
         outputs: List[Output],
         thickness=2.0,
         side_tint: Vec=None,
+        singular: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
     ):
@@ -117,6 +200,9 @@ class FizzlerBrush:
         self.thickness = thickness
         # If set, a colour to apply to the sides.
         self.side_tint = side_tint
+
+        # Use only one brush for all the parts of this.
+        self.singular = singular
 
         # If set, add a material_modify_control to control these brushes.
         self.mat_mod_var = mat_mod_var
@@ -147,13 +233,13 @@ class FizzlerBrush:
         keys = {
             prop.real_name: prop.value
             for prop in
-            conf.find_all('keys')
+            conf.find_children('keys')
         }
 
         local_keys = {
             prop.real_name: prop.value
             for prop in
-            conf.find_all('localkeys')
+            conf.find_children('localkeys')
         }
 
         return FizzlerBrush(
@@ -164,6 +250,7 @@ class FizzlerBrush:
             outputs,
             conf.float('thickness', 2.0),
             side_tint,
+            conf.bool('singular'),
             conf['mat_mod_name', None],
             conf['mat_mod_var', None],
         )
@@ -197,13 +284,8 @@ class FizzlerBrush:
         fizz: Fizzler,
         neg: Vec,
         pos: Vec,
-        inst_name: str,
-    ):
+    ) -> List[Solid]:
         """Generate the actual brush."""
-        brush_ent = Entity(vmf, self.keys)
-        vmf.add_ent(brush_ent)
-        brush_ent['targetname'] = inst_name + '-' + self.name
-
         diff = neg - pos
         # Size of fizzler
         field_length = diff.mag()
@@ -239,6 +321,7 @@ class FizzlerBrush:
                     - (field_length / 2) * field_axis
                 ),
             ).solid  # type: Solid
+            yield brush
             if trigger_tex:
                 for side in brush.sides:
                     side.mat = trigger_tex
@@ -262,8 +345,6 @@ class FizzlerBrush:
                         pos,
                         bool(fitted_tex),
                     )
-
-            brush_ent.solids.append(brush)
         else:
             # Generate the three brushes for fizzlers.
             if field_length < 128:
@@ -288,6 +369,7 @@ class FizzlerBrush:
                     + (field_length / 2) * field_axis
                     ),
             ).solid  # type: Solid
+            yield brush_left
 
             brush_right = vmf.make_prism(
                 p1=(origin
@@ -301,6 +383,7 @@ class FizzlerBrush:
                     + (side_len - field_length/2) * field_axis
                     ),
             ).solid  # type: Solid
+            yield brush_right
 
             if center_len:
                 brush_center = vmf.make_prism(
@@ -315,6 +398,7 @@ class FizzlerBrush:
                         + (center_len/2) * field_axis
                         ),
                 ).solid  # type: Solid
+                yield brush_center
 
                 brushes = [
                     (brush_left, TexGroup.LEFT, 64),
@@ -328,7 +412,7 @@ class FizzlerBrush:
                 ]
 
             for brush, tex_group, brush_length in brushes:
-                brush_ent.solids.append(brush)
+                yield brush
                 for side in brush.sides:
                     side_norm = abs(side.normal())
                     if side_norm == abs(fizz.up_axis):
@@ -346,6 +430,7 @@ class FizzlerBrush:
                         neg,
                         pos,
                     )
+
 
     def _texture_fit(
         self,
@@ -429,6 +514,10 @@ def parse_map(vmf: VMF):
         models = fizz_models[name]
         up_axis = Vec(y=1).rotate_by_str(base_inst['angles'])
 
+        # If upside-down, make it face upright.
+        if up_axis == (0, 0, -1):
+            up_axis = Vec(z=1)
+
         base_inst.outputs.clear()
 
         # Now match the pairs of models to each other.
@@ -483,3 +572,120 @@ def parse_map(vmf: VMF):
         if name in FIZZLERS:
             brush.remove()
 
+
+@conditions.meta_cond(priority=500, only_once=True)
+def generate_fizzlers(vmf: VMF):
+    """Generates fizzler models and the brushes according to their set types.
+
+    After this is done, fizzler-related conditions will not function correctly.
+    However the model instances are now available for modification.
+    """
+    from vbsp import MAP_RAND_SEED
+
+    for fizz in FIZZLERS.values():
+        if fizz.base_inst not in vmf.entities:
+            continue   # The fizzler was removed from the map.
+
+        fizz_name = fizz.base_inst['targetname']
+        fizz_type = fizz.fizz_type
+
+        if not fizz.emitters:
+            LOGGER.warning('No emitters for fizzler "{}"!', fizz_name)
+            continue
+
+        # Brush index -> entity for ones that need to merge.
+        single_brushes = {}  # type: Dict[FizzlerBrush, Entity]
+
+        up_dir = fizz.up_axis
+        forward = (fizz.emitters[0][1] - fizz.emitters[0][0]).norm()
+
+        min_angles = FIZZ_ANGLES[forward.as_tuple(), up_dir.as_tuple()]
+        max_angles = FIZZ_ANGLES[(-forward).as_tuple(), up_dir.as_tuple()]
+
+        model_min = fizz_type.models[ModelCat.PAIR_MIN] or fizz_type.models[ModelCat.ALL]
+        model_max = fizz_type.models[ModelCat.PAIR_MAX] or fizz_type.models[ModelCat.ALL]
+        if not model_min or not model_max:
+            raise ValueError(
+                'No model specified a side of "{}"'
+                ' fizzlers'.format(fizz_type.id),
+            )
+
+        # Define a function to do the model names.
+        model_index = 0
+        if fizz_type.model_naming is ModelName.SAME:
+            def get_model_name(ind):
+                return fizz_name
+        elif fizz_type.model_naming is ModelName.LOCAL:
+            def get_model_name(ind):
+                return fizz_name + '-' + fizz_type.model_name
+        elif fizz_type.model_naming is ModelName.PAIRED:
+            def get_model_name(ind):
+                return '{}-{}{:02}'.format(
+                    fizz_name,
+                    fizz_type.model_name,
+                    ind,
+                )
+        elif fizz_type.model_naming is ModelName.UNIQUE:
+            def get_mode_name(ind):
+                nonlocal model_index
+                model_index += 1
+                return '{}-{}{:02}'.format(
+                    fizz_name,
+                    fizz_type.model_name,
+                    model_index,
+                )
+        else:
+            raise ValueError('Bad ModelName?')
+
+        for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
+            length = (seg_max - seg_min).mag()
+            random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
+            if length == 128 and fizz_type.models[ModelCat.PAIR_SINGLE]:
+                min_inst = vmf.create_ent(
+                    targetname=get_model_name(seg_ind),
+                    classname='func_instance',
+                    file=random.choice(fizz_type.models[ModelCat.PAIR_SINGLE]),
+                    origin=seg_min + 64 * forward,
+                    angles=min_angles,
+                )
+            else:
+                # Both side models.
+                min_inst = vmf.create_ent(
+                    targetname=get_model_name(seg_ind),
+                    classname='func_instance',
+                    file=random.choice(model_min),
+                    origin=seg_min,
+                    angles=min_angles,
+                )
+                random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_max))
+                max_inst = vmf.create_ent(
+                    targetname=get_model_name(seg_ind),
+                    classname='func_instance',
+                    file=random.choice(model_max),
+                    origin=seg_max,
+                    angles=max_angles,
+                )
+                max_inst.fixup.update(fizz.base_inst.fixup)
+            min_inst.fixup.update(fizz.base_inst.fixup)
+
+            for brush_type in fizz_type.brushes:
+                brush_ent = None
+                if brush_type.singular:
+                    brush_ent = single_brushes.get(brush_type, None)
+                if brush_ent is None:
+                    brush_ent = Entity(vmf, keys=brush_type.keys)
+                    vmf.add_ent(brush_ent)
+                    if 'classname' not in brush_ent:
+                        brush_ent['classname'] = 'func_brush'
+                    for key_name, key_value in brush_type.local_keys.items():
+                        brush_ent[key_name] = conditions.local_name(fizz.base_inst, key_value)
+                    brush_ent['targetname'] = conditions.local_name(
+                        fizz.base_inst, brush_type.name,
+                    )
+                    brush_ent['origin'] = (seg_min + seg_max)/2
+                    if brush_type.singular:
+                        single_brushes[brush_type] = brush_ent
+
+                brush_ent.solids.extend(
+                    brush_type.generate(vmf, fizz, seg_min, seg_max)
+                )
