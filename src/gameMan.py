@@ -73,6 +73,26 @@ $decal 1
 $color "{{{:g} {:g} {:g}}}"
 '''
 
+# Proxy setup which makes the texture randomly move.
+FIZZLER_EDGE_MAT_PROXY = '''\
+$offset "[0 0]"
+Proxies
+{
+UniformNoise
+{
+minVal 0
+maxVal 64
+resultVar "$offset[1]"
+}
+TextureTransform
+{
+translateVar $offset
+resultVar $basetexturetransform 
+}
+}
+}
+'''
+
 # The location of all the instances in the game directory
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
@@ -782,7 +802,7 @@ class Game:
                 if alpha != 1:
                     # Add the alpha value, but replace 0.5 -> .5 to save a char.
                     f.write('$alpha {}\n'.format(format(alpha, 'g').replace('0.', '.')))
-                f.write('}')
+                f.write(FIZZLER_EDGE_MAT_PROXY)
 
     def launch(self):
         """Try and launch the game."""
