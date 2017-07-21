@@ -116,10 +116,18 @@ class FizzlerType:
         pack_lists: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
+        out_activate: Optional[Tuple[Optional[str], str]],
+        out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
         inst: Dict[FizzInst, List[str]],
     ):
         self.id = fizz_id
+
+        # The item ID this fizzler is produced from, optionally
+        # with a :laserfield or :fizzler suffix to choose a specific
+        # type.
+        self.item_id = item_id
+
         # The brushes to generate.
         self.brushes = brushes
 
@@ -134,10 +142,9 @@ class FizzlerType:
         # Instances to use.
         self.inst = inst
 
-        # The item ID this fizzler is produced from, optionally
-        # with a :laserfield or :fizzler suffix to choose a specific
-        # type.
-        self.item_id = item_id
+        # If set, outputs to use via the fizzler output relay.
+        self.out_deactivate = out_deactivate
+        self.out_activate = out_activate
 
     @classmethod
     def parse(cls, conf: Property):
@@ -171,6 +178,14 @@ class FizzlerType:
                     voice_attrs.append(child.name)
             voice_attrs.append(prop.name)
 
+        out_activate = conf['OutputActivate', None]
+        if out_activate is not None:
+            out_activate = Output.parse_name(out_activate)
+
+        out_deactivate = conf['OutputDeactivate', None]
+        if out_deactivate is not None:
+            out_deactivate = Output.parse_name(out_deactivate)
+
         pack_lists = {
             prop.value
             for prop in
@@ -189,6 +204,8 @@ class FizzlerType:
             pack_lists,
             model_local_name,
             model_name_type,
+            out_activate,
+            out_deactivate,
             brushes,
             inst,
         )
@@ -566,6 +583,9 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
     fizz_bases = {}  # type: Dict[str, Entity]
     fizz_models = defaultdict(list)  # type: Dict[str, List[Entity]]
 
+    # Position and normal -> name, for output relays.
+    fizz_pos = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], str]
+
     # First use traits to gather up all the instances.
     for inst in vmf.by_class['func_instance']:
         traits = instance_traits.get(inst)
@@ -573,6 +593,11 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             continue
 
         name = inst['targetname']
+
+        origin = Vec.from_str(inst['origin'])
+        normal = Vec(z=1).rotate_by_str(inst['angles'])
+        fizz_pos[origin.as_tuple(), normal.as_tuple()] = name
+
         if 'fizzler_model' in traits:
             name = name.rsplit('_model', 1)[0]
             fizz_models[name].append(inst)
@@ -645,6 +670,43 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
         name = name.rsplit('_brush')[0]
         if name in FIZZLERS:
             brush.remove()
+
+    # Check for fizzler output relays.
+    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
+    if not relay_file:
+        # No relay item - deactivated most likely.
+        return
+
+    for inst in vmf.by_class['func_instance']:
+        filename = inst['file'].casefold()
+
+        if filename not in relay_file:
+            continue
+        try:
+            fizz_name = fizz_pos[
+                Vec.from_str(inst['origin']).as_tuple(),
+                Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
+            ]
+        except KeyError:
+            # Not placed on a fizzler...
+            continue
+        fizz = FIZZLERS[fizz_name]
+
+        inst.remove()
+
+        # Copy over fixup values
+        fizz.base_inst.fixup.update(inst.fixup)
+
+        for out in inst.outputs:
+            new_out = out.copy()
+            if out.output == 'ON' and fizz.fizz_type.out_activate is not None:
+                new_out.inst_out, new_out.output = fizz.fizz_type.out_activate
+            elif out.output == 'OFF' and fizz.fizz_type.out_deactivate is not None:
+                new_out.inst_out, new_out.output = fizz.fizz_type.out_deactivate
+            else:
+                # Not the marker's output somehow?
+                continue
+            fizz.base_inst.add_out(new_out)
 
 
 @conditions.meta_cond(priority=500, only_once=True)
