@@ -15,9 +15,6 @@ import instanceLocs
 
 LOGGER = utils.getLogger(__name__)
 
-# The tint colours used in the map, that VRAD has to generate and pack.
-SIDE_TINTS = set()
-
 FIZZ_TYPES = {}  # type: Dict[str, FizzlerType]
 
 FIZZLERS = {}  # type: Dict[str, Fizzler]
@@ -276,14 +273,17 @@ class FizzlerBrush:
             side.mat = const.Tools.NODRAW
             return
 
+        import vbsp
+
         # Produce a hex colour string, and use that as the material name.
         side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
             int(self.side_tint.x),
             int(self.side_tint.y),
             int(self.side_tint.z),
         )
-        # Record that we need to make that material in VRAD.
-        SIDE_TINTS.add(self.side_tint.as_tuple())
+
+        # Pack the file.
+        vbsp.PACK_FILES.add('materials/{}.vmt'.format(side.mat))
 
         # FLip orientation if needed.
         if not side.uaxis.vec().dot(normal):
