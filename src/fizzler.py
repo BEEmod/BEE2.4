@@ -595,8 +595,6 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]):
 
         FIZZLERS[name] = Fizzler(fizz_type, up_axis, base_inst, emitters)
 
-        base_inst.comments = fizz_type.id
-
     # Delete all the old brushes associated with fizzlers
     for brush in (
         vmf.by_class['trigger_portal_cleanser'] |
@@ -713,6 +711,23 @@ def generate_fizzlers(vmf: VMF):
                 )
                 max_inst.fixup.update(fizz.base_inst.fixup)
             min_inst.fixup.update(fizz.base_inst.fixup)
+
+            if fizz_type.inst[FizzInst.GRID]:
+                # Generate one instance for each position.
+
+                # Go 64 from each side, and always have at least 1 section
+                # A 128 gap will have length = 0
+                for ind, dist in enumerate(range(64, round(length) - 127, 128)):
+                    mid_pos = seg_min + forward * dist
+                    random.seed('{}_fizz_mid_{}'.format(MAP_RAND_SEED, mid_pos))
+                    mid_inst = vmf.create_ent(
+                        classname='func_instance',
+                        targetname=fizz_name,
+                        angles=min_angles,
+                        file=random.choice(fizz_type.inst[FizzInst.GRID]),
+                        origin=mid_pos,
+                    )
+                    mid_inst.fixup.update(fizz.base_inst.fixup)
 
             for brush_type in fizz_type.brushes:
                 brush_ent = None
