@@ -3733,7 +3733,7 @@ def main():
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
-        fizzler.parse_map(VMF, settings['has_attr'])
+        fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
 
         conditions.init(
             seed=MAP_RAND_SEED,

@@ -1,7 +1,7 @@
 """Implements fizzler/laserfield generation and customisation."""
 import random
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Iterator
+from typing import Dict, List, Optional, Tuple, Iterator, Set
 
 import itertools
 from enum import Enum
@@ -103,6 +103,7 @@ class FizzlerType:
         fizz_id: str,
         item_id: str,
         voice_attrs: List[str],
+        pack_lists: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
         brushes: List['FizzlerBrush'],
@@ -113,6 +114,9 @@ class FizzlerType:
         self.brushes = brushes
 
         self.voice_attrs = voice_attrs
+
+        # Packfiles to pack if we're in the map.
+        self.pack_lists = pack_lists
 
         # The method used to name the models.
         self.model_naming = model_name_type
@@ -157,6 +161,12 @@ class FizzlerType:
                     voice_attrs.append(child.name)
             voice_attrs.append(prop.name)
 
+        pack_lists = {
+            prop.value
+            for prop in
+            conf.find_all('Pack')
+        }
+
         brushes = [
             FizzlerBrush.parse(prop)
             for prop in
@@ -166,6 +176,7 @@ class FizzlerType:
             fizz_id,
             item_id,
             voice_attrs,
+            pack_lists,
             model_local_name,
             model_name_type,
             brushes,
@@ -421,7 +432,6 @@ class FizzlerBrush:
                     (brush_right, -field_axis, 64),
                 ]
             else:
-                brush_center = None
                 brushes = [
                     (brush_left, field_axis, side_len),
                     (brush_right, -field_axis, side_len),
@@ -498,7 +508,7 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
-def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]):
+def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
     """Analyse fizzler instances to assign fizzler types.
 
     Instance traits are required.
@@ -576,6 +586,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool]):
 
         for attr_name in fizz_type.voice_attrs:
             voice_attrs[attr_name] = True
+        pack_list |= fizz_type.pack_lists
 
         for model in models:
             pos = Vec.from_str(model['origin'])
