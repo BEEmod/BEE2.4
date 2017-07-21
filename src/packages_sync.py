@@ -81,8 +81,7 @@ def get_package(file: Path) -> RawFileSystem:
 
 def check_file(file: Path, portal2: Path, packages: Path):
     """Check for the location this file is in, and copy it to the other place."""
-
-    if file.suffix in ('vmx', 'log', 'bsp', 'prt', 'lin'):
+    if file.suffix in ('.vmx', '.log', '.bsp', '.prt', '.lin'):
         # Ignore these file types.
         return
 
@@ -131,7 +130,6 @@ def check_file(file: Path, portal2: Path, packages: Path):
             rel_loc = 'resources/' / relative.relative_to(
                 'bee2_dev' if (portal2 / 'bee2_dev').exists() else 'bee2'
             )
-
 
         target_systems = []
 
