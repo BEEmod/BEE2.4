@@ -1,7 +1,7 @@
 """Implements fizzler/laserfield generation and customisation."""
 import random
-from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, Iterator, Set
+from collections import defaultdict, namedtuple
+from typing import Dict, List, Optional, Tuple, Iterator, Set, Callable
 
 import itertools
 from enum import Enum
@@ -26,6 +26,14 @@ LASER_TEX_SIZE = 512
 # Given a normal and the up-axis, the angle used for the instance.
 FIZZ_ANGLES  = {}  # type: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], Vec]
 
+# A few positions for material_modify_control,
+# so they aren't on top of each other.
+MATMOD_OFFSETS = [
+    Vec(0,   0, -32),
+    Vec(0,  16, -32),
+    Vec(0, -16, -64),
+    Vec(0,   0,  32),
+] * 4  # Just in case there happens to be more textures.
 
 class TexGroup(Enum):
     """Types of textures used for fizzlers."""
@@ -62,6 +70,8 @@ class FizzInst(Enum):
     GRID = 'model_mid'  # One in each block the fizzler is in.
 
     BASE = 'base_inst'  # If set, swap the instance to this.
+
+MatModify = namedtuple('MatModify', 'name mat_var')
 
 
 def read_configs(conf: Property):
@@ -227,6 +237,14 @@ class FizzlerBrush:
         self.singular = singular
 
         # If set, add a material_modify_control to control these brushes.
+        if mat_mod_var is not None and not mat_mod_var.startswith('$'):
+            mat_mod_var = '$' + mat_mod_var
+            if mat_mod_name is None:
+                mat_mod_name = 'mat_mod'
+            if not singular:
+                LOGGER.warning('Material modify requires Singular!')
+                self.singular = True
+
         self.mat_mod_var = mat_mod_var
         self.mat_mod_name = mat_mod_name
 
@@ -309,8 +327,12 @@ class FizzlerBrush:
         fizz: Fizzler,
         neg: Vec,
         pos: Vec,
+        used_tex_func: Callable[[str], None],
     ) -> List[Solid]:
-        """Generate the actual brush."""
+        """Generate the actual brush.
+
+        used_tex will be filled with the textures used.
+        """
         diff = neg - pos
         # Size of fizzler
         field_length = diff.mag()
@@ -350,8 +372,10 @@ class FizzlerBrush:
             if trigger_tex:
                 for side in brush.sides:
                     side.mat = trigger_tex
+                used_tex_func(trigger_tex)
             else:
                 mat = fitted_tex or self.textures[TexGroup.SHORT]
+                used_tex_func(mat)
                 for side in brush.sides:
                     side_norm = abs(side.normal())
                     if side_norm == abs(fizz.up_axis):
@@ -431,14 +455,17 @@ class FizzlerBrush:
                     (brush_center, None, center_len),
                     (brush_right, -field_axis, 64),
                 ]
+                used_tex_func(self.textures[TexGroup.CENTER])
             else:
                 brushes = [
                     (brush_left, field_axis, side_len),
                     (brush_right, -field_axis, side_len),
                 ]
 
+            used_tex_func(self.textures[TexGroup.LEFT])
+            used_tex_func(self.textures[TexGroup.RIGHT])
+
             for brush, model_normal, brush_length in brushes:
-                yield brush
                 for side in brush.sides:
                     side_norm = abs(side.normal())
                     if side_norm == abs(fizz.up_axis):
@@ -692,6 +719,11 @@ def generate_fizzlers(vmf: VMF):
         else:
             raise ValueError('Bad ModelName?')
 
+        mat_mod_tex = {}  # type: Dict[FizzlerBrush, List[str]]
+        for brush_type in fizz_type.brushes:
+            if brush_type.mat_mod_var is not None:
+                mat_mod_tex[brush_type] = []
+
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
             random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
@@ -758,6 +790,34 @@ def generate_fizzlers(vmf: VMF):
                     if brush_type.singular:
                         single_brushes[brush_type] = brush_ent
 
+                if brush_type.mat_mod_var is not None:
+                    used_tex_func = mat_mod_tex[brush_type].append
+                else:
+                    def used_tex_func(val):
+                        """Ignore."""
+                        return None
+
                 brush_ent.solids.extend(
-                    brush_type.generate(vmf, fizz, seg_min, seg_max)
+                    brush_type.generate(
+                        vmf,
+                        fizz,
+                        seg_min,
+                        seg_max,
+                        used_tex_func,
+                    )
+                )
+
+        for brush_type, used_tex in mat_mod_tex.items():
+            brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
+            mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
+            for off, tex in zip(MATMOD_OFFSETS, used_tex):
+                pos = off.copy().rotate(*min_angles)
+                pos += Vec.from_str(fizz.base_inst['origin'])
+                vmf.create_ent(
+                    classname='material_modify_control',
+                    origin=pos,
+                    targetname=mat_mod_name,
+                    materialName='materials/' + tex + '.vmt',
+                    materialVar=brush_type.mat_mod_var,
+                    parentname=brush_name,
                 )
