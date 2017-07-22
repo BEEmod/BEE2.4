@@ -8,7 +8,7 @@ from enum import Enum
 
 import conditions
 import utils
-from srctools import Output, Vec, VMF, Solid, Entity, Side, Property
+from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
 import instanceLocs
@@ -182,11 +182,11 @@ class FizzlerType:
                     voice_attrs.append(child.name)
             voice_attrs.append(prop.name)
 
-        out_activate = conf['OutputActivate', None]
+        out_activate = conf['OutActivate', None]
         if out_activate is not None:
             out_activate = Output.parse_name(out_activate)
 
-        out_deactivate = conf['OutputDeactivate', None]
+        out_deactivate = conf['OutDeactivate', None]
         if out_deactivate is not None:
             out_deactivate = Output.parse_name(out_deactivate)
 
@@ -598,10 +598,6 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
 
         name = inst['targetname']
 
-        origin = Vec.from_str(inst['origin'])
-        normal = Vec(z=1).rotate_by_str(inst['angles'])
-        fizz_pos[origin.as_tuple(), normal.as_tuple()] = name
-
         if 'fizzler_model' in traits:
             name = name.rsplit('_model', 1)[0]
             fizz_models[name].append(inst)
@@ -610,6 +606,11 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             fizz_bases[name] = inst
         else:
             LOGGER.warning('Fizzler "{}" has non-base, non-model instance?', name)
+            continue
+
+        origin = Vec.from_str(inst['origin'])
+        normal = Vec(z=1).rotate_by_str(inst['angles'])
+        fizz_pos[origin.as_tuple(), normal.as_tuple()] = name
 
     for name, base_inst in fizz_bases.items():
         models = fizz_models[name]
@@ -686,6 +687,9 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
 
         if filename not in relay_file:
             continue
+
+        inst.remove()
+
         try:
             fizz_name = fizz_pos[
                 Vec.from_str(inst['origin']).as_tuple(),
@@ -695,8 +699,6 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             # Not placed on a fizzler...
             continue
         fizz = FIZZLERS[fizz_name]
-
-        inst.remove()
 
         # Copy over fixup values
         fizz.base_inst.fixup.update(inst.fixup)
@@ -860,6 +862,15 @@ def generate_fizzlers(vmf: VMF):
                     )
                     # Set this to the center, to make sure it's not going to leak.
                     brush_ent['origin'] = (seg_min + seg_max)/2
+
+                    for out in brush_type.outputs:
+                        new_out = out.copy()
+                        new_out.target = conditions.local_name(
+                            fizz.base_inst,
+                            new_out.target,
+                        )
+                        brush_ent.add_out(new_out)
+
                     if brush_type.singular:
                         # Record for the next iteration.
                         single_brushes[brush_type] = brush_ent
