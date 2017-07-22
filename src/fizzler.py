@@ -84,7 +84,7 @@ def read_configs(conf: Property):
 
         FIZZ_TYPES[fizz.id] = fizz
 
-    LOGGER.info('Loaded "{}" fizzlers.', len(FIZZ_TYPES))
+    LOGGER.info('Loaded {} fizzlers.', len(FIZZ_TYPES))
 
 
 def _calc_fizz_angles():
@@ -111,7 +111,7 @@ class FizzlerType:
     def __init__(
         self,
         fizz_id: str,
-        item_id: str,
+        item_ids: List[str],
         voice_attrs: List[str],
         pack_lists: Set[str],
         model_local_name: str,
@@ -123,10 +123,10 @@ class FizzlerType:
     ):
         self.id = fizz_id
 
-        # The item ID this fizzler is produced from, optionally
+        # The item ID(s) this fizzler is produced from, optionally
         # with a :laserfield or :fizzler suffix to choose a specific
         # type.
-        self.item_id = item_id
+        self.item_ids = item_ids
 
         # The brushes to generate.
         self.brushes = brushes
@@ -150,7 +150,11 @@ class FizzlerType:
     def parse(cls, conf: Property):
         """Read in a fizzler from a config."""
         fizz_id = conf['id']
-        item_id = conf['item_id']
+        item_ids = [
+            prop.value.casefold()
+            for prop in
+            conf.find_all('item_id')
+        ]
 
         try:
             model_name_type = ModelName(conf['NameType', 'same'].casefold())
@@ -199,7 +203,7 @@ class FizzlerType:
         ]
         return FizzlerType(
             fizz_id,
-            item_id,
+            item_ids,
             voice_attrs,
             pack_lists,
             model_local_name,
@@ -563,22 +567,22 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
     fizz_types = {}  # type: Dict[Tuple[str, int], FizzlerType]
 
     for fizz_type in FIZZ_TYPES.values():
-        if ':' in fizz_type.item_id:
-            item_id, barrier_type = fizz_type.item_id.casefold().split(':')
-            if barrier_type == 'laserfield':
-                barrier_skin = 2
-            elif barrier_type == 'fizzler':
-                barrier_skin = 0
+        for item_id in fizz_type.item_ids:
+            if ':' in item_id:
+                item_id, barrier_type = item_id.split(':')
+                if barrier_type == 'laserfield':
+                    barrier_skin = 2
+                elif barrier_type == 'fizzler':
+                    barrier_skin = 0
+                else:
+                    LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
+                    fizz_types[item_id, 0] = fizz_type
+                    fizz_types[item_id, 2] = fizz_type
+                    continue
+                fizz_types[item_id, barrier_skin] = fizz_type
             else:
-                LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
                 fizz_types[item_id, 0] = fizz_type
                 fizz_types[item_id, 2] = fizz_type
-                continue
-            fizz_types[item_id, barrier_skin] = fizz_type
-        else:
-            item_id = fizz_type.item_id.casefold()
-            fizz_types[item_id, 0] = fizz_type
-            fizz_types[item_id, 2] = fizz_type
 
     fizz_bases = {}  # type: Dict[str, Entity]
     fizz_models = defaultdict(list)  # type: Dict[str, List[Entity]]
@@ -794,7 +798,7 @@ def generate_fizzlers(vmf: VMF):
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
                     file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE]),
-                    origin=seg_min + 64 * forward,
+                    origin=(seg_min + seg_max)/2,
                     angles=min_angles,
                 )
             else:
@@ -834,31 +838,44 @@ def generate_fizzlers(vmf: VMF):
                     )
                     mid_inst.fixup.update(fizz.base_inst.fixup)
 
+            # Generate the brushes.
             for brush_type in fizz_type.brushes:
                 brush_ent = None
+                # If singular, we reuse the same brush ent for all the segments.
                 if brush_type.singular:
                     brush_ent = single_brushes.get(brush_type, None)
+
+                # Non-singular or not generated yet - make the entity.
                 if brush_ent is None:
                     brush_ent = Entity(vmf, keys=brush_type.keys)
                     vmf.add_ent(brush_ent)
                     if 'classname' not in brush_ent:
+                        # Make sure it has a classname - otherwise it'll crash.
                         brush_ent['classname'] = 'func_brush'
+
                     for key_name, key_value in brush_type.local_keys.items():
                         brush_ent[key_name] = conditions.local_name(fizz.base_inst, key_value)
                     brush_ent['targetname'] = conditions.local_name(
                         fizz.base_inst, brush_type.name,
                     )
+                    # Set this to the center, to make sure it's not going to leak.
                     brush_ent['origin'] = (seg_min + seg_max)/2
                     if brush_type.singular:
+                        # Record for the next iteration.
                         single_brushes[brush_type] = brush_ent
 
+                # If we have a material_modify_control to generate,
+                # we need to parent it to ourselves to restrict it to us
+                # only. We also need one for each material, so provide a
+                # function to the generator which appends to a list.
                 if brush_type.mat_mod_var is not None:
                     used_tex_func = mat_mod_tex[brush_type].append
                 else:
                     def used_tex_func(val):
-                        """Ignore."""
+                        """If not, ignore those calls."""
                         return None
 
+                # Generate the brushes and texture them.
                 brush_ent.solids.extend(
                     brush_type.generate(
                         vmf,
