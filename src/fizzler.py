@@ -12,6 +12,7 @@ from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
 import instanceLocs
+import template_brush
 
 LOGGER = utils.getLogger(__name__)
 
@@ -120,6 +121,11 @@ class FizzlerType:
         out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
         inst: Dict[FizzInst, List[str]],
+
+        temp_brush_keys: Property,
+        temp_min: Optional[str],
+        temp_max: Optional[str],
+        temp_single: Optional[str],
     ):
         self.id = fizz_id
 
@@ -145,6 +151,12 @@ class FizzlerType:
         # If set, outputs to use via the fizzler output relay.
         self.out_deactivate = out_deactivate
         self.out_activate = out_activate
+
+        # If set, add a brush ent using templates.
+        self.temp_single = temp_single
+        self.temp_max = temp_max
+        self.temp_min = temp_min
+        self.temp_brush_keys = temp_brush_keys
 
     @classmethod
     def parse(cls, conf: Property):
@@ -201,6 +213,22 @@ class FizzlerType:
             for prop in
             conf.find_all('Brush')
         ]
+
+        try:
+            temp_conf = conf.find_key('TemplateBrush')
+        except NoKeyError:
+            temp_brush_keys = temp_min = temp_max = temp_single = None
+        else:
+            temp_brush_keys = Property('--', [
+                temp_conf.find_key('Keys'),
+                temp_conf.find_key('LocalKeys', []),
+            ])
+
+            # Find and load the templates.
+            temp_min = temp_conf['Left', None]
+            temp_max = temp_conf['Right', None]
+            temp_single = temp_conf['Single', None]
+
         return FizzlerType(
             fizz_id,
             item_ids,
@@ -212,6 +240,10 @@ class FizzlerType:
             out_deactivate,
             brushes,
             inst,
+            temp_brush_keys,
+            temp_min,
+            temp_max,
+            temp_single,
         )
 
 
@@ -740,7 +772,21 @@ def generate_fizzlers(vmf: VMF):
             continue
 
         # Brush index -> entity for ones that need to merge.
+        # template_brush is used for the templated one.
         single_brushes = {}  # type: Dict[FizzlerBrush, Entity]
+
+        if fizz_type.temp_max or fizz_type.temp_min:
+            template_brush_ent = vmf.create_ent(
+                classname='func_brush',
+                origin=fizz.base_inst['origin'],
+            )
+            conditions.set_ent_keys(
+                template_brush_ent,
+                fizz.base_inst,
+                fizz_type.temp_brush_keys,
+            )
+        else:
+            template_brush_ent = None
 
         up_dir = fizz.up_axis
         forward = (fizz.emitters[0][1] - fizz.emitters[0][0]).norm()
@@ -840,6 +886,36 @@ def generate_fizzlers(vmf: VMF):
                     )
                     mid_inst.fixup.update(fizz.base_inst.fixup)
 
+            if template_brush_ent is not None:
+                if length == 128 and fizz_type.temp_single:
+                    temp = template_brush.import_template(
+                        fizz_type.temp_single,
+                        (seg_min + seg_max) / 2,
+                        min_angles,
+                        force_type=template_brush.TEMP_TYPES.world,
+                        add_to_map=False,
+                    )
+                    template_brush_ent.solids.extend(temp.world)
+                else:
+                    if fizz_type.temp_min:
+                        temp = template_brush.import_template(
+                            fizz_type.temp_min,
+                            seg_min,
+                            min_angles,
+                            force_type=template_brush.TEMP_TYPES.world,
+                            add_to_map=False,
+                        )
+                        template_brush_ent.solids.extend(temp.world)
+                    if fizz_type.temp_max:
+                        temp = template_brush.import_template(
+                            fizz_type.temp_max,
+                            seg_max,
+                            max_angles,
+                            force_type=template_brush.TEMP_TYPES.world,
+                            add_to_map=False,
+                        )
+                        template_brush_ent.solids.extend(temp.world)
+
             # Generate the brushes.
             for brush_type in fizz_type.brushes:
                 brush_ent = None
@@ -896,6 +972,10 @@ def generate_fizzlers(vmf: VMF):
                         used_tex_func,
                     )
                 )
+
+        # If we have the config, but no templates used anywhere...
+        if template_brush_ent is not None and not template_brush_ent.solids:
+            template_brush_ent.remove()
 
         for brush_type, used_tex in mat_mod_tex.items():
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
