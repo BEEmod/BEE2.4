@@ -38,7 +38,8 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     `default` is the ID of a fizzler type which should be used if no outputs
     are fired.
     """
-    shape_item = connections.ITEMS[shape_inst['targetname']]
+    shape_name = shape_inst['targetname']
+    shape_item = connections.ITEMS[shape_name]
 
     for conn in shape_item.outputs:
         fizz_name = conn.inp.name
@@ -52,14 +53,17 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         # No fizzler - create one.
         conn = None
         fizz_type = fizzler.FIZZ_TYPES[res['default']]
-        fizz = fizzler.Fizzler(
+        base_inst = vmf.create_ent(
+            targetname=shape_name,
+            classname='func_instance',
+            origin=shape_inst['origin'],
+            file=fizz_type.inst[fizzler.FizzInst.BASE][0],
+        )
+        base_inst.fixup.update(shape_inst.fixup)
+        fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
             fizz_type,
             Vec(),
-            vmf.create_ent(
-                classname='func_instance',
-                origin=shape_inst['origin'],
-                file=fizz_type.inst[fizzler.FizzInst.BASE][0],
-            ),
+            base_inst,
             [],
         )
 
