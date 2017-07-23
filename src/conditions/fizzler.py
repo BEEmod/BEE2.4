@@ -2,7 +2,7 @@
 import utils
 from conditions import make_result, remove_ant_toggle
 import connections
-from srctools import Property, Entity, Vec
+from srctools import Property, Entity, Vec, VMF
 import fizzler
 
 COND_MOD_NAME = 'Fizzlers'
@@ -27,14 +27,16 @@ def res_change_fizzler_type(inst: Entity, res: Property):
 
 
 @make_result('ReshapeFizzler')
-def res_reshape_fizzler(shape_inst: Entity, res: Property):
+def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     """Convert a fizzler connected via the output to a new shape.
 
     This allows for different placing of fizzler items.
-    Each 'segment' parameter should be a 'x y z;x y z' pair of positions
+    Each `segment` parameter should be a `x y z;x y z` pair of positions
     that represent the ends of the fizzler.
-    'up_axis' should be set to a normal vector pointing in the new 'upward'
+    `up_axis` should be set to a normal vector pointing in the new 'upward'
     direction.
+    `default` is the ID of a fizzler type which should be used if no outputs
+    are fired.
     """
     shape_item = connections.ITEMS[shape_inst['targetname']]
 
@@ -47,13 +49,25 @@ def res_reshape_fizzler(shape_inst: Entity, res: Property):
             continue
         break
     else:
-        LOGGER.warning('Reshaping fizzler without a fizzler!')
-        return
+        # No fizzler - create one.
+        conn = None
+        fizz_type = fizzler.FIZZ_TYPES[res['default']]
+        fizz = fizzler.Fizzler(
+            fizz_type,
+            Vec(),
+            vmf.create_ent(
+                classname='func_instance',
+                origin=shape_inst['origin'],
+                file=fizz_type.inst[fizzler.FizzInst.BASE][0],
+            ),
+            [],
+        )
 
     # Detach this connection and remove traces of it.
-    conn.remove()
-    if shape_item.ind_toggle:
-        remove_ant_toggle(shape_item.ind_toggle)
+    if conn:
+        conn.remove()
+        if shape_item.ind_toggle:
+            remove_ant_toggle(shape_item.ind_toggle)
 
     fizz_base = fizz.base_inst
     fizz_base['origin'] = shape_inst['origin']

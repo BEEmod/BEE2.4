@@ -187,6 +187,9 @@ class FizzlerType:
                 for file in instanceLocs.resolve(prop.value)
             ]
 
+        if not inst[FizzInst.BASE]:
+            raise ValueError('No base instance set!')
+
         voice_attrs = []
         for prop in conf.find_all('Has'):
             if prop.has_children():
