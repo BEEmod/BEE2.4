@@ -630,16 +630,16 @@ def make_tile(
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
     umin_side = template[-1, 0][bevel_umin].copy(map=vmf)
-    umin_side.translate(origin + Vec(**{axis_u: -width/2}))
+    umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
 
     umax_side = template[1, 0][bevel_umax].copy(map=vmf)
-    umax_side.translate(origin + Vec(**{axis_u: width/2}))
+    umax_side.translate(origin + Vec.with_axes(axis_u, width/2))
 
     vmin_side = template[0, -1][bevel_vmin].copy(map=vmf)
-    vmin_side.translate(origin + Vec(**{axis_v: -height/2}))
+    vmin_side.translate(origin + Vec.with_axes(axis_v, -height/2))
 
     vmax_side = template[0, 1][bevel_vmax].copy(map=vmf)
-    vmax_side.translate(origin + Vec(**{axis_v: height/2}))
+    vmax_side.translate(origin + Vec.with_axes(axis_v, height/2))
 
     for face in [back_side, umin_side, umax_side, vmin_side, vmax_side]:
         face.uaxis.offset %= 512
