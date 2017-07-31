@@ -397,8 +397,6 @@ class TileDef:
                 continue
             for umin, vmin, umax, vmax in pattern.tiles:
                 tile_type = tiles[umin, vmin]
-                if not tile_type.is_tile:
-                    continue
                 for uv in iter_uv(umin, umax-1, vmin, vmax-1):
                     if tiles[uv] is not tile_type:
                         break
@@ -499,20 +497,6 @@ class TileDef:
                     tile_center,
                     self.normal,
                     top_surf=consts.Tools.NODRAW,
-                    width=(umax - umin) * 32,
-                    height=(vmax - vmin) * 32,
-                    bevels=bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
-                )
-                self.brush_faces.append(face)
-                yield brush
-            elif tile_type is TileType.LIGHT_STRIP_CLEAN:
-                brush, face = make_tile(
-                    vmf,
-                    tile_center,
-                    self.normal,
-                    top_surf=consts.Tools.NODRAW,
-                    recess_dist=0,  # TODO: Should be 3, but leaks.
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
