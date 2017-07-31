@@ -76,9 +76,10 @@ TileSetter = namedtuple('TileSetter', [
 ])
 
 TILE_SETTER_SKINS = [
-    # The first two are swapped to white if needed.
     TileType.BLACK,
     TileType.BLACK_4x4,
+    TileType.WHITE,
+    TileType.WHITE_4x4,
     TileType.NODRAW,
     TileType.VOID,
     TileType.CUTOUT_TILE_BROKEN,
@@ -412,16 +413,19 @@ def load_templates():
         temp_id = ent['template_id'].casefold()
         tile_type = TILE_SETTER_SKINS[srctools.conv_int(ent['skin'])]
         color = ent['color']
-        if color == 'white':
-            color = Portalable.WHITE
-        elif color == 'black':
-            color = Portalable.BLACK
+        if color == 'tile':
+            try:
+                color = tile_type.color
+            except ValueError:
+                # Non-tile types.
+                color = None
         elif color == 'invert':
             color = 'INVERT'
         elif color == 'match':
             color = None
         else:
-            raise ValueError('Invalid TileSetter color "{}"'.format(color))
+            raise ValueError('Invalid TileSetter color '
+                             '"{}" for "{}"'.format(color, temp_id))
 
         tile_setters[temp_id].append(TileSetter(
             offset=Vec.from_str(ent['origin']),
@@ -431,7 +435,15 @@ def load_templates():
             picker_name=ent['color_picker'],
         ))
 
-    for temp_id in set(detail_ents).union(world_ents, overlay_ents):
+    temp_ids = set(conf_ents).union(
+        detail_ents,
+        world_ents,
+        overlay_ents,
+        color_pickers,
+        tile_setters,
+    )
+
+    for temp_id in temp_ids:
         try:
             conf = conf_ents[temp_id]
         except KeyError:
@@ -748,29 +760,29 @@ def retexture_template(
         setter_pos = tile_setter.offset.copy().rotate(*template_data.angles)
         setter_pos += template_data.origin
         setter_norm = tile_setter.normal.copy().rotate(*template_data.angles)
-        setter_type = tile_setter.tile_type
+        setter_type = tile_setter.tile_type  # type: TileType
 
-        if isinstance(tile_setter.color, Portalable):
-            # The color was specifically set. Inverting
-            # is the only thing that has an effect.
-            if force_colour == 'INVERT':
-                setter_color = ~tile_setter.color
+        if setter_type.is_tile:
+            if isinstance(tile_setter.color, Portalable):
+                # The color was specifically set. Inverting
+                # is the only thing that has an effect.
+                if force_colour == 'INVERT':
+                    setter_color = ~tile_setter.color
+                else:
+                    setter_color = tile_setter.color
+            # Otherwise it copies the forced colour - it needs to be white or black.
+            elif isinstance(force_colour, Portalable):
+                if tile_setter.color == 'INVERT':
+                    setter_color = ~force_colour
+                else:
+                    setter_color = force_colour
             else:
-                setter_color = tile_setter.color
-        # Otherwise it copies the forced colour - it needs to be white or black.
-        elif isinstance(force_colour, Portalable):
-            if tile_setter.color == 'INVERT':
-                setter_color = ~force_colour
-            else:
-                setter_color = force_colour
-        else:
-            raise ValueError('"{}": Tile Setter requires a valid color value!')
+                raise ValueError('"{}": Tile Setter requires a valid color value!')
 
-        if setter_color is Portalable.BLACK:
-            if setter_type is TileType.WHITE:
-                setter_type = TileType.BLACK
-            elif setter_type is TileType.WHITE_4x4:
-                setter_type = TileType.BLACK_4x4
+            setter_type = TileType.with_color_and_size(
+                setter_type.tile_size,
+                setter_color,
+            )
 
         tiling.edit_quarter_tile(
             setter_pos,

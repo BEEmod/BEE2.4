@@ -123,6 +123,18 @@ class TileType(Enum):
         else:
             return TileSize.TILE_1x1
 
+    @staticmethod
+    def with_color_and_size(size: TileSize, color: texturing.Portalable):
+        """Return the TileType with a size and color."""
+        return _tiletype_tiles[size, color]
+
+_tiletype_tiles = {
+    (TileSize.TILE_1x1, texturing.Portalable.BLACK): TileType.BLACK,
+    (TileSize.TILE_1x1, texturing.Portalable.WHITE): TileType.WHITE,
+    (TileSize.TILE_4x4, texturing.Portalable.BLACK): TileType.BLACK_4x4,
+    (TileSize.TILE_4x4, texturing.Portalable.WHITE): TileType.WHITE_4x4,
+}
+
 # Symbols that represent TileSize values.
 TILETYPE_TO_CHAR = {
     TileType.WHITE: 'W',
