@@ -2662,6 +2662,9 @@ class BrushTemplate(PakObject, has_img=False):
         else:
             force_is_detail = None
 
+        # If we don't have anything warn people.
+        has_conf_data = False
+
         # Parse through a config entity in the template file.
         conf_ents = list(vmf_file.by_class['bee2_template_conf'])
         if len(conf_ents) > 1:
@@ -2736,6 +2739,7 @@ class BrushTemplate(PakObject, has_img=False):
                 raise ValueError(
                     'No brushes in scaling template "{}"!'.format(temp_id)
                 )
+            has_conf_data = True
 
             for face in scale_brush:
                 try:
@@ -2752,6 +2756,7 @@ class BrushTemplate(PakObject, has_img=False):
 
         elif keep_brushes:
             for brushes, is_detail, vis_ids in self.yield_world_detail(vmf_file):
+                has_conf_data = True
                 if force_is_detail is not None:
                     export_detail = force_is_detail
                 else:
@@ -2796,13 +2801,19 @@ class BrushTemplate(PakObject, has_img=False):
 
         self.temp_overlays = []
 
-        # Transfer this configuration ent over.
-        for color_picker in vmf_file.by_class['bee2_template_colorpicker']:
-            new_ent = color_picker.copy(map=TEMPLATE_FILE, keep_vis=False)
+        # Transfer these configuration ents over.
+        conf_classes = (
+            vmf_file.by_class['bee2_template_colorpicker'] |
+            vmf_file.by_class['bee2_template_tilesetter']
+        )
+        for conf_ent in conf_classes:
+            new_ent = conf_ent.copy(map=TEMPLATE_FILE, keep_vis=False)
             new_ent['template_id'] = temp_id
             TEMPLATE_FILE.add_ent(new_ent)
+            has_conf_data = True
 
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
+            has_conf_data = True
             visgroups = [
                 visgroup_names[id]
                 for id in
@@ -2825,9 +2836,8 @@ class BrushTemplate(PakObject, has_img=False):
 
             self.temp_overlays.append(new_overlay)
 
-        if self.temp_detail is None and self.temp_world is None:
-            if not self.temp_overlays and not is_scaling:
-                LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
+        if not has_conf_data:
+            LOGGER.warning('BrushTemplate "{}" has no data!', temp_id)
 
     @classmethod
     def parse(cls, data: ParseData):
