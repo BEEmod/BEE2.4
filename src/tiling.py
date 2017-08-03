@@ -524,7 +524,7 @@ class TileDef:
         vmf: VMF,
         pattern: Dict,
         is_wall: bool,
-        bevels: Iterable[bool],
+        bevels: Sequence[bool],
         normal: Vec,
         offset=64,
         thickness=4,
@@ -687,7 +687,9 @@ def make_tile(
     back_side = template['back'].copy(map=vmf)  # type: Side
     back_side.mat = back_surf
     back_side.translate(origin - thickness * normal)
+
     back_side.offset = 0  # Todo: calc offset and scale to fit bevels.
+    back_side.scale = 0.25
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
@@ -1014,6 +1016,9 @@ def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec):
         u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
         if abs(u_off) == 64 or abs(v_off) == 64:
             side.translate(2 * norm)
+            # Snap squarebeams to each other.
+            side.vaxis.offset = 0
+
 
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map, then set overlay sides."""
