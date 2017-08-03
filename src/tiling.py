@@ -533,12 +533,14 @@ class TileDef:
         brushes = []
         faces = []
 
-        patterns = list(self.calc_patterns(pattern, is_wall))
-        for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
+        for umin, umax, vmin, vmax, grid_size, tile_type in self.calc_patterns(pattern, is_wall):
             # We bevel only the grid-edge tiles.
-            bevels = [a and b for a, b in zip(bevels, [
-                umin == 0, umax == 3, vmin == 0, vmax == 3
-            ])]
+            tile_bevels = [
+                umin == 0 and bevels[0],
+                umax == 4 and bevels[1],
+                vmin == 0 and bevels[2],
+                vmax == 4 and bevels[3],
+            ]
             tile_center = self.uv_offset(
                 (umin + umax) * 16 - 64,
                 (vmin + vmax) * 16 - 64,
@@ -558,7 +560,7 @@ class TileDef:
                     top_surf=tex,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
-                    bevels=bevels,
+                    bevels=tile_bevels,
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
