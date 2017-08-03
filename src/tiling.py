@@ -706,9 +706,12 @@ def make_tile(
     vmax_side = template[0, 1][bevel_vmax].copy(map=vmf)
     vmax_side.translate(origin + Vec.with_axes(axis_v, height/2))
 
-    for face in [back_side, umin_side, umax_side, vmin_side, vmax_side]:
+    for face in [umin_side, umax_side, vmin_side, vmax_side]:
         face.uaxis.offset %= 512
-        face.vaxis.offset %= 512
+        face.vaxis.offset = 0
+
+    back_side.uaxis.offset %= 512
+    back_side.vaxis.offset %= 512
 
     edge_name = 'panel_edge' if panel_edge else 'edge'
 
