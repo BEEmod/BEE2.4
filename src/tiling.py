@@ -4,9 +4,10 @@ It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
 from enum import Enum
-from typing import Tuple, Dict, List, Iterable, Optional
+from typing import Tuple, Dict, List, Optional, Sequence
 
 import instanceLocs
+import vbsp_options
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
 from brushLoc import POS as BLOCK_POS, Block
@@ -825,12 +826,19 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]
         if inst['file'].casefold() in panel_inst:
             panels[inst['targetname']] = inst
 
+    dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
+    import conditions
+
     for brush_ent in vmf_file.by_class['func_brush']:
         # Grab the instance name out of the parent - these are the
         # only ones with parents in default PeTI.
         if brush_ent['parentname']:
             # Strip '-model_arms'...
             panel_inst = panels[brush_ent['parentname'][:-11]]
+            brush_ent['parentname'] = conditions.local_name(
+                panel_inst,
+                dynamic_pan_parent
+            )
             tiledef_from_angled_panel(brush_ent, panel_inst)
 
     for brush_ent in vmf_file.by_class['func_door_rotating']:
