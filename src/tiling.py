@@ -494,10 +494,11 @@ class TileDef:
             self.panel_ent.solids.extend(brushes)
         elif self.brush_type is BrushType.FLIP_PANEL:
             # Two surfaces, forward and backward - each is 4 thick.
+            invert_black = self.panel_inst.fixup.bool('$start_reversed')
             inv_subtiles = {
                 uv: (
                     tile_type.inverted
-                    if tile_type.color is Portalable.WHITE else
+                    if invert_black or tile_type.color is Portalable.WHITE else
                     tile_type
                 ) for uv, tile_type in self.sub_tiles.items()
             }
