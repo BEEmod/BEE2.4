@@ -4,17 +4,18 @@ It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
 from enum import Enum
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Iterable, Optional
 
+import instanceLocs
 from srctools import Vec, Vec_tuple
 from srctools import VMF, Entity, Side, Solid
 from brushLoc import POS as BLOCK_POS, Block
+from texturing import TileSize, Portalable
 import comp_consts as consts
 import utils
 import template_brush
 import texturing
 import antlines
-from texturing import TileSize
 
 LOGGER = utils.getLogger(__name__)
 
@@ -109,11 +110,7 @@ class TileType(Enum):
     @property
     def inverted(self):
         """Swap the color of a type."""
-        if self.value in (0, 1):
-            return texturing.Portalable.BLACK
-        elif self.value in (2, 3):
-            return texturing.Portalable.WHITE
-        return self
+        return _tiletype_inverted.get(self, self)
 
     @property
     def tile_size(self):
@@ -133,6 +130,12 @@ _tiletype_tiles = {
     (TileSize.TILE_1x1, texturing.Portalable.WHITE): TileType.WHITE,
     (TileSize.TILE_4x4, texturing.Portalable.BLACK): TileType.BLACK_4x4,
     (TileSize.TILE_4x4, texturing.Portalable.WHITE): TileType.WHITE_4x4,
+}
+_tiletype_inverted = {
+    TileType.BLACK: TileType.WHITE,
+    TileType.WHITE: TileType.BLACK,
+    TileType.BLACK_4x4: TileType.WHITE_4x4,
+    TileType.WHITE_4x4: TileType.BLACK_4x4,
 }
 
 # Symbols that represent TileSize values.
@@ -169,7 +172,7 @@ def round_grid(vec: Vec):
     return vec // 128 * 128 + (64, 64, 64)
 
 
-def iter_uv(umin=0, umax=3, vmin=0, vmax=3):
+def iter_uv(umin: float=0, umax: float=3, vmin: float=0, vmax: float=3):
     """Iterate over points in a rectangle."""
     urange = range(int(umin), int(umax + 1))
     vrange = range(int(vmin), int(vmax + 1))
@@ -276,10 +279,10 @@ class TileDef:
     """Represents one 128 block side.
     
     Attributes:
-        pos: Vec for the center of the side.
+        pos: Vec for the center of the block.
         normal: The direction out of the block.
-        brush_faces: A list of off-grid brushes that this block uses.
-          When exporting, this contains the used brushes.
+        brush_faces: A list of brush faces which this tiledef has exported.
+          Empty before-hand, but after these are faces to attach antlines to.
         brush_type: BrushType - what sort of brush this is.
         base_type: TileSize this tile started with.
         override_tex: If set, a specific texture to use (skybox, light, backpanels etc)
@@ -308,7 +311,7 @@ class TileDef:
         pos: Vec, 
         normal: Vec,
         base_type: TileType,
-        brush_type=BrushType.NORMAL,
+        brush_type: BrushType=BrushType.NORMAL,
         subtiles: Dict[Tuple[int, int], TileType]=None,
         override_tex: str=None,
         is_bullseye: bool=False,
@@ -319,7 +322,7 @@ class TileDef:
         self.pos = pos
         self.normal = normal
         self.brush_type = brush_type
-        self.brush_faces = []
+        self.brush_faces = []  # type: List[Side]
         self.override_tex = override_tex
         self.base_type = base_type
         self.sub_tiles = subtiles
@@ -378,19 +381,18 @@ class TileDef:
         """
         pos = self.pos.copy()
         u_ax, v_ax = Vec.INV_AXIS[self.normal.axis()]
-        pos += 128 * self.normal * norm
-        pos[u_ax] += 128 * u
-        pos[v_ax] += 128 * v
+        pos += self.normal * norm
+        pos[u_ax] += u
+        pos[v_ax] += v
         return pos
 
-    def calc_patterns(self, is_wall=False):
+    def calc_patterns(self, tiles: Dict[Tuple[int, int], TileType], is_wall=False):
         """Figure out the brushes needed for a complex pattern.
 
         This returns
         """
         # copy it, so we can overwrite positions with None = not a tile.
-
-        tiles = self.sub_tiles.copy()  # type: Dict[Tuple[int, int], TileType]
+        tiles = tiles.copy()
 
         for pattern in PATTERNS['clean']:
             if pattern.wall_only and not is_wall:
@@ -413,10 +415,14 @@ class TileDef:
     def export(self, vmf: VMF):
         """Create the solid for this."""
         bevels = [
-            BLOCK_POS['world': self.uv_offset(u, v, 0)].value not in (1, 2)
+            BLOCK_POS[
+                'world': self.uv_offset(128*u, 128*v, 0)
+            ].value not in (1, 2)
             for u, v in UV_NORMALS
         ]
         front_pos = self.pos + 64 * self.normal
+
+        is_wall = bool(self.normal.z)
 
         if self.sub_tiles is None:
             full_type = self.base_type
@@ -433,42 +439,110 @@ class TileDef:
             else:
                 full_type = None
 
+        # We only have one type of tile to generate.
         if full_type is not None:
-            if full_type.is_nodraw:
-                tex = consts.Tools.NODRAW
-            else:
-                tex = texturing.gen(
-                    texturing.GenCat.NORMAL,
+            # If a 'normal' brush, we can simplify to just a single tile.
+            # Otherwise go the full multitile route.
+            if self.brush_type is BrushType.NORMAL:
+                if full_type.is_nodraw:
+                    tex = consts.Tools.NODRAW
+                else:
+                    tex = texturing.gen(
+                        texturing.GenCat.NORMAL,
+                        self.normal,
+                        full_type.color,
+                    ).get(front_pos, full_type.tile_size)
+                brush, face = make_tile(
+                    vmf,
+                    self.pos + self.normal * 64,
                     self.normal,
-                    full_type.color,
-                ).get(front_pos, full_type.tile_size)
-            brush, face = make_tile(
+                    top_surf=tex,
+                    width=128,
+                    height=128,
+                    bevels=bevels,
+                    back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
+                )
+                self.brush_faces.append(face)
+                yield brush
+                return
+
+        if self.sub_tiles is None:
+            # Force subtiles to be all the parts we need.
+            self.sub_tiles = dict.fromkeys(iter_uv(), full_type)
+
+        # Multiple tile types in the block, or a special tiledef type - panels etc.
+
+        if self.brush_type is BrushType.NORMAL:
+            faces, brushes = self.gen_multitile_pattern(
                 vmf,
-                self.pos + self.normal * 64,
+                self.sub_tiles,
+                is_wall,
+                bevels,
                 self.normal,
-                top_surf=tex,
-                width=128,
-                height=128,
-                bevels=bevels,
-                back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
             )
-            self.brush_faces.append(face)
-            yield brush
-            return
+            self.brush_faces.extend(faces)
+            yield from brushes
+        elif self.brush_type is BrushType.ANGLED_PANEL:
+            faces, brushes = self.gen_multitile_pattern(
+                vmf,
+                self.sub_tiles,
+                is_wall,
+                (True, True, True, True),
+                self.normal,
+            )
+            self.panel_ent.solids.extend(brushes)
+        elif self.brush_type is BrushType.FLIP_PANEL:
+            # Two surfaces, forward and backward - each is 4 thick.
+            inv_subtiles = {
+                uv: (
+                    tile_type.inverted
+                    if tile_type.color is Portalable.WHITE else
+                    tile_type
+                ) for uv, tile_type in self.sub_tiles.items()
+            }
+            front_faces, brushes = self.gen_multitile_pattern(
+                vmf,
+                self.sub_tiles,
+                is_wall,
+                (False, False, False, False),
+                self.normal,
+            )
+            self.panel_ent.solids.extend(brushes)
+            back_faces, brushes = self.gen_multitile_pattern(
+                vmf,
+                inv_subtiles,
+                is_wall,
+                (False, False, False, False),
+                -self.normal,
+                offset=64-8,
+            )
+            self.panel_ent.solids.extend(brushes)
+            inset_flip_panel(self.panel_ent, front_pos, self.normal)
 
-        assert self.sub_tiles is not None
+    def gen_multitile_pattern(
+        self,
+        vmf: VMF,
+        pattern: Dict,
+        is_wall: bool,
+        bevels: Iterable[bool],
+        normal: Vec,
+        offset=64,
+        thickness=4,
+    ) -> Tuple[List[Side], List[Solid]]:
+        """Generate a bunch of tiles, and return the front faces."""
+        brushes = []
+        faces = []
 
-        # Multiple tile types in the block - figure out the tile patterns to use.
-        patterns = list(self.calc_patterns(True))
+        patterns = list(self.calc_patterns(pattern, is_wall))
         for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
             # We bevel only the grid-edge tiles.
             bevels = [a and b for a, b in zip(bevels, [
                 umin == 0, umax == 3, vmin == 0, vmax == 3
             ])]
             tile_center = self.uv_offset(
-                (umin + umax) / 8 - 0.5,
-                (vmin + vmax) / 8 - 0.5,
-                0.5,
+                (umin + umax) * 16 - 64,
+                (vmin + vmax) * 16 - 64,
+                offset,
             )
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
@@ -480,7 +554,7 @@ class TileDef:
                 brush, face = make_tile(
                     vmf,
                     tile_center,
-                    self.normal,
+                    normal,
                     top_surf=tex,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
@@ -488,22 +562,24 @@ class TileDef:
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
+                    thickness=thickness,
                 )
-                self.brush_faces.append(face)
-                yield brush
+                faces.append(face)
+                brushes.append(brush)
             elif tile_type is TileType.NODRAW:
                 brush, face = make_tile(
                     vmf,
                     tile_center,
-                    self.normal,
+                    normal,
                     top_surf=consts.Tools.NODRAW,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=bevels,
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind'),
                 )
-                self.brush_faces.append(face)
-                yield brush
+                faces.append(face)
+                brushes.append(brush)
+        return faces, brushes
 
 
 def edit_quarter_tile(
@@ -735,9 +811,35 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]
             # EmbedFace block..
             tiledefs_from_embedface(face_to_tile, brush, grid_pos, norm)
 
+    # Look for Angled panels.
+    # First grab the instances.
+    panel_inst = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
+
+    panels = {}  # type: Dict[str, Entity]
+
+    for inst in vmf_file.by_class['func_instance']:
+        if inst['file'].casefold() in panel_inst:
+            panels[inst['targetname']] = inst
+
+    for brush_ent in vmf_file.by_class['func_brush']:
+        # Grab the instance name out of the parent - these are the
+        # only ones with parents in default PeTI.
+        if brush_ent['parentname']:
+            # Strip '-model_arms'...
+            panel_inst = panels[brush_ent['parentname'][:-11]]
+            tiledef_from_angled_panel(brush_ent, panel_inst)
+
+    for brush_ent in vmf_file.by_class['func_door_rotating']:
+        # Strip '-flipping_panel'...
+        panel_inst = panels[brush_ent['targetname'][:-15]]
+        tiledef_from_flip_panel(brush_ent, panel_inst)
+
     # Tell the antlines which tiledefs they attach to.
     for side, segments in side_to_ant_seg.items():
-        tile = face_to_tile[side]
+        try:
+            tile = face_to_tile[side]
+        except KeyError:
+            continue
         for seg in segments:
             seg.tiles.append(tile)
 
@@ -808,6 +910,46 @@ def tiledefs_from_large_tile(face_to_tile, brush: Solid, grid_pos: Vec, norm: Ve
     face_to_tile[front_face.id] = tiledef
 
 
+def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity):
+    """Generate a tiledef matching an angled panel."""
+    brush = brush_ent.solids.pop()
+    assert not brush_ent.solids, 'Multiple brushes in angled panel?'
+
+    grid_pos = round_grid(Vec.from_str(panel_ent['origin']))
+    norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
+    grid_pos -= 128*norm
+
+    tex_kind, special_tex, front_face = find_front_face(brush, grid_pos, norm)
+
+    TILES[grid_pos.as_tuple(), norm.as_tuple()] = TileDef(
+        grid_pos,
+        norm,
+        base_type=tex_kind,
+        brush_type=BrushType.ANGLED_PANEL,
+        override_tex=special_tex,
+        panel_ent=brush_ent,
+        panel_inst=panel_ent,
+    )
+
+
+def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity):
+    """Generate a tiledef matching a flip panel."""
+    brush_ent.solids.clear()
+    grid_pos = round_grid(Vec.from_str(panel_ent['origin']))
+    norm = Vec(z=1).rotate_by_str(panel_ent['angles'])
+    grid_pos -= 128*norm
+
+    TILES[grid_pos.as_tuple(), norm.as_tuple()] = TileDef(
+        grid_pos,
+        norm,
+        # It's always white in the forward direction
+        base_type=TileType.WHITE,
+        brush_type=BrushType.FLIP_PANEL,
+        panel_ent=brush_ent,
+        panel_inst=panel_ent,
+    )
+
+
 def tiledefs_from_embedface(
     face_to_tile,
     brush: Solid,
@@ -840,7 +982,11 @@ def tiledefs_from_embedface(
         tile.sub_tiles[uv] = tex_kind
 
 
-def find_front_face(brush, grid_pos, norm):
+def find_front_face(
+    brush: Solid,
+    grid_pos: Vec,
+    norm: Vec,
+) -> Tuple[TileType, Optional[str], Side]:
     """Find the tile face in a brush. Returns color, special_mat, face."""
     for face in brush:
         if -face.normal() != norm:
@@ -854,6 +1000,18 @@ def find_front_face(brush, grid_pos, norm):
     else:
         raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
 
+
+def inset_flip_panel(panel: Entity, pos: Vec, normal: Vec):
+    """Inset the sides of a flip panel, to not hit the borders."""
+    norm_axis = normal.axis()
+    for side in panel.sides():
+        norm = side.normal()
+        if norm.axis() == norm_axis:
+            continue  # Front or back
+
+        u_off, v_off = (side.get_origin() - pos).other_axes(norm_axis)
+        if abs(u_off) == 64 or abs(v_off) == 64:
+            side.translate(2 * norm)
 
 def generate_brushes(vmf: VMF):
     """Generate all the brushes in the map, then set overlay sides."""
