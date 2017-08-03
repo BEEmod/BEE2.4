@@ -389,6 +389,23 @@ class CubeType:
             conf['thinkFunc', None],
         )
 
+    def add_models(self, models: Dict[str, str]):
+        """Get the models used for a cube type.
+
+        These are stored as keys of the models dict, with the value a name to
+        use for filters or variables.
+        """
+        # If we have a coloured version, we might need that too.
+        if self.model_color and self.color_in_map:
+            models[self.model_color] = self.has_name + '_color'
+
+        if self.in_map:
+            if self.model:
+                models[self.model] = self.has_name
+            else:
+                # No custom model - it's default.
+                models[DEFAULT_MODELS[self.type]] = self.has_name
+
 
 class CubePair:
     """Represents a single cube/dropper pair."""
@@ -501,8 +518,10 @@ def parse_conf(conf: Property):
             raise Exception('Cube type "{}" is missing!'.format(cube_id))
 
 
-def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
-    """Given a set of cube-type IDs, generate a filter for them.
+def parse_filter_types(
+    cubes: List[str]
+) -> Tuple[Set[CubeType], Set[CubeType], Set[CubeType]]:
+    """Parse a list of cube IDs to a list of included/excluded types.
 
     Each cube should be the name of an ID, with '!' before to exclude it.
     It succeeds if a target is any of the included types, and not any of the
@@ -512,10 +531,9 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     * <companion> to detect 'companion' items.
     * <sphere> to detect sphere-type items.
 
-    The filter will be made if needed, and the targetname to use returned.
+    This returns 3 sets of CubeTypes - all cubes, ones to include, and ones
+    to exclude.
     """
-    # We just parse it here, then pass on to an internal method recursively
-    # to build all the ents.
     inclusions = set()
     exclusions = set()
 
@@ -565,6 +583,19 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     # This also means inclusions represents everything we need to worry about.
     inclusions -= exclusions
 
+    return all_cubes, inclusions, exclusions
+
+
+def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
+    """Given a set of cube-type IDs, generate a filter for them.
+
+    The filter will be made if needed, and the targetname to use returned.
+    """
+    # We just parse it here, then pass on to an internal method recursively
+    # to build all the ents.
+
+    all_cubes, inclusions, exclusions = parse_filter_types(cubes)
+
     # Special case - no cubes at all.
     if not inclusions:
         try:
@@ -611,16 +642,8 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
                 CUBE_FILTERS[cube_type] = filter_name
                 names.add(filter_name)
             continue
-        # If we have a coloured version, we might need that too.
-        if cube_type.model_color and cube_type.color_in_map:
-            models[cube_type.model_color] = cube_type.has_name + '_color'
-
-        if cube_type.in_map:
-            if cube_type.model:
-                models[cube_type.model] = cube_type.has_name
-            else:
-                # No custom model - it's default.
-                models[DEFAULT_MODELS[cube_type.type]] = cube_type.has_name
+        else:
+            cube_type.add_models(models)
 
     for model, filter_name in models.items():
         # Make a filter for each model name.
