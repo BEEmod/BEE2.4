@@ -3417,6 +3417,9 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
+        from conditions.cubes import write_vscripts
+        write_vscripts(conf)
+
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
             f.write(line)

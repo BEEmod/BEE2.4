@@ -1,4 +1,5 @@
 """Implement cubes and droppers."""
+import io
 import itertools
 from collections import namedtuple
 
@@ -7,7 +8,7 @@ from typing import Dict, Optional, List, Union, Tuple, Any, Set, FrozenSet
 
 import brushLoc
 import vbsp_options
-from conditions import meta_cond, make_result, make_flag
+from conditions import meta_cond, make_result, make_flag, RES_EXHAUSTED
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property, NoKeyError, VMF, Entity, Vec, Output,
@@ -49,6 +50,10 @@ CUBE_FILTER_MULTI_IND = 0
 # Max number of ents in a multi filter.
 MULTI_FILTER_COUNT = 10
 
+# The BSP file path -> data for each script query function that's
+# desired.
+CUBE_SCRIPT_FILTERS = {}  # type: Dict[str, io.StringIO]
+
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
     0: 'VALVE_CUBE_STANDARD',
@@ -67,6 +72,18 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
+
+VSCRIPT_CLOSURE = '''\
+class __BEE2_CUBE_FUNC__{
+\ttable = null;
+\tconstructor(table) {
+\t\tthis.table = table;
+\t}
+\tfunction _call(this2, ent) {
+\t\treturn ent.GetModelName().tolower() in this.table;
+\t}
+}
+'''
 
 
 class CubeEntType(Enum):
@@ -518,6 +535,20 @@ def parse_conf(conf: Property):
             raise Exception('Cube type "{}" is missing!'.format(cube_id))
 
 
+def write_vscripts(vrad_conf: Property):
+    """Write CUBE_SCRIPT_FILTERS out for VRAD to use."""
+    if not CUBE_SCRIPT_FILTERS:
+        return
+
+    conf_block = vrad_conf.ensure_exists('InjectFiles')
+
+    for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
+        filename = 'cube_vscript_{:02}.nut'.format(i)
+        with open('BEE2/inject/' + filename, 'w') as f:
+            f.write(buffer.getvalue())
+        conf_block[filename] = 'scripts/vscripts/' + bsp_name
+
+
 def parse_filter_types(
     cubes: List[str]
 ) -> Tuple[Set[CubeType], Set[CubeType], Set[CubeType]]:
@@ -808,6 +839,66 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
             prop.value for prop in res.find_all('Cube')
         ],
     )
+
+
+@make_result('VScriptCubePredicate')
+def res_script_cube_predicate(res: Property):
+    """Given a set of cube-type IDs, generate VScript code to identify them.
+
+    This produces a script to include, which will define the specified function
+    name. Specifying the same filename twice will include all the functions.
+    For that reason the filename should be unique.
+
+    Each cube should be the name of an ID, with `!` before to exclude it.
+    It succeeds if a target is any of the included types, and not any of the
+    excluded types (exclusions override inclusion).
+    The IDs may also be:
+    * `<any>` to detect all cube types (including franken)
+    * `<companion>` to detect 'companion' items.
+    * `<sphere>` to detect sphere-type items.
+
+    Config options:
+    * `function`: Name of the function - called with an entity as an argument.
+    * `filename`: Path to the .nut script, relative to scripts/vscripts/.
+    * `Cube`: A cube to include.
+    """
+    script_function = res['function']
+    script_filename = res['filename']
+
+    if script_function[-2:] == '()':
+        script_function = script_function[:-2]
+    if script_filename[-4:] != '.nut':
+        script_filename += '.nut'
+
+    try:
+        buffer = CUBE_SCRIPT_FILTERS[script_filename]
+    except KeyError:
+        CUBE_SCRIPT_FILTERS[script_filename] = buffer = io.StringIO()
+        # Write our starting code.
+        buffer.write(VSCRIPT_CLOSURE)
+
+    all_cubes, inclusions, exclusions = parse_filter_types([
+        prop.value for prop in res.find_all('Cube')
+    ])
+
+    # We don't actually care about exclusions anymore.
+
+    models = {}  # type: Dict[str, str]
+    for cube_type in inclusions:
+        cube_type.add_models(models)
+
+    # Normalise the names to a consistent format.
+    models = {
+        model.lower().replace('\\', '/')
+        for model in models
+    }
+
+    buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
+    for model in models:
+        buffer.write(' ["{}"]=1,\n'.format(model))
+    buffer.write('});\n')
+
+    return RES_EXHAUSTED
 
 
 @meta_cond(priority=-750, only_once=True)
