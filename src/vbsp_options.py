@@ -304,16 +304,6 @@ DEFAULTS = [
         texture will repeat again.
         """),
 
-    Opt('fizz_visibility', True,
-        """Whether fizzlers should be visible.
-
-        When `False`, this disables fizzler sounds and implies
-        `fizz_scanline` is also `False`.
-        """),
-
-    Opt('force_fizz_reflect', False,
-        """Force fast reflections on fizzlers.
-        """),
     Opt('force_brush_reflect', False,
         """Force fast reflections on func_brushes.
         """),
