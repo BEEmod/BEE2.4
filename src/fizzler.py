@@ -8,6 +8,7 @@ from enum import Enum
 
 import conditions
 import utils
+import vbsp_options
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
 import comp_consts as const
 import instance_traits
@@ -35,6 +36,7 @@ MATMOD_OFFSETS = [
     Vec(0, -16, -64),
     Vec(0,   0,  32),
 ] * 4  # Just in case there happens to be more textures.
+
 
 class TexGroup(Enum):
     """Types of textures used for fizzlers."""
@@ -292,6 +294,14 @@ class Fizzler:
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
         self.emitters = emitters  # Pairs of left, right positions.
 
+    def forward(self) -> Vec:
+        """The axis moving from one side to another."""
+        return (self.emitters[0][1] - self.emitters[0][0]).norm()
+
+    def normal(self) -> Vec:
+        """The axis moving in and out of the surface."""
+        return abs(self.up_axis.cross(self.forward()))
+
 
 class FizzlerBrush:
     """A brush-set used in a fizzler."""
@@ -431,7 +441,7 @@ class FizzlerBrush:
         field_axis = diff.norm()
 
         # Out of the fizzler.
-        normal = abs(fizz.up_axis.cross(field_axis))  # type: Vec
+        normal = fizz.normal()
 
         origin = (pos + neg)/2
 
@@ -973,6 +983,11 @@ def generate_fizzlers(vmf: VMF):
                     )
                     # Set this to the center, to make sure it's not going to leak.
                     brush_ent['origin'] = (seg_min + seg_max)/2
+
+                    # For fizzlers flat on the floor/ceiling, scanlines look
+                    # useless. Turn them off.
+                    if 'usescanline' in brush_ent and fizz.normal().z:
+                        brush_ent['UseScanline'] = 0
 
                     for out in brush_type.outputs:
                         new_out = out.copy()
