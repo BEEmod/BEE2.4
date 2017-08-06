@@ -871,10 +871,10 @@ def generate_fizzlers(vmf: VMF):
         else:
             raise ValueError('Bad ModelName?')
 
-        mat_mod_tex = {}  # type: Dict[FizzlerBrush, List[str]]
+        mat_mod_tex = {}  # type: Dict[FizzlerBrush, Set[str]]
         for brush_type in fizz_type.brushes:
             if brush_type.mat_mod_var is not None:
-                mat_mod_tex[brush_type] = []
+                mat_mod_tex[brush_type] = set()
 
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
@@ -965,9 +965,6 @@ def generate_fizzlers(vmf: VMF):
                 if brush_ent is None:
                     brush_ent = Entity(vmf, keys=brush_type.keys)
                     vmf.add_ent(brush_ent)
-                    if 'classname' not in brush_ent:
-                        # Make sure it has a classname - otherwise it'll crash.
-                        brush_ent['classname'] = 'func_brush'
 
                     for key_name, key_value in brush_type.local_keys.items():
                         brush_ent[key_name] = conditions.local_name(fizz.base_inst, key_value)
@@ -992,9 +989,9 @@ def generate_fizzlers(vmf: VMF):
                 # If we have a material_modify_control to generate,
                 # we need to parent it to ourselves to restrict it to us
                 # only. We also need one for each material, so provide a
-                # function to the generator which appends to a list.
+                # function to the generator which adds to a set.
                 if brush_type.mat_mod_var is not None:
-                    used_tex_func = mat_mod_tex[brush_type].append
+                    used_tex_func = mat_mod_tex[brush_type].add
                 else:
                     def used_tex_func(val):
                         """If not, ignore those calls."""
@@ -1018,7 +1015,7 @@ def generate_fizzlers(vmf: VMF):
         for brush_type, used_tex in mat_mod_tex.items():
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
             mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
-            for off, tex in zip(MATMOD_OFFSETS, used_tex):
+            for off, tex in zip(MATMOD_OFFSETS, sorted(used_tex)):
                 pos = off.copy().rotate(*min_angles)
                 pos += Vec.from_str(fizz.base_inst['origin'])
                 vmf.create_ent(
