@@ -51,6 +51,12 @@ class TexGroup(Enum):
     # If set, it's an invisible trigger/clip - just apply this to all sides.
     TRIGGER = 'trigger'
 
+    # Special case - for Tag fizzlers, when it's on for that side.
+    TAG_ON_LEFT = 'tag_left'
+    TAG_ON_RIGHT = 'tag_right'
+    TAG_ON_CENTER = 'tag_center'
+    TAG_ON_SHORT = 'tag_short'
+
 
 class ModelName(Enum):
     """The method used to give names for models."""
@@ -294,6 +300,10 @@ class Fizzler:
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
         self.emitters = emitters  # Pairs of left, right positions.
 
+        # Special case - for TAG fizzlers, if that side is enabled.
+        # We generate the triggers elsewhere.
+        self.tag_on_pos = self.tag_on_neg = False
+
     def forward(self) -> Vec:
         """The axis moving from one side to another."""
         return (self.emitters[0][1] - self.emitters[0][0]).norm()
@@ -475,16 +485,23 @@ class FizzlerBrush:
                     side.mat = trigger_tex
                 used_tex_func(trigger_tex)
             else:
-                mat = fitted_tex or self.textures[TexGroup.SHORT]
-                used_tex_func(mat)
                 for side in brush.sides:
-                    side_norm = abs(side.normal())
-                    if side_norm == abs(fizz.up_axis):
+                    side_norm = side.normal()
+
+                    if abs(side_norm) == abs(fizz.up_axis):
                         self._side_tint(side, normal, neg)
 
-                    if side_norm != normal:
+                    if abs(side_norm) != normal:
                         continue
-                    side.mat = mat
+
+                    side.mat = fitted_tex or self.textures[
+                        TexGroup.TAG_ON_SHORT if (
+                            fizz.tag_on_pos
+                            if normal.dot(side_norm) > 0 else
+                            fizz.tag_on_neg
+                        ) else TexGroup.SHORT
+                    ]
+                    used_tex_func(side.mat)
 
                     self._texture_fit(
                         side,
@@ -563,20 +580,45 @@ class FizzlerBrush:
                     (brush_right, -field_axis, side_len),
                 ]
 
-            used_tex_func(self.textures[TexGroup.LEFT])
-            used_tex_func(self.textures[TexGroup.RIGHT])
-
             for brush, model_normal, brush_length in brushes:
                 for side in brush.sides:
-                    side_norm = abs(side.normal())
-                    if side_norm == abs(fizz.up_axis):
+                    side_norm = side.normal()
+                    if abs(side_norm) == abs(fizz.up_axis):
                         self._side_tint(side, normal, neg)
 
-                    if side_norm != abs(normal):
+                    if abs(side_norm) != abs(normal):
                         continue
 
+                    tag_enabled = (
+                        fizz.tag_on_pos
+                        if normal.dot(side_norm) > 0 else
+                        fizz.tag_on_neg
+                    )
+
                     if model_normal is None:
-                        side.mat = self.textures[TexGroup.CENTER]
+                        # Center textures.
+                        side.mat = self.textures[
+                            TexGroup.TAG_ON_CENTER
+                            if tag_enabled else
+                            TexGroup.CENTER
+                        ]
+                    else:
+                        # For left and right, we need to figure out what
+                        # direction the texture should be in. The uaxis is
+                        # in the direction of the surface.
+                        if side.uaxis.vec() == model_normal:
+                            side.mat = self.textures[
+                                TexGroup.TAG_ON_RIGHT
+                                if tag_enabled else
+                                TexGroup.RIGHT
+                            ]
+                        else:
+                            side.mat = self.textures[
+                                TexGroup.TAG_ON_LEFT
+                                if tag_enabled else
+                                TexGroup.LEFT
+                            ]
+                    used_tex_func(side.mat)
 
                     self._texture_fit(
                         side,
@@ -585,7 +627,6 @@ class FizzlerBrush:
                         fizz,
                         neg,
                         pos,
-                        model_normal=model_normal,
                     )
 
     def _texture_fit(
@@ -597,7 +638,6 @@ class FizzlerBrush:
         neg: Vec,
         pos: Vec,
         is_laserfield=False,
-        model_normal: Vec=None,
     ):
         """Calculate the texture offsets required for fitting a texture."""
         if side.vaxis.vec() != -fizz.up_axis:
@@ -611,17 +651,7 @@ class FizzlerBrush:
             else:
                 LOGGER.warning("Can't fix rotation for {} -> {}", side.vaxis, fizz.up_axis)
 
-        # For left and right, we need to figure out what direction the texture
-        # should be in. uaxis is in the direction of the surface.
-        if model_normal is not None:
-            uaxis_dir = side.uaxis.vec()
-            if uaxis_dir == model_normal:
-                side.mat = self.textures[TexGroup.RIGHT]
-            else:
-                side.mat = self.textures[TexGroup.LEFT]
-
         side.uaxis.offset = -(tex_size / field_length) * neg.dot(side.uaxis.vec())
-
         side.vaxis.offset = -(tex_size / 128) * neg.dot(side.vaxis.vec())
 
         #  The above fits it correctly, except it's vertically half-offset.

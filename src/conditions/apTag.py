@@ -1,6 +1,7 @@
 """Handles Aperture Tag modifications in the compiler."""
 import math
 import os
+import itertools
 
 import srctools
 import instanceLocs
@@ -10,22 +11,18 @@ import vbsp
 from conditions import (
     meta_cond, make_result,
     remove_ant_toggle,
-    PETI_INST_ANGLE, RES_EXHAUSTED
+    PETI_INST_ANGLE, RES_EXHAUSTED,
+    local_name
 )
+from fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 from srctools import Vec, Property, VMF, Entity, Output
 
 COND_MOD_NAME = None
 
 LOGGER = utils.getLogger(__name__)
 
-# A mapping of fizzler targetnames to the base instance
-tag_fizzlers = {}
-
-# Maps fizzler targetnames to a set of values. This is used to orient
-# floor-attached signs.
-tag_fizzler_locs = {}
-# The value is a tuple of either ('z', x, y, z),
-# ('x', x1, x2, y) or ('y', y1, y2, x).
+# Fizzler type ID for Gel Gun Activator.
+TAG_FIZZ_ID = 'TAG_GEL_GUN'
 
 
 @make_result('ATLAS_SpawnPoint')
@@ -112,7 +109,6 @@ def ap_tag_modifications(vmf: VMF):
     has['spawn_single'] = False
     has['spawn_nogun'] = True
 
-
     transition_ents = instanceLocs.get_special_inst('transitionents')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
@@ -131,69 +127,41 @@ def ap_tag_modifications(vmf: VMF):
                 '../portal2/maps/puzzlemaker',
                 puzz_folder,
             ))
-            LOGGER.info('Creating', new_folder)
+            LOGGER.info('Creating puzzle folder "{}"', new_folder)
             os.makedirs(
                 new_folder,
                 exist_ok=True,
             )
 
 
-@meta_cond(priority=-110, only_once=False)
-def res_find_potential_tag_fizzlers(vmf: VMF, inst: Entity):
-    """We need to know which items are 'real' fizzlers.
+def calc_fizzler_orient(fizzler: Fizzler):
+    # Figure out how to compare for this fizzler.
 
-    This is used for Aperture Tag paint fizzlers.
-    """
-    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
-        return RES_EXHAUSTED
+    s, l = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
 
-    if inst['file'].casefold() not in instanceLocs.resolve('<ITEM_BARRIER_HAZARD:0>'):
-        return
-
-    # The key list in the dict will be a set of all fizzler items!
-    tag_fizzlers[inst['targetname']] = inst
-
-    if tag_fizzler_locs:  # Only loop through fizzlers once.
-        return
-
-    # Determine the origins by first finding the bounding box of the brushes,
-    # then averaging.
-    for fizz in vmf.by_class['trigger_portal_cleanser']:
-        name = fizz['targetname'][:-6]  # Strip off '_brush'
-        bbox_min, bbox_max = fizz.get_bbox()
-        if name in tag_fizzler_locs:
-            orig_min, orig_max = tag_fizzler_locs[name]
-            orig_min.min(bbox_min)
-            orig_max.max(bbox_max)
-        else:
-            tag_fizzler_locs[name] = bbox_min, bbox_max
-
-    for name, (s, l) in tag_fizzler_locs.items():
-        # Figure out how to compare for this brush.
-        # If it's horizontal, signs should point to the center:
-        if abs(s.z - l.z) == 2:
-            tag_fizzler_locs[name] =(
-                'z',
-                s.x + l.x / 2,
-                s.y + l.y / 2,
-                s.z + 1,
-            )
-            continue
-        # For the vertical directions, we want to compare based on the line segment.
-        if abs(s.x - l.x) == 2:  # Y direction
-            tag_fizzler_locs[name] = (
-                'y',
-                s.y,
-                l.y,
-                s.x + 1,
-            )
-        else:  # Extends in X direction
-            tag_fizzler_locs[name] = (
-                'x',
-                s.x,
-                l.x,
-                s.y + 1,
-            )
+    # If it's horizontal, signs should point to the center:
+    if abs(s.z - l.z) == 2:
+        return (
+            'z',
+            s.x + l.x / 2,
+            s.y + l.y / 2,
+            s.z + 1,
+        )
+    # For the vertical directions, we want to compare based on the line segment.
+    if abs(s.x - l.x) == 2:  # Y direction
+        return (
+            'y',
+            s.y,
+            l.y,
+            s.x + 1,
+        )
+    else:  # Extends in X direction
+        return (
+            'x',
+            s.x,
+            l.x,
+            s.y + 1,
+        )
 
 
 @make_result('TagFizzler')
@@ -209,26 +177,33 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         inst.remove()
         return
 
-    fizz_base = fizz_name = None
+    fizzler = None
 
     # Look for the fizzler instance we want to replace
     for targetname in inst.output_targets():
-        if targetname in tag_fizzlers:
-            fizz_name = targetname
-            fizz_base = tag_fizzlers[targetname]
-            del tag_fizzlers[targetname]  # Don't let other signs mod this one!
-            continue
-        else:
+        try:
+            fizzler = FIZZLERS[targetname]
+        except KeyError:
+            # Not a fizzler.
+
             # It's an indicator toggle, remove it and the antline to clean up.
-            LOGGER.warning('Toggle: {}', targetname)
             for ent in vmf.by_target[targetname]:
                 remove_ant_toggle(ent)
-    inst.outputs.clear()  # Remove the outptuts now, they're not valid anyway.
 
-    if fizz_base is None:
+    inst.outputs.clear()  # Remove the outputs now, they're not valid anyway.
+
+    if fizzler is None:
         # No fizzler - remove this sign
         inst.remove()
         return
+
+    if fizzler.fizz_type.id == 'TAG_FIZZ_ID':
+        LOGGER.warning('Two tag signs attached to one fizzler...')
+        inst.remove()
+        return
+
+    # Swap to the special Tag Fizzler type.
+    fizzler.fizz_type = FIZZ_TYPES[TAG_FIZZ_ID]
 
     # The distance from origin the double signs are seperated by.
     sign_offset = res.int('signoffset', 16)
@@ -291,7 +266,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         sign_floor_loc.z = 0  # We don't care about z-positions.
 
         # Grab the data saved earlier in res_find_potential_tag_fizzlers()
-        axis, side_min, side_max, normal = tag_fizzler_locs[fizz_name]
+        axis, side_min, side_max, normal = calc_fizzler_orient(fizzler)
 
         # The Z-axis fizzler (horizontal) must be treated differently.
         if axis == 'z':
@@ -306,31 +281,15 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
                 # Compare to the closest side. Use ** to swap x/y arguments
                 # appropriately. The closest side is the one with the
                 # smallest magnitude.
-                vmf.create_ent(
-                    classname='info_null',
-                    targetname=inst['targetname'] + '_min',
-                    origin=sign_floor_loc - Vec(**{
-                        axis: side_min,
-                        other_axis: normal,
-                    }),
-                )
-                vmf.create_ent(
-                    classname='info_null',
-                    targetname=inst['targetname'] + '_max',
-                    origin=sign_floor_loc - Vec(**{
-                        axis: side_max,
-                        other_axis: normal,
-                    }),
-                )
                 sign_dir = min(
-                    sign_floor_loc - Vec(**{
-                        axis: side_min,
-                        other_axis: normal,
-                    }),
-                    sign_floor_loc - Vec(**{
-                        axis: side_max,
-                        other_axis: normal,
-                    }),
+                    sign_floor_loc - Vec.with_axes(
+                        axis,side_min,
+                        other_axis, normal,
+                    ),
+                    sign_floor_loc - Vec.with_axes(
+                        axis, side_max,
+                        other_axis, normal,
+                    ),
                     key=Vec.mag,
                 )
             else:
@@ -380,76 +339,41 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
 
     # Now modify the fizzler...
 
-    fizz_brushes = list(
-        vmf.by_class['trigger_portal_cleanser'] &
-        vmf.by_target[fizz_name + '_brush']
-    )
-
-    if 'base_inst' in res:
-        fizz_base['file'] = instanceLocs.resolve_one(res['base_inst'], error=True)
-    fizz_base.outputs.clear()  # Remove outputs, otherwise they break
-    # branch_toggle entities
-
     # Subtract the sign from the list of connections, but don't go below
     # zero
-    fizz_base.fixup['$connectioncount'] = str(max(
+    fizzler.base_inst.fixup['$connectioncount'] = str(max(
         0,
-        srctools.conv_int(fizz_base.fixup['$connectioncount', ''], 0) - 1
+        srctools.conv_int(fizzler.base_inst.fixup['$connectioncount', ''], 0) - 1
     ))
 
-    if 'model_inst' in res:
-        model_inst = instanceLocs.resolve_one(res['model_inst'], error=True)
-        for mdl_inst in vmf.by_class['func_instance']:
-            if mdl_inst['targetname', ''].startswith(fizz_name + '_model'):
-                mdl_inst['file'] = model_inst
-
-    # Find the direction the fizzler front/back points - z=floor fizz
+    # Find the direction the fizzler normal is.
     # Signs will associate with the given side!
-    bbox_min, bbox_max = fizz_brushes[0].get_bbox()
-    for axis, val in zip('xyz', bbox_max-bbox_min):
-        if val == 2:
-            fizz_axis = axis
-            sign_center = (bbox_min[axis] + bbox_max[axis]) / 2
-            break
-    else:
-        # A fizzler that's not 128*x*2?
-        raise Exception('Invalid fizzler brush ({})!'.format(fizz_name))
+
+    bbox_min, bbox_max = fizzler.emitters[0]
+    fizz_field_axis = (bbox_max-bbox_min).norm()
+    fizz_norm_axis = fizzler.normal().axis()
+
+    sign_center = (bbox_min[fizz_norm_axis] + bbox_max[fizz_norm_axis]) / 2
 
     # Figure out what the sides will set values to...
     pos_blue = False
     pos_oran = False
     neg_blue = False
     neg_oran = False
-    if sign_loc[fizz_axis] < sign_center:
+
+    if sign_loc[fizz_norm_axis] < sign_center:
         pos_blue = blue_enabled
         pos_oran = oran_enabled
     else:
         neg_blue = blue_enabled
         neg_oran = oran_enabled
 
-    fizz_off_tex = {
-        'left': res['off_left'],
-        'center': res['off_center'],
-        'right': res['off_right'],
-        'short': res['off_short'],
-    }
-    fizz_on_tex = {
-        'left': res['on_left'],
-        'center': res['on_center'],
-        'right': res['on_right'],
-        'short': res['on_short'],
-    }
-
     # If it activates the paint gun, use different textures
-    if pos_blue or pos_oran:
-        pos_tex = fizz_on_tex
-    else:
-        pos_tex = fizz_off_tex
+    fizzler.tag_on_pos = pos_blue or pos_oran
+    fizzler.tag_on_neg = neg_blue or neg_oran
 
-    if neg_blue or neg_oran:
-        neg_tex = fizz_on_tex
-    else:
-        neg_tex = fizz_off_tex
+    # Now make the trigger ents. We special-case these since they need to swap
+    # depending on the sign config and position.
 
     if vbsp.GAME_MODE == 'COOP':
         # We need ATLAS-specific triggers
@@ -470,36 +394,20 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         )
         output = 'OnStartTouch'
 
-    pos_trig['origin'] = neg_trig['origin'] = fizz_base['origin']
+    pos_trig['origin'] = neg_trig['origin'] = fizzler.base_inst['origin']
     pos_trig['spawnflags'] = neg_trig['spawnflags'] = '1'  # Clients Only
 
-    pos_trig['targetname'] = fizz_name + '-trig_pos'
-    neg_trig['targetname'] = fizz_name + '-trig_neg'
+    pos_trig['targetname'] = local_name(fizzler.base_inst, 'trig_pos')
+    neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_neg')
 
     pos_trig.outputs = [
-        Output(
-            output,
-            fizz_name + '-trig_neg',
-            'Enable',
-        ),
-        Output(
-            output,
-            fizz_name + '-trig_pos',
-            'Disable',
-        ),
+        Output(output, neg_trig, 'Enable'),
+        Output(output, pos_trig, 'Disable'),
     ]
 
     neg_trig.outputs = [
-        Output(
-            output,
-            fizz_name + '-trig_pos',
-            'Enable',
-        ),
-        Output(
-            output,
-            fizz_name + '-trig_neg',
-            'Disable',
-        ),
+        Output(output, pos_trig, 'Enable'),
+        Output(output, neg_trig, 'Disable'),
     ]
 
     voice_attr = vbsp.settings['has_attr']
@@ -549,7 +457,7 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
         # either side - use neg_trig for that purpose!
         # We want to get rid of pos_trig to save ents
         vmf.remove_ent(pos_trig)
-        neg_trig['targetname'] = fizz_name + '-trig_off'
+        neg_trig['targetname'] = local_name(fizzler.base_inst, 'trig_off')
         neg_trig.outputs.clear()
         neg_trig.add_out(Output(
             output,
@@ -564,53 +472,19 @@ def res_make_tag_fizzler(vmf: VMF, inst: Entity, res: Property):
             param='0'
         ))
 
-    for fizz_brush in fizz_brushes:  # portal_cleanser ent, not solid!
-        # Modify fizzler textures
-        bbox_min, bbox_max = fizz_brush.get_bbox()
-        for side in fizz_brush.sides():
-            norm = side.normal()
-            if norm[fizz_axis] == 0:
-                # Not the front/back: force nodraw
-                # Otherwise the top/bottom will have the odd stripes
-                # which won't match the sides
-                side.mat = 'tools/toolsnodraw'
-                continue
-            if norm[fizz_axis] == 1:
-                side.mat = pos_tex[
-                    vbsp.TEX_FIZZLER[
-                        side.mat.casefold()
-                    ]
-                ]
-            else:
-                side.mat = neg_tex[
-                    vbsp.TEX_FIZZLER[
-                        side.mat.casefold()
-                    ]
-                ]
-        # The fizzler shouldn't kill cubes
-        fizz_brush['spawnflags'] = '1'
+    # Make the triggers.
+    for bbox_min, bbox_max in fizzler.emitters:
+        bbox_min = bbox_min.copy() - 64 * fizzler.up_axis
+        bbox_max = bbox_max.copy() + 64 * fizzler.up_axis
 
-        fizz_brush.outputs.append(Output(
-            'OnStartTouch',
-            '@shake_global',
-            'StartShake',
-        ))
-
-        fizz_brush.outputs.append(Output(
-            'OnStartTouch',
-            '@shake_global_sound',
-            'PlaySound',
-        ))
-
-        # The triggers are 8 units thick, 24 from the center
-        # (-1 because fizzlers are 2 thick on each side).
+        # The triggers are 8 units thick, with a 32-unit gap in the middle
         neg_min, neg_max = Vec(bbox_min), Vec(bbox_max)
-        neg_min[fizz_axis] -= 23
-        neg_max[fizz_axis] -= 17
+        neg_min[fizz_norm_axis] -= 24
+        neg_max[fizz_norm_axis] -= 16
 
         pos_min, pos_max = Vec(bbox_min), Vec(bbox_max)
-        pos_min[fizz_axis] += 17
-        pos_max[fizz_axis] += 23
+        pos_min[fizz_norm_axis] += 16
+        pos_max[fizz_norm_axis] += 24
 
         if blue_enabled or oran_enabled:
             neg_trig.solids.append(
