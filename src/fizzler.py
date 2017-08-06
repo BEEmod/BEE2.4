@@ -87,6 +87,34 @@ def read_configs(conf: Property):
 
     LOGGER.info('Loaded {} fizzlers.', len(FIZZ_TYPES))
 
+    if vbsp_options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
+        return
+    # In Aperture Tag, we don't have portals. For fizzler types which block
+    # portals (trigger_portal_cleanser), additionally fizzle paint.
+    for fizz in FIZZ_TYPES.values():
+        for brush in fizz.brushes:
+            if brush.keys['classname'].casefold() == 'trigger_portal_cleanser':
+                brush_name = brush.name
+                break
+        else:
+            # No fizzlers in this item.
+            continue
+        # Add a paint fizzler brush to these fizzlers.
+        fizz.brushes.append(FizzlerBrush(
+            brush_name,
+            textures={
+                TexGroup.TRIGGER: const.Tools.TRIGGER,
+            },
+            keys={
+                'classname': 'trigger_paint_cleanser',
+                'startdisabled': '0',
+                'spawnflags': '9',
+            },
+            local_keys={},
+            outputs=[],
+            singular=True,
+        ))
+
 
 def _calc_fizz_angles():
     """Generate FIZZ_ANGLES."""
@@ -327,16 +355,23 @@ class FizzlerBrush:
             textures[group] = conf['tex_' + group.value, None]
 
         keys = {
-            prop.real_name: prop.value
+            prop.name: prop.value
             for prop in
             conf.find_children('keys')
         }
 
         local_keys = {
-            prop.real_name: prop.value
+            prop.name: prop.value
             for prop in
             conf.find_children('localkeys')
         }
+
+        if 'classname' not in keys:
+            raise ValueError(
+                'Fizzler Brush "{}" does not have a classname!'.format(
+                conf['name'],
+                )
+            )
 
         return FizzlerBrush(
             conf['name'],

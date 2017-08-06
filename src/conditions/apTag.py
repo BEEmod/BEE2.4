@@ -112,22 +112,6 @@ def ap_tag_modifications(vmf: VMF):
     has['spawn_single'] = False
     has['spawn_nogun'] = True
 
-    # Add paint fizzlers to all normal fizzlers
-    for fizz in vmf.by_class['trigger_portal_cleanser']:
-        p_fizz = fizz.copy()
-        p_fizz['classname'] = 'trigger_paint_cleanser'
-        vmf.add_ent(p_fizz)
-
-        if p_fizz['targetname'].endswith('_brush'):
-            p_fizz['targetname'] = p_fizz['targetname'][:-6] + '-br_fizz'
-
-        del p_fizz['drawinfastreflection']
-        del p_fizz['visible']
-        del p_fizz['useScanline']
-
-        for side in p_fizz.sides():
-            side.mat = 'tools/toolstrigger'
-            side.scale = 0.25
 
     transition_ents = instanceLocs.get_special_inst('transitionents')
     for inst in vmf.by_class['func_instance']:
