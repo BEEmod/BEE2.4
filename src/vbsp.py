@@ -563,14 +563,6 @@ def fix_fizz_models(inst: Entity):
             inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
 
-@conditions.meta_cond(priority=-100, only_once=False)
-def static_pan(inst: Entity):
-    """Switches glass angled panels to static instances, if needed."""
-    if inst['file'].casefold() in instanceLocs.resolve('<ITEM_PANEL_CLEAR>'):
-        # white/black are found via the func_brush
-        make_static_pan(inst, "glass")
-
-
 ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
 FLIP_PAN_BRUSH = {}  # locations -> white, black faces
 # Record info_targets at the angled panel positions, so we can correct
@@ -2623,34 +2615,15 @@ def change_func_brush():
         if brush in IGNORED_BRUSH_ENTS:
             continue
 
-        brush['drawInFastReflection'] = vbsp_options.get(bool, "force_brush_reflect")
-        parent = brush['parentname', '']
-        # Used when creating static panels
-        brush_type = ""
-        is_bullseye = False
-
         target = brush['targetname', '']
         # Fizzlers need their custom outputs.
         # Change this so the base instance can directly modify the brush.
         if target.endswith('_brush'):
             brush['targetname'] = target[:-6] + '-br_brush'
 
-        # Func_brush/func_rotating (for angled panels and flip panels)
-        # often use different textures, so let the style do that.
-
-        surf_face = None  # The angled-panel top face..
-
         is_grating = False
         delete_brush = False
         for side in brush.sides():
-            # If it's set to a bullseye texture, it's in the ignored_faces
-            # set!
-            if side.mat in bullseye_white:
-                brush_type = 'white'
-                is_bullseye = True
-            elif side.mat in bullseye_black:
-                brush_type = 'black'
-                is_bullseye = True
 
             if side in IGNORED_FACES:
                 continue
@@ -2665,24 +2638,14 @@ def change_func_brush():
                 )
                 continue
 
-            if side.mat in consts.WhitePan:
-                brush_type = "white"
-                set_special_mat(side, 'white')
-                surf_face = side
+            if side.mat == consts.Special.GRATING:
+                is_grating = True
+                if grate_temp is not None:
+                    grate_temp.apply(side, change_mat=False)
+                else:
+                    side.scale = grating_scale
 
-            elif side.mat in consts.BlackPan:
-                brush_type = "black"
-                set_special_mat(side, 'black')
-                surf_face = side
-            else:
-                if side.mat == consts.Special.GRATING:
-                    is_grating = True
-                    if grate_temp is not None:
-                        grate_temp.apply(side, change_mat=False)
-                    else:
-                        side.scale = grating_scale
-
-                alter_mat(side)  # for gratings, laserfields and some others
+            alter_mat(side)  # for gratings, laserfields and some others
 
             # The style blanked the material, so delete the brush
             if side.mat == '':
@@ -2720,185 +2683,12 @@ def change_func_brush():
             )
             clip_ent.solids.append(grate_phys_clip_solid)
 
-        if "-model_arms" in parent:  # is this an angled panel?:
-            # strip only the model_arms off the end
-            targ = '-'.join(parent.split("-")[:-1])
-            # Now find the associated instance
-            for ins in (
-                VMF.by_class['func_instance'] &
-                VMF.by_target[targ]
-            ):
-
-                if 'connectioncount' not in ins.fixup:
-                    continue  # It's a static-style overlay instance, ignore.
-
-                if make_static_pan(ins, brush_type, is_bullseye):
-                    # delete the brush, we don't want it if we made a
-                    # static one
-                    VMF.remove_ent(brush)
-                else:
-                    # Oherwise, rename the brush to -brush, so the panel
-                    # can be sent inputs.
-                    brush['targetname'] = brush['targetname'].replace(
-                        '_panel_top',
-                        '-brush',
-                        )
-                    brush['parentname'] = conditions.local_name(
-                        ins,
-                        dynamic_pan_parent,
-                    )
-
-                    if dynamic_pan_temp:
-                        # Allow replacing the brush used for the surface.
-                        new_brush = template_brush.import_template(
-                            dynamic_pan_temp,
-                            Vec.from_str(brush['origin']),
-                            Vec.from_str(ins['angles']),
-                            targetname=targ,
-                            force_type=template_brush.TEMP_TYPES.detail,
-                        )
-                        brush.solids = new_brush.detail.solids
-                        new_brush.detail.remove()
-                        for side in brush.sides():
-                            if side.mat.casefold() == 'metal/black_wall_metal_002c':
-                                # Copy data from the original face...
-                                side.mat = surf_face.mat
-                                side.uaxis = surf_face.uaxis
-                                side.vaxis = surf_face.vaxis
-                                side.ham_rot = surf_face.ham_rot
-                                side.smooth = surf_face.smooth
-                                side.lightmap = surf_face.lightmap
-
-                break  # Don't run twice - there might be a second matching
-                # overlay instance!
-
     # Remove if it's empty.
     if not grate_player_clip.solids:
         grate_player_clip.remove()
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
         TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
-
-
-def alter_flip_panel():
-    flip_panel_start = vbsp_options.get(str, 'flip_sound_start')
-    flip_panel_stop = vbsp_options.get(str, 'flip_sound_stop')
-    if flip_panel_start is not None or flip_panel_stop is not None:
-        for flip_pan in VMF.by_class['func_door_rotating']:
-            # Change flip panel sounds by editing the func_door_rotating
-            flip_pan['noise1'] = flip_panel_start or ''
-            flip_pan['noise2'] = flip_panel_stop or ''
-
-
-def set_special_mat(face, side_type):
-    """Set a face to a special texture.
-
-    Those include checkers or portal-here tiles, used on flip
-    and angled panels.
-    side_type should be either 'white' or 'black'.
-    """
-    raise NotImplementedError
-
-
-def make_static_pan(ent, pan_type, is_bullseye=False):
-    """Convert a regular panel into a static version.
-
-    This is done to save entities and improve lighting."""
-    static_pan_folder = vbsp_options.get(str, 'staticPan')
-    if not static_pan_folder:
-        return False  # no conversion allowed!
-
-    angle = "00"
-    if ent.fixup['animation']:
-        # the 5:7 is the number in "ramp_45_deg_open"
-        angle = ent.fixup['animation'][5:7]
-    if ent.fixup['start_deployed'] == "0":
-        angle = "00"  # different instance flat with the wall
-    if ent.fixup['connectioncount', '0'] != "0":
-        return False
-    # Handle glass panels
-    if pan_type == 'glass':
-        ent["file"] = static_pan_folder + angle + '_glass.vmf'
-        return True
-
-    # Handle white/black panels:
-    ent['file'] = static_pan_folder + angle + '_surf.vmf'
-
-    # We use a template for the surface, so it can use correct textures.
-    if angle == '00':
-        # Special case: flat panels use different templates
-        temp_data = template_brush.import_template(
-            vbsp_options.get(str, 'static_pan_temp_flat'),
-            origin=Vec.from_str(ent['origin']),
-            angles=Vec.from_str(ent['angles']),
-            targetname=ent['targetname'],
-            force_type=template_brush.TEMP_TYPES.detail,
-        )
-        template_brush.retexture_template(
-            temp_data,
-            origin=Vec.from_str(ent['origin']),
-            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
-            fixup=ent.fixup,
-            use_bullseye=is_bullseye,
-        )
-
-        # Some styles have 8-unit thick flat panels, others use 4-units.
-        # Put the target halfway.
-        faith_targ_pos = Vec(0, 0, -64 + 6).rotate_by_str(ent['angles'])
-        faith_targ_pos += Vec.from_str(ent['origin'])
-    else:
-        # For normal surfaces, we need an  origin and angles
-        #  rotated around the hinge point!
-        temp_origin = Vec(-64, 0, -64).rotate_by_str(ent['angles'])
-        temp_origin += Vec.from_str(ent['origin'])
-
-        temp_angles = Vec.from_str(ent['angles'])
-
-        # figure out the right axis to rotate for the face
-        facing_dir = Vec(0, 1, 0).rotate_by_str(ent['angles'])
-        # Rotating counterclockwise
-        if facing_dir.z == 1:
-            temp_angles.y = (temp_angles.y - int(angle)) % 360
-        # Rotating clockwise
-        elif facing_dir.z == -1:
-            temp_angles.y = (temp_angles.y + int(angle)) % 360
-        else:
-            normal = Vec(0, 0, 1).rotate_by_str(ent['angles'])
-            if normal.z == -1:
-                # On ceiling
-                temp_angles.x = (temp_angles.x + int(angle)) % 360
-            else:
-                # Floor or rotating upright on walls
-                temp_angles.x = (temp_angles.x - int(angle)) % 360
-        # The target should be centered on the rotated panel!
-        faith_targ_pos = Vec(64, 0, 0)
-        faith_targ_pos.localise(temp_origin, temp_angles)
-
-        temp_data = template_brush.import_template(
-            vbsp_options.get(str, 'static_pan_temp_' + pan_type),
-            temp_origin,
-            temp_angles,
-            force_type=template_brush.TEMP_TYPES.detail,
-        )
-        template_brush.retexture_template(
-            temp_data,
-            origin=Vec.from_str(ent['origin']),
-            force_colour=getattr(template_brush.MAT_TYPES, pan_type),
-            fixup=ent.fixup,
-            use_bullseye=is_bullseye,
-        )
-
-    # Search for the info_targets of catapults aimed at the panel,
-    # and adjust them so they're placed precicely on the surface.
-    base_pos = Vec(0, 0, -64).rotate_by_str(ent['angles'])
-    base_pos += Vec.from_str(ent['origin'])
-    # Since it's a defaultdict, misses will give an empty list.
-    for target in PANEL_FAITH_TARGETS[base_pos.as_tuple()]:
-        target['origin'] = faith_targ_pos.join(' ')
-        # Clear the parentname, since the brush is now gone!
-        del target['parentname']
-
-    return True
 
 
 def change_ents():
@@ -3432,7 +3222,6 @@ def main():
 
         texturing.setup(MAP_RAND_SEED, list(tiling.TILES.values()))
 
-        alter_flip_panel()  # Must be done before conditions!
         conditions.check_all()
         add_extra_ents(mode=GAME_MODE)
 

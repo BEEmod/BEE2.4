@@ -168,6 +168,23 @@ class BrushType(Enum):
     FLIP_PANEL = 4  # Flip panels - these are double-sided.
 
 
+class PanelAngle(Enum):
+    """Angles for static angled panels."""
+    ANGLE_FLAT = 0  # Start disabled, so it's flat sticking out slightly.
+    ANGLE_30 = 30
+    ANGLE_45 = 45
+    ANGLE_60 = 60
+    ANGLE_90 = 90
+
+    @classmethod
+    def from_inst(cls, inst: Entity):
+        """Get the angle desired for a panel."""
+        if not inst.fixup.bool('$start_deployed'):
+            return cls.ANGLE_FLAT
+        # "ramp_90_deg_open" -> 90
+        return cls(int(inst.fixup['$animation'][5:7]))
+
+
 def round_grid(vec: Vec):
     """Round to the center of the grid."""
     return vec // 128 * 128 + (64, 64, 64)
@@ -484,14 +501,76 @@ class TileDef:
             self.brush_faces.extend(faces)
             yield from brushes
         elif self.brush_type is BrushType.ANGLED_PANEL:
-            faces, brushes = self.gen_multitile_pattern(
-                vmf,
-                self.sub_tiles,
-                is_wall,
-                (True, True, True, True),
-                self.normal,
-            )
+            if self.panel_inst.fixup.int('$connectioncount') > 0:
+                # Dynamic panels are always beveled.
+                bevels = (True, True, True, True)
+                static_angle = None
+            else:
+                # Static panels can be straight.
+                bevels = (False, False, False, False)
+                static_angle = PanelAngle.from_inst(self.panel_inst)
+
+            panel_angles = Vec.from_str(self.panel_inst['angles'])
+            hinge_axis = Vec(y=1).rotate(*panel_angles)
+            front_normal = Vec(x=1).rotate(*panel_angles)
+
+            # For static 90 degree panels, we want to generate as if it's
+            # in that position.
+            if static_angle is PanelAngle.ANGLE_90:
+                faces, brushes = self.gen_multitile_pattern(
+                    vmf,
+                    self.sub_tiles,
+                    bool(front_normal.z),
+                    bevels,
+                    -front_normal,
+                    vec_offset=64 * self.normal - 64 *front_normal,
+                    thickness=2,
+                )
+            else:
+                faces, brushes = self.gen_multitile_pattern(
+                    vmf,
+                    self.sub_tiles,
+                    is_wall,
+                    bevels,
+                    self.normal,
+                    offset=(68 if static_angle is PanelAngle.ANGLE_FLAT else 64),
+                    thickness=(4 if static_angle is PanelAngle.ANGLE_FLAT else 2),
+                )
             self.panel_ent.solids.extend(brushes)
+            if static_angle is None or static_angle is PanelAngle.ANGLE_90:
+                # Dynamic panel, do nothing.
+                # 90 degree panels don't rotate either.
+                pass
+            elif static_angle is PanelAngle.ANGLE_FLAT:
+                # Make it a func_detail.
+                self.panel_ent.keys = {'classname': 'func_detail'}
+                # Add nodraw behind to seal.
+                brush, face = make_tile(
+                    vmf,
+                    self.pos + self.normal * 64,
+                    self.normal,
+                    top_surf=consts.Tools.NODRAW,
+                    width=128,
+                    height=128,
+                    bevels=bevels,
+                    back_surf=texturing.SPECIAL.get(self.pos, 'behind'),
+                )
+                vmf.add_brush(brush)
+            else:
+                self.panel_ent.keys = {'classname': 'func_detail'}
+
+                # Rotate the panel to match the panel shape:
+                # Figure out if we want to rotate +ve or -ve.
+                # We know 90 degrees should rotate to the normal.
+                if Vec(y=1).rotate(*hinge_axis.rotation_around()) == self.normal:
+                    rotation = hinge_axis.rotation_around(static_angle.value)
+                else:
+                    rotation = hinge_axis.rotation_around(-static_angle.value)
+                panel_offset = front_pos - 64 * front_normal
+                for brush in brushes:
+                    brush.localise(-panel_offset)
+                    brush.localise(panel_offset, rotation)
+
         elif self.brush_type is BrushType.FLIP_PANEL:
             # Two surfaces, forward and backward - each is 4 thick.
             invert_black = self.panel_inst.fixup.bool('$start_reversed')
@@ -521,6 +600,10 @@ class TileDef:
             self.panel_ent.solids.extend(brushes)
             inset_flip_panel(self.panel_ent, front_pos, self.normal)
 
+            # Allow altering the flip panel sounds.
+            self.panel_ent['noise1'] = vbsp_options.get(str, 'flip_sound_start')
+            self.panel_ent['noise2'] = vbsp_options.get(str, 'flip_sound_stop')
+
     def gen_multitile_pattern(
         self,
         vmf: VMF,
@@ -530,6 +613,7 @@ class TileDef:
         normal: Vec,
         offset=64,
         thickness=4,
+        vec_offset: Vec=None,
     ) -> Tuple[List[Side], List[Solid]]:
         """Generate a bunch of tiles, and return the front faces."""
         brushes = []
@@ -548,11 +632,14 @@ class TileDef:
                 (vmin + vmax) * 16 - 64,
                 offset,
             )
+            if vec_offset is not None:
+                tile_center += vec_offset
+
             if tile_type.is_tile:
                 u_size, v_size = TILE_SIZES[grid_size]
                 tex = texturing.gen(
                     texturing.GenCat.NORMAL,
-                    self.normal,
+                    normal,
                     tile_type.color,
                 ).get(tile_center, grid_size)
                 brush, face = make_tile(
