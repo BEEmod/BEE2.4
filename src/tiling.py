@@ -42,10 +42,10 @@ NORMALS = [Vec(x=1), Vec(x=-1), Vec(y=1), Vec(y=-1), Vec(z=1), Vec(z=-1)]
 # Specific angles, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
 NORM_ANGLES = {
-    Vec(x=1).as_tuple(): Vec(0, 0, 90),
-    Vec(x=-1).as_tuple(): Vec(0, 180, 90),
-    Vec(y=1).as_tuple(): Vec(0, 90, 90),
-    Vec(y=-1).as_tuple(): Vec(0, 270, 90),
+    Vec(x=1).as_tuple(): Vec(0, 0, 0),
+    Vec(x=-1).as_tuple(): Vec(0, 180, 0),
+    Vec(y=1).as_tuple(): Vec(0, 90, 0),
+    Vec(y=-1).as_tuple(): Vec(0, 270, 0),
     Vec(z=1).as_tuple(): Vec(270, 270,  0),
     Vec(z=-1).as_tuple(): Vec(90, 90, 0),
 }
