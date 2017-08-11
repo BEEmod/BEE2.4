@@ -1736,7 +1736,6 @@ def change_brush():
     LOGGER.info("Editing Brushes...")
     glass_clip_mat = vbsp_options.get(str, 'glass_clip')
     glass_scale = vbsp_options.get(float, 'glass_scale')
-    goo_scale = vbsp_options.get(float, 'goo_scale')
 
     glass_temp = vbsp_options.get(str, "glass_template")
     if glass_temp:
@@ -1771,24 +1770,6 @@ def change_brush():
 
     highest_brush = 0
 
-    # Calculate the z-level with the largest number of goo brushes,
-    # so we can ensure the 'fancy' pit is the largest one.
-    # Valve just does it semi-randomly.
-    goo_heights = Counter()
-    for pos, block in brushLoc.POS.items():
-        if block.is_goo and block.is_top:
-            # Block position is the center,
-            # save at the height of the top face
-            goo_heights[brushLoc.g2w(pos).z + 32] += 1
-    # Find key with the highest value = z-level with highest brush.
-    try:
-        best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
-    except ValueError:
-        # No goo in the map, it's fine.
-        best_goo = 0
-
-    LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
-
     # This needs to be a func_brush, otherwise the clip texture data will be
     # merged with other clips.
     glass_clip_ent = VMF.create_ent(classname='func_brush', solidbsp=1)
@@ -1802,23 +1783,6 @@ def change_brush():
                 face.planes[1].z,
                 face.planes[2].z,
             )
-            if face.mat in consts.Goo:
-                if make_goo_mist:
-                    mist_solids.add(
-                        solid.get_origin().as_tuple()
-                    )
-                # Apply goo scaling
-                face.scale = goo_scale
-                # Use fancy goo on the level with the
-                # highest number of blocks.
-                # All plane z are the same.
-                face.mat = texturing.SPECIAL.get(
-                    face.get_origin(), (
-                        'goo' if
-                        face.planes[0].z == best_goo
-                        else 'goo_cheap'
-                    ),
-                )
             if face.mat == consts.Special.GLASS:
                 if glass_temp is not None:
                     glass_temp.apply(face, change_mat=False)
@@ -1846,11 +1810,6 @@ def change_brush():
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
         bottomlessPit.make_bottomless_pit(VMF, highest_brush)
-        LOGGER.info('Done!')
-
-    if make_goo_mist:
-        LOGGER.info('Adding Goo Mist...')
-        add_goo_mist(mist_solids)
         LOGGER.info('Done!')
 
     if floorbeam_locs:
