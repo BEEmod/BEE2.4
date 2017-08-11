@@ -536,8 +536,8 @@ class TileDef:
                     is_wall,
                     bevels,
                     self.normal,
-                    offset=(68 if static_angle is PanelAngle.ANGLE_FLAT else 64),
-                    thickness=(4 if static_angle is PanelAngle.ANGLE_FLAT else 2),
+                    offset=(64+8 if static_angle is PanelAngle.ANGLE_FLAT else 64),
+                    thickness=(8 if static_angle is PanelAngle.ANGLE_FLAT else 2),
                 )
             self.panel_ent.solids.extend(brushes)
             if static_angle is None or static_angle is PanelAngle.ANGLE_90:
