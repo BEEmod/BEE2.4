@@ -4,7 +4,7 @@ It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
 from enum import Enum
-from typing import Tuple, Dict, List, Optional, Sequence
+from typing import Tuple, Dict, List, Optional, Sequence, Union
 
 import instanceLocs
 import vbsp_options
@@ -20,10 +20,13 @@ import antlines
 
 LOGGER = utils.getLogger(__name__)
 
-TILE_TEMP = {}  # Face surfaces used to generate tiles.
-# TILE_TEMP[tile_norm][u_norm, v_norm] = (flat_face, bevel_face)
+# Face surfaces used to generate tiles.
+# TILE_TEMP[tile_norm][u_norm, v_norm, thickness, is_bevel] = squarebeams_face
+# thickness = 2,4,8
 # TILE_TEMP[tile_norm]['tile'] = front_face
 # TILE_TEMP[tile_norm]['back'] = back_face
+TILE_TEMP = {}  # type: Dict[Tuple[float, float, float], Dict[Union[str, Tuple[int, int, int, bool]], Side]]
+
 # Maps normals to the index in PrismFace.
 PRISM_NORMALS = {
     # 0 = solid
@@ -743,7 +746,7 @@ def make_tile(
         * top_surf: Texture to apply to the front of the tile.
         * back_surf: Texture to apply to the back of the tile.
         * recess_dist: How far the front is below the block surface.
-        * thickness: How far back the back surface is (normally 4). Max of 4, 
+        * thickness: How far back the back surface is (normally 4). 2, 4, 8,
            Must be > recess_dist.
         * width: size in the U-direction. Must be > 8.
         * height: size in the V-direction. Must be > 8.
@@ -757,10 +760,11 @@ def make_tile(
 
     assert width >= 8 and height >= 8, 'Tile is too small!' \
                                        ' ({}x{})'.format(width, height)
+    assert thickness in (2, 4, 8), 'Bad thickness {}'.format(thickness)
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
-    top_side = template['front'].copy(map=vmf)  # type: Side
+    top_side = template['front'].copy(map=vmf)
     top_side.mat = top_surf
     top_side.translate(origin - recess_dist * normal)
 
@@ -782,16 +786,16 @@ def make_tile(
 
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
-    umin_side = template[-1, 0][bevel_umin].copy(map=vmf)
+    umin_side = template[-1, 0, thickness, bevel_umin].copy(map=vmf)
     umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
 
-    umax_side = template[1, 0][bevel_umax].copy(map=vmf)
+    umax_side = template[1, 0, thickness, bevel_umax].copy(map=vmf)
     umax_side.translate(origin + Vec.with_axes(axis_u, width/2))
 
-    vmin_side = template[0, -1][bevel_vmin].copy(map=vmf)
+    vmin_side = template[0, -1, thickness, bevel_vmin].copy(map=vmf)
     vmin_side.translate(origin + Vec.with_axes(axis_v, -height/2))
 
-    vmax_side = template[0, 1][bevel_vmax].copy(map=vmf)
+    vmax_side = template[0, 1, thickness, bevel_vmax].copy(map=vmf)
     vmax_side.translate(origin + Vec.with_axes(axis_v, height/2))
 
     for face in [umin_side, umax_side, vmin_side, vmax_side]:
@@ -821,12 +825,22 @@ def gen_tile_temp():
     This populates TILE_TEMP with pre-rotated solids in each direction,
      with each side identified.
     """
+
+    categories = {
+        (2, True): 'bevel_thin',
+        (4, True): 'bevel_norm',
+        (8, True): 'bevel_thick',
+
+        (2, False): 'flat_thin',
+        (4, False): 'flat_norm',
+        (8, False): 'flat_thick',
+    }  # type: Dict[Tuple[int, bool], Solid]
+
     try:
         template = template_brush.get_template('__TILING_TEMPLATE__')
         # Template -> world -> first solid
-        # We restrict what templates can be used here.
-        bevel_temp = template.visgrouped(['bevel'])[0][0]
-        flat_temp = template.visgrouped(['flat'])[0][0]
+        for (key, name) in categories.items():
+            categories[key] = template.visgrouped(name)[0][0]
     except KeyError:
         raise Exception('Bad Tiling Template!')
 
@@ -834,40 +848,29 @@ def gen_tile_temp():
         norm = Vec(norm_tup)
         axis_norm = norm.axis()
 
-        rotated_bevel = bevel_temp.copy()
-        rotated_flat = flat_temp.copy()
-
-        rotated_bevel.localise(Vec(), angles)
-        rotated_flat.localise(Vec(), angles)
-
         TILE_TEMP[norm_tup] = temp_part = {}
 
-        bevel_sides = {}
+        for ((thickness, bevel), temp) in categories.items():
+            brush = temp.copy()
+            brush.localise(Vec(), angles)
 
-        for face in rotated_bevel:
-            if face.mat == consts.Special.BACKPANELS:
-                temp_part['back'] = face
-                face.translate(2 * norm)
-            elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
-                temp_part['front'] = face
-                face.translate(-2 * norm)
-            else:
-                # Squarebeams
-                face_norm = round(face.get_origin().norm())  # type: Vec
-                bevel_sides[face_norm.as_tuple()] = face
-                face.translate(-16 * face_norm - 2 * norm)
+            for face in brush:
+                if face.mat == consts.Special.BACKPANELS:
+                    # Only copy the front and back from the normal template.
+                    if thickness == 4 and not bevel:
+                        temp_part['back'] = face
+                        face.translate(2 * norm)
+                elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
+                    if thickness == 4 and not bevel:
+                        temp_part['front'] = face
+                        face.translate(-2 * norm)
+                else:
+                    # Squarebeams
+                    face_norm = round(face.get_origin().norm())  # type: Vec
+                    face.translate(-16 * face_norm - (thickness/ 2) * norm)
+                    u_dir, v_dir = face_norm.other_axes(axis_norm)
+                    temp_part[u_dir, v_dir, thickness, bevel] = face
 
-        # Flat-side squarebeams...
-        for face in rotated_flat:
-            face_norm = round(face.get_origin().norm())  # type: Vec
-            if face_norm[axis_norm]:
-                continue
-
-            face.translate(-16 * face_norm - 2 * norm)
-            temp_part[face_norm.other_axes(norm.axis())] = (
-                face,
-                bevel_sides[face_norm.as_tuple()],
-            )
 
 
 def analyse_map(vmf_file: VMF, side_to_ant_seg: Dict[str, List[antlines.Segment]]):

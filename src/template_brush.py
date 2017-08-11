@@ -222,9 +222,13 @@ class Template:
         """Given some visgroups, return the matching data.
 
         This returns lists of the world brushes, detail brushes, and overlays.
+        visgroups can also be a single string, to select that.
         """
-        visgroups = set(visgroups)
-        visgroups.add('')
+        if isinstance(visgroups, str):
+            visgroups = {'', visgroups}
+        else:
+            visgroups = set(visgroups)
+            visgroups.add('')
 
         world_brushes = []  # type: List[Solid]
         detail_brushes = []  # type: List[Solid]
