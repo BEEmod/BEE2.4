@@ -9,7 +9,8 @@ from enum import Enum
 import utils
 import bottomlessPit
 
-from typing import Dict, Union
+from typing import Dict, Union, Iterator, Tuple
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -190,7 +191,7 @@ class Grid(Dict[_grid_keys, Block]):
         """Like raycast(), but accepts and returns world positions instead."""
         return g2w(self.raycast(w2g(pos), direction, collide))
 
-    def __getitem__(self, pos: _grid_keys):
+    def __getitem__(self, pos: _grid_keys) -> Block:
         return super().get(self._conv_key(pos), Block.VOID)
 
     get = __getitem__
@@ -203,13 +204,13 @@ class Grid(Dict[_grid_keys, Block]):
 
         super().__setitem__(self._conv_key(pos), value)
 
-    def __contains__(self, pos: _grid_keys):
+    def __contains__(self, pos: _grid_keys) -> bool:
         return super().__contains__(self._conv_key(pos))
 
-    def keys(self):
+    def keys(self) -> Iterator[Vec]:
         yield from map(Vec, super().keys())
 
-    def items(self):
+    def items(self) -> Iterator[Tuple[Vec, Block]]:
         for pos, block in super().items():
             yield Vec(pos), block
 
