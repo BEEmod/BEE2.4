@@ -269,9 +269,8 @@ class Grid(Dict[_grid_keys, Block]):
                             (g_x, g_y - 1, g_z),
                         ])
 
-                # Bottomless pits don't use goo, so remove the water..
-                if is_pit:
-                    vmf.remove_brush(brush)
+                # Remove the brush, since we're not going to use it.
+                vmf.remove_brush(brush)
 
                 # Indicate that this map contains goo/pits
                 if is_pit:

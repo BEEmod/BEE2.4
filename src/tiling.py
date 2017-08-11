@@ -3,8 +3,10 @@
 It also tracks overlays assigned to tiles, so we can regenerate all the brushes.
 That allows any wall cube to be split into separate brushes, and make quarter-tile patterns.
 """
+from collections import defaultdict, Counter
+
 from enum import Enum
-from typing import Tuple, Dict, List, Optional, Sequence, Union
+from typing import Tuple, Dict, List, Optional, Sequence, Union, Set
 
 import instanceLocs
 import vbsp_options
@@ -17,6 +19,7 @@ import utils
 import template_brush
 import texturing
 import antlines
+import grid_optim
 
 LOGGER = utils.getLogger(__name__)
 
@@ -1142,3 +1145,65 @@ def generate_brushes(vmf: VMF):
         else:
             over.remove()
 
+    LOGGER.info('Generating goop...')
+    generate_goo(vmf)
+
+
+def generate_goo(vmf: VMF):
+    """Generate goo pit brushes and triggers."""
+    # We want to use as few brushes as possible.
+    # So group them by their min/max Z, and then produce bounding boxes.
+
+    goo_pos = defaultdict(dict)  # type: Dict[Tuple[int, int], Dict[Tuple[int, int], bool]]
+
+    # Calculate the z-level with the largest number of goo brushes,
+    # so we can ensure the 'fancy' pit is the largest one.
+    # Valve just does it semi-randomly.
+    goo_heights = Counter()
+
+    for pos, block_type in BLOCK_POS.items():
+        if block_type is Block.GOO_SINGLE:
+            goo_pos[pos.z, pos.z][pos.x, pos.y] = True
+
+            goo_heights[pos.as_tuple()] += 1
+        elif block_type is Block.GOO_TOP:
+            goo_heights[pos.as_tuple()] += 1
+            # Multi-layer..
+            lower_pos = BLOCK_POS.raycast(pos, Vec(0, 0, -1))
+
+            goo_pos[lower_pos.z, pos.z][pos.x, pos.y] = True
+
+    LOGGER.info('Goo pos: {}', goo_pos)
+
+    # No goo.
+    if not goo_pos:
+        return
+
+    goo_scale = vbsp_options.get(float, 'goo_scale')
+
+    # Find key with the highest value - that gives the largest z-level.
+    best_goo = max(goo_heights.items(), key=lambda x: x[1])[0]
+
+    LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
+
+    for ((min_z, max_z), grid) in goo_pos.items():
+        for min_x, min_y, max_x, max_y in grid_optim.optimise(grid):
+            bbox_min = Vec(min_x, min_y, min_z) * 128
+            bbox_max = Vec(max_x, max_y, max_z) * 128
+            prism = vmf.make_prism(
+                bbox_min,
+                bbox_max + (128, 128, 96),
+            )
+            # Apply goo scaling
+            prism.top.scale = goo_scale
+            # Use fancy goo on the level with the
+            # highest number of blocks.
+            # All plane z are the same.
+            prism.top.mat = texturing.SPECIAL.get(
+                bbox_max + (0, 0, 96), (
+                    'goo' if
+                    bbox_max.z == best_goo
+                    else 'goo_cheap'
+                ),
+            )
+            vmf.add_brush(prism.solid)
