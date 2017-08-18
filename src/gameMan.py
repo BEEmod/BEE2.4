@@ -71,6 +71,7 @@ SolidEnergy
 $basetexture "sprites/laserbeam"
 $flowmap "effects/fizzler_flow"
 $flowbounds "BEE2/fizz/fizz_side"
+$flow_noise_texture "effects/fizzler_noise"
 $additive 1
 $translucent 1
 $decal 1
@@ -84,6 +85,9 @@ $offset "[0 0]"
 Proxies
 {
 FizzlerVortex
+{
+}
+MaterialModify
 {
 }
 }

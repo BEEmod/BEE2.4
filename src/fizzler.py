@@ -415,7 +415,7 @@ class FizzlerBrush:
             conf['mat_mod_var', None],
         )
 
-    def _side_color(self, side: Side, normal: Vec, min_pos: Vec):
+    def _side_color(self, side: Side, normal: Vec, min_pos: Vec, used_tex_func):
         """Output the side texture for fields."""
         if not self.side_color:
             # Just apply nodraw.
@@ -430,6 +430,7 @@ class FizzlerBrush:
             round(self.side_color.y * 255),
             round(self.side_color.z * 255),
         )
+        used_tex_func(side.mat)
 
         # Pack the file.
         vbsp.PACK_FILES.add('materials/{}.vmt'.format(side.mat))
@@ -500,7 +501,7 @@ class FizzlerBrush:
                     side_norm = side.normal()
 
                     if abs(side_norm) == abs(fizz.up_axis):
-                        self._side_color(side, normal, neg)
+                        self._side_color(side, normal, neg, used_tex_func)
 
                     if abs(side_norm) != normal:
                         continue
@@ -595,7 +596,7 @@ class FizzlerBrush:
                 for side in brush.sides:  # type: Side
                     side_norm = side.normal()
                     if abs(side_norm) == abs(fizz.up_axis):
-                        self._side_color(side, normal, neg)
+                        self._side_color(side, normal, neg, used_tex_func)
 
                     if abs(side_norm) != abs(normal):
                         continue
