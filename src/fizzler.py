@@ -217,14 +217,23 @@ class FizzlerType:
 
         inst = {}
         for inst_type in FizzInst:
-            inst[inst_type] = [
+            inst[inst_type] = instances = [
                 file
                 for prop in conf.find_all(inst_type.value)
                 for file in instanceLocs.resolve(prop.value)
             ]
+            # Allow specifying weights to bias model locations
+            weights = conf[inst_type.value + '_weight', '']
+            if weights:
+                # Produce the weights, then process through the original
+                # list to build a new one with repeated elements.
+                inst[inst_type] = [
+                    instances[i]
+                    for i in conditions.weighted_random(len(instances), weights)
+                ]
 
         if not inst[FizzInst.BASE]:
-            raise ValueError('No base instance set!')
+            LOGGER.warning('No base instance set! for "{}"!', fizz_id)
 
         voice_attrs = []
         for prop in conf.find_all('Has'):
