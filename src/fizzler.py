@@ -592,7 +592,7 @@ class FizzlerBrush:
                 ]
 
             for brush, model_normal, brush_length in brushes:
-                for side in brush.sides:
+                for side in brush.sides:  # type: Side
                     side_norm = side.normal()
                     if abs(side_norm) == abs(fizz.up_axis):
                         self._side_color(side, normal, neg)
@@ -604,6 +604,15 @@ class FizzlerBrush:
                         fizz.tag_on_pos
                         if normal.dot(side_norm) > 0 else
                         fizz.tag_on_neg
+                    )
+
+                    self._texture_fit(
+                        side,
+                        FIZZLER_TEX_SIZE,
+                        brush_length,
+                        fizz,
+                        neg,
+                        pos,
                     )
 
                     if model_normal is None:
@@ -630,15 +639,6 @@ class FizzlerBrush:
                                 TexGroup.LEFT
                             ]
                     used_tex_func(side.mat)
-
-                    self._texture_fit(
-                        side,
-                        FIZZLER_TEX_SIZE,
-                        brush_length,
-                        fizz,
-                        neg,
-                        pos,
-                    )
 
     def _texture_fit(
         self,
