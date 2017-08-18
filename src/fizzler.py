@@ -323,7 +323,7 @@ class FizzlerBrush:
         local_keys: Dict[str, str],
         outputs: List[Output],
         thickness=2.0,
-        side_tint: Vec=None,
+        side_color: Vec=None,
         singular: bool=False,
         mat_mod_name: str=None,
         mat_mod_var: str=None,
@@ -335,7 +335,7 @@ class FizzlerBrush:
         # Width of the brush.
         self.thickness = thickness
         # If set, a colour to apply to the sides.
-        self.side_tint = side_tint
+        self.side_color = side_color
 
         # Use only one brush for all the parts of this.
         self.singular = singular
@@ -359,10 +359,10 @@ class FizzlerBrush:
     @classmethod
     def parse(cls, conf: Property):
         """Parse from a config file."""
-        if 'side_tint' in conf:
-            side_tint = conf.vec('side_tint')
+        if 'side_color' in conf:
+            side_color = conf.vec('side_color')
         else:
-            side_tint = None
+            side_color = None
 
         outputs = [
             Output.parse(prop)
@@ -400,15 +400,15 @@ class FizzlerBrush:
             local_keys,
             outputs,
             conf.float('thickness', 2.0),
-            side_tint,
+            side_color,
             conf.bool('singular'),
             conf['mat_mod_name', None],
             conf['mat_mod_var', None],
         )
 
-    def _side_tint(self, side: Side, normal: Vec, min_pos: Vec):
+    def _side_color(self, side: Side, normal: Vec, min_pos: Vec):
         """Output the side texture for fields."""
-        if not self.side_tint:
+        if not self.side_color:
             # Just apply nodraw.
             side.mat = const.Tools.NODRAW
             return
@@ -417,13 +417,15 @@ class FizzlerBrush:
 
         # Produce a hex colour string, and use that as the material name.
         side.mat = 'BEE2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
-            int(self.side_tint.x),
-            int(self.side_tint.y),
-            int(self.side_tint.z),
+            round(self.side_color.x * 255),
+            round(self.side_color.y * 255),
+            round(self.side_color.z * 255),
         )
 
         # Pack the file.
         vbsp.PACK_FILES.add('materials/{}.vmt'.format(side.mat))
+        # Pack the auxiliary texture needed.
+        vbsp.PACK_FILES.add('materials/BEE2/fizz/fizz_side.vtf')
 
         # FLip orientation if needed.
         if not side.uaxis.vec().dot(normal):
@@ -489,7 +491,7 @@ class FizzlerBrush:
                     side_norm = side.normal()
 
                     if abs(side_norm) == abs(fizz.up_axis):
-                        self._side_tint(side, normal, neg)
+                        self._side_color(side, normal, neg)
 
                     if abs(side_norm) != normal:
                         continue
@@ -584,7 +586,7 @@ class FizzlerBrush:
                 for side in brush.sides:
                     side_norm = side.normal()
                     if abs(side_norm) == abs(fizz.up_axis):
-                        self._side_tint(side, normal, neg)
+                        self._side_color(side, normal, neg)
 
                     if abs(side_norm) != abs(normal):
                         continue
