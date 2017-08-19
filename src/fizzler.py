@@ -151,12 +151,13 @@ class FizzlerType:
         item_ids: List[str],
         voice_attrs: List[str],
         pack_lists: Set[str],
+        pack_lists_static: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
         out_activate: Optional[Tuple[Optional[str], str]],
         out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
-        inst: Dict[FizzInst, List[str]],
+        inst: Dict[Tuple[FizzInst, bool], List[str]],
 
         temp_brush_keys: Property,
         temp_min: Optional[str],
@@ -177,11 +178,12 @@ class FizzlerType:
 
         # Packfiles to pack if we're in the map.
         self.pack_lists = pack_lists
+        self.pack_lists_static = pack_lists_static
 
         # The method used to name the models.
         self.model_naming = model_name_type
         self.model_name = model_local_name
-        # Instances to use.
+        # Instances to use - FizzInst, is_static -> list of instances.
         self.inst = inst
 
         # If set, outputs to use via the fizzler output relay.
@@ -216,23 +218,28 @@ class FizzlerType:
             model_name_type = ModelName.SAME
 
         inst = {}
-        for inst_type in FizzInst:
-            inst[inst_type] = instances = [
+        for inst_type, is_static in itertools.product(FizzInst, (False, True)):
+            inst_type_name = inst_type.value + ('_static' if is_static else '')
+            inst[inst_type, is_static] = instances = [
                 file
-                for prop in conf.find_all(inst_type.value)
+                for prop in conf.find_all(inst_type_name)
                 for file in instanceLocs.resolve(prop.value)
             ]
             # Allow specifying weights to bias model locations
-            weights = conf[inst_type.value + '_weight', '']
+            weights = conf[inst_type_name + '_weight', '']
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
-                inst[inst_type] = [
+                inst[inst_type, is_static] = instances = [
                     instances[i]
                     for i in conditions.weighted_random(len(instances), weights)
                 ]
+            # If static versions aren't given, reuse non-static ones.
+            # We do False, True so it's already been calculated.
+            if not instances and is_static:
+                inst[inst_type, True] = inst[inst_type, False]
 
-        if not inst[FizzInst.BASE]:
+        if not inst[FizzInst.BASE, False]:
             LOGGER.warning('No base instance set! for "{}"!', fizz_id)
 
         voice_attrs = []
@@ -254,6 +261,11 @@ class FizzlerType:
             prop.value
             for prop in
             conf.find_all('Pack')
+        }
+        pack_lists_static = {
+            prop.value
+            for prop in
+            conf.find_all('PackStatic')
         }
 
         brushes = [
@@ -282,6 +294,7 @@ class FizzlerType:
             item_ids,
             voice_attrs,
             pack_lists,
+            pack_lists_static,
             model_local_name,
             model_name_type,
             out_activate,
@@ -765,7 +778,6 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
 
         for attr_name in fizz_type.voice_attrs:
             voice_attrs[attr_name] = True
-        pack_list |= fizz_type.pack_lists
 
         for model in models:
             pos = Vec.from_str(model['origin'])
@@ -844,7 +856,7 @@ def generate_fizzlers(vmf: VMF):
     After this is done, fizzler-related conditions will not function correctly.
     However the model instances are now available for modification.
     """
-    from vbsp import MAP_RAND_SEED
+    from vbsp import MAP_RAND_SEED, TO_PACK
 
     for fizz in FIZZLERS.values():
         if fizz.base_inst not in vmf.entities:
@@ -853,9 +865,21 @@ def generate_fizzlers(vmf: VMF):
         fizz_name = fizz.base_inst['targetname']
         fizz_type = fizz.fizz_type
 
-        if fizz_type.inst[FizzInst.BASE]:
+        # Static versions are only used for fizzlers which start on.
+        # Permanently-off fizzlers are kinda useless, so we don't need
+        # to bother optimising for it.
+        is_static = bool(
+            fizz.base_inst.fixup.int('$connectioncount', 0) == 0
+            and fizz.base_inst.fixup.bool('$start_enabled', 1)
+        )
+
+        if is_static:
+            TO_PACK |= fizz.fizz_type.pack_lists_static
+        TO_PACK |= fizz.fizz_type.pack_lists
+
+        if fizz_type.inst[FizzInst.BASE, is_static]:
             random.seed('{}_fizz_base_{}'.format(MAP_RAND_SEED, fizz_name))
-            fizz.base_inst['file'] = random.choice(fizz_type.inst[FizzInst.BASE])
+            fizz.base_inst['file'] = random.choice(fizz_type.inst[FizzInst.BASE, is_static])
 
         if not fizz.emitters:
             LOGGER.warning('No emitters for fizzler "{}"!', fizz_name)
@@ -884,8 +908,15 @@ def generate_fizzlers(vmf: VMF):
         min_angles = FIZZ_ANGLES[forward.as_tuple(), up_dir.as_tuple()]
         max_angles = FIZZ_ANGLES[(-forward).as_tuple(), up_dir.as_tuple()]
 
-        model_min = fizz_type.inst[FizzInst.PAIR_MIN] or fizz_type.inst[FizzInst.ALL]
-        model_max = fizz_type.inst[FizzInst.PAIR_MAX] or fizz_type.inst[FizzInst.ALL]
+        model_min = (
+            fizz_type.inst[FizzInst.PAIR_MIN, is_static]
+            or fizz_type.inst[FizzInst.ALL, is_static]
+        )
+        model_max = (
+            fizz_type.inst[FizzInst.PAIR_MAX, is_static]
+            or fizz_type.inst[FizzInst.ALL, is_static]
+        )
+
         if not model_min or not model_max:
             raise ValueError(
                 'No model specified a side of "{}"'
@@ -931,11 +962,11 @@ def generate_fizzlers(vmf: VMF):
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
             random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
-            if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE]:
+            if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
                 min_inst = vmf.create_ent(
                     targetname=get_model_name(seg_ind),
                     classname='func_instance',
-                    file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE]),
+                    file=random.choice(fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]),
                     origin=(seg_min + seg_max)/2,
                     angles=min_angles,
                 )
@@ -959,7 +990,7 @@ def generate_fizzlers(vmf: VMF):
                 max_inst.fixup.update(fizz.base_inst.fixup)
             min_inst.fixup.update(fizz.base_inst.fixup)
 
-            if fizz_type.inst[FizzInst.GRID]:
+            if fizz_type.inst[FizzInst.GRID, is_static]:
                 # Generate one instance for each position.
 
                 # Go 64 from each side, and always have at least 1 section
@@ -971,7 +1002,7 @@ def generate_fizzlers(vmf: VMF):
                         classname='func_instance',
                         targetname=fizz_name,
                         angles=min_angles,
-                        file=random.choice(fizz_type.inst[FizzInst.GRID]),
+                        file=random.choice(fizz_type.inst[FizzInst.GRID, is_static]),
                         origin=mid_pos,
                     )
                     mid_inst.fixup.update(fizz.base_inst.fixup)
