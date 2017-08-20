@@ -1193,9 +1193,9 @@ def set_elev_videos():
         if inst['file'].casefold() not in transition_ents:
             continue
         if vert_vid:
-            inst.fixup['$vert_video'] = 'media/' + vert_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_VERT] = 'media/' + vert_vid + '.bik'
         if horiz_vid:
-            inst.fixup['$horiz_video'] = 'media/' + horiz_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_HORIZ] = 'media/' + horiz_vid + '.bik'
 
         # Create the video script
         VMF.create_ent(
@@ -1475,7 +1475,7 @@ def mod_entryexit(
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
-        inst.fixup['$corr_index'] = index + 1
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = index + 1
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
@@ -1488,7 +1488,7 @@ def mod_entryexit(
             pretty_name,
             override_corr,
         )
-        inst.fixup['$corr_index'] = override_corr
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = override_corr
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
 
@@ -1732,7 +1732,7 @@ def remove_static_ind_toggles():
         if inst['file'].casefold() not in toggle_file:
             continue
 
-        overlay = inst.fixup['$indicator_name', '']
+        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
         # Remove if there isn't an overlay, or no associated ents.
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
@@ -1788,7 +1788,7 @@ def set_barrier_frame_type():
             norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
         try:
-            inst.fixup['$barrier_type'] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
         except KeyError:
             pass
 
@@ -3310,6 +3310,9 @@ def make_vrad_config(is_peti: bool):
             # It's a list of prop objects, so it'll become a proper
             # block when written.
             conf['MusicScript'] = settings['music_conf']
+
+        from conditions.cubes import write_vscripts
+        write_vscripts(conf)
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():

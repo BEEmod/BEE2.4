@@ -272,8 +272,8 @@ def calc_connections(
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
-                if pan.fixup.bool('$is_timer'):
-                    item.timer = tim = pan.fixup.int('$timer_delay')
+                if pan.fixup.bool(const.FixupVars.TIM_ENABLED):
+                    item.timer = tim = pan.fixup.int(const.FixupVars.TIM_DELAY)
                     if not (1 <= tim <= 30):
                         # These would be infinite.
                         item.timer = None
@@ -290,7 +290,7 @@ def calc_connections(
         # Check/cross instances sometimes don't match the kind of timer delay.
         for pan in item.ind_panels:
             pan['file'] = desired_panel_inst
-            pan.fixup['$is_timer'] = int(item.timer is not None)
+            pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
 
         for inp_item in input_items:  # type: Item
             # Default A/B type.
@@ -325,16 +325,16 @@ def calc_connections(
     for item in ITEMS.values():
         # Copying items can fail to update the connection counts.
         # Make sure they're correct.
-        if '$connectioncount' in item.inst.fixup:
+        if const.FixupVars.CONN_COUNT in item.inst.fixup:
             # Don't count the polarity outputs...
-            item.inst.fixup['$connectioncount'] = sum(
+            item.inst.fixup[const.FixupVars.CONN_COUNT] = sum(
                 1 for conn
                 in item.inputs
                 if conn.type is not ConnType.TBEAM_DIR
             )
-        if '$connectioncount_polarity' in item.inst.fixup:
+        if const.FixupVars.CONN_COUNT_TBEAM in item.inst.fixup:
             # Only count the polarity outputs...
-            item.inst.fixup['$connectioncount_polarity'] = sum(
+            item.inst.fixup[const.FixupVars.CONN_COUNT_TBEAM] = sum(
                 1 for conn
                 in item.inputs
                 if conn.type is ConnType.TBEAM_DIR

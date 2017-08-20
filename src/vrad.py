@@ -621,6 +621,12 @@ def inject_files():
         if os.path.exists(filename):
             yield filename, arcname
 
+    # Additionally add files set in the config.
+    for prop in CONF.find_children('InjectFiles'):
+        filename = os.path.join('bee2', 'inject', prop.real_name)
+        if os.path.exists(filename):
+            yield filename, prop.value
+
 
 def pack_content(bsp_file: BSP, path: str, is_peti: bool):
     """Pack any custom content into the map.

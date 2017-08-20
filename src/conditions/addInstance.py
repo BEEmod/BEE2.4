@@ -7,6 +7,7 @@ import srctools
 import vbsp
 import vbsp_options
 import utils
+import comp_consts as const
 from conditions import (
     make_result, meta_cond, RES_EXHAUSTED,
     GLOBAL_INSTANCES,
@@ -129,23 +130,23 @@ def res_add_overlay_inst(inst: Entity, res: Property):
         # Offset the overlay by the given distance
         # Some special placeholder values:
         if folded_off == '<piston_start>':
-            if srctools.conv_bool(inst.fixup['$start_up', '']):
+            if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
                 folded_off = '<piston_top>'
             else:
                 folded_off = '<piston_bottom>'
         elif folded_off == '<piston_end>':
-            if srctools.conv_bool(inst.fixup['$start_up', '']):
+            if inst.fixup.bool(const.FixupVars.PIST_IS_UP):
                 folded_off = '<piston_bottom>'
             else:
                 folded_off = '<piston_top>'
 
         if folded_off == '<piston_bottom>':
             offset = Vec(
-                z=srctools.conv_int(inst.fixup['$bottom_level']) * 128,
+                z=inst.fixup.int(const.FixupVars.PIST_BTM) * 128,
             )
         elif folded_off == '<piston_top>':
             offset = Vec(
-                z=srctools.conv_int(inst.fixup['$top_level'], 1) * 128,
+                z=inst.fixup.int(const.FixupVars.PIST_TOP) * 128,
             )
         else:
             # Regular vector

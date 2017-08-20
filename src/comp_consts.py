@@ -1,7 +1,8 @@
 """Various constant values for use by VBSP. (Mainly texture names.)"""
 from enum import Enum, EnumMeta
 
-from srctools import Side as _Side
+from srctools import Side as _Side, Entity
+
 
 __all__ = [
     'MaterialGroup',
@@ -67,6 +68,49 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
         """Allow hashing MaterialGroup values."""
         return hash(self.value)
 
+
+class FixupVars(MaterialGroup):
+    """Variable names for fixups."""
+    CONN_COUNT = '$connectioncount'
+    CONN_COUNT_TBEAM = '$connectioncount_polarity'
+
+    CUBE_TYPE = '$cube_type'
+
+    ST_ENABLED = '$start_enabled'
+    ST_REVERSED = '$start_reversed'
+    ST_DEPLOYED = '$start_deployed'
+    DIS_AUTO_RESPAWN = '$disable_autorespawn'
+    DIS_AUTO_DROP = '$disable_autodrop'
+
+    TIM_ENABLED = '$is_timer'
+    TIM_DELAY = '$timer_delay'
+
+    # Indicator env_texturetoggle overlay.
+    TOGGLE_OVERLAY = '$indicator_name'
+
+    PIST_TOP = '$top_level'
+    PIST_BTM = '$bottom_level'
+    PIST_IS_UP = '$start_up'
+
+    TRACK_MOVE_DIST = '$travel_distance'
+    TRACK_MOVE_ANGLES = '$travel_direction'
+    TRACK_START_FRAC = '$starting_position'
+
+    FIZZ_MDL_SKIN = '$skin'  # Fizzler model skin (fizzler, dirty, laserfield)
+
+    # Extra vars we've defined.
+
+    # Index of entry/exit corridor
+    BEE_CORR_INDEX = '$corr_index'
+    # Videos set for arrival_departure_transition_ents.
+    BEE_ELEV_VERT = '$vert_video'
+    BEE_ELEV_HORIZ = '$horiz_video'
+    BEE_MONITOR_IS_BREAKABLE = '$is_breakable'
+    BEE_MONITOR_TOGGLE_FUNC = '$toggle_func'
+    # Is glass or grating?
+    BEE_GLS_TYPE = '$barrier_type'
+    BEE_PIST_IS_STATIC = '$is_static'
+    BEE_PIST_MANAGER_A = '$manager_a'
 
 class ItemClass(MaterialGroup):
     """PeTI item classes."""
