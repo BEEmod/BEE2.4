@@ -879,7 +879,7 @@ def remove_ant_toggle(toggle_ent):
 
     # Assume anything with '$indicator_name' is a toggle instance
     # This will likely be called on the signs too, if present.
-    overlay_name = toggle_ent.fixup['$indicator_name', '']
+    overlay_name = toggle_ent.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
     if overlay_name != '':
         for ent in VMF.by_target[overlay_name]:
             ent.remove()
@@ -1134,7 +1134,7 @@ def fix_catapult_targets(inst: Entity):
 
 @make_result_setup('timedRelay')
 def res_timed_relay_setup(res: Property):
-    var = res['variable', '$timer_delay']
+    var = res['variable', consts.FixupVars.TIM_DELAY]
     name = res['targetname']
     disabled = res['disabled', '0']
     flags = res['spawnflags', '0']
@@ -1337,11 +1337,13 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
     to the item ID optionally followed by a :prefix.
     """
 
-    bottom_pos = ent.fixup.int('bottom_level', 0)
+    bottom_pos = ent.fixup.int(consts.FixupVars.PIST_BTM, 0)
 
-    if (ent.fixup['connectioncount', '0'] != "0" or
-            ent.fixup['disable_autodrop', '0'] != "0"):  # can it move?
-        ent.fixup['$is_static'] = True
+    if (
+        ent.fixup.int(consts.FixupVars.CONN_COUNT) > 0 or
+        ent.fixup.bool(consts.FixupVars.DIS_AUTO_DROP)
+    ):  # can it move?
+        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = True
 
         # Use instances based on the height of the bottom position.
         val = res.value['bottom_' + str(bottom_pos)]
@@ -1358,16 +1360,16 @@ def make_static_pist(vmf: srctools.VMF, ent: Entity, res: Property):
             vmf.add_ent(logic_ent)
             # If no connections are present, set the 'enable' value in
             # the logic to True so the piston can function
-            logic_ent.fixup['manager_a'] = srctools.bool_as_int(
-                ent.fixup['connectioncount', '0'] == '0'
+            logic_ent.fixup[consts.FixupVars.BEE_PIST_MANAGER_A] = (
+                ent.fixup.int(consts.FixupVars.CONN_COUNT) == 0
             )
     else:  # we are static
-        ent.fixup['$is_static'] = False
-        if ent.fixup.bool('start_up'):
-            pos = bottom_pos = ent.fixup.int('top_level', 1)
+        ent.fixup[consts.FixupVars.BEE_PIST_IS_STATIC] = False
+        if ent.fixup.bool(consts.FixupVars.PIST_IS_UP):
+            pos = bottom_pos = ent.fixup.int(consts.FixupVars.PIST_TOP, 1)
         else:
             pos = bottom_pos
-        ent.fixup['top_level'] = ent.fixup['bottom_level'] = pos
+        ent.fixup[consts.FixupVars.PIST_TOP] = ent.fixup[consts.FixupVars.PIST_BTM] = pos
 
         val = res.value['static_' + str(pos)]
         if val:
