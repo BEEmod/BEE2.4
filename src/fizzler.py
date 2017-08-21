@@ -772,9 +772,10 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             item_id, item_subtype = instanceLocs.ITEM_FOR_FILE[base_inst['file'].casefold()]
             fizz_type = fizz_types[item_id, model_skin]
         except KeyError:
+            LOGGER.warning('Fizzler types: {}', fizz_types.keys())
             raise ValueError('No fizzler type for "{}"!'.format(
-                base_inst['file']
-            ))
+                base_inst['file'],
+            )) from None
 
         for attr_name in fizz_type.voice_attrs:
             voice_attrs[attr_name] = True
