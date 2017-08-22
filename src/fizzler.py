@@ -996,7 +996,7 @@ def generate_fizzlers(vmf: VMF):
 
                 # Go 64 from each side, and always have at least 1 section
                 # A 128 gap will have length = 0
-                for ind, dist in enumerate(range(64, round(length) - 127, 128)):
+                for ind, dist in enumerate(range(64, round(length) - 63, 128)):
                     mid_pos = seg_min + forward * dist
                     random.seed('{}_fizz_mid_{}'.format(MAP_RAND_SEED, mid_pos))
                     mid_inst = vmf.create_ent(
