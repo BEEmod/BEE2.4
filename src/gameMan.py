@@ -778,19 +778,29 @@ class Game:
 
         export_screen.set_length('MUS', file_count)
 
+        # We know that it's very unlikely Tag or Mel's going to update
+        # the music files. So we can check to see if they already exist,
+        # and if so skip copying - that'll speed up any exports after the
+        # first.
+        # We'll still go through the list though, just in case one was
+        # deleted.
+
         if copy_tag:
             os.makedirs(tag_dest, exist_ok=True)
             for filename in os.listdir(MUSIC_TAG_LOC):
                 src_loc = os.path.join(MUSIC_TAG_LOC, filename)
-                if os.path.isfile(src_loc):
-                    shutil.copy(src_loc, tag_dest)
-                    export_screen.step('MUS')
+                dest_loc = os.path.join(tag_dest, filename)
+                if os.path.isfile(src_loc) and not os.path.exists(dest_loc):
+                    shutil.copy(src_loc, dest_loc)
+                export_screen.step('MUS')
 
         if MUSIC_MEL_VPK is not None:
             os.makedirs(mel_dest, exist_ok=True)
             for filename in MEL_MUSIC_NAMES:
-                with open(os.path.join(mel_dest, filename), 'wb') as dest:
-                    dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
+                dest_loc = os.path.join(mel_dest, filename)
+                if not os.path.exists(dest_loc):
+                    with open(dest_loc, 'wb') as dest:
+                        dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
                 export_screen.step('MUS')
 
     def init_trans(self):
