@@ -71,11 +71,12 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
             LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
             return error or img_error
         with img_file.open_bin() as file:
-            image = Image.open(file)
+            image = Image.open(file)  # type: Image.Image
             image.load()
 
-    if resize_to != (0, 0):
+    if resize_to != (0, 0) and resize_to != image.size:
         image = image.resize(resize_to, algo)
+        # image.save(img_file._data.sys._resolve_path(img_file._data.path))
 
     tk_img = ImageTk.PhotoImage(image=image)
 

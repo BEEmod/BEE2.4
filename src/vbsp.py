@@ -1,4 +1,3 @@
-
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -26,6 +25,7 @@ import conditions
 import connections
 import instance_traits
 import template_brush
+import fizzler
 import comp_consts as consts
 import conditions.globals
 import conditions.cubes
@@ -39,7 +39,6 @@ COND_MOD_NAME = 'VBSP'
 # Configuration data extracted from VBSP_config
 settings = {
     "textures":       {},
-    "fizzler":        {},
     "options":        {},
     "fog":            {},
     "elev_opt":       {},
@@ -173,35 +172,6 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-
-# angles needed to ensure fizzlers are not upside-down
-# (key=original, val=fixed)
-FIZZLER_ANGLE_FIX = {
-    "0 0 -90":    "0 180 90",
-    "0 0 180":    "0 180 180",
-    "0 90 0":     "0 -90 0",
-    "0 90 -90":   "0 -90 90",
-    "0 180 -90":  "0 0 90",
-    "0 -90 -90":  "0 90 90",
-    "90 180 0":   "-90 0 0",
-    "90 -90 0":   "-90 90 0",
-    "-90 180 0":  "90 0 0",
-    "-90 -90 0":  "90 90 0",
-    }
-
-# Texture -> fizzler.x
-TEX_FIZZLER = {
-    consts.Fizzler.CENTER: "center",
-    consts.Fizzler.LEFT: "left",
-    consts.Fizzler.RIGHT: "right",
-    consts.Fizzler.SHORT: "short",
-    consts.Tools.NODRAW: "nodraw",
-    }
-
-FIZZ_OPTIONS = [
-    ('0', 'scanline'),
-]
-
 BEE2_config = None  # type: ConfigFile
 
 GAME_MODE = 'ERR'  # SP or COOP?
@@ -271,8 +241,6 @@ def alter_mat(face, seed=None, texture_lock=True):
             face.offset = 0
 
         return True
-    elif mat in TEX_FIZZLER:
-        face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
 
@@ -335,17 +303,6 @@ def load_settings():
     # Load in our main configs..
     vbsp_options.load(conf.find_all('Options'))
 
-    # Load in fizzler options and textures. This works similarly to the normal
-    # textures/options.
-
-    fizz_defaults = list(TEX_FIZZLER.items()) + FIZZ_OPTIONS
-    for item, key in fizz_defaults:
-        settings['fizzler'][key] = item
-
-    for fizz_block in conf.find_all('fizzler'):
-        for default, key in fizz_defaults:
-            settings['fizzler'][key] = fizz_block[key, settings['fizzler'][key]]
-
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
         voiceLine.QUOTE_DATA += quote_block.value
@@ -376,6 +333,9 @@ def load_settings():
 
     # Data for different cube types.
     conditions.cubes.parse_conf(conf)
+
+    # Fizzler data
+    fizzler.read_configs(conf)
 
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
@@ -474,7 +434,6 @@ def add_voice():
     )
 
 
-@conditions.meta_cond(priority=-250)
 def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
@@ -585,37 +544,6 @@ def add_fizz_borders():
                 v_repeat=v_rep,
                 swap=flip_uv,
             )
-
-
-@conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst: Entity):
-    """Fix some bugs with fizzler model instances.
-    This removes extra numbers from model instances, which prevents
-    inputs from being read correctly.
-    It also rotates fizzler models so they are both facing the same way.
-    """
-    # Fizzler model names end with this special string
-    if ("_modelStart" in inst['targetname', ''] or
-            "_modelEnd" in inst['targetname', '']):
-
-        # strip off the extra numbers on the end, so fizzler
-        # models recieve inputs correctly (Valve bug!)
-        if "_modelStart" in inst['targetname', '']:
-
-            inst['targetname'] = (
-                inst['targetname'].split("_modelStart")[0] +
-                "_modelStart"
-                )
-        else:
-            inst['targetname'] = (
-                inst['targetname'].split("_modelEnd")[0] +
-                "_modelEnd"
-                )
-
-        # one side of the fizzler models are rotated incorrectly
-        # (upsidown), fix that...
-        if inst['angles'] in FIZZLER_ANGLE_FIX:
-            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
@@ -2663,40 +2591,6 @@ def change_overlays():
             )
 
 
-def change_trig():
-    """Check the triggers and fizzlers."""
-    LOGGER.info("Editing Triggers...")
-
-    for trig in VMF.by_class['trigger_portal_cleanser']:
-        for side in trig.sides():
-            alter_mat(side)
-        target = trig['targetname', '']
-
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_fizz'
-
-        trig['drawInFastReflection'] = vbsp_options.get(bool, "force_fizz_reflect")
-        # This also controls whether fizzlers play sounds.
-        trig['visible'] = vbsp_options.get(bool, 'fizz_visibility')
-
-        use_scanline = settings["fizzler"]["scanline"]
-        # Scanlines always move vertically - on horizontal fizzlers they won't
-        # work.
-        if use_scanline:
-            bbox_min, bbox_max = trig.get_bbox()
-            if (bbox_max - bbox_min).z < 64:
-                # On the floor - no scanline..
-                use_scanline = False
-        trig['useScanline'] = use_scanline
-
-    for trig in VMF.by_class['trigger_hurt']:
-        target = trig['targetname', '']
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_hurt'
-
-
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
@@ -3765,6 +3659,8 @@ def main():
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
+        fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
+
         conditions.init(
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
@@ -3779,7 +3675,6 @@ def main():
         fixup_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
-        change_trig()
         collapse_goo_trig()
         change_func_brush()
         remove_static_ind_toggles()
