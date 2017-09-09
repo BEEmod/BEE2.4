@@ -28,6 +28,7 @@ import connections
 import instance_traits
 import template_brush
 import antlines
+import fizzler
 import comp_consts as consts
 import conditions.globals
 import conditions.cubes
@@ -41,7 +42,6 @@ COND_MOD_NAME = 'VBSP'
 # Configuration data extracted from VBSP_config
 settings = {
     "textures":       {},
-    "fizzler":        {},
     "options":        {},
     "fog":            {},
     "elev_opt":       {},
@@ -174,35 +174,6 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-
-# angles needed to ensure fizzlers are not upside-down
-# (key=original, val=fixed)
-FIZZLER_ANGLE_FIX = {
-    "0 0 -90":    "0 180 90",
-    "0 0 180":    "0 180 180",
-    "0 90 0":     "0 -90 0",
-    "0 90 -90":   "0 -90 90",
-    "0 180 -90":  "0 0 90",
-    "0 -90 -90":  "0 90 90",
-    "90 180 0":   "-90 0 0",
-    "90 -90 0":   "-90 90 0",
-    "-90 180 0":  "90 0 0",
-    "-90 -90 0":  "90 90 0",
-    }
-
-# Texture -> fizzler.x
-TEX_FIZZLER = {
-    consts.Fizzler.CENTER: "center",
-    consts.Fizzler.LEFT: "left",
-    consts.Fizzler.RIGHT: "right",
-    consts.Fizzler.SHORT: "short",
-    consts.Tools.NODRAW: "nodraw",
-    }
-
-FIZZ_OPTIONS = [
-    ('0', 'scanline'),
-]
-
 BEE2_config = None  # type: ConfigFile
 
 GAME_MODE = 'ERR'  # SP or COOP?
@@ -323,6 +294,9 @@ def load_settings():
     # Data for different cube types.
     conditions.cubes.parse_conf(conf)
 
+    # Fizzler data
+    fizzler.read_configs(conf)
+
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
     for trigger in conf.find_all('PackTriggers', 'material'):
@@ -420,7 +394,6 @@ def add_voice():
     )
 
 
-@conditions.meta_cond(priority=-250)
 def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
@@ -532,35 +505,6 @@ def add_fizz_borders():
             )
 
 
-@conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst: Entity):
-    """Fix some bugs with fizzler model instances.
-    This removes extra numbers from model instances, which prevents
-    inputs from being read correctly.
-    It also rotates fizzler models so they are both facing the same way.
-    """
-    # Fizzler model names end with this special string
-    if ("_modelStart" in inst['targetname', ''] or
-            "_modelEnd" in inst['targetname', '']):
-
-        # strip off the extra numbers on the end, so fizzler
-        # models recieve inputs correctly (Valve bug!)
-        if "_modelStart" in inst['targetname', '']:
-
-            inst['targetname'] = (
-                inst['targetname'].split("_modelStart")[0] +
-                "_modelStart"
-                )
-        else:
-            inst['targetname'] = (
-                inst['targetname'].split("_modelEnd")[0] +
-                "_modelEnd"
-                )
-
-        # one side of the fizzler models are rotated incorrectly
-        # (upsidown), fix that...
-        if inst['angles'] in FIZZLER_ANGLE_FIX:
-            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
 
 ANGLED_PAN_BRUSH = {}  # Dict mapping locations -> func_brush face, name
@@ -1093,9 +1037,9 @@ def set_elev_videos():
         if inst['file'].casefold() not in transition_ents:
             continue
         if vert_vid:
-            inst.fixup['$vert_video'] = 'media/' + vert_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_VERT] = 'media/' + vert_vid + '.bik'
         if horiz_vid:
-            inst.fixup['$horiz_video'] = 'media/' + horiz_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_HORIZ] = 'media/' + horiz_vid + '.bik'
 
         # Create the video script
         VMF.create_ent(
@@ -1375,7 +1319,7 @@ def mod_entryexit(
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
-        inst.fixup['$corr_index'] = index + 1
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = index + 1
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
@@ -1388,7 +1332,7 @@ def mod_entryexit(
             pretty_name,
             override_corr,
         )
-        inst.fixup['$corr_index'] = override_corr
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = override_corr
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
 
@@ -1634,7 +1578,7 @@ def remove_static_ind_toggles():
         if inst['file'].casefold() not in toggle_file:
             continue
 
-        overlay = inst.fixup['$indicator_name', '']
+        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
         # Remove if there isn't an overlay, or no associated ents.
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
@@ -1690,7 +1634,7 @@ def set_barrier_frame_type():
             norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
         try:
-            inst.fixup['$barrier_type'] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
         except KeyError:
             pass
 
@@ -2276,40 +2220,6 @@ def change_overlays():
                     over[prop] = val.join(' ')
         # TODO: Remake antlines.
 
-def change_trig():
-    """Check the triggers and fizzlers."""
-    LOGGER.info("Editing Triggers...")
-
-    for trig in VMF.by_class['trigger_portal_cleanser']:
-        for side in trig.sides():
-            alter_mat(side)
-        target = trig['targetname', '']
-
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_fizz'
-
-        trig['drawInFastReflection'] = vbsp_options.get(bool, "force_fizz_reflect")
-        # This also controls whether fizzlers play sounds.
-        trig['visible'] = vbsp_options.get(bool, 'fizz_visibility')
-
-        use_scanline = settings["fizzler"]["scanline"]
-        # Scanlines always move vertically - on horizontal fizzlers they won't
-        # work.
-        if use_scanline:
-            bbox_min, bbox_max = trig.get_bbox()
-            if (bbox_max - bbox_min).z < 64:
-                # On the floor - no scanline..
-                use_scanline = False
-        trig['useScanline'] = use_scanline
-
-    for trig in VMF.by_class['trigger_hurt']:
-        target = trig['targetname', '']
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_hurt'
-
-
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
@@ -2820,6 +2730,9 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
+        from conditions.cubes import write_vscripts
+        write_vscripts(conf)
+
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
             f.write(line)
@@ -3168,6 +3081,8 @@ def main():
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
+        fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
+
         conditions.init(
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
@@ -3189,7 +3104,6 @@ def main():
         #change_brush()
         tiling.generate_brushes(VMF)
         change_overlays()
-        change_trig()
         collapse_goo_trig()
         change_func_brush()
         remove_static_ind_toggles()

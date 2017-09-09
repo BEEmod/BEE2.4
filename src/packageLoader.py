@@ -411,7 +411,6 @@ def load_packages(
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
                 obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
                 # parse through the object and return the resultant class
                 try:
@@ -2676,7 +2675,7 @@ class BrushTemplate(PakObject, has_img=False):
             config_id = config['template_id']
             if config_id and temp_id:
                 if config['template_id'].casefold() != temp_id.casefold():
-                    raise ValueError('VMF and info.txt have different ids: {}, {}'.format(
+                    raise ValueError('VMF and info.txt have different ids:\n conf = {}, info.txt = {}'.format(
                         config['template_id'],
                         temp_id,
                     ))

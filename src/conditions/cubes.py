@@ -1,4 +1,5 @@
 """Implement cubes and droppers."""
+import io
 import itertools
 from collections import namedtuple
 
@@ -7,7 +8,7 @@ from typing import Dict, Optional, List, Union, Tuple, Any, Set, FrozenSet
 
 import brushLoc
 import vbsp_options
-from conditions import meta_cond, make_result, make_flag
+from conditions import meta_cond, make_result, make_flag, RES_EXHAUSTED
 from instanceLocs import resolve as resolve_inst
 from srctools import (
     Property, NoKeyError, VMF, Entity, Vec, Output,
@@ -49,6 +50,10 @@ CUBE_FILTER_MULTI_IND = 0
 # Max number of ents in a multi filter.
 MULTI_FILTER_COUNT = 10
 
+# The BSP file path -> data for each script query function that's
+# desired.
+CUBE_SCRIPT_FILTERS = {}  # type: Dict[str, io.StringIO]
+
 # The IDs for the default cube types, matched to the $cube_type value.
 VALVE_CUBE_IDS = {
     0: 'VALVE_CUBE_STANDARD',
@@ -67,6 +72,18 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
 ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
+
+VSCRIPT_CLOSURE = '''\
+class __BEE2_CUBE_FUNC__{
+\ttable = null;
+\tconstructor(table) {
+\t\tthis.table = table;
+\t}
+\tfunction _call(this2, ent) {
+\t\treturn ent.GetModelName().tolower() in this.table;
+\t}
+}
+'''
 
 
 class CubeEntType(Enum):
@@ -389,6 +406,23 @@ class CubeType:
             conf['thinkFunc', None],
         )
 
+    def add_models(self, models: Dict[str, str]):
+        """Get the models used for a cube type.
+
+        These are stored as keys of the models dict, with the value a name to
+        use for filters or variables.
+        """
+        # If we have a coloured version, we might need that too.
+        if self.model_color and self.color_in_map:
+            models[self.model_color] = self.has_name + '_color'
+
+        if self.in_map:
+            if self.model:
+                models[self.model] = self.has_name
+            else:
+                # No custom model - it's default.
+                models[DEFAULT_MODELS[self.type]] = self.has_name
+
 
 class CubePair:
     """Represents a single cube/dropper pair."""
@@ -501,8 +535,24 @@ def parse_conf(conf: Property):
             raise Exception('Cube type "{}" is missing!'.format(cube_id))
 
 
-def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
-    """Given a set of cube-type IDs, generate a filter for them.
+def write_vscripts(vrad_conf: Property):
+    """Write CUBE_SCRIPT_FILTERS out for VRAD to use."""
+    if not CUBE_SCRIPT_FILTERS:
+        return
+
+    conf_block = vrad_conf.ensure_exists('InjectFiles')
+
+    for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
+        filename = 'cube_vscript_{:02}.nut'.format(i)
+        with open('BEE2/inject/' + filename, 'w') as f:
+            f.write(buffer.getvalue())
+        conf_block[filename] = 'scripts/vscripts/' + bsp_name
+
+
+def parse_filter_types(
+    cubes: List[str]
+) -> Tuple[Set[CubeType], Set[CubeType], Set[CubeType]]:
+    """Parse a list of cube IDs to a list of included/excluded types.
 
     Each cube should be the name of an ID, with '!' before to exclude it.
     It succeeds if a target is any of the included types, and not any of the
@@ -512,10 +562,9 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     * <companion> to detect 'companion' items.
     * <sphere> to detect sphere-type items.
 
-    The filter will be made if needed, and the targetname to use returned.
+    This returns 3 sets of CubeTypes - all cubes, ones to include, and ones
+    to exclude.
     """
-    # We just parse it here, then pass on to an internal method recursively
-    # to build all the ents.
     inclusions = set()
     exclusions = set()
 
@@ -565,6 +614,19 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     # This also means inclusions represents everything we need to worry about.
     inclusions -= exclusions
 
+    return all_cubes, inclusions, exclusions
+
+
+def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
+    """Given a set of cube-type IDs, generate a filter for them.
+
+    The filter will be made if needed, and the targetname to use returned.
+    """
+    # We just parse it here, then pass on to an internal method recursively
+    # to build all the ents.
+
+    all_cubes, inclusions, exclusions = parse_filter_types(cubes)
+
     # Special case - no cubes at all.
     if not inclusions:
         try:
@@ -611,16 +673,8 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
                 CUBE_FILTERS[cube_type] = filter_name
                 names.add(filter_name)
             continue
-        # If we have a coloured version, we might need that too.
-        if cube_type.model_color and cube_type.color_in_map:
-            models[cube_type.model_color] = cube_type.has_name + '_color'
-
-        if cube_type.in_map:
-            if cube_type.model:
-                models[cube_type.model] = cube_type.has_name
-            else:
-                # No custom model - it's default.
-                models[DEFAULT_MODELS[cube_type.type]] = cube_type.has_name
+        else:
+            cube_type.add_models(models)
 
     for model, filter_name in models.items():
         # Make a filter for each model name.
@@ -785,6 +839,66 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property):
             prop.value for prop in res.find_all('Cube')
         ],
     )
+
+
+@make_result('VScriptCubePredicate')
+def res_script_cube_predicate(res: Property):
+    """Given a set of cube-type IDs, generate VScript code to identify them.
+
+    This produces a script to include, which will define the specified function
+    name. Specifying the same filename twice will include all the functions.
+    For that reason the filename should be unique.
+
+    Each cube should be the name of an ID, with `!` before to exclude it.
+    It succeeds if a target is any of the included types, and not any of the
+    excluded types (exclusions override inclusion).
+    The IDs may also be:
+    * `<any>` to detect all cube types (including franken)
+    * `<companion>` to detect 'companion' items.
+    * `<sphere>` to detect sphere-type items.
+
+    Config options:
+    * `function`: Name of the function - called with an entity as an argument.
+    * `filename`: Path to the .nut script, relative to scripts/vscripts/.
+    * `Cube`: A cube to include.
+    """
+    script_function = res['function']
+    script_filename = res['filename']
+
+    if script_function[-2:] == '()':
+        script_function = script_function[:-2]
+    if script_filename[-4:] != '.nut':
+        script_filename += '.nut'
+
+    try:
+        buffer = CUBE_SCRIPT_FILTERS[script_filename]
+    except KeyError:
+        CUBE_SCRIPT_FILTERS[script_filename] = buffer = io.StringIO()
+        # Write our starting code.
+        buffer.write(VSCRIPT_CLOSURE)
+
+    all_cubes, inclusions, exclusions = parse_filter_types([
+        prop.value for prop in res.find_all('Cube')
+    ])
+
+    # We don't actually care about exclusions anymore.
+
+    models = {}  # type: Dict[str, str]
+    for cube_type in inclusions:
+        cube_type.add_models(models)
+
+    # Normalise the names to a consistent format.
+    models = {
+        model.lower().replace('\\', '/')
+        for model in models
+    }
+
+    buffer.write(script_function + ' <- __BEE2_CUBE_FUNC__({\n')
+    for model in models:
+        buffer.write(' ["{}"]=1,\n'.format(model))
+    buffer.write('});\n')
+
+    return RES_EXHAUSTED
 
 
 @meta_cond(priority=-750, only_once=True)

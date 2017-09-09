@@ -23,6 +23,7 @@ utils.setup_localisations(LOGGER)
 
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import List
 
@@ -31,8 +32,8 @@ import shutil
 from BEE2_config import GEN_OPTS
 from packageLoader import (
     packages as PACKAGES,
-    Package,
-    find_packages
+    find_packages,
+    LOGGER as packages_logger
 )
 
 # If true, user said * for packages - use last for all.
@@ -81,11 +82,6 @@ def get_package(file: Path) -> RawFileSystem:
 
 def check_file(file: Path, portal2: Path, packages: Path):
     """Check for the location this file is in, and copy it to the other place."""
-
-    if file.suffix in ('vmx', 'log', 'bsp', 'prt', 'lin'):
-        # Ignore these file types.
-        return
-
     try:
         relative = file.relative_to(portal2)
     except ValueError:
@@ -132,7 +128,6 @@ def check_file(file: Path, portal2: Path, packages: Path):
                 'bee2_dev' if (portal2 / 'bee2_dev').exists() else 'bee2'
             )
 
-
         target_systems = []
 
         for package in PACKAGES.values():
@@ -163,28 +158,54 @@ def main(files: List[str]):
     try:
         portal2_loc = Path(os.environ['PORTAL_2_LOC'])
     except KeyError:
-        LOGGER.error(
+        raise ValueError(
             'Environment Variable $PORTAL_2_LOC not set! '
             'This should be set to Portal 2\'s directory.'
-        )
+        ) from None
 
     # Load the general options in to find out where packages are.
     GEN_OPTS.load()
 
     # Borrow PackageLoader to do the finding and loading for us.
     LOGGER.info('Locating packages...')
+
+    # Disable logging of package info.
+    packages_logger.setLevel(logging.ERROR)
     find_packages(GEN_OPTS['Directories']['package'])
+    packages_logger.setLevel(logging.INFO)
+
+    LOGGER.info('Done!')
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
+
+    file_list = []  # type: List[Path]
 
     for file in files:
         file_path = Path(file)
         if file_path.is_dir():
             for sub_file in file_path.glob('**/*'):  # type: Path
                 if sub_file.is_file():
-                    check_file(sub_file, portal2_loc, package_loc)
+                    file_list.append(sub_file)
         else:
-            check_file(file_path, portal2_loc, package_loc)
+            file_list.append(file_path)
+
+    files_to_check = set()
+
+    for file in file_list:
+        if file.suffix.casefold() in ('.vmx', '.log', '.bsp', '.prt', '.lin'):
+            # Ignore these file types.
+            continue
+        files_to_check.add(file)
+        if file.suffix == '.mdl':
+            for suffix in ['.vvd', '.phy', '.dx90.vtx', '.sw.vtx']:
+                sub_file = file.with_suffix(suffix)
+                if sub_file.exists():
+                    files_to_check.add(sub_file)
+
+    LOGGER.info('Processing {} files...', len(files_to_check))
+
+    for file in files_to_check:
+        check_file(file, portal2_loc, package_loc)
 
 
 if __name__ == '__main__':
