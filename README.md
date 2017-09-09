@@ -9,7 +9,7 @@ Join the Discord [here](https://discord.me/beemod) and the Steam group [here](ht
 ## Portal 2  Mod Tool
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
 different eras, and configure many other aspects. All vanilla items have been upgraded with additional
-bugfixes and improvments.
+bugfixes and improvements.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
