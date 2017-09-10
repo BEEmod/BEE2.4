@@ -59,6 +59,10 @@ UV_NORMALS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 # Maps a pos, normal -> tiledef
 TILES = {}  # type: Dict[Tuple[Vec_tuple, Vec_tuple], TileDef]
 
+# Special key for Tile.SubTile - This is set to 'u' or 'v' to
+# indicate the center section should be nodrawed.
+SUBTILE_FIZZ_KEY = object()
+
 
 class TileType(Enum):
     """Physical types of geometry for each 1/4 tile."""
@@ -222,7 +226,7 @@ class Pattern:
     ):
         self.tex = tex
         self.wall_only = wall_only
-        self.tiles = tiles
+        self.tiles = list(tiles)
         tile_u, tile_v = TILE_SIZES[tex]
         # Do some sanity checks on values..
         for umin, vmin, umax, vmax in tiles:
@@ -231,7 +235,6 @@ class Pattern:
             assert 0 <= vmin < vmax <= 4, tile_tex
             assert (umax - umin) % tile_u == 0, tile_tex
             assert (vmax - vmin) % tile_v == 0, tile_tex
-
             
     def __repr__(self):
         return 'Pattern({!r}, {}{}'.format(
@@ -296,7 +299,33 @@ PATTERNS = {
             (0, 0, 2, 2), (2, 0, 4, 2), (0, 2, 2, 4), (2, 2, 4, 4),  # Corners
         ),
     ],
+    'fizzler_split_u': [],
+    'fizzler_split_v': [],
 }
+
+
+def _make_patterns():
+    """Set additional patterns which derive from CLEAN."""
+    # These are the same as clean, but they don't allow any pattern
+    # which crosses over the centerline in either direction.
+    fizz_u = PATTERNS['fizzler_split_u']
+    fizz_v = PATTERNS['fizzler_split_v']
+
+    for pat in PATTERNS['clean']:
+        pat_u = Pattern(pat.tex, wall_only=pat.wall_only)
+        pat_v = Pattern(pat.tex, wall_only=pat.wall_only)
+        for tile in pat.tiles:
+            umin, vmin, umax, vmax = tile
+            if umin >= 2 or umax <= 2:
+                pat_u.tiles.append(tile)
+            if vmin >= 2 or vmax <= 2:
+                pat_v.tiles.append(tile)
+        if pat_u.tiles:
+            fizz_u.append(pat_u)
+        if pat_v.tiles:
+            fizz_v.append(pat_v)
+
+_make_patterns()
 
 
 class TileDef:
@@ -410,15 +439,60 @@ class TileDef:
         pos[v_ax] += v
         return pos
 
-    def calc_patterns(self, tiles: Dict[Tuple[int, int], TileType], is_wall=False):
+    def calc_patterns(
+        self,
+        tiles: Dict[Union[Tuple[int, int], object], TileType],
+        is_wall=False,
+        _pattern=None,
+    ):
         """Figure out the brushes needed for a complex pattern.
 
         This returns
         """
-        # copy it, so we can overwrite positions with None = not a tile.
+
+        # copy it, so we can overwrite positions with VOID = not a tile.
         tiles = tiles.copy()
 
-        for pattern in PATTERNS['clean']:
+        # Don't check for special types if one is passed - that prevents
+        # infinite recursion.
+        if not _pattern:
+            _pattern = 'clean'
+            if SUBTILE_FIZZ_KEY in tiles:
+                # Output the split patterns for centered fizzlers.
+                # We need to remove it also so our iteration doesn't choke on it.
+                # 'u' or 'v'
+                split_type = tiles.pop(SUBTILE_FIZZ_KEY)  # type: str
+                patterns = self.calc_patterns(
+                    tiles,
+                    is_wall,
+                    'fizzler_split_' + split_type,
+                )
+                # Loop through our output and adjust the centerline outward.
+                if split_type == 'u':
+                    for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
+                        LOGGER.info('Pattern before: {}, {}: {}, {}', umin, vmin, umax, vmax)
+                        if umin == 2:
+                            umin = 2.5
+                        if umax == 2:
+                            umax = 1.5
+                        LOGGER.info('Pattern after: {}, {}: {}, {}', umin, vmin, umax, vmax)
+                        yield umin, umax, vmin, vmax, grid_size, tile_type
+                    # Now yield the nodraw-brush.
+                    yield 1.5, 2.5, 0, 4, TileSize.TILE_4x4, TileType.NODRAW
+                elif split_type == 'v':
+                    for umin, umax, vmin, vmax, grid_size, tile_type in patterns:
+                        LOGGER.info('Pattern before: {}, {}: {}, {}', umin, vmin, umax, vmax)
+                        if vmin == 2:
+                            vmin = 2.5
+                        if vmax == 2:
+                            vmax = 1.5
+                        LOGGER.info('Pattern after: {}, {}: {}, {}', umin, vmin, umax, vmax)
+                        yield umin, umax, vmin, vmax, grid_size, tile_type
+                    # Now yield the nodraw-brush.
+                    yield 0, 4, 1.5, 2.5, TileSize.TILE_4x4, TileType.NODRAW
+                return  # Don't run our checks on the tiles.
+
+        for pattern in PATTERNS[_pattern]:
             if pattern.wall_only and not is_wall:
                 continue
             for umin, vmin, umax, vmax in pattern.tiles:
@@ -431,7 +505,7 @@ class TileDef:
                         tiles[uv] = TileType.VOID
                     yield umin, umax, vmin, vmax, pattern.tex, tile_type
 
-        # All unfilled spots are single 4x4 tiles.
+        # All unfilled spots are single 4x4 tiles, or other objects.
         for (u, v), tile_type in tiles.items():
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
@@ -451,12 +525,8 @@ class TileDef:
         if self.sub_tiles is None:
             full_type = self.base_type
         else:
-            # Normalise subtiles - remove values outside 0-3, and set
-            # unset positions to base_type.
-            orig_tiles = self.sub_tiles
-            self.sub_tiles = {}
-            for uv in iter_uv():
-                self.sub_tiles[uv] = orig_tiles.get(uv, self.base_type)
+            # If we have exactly 1 subtile, use a single full brush
+            # since we know the pattern won't change.
 
             if len(set(self.sub_tiles.values())) == 1:
                 full_type = next(iter(self.sub_tiles.values()))
@@ -625,6 +695,8 @@ class TileDef:
         brushes = []
         faces = []
 
+        # NOTE: calc_patterns can produce 0, 1, 1.5, 2, 2.5, 3, 4!
+        # Half-values are for nodrawing fizzlers which are center-aligned.
         for umin, umax, vmin, vmax, grid_size, tile_type in self.calc_patterns(pattern, is_wall):
             # We bevel only the grid-edge tiles.
             tile_bevels = [

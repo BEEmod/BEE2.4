@@ -14,6 +14,7 @@ import comp_consts as const
 import instance_traits
 import instanceLocs
 import template_brush
+import tiling
 
 LOGGER = utils.getLogger(__name__)
 
@@ -154,6 +155,7 @@ class FizzlerType:
         pack_lists_static: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
+        nodraw_behind: bool,
         out_activate: Optional[Tuple[Optional[str], str]],
         out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
@@ -185,6 +187,10 @@ class FizzlerType:
         self.model_name = model_local_name
         # Instances to use - FizzInst, is_static -> list of instances.
         self.inst = inst
+
+        # If set, nodraw the 128x32 area behind the fizzler - to allow
+        # the Clean model to stick through.
+        self.nodraw_behind = nodraw_behind
 
         # If set, outputs to use via the fizzler output relay.
         self.out_deactivate = out_deactivate
@@ -297,6 +303,7 @@ class FizzlerType:
             pack_lists_static,
             model_local_name,
             model_name_type,
+            conf.bool('nodraw_behind'),
             out_activate,
             out_deactivate,
             brushes,
@@ -322,6 +329,10 @@ class Fizzler:
         self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
         self.emitters = emitters  # Pairs of left, right positions.
 
+        # True if the fizzler is in the original position, and so we need
+        # to adjust tiles for the sides.
+        self.embedded = True
+
         # Special case - for TAG fizzlers, if that side is enabled.
         # We generate the triggers elsewhere.
         self.tag_on_pos = self.tag_on_neg = False
@@ -333,6 +344,46 @@ class Fizzler:
     def normal(self) -> Vec:
         """The axis moving in and out of the surface."""
         return abs(self.up_axis.cross(self.forward()))
+
+    def nodraw_behind_models(self, origin: Vec, normal: Vec):
+        """Set the tile surface behind a model to nodraw.
+
+        position is the center-point on the wall.
+        normal is the direction out of the model.
+        """
+        up_axis = self.up_axis.axis()
+        u_axis, v_axis = Vec.INV_AXIS[normal.axis()]
+
+        if origin % 64 == (0, 0, 0):
+            # Aligned with the 64-grid - it's centered in the tile.
+            # That means we need to set special values.
+            tile = tiling.TILES[
+                (origin - 64 * normal).as_tuple(),
+                normal.as_tuple()
+            ]  # type: tiling.TileDef
+            subtiles = tile.get_subtiles()
+
+            # Reversed?
+            if up_axis == u_axis:
+                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'v'
+            elif up_axis == v_axis:
+                subtiles[tiling.SUBTILE_FIZZ_KEY] = 'u'
+            else:
+                LOGGER.error(
+                    'Not U or V?: {} @ {} ("{}")',
+                    origin,
+                    normal,
+                    self.base_inst['targetname'],
+                )
+        else:
+            # Side-aligned, we just edit quarter-tiles.
+            for off in [-48, -16, 16, 48]:
+                tiling.edit_quarter_tile(
+                    origin + Vec.with_axes(up_axis, off),
+                    normal,
+                    tiling.TileType.NODRAW,
+                )
+
 
 
 class FizzlerBrush:
@@ -990,6 +1041,10 @@ def generate_fizzlers(vmf: VMF):
                 )
                 max_inst.fixup.update(fizz.base_inst.fixup)
             min_inst.fixup.update(fizz.base_inst.fixup)
+
+            if fizz.embedded and fizz_type.nodraw_behind:
+                fizz.nodraw_behind_models(seg_min, forward)
+                fizz.nodraw_behind_models(seg_max, -forward)
 
             if fizz_type.inst[FizzInst.GRID, is_static]:
                 # Generate one instance for each position.
