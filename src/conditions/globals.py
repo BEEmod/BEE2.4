@@ -177,7 +177,7 @@ def res_set_voice_attr(res: Property):
         for opt in res.value:
             vbsp.settings['has_attr'][opt.name] = True
     else:
-        vbsp.settings['has_attr'][res.value.casefold()] = 1
+        vbsp.settings['has_attr'][res.value.casefold()] = True
     return RES_EXHAUSTED
 
 CACHED_MODELS = set()

@@ -907,10 +907,10 @@ def set_player_portalgun():
     - If there are only orange portal spawners, the player gets a blue-
       only gun (Regular single portal device)
     - If there are both spawner types, the player doesn't get a gun.
-    - 'PortalGunOnOff' will also be checked to activate that logic.
+    - 'PortalGunOnOff' or 'NeedsPortalMan' will also be checked to
+      activate that logic.
     """
-    if GAME_MODE == 'COOP':
-        return  # Don't change portalgun in Portal 2 Coop
+
     if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
@@ -921,6 +921,7 @@ def set_player_portalgun():
     blue_portal = not has['blueportal']
     oran_portal = not has['orangeportal']
     has_btn_onoff = has['portalgunonoff']
+    force_portal_man = has_btn_onoff or has['needsportalman']
 
     LOGGER.info(
         'Blue: {}, Orange: {!s}',
@@ -943,33 +944,30 @@ def set_player_portalgun():
 
     ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
 
-    if not blue_portal or not oran_portal or has_btn_onoff:
-        VMF.create_ent(
+    if not blue_portal or not oran_portal or force_portal_man:
+        pgun_script = VMF.create_ent(
             classname='point_template',
             targetname='@portalgun',
-            Template01='__pgun_template',
             vscripts='bee2/portal_man.nut',
-            spawnflags=2,
             origin=ent_pos,
         )
         PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
-        VMF.create_ent(
-            classname='weapon_portalgun',
-            targetname='__pgun_template',
-            CanFirePortal1=0,
-            CanFirePortal2=0,
-            spawnflags=0,
-            origin=ent_pos - (12, 0, 0),
-        )
-        trig_cube = VMF.create_ent(
-            targetname='__pgun_held_trig',
-            classname='trigger_multiple',
-            origin=ent_pos,
-            filtername='@filter_held',
-            startdisabled=1,
-            spawnflags=8,  # Physics
-            wait=0.01,
-        )
+
+        if GAME_MODE == 'SP':
+            VMF.create_ent(
+                classname='weapon_portalgun',
+                targetname='__pgun_template',
+                CanFirePortal1=0,
+                CanFirePortal2=0,
+                spawnflags=0,
+                origin=ent_pos - (12, 0, 0),
+            )
+            pgun_script['Template01'] = '__pgun_template'
+            pgun_script['spawnflags'] = 2
+        else:
+            pgun_script['classname'] = 'logic_script'
+
+        # For removing portalguns from players.
         trig_stripper = VMF.create_ent(
             targetname='__pgun_weapon_strip',
             classname='trigger_weapon_strip',
@@ -983,26 +981,81 @@ def set_player_portalgun():
             Vec(4096, 4096, 4096),
             mat=consts.Tools.TRIGGER,
         ).solid
-        trig_cube.solids = [whole_map.copy()]
-        trig_stripper.solids = [whole_map]
-        trig_cube.add_out(VLib.Output(
-            'OnStartTouch',
-            '@portalgun',
-            'RunScriptCode',
-            '_mark_held_cube()',
-        ))
 
-        GLOBAL_OUTPUTS.append(VLib.Output(
-            'OnMapSpawn',
-            '@portalgun',
-            'RunScriptCode',
-            'init({}, {}, {})'.format(
-                'true' if blue_portal else 'false',
-                'true' if oran_portal else 'false',
-                'true' if has_btn_onoff else 'false',
-            ),
-            delay=0.1,
-        ))
+        trig_stripper.solids = [whole_map]
+
+        # Detect the group ID of portals placed in the map, and write to
+        # the entities what we determine.
+        if GAME_MODE == 'COOP':
+            port_ids = (0, 1, 2)
+        else:
+            port_ids = (0, )
+
+        for port_id in port_ids:
+            trigger_portal = VMF.create_ent(
+                targetname='__pgun_port_detect_{}'.format(port_id),
+                classname='func_portal_detector',
+                origin=ent_pos,
+                CheckAllIDs=0,
+                LinkageGroupID=port_id,
+            )
+            trigger_portal.solids = [whole_map.copy()]
+            trigger_portal.add_out(
+                VLib.Output(
+                    'OnStartTouchPortal1',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_is_oran <- 0; '
+                    '__pgun_port_id <- {}; '
+                    '__pgun_active <- 1'.format(port_id),
+                ),
+                VLib.Output(
+                    'OnStartTouchPortal2',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_is_oran <- 1; '
+                    '__pgun_port_id <- {}; '
+                    '__pgun_active <- 1'.format(port_id),
+                ),
+                VLib.Output(
+                    'OnEndTouchPortal',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_active <- 0',
+                ),
+            )
+
+        # Checking for held cubes, for pgun buttons.
+        if has_btn_onoff:
+            trig_cube = VMF.create_ent(
+                targetname='__pgun_held_trig',
+                classname='trigger_multiple',
+                origin=ent_pos,
+                filtername='@filter_held',
+                startdisabled=1,
+                spawnflags=8,  # Physics
+                wait=0.01,
+            )
+            trig_cube.solids = [whole_map.copy()]
+            trig_cube.add_out(VLib.Output(
+                'OnStartTouch',
+                '@portalgun',
+                'RunScriptCode',
+                '_mark_held_cube()',
+            ))
+
+        if GAME_MODE == 'SP':
+            GLOBAL_OUTPUTS.append(VLib.Output(
+                'OnMapSpawn',
+                '@portalgun',
+                'RunScriptCode',
+                'init({}, {}, {})'.format(
+                    'true' if blue_portal else 'false',
+                    'true' if oran_portal else 'false',
+                    'true' if has_btn_onoff else 'false',
+                ),
+                delay=0.1,
+            ))
 
         # Shuts down various parts when you've reached the exit.
         import conditions.instances
