@@ -289,6 +289,7 @@ def global_input(
         if relay_name is None:
             glob_ent = GLOBAL_INPUT_ENTS[None] = vmf.create_ent(
                 classname='logic_auto',
+                spawnflags='1',  # Remove on fire
                 origin=pos,
             )
         else:
@@ -299,6 +300,7 @@ def global_input(
             )
     if relay_name is None:
         output.output = 'OnMapSpawn'
+        output.only_once = True
     glob_ent.add_out(output)
 
 
