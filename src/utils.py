@@ -6,6 +6,7 @@ import os
 import stat
 import shutil
 import sys
+from pathlib import Path
 from enum import Enum
 
 from typing import (
@@ -62,6 +63,40 @@ STEAM_IDS = {
     # 247120: Sixense
     # 211480: 'In Motion'
 }
+
+# Appropriate locations to store config options for each OS.
+if WIN:
+    _SETTINGS_ROOT = Path(os.environ['APPDATA'])
+elif MAC:
+    _SETTINGS_ROOT = Path('~/Library/Preferences/').expanduser()
+elif LINUX:
+    _SETTINGS_ROOT = Path('~/.config').expanduser()
+else:
+    # Defer the error until used, so it goes in logs and whatnot.
+    # Utils is early, so it'll get lost in stderr.
+    _SETTINGS_ROOT = None
+    
+# We always go in a BEE2 subfolder
+if _SETTINGS_ROOT:
+    _SETTINGS_ROOT /= 'BEEMOD2'
+
+def conf_location(path: str) -> Path:
+    """Return the full path to save settings to.
+    
+    The passed-in path is relative to the settings folder.
+    Any additional subfolders will be created if necessary.
+    """
+    if _SETTINGS_ROOT is None:
+        raise FileNotFoundError("Don't know a good config directory!")
+
+    loc = _SETTINGS_ROOT / path
+    if loc.is_dir():
+        folder = loc
+    else:
+        folder = loc.parent
+    # Create folders if needed.
+    folder.mkdir(parents=True, exist_ok=True)
+    return loc
 
 
 def fix_cur_directory() -> None:
