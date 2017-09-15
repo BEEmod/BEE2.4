@@ -334,6 +334,71 @@ class Fizzler:
         """The axis moving in and out of the surface."""
         return abs(self.up_axis.cross(self.forward()))
 
+    def gen_flinch_trigs(self, vmf: VMF, name: str):
+        """For deadly fizzlers optionally make them safer.
+
+        This adds logic to force players
+        back instead when walking into the field.
+        Only applies to vertical triggers.
+        """
+        normal = abs(self.normal())  # type: Vec
+
+        # Horizontal fizzlers would just have you fall through.
+        if normal.z:
+            return
+
+        # Disabled.
+        if not vbsp_options.get_itemconf(('VALVE_FIZZLER', 'FlinchBack'), False):
+            return
+
+        # Make global entities if not present.
+        if '_fizz_flinch_hurt' not in vmf.by_target:
+            glob_ent_loc = vbsp_options.get(Vec, 'global_ents_loc')
+            vmf.create_ent(
+                classname='point_hurt',
+                targetname='_fizz_flinch_hurt',
+                Damage=10,  # Just for visuals and sounds.
+                # BURN | ENERGYBEAM | PREVENT_PHYSICS_FORCE
+                DamageType=8 | 1024 | 2048,
+                DamageTarget='!activator',  # Hurt the triggering player.
+                DamageRadius=1,  # Target makes this unused.
+                origin=glob_ent_loc,
+            )
+
+        # We need two catapults - one for each side.
+        neg_brush = vmf.create_ent(
+            targetname=name,
+            classname='trigger_catapult',
+            spawnflags=1,  # Players only.
+            origin=self.base_inst['origin'],
+            physicsSpeed=0,
+            playerSpeed=96,
+            launchDirection=(-normal).to_angle(),
+        )
+        neg_brush.add_out(Output('OnCatapulted', '_fizz_flinch_hurt', 'Hurt'))
+
+        pos_brush = neg_brush.copy()
+        pos_brush['launchDirection'] = normal.to_angle()
+        vmf.add_ent(pos_brush)
+
+        for seg_min, seg_max in self.emitters:
+            neg_brush.solids.append(vmf.make_prism(
+                p1=(seg_min
+                    - 4 * normal
+                    - 64 * self.up_axis
+                    ),
+                p2=seg_max + 64 * self.up_axis,
+                mat=const.Tools.TRIGGER,
+            ).solid)
+            pos_brush.solids.append(vmf.make_prism(
+                p1=seg_min - 64 * self.up_axis,
+                p2=(seg_max
+                    + 4 * normal
+                    + 64 * self.up_axis
+                    ),
+                mat=const.Tools.TRIGGER,
+            ).solid)
+
 
 class FizzlerBrush:
     """A brush-set used in a fizzler."""
@@ -971,6 +1036,8 @@ def generate_fizzlers(vmf: VMF):
             if brush_type.mat_mod_var is not None:
                 mat_mod_tex[brush_type] = set()
 
+        trigger_hurt_name = ''
+
         for seg_ind, (seg_min, seg_max) in enumerate(fizz.emitters, start=1):
             length = (seg_max - seg_min).mag()
             random.seed('{}_fizz_{}'.format(MAP_RAND_SEED, seg_min))
@@ -1074,6 +1141,9 @@ def generate_fizzlers(vmf: VMF):
                     if 'usescanline' in brush_ent and fizz.normal().z:
                         brush_ent['UseScanline'] = 0
 
+                    if brush_ent['classname'] == 'trigger_hurt':
+                        trigger_hurt_name = brush_ent['targetname']
+
                     for out in brush_type.outputs:
                         new_out = out.copy()
                         new_out.target = conditions.local_name(
@@ -1107,6 +1177,9 @@ def generate_fizzlers(vmf: VMF):
                         used_tex_func,
                     )
                 )
+
+        if trigger_hurt_name:
+            fizz.gen_flinch_trigs(vmf, trigger_hurt_name)
 
         # If we have the config, but no templates used anywhere...
         if template_brush_ent is not None and not template_brush_ent.solids:
