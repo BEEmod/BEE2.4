@@ -3471,7 +3471,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
         )
     except subprocess.CalledProcessError as err:
         # VBSP didn't suceed. Print the error log..
-        vbsp_logger.error(err.output.decode('ascii'))
+        vbsp_logger.error(err.output.decode('ascii', errors='replace'))
 
         if is_peti:  # Ignore Hammer maps
             process_vbsp_fail(err.output)
@@ -3481,7 +3481,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
         sys.exit(err.returncode)
 
     # Print output
-    vbsp_logger.info(output.decode('ascii'))
+    vbsp_logger.info(output.decode('ascii', errors='replace'))
     LOGGER.info("VBSP Done!")
 
     if is_peti:  # Ignore Hammer maps
