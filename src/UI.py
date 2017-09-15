@@ -100,8 +100,9 @@ class Item:
             'sel_version',
             item.def_ver['id'],
         )
+        # If the last-selected value doesn't exist, fallback to the default.
         if self.selected_ver not in item.versions:
-            self.selected_ver = self.item.def_ver['id']
+            self.selected_ver = item.def_ver['id']
 
         self.item = item
         self.def_data = self.item.def_ver['def_style']  # type: packageLoader.ItemVariant
