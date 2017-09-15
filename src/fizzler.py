@@ -345,6 +345,7 @@ class FizzlerBrush:
         local_keys: Dict[str, str],
         outputs: List[Output],
         thickness=2.0,
+        stretch_center: bool=True,
         side_color: Vec=None,
         singular: bool=False,
         mat_mod_name: str=None,
@@ -361,6 +362,9 @@ class FizzlerBrush:
 
         # Use only one brush for all the parts of this.
         self.singular = singular
+
+        # If set, stretch the center to the brush size.
+        self.stretch_center = stretch_center
 
         # If set, add a material_modify_control to control these brushes.
         if mat_mod_var is not None and not mat_mod_var.startswith('$'):
@@ -422,6 +426,7 @@ class FizzlerBrush:
             local_keys,
             outputs,
             conf.float('thickness', 2.0),
+            conf.bool('stretch_center', True),
             side_color,
             conf.bool('singular'),
             conf['mat_mod_name', None],
@@ -483,6 +488,8 @@ class FizzlerBrush:
         # If either of these, we only need 1 brush.
         trigger_tex = self.textures[TexGroup.TRIGGER]
         fitted_tex = self.textures[TexGroup.FITTED]
+        # If we don't have this, we can't be a single brush.
+        short_tex = self.textures[TexGroup.SHORT]
 
         if trigger_tex or fitted_tex:
             tex_size = LASER_TEX_SIZE
@@ -490,7 +497,7 @@ class FizzlerBrush:
             # Fizzlers are larger resolution..
             tex_size = FIZZLER_TEX_SIZE
 
-        if field_length == 128 or trigger_tex or fitted_tex:
+        if (field_length == 128 and not short_tex) or trigger_tex or fitted_tex:
             # We need only one brush.
             brush = vmf.make_prism(
                 p1=(origin
@@ -537,10 +544,12 @@ class FizzlerBrush:
                         pos,
                         bool(fitted_tex),
                     )
+
+                    if not self.stretch_center:
+                        side.uaxis.scale = 0.25
         else:
             # Generate the three brushes for fizzlers.
-
-            if field_length < 128:
+            if field_length <= 128:
                 side_len = field_length / 2
                 center_len = 0
             else:
@@ -636,6 +645,8 @@ class FizzlerBrush:
                             if tag_enabled else
                             TexGroup.CENTER
                         ]
+                        if not self.stretch_center:
+                            side.uaxis.scale = 0.25
                     else:
                         # For left and right, we need to figure out what
                         # direction the texture should be in. The uaxis is
