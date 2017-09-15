@@ -133,8 +133,8 @@ CLASS_ATTRS = {
 # Special functions to call on an instance for their item ID (str)
 # or class (enum).
 # Arguments are the instance, trait set, item ID and subtype index.
-TRAIT_ID_FUNC = {}  # type: Dict[str, Callable[[Entity, int], None]]
-TRAIT_CLS_FUNC = {}  # type: Dict[ItemClass, Callable[[Entity], None]]
+TRAIT_ID_FUNC = {}  # type: Dict[str, Callable[[Entity, Set[str], str, int], None]]
+TRAIT_CLS_FUNC = {}  # type: Dict[ItemClass, Callable[[Entity, Set[str], str, int], None]]
 
 
 def trait_id_func(target: str):
@@ -186,6 +186,7 @@ def set_traits(vmf: VMF):
         # BEE2_xxx special instance, shouldn't be in the original map...
         if isinstance(item_ind, str):
             LOGGER.warning('<{}:bee2_{}> found in original map?', item_id, item_ind)
+            continue
 
         try:
             item_class = ItemClass(CLASS_FOR_ITEM[item_id.casefold()])
