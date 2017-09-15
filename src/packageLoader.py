@@ -552,9 +552,11 @@ def setup_style_tree(
     # have data defined for every used style.
     for item in item_data:
         all_ver = list(item.versions.values())  # type: List[Dict[str, Union[Dict[str, Style], str]]]
-        # Move default version to the beginning, so it's read first
+        # Move default version to the beginning, so it's read first.
+        # that ensures it's got all styles set if we need to fallback.
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
+
         for vers in all_ver:
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
@@ -636,7 +638,6 @@ def setup_style_tree(
             # Fix this reference to point to the actual value.
             vers['def_style'] = styles[vers['def_style']]
 
-
             for sty_id, style in all_styles.items():
                 if sty_id in styles:
                     continue  # We already have a definition
@@ -654,21 +655,27 @@ def setup_style_tree(
                             )
                         break
                 else:
-                    # For the base version, use the first style if
-                    # a styled version is not present
-                    if vers['id'] == item.def_ver['id']:
-                        styles[sty_id] = vers['def_style']
-                        if log_missing_styles and not item.unstyled:
-                            LOGGER.warning(
-                                'Item "{item}" using '
-                                'inappropriate style for "{style}"!',
-                                item=item.id,
-                                style=sty_id,
-                            )
-                    else:
-                        # For versions other than the first, use
-                        # the base version's definition
-                        styles[sty_id] = item.def_ver['styles'][sty_id]
+                    # No parent matches!
+                    if log_missing_styles and not item.unstyled:
+                        LOGGER.warning(
+                            'Item "{item}" using '
+                            'inappropriate style for "{style}"!',
+                            item=item.id,
+                            style=sty_id,
+                        )
+
+                    # If 'isolate versions' is set on the item,
+                    # we never consult other versions for matching styles.
+                    # There we just use our first style (Clean usually).
+                    # The default version is always isolated.
+                    # If not isolated, we get the version from the default
+                    # version. Note the default one is computed first,
+                    # so it's guaranteed to have a value.
+                    styles[sty_id] = (
+                        vers['def_style'] if
+                        item.isolate_versions or vers['isolate']
+                        else item.def_ver['styles'][sty_id]
+                    )
 
 
 def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
@@ -1235,6 +1242,7 @@ class Item(PakObject):
             needs_unlock=False,
             all_conf=None,
             unstyled=False,
+            isolate_versions=False,
             glob_desc=(),
             desc_last=False,
             folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
@@ -1245,6 +1253,9 @@ class Item(PakObject):
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
+        # If set or set on a version, don't look at the first version
+        # for unstyled items.
+        self.isolate_versions = isolate_versions
         self.unstyled = unstyled
         self.glob_desc = glob_desc
         self.glob_desc_last = desc_last
@@ -1276,13 +1287,12 @@ class Item(PakObject):
             data.id,
         ))
 
-        needs_unlock = data.info.bool('needsUnlock')
-
         for ver in data.info.find_all('version'):  # type: Property
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
                 'styles':  {},
+                'isolate': ver.bool('isolated'),
                 'def_style': None,
                 }
             for style in ver.find_children('styles'):
@@ -1329,8 +1339,13 @@ class Item(PakObject):
                             style.real_name,
                         ))
             versions[vals['id']] = vals
+
+            # The first version is the 'default',
+            # so non-isolated versions will fallback to it.
+            # But the default is isolated itself.
             if def_version is None:
                 def_version = vals
+                vals['isolate'] = True
 
         # Fill out the folders dict with the actual data
         parse_item_folder(folders, data.fsys, data.pak_id)
@@ -1350,7 +1365,8 @@ class Item(PakObject):
             data.id,
             versions=versions,
             def_version=def_version,
-            needs_unlock=needs_unlock,
+            needs_unlock=data.info.bool('needsUnlock'),
+            isolate_versions=data.info.bool('isolate_versions'),
             all_conf=all_config,
             unstyled=unstyled,
             glob_desc=glob_desc,
