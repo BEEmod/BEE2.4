@@ -9,11 +9,11 @@ Join the Discord [here](https://discord.me/beemod) and the Steam group [here](ht
 ## Portal 2  Mod Tool
 The BEE2 allows reconfiguring Portal 2's Puzzlemaker editor to use additional items, reskin maps for
 different eras, and configure many other aspects. All vanilla items have been upgraded with additional
-bugfixes and improvments.
+bugfixes and improvements.
 
 The packages (item, style, etc definitions) are in the [BEE2-Items](https://github.com/BEEmod/BEE2-items) repository.
 
-## Download and Use (Recommended)
+## Download and Use (Recommended, for using the BEE2.4)
 Download the latest releases of the BEE2.4 and items from the following pages:
 - [Application](https://github.com/BEEmod/BEE2.4/releases)
 - [Item Packages](https://github.com/BEEmod/BEE2-items/releases)
@@ -21,7 +21,7 @@ Download the latest releases of the BEE2.4 and items from the following pages:
 - Place extracted package folder in the root BEE2 folder. _e.g. C:\BEE2.4\packages_
 - To run, locate the BEE2.exe in the bin folder and execute it. _e.g. C:\BEE2.4\bin\BEE2.exe_
 
-## Build From Source ##
+## Build from Source (Advanced, for Adding to BEE2.4 Program) [Windows] ##
 ### Dependencies ###
 - [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) and [AVBin](http://avbin.github.io/AVbin/Home/Home.html) (for sounds, not required)
 - [Pillow](https://python-pillow.github.io/)
@@ -55,7 +55,26 @@ For the release copy, it should include:
 
 The various `cache` folders and `config` folders should not be included.
 
-### Modules ###
+## Build from Source [Mac]
+
+Download and install [AVBin](http://avbin.github.io/AVbin/Download.html)
+
+    cd BEE2.4/src/
+    
+    $ python -m pip install cx_Freeze --upgrade
+    $ pip install pipenv
+    $ pipenv install requests
+    $ pip install pyglet
+    $ pip install Pillow
+    $ pip install noise
+    $ pip install markdown
+    
+    $ python compile_BEE2.py build
+    > BEE2 Version: custom
+    # python compile_VBSP_VRAD.py build
+    > BEE2 Version: custom
+
+## Modules Documentation ##
 - Common:
 	- `property_parser`: Library to allow reading and writing Valve's KeyValues format.
 	- `utils`: Various utility functions and a Vector class.
