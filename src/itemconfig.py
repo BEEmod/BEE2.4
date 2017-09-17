@@ -237,72 +237,38 @@ def make_pane(parent: ttk.Frame):
     CONFIG_ORDER.sort(key=lambda grp: grp.name)
 
     parent.columnconfigure(0, weight=1)
-    parent.rowconfigure(1, weight=1)
-
-    item_frames = []  # type: List[ttk.Frame]
-
-    def swap_to_item(e: tk.Event=None):
-        """Swap what's shown in the pane."""
-        for frame in item_frames:
-            frame.grid_forget()
-
-        cur_dropdown = dropdown.current()
-        if cur_dropdown == -1:
-            # Not valid
-            return
-
-        # Block sound for the first few millisec to stop excess sounds from
-        # playing during gridding.
-        sound.block_fx()
-
-        item_frames[cur_dropdown].grid(row=1, column=0, sticky='nsew')
-
-    dropdown = ttk.Combobox(
-        parent,
-        state='readonly',
-        exportselection=False,
-        values=[
-            group.name
-            for group in
-            CONFIG_ORDER
-        ],
-    )
-    dropdown.grid(row=0, column=0, columnspan=2, sticky='ew')
-    dropdown.bind('<<ComboboxSelected>>', swap_to_item)
 
     # need to use a canvas to allow scrolling
     canvas = tk.Canvas(parent, highlightthickness=0)
-    canvas.grid(row=1, column=0, sticky='NSEW')
-    parent.rowconfigure(1, weight=1)
+    canvas.grid(row=0, column=0, sticky='NSEW')
+    parent.rowconfigure(0, weight=1)
 
     scrollbar = ttk.Scrollbar(
         parent,
         orient='vertical',
         command=canvas.yview,
     )
-    scrollbar.grid(column=1, row=1, sticky="ns")
+    scrollbar.grid(column=1, row=0, sticky="ns")
     canvas['yscrollcommand'] = scrollbar.set
 
-    utils.add_mousewheel(canvas, parent)
+    utils.add_mousewheel(canvas, canvas, parent)
     canvas_frame = ttk.Frame(canvas)
     canvas.create_window(0, 0, window=canvas_frame, anchor="nw")
     canvas_frame.rowconfigure(0, weight=1)
 
-    for config in CONFIG_ORDER:
-        frame = ttk.Frame(canvas_frame)
+    for conf_row, config in enumerate(CONFIG_ORDER):
+        frame = ttk.LabelFrame(canvas_frame, text=config.name)
         frame.columnconfigure(0, weight=1)
-        item_frames.append(frame)
+        frame.grid(row=conf_row, column=0, sticky='nsew')
+
+        row = 0
 
         # Now make the widgets.
         if config.widgets:
-            non_timer_frame = ttk.LabelFrame(frame, text=_('General'))
-            non_timer_frame.grid(row=0, column=0, sticky='ew')
-            non_timer_frame.columnconfigure(1, weight=1)
-
             for row, wid in enumerate(config.widgets):
-                label = ttk.Label(non_timer_frame, text=wid.name + ': ')
+                label = ttk.Label(frame, text=wid.name + ': ')
                 label.grid(row=row, column=0)
-                widget = wid.create_func(non_timer_frame, wid.values, wid.config)
+                widget = wid.create_func(frame, wid.values, wid.config)
                 widget.grid(row=row, column=1, sticky='ew')
 
                 if wid.tooltip:
@@ -318,10 +284,10 @@ def make_pane(parent: ttk.Frame):
         if not config.multi_widgets:
             continue
 
-        for row, wid in enumerate(config.multi_widgets):
-
+        # Continue from wherever we were.
+        for row, wid in enumerate(config.multi_widgets, start=row+1):
             wid_frame = ttk.LabelFrame(frame, text=wid.name)
-            wid_frame.grid(row=2 + row, column=0, sticky='ew')
+            wid_frame.grid(row=row, column=0, sticky='ew')
             wid_frame.columnconfigure(1, weight=1)
 
             wid.multi_func(
@@ -332,10 +298,6 @@ def make_pane(parent: ttk.Frame):
 
             if wid.tooltip:
                 add_tooltip(wid_frame, wid.tooltip)
-
-    # Select the first item, so we show something.
-    dropdown.current(0)
-    swap_to_item()
 
     canvas.update_idletasks()
     canvas.config(
