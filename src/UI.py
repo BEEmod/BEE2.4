@@ -1315,19 +1315,25 @@ def init_option(pane: SubPane):
 
     ttk.Button(
         frame,
+        textvariable=EXPORT_CMD_VAR,
+        command=export_editoritems,
+    ).grid(row=0, sticky="EW", padx=5)
+
+    ttk.Button(
+        frame,
         text=_("Save Palette..."),
         command=pal_save,
-    ).grid(row=0, sticky="EW", padx=5)
+    ).grid(row=1, sticky="EW", padx=5)
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
         command=pal_save_as,
-    ).grid(row=1, sticky="EW", padx=5)
-    ttk.Button(
-        frame,
-        textvariable=EXPORT_CMD_VAR,
-        command=export_editoritems,
     ).grid(row=2, sticky="EW", padx=5)
+
+    ttk.Checkbutton(
+        frame,
+        text=_('Save Settings in Palettes'),
+    ).grid(row=3, sticky="EW", padx=5)
 
     props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
     props.columnconfigure(1, weight=1)
