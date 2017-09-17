@@ -45,7 +45,7 @@ def apply_settings(props: Property):
 def read_settings():
     """Read and apply the settings from disk."""
     try:
-        file = open(utils.conf_location('config/config.props'), encoding='utf8')
+        file = open(utils.conf_location('config/config.vdf'), encoding='utf8')
     except FileNotFoundError:
         return
     with file:
@@ -57,7 +57,7 @@ def write_settings():
     """Write the settings to disk."""
     props = get_curr_settings()
     props.name = None
-    with open(utils.conf_location('config/config.props'), 'w', encoding='utf8') as file:
+    with open(utils.conf_location('config/config.vdf'), 'w', encoding='utf8') as file:
         for line in props.export():
             file.write(line)
 
