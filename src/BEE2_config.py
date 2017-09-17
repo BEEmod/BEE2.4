@@ -6,6 +6,7 @@ Most functions are also altered to allow defaults instead of erroring.
 from configparser import ConfigParser, NoOptionError
 
 import os
+import utils
 import srctools.logger
 
 
@@ -20,19 +21,27 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
-    def __init__(self, filename, root='../config', auto_load=True):
+    def __init__(self, filename, root=None, auto_load=True):
         """Initialise the config file.
 
-        filename is the name of the config file, in the 'root' directory.
-        If auto_load is true, this file will immediately be read and parsed.
+        `filename` is the name of the config file, in the `root` directory.
+        If `auto_load` is true, this file will immediately be read and parsed.
+        If `root` is not set, it will be set to the 'config/' folder in the BEE2
+        folder.
         """
         super().__init__()
-        self.filename = os.path.join(root, filename)
+
+        if root is None:
+            self.filename = utils.conf_location(os.path.join('config/', filename))
+        else:
+            self.filename = os.path.join(root, filename)
+
         self.writer = srctools.AtomicWriter(self.filename)
         self.has_changed = False
 
         if auto_load:
             self.load()
+
 
     def load(self):
         if self.filename is None:

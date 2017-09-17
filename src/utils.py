@@ -80,17 +80,20 @@ else:
 if _SETTINGS_ROOT:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
+
 def conf_location(path: str) -> Path:
     """Return the full path to save settings to.
     
     The passed-in path is relative to the settings folder.
     Any additional subfolders will be created if necessary.
+    If it ends with a '/' or '\', it is treated as a folder.
     """
     if _SETTINGS_ROOT is None:
         raise FileNotFoundError("Don't know a good config directory!")
 
     loc = _SETTINGS_ROOT / path
-    if loc.is_dir():
+    
+    if path.endswith(('\\', '/')) and not loc.suffix:
         folder = loc
     else:
         folder = loc.parent
