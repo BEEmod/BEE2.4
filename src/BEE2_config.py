@@ -21,27 +21,31 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
-    def __init__(self, filename, root=None, auto_load=True):
+    def __init__(self, filename, *, in_conf_folder=True, auto_load=True):
         """Initialise the config file.
 
         `filename` is the name of the config file, in the `root` directory.
         If `auto_load` is true, this file will immediately be read and parsed.
-        If `root` is not set, it will be set to the 'config/' folder in the BEE2
-        folder.
+        If in_conf_folder is set, The folder is relative to the 'config/'
+        folder in the BEE2 folder.
         """
         super().__init__()
 
-        if root is None:
-            self.filename = utils.conf_location(os.path.join('config/', filename))
-        else:
-            self.filename = os.path.join(root, filename)
-
-        self.writer = srctools.AtomicWriter(self.filename)
         self.has_changed = False
 
-        if auto_load:
-            self.load()
+        if filename is not None:
+            if in_conf_folder:
+                self.filename = utils.conf_location('config/' + filename)
+            else:
+                self.filename = filename
 
+            self.writer = srctools.AtomicWriter(self.filename)
+            self.has_changed = False
+
+            if auto_load:
+                self.load()
+        else:
+            self.filename = self.writer = None
 
     def load(self):
         if self.filename is None:
@@ -157,6 +161,7 @@ class ConfigFile(ConfigParser):
     add_section.__doc__ = ConfigParser.add_section.__doc__
     remove_section.__doc__ = ConfigParser.remove_section.__doc__
     set.__doc__ = ConfigParser.set.__doc__
+
 
 # Define this here so app modules can easily access the config
 # Don't load it though, since this is imported by VBSP too.
