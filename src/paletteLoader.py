@@ -6,8 +6,10 @@ import utils
 
 import srctools.logger
 from srctools import Property
+import BEE2_config
+from srctools import Property, NoKeyError
 
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -46,7 +48,7 @@ class Palette:
         trans_name='',
         prevent_overwrite=False,
         filename: str=None,
-        settings: Optional[Dict[str, Property]]=None,
+        settings: Optional[Property]=None,
     ):
         # Name of the palette
         self.name = name
@@ -84,11 +86,9 @@ class Palette:
 
         trans_name = props['TransName', '']
 
-        settings = {
-            prop.name: prop
-            for prop in props.find_children('settings')
-        }
-        if not settings:
+        try:
+            settings = props.find_key('Settings')
+        except NoKeyError:
             settings = None
 
         return Palette(
@@ -127,6 +127,10 @@ class Palette:
 
         if not self.prevent_overwrite:
             del props['ReadOnly']
+
+        if self.settings is not None:
+            self.settings.name = 'Settings'
+            props.append(self.settings.copy())
 
         # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)
@@ -238,7 +242,7 @@ def parse_legacy(posfile, propfile, path):
     return Palette(name, pos)
 
 
-def save_pal(items, name):
+def save_pal(items, name: str, include_settings: bool):
     """Save a palette under the specified name."""
     for pal in pal_list:
         if pal.name == name and not pal.prevent_overwrite:
@@ -247,6 +251,11 @@ def save_pal(items, name):
     else:
         pal = Palette(name, list(items))
         pal_list.append(pal)
+
+    if include_settings:
+        pal.settings = BEE2_config.get_curr_settings()
+    else:
+        pal.settings = None
 
     pal.save()
     return pal
@@ -261,6 +270,6 @@ def check_exists(name):
 
 
 if __name__ == '__main__':
-    results = load_palettes('palettes\\')
+    results = load_palettes()
     for palette in results:
         print(palette)

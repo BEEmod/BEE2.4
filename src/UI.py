@@ -65,6 +65,8 @@ selectedPalette = 0
 selectedPalette_radio = IntVar(value=0)
 # Variable used for export button (changes to include game name)
 EXPORT_CMD_VAR = StringVar(value=_('Export...'))
+# If set, save settings into the palette in addition to items.
+var_pal_save_settings = BooleanVar(value=True)
 
 # Maps item IDs to our wrapper for the object.
 item_list = {}  # type: Dict[str, Item]
@@ -1214,6 +1216,7 @@ def pal_save_as(e: Event=None):
     paletteLoader.save_pal(
         [(it.id, it.subKey) for it in pal_picked],
         name,
+        var_pal_save_settings.get(),
     )
     refresh_pal_ui()
 
@@ -1223,6 +1226,7 @@ def pal_save(e=None):
     paletteLoader.save_pal(
         [(it.id, it.subKey) for it in pal_picked],
         pal.name,
+        var_pal_save_settings.get(),
     )
     refresh_pal_ui()
 
@@ -1333,6 +1337,7 @@ def init_option(pane: SubPane):
     ttk.Checkbutton(
         frame,
         text=_('Save Settings in Palettes'),
+        variable=var_pal_save_settings,
     ).grid(row=3, sticky="EW", padx=5)
 
     props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
@@ -1706,8 +1711,7 @@ def init_menu_bar(win):
     gameMan.add_menu_opts(menus['file'], callback=set_game)
     gameMan.game_menu = menus['file']
 
-    menus['pal'] = Menu(bar)
-    pal_menu = menus['pal']
+    pal_menu = menus['pal'] = Menu(bar)
     # Menu name
     bar.add_cascade(menu=pal_menu, label=_('Palette'))
     pal_menu.add_command(
@@ -1723,6 +1727,16 @@ def init_menu_bar(win):
         label=_('Fill Palette'),
         command=pal_shuffle,
     )
+
+    pal_menu.add_separator()
+
+    pal_menu.add_checkbutton(
+        label=_('Save Settings in Palettes'),
+        variable=var_pal_save_settings,
+    )
+
+    pal_menu.add_separator()
+
     pal_menu.add_command(
         label=_('Save Palette'),
         command=pal_save,
