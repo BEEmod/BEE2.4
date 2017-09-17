@@ -6,6 +6,7 @@ import itertools
 import operator
 import random
 
+from srctools import Property, NoKeyError
 import music_conf
 from tk_tools import TK_ROOT
 from query_dialogs import ask_string
@@ -465,6 +466,30 @@ def load_settings():
     optionWindow.load()
 
 
+@BEE2_config.option_handler('LastSelected')
+def save_load_selector_win(props: Property=None):
+    """Save and load options on the selector window."""
+    sel_win = [
+        ('Style', style_win),
+        ('Skybox', skybox_win),
+        ('Voice', voice_win),
+        ('Music', music_win),
+        ('Elevator', elev_win),
+    ]
+    if props is None:
+        props = Property('', [])
+        for win_name, win in sel_win:
+            props.append(Property(win_name, win.chosen_id or '<NONE>'))
+        return props
+
+    # Loading
+    for win_name, win in sel_win:
+        try:
+            win.sel_item_id(props[win_name])
+        except NoKeyError:
+            pass
+
+
 def load_packages(data):
     """Import in the list of items and styles from the packages.
 
@@ -535,11 +560,8 @@ def load_packages(data):
     def win_callback(style_id, win_name):
         """Callback for the selector windows.
 
-        This saves into the config file the last selected item.
+        This just refreshes if the 'apply selection' option is enabled.
         """
-        if style_id is None:
-            style_id = '<NONE>'
-        GEN_OPTS['Last_Selected'][win_name] = style_id
         suggested_refresh()
 
     def voice_callback(style_id):
@@ -551,7 +573,6 @@ def load_packages(data):
         voiceEditor.save()
         try:
             if style_id is None:
-                style_id = '<NONE>'
                 UI['conf_voice'].state(['disabled'])
                 UI['conf_voice']['image'] = img.png('icons/gear_disabled')
             else:
@@ -560,7 +581,6 @@ def load_packages(data):
         except KeyError:
             # When first initialising, conf_voice won't exist!
             pass
-        GEN_OPTS['Last_Selected']['Voice'] = style_id
         suggested_refresh()
 
     skybox_win = selWin(
@@ -639,23 +659,14 @@ def load_packages(data):
         ]
     )
 
-    last_style = GEN_OPTS.get_val('Last_Selected', 'Style', 'BEE2_CLEAN')
-    if last_style in style_win:
-        style_win.sel_item_id(last_style)
-        selected_style = last_style
-    else:
-        selected_style = 'BEE2_CLEAN'
-        style_win.sel_item_id('BEE2_CLEAN')
+    # Defaults, which will be reset at the end.
+    selected_style = 'BEE2_CLEAN'
+    style_win.sel_item_id('BEE2_CLEAN')
 
-    obj_types = [
-        (voice_win, 'Voice'),
-        (skybox_win, 'Skybox'),
-        (elev_win, 'Elevator'),
-        ]
-    for (sel_win, opt_name), default in zip(obj_types, current_style().suggested):
-        sel_win.sel_item_id(
-            GEN_OPTS.get_val('Last_Selected', opt_name, default)
-        )
+    voice_win.sel_suggested()
+    music_win.sel_suggested()
+    skybox_win.sel_suggested()
+    elev_win.sel_suggested()
 
 
 def current_style() -> packageLoader.Style:
@@ -2016,7 +2027,6 @@ def init_windows():
         """Callback whenever a new style is chosen."""
         global selected_style
         selected_style = style_id
-        GEN_OPTS['Last_Selected']['Style'] = style_id
 
         style_obj = current_style()
 
