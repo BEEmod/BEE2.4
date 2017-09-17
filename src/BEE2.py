@@ -28,7 +28,6 @@ import music_conf
 
 DEFAULT_SETTINGS = {
     'Directories': {
-        'palette': 'palettes/',
         'package': 'packages/',
     },
     'General': {
@@ -108,7 +107,7 @@ UI.load_packages(pack_data)
 LOGGER.info('Done!')
 
 LOGGER.info('Loading Palettes...')
-paletteLoader.load_palettes(GEN_OPTS['Directories']['palette'])
+paletteLoader.load_palettes()
 LOGGER.info('Done!')
 
 # Check games for Portal 2's basemodui.txt file, so we can translate items.
