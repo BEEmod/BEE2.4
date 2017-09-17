@@ -302,7 +302,9 @@ def make_pane(tool_frame):
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            checkbox_all[var.id]['command'] = lambda e: update_filter()
+            def cmd():
+                update_filter()
+            checkbox_all[var.id]['command'] = cmd
 
         tooltip.add_tooltip(
             checkbox_all[var.id],
