@@ -2,11 +2,12 @@ import os
 import shutil
 import zipfile
 import random
+import utils
 
 import srctools.logger
 from srctools import Property
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -45,6 +46,7 @@ class Palette:
         trans_name='',
         prevent_overwrite=False,
         filename: str=None,
+        settings: Optional[Dict[str, Property]]=None,
     ):
         # Name of the palette
         self.name = name
@@ -64,6 +66,9 @@ class Palette:
         # (premade palettes or <LAST EXPORT>)
         self.prevent_overwrite = prevent_overwrite
 
+        # If not None, settings associated with the palette.
+        self.settings = settings
+
     def __str__(self):
         return self.name
 
@@ -79,12 +84,20 @@ class Palette:
 
         trans_name = props['TransName', '']
 
+        settings = {
+            prop.name: prop
+            for prop in props.find_children('settings')
+        }
+        if not settings:
+            settings = None
+
         return Palette(
             name,
             items,
             trans_name=trans_name,
             prevent_overwrite=props.bool('readonly'),
             filename=os.path.basename(path),
+            settings=settings,
         )
 
     def save(self, ignore_readonly=False):
