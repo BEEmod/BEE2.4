@@ -42,6 +42,26 @@ def apply_settings(props: Property):
             func(opt_prop)
 
 
+def read_settings():
+    """Read and apply the settings from disk."""
+    try:
+        file = open(utils.conf_location('config/config.props'), encoding='utf8')
+    except FileNotFoundError:
+        return
+    with file:
+        props = Property.parse(file)
+    apply_settings(props)
+
+
+def write_settings():
+    """Write the settings to disk."""
+    props = get_curr_settings()
+    props.name = None
+    with open(utils.conf_location('config/config.props'), 'w', encoding='utf8') as file:
+        for line in props.export():
+            file.write(line)
+
+
 class ConfigFile(ConfigParser):
     """A version of ConfigParser which can easily save itself.
 
