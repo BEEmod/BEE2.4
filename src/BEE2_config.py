@@ -4,6 +4,7 @@ It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
 from configparser import ConfigParser, NoOptionError
+from srctools import AtomicWriter, Property
 
 import os
 import utils
@@ -11,6 +12,34 @@ import srctools.logger
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+
+# Functions for saving or loading application settings.
+# Call with a block to load, or with no args to return the current
+# values.
+option_handler = utils.FuncLookup('OptionHandlers')
+
+
+def get_curr_settings() -> Property:
+    """Return a property tree defining the current options."""
+    props = Property('', [])
+
+    for opt_id, opt_func in option_handler.items():
+        opt_prop = opt_func()
+        opt_prop.name = opt_id.title()
+        props.append(opt_prop)
+
+    return props
+
+
+def apply_settings(props: Property):
+    """Given a property tree, apply it to the widgets."""
+    for opt_prop in props:
+        try:
+            func = option_handler[opt_prop.name]
+        except KeyError:
+            LOGGER.warning('No handler for option type "{}"!', opt_prop.real_name)
+        else:
+            func(opt_prop)
 
 
 class ConfigFile(ConfigParser):
@@ -39,7 +68,7 @@ class ConfigFile(ConfigParser):
             else:
                 self.filename = filename
 
-            self.writer = srctools.AtomicWriter(self.filename)
+            self.writer = AtomicWriter(self.filename)
             self.has_changed = False
 
             if auto_load:
