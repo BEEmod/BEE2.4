@@ -431,10 +431,14 @@ def quit_application() -> None:
         GEN_OPTS['win_state']['main_window_x'] = str(TK_ROOT.winfo_rootx())
         GEN_OPTS['win_state']['main_window_y'] = str(TK_ROOT.winfo_rooty())
 
+    # Clean up sounds.
+    snd.clean_folder()
+
     GEN_OPTS.save_check()
     item_opts.save_check()
     CompilerPane.COMPILE_CFG.save_check()
     gameMan.save()
+
     # Destroy the TK windows
     TK_ROOT.quit()
     sys.exit(0)

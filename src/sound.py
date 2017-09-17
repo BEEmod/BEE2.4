@@ -24,7 +24,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 play_sound = True
 
-SAMPLE_WRITE_PATH = utils.conf_location('config/music_sample_temp')
+SAMPLE_WRITE_PATH = utils.conf_location('config/music_sample/temp')
 
 # This starts holding the filenames, but then caches the actual sound object.
 SOUNDS = {
@@ -78,6 +78,9 @@ except ImportError:
     def block_fx():
         """Block fx_blockable() for a short time."""
 
+    def clean_folder():
+        pass
+
     initiallised = False
     pyglet = avbin = None  # type: ignore
     SamplePlayer = None  # type: ignore
@@ -128,6 +131,15 @@ else:
         global _play_repeat_sfx
         _play_repeat_sfx = False
         TK_ROOT.after(50, _reset_fx_blockable)
+
+    def clean_folder():
+        """Delete files used by the sample player."""
+        for file in SAMPLE_WRITE_PATH.parent.iterdir():
+            LOGGER.info('Cleaning up "{}"...', file)
+            try:
+                file.unlink()
+            except (PermissionError, FileNotFoundError):
+                pass
 
     class SamplePlayer:
         """Handles playing a single audio file, and allows toggling it on/off."""
