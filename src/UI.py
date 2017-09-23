@@ -1337,30 +1337,32 @@ def init_option(pane: SubPane):
 
     ttk.Button(
         frame,
-        textvariable=EXPORT_CMD_VAR,
-        command=export_editoritems,
-    ).grid(row=0, sticky="EW", padx=5)
-
-    ttk.Button(
-        frame,
         text=_("Save Palette..."),
         command=pal_save,
-    ).grid(row=1, sticky="EW", padx=5)
+    ).grid(row=0, sticky="EW", padx=5)
     ttk.Button(
         frame,
         text=_("Save Palette As..."),
         command=pal_save_as,
-    ).grid(row=2, sticky="EW", padx=5)
+    ).grid(row=1, sticky="EW", padx=5)
 
     ttk.Checkbutton(
         frame,
         text=_('Save Settings in Palettes'),
         variable=var_pal_save_settings,
-    ).grid(row=3, sticky="EW", padx=5)
+    ).grid(row=2, sticky="EW", padx=5)
 
-    props = ttk.LabelFrame(frame, text=_("Properties"), width="50")
+    ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
+
+    ttk.Button(
+        frame,
+        textvariable=EXPORT_CMD_VAR,
+        command=export_editoritems,
+    ).grid(row=4, sticky="EW", padx=5)
+
+    props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
-    props.grid(row=4, sticky="EW")
+    props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props, text=_('Music: '))
     music_win = music_conf.make_widgets(music_frame, pane)
