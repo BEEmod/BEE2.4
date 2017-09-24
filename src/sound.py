@@ -79,12 +79,11 @@ except ImportError:
     initiallised = False
     pyglet = avbin = None
     SamplePlayer = None
-    play_sfx_repeat = False
 else:
     # Succeeded in loading PyGame
     from pyglet.media import Source, MediaFormatException, CannotSeekException
     initiallised = True
-    play_sfx_repeat = True
+    _play_repeat_sfx = True
 
     def load_snd():
         """Load in sound FX."""
@@ -103,8 +102,8 @@ else:
 
     def _reset_fx_blockable():
         """Reset the fx_norep() call after a delay."""
-        global play_sfx_repeat
-        play_sfx_repeat = True
+        global _play_repeat_sfx
+        _play_repeat_sfx = True
 
     def fx_blockable(sound):
         """Play a sound effect.
@@ -112,16 +111,16 @@ else:
         This waits for a certain amount of time between retriggering sounds
         so they don't overlap.
         """
-        global play_sfx_repeat
-        if play_sound and play_sfx_repeat:
+        global _play_repeat_sfx
+        if play_sound and _play_repeat_sfx:
             fx(sound)
-            play_sfx_repeat = False
+            _play_repeat_sfx = False
             TK_ROOT.after(75, _reset_fx_blockable)
 
     def block_fx():
         """Block fx_blockable() for a short time."""
-        global play_sfx_repeat
-        play_sfx_repeat = False
+        global _play_repeat_sfx
+        _play_repeat_sfx = False
         TK_ROOT.after(50, _reset_fx_blockable)
 
     class SamplePlayer:
