@@ -8,7 +8,7 @@ import shutil
 import os.path
 
 from tk_tools import TK_ROOT
-from srctools.filesys import FileSystem, FileSystemChain
+from srctools.filesys import RawFileSystem, FileSystemChain
 import utils
 
 __all__ = [
@@ -162,10 +162,22 @@ else:
 
             # TODO: Pyglet doesn't support direct streams, so we have to
             # TODO: extract sounds to disk first.
-            with self.system.get_system(file), file.open_bin() as fsrc, open(
-                SAMPLE_WRITE_PATH + os.path.splitext(self.cur_file)[1], 'wb',
-            ) as fdest:
-                shutil.copyfileobj(fsrc, fdest)
+
+            fsystem = self.system.get_system(file)
+            if isinstance(fsystem, RawFileSystem):
+                # Special case, it's directly lying on the disk -
+                # We can just pass that along.
+                disk_filename = os.path.join(fsystem.path, file.path)
+            else:
+                # In a filesystem, we need to extract it.
+                # SAMPLE_WRITE_PATH + the appropriate extension.
+                disk_filename = (
+                    SAMPLE_WRITE_PATH +
+                    os.path.splitext(self.cur_file)[1]
+                )
+                with self.system.get_system(file), file.open_bin() as fsrc:
+                    with open(disk_filename, 'wb') as fdest:
+                        shutil.copyfileobj(fsrc, fdest)
 
             try:
                 sound = pyglet.media.load(disk_filename, streaming=False)  # type: Source
