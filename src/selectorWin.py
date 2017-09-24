@@ -20,7 +20,7 @@ import img  # png library for TKinter
 from richTextBox import tkRichText
 from tooltip import add_tooltip
 from srctools import Vec, EmptyMapping
-from srctools.filesys import FileSystem, FileSystemChain
+from srctools.filesys import FileSystemChain
 import tkMarkdown
 import sound
 import utils
@@ -370,7 +370,7 @@ class selWin:
             *,  # Make all keyword-only for readability
             has_none=True,
             has_def=True,
-            sound_sys: FileSystem=None,
+            sound_sys: FileSystemChain=None,
             modal=False,
             # i18n: 'None' item description
             none_desc=_('Do not add anything.'),

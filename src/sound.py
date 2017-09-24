@@ -7,6 +7,7 @@ If PyGame fails to load, all fx() calls will fail silently.
 import shutil
 import os.path
 
+from srctools import VPK
 from tk_tools import TK_ROOT
 from srctools.filesys import RawFileSystem, FileSystemChain
 import utils
@@ -138,7 +139,8 @@ else:
 
         @property
         def is_playing(self):
-            return bool(self.sample)
+            """Is the player currently playing sounds?"""
+            return self.sample is not None
 
         def play_sample(self, e=None):
             pass
