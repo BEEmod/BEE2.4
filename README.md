@@ -58,12 +58,14 @@ The various `cache` folders and `config` folders should not be included.
 ## Build from Source [Mac]
 
 Download and install [AVBin](http://avbin.github.io/AVbin/Download.html)
+Download and install [TK 8.5.18.0](https://www.activestate.com/activetcl/downloads/thank-you?dl=http://downloads.activestate.com/ActiveTcl/releases/8.5.18.0/ActiveTcl8.5.18.0.298892-macosx10.5-i386-x86_64-threaded.dmg)
 
     cd BEE2.4/src/
     
-    $ python -m pip install cx_Freeze --upgrade
     $ pip install pipenv
     $ pipenv install requests
+    $ pipenv shell
+    $ python -m pip install cx_Freeze --upgrade
     $ pip install pyglet
     $ pip install Pillow
     $ pip install noise
