@@ -11,6 +11,14 @@ from tk_tools import TK_ROOT
 from srctools.filesys import FileSystem, FileSystemChain
 import utils
 
+__all__ = [
+    'SOUNDS', 'SamplePlayer',
+
+    'avbin_version', 'pyglet_version', 'initiallised',
+    'load_snd', 'play_sound', 'fx',
+    'fx_blockable', 'block_fx',
+]
+
 LOGGER = utils.getLogger(__name__)
 
 play_sound = True
@@ -40,7 +48,7 @@ SOUNDS = {
 
 try:
     import pyglet.media
-    from pyglet.media import avbin  # We need this extension, so error early..
+    from pyglet.media import avbin  # We need this extension, so error early.
 
     pyglet_version = pyglet.version
     avbin_version = avbin.get_version()
@@ -56,14 +64,17 @@ except ImportError:
         """
 
     def load_snd():
-        pass
+        """Load in sound FX."""
 
     def fx_blockable(sound):
-        pass
+        """Play a sound effect.
+
+        This waits for a certain amount of time between retriggering sounds
+        so they don't overlap.
+        """
 
     def block_fx():
         """Block fx_blockable() for a short time."""
-        pass
 
     initiallised = False
     pyglet = avbin = None
@@ -71,6 +82,7 @@ except ImportError:
     play_sfx_repeat = False
 else:
     # Succeeded in loading PyGame
+    from pyglet.media import Source, MediaFormatException, CannotSeekException
     initiallised = True
     play_sfx_repeat = True
 
@@ -78,7 +90,10 @@ else:
         """Load in sound FX."""
         for key, filename in SOUNDS.items():
             LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pyglet.media.load('../sounds/' + filename + '.ogg', streaming=False)
+            SOUNDS[key] = pyglet.media.load(
+                '../sounds/' + filename + '.ogg',
+                streaming=False,
+            )
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
@@ -153,8 +168,8 @@ else:
                 shutil.copyfileobj(fsrc, fdest)
 
             try:
-                sound = pyglet.media.load(fdest.name, streaming=False)
-            except pyglet.media.MediaFormatException:
+                sound = pyglet.media.load(disk_filename, streaming=False)  # type: Source
+            except MediaFormatException:
                 self.stop_callback()
                 LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
