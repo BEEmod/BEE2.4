@@ -129,6 +129,7 @@ else:
             """Initialise the sample-playing manager.
             """
             self.sample = None
+            self.start_time = 0   # If set, the time to start the track at.
             self.after = None
             self.start_callback = start_callback
             self.stop_callback = stop_callback
@@ -172,6 +173,12 @@ else:
                 self.stop_callback()
                 LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
+
+            if self.start_time:
+                try:
+                    sound.seek(self.start_time)
+                except CannotSeekException:
+                    LOGGER.exception('Cannot seek in "{}"!', self.cur_file)
 
             self.sample = sound.play()
             self.after = TK_ROOT.after(
