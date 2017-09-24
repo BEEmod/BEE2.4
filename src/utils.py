@@ -270,7 +270,7 @@ if MAC:
             # e.state is a set of binary flags
             # Don't run the event if control is held!
             if e.state & 4 == 0:
-                func()
+                func(e)
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @bind_event_handler

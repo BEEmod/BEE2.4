@@ -130,4 +130,9 @@ loadScreen.main_loader.destroy()
 # of building a callable.
 TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
 
-TK_ROOT.mainloop()
+while True:
+    try:
+        TK_ROOT.mainloop()
+        break
+    except UnicodeDecodeError:
+        pass
