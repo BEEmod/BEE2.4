@@ -62,6 +62,11 @@ Download and install [TK 8.5.18.0](https://www.activestate.com/activetcl/downloa
 
     cd BEE2.4/src/
     
+    $ git clone https://github.com/TeamSpen210/srctools.git
+    $ mv srctools srctools_old
+    $ mv ./srctools_old/srctools srctools
+    $ rm -rf srctools_old
+    
     $ pip install pipenv
     $ pipenv install requests
     $ pipenv shell
@@ -73,7 +78,7 @@ Download and install [TK 8.5.18.0](https://www.activestate.com/activetcl/downloa
     
     $ python compile_BEE2.py build
     > BEE2 Version: custom
-    # python compile_VBSP_VRAD.py build
+    $ python compile_VBSP_VRAD.py build
     > BEE2 Version: custom
 
 ## Modules Documentation ##
