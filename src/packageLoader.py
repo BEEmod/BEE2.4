@@ -448,6 +448,12 @@ def load_packages(
         if should_close_filesystems:
             close_filesystems()
 
+    LOGGER.info('Object counts:\n{}\n', '\n'.join(
+        '{:<15}: {}'.format(name, len(objs))
+        for name, objs in
+        data.items()
+    ))
+
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
         Item.all(),
@@ -489,7 +495,10 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
             )
 
         for obj in pack.info.find_all(comp_type):
-            obj_id = obj['id']
+            try:
+                obj_id = obj['id']
+            except IndexError:
+                raise ValueError('No ID for "{}" object type in "{}" package!'.format(comp_type, pack.id)) from None
             if obj_id in all_obj[comp_type]:
                 if allow_dupes:
                     # Pretend this is an override
