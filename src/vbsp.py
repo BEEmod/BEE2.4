@@ -2659,7 +2659,8 @@ def add_extra_ents(mode):
     inst = vbsp_options.get(str, 'music_instance')
     snd_length = vbsp_options.get(int, 'music_looplen')
 
-    if sound:
+    # Don't add our logic if an instance was provided.
+    if sound and not inst:
         music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
