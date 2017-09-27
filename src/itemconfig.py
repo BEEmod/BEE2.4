@@ -335,8 +335,8 @@ def widget_timer_generic(widget_func):
     return generic_func
 
 
-def multi_grid(values: List[Tuple[str, tk.StringVar]]):
-    """Generate the row and columns needed for a nice layout of square widgets."""
+def multi_grid(values: List[Tuple[str, tk.StringVar]], columns=10):
+    """Generate the row and columns needed for a nice layout of widgets."""
     for tim, var in values:
         if tim == 'inf':
             tim_disp = INF
@@ -344,7 +344,7 @@ def multi_grid(values: List[Tuple[str, tk.StringVar]]):
         else:
             tim_disp = str(tim)
             index = int(tim)
-        row, column = divmod(index - 1, 10)
+        row, column = divmod(index - 1, columns)
         yield row, column, tim_disp, var
 
 
@@ -430,7 +430,7 @@ def widget_checkmark(parent: tk.Frame, var: tk.StringVar, conf: Property):
 @WidgetLookupMulti('boolean', 'bool', 'checkbox')
 def widget_checkmark(
         parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
-    """For timers, display in a more compact form."""
+    """For checkmarks, display in a more compact form."""
     for row, column, tim_text, var in multi_grid(values):
         checkbox = widget_checkmark(parent, var, conf)
         checkbox.grid(row=row, column=column)
@@ -469,7 +469,7 @@ def widget_color_single(parent: tk.Frame, var: tk.StringVar, conf: Property) -> 
 @WidgetLookupMulti('color', 'colour', 'rgb')
 def widget_color_multi(
         parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
-    """For timers, display in a more compact form."""
+    """For color swatches, display in a more compact form."""
     for row, column, tim_text, var in multi_grid(values):
         swatch = make_color_swatch(parent, var)
         swatch.grid(row=row, column=column)
@@ -523,8 +523,18 @@ def timer_values(min_value, max_value):
     ]
 
 
+@WidgetLookupMulti('Timer', 'MinuteSeconds')
+def widget_minute_seconds_multi(
+        parent: tk.Frame, values: List[Tuple[str, tk.StringVar]], conf: Property):
+    """For timers, display in a more compact form."""
+    for row, column, tim_text, var in multi_grid(values, columns=5):
+        timer = widget_minute_seconds(parent, var, conf)
+        timer.grid(row=row, column=column)
+        add_tooltip(timer, tim_text, delay=0)
+
+
 @WidgetLookup('Timer', 'MinuteSeconds')
-def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Misc:
+def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -> tk.Widget:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
@@ -598,6 +608,7 @@ def widget_minute_seconds(parent: tk.Frame, var: tk.StringVar, conf: Property) -
         command=set_var,
         wrap=True,
         values=values,
+        width=5,
 
         validate='all',
         # %args substitute the values for the args to validate_cmd.
