@@ -263,6 +263,8 @@ def make_pane(parent: ttk.Frame):
 
         row = 0
 
+        widget_count = len(config.widgets) + len(config.multi_widgets)
+
         # Now make the widgets.
         if config.widgets:
             for row, wid in enumerate(config.widgets):
@@ -286,10 +288,13 @@ def make_pane(parent: ttk.Frame):
 
         # Continue from wherever we were.
         for row, wid in enumerate(config.multi_widgets, start=row+1):
-            wid_frame = ttk.LabelFrame(frame, text=wid.name)
-            wid_frame.grid(row=row, column=0, sticky='ew')
-            wid_frame.columnconfigure(1, weight=1)
+            # If we only have 1 widget, don't add a redundant title.
+            if widget_count == 1:
+                wid_frame = ttk.Frame(frame)
+            else:
+                wid_frame = ttk.LabelFrame(frame, text=wid.name)
 
+            wid_frame.grid(row=row, column=0, sticky='ew')
             wid.multi_func(
                 wid_frame,
                 wid.values,
