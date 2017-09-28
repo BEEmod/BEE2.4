@@ -150,6 +150,8 @@ class CubeOutputs(Enum):
     SPAWN = 'OnSpawn'  # When created - !self replaced by cube.
     FIZZLED = 'OnFizzle'  # When dissolved...
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
+    ON_PICKUP = 'OnPickup'
+    ON_DROP = 'OnDrop'
 
 
 # Things that get attached to a cube.
@@ -1286,6 +1288,19 @@ def make_cube(
             ent['CubeType'] = ENT_TYPE_INDEX[cube_type.type]
             # The model is unused, but set it so it looks nicer.
             ent['model'] = DEFAULT_MODELS[cube_type.type]
+
+    for temp_out in pair.outputs[CubeOutputs.ON_PICKUP]:
+        ent.add_out(setup_output(
+            temp_out,
+            targ_inst,
+            'OnPlayerPickup',
+        ))
+    for temp_out in pair.outputs[CubeOutputs.ON_DROP]:
+        ent.add_out(setup_output(
+            temp_out,
+            targ_inst,
+            'OnPhysGunDrop',
+        ))
 
     return has_addon_inst, ent
 
