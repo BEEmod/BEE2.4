@@ -181,12 +181,12 @@ class CubeAddon:
 
     @classmethod
     def parse(cls, props: Property):
-
         addon = cls(
             props['id'],
             props['instance', ''],
             props['packlist', ''],
             props['vscript', ''],
+            cls._parse_scriptvar(props),
             cls._parse_outputs(props),
         )
         return addon
@@ -1488,7 +1488,7 @@ def generate_cubes(vmf: VMF):
                 script_vars,
             ))
 
-            for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
+            for temp_out in pair.outputs[CubeOutputs.SPAWN]:
                 cube_temp.add_out(setup_output(
                     temp_out,
                     pair.cube,
