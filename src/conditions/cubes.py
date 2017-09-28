@@ -781,7 +781,7 @@ def flag_cube_type(inst: Entity, res: Property):
         elif cube_type == 'cube':
             return inst is pair.cube
         else:
-            raise ValueError('Unreckognised value ' + repr(res.value))
+            raise ValueError('Unrecognised value ' + repr(res.value))
 
     return pair.cube_type.id == cube_type.upper()
 
@@ -1495,6 +1495,16 @@ def generate_cubes(vmf: VMF):
                     'OnEntitySpawned',
                     self_name=cube_name,
                 ))
+
+            for temp_out in pair.outputs[CubeOutputs.DROP_DONE]:
+                output = setup_output(
+                    temp_out,
+                    pair.cube,
+                    'OnEntitySpawned',
+                    self_name=cube_name,
+                )
+                output.delay += 0.5
+                cube_temp.add_out(output)
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
