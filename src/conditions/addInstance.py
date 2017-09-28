@@ -37,27 +37,29 @@ def res_add_global_inst(res: Property):
             in a 128x128 nodraw room somewhere in the map. Objects which can
             interact with nearby object should not be placed there.
     """
-    if res.value is not None:
-        if res.bool('allow_multiple') or res['file'] not in GLOBAL_INSTANCES:
-            # By default we will skip adding the instance
-            # if was already added - this is helpful for
-            # items that add to original items, or to avoid
-            # bugs.
-            new_inst = vbsp.VMF.create_ent(
-                classname="func_instance",
-                targetname=res['name', ''],
-                file=instanceLocs.resolve_one(res['file'], error=True),
-                angles=res['angles', '0 0 0'],
-                fixup_style=res['fixup_style', '0'],
-            )
-            try:
-                new_inst['origin'] = res['position']
-            except IndexError:
-                new_inst['origin'] = vbsp_options.get(Vec, 'global_ents_loc')
-            GLOBAL_INSTANCES.add(res['file'])
-            if new_inst['targetname'] == '':
-                new_inst['targetname'] = "inst_"
-                new_inst.make_unique()
+    if not res.has_children():
+        res = Property('AddGlobal', [Property('File', res.value)])
+
+    if res.bool('allow_multiple') or res['file'] not in GLOBAL_INSTANCES:
+        # By default we will skip adding the instance
+        # if was already added - this is helpful for
+        # items that add to original items, or to avoid
+        # bugs.
+        new_inst = vbsp.VMF.create_ent(
+            classname="func_instance",
+            targetname=res['name', ''],
+            file=instanceLocs.resolve_one(res['file'], error=True),
+            angles=res['angles', '0 0 0'],
+            fixup_style=res['fixup_style', '0'],
+        )
+        try:
+            new_inst['origin'] = res['position']
+        except IndexError:
+            new_inst['origin'] = vbsp_options.get(Vec, 'global_ents_loc')
+        GLOBAL_INSTANCES.add(res['file'])
+        if new_inst['targetname'] == '':
+            new_inst['targetname'] = "inst_"
+            new_inst.make_unique()
     return RES_EXHAUSTED
 
 
