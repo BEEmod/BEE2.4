@@ -422,6 +422,8 @@ class Game:
     def refresh_cache(self):
         """Copy over the resource files into this game."""
         screen_func = export_screen.step
+        
+        already_copied = set()
 
         with res_system:
             for file in res_system.walk_folder_repeat():
@@ -442,9 +444,10 @@ class Game:
                     dest = self.abs_path(os.path.join('bee2', start_folder, path))
 
                 # Already copied from another package.
-                if os.path.exists(dest):
+                if dest in already_copied:
                     screen_func('RES')
                     continue
+                already_copied.add(dest)
 
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
