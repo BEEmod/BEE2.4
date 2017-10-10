@@ -25,11 +25,11 @@ def flag_angles(inst: Entity, flag: Property):
 
     The value should be either just the angle to check, or a block of
     options:
-    - Angle: A unit vector (XYZ value) pointing in a direction, or some
-        keywords: +z, -y, N/S/E/W, up/down, floor/ceiling, or walls
-    - From_dir: The direction the unrotated instance is pointed in.
+    - `Angle`: A unit vector (XYZ value) pointing in a direction, or some
+        keywords: `+z`, `-y`, `N`/`S`/`E`/`W`, `up`/`down`, `floor`/`ceiling`, or `walls` for any wall side.
+    - `From_dir`: The direction the unrotated instance is pointed in.
         This lets the flag check multiple directions
-    - Allow_inverse: If true, this also returns True if the instance is
+    - `Allow_inverse`: If true, this also returns True if the instance is
         pointed the opposite direction .
     """
     angle = inst['angles', '0 0 0']
@@ -67,20 +67,20 @@ def flag_angles(inst: Entity, flag: Property):
 def flag_brush_at_loc(inst: Entity, flag: Property):
     """Checks to see if a wall is present at the given location.
 
-    - Pos is the position of the brush, where `0 0 0` is the floor-position
+    - `Pos` is the position of the brush, where `0 0 0` is the floor-position
        of the brush.
-    - Dir is the normal the face is pointing. (0 0 -1) is 'up'.
-    - Type defines the type the brush must be:
-      - "Any" requires either a black or white brush.
-      - "None" means that no brush must be present.
-      - "White" requires a portalable surface.
-      - "Black" requires a non-portalable surface.
-    - SetVar defines an instvar which will be given a value of "black",
-      "white" or "none" to allow the result to be reused.
-    - If gridPos is true, the position will be snapped so it aligns with
-      the 128 brushes (Useful with fizzler/light strip items).
-    - RemoveBrush: If set to 1, the brush will be removed if found.
-      Only do this to EmbedFace brushes, since it will remove the other
+    - `Dir` is the normal the face is pointing. `(0 0 -1)` is up.
+    - `Type` defines the type the brush must be:
+      - `Any` requires either a black or white brush.
+      - `None` means that no brush must be present.
+      - `White` requires a portalable surface.
+      - `Black` requires a non-portalable surface.
+    - `SetVar` defines an instvar which will be given a value of `black`,
+      `white` or `none` to allow the result to be reused.
+    - If `gridPos` is true, the position will be snapped so it aligns with
+      the 128 grid (Useful with fizzler/light strip items).
+    - `RemoveBrush`: If set to `1`, the brush will be removed if found.
+      Only do this to `EmbedFace` brushes, since it will remove the other
       sides as well.
     """
     from conditions import VMF
@@ -132,7 +132,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
 def flag_goo_at_loc(inst: Entity, flag: Property):
     """Check to see if a given location is submerged in goo.
 
-    0 0 0 is the origin of the instance, values are in 128 increments.
+    `0 0 0` is the origin of the instance, values are in `128` increments.
     """
     pos = Vec.from_str(flag.value).rotate_by_str(inst['angles', '0 0 0'])
     pos *= 128
@@ -153,21 +153,21 @@ def flag_blockpos_type(inst: Entity, flag: Property):
     The offset is in block increments, with 0 0 0 equal to the mounting surface.
 
     The type should be a space-seperated list of locations:
-    * VOID (Outside the map)
-    * SOLID (Full wall cube)
-    * EMBED (Hollow wall cube)
-    * AIR (Inside the map, may be occupied by items)
-    * OCCUPIED (Known to be occupied by items)
-    * PIT (Bottomless pits, any)
-      * PIT_SINGLE (one-high)
-      * PIT_TOP
-      * PIT_MID
-      * PIT_BOTTOM
-    * GOO
-      * GOO_SINGLE (one-deep goo)
-      * GOO_TOP (goo surface)
-      * GOO_MID
-      * GOO_BOTTOM (floor)
+    * `VOID` (Outside the map)
+    * `SOLID` (Full wall cube)
+    * `EMBED` (Hollow wall cube)
+    * `AIR` (Inside the map, may be occupied by items)
+    * `OCCUPIED` (Known to be occupied by items)
+    * `PIT` (Bottomless pits, any)
+      * `PIT_SINGLE` (one-high)
+      * `PIT_TOP`
+      * `PIT_MID`
+      * `PIT_BOTTOM`
+    * `GOO`
+      * `GOO_SINGLE` (one-deep goo)
+      * `GOO_TOP` (goo surface)
+      * `GOO_MID`
+      * `GOO_BOTTOM` (floor)
     """
     if flag.has_children():
         pos = flag.vec('offset') * 128
@@ -196,7 +196,7 @@ def res_set_block(inst: Entity, res: Property):
     """Set a block to the given value.
 
     This should be used only if you know what is in the position.
-    The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    The offset is in block increments, with `0 0 0` equal to the mounting surface.
     """
     pos = res.vec('offset') * 128
     try:
@@ -241,7 +241,7 @@ def res_set_angles(inst: Entity, res: Property):
 def res_translate_inst(inst: Entity, res: Property):
     """Translate the instance locally by the given amount.
 
-    The special values <piston>, <piston_bottom> and <piston_top> can be
+    The special values `<piston>`, `<piston_bottom>` and `<piston_top>` can be
     used to offset it based on the starting position, bottom or top position
     of a piston platform.
     """
@@ -268,7 +268,7 @@ def res_translate_inst(inst: Entity, res: Property):
 def res_calc_opposite_wall_dist(inst: Entity, res: Property):
     """Calculate the distance between this item and the opposing wall.
 
-    The value is stored in the $var specified by the property value.
+    The value is stored in the `$var` specified by the property value.
     Alternately it is set by `ResultVar`, and `offset` adds or subtracts to the value.
     `GooCollide` means that it will stop when goo is found, otherwise it is
     ignored.

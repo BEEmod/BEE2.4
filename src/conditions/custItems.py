@@ -221,13 +221,13 @@ def res_cust_antline(inst: Entity, res: Property):
 
     This allows adding extra outputs between the instance and the toggle.
     Values:
-        straight: The straight overlay texture.
-        corner: The corner overlay texture.
-        straightFloor: Alt texture used on straight floor segements (P1 style)
-        cornerFloor: Alt texture for floor corners (P1 style)
+        `straight`: The straight overlay texture.
+        `corner`: The corner overlay texture.
+        `straightFloor`: Alt texture used on straight floor segements (P1 style)
+        `cornerFloor`: Alt texture for floor corners (P1 style)
           If these aren't set, the wall textures will be used.
-        instance: Use the given indicator_toggle instance instead
-        addOut: A set of additional ouputs to add, pointing at the
+        `instance`: Use the given `indicator_toggle` instance instead
+        `addOut`: A set of additional outputs to add, pointing at the
           toggle instance
     """
     straight_args, corner_args, toggle_inst, toggle_out = res.value
@@ -286,7 +286,7 @@ def res_change_outputs(inst: Entity, res: Property):
     """Switch the outputs on an instance.
 
     Each child is a original -> replace value. These match the values
-    in editoritems.txt. Use a blank value to indicate it should be deleted.
+    in `editoritems.txt`. Use a blank value to indicate it should be deleted.
     """
     for output in inst.outputs[:]:  # type: Output
         for (orig_name, orig_comm), rep in res.value:
@@ -320,9 +320,9 @@ def res_change_inputs(inst: Entity, res: Property):
     """Switch the inputs for an instance.
 
     Each child is an input to replace. The name is the original input, matching
-    the values in editoritems.txt. If 'inst_in' is set, this is the local entity
+    the values in `editoritems.txt`. If `inst_in` is set, this is the local entity
     to trigger via proxy (otherwise it controls the instance). 'input',
-    'params', 'delay', and 'only_once' match the values in Hammer.
+    `params`, `delay`, and `only_once` match the values in Hammer.
 
     Use empty quotes instead of a block to indicate it should be deleted.
     This replaces all outputs which target this instance name.
@@ -361,19 +361,19 @@ def res_change_inputs(inst: Entity, res: Property):
 
 @make_result('faithMods')
 def res_faith_mods(inst: Entity, res: Property):
-    """Modify the trigger_catrapult that is created for ItemFaithPlate items.
+    """Modify the `trigger_catapult` that is created for `ItemFaithPlate` items.
 
     Values:
-        - raise_trig: Raise or lower the trigger_catapults by this amount.
-        - angled_targ, angled_in: Instance entity and input for angled plates
-        - straight_targ, straight_in: Instance entity and input for
+        - `raise_trig`: Raise or lower the `trigger_catapult`s by this amount.
+        - `angled_targ`, `angled_in`: Instance entity and input for angled plates
+        - `straight_targ`, `straight_in`: Instance entity and input for
             straight plates
-        - instvar: A $replace value to set to either 'angled' or '
+        - `instvar`: A $replace value to set to either 'angled' or '
             'straight'.
-        - enabledVar: A $replace value which will be copied to the main
+        - `enabledVar`: A `$replace` value which will be copied to the main
             trigger's Start Disabled value (and inverted).
-        - trig_temp: An ID for a template brush to add. This will be offset by
-            the trigger's position (in the case of the 'helper' trigger).
+        - `trig_temp`: An ID for a template brush to add. This will be offset by
+            the trigger's position (in the case of the `helper` trigger).
     """
     # Get data about the trigger this instance uses for flinging
     fixup_var = res['instvar', '']

@@ -3,7 +3,7 @@
 """
 import operator
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import conditions
 import srctools
@@ -12,7 +12,8 @@ from conditions import (
     ALL_INST,
 )
 import instanceLocs
-from srctools import Property, Vec, Entity, Output
+from srctools import Property, Vec, Entity, Output, VMF
+
 
 COND_MOD_NAME = 'Instances'
 
@@ -61,10 +62,10 @@ INSTVAR_COMP = {
 def flag_instvar(inst: Entity, flag: Property):
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form "$start_enabled == 1", with or without
-    the $.
-    The operator can be any of '=', '==', '<', '>', '<=', '>=', '!='.
-    If ommitted, the operation is assumed to be ==.
+    The flag value follows the form `$start_enabled == 1`, with or without
+    the `$`.
+    The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
+    If omitted, the operation is assumed to be `==`.
     """
     values = flag.value.split(' ', 3)
     if len(values) == 3:
@@ -126,8 +127,8 @@ def res_add_inst_var(inst: Entity, res: Property):
 def res_set_inst_var(inst: Entity, res: Property):
     """Set an instance variable to the given value.
 
-    Values follow the format "$start_enabled 1", with or without the $.
-    "$out $in" will copy the value of $in into $out.
+    Values follow the format `$start_enabled 1`, with or without the `$`.
+    `$out $in` will copy the value of `$in` into `$out`.
     """
     var_name, val = res.value.split(' ', 1)
     inst.fixup[var_name] = conditions.resolve_value(inst, val)
@@ -177,7 +178,7 @@ def res_local_targetname(inst: Entity, res: Property):
 
     Useful with AddOutput commands, or other values which use
     targetnames in the parameter.
-    The result takes the form "<prefix><instance name>[-<local>]<suffix>".
+    The result takes the form `<prefix><instance name>[-<local>]<suffix>`.
     """
     local_name = res['name', '']
     if local_name:
@@ -191,10 +192,10 @@ def res_local_targetname(inst: Entity, res: Property):
 def res_replace_instance(inst: Entity, res: Property):
     """Replace an instance with another entity.
 
-    'keys' and 'localkeys' defines the new keyvalues used.
-    'targetname' and 'angles' are preset, and 'origin' will be used to offset
+    `keys` and `localkeys` defines the new keyvalues used.
+    `targetname` and `angles` are preset, and `origin` will be used to offset
     the given amount from the current location.
-    If 'keep_instance' is true, the instance entity will be kept instead of
+    If keep_instance` is true, the instance entity will be kept instead of
     removed.
     """
     import vbsp
@@ -206,7 +207,7 @@ def res_replace_instance(inst: Entity, res: Property):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
-    # We copy to allow us to still acess the $fixups and other values.
+    # We copy to allow us to still access the $fixups and other values.
     new_ent = inst.copy(des_id=inst.id)
     new_ent.clear_keys()
     # Ensure there's a classname, just in case.
@@ -238,58 +239,29 @@ def res_global_input_setup(res: Property):
 
 
 @make_result('GlobalInput')
-def res_global_input(inst: Entity, res: Property):
+def res_global_input(vmf: VMF, inst: Entity, res: Property):
     """Trigger an input either on map spawn, or when a relay is triggered.
 
-    Arguments:
-        - "Input": the input to use, either a name or an instance: command.
-        - "Target": If set, a local name to send commands to.
-        - "Delay": Number of seconds to delay the input.
-        - "Name": If set the name of the logic_relay which must be triggered.
-            If not set the output will fire OnMapSpawn.
-        - "Output": The name of the output, defaulting to OnTrigger. Ignored
-            if Name is not set.
-        - "Param": The parameter for the output.
+    Arguments:  
+    
+    - `Input`: the input to use, either a name or an `instance:` command.
+    - `Target`: If set, a local name to send commands to.
+    - `Delay`: Number of seconds to delay the input.
+    - `Name`: If set the name of the `logic_relay` which must be triggered.
+        If not set the output will fire `OnMapSpawn`.
+    - `Output`: The name of the output, defaulting to `OnTrigger`. Ignored
+        if Name is not set.
+    - `Param`: The parameter for the output.
     """
-    name, proxy_name, command, output, delay, param, target = res.value
-
-    global_input(inst, command, proxy_name, name, output, target, param, delay)
-
-
-def global_input(
-    inst: Entity,
-    command: str,
-    proxy_name: str=None,
-    relay_name: str=None,
-    relay_out: str='OnTrigger',
-    target: str=None,
-    param='',
-    delay=0.0,
-):
-    """Create a global input."""
+    relay_name, proxy_name, command, relay_out, delay, param, target = res.value
 
     if relay_name is not None:
         relay_name = conditions.resolve_value(inst, relay_name)
     if target is not None:
         target = conditions.resolve_value(inst, target)
 
-    try:
-        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
-    except KeyError:
-        if relay_name is None:
-            glob_ent = GLOBAL_INPUT_ENTS[None] = inst.map.create_ent(
-                classname='logic_auto',
-                origin=inst['origin'],
-            )
-        else:
-            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = inst.map.create_ent(
-                classname='logic_relay',
-                targetname=relay_name,
-                origin=inst['origin'],
-            )
-
-    out = Output(
-        out=('OnMapSpawn' if relay_name is None else relay_out),
+    output = Output(
+        out=relay_out,
         targ=(
             conditions.local_name(inst, target)
             if target else
@@ -300,11 +272,40 @@ def global_input(
         delay=delay,
         param=conditions.resolve_value(inst, param),
     )
-    glob_ent.add_out(out)
+
+    global_input(vmf, inst['origin'], output, relay_name)
+
+
+def global_input(
+    vmf: VMF,
+    pos: Union[Vec, str],
+    output: Output,
+    relay_name: str=None,
+):
+    """Create a global input."""
+    try:
+        glob_ent = GLOBAL_INPUT_ENTS[relay_name]
+    except KeyError:
+        if relay_name is None:
+            glob_ent = GLOBAL_INPUT_ENTS[None] = vmf.create_ent(
+                classname='logic_auto',
+                spawnflags='1',  # Remove on fire
+                origin=pos,
+            )
+        else:
+            glob_ent = GLOBAL_INPUT_ENTS[relay_name] = vmf.create_ent(
+                classname='logic_relay',
+                targetname=relay_name,
+                origin=pos,
+            )
+    if relay_name is None:
+        output.output = 'OnMapSpawn'
+        output.only_once = True
+    glob_ent.add_out(output)
 
 
 @make_result('ScriptVar')
-def res_script_var(inst: Entity, res: Property):
+def res_script_var(vmf: VMF, inst: Entity, res: Property):
     """Set a variable on a script, via a logic_auto.
 
     Name is the local name for the script entity.
@@ -312,11 +313,15 @@ def res_script_var(inst: Entity, res: Property):
     Value is the value to set.
     """
     global_input(
-        inst,
-        command='RunScriptCode',
-        target=conditions.local_name(inst, res['name']),
-        param='{} <- {}'.format(
-            res['var'],
-            conditions.resolve_value(inst, res['value']),
+        vmf,
+        inst['origin'],
+        Output(
+            'OnMapSpawn',
+            conditions.local_name(inst, res['name']),
+            'RunScriptCode',
+            param='{} <- {}'.format(
+                res['var'],
+                conditions.resolve_value(inst, res['value']),
+            ),
         ),
     )

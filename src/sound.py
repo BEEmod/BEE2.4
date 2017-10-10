@@ -7,9 +7,18 @@ If PyGame fails to load, all fx() calls will fail silently.
 import shutil
 import os.path
 
+from srctools import VPK
 from tk_tools import TK_ROOT
-from srctools.filesys import FileSystem, FileSystemChain
+from srctools.filesys import RawFileSystem, FileSystemChain
 import utils
+
+__all__ = [
+    'SOUNDS', 'SamplePlayer',
+
+    'avbin_version', 'pyglet_version', 'initiallised',
+    'load_snd', 'play_sound', 'fx',
+    'fx_blockable', 'block_fx',
+]
 
 LOGGER = utils.getLogger(__name__)
 
@@ -40,7 +49,7 @@ SOUNDS = {
 
 try:
     import pyglet.media
-    from pyglet.media import avbin  # We need this extension, so error early..
+    from pyglet.media import avbin  # We need this extension, so error early.
 
     pyglet_version = pyglet.version
     avbin_version = avbin.get_version()
@@ -56,29 +65,35 @@ except ImportError:
         """
 
     def load_snd():
-        pass
+        """Load in sound FX."""
 
     def fx_blockable(sound):
-        pass
+        """Play a sound effect.
+
+        This waits for a certain amount of time between retriggering sounds
+        so they don't overlap.
+        """
 
     def block_fx():
         """Block fx_blockable() for a short time."""
-        pass
 
     initiallised = False
     pyglet = avbin = None
     SamplePlayer = None
-    play_sfx_repeat = False
 else:
     # Succeeded in loading PyGame
+    from pyglet.media import Source, MediaFormatException, CannotSeekException
     initiallised = True
-    play_sfx_repeat = True
+    _play_repeat_sfx = True
 
     def load_snd():
         """Load in sound FX."""
         for key, filename in SOUNDS.items():
             LOGGER.debug('Loading {}', filename)
-            SOUNDS[key] = pyglet.media.load('../sounds/' + filename + '.ogg', streaming=False)
+            SOUNDS[key] = pyglet.media.load(
+                '../sounds/' + filename + '.ogg',
+                streaming=False,
+            )
 
     def fx(name, e=None):
         """Play a sound effect stored in the sounds{} dict."""
@@ -88,8 +103,8 @@ else:
 
     def _reset_fx_blockable():
         """Reset the fx_norep() call after a delay."""
-        global play_sfx_repeat
-        play_sfx_repeat = True
+        global _play_repeat_sfx
+        _play_repeat_sfx = True
 
     def fx_blockable(sound):
         """Play a sound effect.
@@ -97,16 +112,16 @@ else:
         This waits for a certain amount of time between retriggering sounds
         so they don't overlap.
         """
-        global play_sfx_repeat
-        if play_sound and play_sfx_repeat:
+        global _play_repeat_sfx
+        if play_sound and _play_repeat_sfx:
             fx(sound)
-            play_sfx_repeat = False
+            _play_repeat_sfx = False
             TK_ROOT.after(75, _reset_fx_blockable)
 
     def block_fx():
         """Block fx_blockable() for a short time."""
-        global play_sfx_repeat
-        play_sfx_repeat = False
+        global _play_repeat_sfx
+        _play_repeat_sfx = False
         TK_ROOT.after(50, _reset_fx_blockable)
 
     class SamplePlayer:
@@ -115,6 +130,7 @@ else:
             """Initialise the sample-playing manager.
             """
             self.sample = None
+            self.start_time = 0   # If set, the time to start the track at.
             self.after = None
             self.start_callback = start_callback
             self.stop_callback = stop_callback
@@ -123,7 +139,8 @@ else:
 
         @property
         def is_playing(self):
-            return bool(self.sample)
+            """Is the player currently playing sounds?"""
+            return self.sample is not None
 
         def play_sample(self, e=None):
             pass
@@ -147,17 +164,35 @@ else:
 
             # TODO: Pyglet doesn't support direct streams, so we have to
             # TODO: extract sounds to disk first.
-            with self.system.get_system(file), file.open_bin() as fsrc, open(
-                SAMPLE_WRITE_PATH + os.path.splitext(self.cur_file)[1], 'wb',
-            ) as fdest:
-                shutil.copyfileobj(fsrc, fdest)
+
+            fsystem = self.system.get_system(file)
+            if isinstance(fsystem, RawFileSystem):
+                # Special case, it's directly lying on the disk -
+                # We can just pass that along.
+                disk_filename = os.path.join(fsystem.path, file.path)
+            else:
+                # In a filesystem, we need to extract it.
+                # SAMPLE_WRITE_PATH + the appropriate extension.
+                disk_filename = (
+                    SAMPLE_WRITE_PATH +
+                    os.path.splitext(self.cur_file)[1]
+                )
+                with self.system.get_system(file), file.open_bin() as fsrc:
+                    with open(disk_filename, 'wb') as fdest:
+                        shutil.copyfileobj(fsrc, fdest)
 
             try:
-                sound = pyglet.media.load(fdest.name, streaming=False)
-            except pyglet.media.MediaFormatException:
+                sound = pyglet.media.load(disk_filename, streaming=False)  # type: Source
+            except MediaFormatException:
                 self.stop_callback()
                 LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
                 return  # Abort if music isn't found..
+
+            if self.start_time:
+                try:
+                    sound.seek(self.start_time)
+                except CannotSeekException:
+                    LOGGER.exception('Cannot seek in "{}"!', self.cur_file)
 
             self.sample = sound.play()
             self.after = TK_ROOT.after(

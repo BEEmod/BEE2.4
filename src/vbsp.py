@@ -1,4 +1,3 @@
-
 import utils
 # Do this very early, so we log the startup sequence.
 LOGGER = utils.init_logging('bee2/vbsp.log')
@@ -26,8 +25,10 @@ import conditions
 import connections
 import instance_traits
 import template_brush
+import fizzler
 import comp_consts as consts
 import conditions.globals
+import conditions.cubes
 
 from typing import (
     Dict, Tuple, List
@@ -38,7 +39,6 @@ COND_MOD_NAME = 'VBSP'
 # Configuration data extracted from VBSP_config
 settings = {
     "textures":       {},
-    "fizzler":        {},
     "options":        {},
     "fog":            {},
     "elev_opt":       {},
@@ -172,35 +172,6 @@ BLACK_PAN = [
     "metal/black_wall_metal_002b",  # 4x4
     ]
 
-
-# angles needed to ensure fizzlers are not upside-down
-# (key=original, val=fixed)
-FIZZLER_ANGLE_FIX = {
-    "0 0 -90":    "0 180 90",
-    "0 0 180":    "0 180 180",
-    "0 90 0":     "0 -90 0",
-    "0 90 -90":   "0 -90 90",
-    "0 180 -90":  "0 0 90",
-    "0 -90 -90":  "0 90 90",
-    "90 180 0":   "-90 0 0",
-    "90 -90 0":   "-90 90 0",
-    "-90 180 0":  "90 0 0",
-    "-90 -90 0":  "90 90 0",
-    }
-
-# Texture -> fizzler.x
-TEX_FIZZLER = {
-    consts.Fizzler.CENTER: "center",
-    consts.Fizzler.LEFT: "left",
-    consts.Fizzler.RIGHT: "right",
-    consts.Fizzler.SHORT: "short",
-    consts.Tools.NODRAW: "nodraw",
-    }
-
-FIZZ_OPTIONS = [
-    ('0', 'scanline'),
-]
-
 BEE2_config = None  # type: ConfigFile
 
 GAME_MODE = 'ERR'  # SP or COOP?
@@ -270,8 +241,6 @@ def alter_mat(face, seed=None, texture_lock=True):
             face.offset = 0
 
         return True
-    elif mat in TEX_FIZZLER:
-        face.mat = settings['fizzler'][TEX_FIZZLER[mat]]
     else:
         return False
 
@@ -334,17 +303,6 @@ def load_settings():
     # Load in our main configs..
     vbsp_options.load(conf.find_all('Options'))
 
-    # Load in fizzler options and textures. This works similarly to the normal
-    # textures/options.
-
-    fizz_defaults = list(TEX_FIZZLER.items()) + FIZZ_OPTIONS
-    for item, key in fizz_defaults:
-        settings['fizzler'][key] = item
-
-    for fizz_block in conf.find_all('fizzler'):
-        for default, key in fizz_defaults:
-            settings['fizzler'][key] = fizz_block[key, settings['fizzler'][key]]
-
     # The voice line property block
     for quote_block in conf.find_all("quotes"):
         voiceLine.QUOTE_DATA += quote_block.value
@@ -372,6 +330,12 @@ def load_settings():
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
+
+    # Data for different cube types.
+    conditions.cubes.parse_conf(conf)
+
+    # Fizzler data
+    fizzler.read_configs(conf)
 
     # These are custom textures we need to pack, if they're in the map.
     # (World brush textures, antlines, signage, glass...)
@@ -418,6 +382,9 @@ def load_settings():
         'height_start': fog_config['height_start', '0'],
         'height_density': fog_config['height_density', '0'],
         'height_max_density': fog_config['height_max_density', '1'],
+
+        # Shadow background
+        'shadow': fog_config['shadowColor', '98 102 106'],
 
         'tonemap_rate': fog_config['tonemap_rate', '0.25'],
         'tonemap_brightpixels': fog_config['tonemap_brightpixels', '5'],
@@ -467,7 +434,6 @@ def add_voice():
     )
 
 
-@conditions.meta_cond(priority=-250)
 def add_fizz_borders():
     """Generate overlays at the top and bottom of fizzlers.
 
@@ -578,37 +544,6 @@ def add_fizz_borders():
                 v_repeat=v_rep,
                 swap=flip_uv,
             )
-
-
-@conditions.meta_cond(priority=-200, only_once=False)
-def fix_fizz_models(inst: Entity):
-    """Fix some bugs with fizzler model instances.
-    This removes extra numbers from model instances, which prevents
-    inputs from being read correctly.
-    It also rotates fizzler models so they are both facing the same way.
-    """
-    # Fizzler model names end with this special string
-    if ("_modelStart" in inst['targetname', ''] or
-            "_modelEnd" in inst['targetname', '']):
-
-        # strip off the extra numbers on the end, so fizzler
-        # models recieve inputs correctly (Valve bug!)
-        if "_modelStart" in inst['targetname', '']:
-
-            inst['targetname'] = (
-                inst['targetname'].split("_modelStart")[0] +
-                "_modelStart"
-                )
-        else:
-            inst['targetname'] = (
-                inst['targetname'].split("_modelEnd")[0] +
-                "_modelEnd"
-                )
-
-        # one side of the fizzler models are rotated incorrectly
-        # (upsidown), fix that...
-        if inst['angles'] in FIZZLER_ANGLE_FIX:
-            inst['angles'] = FIZZLER_ANGLE_FIX[inst['angles']]
 
 
 @conditions.meta_cond(priority=-100, only_once=False)
@@ -972,11 +907,10 @@ def set_player_portalgun():
     - If there are only orange portal spawners, the player gets a blue-
       only gun (Regular single portal device)
     - If there are both spawner types, the player doesn't get a gun.
-    - The two relays '@player_has_blue' and '@player_has_oran' will be
-      triggered OnMapSpawn if the player has those portals.
+    - 'PortalGunOnOff' or 'NeedsPortalMan' will also be checked to
+      activate that logic.
     """
-    if GAME_MODE == 'COOP':
-        return  # Don't change portalgun in Portal 2 Coop
+
     if vbsp_options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
@@ -986,8 +920,11 @@ def set_player_portalgun():
 
     blue_portal = not has['blueportal']
     oran_portal = not has['orangeportal']
+    has_btn_onoff = has['portalgunonoff']
+    force_portal_man = has_btn_onoff or has['needsportalman']
 
-    LOGGER.info('Blue: {}, Orange: {!s}',
+    LOGGER.info(
+        'Blue: {}, Orange: {!s}',
         'Y' if blue_portal else 'N',
         'Y' if oran_portal else 'N',
     )
@@ -1000,29 +937,134 @@ def set_player_portalgun():
         has['spawn_dual'] = False
         has['spawn_single'] = True
         has['spawn_nogun'] = False
-        inst = VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),  # Reuse this location
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/pgun_single.vmf',
-        )
-        # Set which portals this weapon_portalgun can fire
-        inst.fixup['blue_portal'] = srctools.bool_as_int(blue_portal)
-        inst.fixup['oran_portal'] = srctools.bool_as_int(oran_portal)
     else:
         has['spawn_dual'] = False
         has['spawn_single'] = False
         has['spawn_nogun'] = True
-        has_gun = False
-        # This instance only has a trigger_weapon_strip.
-        VMF.create_ent(
-            classname='func_instance',
-            targetname='pgun_logic',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            angles='0 0 0',
-            file='instances/BEE2/logic/pgun/no_pgun.vmf',
+
+    ent_pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    if not blue_portal or not oran_portal or force_portal_man:
+        pgun_script = VMF.create_ent(
+            classname='point_template',
+            targetname='@portalgun',
+            vscripts='bee2/portal_man.nut',
+            origin=ent_pos,
         )
+        PACK_FILES.add('scripts/vscripts/bee2/portal_man.nut')
+
+        if GAME_MODE == 'SP':
+            VMF.create_ent(
+                classname='weapon_portalgun',
+                targetname='__pgun_template',
+                CanFirePortal1=0,
+                CanFirePortal2=0,
+                spawnflags=0,
+                origin=ent_pos - (12, 0, 0),
+            )
+            pgun_script['Template01'] = '__pgun_template'
+            pgun_script['spawnflags'] = 2
+        else:
+            pgun_script['classname'] = 'logic_script'
+
+        # For removing portalguns from players.
+        trig_stripper = VMF.create_ent(
+            targetname='__pgun_weapon_strip',
+            classname='trigger_weapon_strip',
+            origin=ent_pos,
+            startdisabled=1,
+            spawnflags=1,  # Players
+            KillWeapons=1,
+        )
+        whole_map = VMF.make_prism(
+            Vec(-4096, -4096, -4096),
+            Vec(4096, 4096, 4096),
+            mat=consts.Tools.TRIGGER,
+        ).solid
+
+        trig_stripper.solids = [whole_map]
+
+        # Detect the group ID of portals placed in the map, and write to
+        # the entities what we determine.
+        if GAME_MODE == 'COOP':
+            port_ids = (0, 1, 2)
+        else:
+            port_ids = (0, )
+
+        for port_id in port_ids:
+            trigger_portal = VMF.create_ent(
+                targetname='__pgun_port_detect_{}'.format(port_id),
+                classname='func_portal_detector',
+                origin=ent_pos,
+                CheckAllIDs=0,
+                LinkageGroupID=port_id,
+            )
+            trigger_portal.solids = [whole_map.copy()]
+            trigger_portal.add_out(
+                VLib.Output(
+                    'OnStartTouchPortal1',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_is_oran <- 0; '
+                    '__pgun_port_id <- {}; '
+                    '__pgun_active <- 1'.format(port_id),
+                ),
+                VLib.Output(
+                    'OnStartTouchPortal2',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_is_oran <- 1; '
+                    '__pgun_port_id <- {}; '
+                    '__pgun_active <- 1'.format(port_id),
+                ),
+                VLib.Output(
+                    'OnEndTouchPortal',
+                    '!activator',
+                    'RunScriptCode',
+                    '__pgun_active <- 0',
+                ),
+            )
+
+        # Checking for held cubes, for pgun buttons.
+        if has_btn_onoff:
+            trig_cube = VMF.create_ent(
+                targetname='__pgun_held_trig',
+                classname='trigger_multiple',
+                origin=ent_pos,
+                filtername='@filter_held',
+                startdisabled=1,
+                spawnflags=8,  # Physics
+                wait=0.01,
+            )
+            trig_cube.solids = [whole_map.copy()]
+            trig_cube.add_out(VLib.Output(
+                'OnStartTouch',
+                '@portalgun',
+                'RunScriptCode',
+                '_mark_held_cube()',
+            ))
+
+        if GAME_MODE == 'SP':
+            GLOBAL_OUTPUTS.append(VLib.Output(
+                'OnMapSpawn',
+                '@portalgun',
+                'RunScriptCode',
+                'init({}, {}, {})'.format(
+                    'true' if blue_portal else 'false',
+                    'true' if oran_portal else 'false',
+                    'true' if has_btn_onoff else 'false',
+                ),
+                delay=0.1,
+            ))
+
+        # Shuts down various parts when you've reached the exit.
+        import conditions.instances
+        conditions.instances.global_input(VMF, ent_pos, VLib.Output(
+            'OnTrigger',
+            '@portalgun',
+            'RunScriptCode',
+            'map_won()',
+        ), relay_name='@map_won')
 
     if blue_portal:
         GLOBAL_OUTPUTS.append(VLib.Output(
@@ -1047,11 +1089,11 @@ def add_screenshot_logic():
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
         'Screenshot', 'type', 'PETI'
-    ).upper() == 'AUTO':
+    ).upper() == 'AUTO' and IS_PREVIEW:
         VMF.create_ent(
             classname='func_instance',
             file='instances/BEE2/logic/screenshot_logic.vmf',
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
             angles='0 0 0',
         )
         LOGGER.info('Added Screenshot Logic')
@@ -1060,7 +1102,7 @@ def add_screenshot_logic():
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents():
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = vbsp_options.get(Vec, 'global_pti_ents_loc')
+    pos = vbsp_options.get(Vec, 'global_ents_loc')
     VMF.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -1068,6 +1110,18 @@ def add_fog_ents():
     )
 
     fog_opt = settings['fog']
+
+    random.seed(MAP_RAND_SEED + '_shadow_angle')
+    VMF.create_ent(
+        classname='shadow_control',
+        # Slight variations around downward direction.
+        angles=Vec(random.randrange(85, 90), random.randrange(0, 360), 0),
+        origin=pos + (0, 16, 0),
+        distance=100,
+        color=fog_opt['shadow'],
+        disableallshadows=0,
+        enableshadowsfromlocallights=1,
+    )
 
     fog_controller = VMF.create_ent(
         classname='env_fog_controller',
@@ -1192,9 +1246,9 @@ def set_elev_videos():
         if inst['file'].casefold() not in transition_ents:
             continue
         if vert_vid:
-            inst.fixup['$vert_video'] = 'media/' + vert_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_VERT] = 'media/' + vert_vid + '.bik'
         if horiz_vid:
-            inst.fixup['$horiz_video'] = 'media/' + horiz_vid + '.bik'
+            inst.fixup[consts.FixupVars.BEE_ELEV_HORIZ] = 'media/' + horiz_vid + '.bik'
 
         # Create the video script
         VMF.create_ent(
@@ -1474,7 +1528,7 @@ def mod_entryexit(
 
     if override_corr == 0:
         index = files.index(inst['file'].casefold())
-        inst.fixup['$corr_index'] = index + 1
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = index + 1
         LOGGER.info(
             'Using random {} ({})',
             pretty_name,
@@ -1487,7 +1541,7 @@ def mod_entryexit(
             pretty_name,
             override_corr,
         )
-        inst.fixup['$corr_index'] = override_corr
+        inst.fixup[consts.FixupVars.BEE_CORR_INDEX] = override_corr
         inst['file'] = files[override_corr - 1]
         return override_corr - 1
 
@@ -1516,8 +1570,8 @@ def mod_doorframe(inst: VLib.Entity, corr_id, corr_type, corr_name):
             color='white' if is_white else 'black',
         )
     )
-    if replace:
-        inst['file'] = replace[0]
+    if replace is not None:
+        inst['file'] = replace
 
 
 def calc_rand_seed():
@@ -1731,7 +1785,7 @@ def remove_static_ind_toggles():
         if inst['file'].casefold() not in toggle_file:
             continue
 
-        overlay = inst.fixup['$indicator_name', '']
+        overlay = inst.fixup[consts.FixupVars.TOGGLE_OVERLAY, '']
         # Remove if there isn't an overlay, or no associated ents.
         if overlay == '' or len(VMF.by_target[overlay]) == 0:
             inst.remove()
@@ -1787,7 +1841,7 @@ def set_barrier_frame_type():
             norm = Vec(0, 0, -1).rotate_by_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
         try:
-            inst.fixup['$barrier_type'] = barrier_types[origin.as_tuple(), norm.as_tuple()]
+            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = barrier_types[origin.as_tuple(), norm.as_tuple()]
         except KeyError:
             pass
 
@@ -2590,40 +2644,6 @@ def change_overlays():
             )
 
 
-def change_trig():
-    """Check the triggers and fizzlers."""
-    LOGGER.info("Editing Triggers...")
-
-    for trig in VMF.by_class['trigger_portal_cleanser']:
-        for side in trig.sides():
-            alter_mat(side)
-        target = trig['targetname', '']
-
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_fizz'
-
-        trig['drawInFastReflection'] = vbsp_options.get(bool, "force_fizz_reflect")
-        # This also controls whether fizzlers play sounds.
-        trig['visible'] = vbsp_options.get(bool, 'fizz_visibility')
-
-        use_scanline = settings["fizzler"]["scanline"]
-        # Scanlines always move vertically - on horizontal fizzlers they won't
-        # work.
-        if use_scanline:
-            bbox_min, bbox_max = trig.get_bbox()
-            if (bbox_max - bbox_min).z < 64:
-                # On the floor - no scanline..
-                use_scanline = False
-        trig['useScanline'] = use_scanline
-
-    for trig in VMF.by_class['trigger_hurt']:
-        target = trig['targetname', '']
-        # Change this so the base instance can directly modify the brush.
-        if target.endswith('_brush'):
-            trig['targetname'] = target[:-6] + '-br_hurt'
-
-
 def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
@@ -2639,7 +2659,8 @@ def add_extra_ents(mode):
     inst = vbsp_options.get(str, 'music_instance')
     snd_length = vbsp_options.get(int, 'music_looplen')
 
-    if sound:
+    # Don't add our logic if an instance was provided.
+    if sound and not inst:
         music = VMF.create_ent(
             classname='ambient_generic',
             spawnflags='17',  # Looping, Infinite Range, Starts Silent
@@ -2648,18 +2669,88 @@ def add_extra_ents(mode):
             message=sound,
             health='10',  # Volume
         )
-        music.add_out(VLib.Output('OnUser1', '@music', 'PlaySound'))
 
-        if snd_length > 0:
-            # Allow us to use non-looping mp3s, by continually re-triggering
-            # the music entity.
-            music.add_out(
-                VLib.Output('OnUser1', '@music', 'FireUser1', delay=snd_length)
+        music_start = VMF.create_ent(
+            classname='logic_relay',
+            spawnflags='0',
+            targetname='@music_start',
+            origin=loc + (-16, 0, -16),
+        )
+        music_stop = VMF.create_ent(
+            classname='logic_relay',
+            spawnflags='0',
+            targetname='@music_stop',
+            origin=loc + (16, 0, -16),
+        )
+        music_stop.add_out(
+            VLib.Output('OnTrigger', music, 'StopSound'),
+            VLib.Output('OnTrigger', music, 'Volume', '0'),
+        )
+
+        # In SinglePlayer, music gets killed during reload,
+        # so we need to restart it.
+
+        # If snd_length is set, we have a non-loopable MP3
+        # and want to re-trigger it after the time elapses, to simulate
+        # looping.
+
+        # In either case, we need @music_restart to do that safely.
+        if GAME_MODE == 'SP' or snd_length > 0:
+
+            music_restart = VMF.create_ent(
+                classname='logic_relay',
+                spawnflags='2',  # Allow fast retrigger.
+                targetname='@music_restart',
+                StartDisabled='1',
+                origin=loc + (0, 0, -16),
             )
-            # Set to non-looping, so re-playing will restart it correctly.
-            music['spawnflags'] = '49'
+
+            music_start.add_out(
+                VLib.Output('OnTrigger', music_restart, 'Enable'),
+                VLib.Output('OnTrigger', music_restart, 'Trigger', delay=0.01),
+            )
+
+            music_stop.add_out(
+                VLib.Output('OnTrigger', music_restart, 'Disable'),
+                VLib.Output('OnTrigger', music_restart, 'CancelPending'),
+            )
+
+            music_restart.add_out(
+                VLib.Output('OnTrigger', music, 'StopSound'),
+                VLib.Output('OnTrigger', music, 'Volume', '0'),
+                VLib.Output('OnTrigger', music, 'Volume', '10', delay=0.1),
+                VLib.Output('OnTrigger', music, 'PlaySound', delay=0.1),
+            )
+
+            if GAME_MODE == 'SP':
+                # Trigger on level loads.
+                VMF.create_ent(
+                    classname='logic_auto',
+                    origin=loc + (0, 0, 16),
+                    spawnflags='0',  # Don't remove after fire
+                    globalstate='',
+                ).add_out(
+                    VLib.Output('OnLoadGame', music_restart, 'CancelPending'),
+                    VLib.Output('OnLoadGame', music_restart, 'Trigger', delay=0.01),
+                )
+
+            if snd_length > 0:
+                # Re-trigger after the music duration.
+                music_restart.add_out(
+                    VLib.Output('OnTrigger', '!self', 'Trigger', delay=snd_length)
+                )
+                # Set to non-looping, so re-playing will restart it correctly.
+                music['spawnflags'] = '49'
+        else:
+            # The music track never needs to have repeating managed,
+            # just directly trigger.
+            music_start.add_out(
+                VLib.Output('OnTrigger', music, 'PlaySound'),
+                VLib.Output('OnTrigger', music, 'Volume', '10'),
+            )
 
     if inst:
+        # We assume the instance is setup correct.
         VMF.create_ent(
             classname='func_instance',
             targetname='music',
@@ -2669,19 +2760,45 @@ def add_extra_ents(mode):
             fixup_style='0',
         )
 
+    LOGGER.info('Adding global ents...')
+
     # Add the global_pti_ents instance automatically, with disable_pti_audio
     # set.
-
+    global_ents_pos = vbsp_options.get(Vec, 'global_ents_loc')
     pti_file = vbsp_options.get(str, 'global_pti_ents')
     pti_loc = vbsp_options.get(Vec, 'global_pti_ents_loc')
+
+    # Add a nodraw box around the global entity location, to seal it.
+    VMF.add_brushes(VMF.make_hollow(
+        global_ents_pos + (128, 128, 128),
+        global_ents_pos - (128, 128, 64),
+    ))
 
     # Add a cubemap into the map, so materials get a blank one generated.
     # If none are present this doesn't happen...
     VMF.create_ent(
         classname='env_cubemap',
-        cubemapsize=1, # Make as small as possible..
-        origin=pti_loc,
+        cubemapsize=1,  # Make as small as possible..
+        origin=global_ents_pos,
     )
+
+    # So we have one in the map.
+    VMF.create_ent(
+        classname='info_node',
+        origin=global_ents_pos - (0, 0, 64),
+        nodeid=1,
+        spawnflags=0,
+        angles='0 0 0',
+    )
+
+    if settings['has_attr']['bridge'] or settings['has_attr']['lightbridge']:
+        # If we have light bridges, make sure we precache the particle.
+        VMF.create_ent(
+            classname='info_particle_system',
+            origin=global_ents_pos,
+            effect_name='projected_wall_impact',
+            start_active=0,
+        )
 
     if pti_file:
         LOGGER.info('Adding Global PTI Ents')
@@ -2718,7 +2835,7 @@ def add_extra_ents(mode):
     logic_auto = VMF.create_ent(
         classname='logic_auto',
         spawnflags='0',  # Don't remove on fire
-        origin=pti_loc + (0, 0, 16),
+        origin=global_ents_pos + (0, 0, 16),
     )
     logic_auto.outputs = GLOBAL_OUTPUTS
 
@@ -3248,6 +3365,9 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
+        from conditions.cubes import write_vscripts
+        write_vscripts(conf)
+
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
             f.write(line)
@@ -3352,7 +3472,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
         )
     except subprocess.CalledProcessError as err:
         # VBSP didn't suceed. Print the error log..
-        vbsp_logger.error(err.output.decode('ascii'))
+        vbsp_logger.error(err.output.decode('ascii', errors='replace'))
 
         if is_peti:  # Ignore Hammer maps
             process_vbsp_fail(err.output)
@@ -3362,7 +3482,7 @@ def run_vbsp(vbsp_args, path, new_path=None):
         sys.exit(err.returncode)
 
     # Print output
-    vbsp_logger.info(output.decode('ascii'))
+    vbsp_logger.info(output.decode('ascii', errors='replace'))
     LOGGER.info("VBSP Done!")
 
     if is_peti:  # Ignore Hammer maps
@@ -3593,6 +3713,8 @@ def main():
 
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
+        fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
+
         conditions.init(
             seed=MAP_RAND_SEED,
             inst_list=all_inst,
@@ -3607,7 +3729,6 @@ def main():
         fixup_goo_sides()  # Must be done before change_brush()!
         change_brush()
         change_overlays()
-        change_trig()
         collapse_goo_trig()
         change_func_brush()
         remove_static_ind_toggles()

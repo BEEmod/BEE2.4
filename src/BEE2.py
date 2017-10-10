@@ -85,6 +85,7 @@ gameMan.scan_music_locs()
 LOGGER.info('Loading Packages...')
 pack_data, package_sys = packageLoader.load_packages(
     GEN_OPTS['Directories']['package'],
+    loader=loadScreen.main_loader,
     log_item_fallbacks=GEN_OPTS.get_bool(
         'Debug', 'log_item_fallbacks'),
     log_missing_styles=GEN_OPTS.get_bool(

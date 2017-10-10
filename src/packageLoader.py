@@ -12,7 +12,6 @@ from collections import defaultdict
 import srctools
 import tkMarkdown
 import utils
-from loadScreen import main_loader as loader
 from packageMan import PACK_CONFIG
 from selectorWin import SelitemData
 from srctools import (
@@ -27,10 +26,12 @@ from typing import (
     Union, Optional, Any, TYPE_CHECKING,
     Iterator, Iterable, Type,
     Dict, List, Tuple, NamedTuple,
+    Match
 )
 
 if TYPE_CHECKING:
     from gameMan import Game
+    from loadScreen import BaseLoadScreen
 
 LOGGER = utils.getLogger(__name__)
 
@@ -93,6 +94,8 @@ UnParsedItemVariant = NamedTuple('UnParsedItemVariant', [
     ('config', Property),  # Config for editing
 ])
 
+# Finds names surrounded by %s
+RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'
@@ -335,6 +338,7 @@ def close_filesystems():
 
 def load_packages(
         pak_dir,
+        loader: 'BaseLoadScreen',
         log_item_fallbacks=False,
         log_missing_styles=False,
         log_missing_ent_count=False,
@@ -407,7 +411,6 @@ def load_packages(
 
         for obj_type, objs in all_obj.items():
             for obj_id, obj_data in objs.items():
-                LOGGER.debug('Loading {type} "{id}"!', type=obj_type, id=obj_id)
                 obj_class = OBJ_TYPES[obj_type].cls  # type: Type[PakObject]
                 # parse through the object and return the resultant class
                 try:
@@ -444,6 +447,12 @@ def load_packages(
     finally:
         if should_close_filesystems:
             close_filesystems()
+
+    LOGGER.info('Object counts:\n{}\n', '\n'.join(
+        '{:<15}: {}'.format(name, len(objs))
+        for name, objs in
+        data.items()
+    ))
 
     LOGGER.info('Allocating styled items...')
     setup_style_tree(
@@ -486,7 +495,10 @@ def parse_package(pack: 'Package', has_tag=False, has_mel=False):
             )
 
         for obj in pack.info.find_all(comp_type):
-            obj_id = obj['id']
+            try:
+                obj_id = obj['id']
+            except IndexError:
+                raise ValueError('No ID for "{}" object type in "{}" package!'.format(comp_type, pack.id)) from None
             if obj_id in all_obj[comp_type]:
                 if allow_dupes:
                     # Pretend this is an override
@@ -549,9 +561,11 @@ def setup_style_tree(
     # have data defined for every used style.
     for item in item_data:
         all_ver = list(item.versions.values())  # type: List[Dict[str, Union[Dict[str, Style], str]]]
-        # Move default version to the beginning, so it's read first
+        # Move default version to the beginning, so it's read first.
+        # that ensures it's got all styles set if we need to fallback.
         all_ver.remove(item.def_ver)
         all_ver.insert(0, item.def_ver)
+
         for vers in all_ver:
             # We need to repeatedly loop to handle the chains of
             # dependencies. This is a list of (style_id, UnParsed).
@@ -633,7 +647,6 @@ def setup_style_tree(
             # Fix this reference to point to the actual value.
             vers['def_style'] = styles[vers['def_style']]
 
-
             for sty_id, style in all_styles.items():
                 if sty_id in styles:
                     continue  # We already have a definition
@@ -651,21 +664,27 @@ def setup_style_tree(
                             )
                         break
                 else:
-                    # For the base version, use the first style if
-                    # a styled version is not present
-                    if vers['id'] == item.def_ver['id']:
-                        styles[sty_id] = vers['def_style']
-                        if log_missing_styles and not item.unstyled:
-                            LOGGER.warning(
-                                'Item "{item}" using '
-                                'inappropriate style for "{style}"!',
-                                item=item.id,
-                                style=sty_id,
-                            )
-                    else:
-                        # For versions other than the first, use
-                        # the base version's definition
-                        styles[sty_id] = item.def_ver['styles'][sty_id]
+                    # No parent matches!
+                    if log_missing_styles and not item.unstyled:
+                        LOGGER.warning(
+                            'Item "{item}" using '
+                            'inappropriate style for "{style}"!',
+                            item=item.id,
+                            style=sty_id,
+                        )
+
+                    # If 'isolate versions' is set on the item,
+                    # we never consult other versions for matching styles.
+                    # There we just use our first style (Clean usually).
+                    # The default version is always isolated.
+                    # If not isolated, we get the version from the default
+                    # version. Note the default one is computed first,
+                    # so it's guaranteed to have a value.
+                    styles[sty_id] = (
+                        vers['def_style'] if
+                        item.isolate_versions or vers['isolate']
+                        else item.def_ver['styles'][sty_id]
+                    )
 
 
 def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
@@ -745,6 +764,41 @@ def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
 
         set_cond_source(conf, folders[fold].source)
 
+
+def apply_replacements(conf: Property) -> Property:
+    """Apply a set of replacement values to a config file, returning a new copy.
+
+    The replacements are found in a 'Replacements' block in the property.
+    These replace %values% starting and ending with percents. A double-percent
+    allows literal percents. Unassigned values are an error.
+    """
+    replace = {}
+    new_conf = Property(conf.real_name, [])
+
+    # Strip the replacement blocks from the config, and save the values.
+    for prop in conf:
+        if prop.name == 'replacements':
+            for rep_prop in prop:
+                replace[rep_prop.name.strip('%')] = rep_prop.value
+        else:
+            new_conf.append(prop)
+
+    def rep_func(match: Match):
+        """Does the replacement."""
+        var = match.group(1)
+        if not var:  # %% becomes %.
+            return '%'
+        try:
+            return replace[var.casefold()]
+        except KeyError:
+            raise ValueError('Unresolved variable: {!r}\n{}'.format(var, replace))
+
+    for prop in new_conf.iter_tree(blocks=True):
+        prop.name = RE_PERCENT_VAR.sub(rep_func, prop.real_name)
+        if not prop.has_children():
+            prop.value = RE_PERCENT_VAR.sub(rep_func, prop.value)
+
+    return new_conf
 
 class ItemVariant:
     """Data required for an item in a particular style."""
@@ -1197,6 +1251,7 @@ class Item(PakObject):
             needs_unlock=False,
             all_conf=None,
             unstyled=False,
+            isolate_versions=False,
             glob_desc=(),
             desc_last=False,
             folders: Dict[Tuple[FileSystem, str], ItemVariant]=EmptyMapping,
@@ -1207,6 +1262,9 @@ class Item(PakObject):
         self.def_data = def_version['def_style']
         self.needs_unlock = needs_unlock
         self.all_conf = all_conf or Property(None, [])
+        # If set or set on a version, don't look at the first version
+        # for unstyled items.
+        self.isolate_versions = isolate_versions
         self.unstyled = unstyled
         self.glob_desc = glob_desc
         self.glob_desc_last = desc_last
@@ -1238,13 +1296,12 @@ class Item(PakObject):
             data.id,
         ))
 
-        needs_unlock = data.info.bool('needsUnlock')
-
         for ver in data.info.find_all('version'):  # type: Property
             vals = {
                 'name':    ver['name', 'Regular'],
                 'id':      ver['ID', 'VER_DEFAULT'],
                 'styles':  {},
+                'isolate': ver.bool('isolated'),
                 'def_style': None,
                 }
             for style in ver.find_children('styles'):
@@ -1291,8 +1348,13 @@ class Item(PakObject):
                             style.real_name,
                         ))
             versions[vals['id']] = vals
+
+            # The first version is the 'default',
+            # so non-isolated versions will fallback to it.
+            # But the default is isolated itself.
             if def_version is None:
                 def_version = vals
+                vals['isolate'] = True
 
         # Fill out the folders dict with the actual data
         parse_item_folder(folders, data.fsys, data.pak_id)
@@ -1312,7 +1374,8 @@ class Item(PakObject):
             data.id,
             versions=versions,
             def_version=def_version,
-            needs_unlock=needs_unlock,
+            needs_unlock=data.info.bool('needsUnlock'),
+            isolate_versions=data.info.bool('isolate_versions'),
             all_conf=all_config,
             unstyled=unstyled,
             glob_desc=glob_desc,
@@ -1386,9 +1449,9 @@ class Item(PakObject):
             ) = item._get_export_data(
                 pal_list, ver_id, style_id, prop_conf,
             )
-            editoritems += item_block.copy()
-            editoritems += editor_parts.copy()
-            vbsp_config += config_part.copy()
+            editoritems += apply_replacements(item_block)
+            editoritems += apply_replacements(editor_parts)
+            vbsp_config += apply_replacements(config_part)
 
             # Add auxiliary configs as well.
             try:
@@ -1396,9 +1459,9 @@ class Item(PakObject):
             except KeyError:
                 pass
             else:
-                vbsp_config += aux_conf.all_conf.copy()
+                vbsp_config += apply_replacements(aux_conf.all_conf)
                 try:
-                    version_data = aux_conf.versions[ver_id].copy()
+                    version_data = aux_conf.versions[ver_id]
                 except KeyError:
                     pass  # No override.
                 else:
@@ -1406,7 +1469,9 @@ class Item(PakObject):
                     # that's defined for this config
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
-                            vbsp_config += version_data[poss_style.id].copy()
+                            vbsp_config += apply_replacements(
+                                version_data[poss_style.id]
+                            )
                             break
 
     def _get_export_data(
@@ -2632,7 +2697,7 @@ class BrushTemplate(PakObject, has_img=False):
             config_id = config['template_id']
             if config_id and temp_id:
                 if config['template_id'].casefold() != temp_id.casefold():
-                    raise ValueError('VMF and info.txt have different ids: {}, {}'.format(
+                    raise ValueError('VMF and info.txt have different ids:\n conf = {}, info.txt = {}'.format(
                         config['template_id'],
                         temp_id,
                     ))
@@ -2754,6 +2819,12 @@ class BrushTemplate(PakObject, has_img=False):
                     )
 
         self.temp_overlays = []
+
+        # Transfer this configuration ent over.
+        for color_picker in vmf_file.by_class['bee2_template_colorpicker']:
+            new_ent = color_picker.copy(map=TEMPLATE_FILE, keep_vis=False)
+            new_ent['template_id'] = temp_id
+            TEMPLATE_FILE.add_ent(new_ent)
 
         for overlay in vmf_file.by_class['info_overlay']:  # type: Entity
             visgroups = [
