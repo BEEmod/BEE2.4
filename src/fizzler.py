@@ -246,8 +246,11 @@ class FizzlerType:
         for prop in conf.find_all('Has'):
             if prop.has_children():
                 for child in prop:
-                    voice_attrs.append(child.name)
-            voice_attrs.append(prop.name)
+                    voice_attrs.append(child.name.casefold())
+            else:
+                voice_attrs.append(prop.value.casefold())
+
+
 
         out_activate = conf['OutActivate', None]
         if out_activate is not None:
