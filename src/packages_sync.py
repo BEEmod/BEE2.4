@@ -139,7 +139,10 @@ def check_file(file: Path, portal2: Path, packages: Path):
 
         if not target_systems:
             # This file is totally new.
-            target_systems.append(get_package(rel_loc))
+            try:
+                target_systems.append(get_package(rel_loc))
+            except KeyboardInterrupt:
+                return
 
         for fsys in target_systems:
             full_loc = fsys.path / rel_loc
