@@ -203,6 +203,7 @@ class Dialog(tk.Toplevel):
         self.title(title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
+        self.text = text
         tk_tools.set_window_icon(self)
 
         # Hide when the exit button is pressed, or Escape
@@ -229,9 +230,6 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        parsed_text = tkMarkdown.convert(text)
-        self.textbox.set_text(parsed_text)
-
         ttk.Button(
             frame,
             text=_('Close'),
@@ -241,6 +239,13 @@ class Dialog(tk.Toplevel):
         )
 
     def show(self, e=None):
+        # The first time we're shown, decode the text.
+        # That way we don't need to do it on startup.
+        if self.text is not None:
+            parsed_text = tkMarkdown.convert(self.text)
+            self.textbox.set_text(parsed_text)
+            self.text = None
+
         self.deiconify()
         self.update_idletasks()
         utils.center_win(self, TK_ROOT)
