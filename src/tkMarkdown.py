@@ -8,6 +8,9 @@ import markdown
 
 import utils
 
+from typing import Iterable, Iterator, Union, List, Tuple
+
+
 LOGGER = utils.getLogger(__name__)
 
 # These tags if present simply add a TK tag.
@@ -35,33 +38,47 @@ HRULE_TEXT = ('\n ', ('hrule', ))
 
 LINK_TAG_START = 'link_callback_'
 
+
 class TAG(Enum):
     START = 0
     END = 1
 
 
+class BlockTags(Enum):
+    """The various kinds of blocks that can happen."""
+    # Paragraphs of regular text or other stuff we can insert.
+    # The data is alternating text, tag-tuples suitable to pass
+    # to Text.insert().
+    TEXT = 'text'
+    # An image, data is the file path.
+    IMAGE = 'image'
+
+
 class MarkdownData:
     """The output of the conversion, a set of tags and link references for callbacks.
 
-    Tags is a tuple of alternating strings and tag tuples.
-    links is a dict mapping urls to callback IDs.
+    Blocks are a list of two-tuples - each is a Block type, and data for it.
+    Links is a dict mapping urls to callback IDs.
     """
-    def __init__(self, tags=(), links=None):
-        self.tags = tuple(tags)
+    def __init__(self, blocks=(), links=None):
+        self.blocks = list(blocks)
         self.links = links if links is not None else {}
 
     def __bool__(self):
         """Empty data is false."""
-        return bool(self.tags)
+        return bool(self.blocks)
 
     def copy(self) -> 'MarkdownData':
         """Create and return a duplicate of this object."""
-        return MarkdownData(self.tags, self.links.copy())
+        return MarkdownData(self.blocks, self.links.copy())
 
     __copy__ = copy
 
 
-def iter_elemtext(elem: etree.Element, parent_path=()):
+def iter_elemtext(
+    elem: etree.Element,
+    parent_path: Iterable[etree.Element]=(),
+) -> Iterator[Tuple[List[etree.Element], Union[str, TAG]]]:
     """Flatten out an elementTree into the text parts.
 
     Yields path, text tuples. path is a list of the parent elements for the
@@ -89,13 +106,23 @@ def iter_elemtext(elem: etree.Element, parent_path=()):
 def parse_html(element: etree.Element):
     """Translate markdown HTML into TK tags.
 
-    This yields alternating text and tags, matching the arguments for
+    This returns lists of alternating text and tags, matching the arguments for
     Text widgets.
-    The last yielded value is a tag: url dict for the embedded hyperlinks.
+    This also returns a tag: url dict for the embedded hyperlinks.
     """
     ol_nums = []
     links = {}
     link_counter = count(start=1)
+    force_return = False
+
+    blocks = []
+    cur_text_block = []
+
+    def finish_text_block():
+        """Copy the cur_text_block into blocks ready for another type."""
+        if cur_text_block:
+            blocks.append((BlockTags.TEXT, tuple(cur_text_block)))
+            cur_text_block.clear()
 
     for path, text in iter_elemtext(element, parent_path=[element]):
         last = path[-1]
@@ -103,28 +130,35 @@ def parse_html(element: etree.Element):
         if last.tag == 'div':
             continue  # This wraps around the entire block..
 
+        # We need to insert a return after <p> or <br>, but only if
+        # the next block is empty.
+        if force_return:
+            force_return = False
+            cur_text_block.append('\n')
+            cur_text_block.append(())
+
         # Line breaks at <br> or at the end of <p> blocks.
         # <br> emits a START, '', and END - we only want to output for one
         # of those.
         if last.tag in ('br', 'p') and text is TAG.END:
-            yield '\n'
-            yield ()
+            cur_text_block.append('\n')
+            cur_text_block.append(())
             continue
 
         # Insert the number or bullet
         if last.tag == 'li' and text is TAG.START:
             list_type = path[-2].tag
             if list_type == 'ul':
-                yield UL_START
-                yield ('list_start', 'indent')
+                cur_text_block.append(UL_START)
+                cur_text_block.append(('list_start', 'indent'))
             elif list_type == 'ol':
                 ol_nums[-1] += 1
-                yield OL_START.format(ol_nums[-1])
-                yield ('list_start', 'indent')
+                cur_text_block.append(OL_START.format(ol_nums[-1]))
+                cur_text_block.append(('list_start', 'indent'))
 
         if last.tag == 'li' and text is TAG.END:
-            yield '\n'
-            yield ('indent', )
+            cur_text_block.append('\n')
+            cur_text_block.append(('indent', ))
 
         if last.tag == 'ol':
             # Set and reset the counter appropriately..
@@ -133,11 +167,14 @@ def parse_html(element: etree.Element):
             if text is TAG.END:
                 ol_nums.pop()
 
+        if last.tag == 'img' and not text:
+            # Add the image - it's own block type.
+            finish_text_block()
+            blocks.append((BlockTags.IMAGE, last.attrib['src']))
+
         if isinstance(text, TAG) or not text:
             # Don't output these internal values.
             continue
-
-        force_return = False
 
         tk_tags = set()
         for tag in {elem.tag for elem in path}:
@@ -166,14 +203,13 @@ def parse_html(element: etree.Element):
             tk_tags.add('link')  # For formatting
             tk_tags.add(url_id)  # For the click-callback.
 
-        yield text
-        yield tuple(tk_tags)
+        cur_text_block.append(text)
+        cur_text_block.append(tuple(tk_tags))
 
-        if force_return:
-            yield '\n'
-            yield ()
+    # Finish our last block.
+    finish_text_block()
 
-    yield links
+    return blocks, links
 
 
 class TKConverter(markdown.Extension, Preprocessor):
@@ -193,7 +229,7 @@ class TKConverter(markdown.Extension, Preprocessor):
         self.result = MarkdownData()
 
     def run(self, lines):
-        # Set the markdown class to use our serialiser when run..
+        """Set the markdown class to use our serialiser when run."""
         self.md.serializer = self.serialise
 
         return lines  # And don't modify the text..
@@ -205,19 +241,10 @@ class TKConverter(markdown.Extension, Preprocessor):
         # We can't directly return the list, since it'll break Markdown.
         # Return an empty document and save it elsewhere.
 
-        parsed_tags = list(parse_html(element))
-        # The last yielded value is the dictionary of URL link keys.
-        # Pop that off.
-        links = parsed_tags.pop()
-
-        # Remove a bare \n at the end of the description
-        # It's followed by the tag.
-        if parsed_tags and parsed_tags[-2:-1] == ['\n', ()]:
-            parsed_tags.pop()
-            parsed_tags.pop()
+        blocks, links = parse_html(element)
 
         self.result = MarkdownData(
-            parsed_tags,
+            blocks,
             links,
         )
 
@@ -254,16 +281,16 @@ def join(*args: MarkdownData) -> MarkdownData:
     if len(to_join) == 1:
         # We only have one block, just copy and return.
         return MarkdownData(
-            to_join[0].tags,
+            to_join[0].blocks,
             to_join[0].links.copy(),
         )
 
     link_ind = 0
     combined_links = {}
-    new_text = []
+    new_blocks = []
     old_to_new = {}  # Maps original callback to new callback
     for data in to_join:
-        tags = data.tags
+        blocks = data.blocks
         links = data.links
 
         old_to_new.clear()
@@ -274,16 +301,28 @@ def join(*args: MarkdownData) -> MarkdownData:
                 link_ind += 1
                 old_to_new[call_name] = combined_links[url] = LINK_TAG_START + str(link_ind)
 
-        for tag_text in tags:
-            if isinstance(tag_text, str):  # Text to display
-                new_text.append(tag_text)
+        # Modify tags to use the new links.
+        for block_type, block_data in blocks:
+            if block_type is not BlockTags.TEXT:
+                # Other block types.
+                new_blocks.append((block_type, block_data))
                 continue
-            new_tag = []
-            for tag in tag_text:
-                if tag.startswith(LINK_TAG_START):
-                    # Replace with the new tag we've set.
-                    new_tag.append(old_to_new[tag])
-                else:
-                    new_tag.append(tag)
-            new_text.append(tuple(new_tag))
-    return MarkdownData(new_text, combined_links)
+
+            new_block_data = []
+            # block_type == BlockTags.TEXT
+            new_blocks.append((block_type, new_block_data))
+            for tag_text in block_data:
+                if isinstance(tag_text, str):  # Text to display
+                    new_block_data.append(tag_text)
+                    continue
+
+                new_tag = []
+                for tag in tag_text:
+                    if tag.startswith(LINK_TAG_START):
+                        # Replace with the new tag we've set.
+                        new_tag.append(old_to_new[tag])
+                    else:
+                        new_tag.append(tag)
+                new_block_data.append(tuple(new_tag))
+
+    return MarkdownData(new_blocks, combined_links)
