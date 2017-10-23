@@ -32,6 +32,8 @@ class tkRichText(tkinter.Text):
             height=height,
             wrap="word",
             font=self.font,
+            # We only want the I-beam cursor over text.
+            cursor=utils.CURSORS['regular'],
         )
 
         self.heading_font = {}
