@@ -66,20 +66,25 @@ def flag_instvar(inst: Entity, flag: Property):
     the `$`.
     The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
     If omitted, the operation is assumed to be `==`.
+    If only the variable name is present, it is tested as a boolean flag.
     """
     values = flag.value.split(' ', 3)
     if len(values) == 3:
         variable, op, comp_val = values
         value = inst.fixup[variable]
         try:
-            # Convert to floats if possible, otherwise handle both as strings
+            # Convert to floats if possible, otherwise handle both as strings.
+            # That ensures we normalise different number formats (1 vs 1.0)
             comp_val, value = float(comp_val), float(value)
         except ValueError:
             pass
         return INSTVAR_COMP.get(op, operator.eq)(value, comp_val)
-    else:
+    elif len(values) == 2:
         variable, value = values
         return inst.fixup[variable] == value
+    else:
+        # For just a name.
+        return inst.fixup.bool(flag.value)
 
 
 @make_result('rename', 'changeInstance')
