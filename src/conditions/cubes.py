@@ -50,6 +50,11 @@ CUBE_FILTER_MULTI_IND = 0
 # Max number of ents in a multi filter.
 MULTI_FILTER_COUNT = 10
 
+# filter_activator_class entities for weighted_cube and monster_box.
+# These are in global_pti_ents.
+FILTER_MONST_CLS = '@is_fbox'
+FILTER_CUBE_CLS = '@is_mbox'
+
 # The BSP file path -> data for each script query function that's
 # desired.
 CUBE_SCRIPT_FILTERS = {}  # type: Dict[str, io.StringIO]
@@ -642,14 +647,16 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
             )['targetname']
             return filter_name
 
-    if len(inclusions) > len(CUBE_TYPES) / 2:
+    # Some others which are predefined.
+
+    if len(inclusions) > len(CUBE_TYPES) / 2 and 0:
         # If more than half of cubes are included, it's better to exclude
         # the missing ones.
         invert = True
-        name_start = '@filter_bee2_not_'
+        name_start = '@filter_bee2_exc_'
         children = all_cubes - inclusions
     else:
-        name_start = '@filter_bee2_'
+        name_start = '@filter_bee2_inc_'
         invert = False
         children = inclusions
 
@@ -658,24 +665,21 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     # Names to use in the final filter
     names = set()
 
+    # Check if we have the two class types.
+    has_cube_cls = has_monst_cls = False
+
     for cube_type in children:  # type: CubeType
         # Special case - no model, just by class.
+        # FrankenTurrets don't have one model.
         if cube_type.type is CubeEntType.franken:
             # We use the cube type instance as a unique key.
-            try:
-                names.add(CUBE_FILTERS[cube_type])
-            except KeyError:
-                # We need to make it.
-                filter_name = name_start + cube_type.has_name
-                vmf.create_ent(
-                    classname='filter_activator_class',
-                    targetname=filter_name,
-                    filterclass='prop_monster_box',
-                )
-                CUBE_FILTERS[cube_type] = filter_name
-                names.add(filter_name)
-            continue
+            has_monst_cls = True
+            if not invert:
+                # Don't do this here if inverted - it's done in the
+                # multi-filter.
+                names.add(FILTER_MONST_CLS)
         else:
+            has_cube_cls = True
             cube_type.add_models(models)
 
     for model, filter_name in models.items():
@@ -698,10 +702,24 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: List[str]) -> str:
     if len(names) == 1 and not invert:
         return next(iter(names))
 
-    return _make_multi_filter(vmf, pos, list(names), invert)
+    return _make_multi_filter(
+        vmf,
+        pos,
+        list(names),
+        invert,
+        has_cube_cls,
+        has_monst_cls,
+    )
 
 
-def _make_multi_filter(vmf: VMF, pos: Vec, names: List[str], invert: bool) -> str:
+def _make_multi_filter(
+    vmf: VMF,
+    pos: Vec,
+    names: List[str],
+    invert: bool,
+    has_cube_cls: bool,
+    has_monst_cls: bool,
+) -> str:
     """Generate the multi-filter for cube filtering.
 
     This reuses ents for duplicate calls, and recurses if needed.
@@ -718,7 +736,8 @@ def _make_multi_filter(vmf: VMF, pos: Vec, names: List[str], invert: bool) -> st
     if len(names) > MULTI_FILTER_COUNT:
         # 5 is the maximum number in a filter_multi, we need more than one.
         names, extra_names = names[:MULTI_FILTER_COUNT], names[MULTI_FILTER_COUNT:]
-        names.append(_make_multi_filter(vmf, pos, extra_names, invert))
+        # For inversion, only the first one should be inverted.
+        names.append(_make_multi_filter(vmf, pos, extra_names, False, False, False))
 
     # Names must now be 5 or less.
 
@@ -736,6 +755,31 @@ def _make_multi_filter(vmf: VMF, pos: Vec, names: List[str], invert: bool) -> st
         filter_ent['Filter{:02}'.format(ind)] = name
 
     CUBE_FILTERS[key] = filter_ent['targetname']
+
+    if invert:
+        # For inverted ones, we need to check it's a cube class, AND not
+        # the models.
+        inv_name = filter_ent['targetname']
+        try:
+            return CUBE_FILTERS[inv_name, all]
+        except KeyError:
+            pass
+
+        CUBE_FILTER_MULTI_IND += 1
+        filter_ent = vmf.create_ent(
+            targetname='@filter_multi_{:02}'.format(CUBE_FILTER_MULTI_IND),
+            classname='filter_multi',
+            origin=pos,
+            filtertype=0,  # AND
+            filter01=inv_name,
+        )
+        if has_cube_cls:
+            filter_ent['filter02'] = FILTER_CUBE_CLS
+        if has_monst_cls:
+            filter_ent['filter03'] = FILTER_MONST_CLS
+
+        CUBE_FILTERS[inv_name, all] = filter_ent['targetname']
+
     return filter_ent['targetname']
 
 
