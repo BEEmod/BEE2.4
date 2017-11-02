@@ -521,7 +521,6 @@ class selWin:
         self.win.columnconfigure(0, weight=1)
         self.win.rowconfigure(1, weight=1)
 
-        self.wid = {}
         shim = ttk.Frame(self.pane_win, relief="sunken")
         shim.rowconfigure(0, weight=1)
         shim.columnconfigure(0, weight=1)
