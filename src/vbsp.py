@@ -21,14 +21,13 @@ import vbsp_options
 import instanceLocs
 import brushLoc
 import bottomlessPit
-import conditions
+import conditions.globals
 import connections
 import instance_traits
 import template_brush
 import fizzler
 import comp_consts as consts
-import conditions.globals
-import conditions.cubes
+import cubes
 
 from typing import (
     Dict, Tuple, List
@@ -332,7 +331,7 @@ def load_settings():
         conditions.add(cond)
 
     # Data for different cube types.
-    conditions.cubes.parse_conf(conf)
+    cubes.parse_conf(conf)
 
     # Fizzler data
     fizzler.read_configs(conf)
@@ -3365,7 +3364,7 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
-        from conditions.cubes import write_vscripts
+        from cubes import write_vscripts
         write_vscripts(conf)
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:

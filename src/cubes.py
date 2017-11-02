@@ -20,7 +20,7 @@ import vbsp
 from srctools.vmf import EntityFixup
 
 
-LOGGER = utils.getLogger(__name__, 'cond.cubes')
+LOGGER = utils.getLogger(__name__)
 
 COND_MOD_NAME = 'Cubes/Droppers'
 
