@@ -26,7 +26,6 @@ import sound
 import utils
 import tk_tools
 
-from typing import Callable, Union
 
 LOGGER = utils.getLogger(__name__)
 
@@ -269,18 +268,18 @@ class Item:
     ]
 
     def __init__(
-            self,
-            name: str,
-            short_name: str,
-            long_name: str=None,
-            icon=None,
-            large_icon=None,
-            authors: list=None,
-            desc: Union[tkMarkdown.MarkdownData, str]='',
-            group: str=None,
-            sort_key: str=None,
-            attributes: dict=None,
-            snd_sample: str=None,
+        self,
+        name,
+        short_name,
+        long_name=None,
+        icon=None,
+        large_icon=None,
+        authors=None,
+        desc='',
+        group=None,
+        sort_key=None,
+        attributes=None,
+        snd_sample=None,
     ):
         self.name = name
         self.shortName = short_name
@@ -378,7 +377,7 @@ class selWin:
             title='BEE2',
             desc='',
             readonly_desc='',
-            callback: Callable[..., None]=None,
+            callback=None,
             callback_params=(),
             attributes=()
     ):
@@ -980,7 +979,7 @@ class selWin:
         self.sel_item(self.selected)
         self.win.after(2, self.flow_items)
 
-    def open_context(self, _):
+    def open_context(self, e=None):
         """Dislay the context window at the text widget."""
         if not self._readonly:
             self.context_menu.post(
@@ -1288,7 +1287,7 @@ class selWin:
         )
         self.pal_frame['height'] = y_off
 
-    def scroll_to(self, item: Item):
+    def scroll_to(self, item):
         """Scroll to an item so it's visible."""
         canvas = self.wid_canvas
 
@@ -1327,7 +1326,7 @@ class selWin:
         """Return whether the current item is the suggested one."""
         return self.suggested == self.selected
 
-    def set_context_font(self, item: Item, font):
+    def set_context_font(self, item, font):
         """Set the font of an item, and its parent group."""
         if item.group:
             group_key = item.group.casefold()
