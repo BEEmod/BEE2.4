@@ -13,7 +13,6 @@ import srctools
 import tkMarkdown
 import utils
 from packageMan import PACK_CONFIG
-from selectorWin import SelitemData
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
@@ -31,6 +30,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from gameMan import Game
+    from selectorWin import SelitemData
     from loadScreen import BaseLoadScreen
 
 LOGGER = utils.getLogger(__name__)
@@ -2931,6 +2931,8 @@ def desc_parse(info, id='', *, prop_name='description'):
 def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
     """
+    from selectorWin import SelitemData
+
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
     name = info['name']
@@ -2962,6 +2964,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
     This uses the over_data values if defined, using our_data if not.
     Authors and descriptions will be joined to each other.
     """
+    from selectorWin import SelitemData
     (
         our_name,
         our_short_name,
