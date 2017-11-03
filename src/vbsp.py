@@ -21,7 +21,7 @@ import vbsp_options
 import instanceLocs
 import brushLoc
 import bottomlessPit
-import conditions.globals
+import conditions
 import connections
 import instance_traits
 import template_brush

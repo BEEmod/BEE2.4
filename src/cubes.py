@@ -4,7 +4,7 @@ import itertools
 from collections import namedtuple
 
 from enum import Enum
-from typing import Dict, Optional, List, Union, Tuple, Any, Set, FrozenSet
+from typing import Dict, Optional, List, Union, Tuple, Set, FrozenSet
 
 import brushLoc
 import vbsp_options
@@ -15,7 +15,7 @@ from srctools import (
     EmptyMapping
 )
 import utils
-import conditions
+import conditions.globals
 import vbsp
 from srctools.vmf import EntityFixup
 
@@ -74,9 +74,27 @@ VALVE_DROPPER_ID = 'VITAL_APPARATUS_VENT'
 # making it use the default model (set in the model keyvalue).
 # This lets us have custom models - since those are saved and
 # loaded in the base-entity machinery.
+# It's somewhat buggy though, so we use the SetModel method if possible.
 CUBE_ID_CUSTOM_MODEL_HACK = '6'
 
+# The self.SetModel() functions we require. This is an alternate method to swap
+# the model, which works better but requires the collision mesh to be exactly
+# identical.
+SETMODEL_FUNCS = {}
+# The script we're making.
+SETMODEL_VSCRIPT = 'BEE2/cube_setmodel.nut'
+
+SETMODEL_TEMP = '''\
+function %s() {
+\tself.SetModel("%s");
+}
+
+'''
+
 ScriptVar = namedtuple('ScriptVar', 'local_name function vars')
+
+# For filtering, we use this class. It stores the table of values, and then
+# provides a __call__()-style method to check if an ent matches the models.
 
 VSCRIPT_CLOSURE = '''\
 class __BEE2_CUBE_FUNC__{
@@ -157,6 +175,12 @@ class CubeOutputs(Enum):
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
     ON_PICKUP = 'OnPickup'
     ON_DROP = 'OnDrop'
+
+
+class ModelSwapMeth(Enum):
+    """Method to use to swap to custom cube models."""
+    SETMODEL = 'SETMODEL'  # self.SetModel()
+    CUBE_TYPE = 'CUBE_TYPE'  # CubeType = 6
 
 
 # Things that get attached to a cube.
@@ -297,6 +321,7 @@ class CubeType:
         is_companion: bool,
         model: Optional[str],
         model_color: Optional[str],
+        model_swap_meth: ModelSwapMeth,
         pack: Union[str, List[str]],
         pack_color: Union[str, List[str]],
         base_offset: float,
@@ -320,6 +345,8 @@ class CubeType:
         # If set it swaps to that model.
         self.model = model
         self.model_color = model_color
+        # Technique to use.
+        self.model_swap_meth = model_swap_meth
 
         # List of files, or a str packlist ID.
         self.pack = pack
@@ -382,6 +409,13 @@ class CubeType:
         except NoKeyError:
             raise ValueError('No cube type for "{}"!'.format(cube_id)) from None
 
+        try:
+            model_swap_meth = ModelSwapMeth(conf['modelswapmeth', 'SETMODEL'].upper())
+        except ValueError:
+            raise ValueError('Bad model swapping method "{}" for {}'.format(
+                conf['modelswapmeth'], cube_id)
+            ) from None
+
         if cube_type is CubeEntType.franken:
             # Frankenturrets can't swap their model.
             cust_model = cust_model_color = None
@@ -404,6 +438,7 @@ class CubeType:
             cube_type is CubeEntType.comp or conf.bool('isCompanion'),
             cust_model,
             cust_model_color,
+            model_swap_meth,
             packlist,
             packlist_color,
             conf.float('offset', 20),
@@ -429,7 +464,6 @@ class CubeType:
             else:
                 # No custom model - it's default.
                 models[DEFAULT_MODELS[self.type]] = self.has_name
-
 
 class CubePair:
     """Represents a single cube/dropper pair."""
@@ -501,6 +535,19 @@ class CubePair:
             drop_id, self.cube_type.id, drop, cube, self.tint,
         )
 
+    def add_setmodel_func(self, model:str):
+        """Link up the function to do SetModel."""
+        func_name = (
+            '_bee2_setmodel_'
+            + self.cube_type.id.casefold()
+            + ('_color' if self.tint else '_notint')
+        )
+
+        SETMODEL_FUNCS[func_name] = model
+        self.outputs[CubeOutputs.SPAWN].append(Output(
+            '', '!self', 'RunScriptCode', func_name + '()',
+        ))
+
 
 def parse_conf(conf: Property):
     """Parse the config file for cube info."""
@@ -543,17 +590,21 @@ def parse_conf(conf: Property):
 
 
 def write_vscripts(vrad_conf: Property):
-    """Write CUBE_SCRIPT_FILTERS out for VRAD to use."""
-    if not CUBE_SCRIPT_FILTERS:
-        return
+    """Write CUBE_SCRIPT_FILTERS and SetModel functions out for VRAD to use."""
+    if SETMODEL_FUNCS:
+        with open('BEE2/inject/cube_setmodel.nut', 'w') as f:
+            for func_name_model in SETMODEL_FUNCS.items():
+                f.write(SETMODEL_TEMP % func_name_model)
 
-    conf_block = vrad_conf.ensure_exists('InjectFiles')
 
-    for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
-        filename = 'cube_vscript_{:02}.nut'.format(i)
-        with open('BEE2/inject/' + filename, 'w') as f:
-            f.write(buffer.getvalue())
-        conf_block[filename] = 'scripts/vscripts/' + bsp_name
+    if CUBE_SCRIPT_FILTERS:
+        conf_block = vrad_conf.ensure_exists('InjectFiles')
+
+        for i, (bsp_name, buffer) in enumerate(CUBE_SCRIPT_FILTERS.items(), start=1):
+            filename = 'cube_vscript_{:02}.nut'.format(i)
+            with open('BEE2/inject/' + filename, 'w') as f:
+                f.write(buffer.getvalue())
+            conf_block[filename] = 'scripts/vscripts/' + bsp_name
 
 
 def parse_filter_types(
@@ -911,6 +962,7 @@ def res_script_cube_predicate(res: Property):
     script_function = res['function']
     script_filename = res['filename']
 
+    # Allow function() and filenames without '.nut'.
     if script_function[-2:] == '()':
         script_function = script_function[:-2]
     if script_filename[-4:] != '.nut':
@@ -1282,10 +1334,6 @@ def make_cube(
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
 
-    ent['vscripts'] = ' '.join(vscripts)
-    if vscripts and cube_type.overlay_think:
-        ent['thinkfunction'] = cube_type.overlay_think
-
     if pair.tint:
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
@@ -1314,24 +1362,35 @@ def make_cube(
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
 
-        if cust_model:
-            ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
-            ent['model'] = cust_model
+        ent['CubeType'] = ENT_TYPE_INDEX[cube_type.type]
 
-            if cube_type.type is CubeEntType.comp:
-                # Since we're not using the real cube type, Companion
-                # cubes don't swap to the right skin.
-                # We need to set that manually.
-                ent['skin'] = 1
+        if cust_model:
+            ent['model'] = cust_model
+            
+            if cube_type.model_swap_meth is ModelSwapMeth.CUBE_TYPE:
+                ent['CubeType'] = CUBE_ID_CUSTOM_MODEL_HACK
+
+                if cube_type.type is CubeEntType.comp:
+                    # Since we're not using the real cube type, Companion
+                    # cubes don't swap to the right skin.
+                    # We need to set that manually.
+                    ent['skin'] = 1
+            elif cube_type.model_swap_meth is ModelSwapMeth.SETMODEL:
+                # Use SetModel.
+                vscripts.insert(0, SETMODEL_VSCRIPT)
+                pair.add_setmodel_func(cust_model)
 
             if isinstance(pack, list):
                 vbsp.PACK_FILES.update(pack)
             elif isinstance(pack, str):
                 vbsp.TO_PACK.add(pack)
         else:
-            ent['CubeType'] = ENT_TYPE_INDEX[cube_type.type]
             # The model is unused, but set it so it looks nicer.
             ent['model'] = DEFAULT_MODELS[cube_type.type]
+
+    ent['vscripts'] = ' '.join(vscripts)
+    if vscripts and cube_type.overlay_think:
+        ent['thinkfunction'] = cube_type.overlay_think
 
     for temp_out in pair.outputs[CubeOutputs.ON_PICKUP]:
         ent.add_out(setup_output(
@@ -1603,3 +1662,8 @@ def generate_cubes(vmf: VMF):
             if pair.cube_type.type is CubeEntType.franken:
                 CubeVoiceEvents.PICKUP_FRANKEN(cube, 'OnPlayerPickup')
             CubeVoiceEvents.PICKUP_ANY(cube, 'OnPlayerPickup')
+
+        # For the various SetModel commands, insert the required
+        # precaching models.
+        for model in SETMODEL_FUNCS.values():
+            conditions.globals.precache_model(vmf, model)

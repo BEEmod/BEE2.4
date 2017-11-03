@@ -67,6 +67,9 @@ INJECT_FILES = {
 
     # Commands for monitor items.
     'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
+
+    # Script for setting model types on cubes.
+    'cube_setmodel.nut': 'scripts/vscripts/BEE2/cube_setmodel.nut',
 }
 
 # Additional parts to add if we have a mdl file.
