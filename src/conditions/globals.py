@@ -2,7 +2,7 @@
 import utils
 import vbsp_options
 
-from srctools import Vec, Property, Entity, conv_bool
+from srctools import Vec, Property, Entity, conv_bool, VMF
 from conditions import (
     make_flag, make_result, RES_EXHAUSTED,
 )
@@ -103,14 +103,13 @@ def flag_is_preview(flag: Property):
 
     Preview mode is always `False` when publishing.
     """
-    import vbsp
     return vbsp.IS_PREVIEW == conv_bool(flag.value, False)
 
 
 @make_flag('hasExitSignage')
-def flag_has_exit_signage():
+def flag_has_exit_signage(vmf: VMF):
     """Check to see if either exit sign is present."""
-    for over in vbsp.VMF.by_class['info_overlay']:
+    for over in vmf.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
             return True
     return False
@@ -180,16 +179,25 @@ def res_set_voice_attr(res: Property):
         vbsp.settings['has_attr'][res.value.casefold()] = True
     return RES_EXHAUSTED
 
+
 CACHED_MODELS = set()
 
 
 @make_result('PreCacheModel')
-def res_pre_cache_model(res: Property):
+def res_pre_cache_model(vmf: VMF, res: Property):
     """Precache the given model for switching.
 
     This places it as a `prop_dynamic_override`.
     """
-    mdl_name = res.value.casefold()
+    precache_model(vmf, res.value.casefold())
+
+
+def precache_model(vmf: VMF, mdl_name: str):
+    """Precache the given model for switching.
+
+    This places it as a `prop_dynamic_override`.
+    """
+
     if not mdl_name.startswith('models/'):
         mdl_name = 'models/' + mdl_name
     if not mdl_name.endswith('.mdl'):
@@ -197,8 +205,9 @@ def res_pre_cache_model(res: Property):
 
     if mdl_name in CACHED_MODELS:
         return
+
     CACHED_MODELS.add(mdl_name)
-    vbsp.VMF.create_ent(
+    vmf.create_ent(
         classname='prop_dynamic_override',
         targetname='@precache',
         origin=vbsp_options.get(Vec, 'global_ents_loc'),
