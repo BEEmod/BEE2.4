@@ -15,28 +15,30 @@ LOGGER = utils.getLogger(__name__)
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
-    DEFAULT = 0  # Normal / unconfigured input
+    DEFAULT = 'default'  # Normal / unconfigured input
     # Becomes one of the others based on item preference.
 
-    PRIMARY = TBEAM_IO = 1  # A Type, 'normal'
-    SECONDARY = TBEAM_DIR = 2  # B Type, 'alt'
+    PRIMARY = TBEAM_IO = 'primary'  # A Type, 'normal'
+    SECONDARY = TBEAM_DIR = 'secondary'  # B Type, 'alt'
 
-    BOTH = 3  # Trigger both simultaneously.
+    BOTH = 'both'  # Trigger both simultaneously.
 
 
 class LogicType(Enum):
-    """Indicates simple logic item types implemented by the compiler.
+    """Indicates the kind of input behaviour to use."""
+    # Normal PeTI, pass activate/deactivate via proxy.
+    # For this the IO command is the original counter style.
+    DEFAULT = 'default'
 
-    If set, this implies the instance should be removed - as it is not used.
-    """
-    NONE = 0  # Default, a normal item which does things.
+    AND = 'and'  # AND input for an item.
+    OR = 'or'    # OR input for an item.
+
+    OR_LOGIC = 'or_logic'  # Treat as an invisible OR gate, no instance.
+    AND_LOGIC = 'and_logic'  # Treat as an invisible AND gate, no instance.
 
     # An item 'chained' to the next. Inputs should be moved to the output
     # item in addition to our own output.
-    DAISYCHAIN = 1
-
-    AND = 2  # Activates output when all inputs are on.
-    OR = 3  # Activates output when any inputs are on.
+    DAISYCHAIN = 'daisychain'
 
 
 CONN_NAMES = {
