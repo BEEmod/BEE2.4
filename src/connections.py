@@ -131,21 +131,30 @@ class ShapeSignage:
 
 class ItemType:
     """Represents an item, with inputs and outputs."""
+
+    __slots__ = [
+        'id', 'default_dual',
+        'invert_var', 'enable_cmd', 'disable_cmd',
+        'sec_invert_var', 'sec_enable_cmd', 'sec_disable_cmd',
+        'output_type', 'output_act', 'output_deact',
+    ]
+
     def __init__(
         self,
         id: str,
-
         default_dual: ConnType,
 
         invert_var: str,
-        enable_cmd: Tuple[Optional[str], str],
-        disable_cmd: Tuple[Optional[str], str],
+        enable_cmd: List[Output],
+        disable_cmd: List[Output],
 
         sec_invert_var: str,
-        sec_enable_cmd: Optional[Tuple[Optional[str], str]],
-        sec_disable_cmd: Optional[Tuple[Optional[str], str]],
+        sec_enable_cmd: List[Output],
+        sec_disable_cmd: List[Output],
 
         output_type: ConnType,
+        output_act: Optional[Tuple[Optional[str], str]],
+        output_deact: Optional[Tuple[Optional[str], str]],
     ):
         self.id = id
 
@@ -170,20 +179,34 @@ class ItemType:
         # If DEFAULT, we use the value on the target item.
         self.output_type = output_type
 
+        # inst_name, output commands for outputs.
+        # If they are None, it's not used.
+        self.output_act = output_act
+        self.output_deact = output_deact
+
     @staticmethod
     def parse(conf: Property):
         """Read the item type info from the given config."""
+        item_id = conf.real_name
 
-        enable_cmd = Output.parse_name(conf['sec_enable_cmd', ''])
-        disable_cmd = Output.parse_name(conf['sec_disable_cmd', ''])
+        def get_outputs(prop_name):
+            """Parse all the outputs with this name."""
+            return [
+                Output.parse(prop)
+                for prop in
+                conf.find_all(prop_name)
+            ]
+
+        enable_cmd = get_outputs('enable_cmd')
+        disable_cmd = get_outputs('disable_cmd')
 
         has_sec = 'sec_enable_cmd' in conf or 'sec_disable_cmd' in conf
 
         invert_var = conf['invertVar', '0']
 
         if has_sec:
-            sec_enable_cmd = Output.parse_name(conf['sec_enable_cmd', ''])
-            sec_disable_cmd = Output.parse_name(conf['sec_disable_cmd', ''])
+            sec_enable_cmd = get_outputs('sec_enable_cmd')
+            sec_disable_cmd = get_outputs('sec_disable_cmd')
 
             try:
                 default_dual = ConnType(
@@ -191,12 +214,13 @@ class ItemType:
                 )
             except ValueError:
                 raise ValueError('Invalid default type for "{}": {}'.format(
-                    conf.real_name, conf['default_dual'],
+                    item_id, conf['default_dual'],
                 )) from None
 
             sec_invert_var = conf['sec_invertVar', '0']
         else:
-            sec_enable_cmd = sec_disable_cmd = None
+            sec_enable_cmd = []
+            sec_disable_cmd = []
             default_dual = sec_invert_var = None
 
         try:
@@ -205,19 +229,24 @@ class ItemType:
             )
         except ValueError:
             raise ValueError('Invalid output affinity for "{}": {}'.format(
-                conf.real_name, conf['default_dual'],
+                item_id, conf['default_dual'],
             )) from None
 
+        try:
+            out_act = Output.parse_name(conf['out_activate_cmd'])
+        except IndexError:
+            out_act = None
+
+        try:
+            out_deact = Output.parse_name(conf['out_deactivate_cmd'])
+        except IndexError:
+            out_deact = None
+
         return ItemType(
-            conf.real_name,
-            default_dual,
-            invert_var,
-            enable_cmd,
-            disable_cmd,
-            sec_invert_var,
-            sec_enable_cmd,
-            sec_disable_cmd,
-            output_type,
+            item_id, default_dual,
+            invert_var, enable_cmd, disable_cmd,
+            sec_invert_var, sec_enable_cmd, sec_disable_cmd,
+            output_type, out_act, out_deact,
         )
 
 
@@ -341,32 +370,10 @@ class Connection:
 
 def read_configs(conf: Property):
     """Build our connection configuration from the config files."""
-
-    global TBEAM_CONN_ACT, TBEAM_CONN_DEACT
-
-    def parse(item, key):
-        """Parse the output value, handling values that aren't present."""
-        val = item[key, '']
-        if not val:
-            return None, ''
-        return Output.parse_name(val)
-
     for prop in conf.find_children('Items'):
         if prop.name in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
         ITEM_TYPES[prop.name] = ItemType.parse(prop)
-
-        CONNECTIONS[conf.name] = ItemConnections(
-            in_act=parse(conf, 'input_activate'),
-            in_deact=parse(conf, 'input_deactivate'),
-
-            out_act=parse(conf, 'output_activate'),
-            out_deact=parse(conf, 'output_deactivate'),
-        )
-
-        if conf.name == 'item_tbeam':
-            TBEAM_CONN_ACT = parse(conf, 'tbeam_activate')
-            TBEAM_CONN_DEACT = parse(conf, 'tbeam_deactivate')
 
 
 def calc_connections(
