@@ -233,12 +233,12 @@ class ItemType:
             )) from None
 
         try:
-            out_act = Output.parse_name(conf['out_activate_cmd'])
+            out_act = Output.parse_name(conf['out_activate'])
         except IndexError:
             out_act = None
 
         try:
-            out_deact = Output.parse_name(conf['out_deactivate_cmd'])
+            out_deact = Output.parse_name(conf['out_deactivate'])
         except IndexError:
             out_deact = None
 

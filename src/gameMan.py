@@ -797,7 +797,7 @@ class Game:
             for block in item.find_all('Exporting', 'Outputs', CONN_NORM):
                 has_output = True
                 for io_prop in block:
-                    comm_block['out_' + io_prop.name + '_cmd'] = io_prop.value
+                    comm_block['out_' + io_prop.name] = io_prop.value
 
             # The funnel item type is special, having the additional input type.
             # Handle that specially.
@@ -813,7 +813,7 @@ class Game:
             if 'sec_enablecmd' in input_conf or 'sec_disablecmd' in input_conf:
                 has_secondary = True
 
-            if 'out_activate_cmd' in output_conf or 'out_deactivate_cmd' in output_conf:
+            if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                 has_output = True
 
             comm_block += input_conf
