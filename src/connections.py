@@ -90,8 +90,15 @@ ITEMS = {}  # type: Dict[str, Item]
 
 class ShapeSignage:
     """Represents a pair of signage shapes."""
+    __slots__ = (
+        'overlays',
+        'name',
+        'index',
+        'repeat_group',
+        'overlay_frames',
+    )
+
     def __init__(self, overlays: List[Entity]):
-        super().__init__()
         if not overlays:
             raise ValueError('No overlays')
         self.overlays = list(overlays)
@@ -111,7 +118,15 @@ class ShapeSignage:
         self.overlay_frames = []  # type: List[Entity]
 
     def __iter__(self):
-        yield from self.overlays
+        return iter(self.overlays)
+
+    def __lt__(self, other: 'ShapeSignage'):
+        """Allow sorting in a consistent order."""
+        return self.name < other.name
+
+    def __gt__(self, other: 'ShapeSignage'):
+        """Allow sorting in a consistent order."""
+        return self.name > other.name
 
 
 class ItemType:
@@ -503,30 +518,12 @@ def calc_connections(
             )
             conn.add()
 
-    for item in ITEMS.values():
-        # Copying items can fail to update the connection counts.
-        # Make sure they're correct.
-        if const.FixupVars.CONN_COUNT in item.inst.fixup:
-            # Don't count the polarity outputs...
-            item.inst.fixup[const.FixupVars.CONN_COUNT] = sum(
-                1 for conn
-                in item.inputs
-                if conn.type is not ConnType.TBEAM_DIR
-            )
-        if const.FixupVars.CONN_COUNT_TBEAM in item.inst.fixup:
-            # Only count the polarity outputs...
-            item.inst.fixup[const.FixupVars.CONN_COUNT_TBEAM] = sum(
-                1 for conn
-                in item.inputs
-                if conn.type is ConnType.TBEAM_DIR
-            )
-
     # Make signage frames
     shape_frame_tex = [mat for mat in shape_frame_tex if mat]
     if shape_frame_tex and enable_shape_frame:
         for shape_mat in sign_shape_by_index.values():
-            # Sort by name, so which gets what frame is consistent
-            shape_mat.sort(key=lambda shape: shape.name)
+            # Sort so which gets what frame is consistent.
+            shape_mat.sort()
             for index, shape in enumerate(shape_mat):
                 shape.repeat_group = index
                 if index == 0:
