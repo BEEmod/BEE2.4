@@ -252,14 +252,10 @@ class Item:
 
 
 class Connection:
-    """Represents a connection between two items.
-
-    The item references should not be modified, as this will invalidate
-    INPUTS and OUTPUTS.
-    """
+    """Represents a connection between two items."""
 
     __slots__ = [
-        'inp', 'out', 'type', 'outputs',
+        '_to', '_from', 'type', 'outputs',
     ]
     def __init__(
         self,
@@ -268,36 +264,49 @@ class Connection:
         conn_type=ConnType.DEFAULT,
         outputs: Iterable[Output]=(),
     ):
-        self.inp = to_item
-        self.out = from_item
+        self._to = to_item
+        self._from = from_item
         self.type = conn_type
         self.outputs = list(outputs)
 
     def __repr__(self):
         return '<Connection {} {} -> {}>'.format(
             CONN_NAMES[self.type],
-            self.out.name,
-            self.inp.name,
+            self._from.name,
+            self._to.name,
         )
 
     def add(self):
         """Add this to the directories."""
-        self.inp.inputs.add(self)
-        self.out.outputs.add(self)
+        self._from.inputs.add(self)
+        self._to.outputs.add(self)
 
     def remove(self):
         """Remove this from the directories."""
-        self.inp.inputs.discard(self)
-        self.out.outputs.discard(self)
+        self._from.inputs.discard(self)
+        self._to.outputs.discard(self)
 
-    def set_item(self, input=None, output=None):
-        """Set the input or output used for this item."""
-        self.remove()
-        if input is not None:
-            self.inp = input
-        if output is not None:
-            self.out = output
-        self.add()
+    @property
+    def to_item(self) -> Item:
+        """The item this connection is going to."""
+        return self._to
+
+    @to_item.setter
+    def to_item(self, item: Item):
+        self._to.inputs.discard(self)
+        self._to = item
+        item.inputs.add(self)
+
+    @property
+    def from_item(self) -> Item:
+        """The item this connection comes from."""
+        return self._from
+
+    @from_item.setter
+    def from_item(self, item: Item):
+        self._from.outputs.discard(self)
+        self._from = item
+        item.outputs.add(self)
 
 
 def read_configs(conf: Property):
