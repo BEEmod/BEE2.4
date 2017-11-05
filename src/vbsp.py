@@ -326,6 +326,9 @@ def load_settings():
     conditions.build_connections_dict(instance_file)
     conditions.build_itemclass_dict(instance_file)
 
+    with open('bee2/connections.cfg') as f:
+        connections.read_configs(Property.parse(f))
+
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)

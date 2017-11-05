@@ -24,7 +24,7 @@ class ConnType(Enum):
     BOTH = 'both'  # Trigger both simultaneously.
 
 
-class LogicType(Enum):
+class InputType(Enum):
     """Indicates the kind of input behaviour to use."""
     # Normal PeTI, pass activate/deactivate via proxy.
     # For this the IO command is the original counter style.
@@ -99,52 +99,96 @@ class ShapeSignage:
         yield from self.overlays
 
 
-class IOPair:
-    """Represents the input or output half of a pair of IO connections."""
-    __slots__ = [
-        'act_name', 'deact_name',
-        'act_command', 'deact_command',
-    ]
+class ItemType:
+    """Represents an item, with inputs and outputs."""
     def __init__(
         self,
-        act_name: Optional[str],
-        deact_name: Optional[str],
-        act_command: Optional[str],
-        deact_command: Optional[str],
-    ):
-        # Name inside the instance.
-        # If none it targets the ent directly.
-        self.act_name = act_name
-        self.deact_name = deact_name
+        id: str,
 
-        # Input or output command.
-        # If None only one is present.
-        self.act_command = act_command
-        self.deact_command = deact_command
+        default_dual: ConnType,
+
+        invert_var: str,
+        enable_cmd: Tuple[Optional[str], str],
+        disable_cmd: Tuple[Optional[str], str],
+
+        sec_invert_var: str,
+        sec_enable_cmd: Optional[Tuple[Optional[str], str]],
+        sec_disable_cmd: Optional[Tuple[Optional[str], str]],
+
+        output_type: ConnType,
+    ):
+        self.id = id
+
+        # True/False for always, $var, !$var for lookup.
+        self.invert_var = invert_var
+
+        # IO commands for enabling/disabling the item.
+        self.enable_cmd = enable_cmd
+        self.disable_cmd = disable_cmd
+
+        # If no A/B type is set on the input, use this type.
+        # Set to None to indicate no secondary is present.
+        self.default_dual = default_dual
+
+        # Same for secondary items.
+        self.sec_invert_var = sec_invert_var
+        self.sec_enable_cmd = sec_enable_cmd
+        self.sec_disable_cmd = sec_disable_cmd
+
+        # Sets the affinity used for outputs from this item - makes the
+        # Input A/B converter items work.
+        # If DEFAULT, we use the value on the target item.
+        self.output_type = output_type
 
     @staticmethod
-    def link(inp: 'IOPair', out: 'IOPair', target: Entity) -> Iterable[Output]:
-        """Create VMF Outputs for an input and output set.
+    def parse(conf: Property):
+        """Read the item type info from the given config."""
 
-        target is the entity they activate.
-        """
-        if inp.act_command is not None and out.act_command is not None:
-            yield Output(
-                out=out.act_command,
-                targ=target,
-                inp=inp.act_command,
-                inst_out=out.act_name,
-                inst_in=inp.act_name,
-            )
+        enable_cmd = Output.parse_name(conf['sec_enable_cmd', ''])
+        disable_cmd = Output.parse_name(conf['sec_disable_cmd', ''])
 
-        if inp.deact_command is not None and out.deact_command is not None:
-            yield Output(
-                out=out.deact_command,
-                targ=target,
-                inp=inp.deact_command,
-                inst_out=out.deact_name,
-                inst_in=inp.deact_name,
+        has_sec = 'sec_enable_cmd' in conf or 'sec_disable_cmd' in conf
+
+        invert_var = conf['invertVar', '0']
+
+        if has_sec:
+            sec_enable_cmd = Output.parse_name(conf['sec_enable_cmd', ''])
+            sec_disable_cmd = Output.parse_name(conf['sec_disable_cmd', ''])
+
+            try:
+                default_dual = ConnType(
+                    conf['default_dual', 'default'].casefold()
+                )
+            except ValueError:
+                raise ValueError('Invalid default type for "{}": {}'.format(
+                    conf.real_name, conf['default_dual'],
+                )) from None
+
+            sec_invert_var = conf['sec_invertVar', '0']
+        else:
+            sec_enable_cmd = sec_disable_cmd = None
+            default_dual = sec_invert_var = None
+
+        try:
+            output_type = ConnType(
+                conf['DualType', 'default'].casefold()
             )
+        except ValueError:
+            raise ValueError('Invalid output affinity for "{}": {}'.format(
+                conf.real_name, conf['default_dual'],
+            )) from None
+
+        return ItemType(
+            conf.real_name,
+            default_dual,
+            invert_var,
+            enable_cmd,
+            disable_cmd,
+            sec_invert_var,
+            sec_enable_cmd,
+            sec_disable_cmd,
+            output_type,
+        )
 
 
 class Item:
@@ -155,20 +199,21 @@ class Item:
         'antlines', 'shape_signs',
         'timer',
         'inputs', 'outputs',
-        'logic_type',
+        'item_type',
     ]
 
     def __init__(
         self,
         inst: Entity,
+        item_type: ItemType,
         toggle: Entity = None,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
-        logic_type: LogicType=LogicType.NONE,
     ):
         self.inst = inst
+        self.item_type = item_type
 
         # Associated indicator panels
         self.ind_panels = set(panels)  # type: Set[Entity]
@@ -180,8 +225,6 @@ class Item:
         # None = Infinite/normal.
         self.timer = timer_count
 
-        self.logic_type = logic_type
-
         # From this item
         self.outputs = set()  # type: Set[Connection]
         # To this item
@@ -190,7 +233,7 @@ class Item:
         assert self.name, 'Blank name!'
 
     def __repr__(self):
-        return '<Item "{}">'.format(self.name)
+        return '<Item {}: "{}">'.format(self.item_type.id, self.name)
 
     @property
     def traits(self):
@@ -257,6 +300,14 @@ class Connection:
         self.add()
 
 
+def read_configs(conf: Property):
+    """Build our connection configuration from the config files."""
+    for prop in conf.find_children('Items'):
+        if prop.name in ITEM_TYPES:
+            raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
+        ITEM_TYPES[prop.name] = ItemType.parse(prop)
+
+
 def calc_connections(
     vmf: VMF,
     shape_frame_tex: List[str],
@@ -298,7 +349,16 @@ def calc_connections(
         elif 'indicator_panel' in traits:
             panels[inst['targetname']] = inst
         else:
-            ITEMS[inst_name] = Item(inst)
+            # Normal item.
+            try:
+                item_type = ITEM_TYPES[instance_traits.get_item_id(inst).casefold()]
+            except KeyError:
+                raise ValueError(
+                    'No connections for item "{}", '
+                    'but connections in the map!'.format(
+                        instance_traits.get_item_id(inst)
+                    ))
+            ITEMS[inst_name] = Item(inst, item_type)
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
