@@ -323,7 +323,6 @@ def load_settings():
         )
     # Parse that data in the relevant modules.
     instanceLocs.load_conf(instance_file)
-    conditions.build_connections_dict(instance_file)
     conditions.build_itemclass_dict(instance_file)
 
     with open('bee2/connections.cfg') as f:

@@ -1,16 +1,31 @@
 """Manages PeTI item connections."""
 from enum import Enum
-from collections import defaultdict
-from srctools import VMF, Entity, Output
+from collections import defaultdict, namedtuple
+
+from srctools import VMF, Entity, Output, Property
 import comp_consts as const
 import instanceLocs
-import conditions
 import instance_traits
 import utils
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple
 
+
 LOGGER = utils.getLogger(__name__)
+
+ITEM_TYPES = {}  # type: Dict[str, ItemType]
+
+# The original input/output connection values defined for each item.
+# Each is a tuple of (inst_name, command) values, ready to be passed to
+# VLib.Output().
+# If the command is '', no in/output is present.
+ItemConnections = namedtuple('ItemConnections', [
+    'in_act', 'in_deact', 'out_act', 'out_deact',
+])
+CONNECTIONS = {}
+
+# The special tbeam polarity input from ITEM_TBEAM. Works like above.
+TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
 
 
 class ConnType(Enum):
@@ -311,10 +326,32 @@ class Connection:
 
 def read_configs(conf: Property):
     """Build our connection configuration from the config files."""
+
+    global TBEAM_CONN_ACT, TBEAM_CONN_DEACT
+
+    def parse(item, key):
+        """Parse the output value, handling values that aren't present."""
+        val = item[key, '']
+        if not val:
+            return None, ''
+        return Output.parse_name(val)
+
     for prop in conf.find_children('Items'):
         if prop.name in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
         ITEM_TYPES[prop.name] = ItemType.parse(prop)
+
+        CONNECTIONS[conf.name] = ItemConnections(
+            in_act=parse(conf, 'input_activate'),
+            in_deact=parse(conf, 'input_deactivate'),
+
+            out_act=parse(conf, 'output_activate'),
+            out_deact=parse(conf, 'output_deactivate'),
+        )
+
+        if conf.name == 'item_tbeam':
+            TBEAM_CONN_ACT = parse(conf, 'tbeam_activate')
+            TBEAM_CONN_DEACT = parse(conf, 'tbeam_deactivate')
 
 
 def calc_connections(
@@ -331,20 +368,25 @@ def calc_connections(
     # First we want to match targetnames to item types.
     toggles = {}  # type: Dict[str, Entity]
     overlays = defaultdict(set)  # type: Dict[str, Set[Entity]]
+
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
     sign_shape_overlays = defaultdict(list)  # type: Dict[Tuple[str, str], List[Entity]]
+
+    # Indicator panels
     panels = {}  # type: Dict[str, Entity]
 
     panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
     panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
 
     tbeam_polarity = {
-        conditions.TBEAM_CONN_ACT,
-        conditions.TBEAM_CONN_DEACT,
+        TBEAM_CONN_ACT,
+        TBEAM_CONN_DEACT,
     }
-    tbeam_io = conditions.CONNECTIONS['item_tbeam']
-    tbeam_io = {tbeam_io.in_act, tbeam_io.in_deact}
+    tbeam_io = {
+        CONNECTIONS['item_tbeam'].in_act,
+        CONNECTIONS['item_tbeam'].in_deact
+    }
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
@@ -436,10 +478,10 @@ def calc_connections(
             conn_type = ConnType.DEFAULT
             in_outputs = inputs[inp_item.name]
 
-            if 'tbeam_emitter' in inp_item.traits:
+            if inp_item.item_type.id == 'ITEM_TBEAM':
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
-                for out in in_outputs:  # type: Output
+                for out in in_outputs:
                     input_tuple = (out.inst_in, out.input)
                     if input_tuple in tbeam_polarity:
                         conn_type = ConnType.TBEAM_DIR
@@ -496,4 +538,4 @@ def calc_connections(
                     shape.overlay_frames.append(frame)
                     vmf.add_ent(frame)
                     frame['material'] = frame_mat
-                    frame['renderorder'] = 1 # On top
+                    frame['renderorder'] = 1  # On top
