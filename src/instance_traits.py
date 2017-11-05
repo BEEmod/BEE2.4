@@ -105,7 +105,7 @@ CLASS_ATTRS = {
     ],
     ItemClass.DOOR_ENTRY_COOP: [
         {'entry_corridor', 'coop_corridor'},
-        set(),
+        set(),  # White/black 'door frames', not used on the entry.
         set(),
         {'exit_elevator', 'elevator', 'coop_corridor'},
         {'arrival_departure_transition'},
@@ -171,6 +171,14 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
     return getattr(inst, 'peti_class', None)
 
 
+def get_item_id(inst: Entity) -> Optional[str]:
+    """If known, return the item ID for this instance.
+
+    It must be the original entity placed by the PeTI.
+    """
+    return getattr(inst, 'peti_item_id', None)
+
+
 def set_traits(vmf: VMF):
     """Scan through the map, and apply traits to instances."""
     for inst in vmf.by_class['func_instance']:
@@ -198,6 +206,7 @@ def set_traits(vmf: VMF):
             item_class = ItemClass.UNCLASSED
 
         inst.peti_class = item_class
+        inst.peti_item_id = item_id
         traits = get(inst)
         try:
             traits |= ID_ATTRS[item_id.upper()][item_ind]
