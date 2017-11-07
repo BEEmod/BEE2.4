@@ -151,6 +151,17 @@ def check_file(file: Path, portal2: Path, packages: Path):
             shutil.copy(str(file), str(full_loc))
 
 
+def print_package_ids():
+    """Print all the packages out."""
+    id_len = max(len(pack.id) for pack in PACKAGES.values())
+    row_count = 128 // (id_len + 2)
+    for i, pack in enumerate(sorted(pack.id for pack in PACKAGES.values()), start=1):
+        print(' {0:<{1}} '.format(pack, id_len), end='')
+        if i % row_count == 0:
+            print()
+    print()
+
+
 def main(files: List[str]):
     """Run the transfer."""
     if not files:
@@ -178,6 +189,8 @@ def main(files: List[str]):
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
+
+    print_package_ids()
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
 
