@@ -88,7 +88,7 @@ class BaseLoadScreen:
     # Methods the subclasses must implement.
     
     @abstractmethod
-    def set_length(self, stage: str, num: str):
+    def set_length(self, stage: str, num: int):
         pass
 
     @abstractmethod
