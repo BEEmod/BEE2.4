@@ -421,3 +421,13 @@ def init_dev_tab(f):
         var=SHOW_LOG_WIN,
         tooltip=_('Show the log file in real-time.'),
     ).grid(row=1, column=1, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='force_all_editor_models',
+        desc=_("Force Editor Models"),
+        tooltip=_('Make all props_map_editor models available for use. '
+                  'Portal 2 has a limit of 1024 models loaded in memory at '
+                  'once, so we need to disable unused ones to free this up.'),
+    ).grid(row=2, column=1, sticky=W)
