@@ -15,18 +15,6 @@ LOGGER = utils.getLogger(__name__)
 
 ITEM_TYPES = {}  # type: Dict[str, ItemType]
 
-# The original input/output connection values defined for each item.
-# Each is a tuple of (inst_name, command) values, ready to be passed to
-# VLib.Output().
-# If the command is '', no in/output is present.
-ItemConnections = namedtuple('ItemConnections', [
-    'in_act', 'in_deact', 'out_act', 'out_deact',
-])
-CONNECTIONS = {}
-
-# The special tbeam polarity input from ITEM_TBEAM. Works like above.
-TBEAM_CONN_ACT = TBEAM_CONN_DEACT = (None, '')
-
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
@@ -370,7 +358,7 @@ class Connection:
 
 def read_configs(conf: Property):
     """Build our connection configuration from the config files."""
-    for prop in conf.find_children('Items'):
+    for prop in conf.find_children('Connections'):
         if prop.name in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
         ITEM_TYPES[prop.name] = ItemType.parse(prop)
@@ -401,17 +389,17 @@ def calc_connections(
     panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
     panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
 
-    tbeam_polarity = {
-        TBEAM_CONN_ACT,
-        TBEAM_CONN_DEACT,
-    }
-    tbeam_io = {
-        CONNECTIONS['item_tbeam'].in_act,
-        CONNECTIONS['item_tbeam'].in_deact
-    }
+    # The replacement 'proxy' commands we inserted into editoritems.
+    # We only need to pay attention for TBeams, other items we can
+    # just detect any output.
+    tbeam_polarity = {'ACTIVATE_POLARITY', 'DEACTIVATE_POLARITY'}
+    # Also applies to other items, but not needed.
+    tbeam_io = {'ACTIVATE', 'DEACTIVATE'}
+    # Needs to match gameMan.Game.build_instance_data().
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
+        # No connections, so nothing to worry about.
         if not inst_name:
             continue
 
@@ -426,11 +414,9 @@ def calc_connections(
             try:
                 item_type = ITEM_TYPES[instance_traits.get_item_id(inst).casefold()]
             except KeyError:
-                raise ValueError(
-                    'No connections for item "{}", '
-                    'but connections in the map!'.format(
-                        instance_traits.get_item_id(inst)
-                    ))
+                # These aren't made for non-io items. If it has outputs,
+                # that'll be a problem later.
+                item_type = None
             ITEMS[inst_name] = Item(inst, item_type)
 
     for over in vmf.by_class['info_overlay']:
@@ -459,14 +445,24 @@ def calc_connections(
         input_items = []  # Instances we trigger
         inputs = defaultdict(list)  # type: Dict[str, List[Output]]
 
+        if item.inst.outputs and item.item_type is None:
+            raise ValueError(
+                'No connections for item "{}", '
+                'but outputs in the map!'.format(
+                    instance_traits.get_item_id(item.inst)
+                )
+            )
+
         for out in item.inst.outputs:
             inputs[out.target].append(out)
-        # inst.outputs.clear()
+
+        # Remove the original outputs, we've consumed those already.
+        item.inst.outputs.clear()
 
         for out_name in inputs:
-            # Fizzler base -> model/brush outputs, skip and readd.
+            # Fizzler base -> model/brush outputs, ignore these (discard).
+            # fizzler.py will regenerate as needed.
             if out_name.endswith(('_modelStart', '_modelEnd', '_brush')):
-                # item.inst.add_out(*inputs[out_name])
                 continue
 
             if out_name in toggles:
@@ -484,9 +480,18 @@ def calc_connections(
                     item.timer = None
             else:
                 try:
-                    input_items.append(ITEMS[out_name])
+                    inp_item = ITEMS[out_name]
                 except KeyError:
                     raise ValueError('"{}" is not a known instance!'.format(out_name))
+                else:
+                    input_items.append(inp_item)
+                    if inp_item.item_type is None:
+                        raise ValueError(
+                            'No connections for item "{}", '
+                            'but inputs in the map!'.format(
+                                instance_traits.get_item_id(inp_item.inst)
+                            )
+                        )
 
         desired_panel_inst = panel_check if item.timer is None else panel_timer
 
@@ -504,11 +509,10 @@ def calc_connections(
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:
-                    input_tuple = (out.inst_in, out.input)
-                    if input_tuple in tbeam_polarity:
+                    if out.input in tbeam_polarity:
                         conn_type = ConnType.TBEAM_DIR
                         break
-                    elif input_tuple in tbeam_io:
+                    elif out.input in tbeam_io:
                         conn_type = ConnType.TBEAM_IO
                         break
                 else:
