@@ -337,13 +337,13 @@ class Connection:
 
     def add(self):
         """Add this to the directories."""
-        self._from.inputs.add(self)
-        self._to.outputs.add(self)
+        self._from.outputs.add(self)
+        self._to.inputs.add(self)
 
     def remove(self):
         """Remove this from the directories."""
-        self._from.inputs.discard(self)
-        self._to.outputs.discard(self)
+        self._from.outputs.discard(self)
+        self._to.inputs.discard(self)
 
     @property
     def to_item(self) -> Item:
