@@ -157,7 +157,7 @@ else:
 
             try:
                 file = self.system[self.cur_file]
-            except KeyError:
+            except (KeyError, FileNotFoundError):
                 self.stop_callback()
                 LOGGER.error('Sound sample not found: "{}"', self.cur_file)
                 return  # Abort if music isn't found..

@@ -525,8 +525,12 @@ class Game:
             else:
                 LOGGER.info("Skipped copying cache!")
 
-        # The items, plus editoritems, vbsp_config and the instance list.
-        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
+        # Each object type
+        # Editoritems
+        # VBSP_config
+        # Instance list
+        # Editor models.
+        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 4)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -629,6 +633,10 @@ class Game:
                     editor_section['copyable'] = '1'
                     editor_section['DesiredFacing'] = 'DESIRES_UP'
 
+        LOGGER.info('Optimizing editor models...')
+        self.clean_editor_models(editoritems)
+        export_screen.step('EXP')
+
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
@@ -706,6 +714,57 @@ class Game:
         export_screen.grab_release()
         export_screen.reset()  # Hide loading screen, we're done
         return True, vpk_success
+
+    def clean_editor_models(self, editoritems: Property):
+        """The game is limited to having 1024 models loaded at once.
+
+        Editor models are always being loaded, so we need to keep the number
+        small. Go through editoritems, and disable (by renaming to .mdl_dis)
+        unused ones.
+        """
+        # If set, force them all to be present.
+        force_on = GEN_OPTS.get_bool('Debug', 'force_all_editor_models')
+
+        used_models = {
+            mdl.value.rsplit('.', 1)[0].casefold()
+            for mdl in
+            editoritems.find_all(
+                'Item', 'Editor', 'Subtype',
+                'Model', 'ModelName',
+            )
+        }
+
+        mdl_count = 0
+
+        for mdl_folder in [
+            self.abs_path('bee2/models/props_map_editor/'),
+            self.abs_path('bee2_dev/models/props_map_editor/'),
+        ]:
+            if not os.path.exists(mdl_folder):
+                continue
+            for file in os.listdir(mdl_folder):
+                if not file.endswith(('.mdl', '.mdl_dis')):
+                    continue
+
+                mdl_count += 1
+
+                file_no_ext, ext = os.path.splitext(file)
+                if force_on or file_no_ext.casefold() in used_models:
+                    new_ext = '.mdl'
+                else:
+                    new_ext = '.mdl_dis'
+
+                if new_ext != ext:
+                    try:
+                        os.remove(os.path.join(mdl_folder, file_no_ext + new_ext))
+                    except FileNotFoundError:
+                        pass
+                    os.rename(
+                        os.path.join(mdl_folder, file_no_ext + ext),
+                        os.path.join(mdl_folder, file_no_ext + new_ext),
+                    )
+
+        LOGGER.info('{}/{} editor models used.', len(used_models), mdl_count)
 
     @staticmethod
     def build_instance_data(editoritems: Property):
@@ -862,6 +921,7 @@ class Game:
                 commands.append(comm_block)
 
         return root_block.export()
+
 
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""

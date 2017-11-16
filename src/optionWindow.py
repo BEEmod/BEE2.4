@@ -389,7 +389,7 @@ def init_dev_tab(f):
         tooltip=_('Log when an item reuses a variant from a parent style '
                   '(1970s using 1950s items, for example). This is usually '
                   'fine, but may need to be fixed.'),
-    ).grid(row=3, column=0, sticky=W)
+    ).grid(row=2, column=0, sticky=W)
 
     make_checkbox(
         f,
@@ -399,7 +399,7 @@ def init_dev_tab(f):
         tooltip=_('Log when the resources a "PackList" refers to are not '
                   'present in the zip. This may be fine (in a prerequisite zip),'
                   ' but it often indicates an error.'),
-    ).grid(row=4, column=0, sticky=W)
+    ).grid(row=3, column=0, sticky=W)
 
     make_checkbox(
         f,
@@ -421,3 +421,13 @@ def init_dev_tab(f):
         var=SHOW_LOG_WIN,
         tooltip=_('Show the log file in real-time.'),
     ).grid(row=1, column=1, sticky=W)
+
+    make_checkbox(
+        f,
+        section='Debug',
+        item='force_all_editor_models',
+        desc=_("Force Editor Models"),
+        tooltip=_('Make all props_map_editor models available for use. '
+                  'Portal 2 has a limit of 1024 models loaded in memory at '
+                  'once, so we need to disable unused ones to free this up.'),
+    ).grid(row=2, column=1, sticky=W)

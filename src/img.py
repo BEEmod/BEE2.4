@@ -68,7 +68,7 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     with filesystem:
         try:
             img_file = filesystem[path]
-        except KeyError:
+        except (KeyError, FileNotFoundError):
             LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
             return error or img_error
         with img_file.open_bin() as file:
