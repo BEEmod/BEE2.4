@@ -389,7 +389,7 @@ def init_dev_tab(f):
         tooltip=_('Log when an item reuses a variant from a parent style '
                   '(1970s using 1950s items, for example). This is usually '
                   'fine, but may need to be fixed.'),
-    ).grid(row=3, column=0, sticky=W)
+    ).grid(row=2, column=0, sticky=W)
 
     make_checkbox(
         f,
@@ -399,7 +399,7 @@ def init_dev_tab(f):
         tooltip=_('Log when the resources a "PackList" refers to are not '
                   'present in the zip. This may be fine (in a prerequisite zip),'
                   ' but it often indicates an error.'),
-    ).grid(row=4, column=0, sticky=W)
+    ).grid(row=3, column=0, sticky=W)
 
     make_checkbox(
         f,

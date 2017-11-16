@@ -525,8 +525,12 @@ class Game:
             else:
                 LOGGER.info("Skipped copying cache!")
 
-        # The items, plus editoritems, vbsp_config and the instance list.
-        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 3)
+        # Each object type
+        # Editoritems
+        # VBSP_config
+        # Instance list
+        # Editor models.
+        export_screen.set_length('EXP', len(packageLoader.OBJ_TYPES) + 4)
 
         # Do this before setting music and resources,
         # those can take time to compute.
@@ -631,6 +635,7 @@ class Game:
 
         LOGGER.info('Optimizing editor models...')
         self.clean_editor_models(editoritems)
+        export_screen.step('EXP')
 
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
@@ -744,7 +749,6 @@ class Game:
                 mdl_count += 1
 
                 file_no_ext, ext = os.path.splitext(file)
-                LOGGER.info('MDL: {!r}', file_no_ext.casefold())
                 if force_on or file_no_ext.casefold() in used_models:
                     new_ext = '.mdl'
                 else:
