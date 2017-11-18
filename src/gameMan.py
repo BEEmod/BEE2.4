@@ -786,6 +786,11 @@ class Game:
             commands,
         ])
 
+        # Produce the VMF output command we want - all PeTI outputs are simply
+        # just the input part, no delays, counts, parameter or target instance.
+        # so make those blank.
+        output_format = ',{},,0.0,-1'.replace(',', Output.SEP).format
+
         def conv_peti_input(key: str, name: str):
             """Do comm_block[key] = block[name], but convert the formats.
 
@@ -793,7 +798,7 @@ class Game:
             component (instance:x;blah).
             """
             try:
-                comm_block[key] = block[name] + ',,0.0,-1'.replace(',', Output.SEP)
+                comm_block[key] = output_format(block[name])
             except IndexError:
                 pass
 
