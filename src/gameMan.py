@@ -665,6 +665,10 @@ class Game:
         if num_compiler_files > 0:
             LOGGER.info('Copying Custom Compiler!')
             for file in os.listdir('../compiler'):
+                # Ignore these dummy executables.
+                if 'original' in file:
+                    continue
+
                 src_path = os.path.join('../compiler', file)
                 if not os.path.isfile(src_path):
                     continue
