@@ -675,6 +675,14 @@ DOC_HEADER = '''\
 This is a list of all condition flags and results in the current release.
 '''
 
+DOC_META_COND = '''\
+### Meta-Conditions
+
+Metaconditions are conditions run automatically by the compiler. These exist
+so package conditions can choose a priority to run before or after these 
+operations.
+'''
+
 DOC_SPECIAL_GROUP = '''\
 ### Specialized Conditions
 
@@ -690,7 +698,7 @@ def dump_conditions(file):
 
     print(DOC_HEADER, file=file)
 
-    print('# MetaConditions', file=file)
+    print('#\n', file=file)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
     for flag_key, priority, func in ALL_META:
