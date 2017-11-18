@@ -336,6 +336,22 @@ def close_filesystems():
         sys.close_ref()
 
 
+def no_packages_err(pak_dir, msg):
+    """Show an error message indicating no packages are present."""
+    from tkinter import messagebox
+    import sys
+    # We don't have a packages directory!
+    messagebox.showerror(
+        title='BEE2 - Invalid Packages Directory!',
+        message=(
+            '{}\nGet the packages from '
+            '"http://github.com/BEEmod/BEE2-items" '
+            'and place them in "{}".').format(msg, pak_dir + os.path.sep),
+        # Add slash to the end to indicate it's a folder.
+    )
+    sys.exit()
+
+
 def load_packages(
         pak_dir,
         loader: 'BaseLoadScreen',
@@ -351,18 +367,7 @@ def load_packages(
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
     if not os.path.isdir(pak_dir):
-        from tkinter import messagebox
-        import sys
-        # We don't have a packages directory!
-        messagebox.showerror(
-            title='BEE2 - Invalid Packages Directory!',
-            message='The given packages directory is not present!\n'
-                    'Get the packages from '
-                    '"http://github.com/BEEmod/BEE2-items" '
-                    'and place them in "' + pak_dir + os.path.sep + '".',
-                    # Add slash to the end to indicate it's a folder.
-        )
-        sys.exit()
+        no_packages_err(pak_dir, 'The given packages directory is not present!')
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -374,6 +379,17 @@ def load_packages(
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
+
+        if pack_count == 0:
+            no_packages_err(pak_dir, 'No packages found!')
+
+        # We must have the clean style package.
+        if CLEAN_PACKAGE not in packages:
+            no_packages_err(
+                pak_dir,
+                'No Clean Style package! This is required for some '
+                'essential resources and objects.'
+            )
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
