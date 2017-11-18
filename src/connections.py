@@ -2,9 +2,10 @@
 from enum import Enum
 from collections import defaultdict, namedtuple
 
-from srctools import VMF, Entity, Output, Property
+from srctools import VMF, Entity, Output, Property, conv_bool
 import comp_consts as const
 import instanceLocs
+import conditions
 import instance_traits
 import utils
 
@@ -356,6 +357,32 @@ class Connection:
         item.outputs.add(self)
 
 
+def combine_out(inp: Output, target: str, out: Output) -> Output:
+    """Combine two output 'halves' to form a full value.
+
+    The input half sets the output instance name and the output used.
+    The output half sets everything else.
+    The delay and number of outputs is merged.
+    """
+    if inp.times == -1:
+        times = out.times
+    elif out.times == -1:
+        times = inp.times
+    else:
+        times = min(inp.times, out.times)
+
+    return Output(
+        inp.output,
+        target,
+        out.input,
+        out.params,
+        inp.delay + out.delay,
+        times=times,
+        inst_out=inp.inst_out,
+        inst_in=out.inst_in,
+    )
+
+
 def read_configs(conf: Property):
     """Build our connection configuration from the config files."""
     for prop in conf.find_children('Connections'):
@@ -547,3 +574,75 @@ def calc_connections(
                     vmf.add_ent(frame)
                     frame['material'] = frame_mat
                     frame['renderorder'] = 1  # On top
+
+
+@conditions.meta_cond(-250, only_once=True)
+def gen_item_outputs():
+    """Create outputs for all items with connections.
+
+    This performs an optimization pass over items with outputs to remove
+    redundancy, then applies all the outputs to the instances. Before this,
+    connection count and inversion values are not valid. After this point,
+    items may not have connections altered.
+    """
+    # We go 'backwards', creating all the inputs for each item.
+    # That way we can change behaviour based on item counts.
+    for item in ITEMS.values():
+        if not item.inputs:
+            continue
+
+        # for conn in item.inputs:
+        #     conn.from_item.inst.add_out(Output(
+        #         'Output',
+        #         item.inst,
+        #         'Input',
+        #     ))
+
+        prim_inputs = [
+            conn
+            for conn in item.inputs
+            if conn.type is ConnType.PRIMARY
+            or conn.type is ConnType.DEFAULT
+        ]
+
+        item.inst.fixup[const.FixupVars.CONN_COUNT] = len(prim_inputs)
+        is_inverted = conv_bool(conditions.resolve_value(
+            item.inst,
+            item.item_type.invert_var,
+        ))
+
+        if is_inverted:
+            out_act = item.item_type.enable_cmd
+            out_deact = item.item_type.disable_cmd
+        else:
+            out_act = item.item_type.disable_cmd
+            out_deact = item.item_type.enable_cmd
+
+        for conn in prim_inputs:
+            inp_item = conn.from_item
+            if inp_item.item_type.output_act and out_act:
+                out_name, out_cmd = inp_item.item_type.output_act
+                for act in out_act:
+                    inp_item.inst.add_out(
+                        Output(
+                            out_cmd,
+                            conditions.local_name(item.inst, act.target),
+                            act.input,
+                            act.params,
+                            inst_out=out_name,
+                            times=act.times,
+                        )
+                    )
+            if inp_item.item_type.output_deact and out_deact:
+                out_name, out_cmd = inp_item.item_type.output_deact
+                for deact in out_deact:
+                    inp_item.inst.add_out(
+                        Output(
+                            out_cmd,
+                            conditions.local_name(item.inst, deact.target),
+                            deact.input,
+                            deact.params,
+                            inst_out=out_name,
+                            times=deact.times,
+                        )
+                    )
