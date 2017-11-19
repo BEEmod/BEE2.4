@@ -2,7 +2,6 @@
 from enum import Enum
 
 import inspect
-import io
 
 from srctools import Property, Vec, parse_vec_str
 from BEE2_config import ConfigFile
@@ -35,7 +34,7 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionType = Union[str, int, float, bool, Vec]
+OptionType = TypeVar('OptionType')
 
 
 class Opt:
@@ -96,7 +95,7 @@ def load(opt_blocks: Iterator[Property]):
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
             SETTINGS[opt.id] = srctools.conv_bool(val, opt.default)
-        else: # int, float, str - no special handling...
+        else:  # int, float, str - no special handling...
             try:
                 SETTINGS[opt.id] = opt.type.value(val)
             except (ValueError, TypeError):
@@ -139,26 +138,49 @@ def set_opt(opt_name: str, value: str):
             pass
 
 
-def get(expected_type: Type[OptionType], name) -> Optional[OptionType]:
+def get(expected_type: Type[OptionType], name: str) -> Optional[OptionType]:
     """Get the given option. 
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
+
+    If expected_type is an Enum, this will be used to convert the output.
+    If it fails, a warning is produced and the first value in the enum is
+    returned.
     """
     try:
         val = SETTINGS[name.casefold()]
     except KeyError:
         raise TypeError('Option "{}" does not exist!'.format(name)) from None
-    
+
     if val is None:
         return None
+
+    if issubclass(expected_type, Enum):
+        enum_type = expected_type
+        expected_type = str
+    else:
+        enum_type = None
         
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
         raise ValueError('Option "{}" is {} (expected {})'.format(
-            name, 
-            type(val), 
+            name,
+            type(val),
             expected_type,
         ))
+
+    if enum_type is not None:
+        try:
+            return enum_type(val)
+        except ValueError:
+            LOGGER.warning(
+                'Option "{}" is not a valid value. '
+                'Allowed values are:\n{}',
+                name,
+                '\n'.join([mem.value for mem in enum_type])
+            )
+            return next(iter(enum_type))
+
     # Vec is mutable, don't allow modifying the original.
     if expected_type is Vec:
         return val.copy()
