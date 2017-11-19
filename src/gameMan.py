@@ -843,15 +843,20 @@ class Game:
 
             try:
                 [input_conf] = item.find_all('Exporting', 'Inputs', 'BEE2')
-                input_conf.name = None
             except ValueError:
                 input_conf = Property(None, [])
+            else:
+                input_conf = input_conf.copy()
+                input_conf.name = None
 
             try:
                 [output_conf] = item.find_all('Exporting', 'Outputs', 'BEE2')
                 output_conf.name = None
             except ValueError:
                 output_conf = Property(None, [])
+            else:
+                output_conf = output_conf.copy()
+                output_conf.name = None
 
             for block in item.find_all('Exporting', 'Inputs', CONN_NORM):
                 has_input = True
@@ -893,10 +898,13 @@ class Game:
 
             # Remove all the IO blocks from editoritems, and replace with
             # dummy ones.
+            # Then remove the config blocks.
             for io_type in ('Inputs', 'Outputs'):
                 for block in item.find_all('Exporting', io_type):
                     while CONN_NORM in block:
                         del block[CONN_NORM]
+                    while 'BEE2' in block:
+                        del block['BEE2']
 
             if has_input:
                 item.ensure_exists('Exporting').ensure_exists('Inputs').append(
