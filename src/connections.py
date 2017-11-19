@@ -616,51 +616,112 @@ def gen_item_outputs():
         #         'Input',
         #     ))
 
-        prim_inputs = [
-            conn
-            for conn in item.inputs
-            if conn.type is ConnType.PRIMARY
-            or conn.type is ConnType.DEFAULT
-        ]
+        if item.item_type.input_type is InputType.DUAL:
 
-        item.inst.fixup[const.FixupVars.CONN_COUNT] = len(prim_inputs)
-        is_inverted = conv_bool(conditions.resolve_value(
-            item.inst,
-            item.item_type.invert_var,
-        ))
-
-        if is_inverted:
-            out_act = item.item_type.enable_cmd
-            out_deact = item.item_type.disable_cmd
+            prim_inputs = [
+                conn
+                for conn in item.inputs
+                if conn.type is ConnType.PRIMARY
+                or conn.type is ConnType.DEFAULT
+            ]
+            sec_inputs = [
+                conn
+                for conn in item.inputs
+                if conn.type is ConnType.SECONDARY
+                or conn.type is ConnType.DEFAULT
+            ]
+            add_item_inputs(
+                item,
+                InputType.AND,
+                prim_inputs,
+                const.FixupVars.CONN_COUNT_A,
+                item.item_type.enable_cmd,
+                item.item_type.disable_cmd,
+                item.item_type.invert_var,
+            )
+            add_item_inputs(
+                item,
+                InputType.AND,
+                sec_inputs,
+                const.FixupVars.CONN_COUNT_B,
+                item.item_type.sec_enable_cmd,
+                item.item_type.sec_disable_cmd,
+                item.item_type.sec_invert_var,
+            )
         else:
-            out_act = item.item_type.disable_cmd
-            out_deact = item.item_type.enable_cmd
+            add_item_inputs(
+                item,
+                item.item_type.input_type,
+                list(item.inputs),
+                const.FixupVars.CONN_COUNT,
+                item.item_type.enable_cmd,
+                item.item_type.disable_cmd,
+                item.item_type.invert_var,
+            )
 
-        for conn in prim_inputs:
+
+def add_item_inputs(
+    item: Item,
+    logic_type: InputType,
+    inputs: List[Connection],
+    count_var: str,
+    enable_cmd: List[Output],
+    disable_cmd: List[Output],
+    invert_var: str,
+):
+    """Handle either the primary or secondary inputs to an item."""
+    item.inst.fixup[count_var] = len(inputs)
+
+    if logic_type is InputType.DEFAULT:
+        # 'Original' PeTI proxies.
+        for conn in inputs:
             inp_item = conn.from_item
-            if inp_item.item_type.output_act and out_act:
-                out_name, out_cmd = inp_item.item_type.output_act
-                for act in out_act:
+            for output, input_cmds in [
+                (inp_item.item_type.output_act, enable_cmd),
+                (inp_item.item_type.output_deact, disable_cmd)
+            ]:
+                if not output or not input_cmds:
+                    continue
+
+                out_name, out_cmd = output
+                for cmd in input_cmds:
                     inp_item.inst.add_out(
                         Output(
                             out_cmd,
-                            conditions.local_name(item.inst, act.target),
-                            act.input,
-                            act.params,
+                            item.inst,
+                            cmd.input,
                             inst_out=out_name,
-                            times=act.times,
+                            inst_in=cmd.inst_in,
                         )
                     )
-            if inp_item.item_type.output_deact and out_deact:
-                out_name, out_cmd = inp_item.item_type.output_deact
-                for deact in out_deact:
-                    inp_item.inst.add_out(
-                        Output(
-                            out_cmd,
-                            conditions.local_name(item.inst, deact.target),
-                            deact.input,
-                            deact.params,
-                            inst_out=out_name,
-                            times=deact.times,
-                        )
+        return
+
+    is_inverted = conv_bool(conditions.resolve_value(
+        item.inst,
+        invert_var,
+    ))
+
+    if is_inverted:
+        enable_cmd, disable_cmd = disable_cmd, enable_cmd
+
+    for conn in inputs:
+        inp_item = conn.from_item
+        for output, input_cmds in [
+            (inp_item.item_type.output_act, enable_cmd),
+            (inp_item.item_type.output_deact, disable_cmd)
+        ]:
+            if not output or not input_cmds:
+                continue
+
+            out_name, out_cmd = output
+            for cmd in input_cmds:
+                inp_item.inst.add_out(
+                    Output(
+                        out_cmd,
+                        conditions.local_name(item.inst, cmd.target),
+                        cmd.input,
+                        cmd.params,
+                        inst_out=out_name,
+                        times=cmd.times,
                     )
+                )
