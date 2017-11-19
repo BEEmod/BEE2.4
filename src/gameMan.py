@@ -874,7 +874,7 @@ class Game:
             if 'enablecmd' in input_conf or 'disablecmd' in input_conf:
                 has_input = True
 
-            if 'sec_enablecmd' in input_conf or 'sec_disablecmd' in input_conf:
+            if input_conf['type', ''].casefold() == 'dual':
                 has_secondary = True
 
             if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
@@ -899,11 +899,15 @@ class Game:
                 )
 
             # Add the secondary for funnels only.
-            if item_id.casefold() == 'item_tbeam' and has_secondary:
+            if item_id.casefold() == 'item_tbeam':
+                if not has_secondary:
+                    LOGGER.warning(
+                        "No dual input for TBeam, these won't function."
+                    )
                 item.ensure_exists('Exporting').ensure_exists('Inputs').append(
                     Property(CONN_FUNNEL, [
-                        Property('Activate', 'ACTIVATE_POLARITY'),
-                        Property('Deactivate', 'DEACTIVATE_POLARITY'),
+                        Property('Activate', 'ACTIVATE_SECONDARY'),
+                        Property('Deactivate', 'DEACTIVATE_SECONDARY'),
                     ])
                 )
 

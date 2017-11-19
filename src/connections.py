@@ -34,6 +34,9 @@ class InputType(Enum):
     # For this the IO command is the original counter style.
     DEFAULT = 'default'
 
+    # Have A and B inputs - acts like AND for both.
+    DUAL = 'dual'
+
     AND = 'and'  # AND input for an item.
     OR = 'or'    # OR input for an item.
 
@@ -121,17 +124,11 @@ class ShapeSignage:
 class ItemType:
     """Represents an item, with inputs and outputs."""
 
-    __slots__ = [
-        'id', 'default_dual',
-        'invert_var', 'enable_cmd', 'disable_cmd',
-        'sec_invert_var', 'sec_enable_cmd', 'sec_disable_cmd',
-        'output_type', 'output_act', 'output_deact',
-    ]
-
     def __init__(
         self,
         id: str,
         default_dual: ConnType,
+        input_type: InputType,
 
         invert_var: str,
         enable_cmd: List[Output],
@@ -146,6 +143,9 @@ class ItemType:
         output_deact: Optional[Tuple[Optional[str], str]],
     ):
         self.id = id
+
+        # How this item uses their inputs.
+        self.input_type = input_type
 
         # True/False for always, $var, !$var for lookup.
         self.invert_var = invert_var
@@ -189,11 +189,18 @@ class ItemType:
         enable_cmd = get_outputs('enable_cmd')
         disable_cmd = get_outputs('disable_cmd')
 
-        has_sec = 'sec_enable_cmd' in conf or 'sec_disable_cmd' in conf
+        try:
+            input_type = InputType(
+                conf['Type', 'default'].casefold()
+            )
+        except ValueError:
+            raise ValueError('Invalid input type "{}": {}'.format(
+                item_id, conf['type'],
+            )) from None
 
         invert_var = conf['invertVar', '0']
 
-        if has_sec:
+        if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
             sec_disable_cmd = get_outputs('sec_disable_cmd')
 
@@ -218,7 +225,7 @@ class ItemType:
             )
         except ValueError:
             raise ValueError('Invalid output affinity for "{}": {}'.format(
-                item_id, conf['default_dual'],
+                item_id, conf['DualType'],
             )) from None
 
         try:
@@ -232,7 +239,7 @@ class ItemType:
             out_deact = None
 
         return ItemType(
-            item_id, default_dual,
+            item_id, default_dual, input_type,
             invert_var, enable_cmd, disable_cmd,
             sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
