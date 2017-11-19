@@ -366,6 +366,28 @@ DEFAULTS = [
         automatically sets the attachment point for the brush.
         """),
 
+    Opt('ind_pan_check_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
+    Opt('ind_pan_timer_switching', 'custom',
+        """Specify the type of switching behaviour used in the instance.
+        
+        This can allow optimising control of antlines. The $indicator_name
+        fixup value should be used for the names of overlays. If the option is
+        set to 'internal', one instance contains the toggle/panel entity. If it 
+        is set to 'external', one is generated for the instance(s). If set to 
+        'custom' (default), no optimisation is done (other than skipping the
+        proxy).
+        """),
+
     Opt('signInst', TYPE.STR,
         """Adds this instance on all the signs.
 

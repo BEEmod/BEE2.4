@@ -8,6 +8,7 @@ import instanceLocs
 import conditions
 import instance_traits
 import utils
+import vbsp_options
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple
 
@@ -59,6 +60,13 @@ class InputType(Enum):
     def is_logic(self):
         """Is this a logic gate?"""
         return self.value in ('and_logic', 'or_logic')
+
+
+class PanelSwitchingStyle(Enum):
+    """How the panel instance does its switching."""
+    CUSTOM = 'custom'      # Some logic, we don't do anything.
+    EXTERNAL = 'external'  # Provide a toggle to the instance.
+    INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
 
 
 class OutNames(str, Enum):
@@ -285,7 +293,7 @@ class Item:
     """Represents one item/instance with IO."""
     __slots__ = [
         'inst',
-        'ind_panels', 'ind_toggle',
+        'ind_panels',
         'antlines', 'shape_signs',
         'timer',
         'inputs', 'outputs',
@@ -296,7 +304,6 @@ class Item:
         self,
         inst: Entity,
         item_type: ItemType,
-        toggle: Entity = None,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -307,7 +314,7 @@ class Item:
 
         # Associated indicator panels
         self.ind_panels = set(panels)  # type: Set[Entity]
-        self.ind_toggle = toggle
+
         # Overlays
         self.antlines = set(antlines)  # type: Set[Entity]
         self.shape_signs = list(shape_signs)
@@ -432,6 +439,12 @@ def read_configs(conf: Property):
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
         ITEM_TYPES[prop.name] = ItemType.parse(prop)
 
+    if 'item_indicator_panel' not in ITEM_TYPES:
+        raise ValueError('No checkmark panel item type!')
+
+    if 'item_indicator_panel_timer' not in ITEM_TYPES:
+        raise ValueError('No timer panel item type!')
+
 
 def calc_connections(
     vmf: VMF,
@@ -474,6 +487,8 @@ def calc_connections(
 
         if 'indicator_toggle' in traits:
             toggles[inst['targetname']] = inst
+            # We do not use toggle instances.
+            inst.remove()
         elif 'indicator_panel' in traits:
             panels[inst['targetname']] = inst
         else:
@@ -625,20 +640,26 @@ def gen_item_outputs():
     connection count and inversion values are not valid. After this point,
     items may not have connections altered.
     """
+    pan_switching_check = vbsp_options.get(PanelSwitchingStyle, 'ind_pan_check_switching')
+    pan_switching_timer = vbsp_options.get(PanelSwitchingStyle, 'ind_pan_timer_switching')
+
+    pan_check_type = ITEM_TYPES['item_indicator_panel']
+    pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
+
     # todo: Optimisation here.
 
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
+        # Add outputs for antlines.
+        if item.antlines or item.ind_panels:
+            if item.timer is None:
+                add_item_indicators(item, pan_switching_check, pan_check_type)
+            else:
+                add_item_indicators(item, pan_switching_timer, pan_timer_type)
+
         if not item.inputs:
             continue
-
-        # for conn in item.inputs:
-        #     conn.from_item.inst.add_out(Output(
-        #         'Output',
-        #         item.inst,
-        #         'Input',
-        #     ))
 
         if item.item_type.input_type is InputType.DUAL:
 
@@ -836,3 +857,81 @@ def add_item_inputs(
                             times=cmd.times,
                         )
                     )
+
+
+def add_item_indicators(
+    item: Item,
+    inst_type: PanelSwitchingStyle,
+    pan_item: ItemType,
+):
+    """Generate the commands for antlines."""
+    ant_name = '@{}_overlay'.format(item.name)
+    has_ant = len(item.antlines) > 0
+    has_sign = len(item.ind_panels) > 0
+
+    for ind in item.antlines:
+        ind['targetname'] = ant_name
+
+    if inst_type is PanelSwitchingStyle.CUSTOM:
+        needs_toggle = has_ant
+    elif inst_type is PanelSwitchingStyle.EXTERNAL:
+        needs_toggle = has_ant or has_sign
+    elif inst_type is PanelSwitchingStyle.INTERNAL:
+        needs_toggle = has_ant and not has_sign
+    else:
+        raise ValueError('Bad switch style ' + repr(inst_type))
+
+    first_inst = True
+
+    for pan in item.ind_panels:
+        if inst_type is PanelSwitchingStyle.EXTERNAL:
+            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name
+        # Ensure only one gets the indicator name.
+        elif first_inst and inst_type is PanelSwitchingStyle.INTERNAL:
+            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name
+            first_inst = False
+        else:
+            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ' '
+
+        for output, input_cmds in [
+            (item.item_type.output_act, pan_item.enable_cmd),
+            (item.item_type.output_deact, pan_item.disable_cmd)
+        ]:
+            if not output:
+                continue
+            out_name, out = output
+            for cmd in input_cmds:
+                item.inst.add_out(
+                    Output(
+                        out,
+                        conditions.local_name(pan, cmd.target) or pan,
+                        cmd.input,
+                        cmd.params,
+                        inst_out=out_name,
+                        times=cmd.times,
+                    )
+                )
+
+    if needs_toggle:
+        toggle = item.inst.map.create_ent(
+            classname='env_texturetoggle',
+            origin=item.inst['origin'],
+            targetname='toggle_' + item.name,
+            target=ant_name,
+        )
+        for output, skin in [
+            (item.item_type.output_act, 1),
+            (item.item_type.output_deact, 0)
+        ]:
+            if not output:
+                continue
+            out_name, out = output
+            item.inst.add_out(
+                Output(
+                    out,
+                    toggle,
+                    'SetTextureIndex',
+                    skin,
+                    inst_out=out_name,
+                )
+            )
