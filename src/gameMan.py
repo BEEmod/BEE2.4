@@ -871,13 +871,21 @@ class Game:
                     conv_peti_input('sec_enable_cmd', 'activate')
                     conv_peti_input('sec_disable_cmd', 'deactivate')
 
-            if 'enablecmd' in input_conf or 'disablecmd' in input_conf:
+            if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
                 has_input = True
 
-            if input_conf['type', ''].casefold() == 'dual':
-                has_secondary = True
+            inp_type = input_conf['type', ''].casefold()
 
-            if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
+            if inp_type == 'dual':
+                has_secondary = True
+            elif inp_type.endswith('_logic'):
+                if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
+                    LOGGER.warning(
+                        'AND_LOGIC or OR_LOGIC items cannot '
+                        'have specified outputs.'
+                    )
+                has_output = True
+            elif 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                 has_output = True
 
             comm_block += input_conf
