@@ -48,6 +48,19 @@ class InputType(Enum):
     DAISYCHAIN = 'daisychain'
 
 
+class OutNames(str, Enum):
+    """Fake input/outputs used in generation of the real ones."""
+    # Needs to match gameMan.Game.build_instance_data().
+    IN_ACT = 'ACTIVATE'
+    IN_DEACT = 'DEACTIVATE'
+
+    IN_SEC_ACT = 'ACTIVATE_SECONDARY'
+    IN_SEC_DEACT = 'DEACTIVATE_SECONDARY'
+
+    OUT_ACT = 'ON_ACTIVATED'
+    OUT_DEACT = 'ON_DEACTIVATED'
+
+
 CONN_NAMES = {
     ConnType.DEFAULT: '',
     ConnType.PRIMARY: 'A',
@@ -423,13 +436,11 @@ def calc_connections(
     panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
     panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
 
-    # The replacement 'proxy' commands we inserted into editoritems.
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
-    tbeam_polarity = {'ACTIVATE_POLARITY', 'DEACTIVATE_POLARITY'}
-    # Also applies to other items, but not needed.
-    tbeam_io = {'ACTIVATE', 'DEACTIVATE'}
-    # Needs to match gameMan.Game.build_instance_data().
+    tbeam_polarity = {OutNames.IN_SEC_ACT, OutNames.IN_SEC_DEACT}
+    # Also applies to other items, but not needed for this analysis.
+    tbeam_io = {OutNames.IN_ACT, OutNames.IN_DEACT}
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
