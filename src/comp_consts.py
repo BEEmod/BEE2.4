@@ -74,10 +74,6 @@ class FixupVars(MaterialGroup):
     CONN_COUNT = '$connectioncount'
     CONN_COUNT_TBEAM = '$connectioncount_polarity'
 
-    # New ones we add.
-    CONN_COUNT_A = '$conn_count_a'
-    CONN_COUNT_B = '$conn_count_b'
-
     CUBE_TYPE = '$cube_type'
 
     ST_ENABLED = '$start_enabled'
@@ -104,6 +100,9 @@ class FixupVars(MaterialGroup):
 
     # Extra vars we've defined.
 
+    BEE_CONN_COUNT_A = '$conn_count_a'
+    BEE_CONN_COUNT_B = '$conn_count_b'
+
     # Index of entry/exit corridor
     BEE_CORR_INDEX = '$corr_index'
     # Videos set for arrival_departure_transition_ents.
@@ -115,6 +114,7 @@ class FixupVars(MaterialGroup):
     BEE_GLS_TYPE = '$barrier_type'
     BEE_PIST_IS_STATIC = '$is_static'
     BEE_PIST_MANAGER_A = '$manager_a'
+
 
 class ItemClass(MaterialGroup):
     """PeTI item classes."""

@@ -658,7 +658,7 @@ def gen_item_outputs():
                 item,
                 InputType.AND,
                 prim_inputs,
-                const.FixupVars.CONN_COUNT_A,
+                const.FixupVars.BEE_CONN_COUNT_A,
                 item.item_type.enable_cmd,
                 item.item_type.disable_cmd,
                 item.item_type.invert_var,
@@ -667,7 +667,7 @@ def gen_item_outputs():
                 item,
                 InputType.AND,
                 sec_inputs,
-                const.FixupVars.CONN_COUNT_B,
+                const.FixupVars.BEE_CONN_COUNT_B,
                 item.item_type.sec_enable_cmd,
                 item.item_type.sec_disable_cmd,
                 item.item_type.sec_invert_var,
@@ -778,8 +778,6 @@ def add_item_inputs(
                         inst_out=out_name,
                     )
                 )
-
-        LOGGER.info('Counter outputs: "{}"={}, {} & {}',counter['targetname'], logic_type, enable_cmd, disable_cmd)
 
         if logic_type is InputType.AND:
             count_on = COUNTER_AND_ON
