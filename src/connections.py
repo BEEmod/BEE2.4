@@ -16,6 +16,14 @@ LOGGER = utils.getLogger(__name__)
 
 ITEM_TYPES = {}  # type: Dict[str, ItemType]
 
+# Outputs we need to use to make a math_counter act like
+# the specified logic gate.
+COUNTER_AND_ON = 'OnHitMax'
+COUNTER_AND_OFF = 'OnChangedFromMax'
+
+COUNTER_OR_ON = 'OnChangedFromMin'
+COUNTER_OR_OFF = 'OnHitMin'
+
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
@@ -46,6 +54,11 @@ class InputType(Enum):
     # An item 'chained' to the next. Inputs should be moved to the output
     # item in addition to our own output.
     DAISYCHAIN = 'daisychain'
+
+    @property
+    def is_logic(self):
+        """Is this a logic gate?"""
+        return self.value in ('and_logic', 'or_logic')
 
 
 class OutNames(str, Enum):
@@ -183,8 +196,17 @@ class ItemType:
 
         # inst_name, output commands for outputs.
         # If they are None, it's not used.
-        self.output_act = output_act
-        self.output_deact = output_deact
+
+        # Logic items have preset ones of these from the counter.
+        if input_type is InputType.AND_LOGIC:
+            self.output_act = COUNTER_AND_ON
+            self.output_deact = COUNTER_AND_OFF
+        if input_type is InputType.OR_LOGIC:
+            self.output_act = COUNTER_OR_ON
+            self.output_deact = COUNTER_OR_OFF
+        else:
+            self.output_act = output_act
+            self.output_deact = output_deact
 
     @staticmethod
     def parse(conf: Property):
@@ -267,7 +289,7 @@ class Item:
         'antlines', 'shape_signs',
         'timer',
         'inputs', 'outputs',
-        'item_type',
+        'item_type', 'io_outputs',
     ]
 
     def __init__(
@@ -603,6 +625,8 @@ def gen_item_outputs():
     connection count and inversion values are not valid. After this point,
     items may not have connections altered.
     """
+    # todo: Optimisation here.
+
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
@@ -704,24 +728,113 @@ def add_item_inputs(
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
 
-    for conn in inputs:
-        inp_item = conn.from_item
-        for output, input_cmds in [
-            (inp_item.item_type.output_act, enable_cmd),
-            (inp_item.item_type.output_deact, disable_cmd)
-        ]:
-            if not output or not input_cmds:
-                continue
+    if logic_type is InputType.DAISYCHAIN:
+        needs_counter = True
+    else:
+        needs_counter = len(inputs) > 1
 
-            out_name, out_cmd = output
-            for cmd in input_cmds:
+    if logic_type.is_logic:
+        origin = item.inst['origin']
+        name = item.name
+
+        counter = item.inst
+        counter.clear_keys()
+
+        counter['origin'] = origin
+        counter['targetname'] = name
+        counter['classname'] = 'math_counter'
+
+        if not needs_counter:
+            LOGGER.warning('Item "{}" was not optimised out!', item.item_type.id)
+    elif needs_counter:
+        counter = item.inst.map.create_ent(
+            classname='math_counter',
+            targetname=conditions.local_name(item.inst, 'counter'),
+            origin=item.inst['origin'],
+        )
+    else:
+        counter = None
+
+    if needs_counter:
+        counter['min'] = counter['startvalue'] = counter['StartDisabled'] = 0
+        counter['max'] = len(inputs)
+
+        for conn in inputs:
+            inp_item = conn.from_item
+            for output, input_name in [
+                (inp_item.item_type.output_act, 'Add'),
+                (inp_item.item_type.output_deact, 'Subtract')
+            ]:
+                if not output:
+                    continue
+
+                out_name, out_cmd = output
                 inp_item.inst.add_out(
                     Output(
                         out_cmd,
-                        conditions.local_name(item.inst, cmd.target),
+                        counter,
+                        input_name,
+                        '1',
+                        inst_out=out_name,
+                    )
+                )
+
+        LOGGER.info('Counter outputs: "{}"={}, {} & {}',counter['targetname'], logic_type, enable_cmd, disable_cmd)
+
+        if logic_type is InputType.AND:
+            count_on = COUNTER_AND_ON
+            count_off = COUNTER_AND_OFF
+        elif logic_type is InputType.OR:
+            count_on = COUNTER_OR_ON
+            count_off = COUNTER_OR_OFF
+        elif logic_type.is_logic:
+            # We don't add outputs here, the outputted items do that.
+            # counter is item.inst, so those are added to that.
+            LOGGER.info('LOGIC counter: {}', counter['targetname'])
+            return
+        elif logic_type.DAISYCHAIN:
+            # Todo
+            return
+        else:
+            # Should never happen, not other types.
+            raise ValueError('Unknown counter logic type: ' + repr(logic_type))
+
+        for output_name, input_cmds in [
+            (count_on, enable_cmd),
+            (count_off, disable_cmd)
+        ]:
+            if not input_cmds:
+                continue
+            for cmd in input_cmds:
+                counter.add_out(
+                    Output(
+                        output_name,
+                        conditions.local_name(item.inst, cmd.target) or item.inst,
                         cmd.input,
                         cmd.params,
-                        inst_out=out_name,
                         times=cmd.times,
                     )
                 )
+
+    else:  # No counter - fire directly.
+        for conn in inputs:
+            inp_item = conn.from_item
+            for output, input_cmds in [
+                (inp_item.item_type.output_act, enable_cmd),
+                (inp_item.item_type.output_deact, disable_cmd)
+            ]:
+                if not output or not input_cmds:
+                    continue
+
+                out_name, out_cmd = output
+                for cmd in input_cmds:
+                    inp_item.inst.add_out(
+                        Output(
+                            out_cmd,
+                            conditions.local_name(item.inst, cmd.target) or item.inst,
+                            cmd.input,
+                            cmd.params,
+                            inst_out=out_name,
+                            times=cmd.times,
+                        )
+                    )
