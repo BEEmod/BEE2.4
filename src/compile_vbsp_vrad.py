@@ -69,8 +69,8 @@ INCLUDES = [
 
 # Get the list of condition sub-modules that we need to also include.
 condition_modules = [
-    module.name
-    for module in
+    name
+    for loader, name, is_package in
     pkgutil.iter_modules(['conditions'])
 ]
 
