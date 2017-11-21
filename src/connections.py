@@ -1,6 +1,10 @@
-"""Manages PeTI item connections."""
+"""Manages PeTI item connections.
+
+This allows checking which items are connected to what, and also regenerates
+the outputs with optimisations and custom settings.
+"""
 from enum import Enum
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 from srctools import VMF, Entity, Output, Property, conv_bool
 import comp_consts as const
@@ -16,6 +20,9 @@ from typing import Optional, Iterable, Dict, List, Set, Tuple
 LOGGER = utils.getLogger(__name__)
 
 ITEM_TYPES = {}  # type: Dict[str, ItemType]
+
+# Targetname -> item
+ITEMS = {}  # type: Dict[str, Item]
 
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
@@ -108,10 +115,6 @@ SIGN_ORDER_LOOKUP = {
     for index, sign in
     enumerate(SIGN_ORDER)
 }
-
-
-# Targetname -> item
-ITEMS = {}  # type: Dict[str, Item]
 
 
 class ShapeSignage:
