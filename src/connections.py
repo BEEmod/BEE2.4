@@ -220,9 +220,8 @@ class ItemType:
             self.output_deact = output_deact
 
     @staticmethod
-    def parse(conf: Property):
+    def parse(item_id: str, conf: Property):
         """Read the item type info from the given config."""
-        item_id = conf.real_name
 
         def get_outputs(prop_name):
             """Parse all the outputs with this name."""
@@ -440,7 +439,7 @@ def read_configs(conf: Property):
     for prop in conf.find_children('Connections'):
         if prop.name in ITEM_TYPES:
             raise ValueError('Duplicate item type "{}"'.format(prop.real_name))
-        ITEM_TYPES[prop.name] = ItemType.parse(prop)
+        ITEM_TYPES[prop.name] = ItemType.parse(prop.real_name, prop)
 
     if 'item_indicator_panel' not in ITEM_TYPES:
         raise ValueError('No checkmark panel item type!')
@@ -632,6 +631,28 @@ def calc_connections(
                     vmf.add_ent(frame)
                     frame['material'] = frame_mat
                     frame['renderorder'] = 1  # On top
+
+
+@conditions.make_result_setup('ChangeIOType')
+def res_change_io_type_parse(props: Property):
+    """Pre-parse all item types into an anonymous block."""
+    return ItemType.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
+
+
+@conditions.make_result('ChangeIOType')
+def res_change_io_type(inst: Entity, res: Property):
+    """Switch an item to use different inputs or outputs.
+
+    Must be done before priority level -250.
+    The contents are the same as that allowed in the input BEE2 block in
+    editoritems.
+    """
+    try:
+        item = ITEMS[inst['targetname']]
+    except KeyError:
+        raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+
+    item.item_type = res.value
 
 
 @conditions.meta_cond(-250, only_once=True)
