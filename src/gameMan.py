@@ -887,9 +887,14 @@ class Game:
                 if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                     LOGGER.warning(
                         'AND_LOGIC or OR_LOGIC items cannot '
-                        'have specified outputs.'
+                        'have outputs specified.'
                     )
-                has_output = True
+                if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
+                    LOGGER.warning(
+                        'AND_LOGIC or OR_LOGIC items cannot '
+                        'have inputs specified.'
+                    )
+                has_input = has_output = True
             elif 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                 has_output = True
 

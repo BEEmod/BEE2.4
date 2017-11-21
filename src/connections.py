@@ -210,11 +210,11 @@ class ItemType:
 
         # Logic items have preset ones of these from the counter.
         if input_type is InputType.AND_LOGIC:
-            self.output_act = COUNTER_AND_ON
-            self.output_deact = COUNTER_AND_OFF
-        if input_type is InputType.OR_LOGIC:
-            self.output_act = COUNTER_OR_ON
-            self.output_deact = COUNTER_OR_OFF
+            self.output_act = (None, COUNTER_AND_ON)
+            self.output_deact = (None, COUNTER_AND_OFF)
+        elif input_type is InputType.OR_LOGIC:
+            self.output_act = (None, COUNTER_OR_ON)
+            self.output_deact = (None, COUNTER_OR_OFF)
         else:
             self.output_act = output_act
             self.output_deact = output_deact
@@ -408,30 +408,6 @@ class Connection:
         item.outputs.add(self)
 
 
-def combine_out(inp: Output, target: str, out: Output) -> Output:
-    """Combine two output 'halves' to form a full value.
-
-    The input half sets the output instance name and the output used.
-    The output half sets everything else.
-    The delay and number of outputs is merged.
-    """
-    if inp.times == -1:
-        times = out.times
-    elif out.times == -1:
-        times = inp.times
-    else:
-        times = min(inp.times, out.times)
-
-    return Output(
-        inp.output,
-        target,
-        out.input,
-        out.params,
-        inp.delay + out.delay,
-        times=times,
-        inst_out=inp.inst_out,
-        inst_in=out.inst_in,
-    )
 
 
 def read_configs(conf: Property):
@@ -790,7 +766,9 @@ def add_item_inputs(
         counter['classname'] = 'math_counter'
 
         if not needs_counter:
-            LOGGER.warning('Item "{}" was not optimised out!', item.item_type.id)
+            LOGGER.warning('Item "{}" was not optimised out!', name)
+            # Force counter so it still works.
+            needs_counter = True
     elif needs_counter:
         counter = item.inst.map.create_ent(
             classname='math_counter',
