@@ -716,6 +716,25 @@ def gen_item_outputs(vmf: VMF):
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
+    # Apply input A/B types to connections.
+    # After here, all connections are primary or secondary only.
+    for item in ITEMS.values():
+        for conn in item.outputs:
+            LOGGER.info('{}: {} -> {}({})', item.name, item.item_type.output_type, conn.to_item, conn.to_item.item_type.input_type)
+            # If not a dual item, it's primary.
+            if conn.to_item.item_type.input_type is not InputType.DUAL:
+                conn.type = ConnType.PRIMARY
+                continue
+            # If already set, that is the priority.
+            if conn.type is not ConnType.DEFAULT:
+                continue
+            # Our item set the type of outputs.
+            if item.item_type.output_type is not ConnType.DEFAULT:
+                conn.type = item.item_type.output_type
+            else:
+                # Use the affinity of the target.
+                conn.type = conn.to_item.item_type.default_dual
+
     do_item_optimisation(vmf)
 
     # We go 'backwards', creating all the inputs for each item.
@@ -740,13 +759,11 @@ def gen_item_outputs(vmf: VMF):
                 conn
                 for conn in item.inputs
                 if conn.type is ConnType.PRIMARY
-                or conn.type is ConnType.DEFAULT
             ]
             sec_inputs = [
                 conn
                 for conn in item.inputs
                 if conn.type is ConnType.SECONDARY
-                or conn.type is ConnType.DEFAULT
             ]
             add_item_inputs(
                 item,
