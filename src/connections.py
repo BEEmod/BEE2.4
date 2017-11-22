@@ -999,7 +999,7 @@ def add_item_indicators(
             (item.item_type.output_act, pan_item.enable_cmd),
             (item.item_type.output_deact, pan_item.disable_cmd)
         ]:
-            if not output:
+            if not output or not input_cmds:
                 continue
             out_name, out = output
             for cmd in input_cmds:
