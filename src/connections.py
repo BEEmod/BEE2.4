@@ -44,6 +44,16 @@ class ConnType(Enum):
     BOTH = 'both'  # Trigger both simultaneously.
 
 
+CONN_TYPE_NAMES = {
+    'none': ConnType.DEFAULT,
+    'a': ConnType.PRIMARY,
+    'b': ConnType.SECONDARY,
+    'ab': ConnType.BOTH,
+}  # type: Dict[str, ConnType]
+
+CONN_TYPE_NAMES.update(ConnType._value2member_map_)
+
+
 class InputType(Enum):
     """Indicates the kind of input behaviour to use."""
     # Normal PeTI, pass activate/deactivate via proxy.
@@ -250,10 +260,10 @@ class ItemType:
             sec_disable_cmd = get_outputs('sec_disable_cmd')
 
             try:
-                default_dual = ConnType(
+                default_dual = CONN_TYPE_NAMES[
                     conf['default_dual', 'default'].casefold()
-                )
-            except ValueError:
+                ]
+            except KeyError:
                 raise ValueError('Invalid default type for "{}": {}'.format(
                     item_id, conf['default_dual'],
                 )) from None
@@ -265,10 +275,10 @@ class ItemType:
             default_dual = sec_invert_var = None
 
         try:
-            output_type = ConnType(
+            output_type = CONN_TYPE_NAMES[
                 conf['DualType', 'default'].casefold()
-            )
-        except ValueError:
+            ]
+        except KeyError:
             raise ValueError('Invalid output affinity for "{}": {}'.format(
                 item_id, conf['DualType'],
             )) from None
