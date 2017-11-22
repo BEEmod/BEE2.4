@@ -1128,11 +1128,18 @@ def generate_fizzlers(vmf: VMF):
 
                 # Non-singular or not generated yet - make the entity.
                 if brush_ent is None:
-                    brush_ent = Entity(vmf, keys=brush_type.keys)
-                    vmf.add_ent(brush_ent)
+                    brush_ent = vmf.create_ent(classname='func_brush')
+
+                    for key_name, key_value in brush_type.keys.items():
+                        brush_ent[key_name] = conditions.resolve_value(fizz.base_inst, key_value)
 
                     for key_name, key_value in brush_type.local_keys.items():
-                        brush_ent[key_name] = conditions.local_name(fizz.base_inst, key_value)
+                        brush_ent[key_name] = conditions.local_name(
+                            fizz.base_inst, conditions.resolve_value(
+                                fizz.base_inst, key_value,
+                            )
+                        )
+
                     brush_ent['targetname'] = conditions.local_name(
                         fizz.base_inst, brush_type.name,
                     )
