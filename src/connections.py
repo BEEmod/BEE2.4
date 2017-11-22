@@ -990,7 +990,7 @@ def add_item_indicators(
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name
         # Ensure only one gets the indicator name.
         elif first_inst and inst_type is PanelSwitchingStyle.INTERNAL:
-            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name
+            pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ant_name if has_ant else ' '
             first_inst = False
         else:
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ' '
