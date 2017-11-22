@@ -49,6 +49,7 @@ CONN_TYPE_NAMES = {
     'a': ConnType.PRIMARY,
     'b': ConnType.SECONDARY,
     'ab': ConnType.BOTH,
+    'a+b': ConnType.BOTH,
 }  # type: Dict[str, ConnType]
 
 CONN_TYPE_NAMES.update(ConnType._value2member_map_)
@@ -100,7 +101,7 @@ class OutNames(str, Enum):
 
 
 CONN_NAMES = {
-    ConnType.DEFAULT: '',
+    ConnType.DEFAULT: 'DEF',
     ConnType.PRIMARY: 'A',
     ConnType.SECONDARY: 'B',
     ConnType.BOTH: 'A+B',
@@ -261,11 +262,11 @@ class ItemType:
 
             try:
                 default_dual = CONN_TYPE_NAMES[
-                    conf['default_dual', 'default'].casefold()
+                    conf['DefaultDual', 'default'].casefold()
                 ]
             except KeyError:
                 raise ValueError('Invalid default type for "{}": {}'.format(
-                    item_id, conf['default_dual'],
+                    item_id, conf['DefaultDual'],
                 )) from None
 
             sec_invert_var = conf['sec_invertVar', '0']
@@ -730,7 +731,6 @@ def gen_item_outputs(vmf: VMF):
     # After here, all connections are primary or secondary only.
     for item in ITEMS.values():
         for conn in item.outputs:
-            LOGGER.info('{}: {} -> {}({})', item.name, item.item_type.output_type, conn.to_item, conn.to_item.item_type.input_type)
             # If not a dual item, it's primary.
             if conn.to_item.item_type.input_type is not InputType.DUAL:
                 conn.type = ConnType.PRIMARY
