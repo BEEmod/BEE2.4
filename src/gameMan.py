@@ -883,6 +883,17 @@ class Game:
 
             if inp_type == 'dual':
                 has_secondary = True
+            elif inp_type == 'daisychain':
+                # We specify this.
+                if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
+                    LOGGER.warning(
+                        'DAISYCHAIN items cannot have inputs specified.'
+                    )
+                has_input = True
+                if not has_output:
+                    LOGGER.warning(
+                        'DAISYCHAIN items need an output to make sense!'
+                    )
             elif inp_type.endswith('_logic'):
                 if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                     LOGGER.warning(

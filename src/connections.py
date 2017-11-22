@@ -216,7 +216,7 @@ class ItemType:
         # If DEFAULT, we use the value on the target item.
         self.output_type = output_type
 
-        # inst_name, output commands for outputs.
+        # (inst_name, output) commands for outputs.
         # If they are None, it's not used.
 
         # Logic items have preset ones of these from the counter.
@@ -226,7 +226,7 @@ class ItemType:
         elif input_type is InputType.OR_LOGIC:
             self.output_act = (None, COUNTER_OR_ON)
             self.output_deact = (None, COUNTER_OR_OFF)
-        else:
+        else:  # Other types use the specified ones.
             self.output_act = output_act
             self.output_deact = output_deact
 
@@ -359,6 +359,20 @@ class Item:
     def name(self, name: str):
         """Set the targetname of the item."""
         self.inst['targetname'] = name
+
+    def output_act(self) -> Optional[Tuple[Optional[str], str]]:
+        """Return the output to use when activating this."""
+        if self.item_type.input_type is InputType.DAISYCHAIN:
+            if self.inputs:
+                return None, COUNTER_AND_ON
+        return self.item_type.output_act
+
+    def output_deact(self) -> Optional[Tuple[Optional[str], str]]:
+        """Return the output to use when deactivating this."""
+        if self.item_type.input_type is InputType.DAISYCHAIN:
+            if self.inputs:
+                return None, COUNTER_AND_OFF
+        return self.item_type.output_deact
 
 
 class Connection:
@@ -822,8 +836,8 @@ def add_item_inputs(
         for conn in inputs:
             inp_item = conn.from_item
             for output, input_cmds in [
-                (inp_item.item_type.output_act, enable_cmd),
-                (inp_item.item_type.output_deact, disable_cmd)
+                (inp_item.output_act(), enable_cmd),
+                (inp_item.output_deact(), disable_cmd)
             ]:
                 if not output or not input_cmds:
                     continue
@@ -840,6 +854,65 @@ def add_item_inputs(
                         )
                     )
         return
+    elif logic_type is InputType.DAISYCHAIN:
+        # Another special case, these items AND themselves with their inputs.
+        # We aren't called if we have no inputs, so we don't need to handle that.
+
+        # We transform the instance into a counter, but first duplicate the
+        # instance as a new entity. This way references to the instance add
+        # outputs to the counter instead.
+        orig_inst = item.inst.copy()
+        orig_inst.map.add_ent(orig_inst)
+        orig_inst.outputs.clear()
+
+        counter = item.inst
+        counter.clear_keys()
+
+        counter['origin'] = orig_inst['origin']
+        counter['targetname'] = conditions.local_name(orig_inst, 'counter')
+        counter['classname'] = 'math_counter'
+        counter['min'] = 0
+        counter['max'] = len(inputs) + 1
+
+        for output, input_name in [
+            (item.item_type.output_act, 'Add'),
+            (item.item_type.output_deact, 'Subtract')
+        ]:
+            if not output:
+                continue
+
+            out_name, out_cmd = output
+            orig_inst.add_out(
+                Output(
+                    out_cmd,
+                    counter,
+                    input_name,
+                    '1',
+                    inst_out=out_name,
+                )
+            )
+
+        for conn in inputs:
+            inp_item = conn.from_item
+            for output, input_name in [
+                (inp_item.output_act(), 'Add'),
+                (inp_item.output_deact(), 'Subtract')
+            ]:
+                if not output:
+                    continue
+
+                out_name, out_cmd = output
+                inp_item.inst.add_out(
+                    Output(
+                        out_cmd,
+                        counter,
+                        input_name,
+                        '1',
+                        inst_out=out_name,
+                    )
+                )
+
+        return
 
     is_inverted = conv_bool(conditions.resolve_value(
         item.inst,
@@ -849,10 +922,7 @@ def add_item_inputs(
     if is_inverted:
         enable_cmd, disable_cmd = disable_cmd, enable_cmd
 
-    if logic_type is InputType.DAISYCHAIN:
-        needs_counter = True
-    else:
-        needs_counter = len(inputs) > 1
+    needs_counter = len(inputs) > 1
 
     if logic_type.is_logic:
         origin = item.inst['origin']
@@ -885,8 +955,8 @@ def add_item_inputs(
         for conn in inputs:
             inp_item = conn.from_item
             for output, input_name in [
-                (inp_item.item_type.output_act, 'Add'),
-                (inp_item.item_type.output_deact, 'Subtract')
+                (inp_item.output_act(), 'Add'),
+                (inp_item.output_deact(), 'Subtract')
             ]:
                 if not output:
                     continue
@@ -913,9 +983,6 @@ def add_item_inputs(
             # counter is item.inst, so those are added to that.
             LOGGER.info('LOGIC counter: {}', counter['targetname'])
             return
-        elif logic_type.DAISYCHAIN:
-            # Todo
-            return
         else:
             # Should never happen, not other types.
             raise ValueError('Unknown counter logic type: ' + repr(logic_type))
@@ -941,8 +1008,8 @@ def add_item_inputs(
         for conn in inputs:
             inp_item = conn.from_item
             for output, input_cmds in [
-                (inp_item.item_type.output_act, enable_cmd),
-                (inp_item.item_type.output_deact, disable_cmd)
+                (inp_item.output_act(), enable_cmd),
+                (inp_item.output_deact(), disable_cmd)
             ]:
                 if not output or not input_cmds:
                     continue
@@ -996,8 +1063,8 @@ def add_item_indicators(
             pan.fixup[const.FixupVars.TOGGLE_OVERLAY] = ' '
 
         for output, input_cmds in [
-            (item.item_type.output_act, pan_item.enable_cmd),
-            (item.item_type.output_deact, pan_item.disable_cmd)
+            (item.output_act(), pan_item.enable_cmd),
+            (item.output_deact(), pan_item.disable_cmd)
         ]:
             if not output or not input_cmds:
                 continue
@@ -1022,8 +1089,8 @@ def add_item_indicators(
             target=ant_name,
         )
         for output, skin in [
-            (item.item_type.output_act, 1),
-            (item.item_type.output_deact, 0)
+            (item.output_act(), 1),
+            (item.output_deact(), 0)
         ]:
             if not output:
                 continue
