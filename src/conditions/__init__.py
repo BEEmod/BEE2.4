@@ -947,10 +947,20 @@ def resolve_value(inst: Entity, value: str):
     """If a value starts with '$', lookup the associated var.
 
     Non-string values are passed through unchanged.
+    If it starts with '!' (before '$'), invert boolean values.
     """
-    if isinstance(value, str) and value.startswith('$'):
+    if not isinstance(value, str):
+        return value
+
+    if value.startswith('!'):
+        inverted = True
+        value = value[1:]
+    else:
+        inverted = False
+
+    if value.startswith('$'):
         if value in inst.fixup:
-            return inst.fixup[value]
+            value = inst.fixup[value]
         else:
             LOGGER.warning(
                 'Invalid fixup ({}) in the "{}" instance:\n{}\n{}',
@@ -959,7 +969,9 @@ def resolve_value(inst: Entity, value: str):
                 inst,
                 inst.fixup._fixup
             )
-            return ''
+            value = ''
+    if inverted:
+        return srctools.bool_as_int(not srctools.conv_bool(value))
     else:
         return value
 
