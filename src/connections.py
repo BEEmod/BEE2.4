@@ -768,12 +768,12 @@ def gen_item_outputs(vmf: VMF):
             prim_inputs = [
                 conn
                 for conn in item.inputs
-                if conn.type is ConnType.PRIMARY
+                if conn.type is ConnType.PRIMARY or conn.type is ConnType.BOTH
             ]
             sec_inputs = [
                 conn
                 for conn in item.inputs
-                if conn.type is ConnType.SECONDARY
+                if conn.type is ConnType.SECONDARY or conn.type is ConnType.BOTH
             ]
             add_item_inputs(
                 item,
