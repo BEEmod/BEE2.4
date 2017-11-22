@@ -898,6 +898,16 @@ class Game:
             elif 'out_activate' in output_conf or 'out_deactivate' in output_conf:
                 has_output = True
 
+            if item_id.casefold() in (
+                'item_indicator_panel',
+                'item_indicator_panel_timer',
+                'item_indicator_toggle',
+            ):
+                # Force the antline instances to have inputs, so we can specify
+                # the real instance doesn't. We need the fake ones to match
+                # instances to items.
+                has_input = True
+
             comm_block += input_conf
             comm_block += output_conf
 
