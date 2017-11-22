@@ -6,7 +6,7 @@ the outputs with optimisations and custom settings.
 from enum import Enum
 from collections import defaultdict
 
-from srctools import VMF, Entity, Output, Property, conv_bool
+from srctools import VMF, Entity, Output, Property, conv_bool, Vec
 import comp_consts as const
 import instanceLocs
 import conditions
@@ -408,6 +408,27 @@ class Connection:
         item.outputs.add(self)
 
 
+def collapse_item(item: Item):
+    """Remove an item with a single input, transferring all IO."""
+    try:
+        [input_conn] = item.inputs  # type: Connection
+        input_item = input_conn.from_item  # type: Item
+    except ValueError:
+        raise ValueError('Too many inputs for "{}"!'.format(item.name))
+
+    input_conn.remove()
+
+    input_item.antlines |= item.antlines
+    input_item.ind_panels |= item.ind_panels
+
+    item.antlines.clear()
+    item.ind_panels.clear()
+
+    for conn in list(item.outputs):
+        conn.from_item = input_item
+
+    del ITEMS[item.name]
+    item.inst.remove()
 
 
 def read_configs(conf: Property):
@@ -631,8 +652,57 @@ def res_change_io_type(inst: Entity, res: Property):
     item.item_type = res.value
 
 
+def do_item_optimisation(vmf: VMF):
+    """Optimise redundant logic items."""
+    needs_global_toggle = False
+
+    for item in list(ITEMS.values()):
+        # We can't remove items that have functionality, or don't have IO.
+        if item.item_type is None or not item.item_type.input_type.is_logic:
+            continue
+
+        prim_inverted = conv_bool(conditions.resolve_value(
+            item.inst,
+            item.item_type.invert_var,
+        ))
+
+        sec_inverted = conv_bool(conditions.resolve_value(
+            item.inst,
+            item.item_type.sec_invert_var,
+        ))
+
+        # Don't optimise if inverted.
+        if prim_inverted or sec_inverted:
+            continue
+        inp_count = len(item.inputs)
+        if inp_count == 0:
+            # Totally useless, remove.
+            # We just leave the panel entities, and tie all the antlines
+            # to the same toggle.
+            needs_global_toggle = True
+            for ent in item.antlines:
+                ent['targetname'] = '_static_ind'
+
+            del ITEMS[item.name]
+            item.inst.remove()
+        elif inp_count == 1:
+            # Only one input, so AND or OR are useless.
+            # Transfer input item to point to the output(s).
+            collapse_item(item)
+
+    # The antlines need a toggle entity, otherwise they'll copy random other
+    # overlays.
+    if needs_global_toggle:
+        vmf.create_ent(
+            classname='env_texturetoggle',
+            origin=vbsp_options.get(Vec, 'global_ents_loc'),
+            targetname='_static_ind_tog',
+            target='_static_ind',
+        )
+
+
 @conditions.meta_cond(-250, only_once=True)
-def gen_item_outputs():
+def gen_item_outputs(vmf: VMF):
     """Create outputs for all items with connections.
 
     This performs an optimization pass over items with outputs to remove
@@ -646,11 +716,14 @@ def gen_item_outputs():
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
-    # todo: Optimisation here.
+    do_item_optimisation(vmf)
 
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
+        if item.item_type is None:
+            continue
+
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
             if item.timer is None:
@@ -917,7 +990,7 @@ def add_item_indicators(
     if needs_toggle:
         toggle = item.inst.map.create_ent(
             classname='env_texturetoggle',
-            origin=item.inst['origin'],
+            origin=Vec.from_str(item.inst['origin']) + (0, 0, 16),
             targetname='toggle_' + item.name,
             target=ant_name,
         )
