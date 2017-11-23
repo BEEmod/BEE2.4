@@ -851,6 +851,7 @@ def add_item_inputs(
                             cmd.input,
                             inst_out=out_name,
                             inst_in=cmd.inst_in,
+                            delay=cmd.delay,
                         )
                     )
         return
@@ -1000,6 +1001,7 @@ def add_item_inputs(
                         conditions.local_name(item.inst, cmd.target) or item.inst,
                         cmd.input,
                         cmd.params,
+                        delay=cmd.delay,
                         times=cmd.times,
                     )
                 )
@@ -1023,6 +1025,7 @@ def add_item_inputs(
                             cmd.input,
                             cmd.params,
                             inst_out=out_name,
+                            delay=cmd.delay,
                             times=cmd.times,
                         )
                     )
