@@ -1,6 +1,6 @@
 """Results for custom fizzlers."""
 import utils
-from conditions import make_result, remove_ant_toggle
+from conditions import make_result, make_flag, remove_ant_toggle
 import connections
 from srctools import Property, Entity, Vec, VMF
 import fizzler
@@ -8,6 +8,16 @@ import fizzler
 COND_MOD_NAME = 'Fizzlers'
 
 LOGGER = utils.getLogger(__name__, alias='cond.fizzler')
+
+
+@make_flag('FizzlerType')
+def flag_fizz_type(inst: Entity, flag: Property):
+    """Check if a fizzler is the specified type name."""
+    try:
+        fizz = fizzler.FIZZLERS[inst['targetname']]
+    except KeyError:
+        return False
+    return fizz.fizz_type.id.casefold() == flag.value.casefold()
 
 
 @make_result('ChangeFizzlerType')
