@@ -343,7 +343,10 @@ class Item:
         assert self.name, 'Blank name!'
 
     def __repr__(self):
-        return '<Item {}: "{}">'.format(self.item_type.id, self.name)
+        if self.item_type is None:
+            return '<Item (NO IO): "{}">'.format(self.name)
+        else:
+            return '<Item {}: "{}">'.format(self.item_type.id, self.name)
 
     @property
     def traits(self):
