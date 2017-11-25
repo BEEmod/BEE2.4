@@ -1,9 +1,9 @@
 """Results for custom fizzlers."""
-import utils
-from conditions import make_result, make_flag, remove_ant_toggle
-import connections
+from conditions import make_result, make_flag
 from srctools import Property, Entity, Vec, VMF
+import connections
 import fizzler
+import utils
 
 COND_MOD_NAME = 'Fizzlers'
 
@@ -49,20 +49,30 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
     are fired.
     """
     shape_name = shape_inst['targetname']
-    shape_item = connections.ITEMS[shape_name]
+    shape_item = connections.ITEMS.pop(shape_name)
 
     for conn in shape_item.outputs:
-        fizz_name = conn.inp.name
+        fizz_item = conn.from_item
         try:
-            fizz = fizzler.FIZZLERS[fizz_name]
+            fizz = fizzler.FIZZLERS[fizz_item.name]
         except KeyError:
             LOGGER.warning('Reshaping fizzler with non-fizzler output! Ignoring!')
             continue
         break
     else:
-        # No fizzler - create one.
+        # No fizzler, so generate a default.
+        # We create the fizzer instance, Fizzler object, and Item object
+        # matching it.
         conn = None
-        fizz_type = fizzler.FIZZ_TYPES[res['default']]
+        try:
+            fizz_type = fizzler.FIZZ_TYPES[res['default']]
+        except KeyError:
+            LOGGER.error(
+                'Fizzler shape needs a valid default '
+                'item type, not "{}"!',
+                res['default']
+            )
+            return
         base_inst = vmf.create_ent(
             targetname=shape_name,
             classname='func_instance',
@@ -76,12 +86,22 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             base_inst,
             [],
         )
+        fizz_item = connections.Item(
+            base_inst,
+            connections.ITEM_TYPES.get(res['default'], None),
+        )
+        connections.ITEMS[shape_name] = fizz_item
 
     # Detach this connection and remove traces of it.
     if conn:
         conn.remove()
-        if shape_item.ind_toggle:
-            remove_ant_toggle(shape_item.ind_toggle)
+    for coll in [shape_item.antlines, shape_item.ind_panels, shape_item.shape_signs]:
+        for ent in coll:
+            ent.remove()
+        coll.clear()
+
+    for inp in list(shape_item.inputs):
+        inp.to_item = fizz_item
 
     fizz_base = fizz.base_inst
     fizz_base['origin'] = shape_inst['origin']

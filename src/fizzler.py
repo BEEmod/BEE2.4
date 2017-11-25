@@ -7,6 +7,7 @@ import itertools
 from enum import Enum
 
 import conditions
+import connections
 import utils
 import vbsp_options
 from srctools import Output, Vec, VMF, Solid, Entity, Side, Property, NoKeyError
@@ -154,8 +155,6 @@ class FizzlerType:
         pack_lists_static: Set[str],
         model_local_name: str,
         model_name_type: ModelName,
-        out_activate: Optional[Tuple[Optional[str], str]],
-        out_deactivate: Optional[Tuple[Optional[str], str]],
         brushes: List['FizzlerBrush'],
         inst: Dict[Tuple[FizzInst, bool], List[str]],
 
@@ -185,10 +184,6 @@ class FizzlerType:
         self.model_name = model_local_name
         # Instances to use - FizzInst, is_static -> list of instances.
         self.inst = inst
-
-        # If set, outputs to use via the fizzler output relay.
-        self.out_deactivate = out_deactivate
-        self.out_activate = out_activate
 
         # If set, add a brush ent using templates.
         self.temp_single = temp_single
@@ -250,16 +245,6 @@ class FizzlerType:
             else:
                 voice_attrs.append(prop.value.casefold())
 
-
-
-        out_activate = conf['OutActivate', None]
-        if out_activate is not None:
-            out_activate = Output.parse_name(out_activate)
-
-        out_deactivate = conf['OutDeactivate', None]
-        if out_deactivate is not None:
-            out_deactivate = Output.parse_name(out_deactivate)
-
         pack_lists = {
             prop.value
             for prop in
@@ -300,8 +285,6 @@ class FizzlerType:
             pack_lists_static,
             model_local_name,
             model_name_type,
-            out_activate,
-            out_deactivate,
             brushes,
             inst,
             temp_brush_keys,
@@ -775,6 +758,7 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
 
     Instance traits are required.
     The model instances and brushes will be removed from the map.
+    Needs connections to be parsed.
     """
 
     # Item ID and model skin -> fizzler type
@@ -891,42 +875,47 @@ def parse_map(vmf: VMF, voice_attrs: Dict[str, bool], pack_list: Set[str]):
             brush.remove()
 
     # Check for fizzler output relays.
-    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>')
+    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
     if not relay_file:
         # No relay item - deactivated most likely.
         return
 
     for inst in vmf.by_class['func_instance']:
-        filename = inst['file'].casefold()
-
-        if filename not in relay_file:
+        if inst['file'].casefold() not in relay_file:
             continue
 
         inst.remove()
+
+        relay_item = connections.ITEMS[inst['targetname']]
 
         try:
             fizz_name = fizz_pos[
                 Vec.from_str(inst['origin']).as_tuple(),
                 Vec(0, 0, 1).rotate_by_str(inst['angles']).as_tuple()
             ]
+            fizz_item = connections.ITEMS[fizz_name]
         except KeyError:
-            # Not placed on a fizzler...
+            # Not placed on a fizzler, or a fizzler with no IO
+            # - ignore, and destroy.
+            for out in list(relay_item.outputs):
+                out.remove()
+            for out in list(relay_item.inputs):
+                out.remove()
+            del connections.ITEMS[relay_item.name]
             continue
-        fizz = FIZZLERS[fizz_name]
 
-        # Copy over fixup values
-        fizz.base_inst.fixup.update(inst.fixup)
+        # Copy over the timer delay set in the relay.
+        fizz_item.timer = relay_item.timer
+        # Transfer over antlines.
+        fizz_item.antlines |= relay_item.antlines
+        fizz_item.shape_signs |= relay_item.shape_signs
+        fizz_item.ind_panels |= relay_item.ind_panels
 
-        for out in inst.outputs:
-            new_out = out.copy()
-            if out.output == 'ON' and fizz.fizz_type.out_activate is not None:
-                new_out.inst_out, new_out.output = fizz.fizz_type.out_activate
-            elif out.output == 'OFF' and fizz.fizz_type.out_deactivate is not None:
-                new_out.inst_out, new_out.output = fizz.fizz_type.out_deactivate
-            else:
-                # Not the marker's output somehow?
-                continue
-            fizz.base_inst.add_out(new_out)
+        # Remove the relay item so it doesn't get added to the map.
+        del connections.ITEMS[relay_item.name]
+
+        for conn in list(relay_item.outputs):
+            conn.from_item = fizz_item
 
 
 @conditions.meta_cond(priority=500, only_once=True)
