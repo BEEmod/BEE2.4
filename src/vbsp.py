@@ -197,11 +197,6 @@ TO_PACK = set()  # The packlists we want to pack.
 PACK_FILES = set()  # Raw files we force pack
 PACK_RENAME = {}  # Files to pack under a different name (key=new, val=original)
 
-# Names initially assigned to toggles and panels.
-IND_TOGGLE_NAMES = set()
-IND_PANEL_NAMES = set()
-IND_ITEM_NAMES = set() # And both combined
-
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 ##################
@@ -1286,9 +1281,6 @@ def get_map_info():
     file_sp_door_frame = instanceLocs.get_special_inst('door_frame_sp')
     file_coop_door_frame = instanceLocs.get_special_inst('door_frame_coop')
 
-    file_ind_panel = instanceLocs.get_special_inst('indpan')
-    file_ind_toggle = instanceLocs.get_special_inst('indtoggle')
-
     # Should we force the player to spawn in the elevator?
     elev_override = BEE2_config.get_bool('General', 'spawn_elev')
 
@@ -1405,13 +1397,6 @@ def get_map_info():
         elif file in file_coop_door_frame:
             # The coop frame must be the exit door...
             exit_door_frame = item
-        # Record the names of toggle or indicator panel instances.
-        elif file in file_ind_panel:
-            IND_PANEL_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
-        elif file in file_ind_toggle:
-            IND_TOGGLE_NAMES.add(item['targetname'])
-            IND_ITEM_NAMES.add(item['targetname'])
 
         inst_files.add(item['file'])
 
