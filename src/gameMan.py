@@ -844,19 +844,21 @@ class Game:
             try:
                 [input_conf] = item.find_all('Exporting', 'Inputs', 'BEE2')
             except ValueError:
-                input_conf = Property(None, [])
+                pass
             else:
                 input_conf = input_conf.copy()
                 input_conf.name = None
+                comm_block += input_conf
 
             try:
                 [output_conf] = item.find_all('Exporting', 'Outputs', 'BEE2')
                 output_conf.name = None
             except ValueError:
-                output_conf = Property(None, [])
+                pass
             else:
                 output_conf = output_conf.copy()
                 output_conf.name = None
+                comm_block += output_conf
 
             for block in item.find_all('Exporting', 'Inputs', CONN_NORM):
                 has_input = True
@@ -876,16 +878,16 @@ class Game:
                     conv_peti_input('sec_enable_cmd', 'activate')
                     conv_peti_input('sec_disable_cmd', 'deactivate')
 
-            if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
+            if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
                 has_input = True
 
-            inp_type = input_conf['type', ''].casefold()
+            inp_type = comm_block['type', ''].casefold()
 
             if inp_type == 'dual':
                 has_secondary = True
             elif inp_type == 'daisychain':
                 # We specify this.
-                if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
+                if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
                     LOGGER.warning(
                         'DAISYCHAIN items cannot have inputs specified.'
                     )
@@ -895,18 +897,18 @@ class Game:
                         'DAISYCHAIN items need an output to make sense!'
                     )
             elif inp_type.endswith('_logic'):
-                if 'out_activate' in output_conf or 'out_deactivate' in output_conf:
+                if 'out_activate' in comm_block or 'out_deactivate' in comm_block:
                     LOGGER.warning(
                         'AND_LOGIC or OR_LOGIC items cannot '
                         'have outputs specified.'
                     )
-                if 'enable_cmd' in input_conf or 'disable_cmd' in input_conf:
+                if 'enable_cmd' in comm_block or 'disable_cmd' in comm_block:
                     LOGGER.warning(
                         'AND_LOGIC or OR_LOGIC items cannot '
                         'have inputs specified.'
                     )
                 has_input = has_output = True
-            elif 'out_activate' in output_conf or 'out_deactivate' in output_conf:
+            elif 'out_activate' in comm_block or 'out_deactivate' in comm_block:
                 has_output = True
 
             if item_id.casefold() in (
@@ -918,9 +920,6 @@ class Game:
                 # the real instance doesn't. We need the fake ones to match
                 # instances to items.
                 has_input = True
-
-            comm_block += input_conf
-            comm_block += output_conf
 
             # Remove all the IO blocks from editoritems, and replace with
             # dummy ones.
