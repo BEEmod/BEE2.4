@@ -1019,6 +1019,22 @@ class ItemVariant:
         for key, prop in sorted(inst_children.items(), key=operator.itemgetter(0)):
             instances.append(prop)
 
+        # Override IO commands.
+        if 'IOConf' in props:
+            for io_block in variant.editor.find_children('Exporting'):
+                if io_block.name not in ('outputs', 'inputs'):
+                    continue
+                while 'bee2' in io_block:
+                    del io_block['bee2']
+
+            io_conf = props.find_key('IOConf')
+            io_conf.name = 'BEE2'
+            (variant.editor.
+                ensure_exists('Exporting').
+                ensure_exists('Inputs').
+                append(io_conf)
+            )
+
         return variant
 
     @staticmethod
