@@ -175,20 +175,20 @@ class ItemType:
     def __init__(
         self,
         id: str,
-        default_dual: ConnType,
-        input_type: InputType,
+        default_dual: ConnType=ConnType.DEFAULT,
+        input_type: InputType=InputType.DEFAULT,
 
-        invert_var: str,
-        enable_cmd: List[Output],
-        disable_cmd: List[Output],
+        invert_var: str='0',
+        enable_cmd: List[Output]=(),
+        disable_cmd: List[Output]=(),
 
-        sec_invert_var: str,
-        sec_enable_cmd: List[Output],
-        sec_disable_cmd: List[Output],
+        sec_invert_var: str='0',
+        sec_enable_cmd: List[Output]=(),
+        sec_disable_cmd: List[Output]=(),
 
-        output_type: ConnType,
-        output_act: Optional[Tuple[Optional[str], str]],
-        output_deact: Optional[Tuple[Optional[str], str]],
+        output_type: ConnType=ConnType.DEFAULT,
+        output_act: Optional[Tuple[Optional[str], str]]=None,
+        output_deact: Optional[Tuple[Optional[str], str]]=None,
     ):
         self.id = id
 
@@ -199,8 +199,8 @@ class ItemType:
         self.invert_var = invert_var
 
         # IO commands for enabling/disabling the item.
-        self.enable_cmd = enable_cmd
-        self.disable_cmd = disable_cmd
+        self.enable_cmd = list(enable_cmd)
+        self.disable_cmd = list(disable_cmd)
 
         # If no A/B type is set on the input, use this type.
         # Set to None to indicate no secondary is present.
@@ -208,8 +208,8 @@ class ItemType:
 
         # Same for secondary items.
         self.sec_invert_var = sec_invert_var
-        self.sec_enable_cmd = sec_enable_cmd
-        self.sec_disable_cmd = sec_disable_cmd
+        self.sec_enable_cmd = list(sec_enable_cmd)
+        self.sec_disable_cmd = list(sec_disable_cmd)
 
         # Sets the affinity used for outputs from this item - makes the
         # Input A/B converter items work.
