@@ -227,8 +227,17 @@ class ItemType:
             self.output_act = (None, COUNTER_OR_ON)
             self.output_deact = (None, COUNTER_OR_OFF)
         else:  # Other types use the specified ones.
-            self.output_act = output_act
-            self.output_deact = output_deact
+            # Allow passing in an output with a blank command, to indicate
+            # no outputs.
+            if output_act == (None, ''):
+                self.output_act = None
+            else:
+                self.output_act = output_act
+
+            if output_deact == (None, ''):
+                self.output_deact = None
+            else:
+                self.output_deact = output_deact
 
     @staticmethod
     def parse(item_id: str, conf: Property):
