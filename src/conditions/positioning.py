@@ -151,6 +151,8 @@ def flag_blockpos_type(inst: Entity, flag: Property):
     If the value is single value, that should be the type.
     Otherwise, the value should be a block with 'offset' and 'type' values.
     The offset is in block increments, with 0 0 0 equal to the mounting surface.
+    If 'offset2' is also provided, all positions in the bounding box will
+    be checked.
 
     The type should be a space-seperated list of locations:
     * `VOID` (Outside the map)
@@ -169,26 +171,45 @@ def flag_blockpos_type(inst: Entity, flag: Property):
       * `GOO_MID`
       * `GOO_BOTTOM` (floor)
     """
+    pos2 = None
+
     if flag.has_children():
-        pos = flag.vec('offset') * 128
+        pos1 = flag.vec('offset') * 128
         types = flag['type'].split()
+        if 'offset2' in flag:
+            pos2 = flag.vec('offset2') * 128
     else:
         types = flag.value.split()
-        pos = Vec()
-    pos.z -= 128
-    pos.localise(
+        pos1 = Vec()
+
+    pos1.z -= 128
+    pos1.localise(
         Vec.from_str(inst['origin']),
         Vec.from_str(inst['angles']),
     )
-    block = brushLoc.POS['world': pos]
-    for block_type in types:
-        try:
-            allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
-        except KeyError:
-            raise ValueError('"{}" is not a valid block type!'.format(block_type))
-        if block in allowed:
-            return True
-    return False
+
+    if pos2 is not None:
+        pos2.z -= 128
+        pos2.localise(
+            Vec.from_str(inst['origin']),
+            Vec.from_str(inst['angles']),
+        )
+        bbox = Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128)
+    else:
+        bbox = [pos1]
+
+    for pos in bbox:
+        block = brushLoc.POS['world': pos]
+        for block_type in types:
+            try:
+                allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
+            except KeyError:
+                raise ValueError('"{}" is not a valid block type!'.format(block_type))
+            if block in allowed:
+                break  # To next position
+        else:
+            return False  # Didn't match any in this list.
+    return True  # Matched all positions.
 
 
 @make_result('SetBlock')
