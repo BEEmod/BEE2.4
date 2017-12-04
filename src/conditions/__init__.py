@@ -320,6 +320,8 @@ def annotation_caller(func, *parms):
     sig = inspect.signature(func)
     for parm in sig.parameters.values():
         ann = parm.annotation
+        if isinstance(ann, str):
+            ann = eval(ann)
         if parm.kind not in allowed_kinds:
             raise ValueError('Parameter kind "{}" is not allowed!'.format(parm.kind))
         if ann is inspect.Parameter.empty:
