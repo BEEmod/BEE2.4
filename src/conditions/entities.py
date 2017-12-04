@@ -160,7 +160,7 @@ def res_water_splash_setup(res: Property):
 
 
 @make_result('WaterSplash')
-def res_water_splash(inst: Entity, res: Property):
+def res_water_splash(vmf: VMF, inst: Entity, res: Property):
     """Creates splashes when something goes in and out of water.
 
     Arguments:
@@ -219,13 +219,6 @@ def res_water_splash(inst: Entity, res: Property):
     pos1.localise(origin, angles)
     pos2.localise(origin, angles)
 
-    conditions.VMF.create_ent(
-        classname='env_beam',
-        targetname=conditions.local_name(inst, name + '_pos'),
-        origin=str(pos1),
-        targetpoint=str(pos2),
-    )
-
     # Since it's a straight line and you can't go through walls,
     # if pos1 and pos2 aren't in goo we aren't ever in goo.
 
@@ -271,7 +264,7 @@ def res_water_splash(inst: Entity, res: Property):
         'f' if fast_check else 's',
     )
 
-    conditions.VMF.create_ent(
+    vmf.create_ent(
         classname='env_splash',
         targetname=conditions.local_name(inst, name) + enc_data,
         parentname=conditions.local_name(inst, parent),

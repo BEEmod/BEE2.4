@@ -5,7 +5,7 @@ from conditions import (
     DIRECTIONS, SOLIDS, GOO_LOCS,
 )
 import brushLoc
-from srctools import Vec, Entity, Property
+from srctools import Vec, Entity, Property, VMF
 import srctools
 
 COND_MOD_NAME = 'Positioning'
@@ -64,7 +64,7 @@ def flag_angles(inst: Entity, flag: Property):
 
 
 @make_flag('posIsSolid')
-def flag_brush_at_loc(inst: Entity, flag: Property):
+def flag_brush_at_loc(vmf: VMF, inst: Entity, flag: Property):
     """Checks to see if a wall is present at the given location.
 
     - `Pos` is the position of the brush, where `0 0 0` is the floor-position
@@ -83,7 +83,6 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
       Only do this to `EmbedFace` brushes, since it will remove the other
       sides as well.
     """
-    from conditions import VMF
     pos = Vec.from_str(flag['pos', '0 0 0'])
     pos.z -= 64  # Subtract so origin is the floor-position
     pos = pos.rotate_by_str(inst['angles', '0 0 0'])
@@ -115,7 +114,7 @@ def flag_brush_at_loc(inst: Entity, flag: Property):
     else:
         br_type = str(brush.color)
         if should_remove:
-            VMF.remove_brush(
+            vmf.remove_brush(
                 brush.solid,
             )
 
