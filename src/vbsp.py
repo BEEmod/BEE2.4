@@ -964,7 +964,24 @@ def set_player_portalgun():
             pgun_script['Template01'] = '__pgun_template'
             pgun_script['spawnflags'] = 2
         else:
+            # In coop we have not need to actually spawn portalguns.
             pgun_script['classname'] = 'logic_script'
+
+            # For Absolute Fizzler or otherwise, this fizzles portals on a
+            # player remotely.
+            cleanser = VMF.create_ent(
+                classname='trigger_portal_cleanser',
+                targetname='__pgun_cleanser',
+                parentname=pgun_script['targetname'],
+                origin=ent_pos,
+                startdisabled=0,
+                visible=0,
+                spawnflags=1,  # Clients only.
+            )
+            cleanser.solids.append(VMF.make_prism(
+                ent_pos - 4, ent_pos + 4,
+                mat=consts.Tools.TRIGGER,
+            ).solid)
 
         # For removing portalguns from players.
         trig_stripper = VMF.create_ent(
