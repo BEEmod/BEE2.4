@@ -1,5 +1,7 @@
 """The result used to generate unstationary scaffolds."""
 import math
+from typing import Tuple, Any, Dict
+
 from enum import Enum
 
 import instanceLocs
@@ -33,6 +35,33 @@ def scaff_scan(inst_list, start_ent):
         cur_ent = inst_list.get(cur_ent['next'], None)
         if cur_ent is None:
             return
+
+
+def get_config(
+    node: item_chain.Node,
+) -> Tuple[str, Vec]:
+    """Compute the config values for a node."""
+
+    orient = (
+        'floor' if
+        Vec(0, 0, 1).rotate_by_str(node.inst['angles']) == (0, 0, 1)
+        else 'wall'
+    )
+    # Find the offset used for the platform.
+    offset = (node.conf['off_' + orient]).copy()  # type: Vec
+    if node.conf['is_piston']:
+        # Adjust based on the piston position
+        offset.z += 128 * srctools.conv_int(
+            node.inst.fixup[
+                '$top_level' if
+                node.inst.fixup[
+                    '$start_up'] == '1'
+                else '$bottom_level'
+            ]
+        )
+    offset.rotate_by_str(node.inst['angles'])
+    offset += Vec.from_str(node.inst['origin'])
+    return orient, offset
 
 # The name we give to instances and other parts.
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
@@ -115,10 +144,10 @@ def res_unst_scaffold(vmf: VMF, res: Property):
         'Running Scaffold Generator ({})...',
         res.value
     )
-    TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
+    inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
     del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
-    chains = item_chain.chain(vmf, TARG_INST.keys(), allow_loop=False)
+    chains = item_chain.chain(vmf, inst_to_config.keys(), allow_loop=False)
 
     # We need to make the link entities unique for each scaffold set,
     # otherwise the AllVar property won't work.
@@ -136,26 +165,15 @@ def res_unst_scaffold(vmf: VMF, res: Property):
 
         should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
 
+        # Stash this off to start, so we can find this after items are processed
+        # and the instance names change.
+        for node in node_list:
+            node.conf = inst_to_config[node.inst['file'].casefold()]
+
         # Now set each instance in the chain, including first and last
         for index, node in enumerate(node_list):
-            conf = TARG_INST[node.inst['file'].casefold()]
-            orient = (
-                'floor' if
-                Vec(0, 0, 1).rotate_by_str(node.inst['angles']) == (0, 0, 1)
-                else 'wall'
-            )
-
-            # Find the offset used for the logic ents
-            offset = (conf['off_' + orient]).copy()
-            if conf['is_piston']:
-                # Adjust based on the piston position
-                offset.z += 128 * srctools.conv_int(node.inst.fixup[
-                    '$top_level' if
-                    node.inst.fixup['$start_up'] == '1'
-                    else '$bottom_level'
-                ])
-            offset.rotate_by_str(node.inst['angles'])
-            offset += Vec.from_str(node.inst['origin'])
+            conf = node.conf
+            orient, offset = get_config(node)
 
             if node.prev is None:
                 link_type = LinkType.START
