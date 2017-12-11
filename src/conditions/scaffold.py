@@ -182,37 +182,47 @@ def res_unst_scaffold(vmf: VMF, res: Property):
             else:
                 link_type = LinkType.MID
 
+            # Special case - add an extra instance for the ends, pointing
+            # in the direction
+            # of the connected track. This would be the endcap
+            # model.
+            placed_endcap = False
             if (
-                orient == 'floor' and
-                link_type is not LinkType.MID and
-                conf['inst_end'] is not None
-            ):
-                # Add an extra instance pointing in the direction
-                # of the connected track. This would be the endcap
-                # model.
+                    orient == 'floor' and
+                    link_type is not LinkType.MID and
+                    conf['inst_end'] is not None
+                    ):
                 if link_type is LinkType.START:
-                    other_inst = node.next.inst
+                    other_node = node.next
                 else:
-                    other_inst = node.prev.inst
+                    other_node = node.prev
 
-                other_pos = Vec.from_str(other_inst['origin'])
-                our_pos = Vec.from_str(node.inst['origin'])
-                link_dir = other_pos - our_pos
-                link_ang = math.degrees(
-                    math.atan2(link_dir.y, link_dir.x)
-                )
-                # Round to nearest 90 degrees
-                # Add 45 so the switchover point is at the diagonals
-                link_ang = (link_ang + 45) // 90 * 90
-                vbsp.VMF.create_ent(
-                    classname='func_instance',
-                    targetname=node.inst['targetname'],
-                    file=conf['inst_end'],
-                    origin=offset,
-                    angles='0 {:.0f} 0'.format(link_ang),
-                )
-                # Don't place the offset instance, this replaces that!
-            elif conf['inst_offset'] is not None:
+                other_offset = get_config(other_node)[1]
+                link_dir = other_offset - offset
+
+                # Compute the horizontal gradient (z / xy dist).
+                # Don't use endcap if rising more than ~45 degrees, or lowering
+                # more than ~12 degrees.
+                # If
+                horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
+                if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
+                    link_ang = math.degrees(
+                        math.atan2(link_dir.y, link_dir.x)
+                    )
+                    # Round to nearest 90 degrees
+                    # Add 45 so the switchover point is at the diagonals
+                    link_ang = (link_ang + 45) // 90 * 90
+                    vbsp.VMF.create_ent(
+                        classname='func_instance',
+                        targetname=node.inst['targetname'],
+                        file=conf['inst_end'],
+                        origin=offset,
+                        angles='0 {:.0f} 0'.format(link_ang),
+                    )
+                    # Don't place the offset instance, this replaces that!
+                    placed_endcap = True
+
+            if not placed_endcap and conf['inst_offset'] is not None:
                 # Add an additional rotated entity at the offset.
                 # This is useful for the piston item.
                 vbsp.VMF.create_ent(
@@ -223,7 +233,7 @@ def res_unst_scaffold(vmf: VMF, res: Property):
                     angles=node.inst['angles'],
                 )
 
-            logic_inst = vbsp.VMF.create_ent(
+            logic_inst = vmf.create_ent(
                 classname='func_instance',
                 targetname=node.inst['targetname'],
                 file=conf.get(
