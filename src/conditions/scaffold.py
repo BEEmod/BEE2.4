@@ -1,15 +1,26 @@
 """The result used to generate unstationary scaffolds."""
 import math
+from typing import Tuple, Any, Dict
 
+from enum import Enum
+
+import instanceLocs
+import item_chain
+import srctools
+import utils
+import vbsp
 from conditions import (
     make_result, make_result_setup, RES_EXHAUSTED,
 )
-import instanceLocs
-from srctools import Vec, Property
-import srctools
-import conditions
-import utils
-import vbsp
+from srctools import Vec, Property, VMF
+
+
+class LinkType(Enum):
+    """Type of node."""
+    START = 'start'
+    MID = 'mid'
+    END = 'end'
+
 
 COND_MOD_NAME = None
 
@@ -26,7 +37,35 @@ def scaff_scan(inst_list, start_ent):
             return
 
 
+def get_config(
+    node: item_chain.Node,
+) -> Tuple[str, Vec]:
+    """Compute the config values for a node."""
+
+    orient = (
+        'floor' if
+        Vec(0, 0, 1).rotate_by_str(node.inst['angles']) == (0, 0, 1)
+        else 'wall'
+    )
+    # Find the offset used for the platform.
+    offset = (node.conf['off_' + orient]).copy()  # type: Vec
+    if node.conf['is_piston']:
+        # Adjust based on the piston position
+        offset.z += 128 * srctools.conv_int(
+            node.inst.fixup[
+                '$top_level' if
+                node.inst.fixup[
+                    '$start_up'] == '1'
+                else '$bottom_level'
+            ]
+        )
+    offset.rotate_by_str(node.inst['angles'])
+    offset += Vec.from_str(node.inst['origin'])
+    return orient, offset
+
+# The name we give to instances and other parts.
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
+
 # Store the configs for scaffold items so we can
 # join them up later
 SCAFFOLD_CONFIGS = {}
@@ -91,7 +130,7 @@ def res_unst_scaffold_setup(res: Property):
 
 
 @make_result('UnstScaffold')
-def res_unst_scaffold(res: Property):
+def res_unst_scaffold(vmf: VMF, res: Property):
     """The condition to generate Unstationary Scaffolds.
 
     This is executed once to modify all instances.
@@ -105,165 +144,114 @@ def res_unst_scaffold(res: Property):
         'Running Scaffold Generator ({})...',
         res.value
     )
-    TARG_INST, LINKS = SCAFFOLD_CONFIGS[res.value]
-    del SCAFFOLD_CONFIGS[res.value] # Don't let this run twice
+    inst_to_config, LINKS = SCAFFOLD_CONFIGS[res.value]
+    del SCAFFOLD_CONFIGS[res.value]  # Don't let this run twice
 
-    instances = {}
-    # Find all the instances we're wanting to change, and map them to
-    # targetnames
-    for ent in vbsp.VMF.by_class['func_instance']:
-        file = ent['file'].casefold()
-        targ = ent['targetname']
-        if file not in TARG_INST:
-            continue
-        config = TARG_INST[file]
-        next_inst = set(
-            out.target
-            for out in
-            ent.outputs
-        )
-        # Destroy these outputs, they're useless now!
-        ent.outputs.clear()
-        instances[targ] = {
-            'ent': ent,
-            'conf': config,
-            'next': next_inst,
-            'prev': None,
-        }
-
-    # Now link each instance to its in and outputs
-    for targ, inst in instances.items():
-        scaff_targs = 0
-        for ent_targ in inst['next']:
-            if ent_targ in instances:
-                instances[ent_targ]['prev'] = targ
-                inst['next'] = ent_targ
-                scaff_targs += 1
-            else:
-                # If it's not a scaffold, it's probably an indicator_toggle.
-                # We want to remove any them as well as the assoicated
-                # antlines!
-                for toggle in vbsp.VMF.by_target[ent_targ]:
-                    conditions.remove_ant_toggle(toggle)
-        if scaff_targs > 1:
-            raise Exception('A scaffold item has multiple destinations!')
-        elif scaff_targs == 0:
-            inst['next'] = None  # End instance
-
-    starting_inst = []
-    # We need to find the start instances, so we can set everything up
-    for inst in instances.values():
-        if inst['prev'] is None and inst['next'] is None:
-            # Static item!
-            continue
-        elif inst['prev'] is None:
-            starting_inst.append(inst)
+    chains = item_chain.chain(vmf, inst_to_config.keys(), allow_loop=False)
 
     # We need to make the link entities unique for each scaffold set,
     # otherwise the AllVar property won't work.
-    group_counter = 0
 
-    # Set all the instances and properties
-    for start_inst in starting_inst:
-        group_counter += 1
-        ent = start_inst['ent']
+    for group_counter, node_list in enumerate(chains):
+        # Set all the instances and properties
+        start_inst = node_list[0].item.inst
         for vals in LINKS.values():
             if vals['all'] is not None:
-                ent.fixup[vals['all']] = SCAFF_PATTERN.format(
+                start_inst.fixup[vals['all']] = SCAFF_PATTERN.format(
                     name=vals['name'],
                     group=group_counter,
                     index='*',
                 )
 
-        should_reverse = srctools.conv_bool(ent.fixup['$start_reversed'])
+        should_reverse = srctools.conv_bool(start_inst.fixup['$start_reversed'])
+
+        # Stash this off to start, so we can find this after items are processed
+        # and the instance names change.
+        for node in node_list:
+            node.conf = inst_to_config[node.inst['file'].casefold()]
 
         # Now set each instance in the chain, including first and last
-        for index, inst in enumerate(scaff_scan(instances, start_inst)):
-            ent, conf = inst['ent'], inst['conf']
-            orient = (
-                'floor' if
-                Vec(0, 0, 1).rotate_by_str(ent['angles']) == (0, 0, 1)
-                else 'wall'
-            )
+        for index, node in enumerate(node_list):
+            conf = node.conf
+            orient, offset = get_config(node)
 
-            # Find the offset used for the logic ents
-            offset = (conf['off_' + orient]).copy()
-            if conf['is_piston']:
-                # Adjust based on the piston position
-                offset.z += 128 * srctools.conv_int(ent.fixup[
-                    '$top_level' if
-                    ent.fixup['$start_up'] == '1'
-                    else '$bottom_level'
-                ])
-            offset.rotate_by_str(ent['angles'])
-            offset += Vec.from_str(ent['origin'])
-
-            if inst['prev'] is None:
-                link_type = 'start'
-            elif inst['next'] is None:
-                link_type = 'end'
+            if node.prev is None:
+                link_type = LinkType.START
+            elif node.next is None:
+                link_type = LinkType.END
             else:
-                link_type = 'mid'
+                link_type = LinkType.MID
 
+            # Special case - add an extra instance for the ends, pointing
+            # in the direction
+            # of the connected track. This would be the endcap
+            # model.
+            placed_endcap = False
             if (
                     orient == 'floor' and
-                    link_type != 'mid' and
+                    link_type is not LinkType.MID and
                     conf['inst_end'] is not None
                     ):
-                # Add an extra instance pointing in the direction
-                # of the connected track. This would be the endcap
-                # model.
-                other_ent = instances[inst[
-                    'next' if link_type == 'start' else 'prev'
-                ]]['ent']
+                if link_type is LinkType.START:
+                    other_node = node.next
+                else:
+                    other_node = node.prev
 
-                other_pos = Vec.from_str(other_ent['origin'])
-                our_pos = Vec.from_str(ent['origin'])
-                link_dir = other_pos - our_pos
-                link_ang = math.degrees(
-                    math.atan2(link_dir.y, link_dir.x)
-                )
-                # Round to nearest 90 degrees
-                # Add 45 so the switchover point is at the diagonals
-                link_ang = (link_ang + 45) // 90 * 90
-                vbsp.VMF.create_ent(
-                    classname='func_instance',
-                    targetname=ent['targetname'],
-                    file=conf['inst_end'],
-                    origin=offset.join(' '),
-                    angles='0 {:.0f} 0'.format(link_ang),
-                )
-                # Don't place the offset instance, this replaces that!
-            elif conf['inst_offset'] is not None:
+                other_offset = get_config(other_node)[1]
+                link_dir = other_offset - offset
+
+                # Compute the horizontal gradient (z / xy dist).
+                # Don't use endcap if rising more than ~45 degrees, or lowering
+                # more than ~12 degrees.
+                # If
+                horiz_dist = math.sqrt(link_dir.x ** 2 + link_dir.y ** 2)
+                if horiz_dist != 0 and -0.15 <= (link_dir.z / horiz_dist) <= 1:
+                    link_ang = math.degrees(
+                        math.atan2(link_dir.y, link_dir.x)
+                    )
+                    # Round to nearest 90 degrees
+                    # Add 45 so the switchover point is at the diagonals
+                    link_ang = (link_ang + 45) // 90 * 90
+                    vbsp.VMF.create_ent(
+                        classname='func_instance',
+                        targetname=node.inst['targetname'],
+                        file=conf['inst_end'],
+                        origin=offset,
+                        angles='0 {:.0f} 0'.format(link_ang),
+                    )
+                    # Don't place the offset instance, this replaces that!
+                    placed_endcap = True
+
+            if not placed_endcap and conf['inst_offset'] is not None:
                 # Add an additional rotated entity at the offset.
                 # This is useful for the piston item.
                 vbsp.VMF.create_ent(
                     classname='func_instance',
-                    targetname=ent['targetname'],
+                    targetname=node.inst['targetname'],
                     file=conf['inst_offset'],
-                    origin=offset.join(' '),
-                    angles=ent['angles'],
+                    origin=offset,
+                    angles=node.inst['angles'],
                 )
 
-            logic_inst = vbsp.VMF.create_ent(
+            logic_inst = vmf.create_ent(
                 classname='func_instance',
-                targetname=ent['targetname'],
+                targetname=node.inst['targetname'],
                 file=conf.get(
-                    'logic_' + link_type + (
+                    'logic_' + link_type.value + (
                         '_rev' if
                         should_reverse
                         else ''
                         ),
                     '',
                 ),
-                origin=offset.join(' '),
+                origin=offset,
                 angles=(
                     '0 0 0' if
                     conf['rotate_logic']
-                    else ent['angles']
+                    else node.inst['angles']
                 ),
             )
-            for key, val in ent.fixup.items():
+            for key, val in node.inst.fixup.items():
                 # Copy over fixup values
                 logic_inst.fixup[key] = val
 
@@ -274,7 +262,7 @@ def res_unst_scaffold(res: Property):
                     group=group_counter,
                     index=index,
                 )
-                if inst['next'] is not None:
+                if node.next is not None:
                     logic_inst.fixup[link['next']] = SCAFF_PATTERN.format(
                         name=link['name'],
                         group=group_counter,
@@ -283,7 +271,7 @@ def res_unst_scaffold(res: Property):
 
             new_file = conf.get('inst_' + orient, '')
             if new_file != '':
-                ent['file'] = new_file
+                node.inst['file'] = new_file
 
     LOGGER.info('Finished Scaffold generation!')
     return RES_EXHAUSTED
