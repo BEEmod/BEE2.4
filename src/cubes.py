@@ -1,6 +1,7 @@
 """Implement cubes and droppers."""
 import io
 import itertools
+from contextlib import suppress
 from collections import namedtuple
 
 from enum import Enum
@@ -183,6 +184,15 @@ class ModelSwapMeth(Enum):
     CUBE_TYPE = 'CUBE_TYPE'  # CubeType = 6
 
 
+class CubePaintType(Enum):
+    """If a Cube Painter is present, indicates the type of gel to apply.
+
+    The value is the engine paint index.
+    """
+    BOUNCE = 0
+    SPEED = 2
+
+
 # Things that get attached to a cube.
 class CubeAddon:
     """A thing that can be attached to a cube."""
@@ -273,6 +283,7 @@ class DropperType:
         out_start_drop: Tuple[Optional[str], str],
         out_finish_drop: Tuple[Optional[str], str],
         in_respawn: Tuple[Optional[str], str],
+        bounce_paint_file: str,
     ):
         self.id = id
         self.instances = resolve_inst(item_id)
@@ -289,6 +300,9 @@ class DropperType:
 
         # Instance input to respawn the cube.
         self.in_respawn = in_respawn
+
+        # The instance to use to bounce-paint the dropped cube.
+        self.bounce_paint_file = bounce_paint_file
 
     @classmethod
     def parse(cls, conf: Property):
@@ -307,6 +321,7 @@ class DropperType:
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
             out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
             in_respawn=Output.parse_name(conf['InputRespawn']),
+            bounce_paint_file=conf['BluePaintInst', ''],
         )
 
 
@@ -465,6 +480,7 @@ class CubeType:
                 # No custom model - it's default.
                 models[DEFAULT_MODELS[self.type]] = self.has_name
 
+
 class CubePair:
     """Represents a single cube/dropper pair."""
     def __init__(
@@ -495,6 +511,9 @@ class CubePair:
                 cube_fixup = EntityFixup()
 
         self.cube_fixup = cube_fixup
+
+        # If set, the cube has this paint type.
+        self.paint_type = None  # type: Optional[CubePaintType]
 
         self.tint = tint  # If set, Colorizer color to use.
 
@@ -1138,29 +1157,29 @@ def link_cubes(vmf: VMF):
             dropper=dropper,
         ))
 
-    # Check for colorizers in the map, and apply those.
+    # Check for colorizers and gel splats in the map, and apply those.
     colorizer_inst = resolve_inst('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
+    splat_inst = resolve_inst('<ITEM_PAINT_SPLAT>', silent=True)
+
+    LOGGER.info('SPLAT File: {}', splat_inst)
+
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() not in colorizer_inst:
+        file = inst['file'].casefold()
+
+        if file in colorizer_inst:
+            file = colorizer_inst
+        elif file in splat_inst:
+            file = splat_inst
+        else:
+            # Not one we care about.
             continue
 
-        color = Vec.from_str(vbsp_options.get_itemconf(
-            ('BEE2_CUBE_COLORISER', 'COLOR'),
-            '255 255 255',
-            timer_delay=inst.fixup.int('$timer_delay'),
-        ))
-
-        # The instance is useless now we know about it.
-        inst.remove()
+        pairs = []  # type: List[CubePair]
 
         origin = Vec.from_str(inst['origin'])
 
-        try:
-            cube = CUBE_POS[origin.as_tuple()]
-        except KeyError:
-            pass
-        else:
-            cube.tint = color
+        with suppress(KeyError):
+            pairs.append(CUBE_POS[origin.as_tuple()])
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
@@ -1170,12 +1189,37 @@ def link_cubes(vmf: VMF):
                 origin,
                 direction=(0, 0, 1),
             )
+            with suppress(KeyError):
+                pairs.append(CUBE_POS[pos.as_tuple()])
+
+        if file is colorizer_inst:
+            # The instance is useless now we know about it.
+            inst.remove()
+
+            color = Vec.from_str(vbsp_options.get_itemconf(
+                ('BEE2_CUBE_COLORISER', 'COLOR'),
+                '255 255 255',
+                timer_delay=inst.fixup.int('$timer_delay'),
+            ))
+            for pair in pairs:
+                pair.tint = color.copy()
+        elif file is splat_inst:
             try:
-                dropper = CUBE_POS[pos.as_tuple()]
-            except KeyError:
-                pass
-            else:
-                dropper.tint = color
+                paint_type = CubePaintType(inst.fixup.int('$paint_type'))
+            except ValueError:
+                # Don't touch if not bounce/speed.
+                continue
+
+            # Only 'use up' one splat, so you can place multiple to apply them
+            # to both the cube and surface.
+            used = False
+
+            for pair in pairs:
+                if pair.paint_type is None:
+                    pair.paint_type = paint_type
+                    used = True
+            if used:
+                inst.remove()
 
     # After that's done, save what cubes are present for filter optimisation,
     # and set Voice 'Has' attrs.
@@ -1191,6 +1235,13 @@ def link_cubes(vmf: VMF):
             pair.cube_type.color_in_map = True
         else:
             pair.cube_type.in_map = True
+
+        if pair.paint_type is CubePaintType.BOUNCE:
+            voice_attr['BounceGel'] = voice_attr['BlueGel'] = True
+            voice_attr['Gel'] = True
+        elif pair.paint_type is CubePaintType.SPEED:
+            voice_attr['SpeedGel'] = voice_attr['OrangeGel'] = True
+            voice_attr['Gel'] = True
 
         has_name = pair.cube_type.has_name
         voice_attr['cube' + has_name] = True
@@ -1293,6 +1344,7 @@ def make_cube(
     ent = vmf.create_ent(
         classname='prop_weighted_cube',
         origin=origin,
+        PaintPower=4,  # Unpainted
     )
 
     if in_dropper:
@@ -1306,6 +1358,62 @@ def make_cube(
     else:
         norm = Vec(x=-1).rotate_by_str(pair.cube['angles'])
         targ_inst = pair.cube
+
+    if pair.paint_type is not None:
+        if is_frank:
+            # Special case - frankenturrets don't have inputs for it.
+            # We need a sprayer to generate the actual paint,
+
+            # Set rendercolor to what it will be, so it doesn't
+            # visually change. (speed_paint_color, bounce_paint_color ConVars.)
+            if pair.paint_type is CubePaintType.SPEED:
+                ent['rendercolor'] = '255 106 0'
+            elif pair.paint_type is CubePaintType.BOUNCE:
+                ent['rendercolor'] = '0 165 255'
+
+            painter = vmf.create_ent(
+                targetname=conditions.local_name(targ_inst, 'cube_addon_painter'),
+                classname='info_paint_sprayer',
+                ambientsound=0,
+                drawonly=0,
+                silent=1,
+                painttype=pair.paint_type.value,
+            )
+        else:
+            # Two ways of applying paint - immediately on spawn, or at playtime.
+            # Orange cubes can stay put when dropped, so they're fine.
+            # Dropperless cubes should spawn bouncing around.
+            if not in_dropper or pair.paint_type is CubePaintType.SPEED:
+                ent['PaintPower'] = pair.paint_type.value
+            else:
+                # Add the bounce painter. This is only on the dropper.
+                vmf.create_ent(
+                    classname='func_instance',
+                    targetname=pair.dropper['targetname'],
+                    origin=pair.dropper['origin'],
+                    angles=pair.dropper['angles'],
+                    file=pair.drop_type.bounce_paint_file,
+                )
+                # Manually add the dropper outputs here, so they only add to the
+                # actual dropper.
+                drop_name, drop_cmd = pair.drop_type.out_finish_drop
+                pair.dropper.add_out(
+                    # Fire an input to activate the effects.
+                    Output(
+                        drop_cmd,
+                        conditions.local_name(pair.dropper, 'painter_blue'),
+                        'FireUser1',
+                        inst_out=drop_name,
+                    ),
+                    # And also paint the cube itself.
+                    Output(
+                        drop_cmd,
+                        '!activator',
+                        'SetPaint',
+                        pair.paint_type.value,
+                        inst_out=drop_name,
+                    )
+                )
 
     yaw = norm.to_angle().y
 
@@ -1334,7 +1442,10 @@ def make_cube(
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
 
-    if pair.tint:
+    if is_frank:
+        # No tinting or custom models for this.
+        cust_model = pack = None
+    elif pair.tint:
         cust_model = cube_type.model_color
         pack = cube_type.pack_color
         # Multiply the two tints together.
@@ -1358,7 +1469,6 @@ def make_cube(
         ent['NewSkins'] = '1'
         ent['SkinType'] = '0'
         ent['angles'] = Vec(0, yaw, 0)
-        ent['PaintPower'] = 4
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
 
@@ -1435,13 +1545,27 @@ def generate_cubes(vmf: VMF):
                 pair.outputs[out_type].extend(out_list)
             script_vars.extend(addon.script_vars)
 
+        # Generate the outputs to paint the cubes.
+        if pair.cube_type.type is CubeEntType.franken and pair.paint_type is not None:
+            pair.outputs[CubeOutputs.SPAWN].append(Output(
+                'Spawn',
+                'cube_addon_painter',
+                'Start',
+            ))
+            pair.outputs[CubeOutputs.SPAWN].append(Output(
+                'Spawn',
+                'cube_addon_painter',
+                'Kill',
+                delay=0.1,
+            ))
+
         if pair.dropper:
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.drop_type.cube_pos.copy().rotate_by_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True)
             cubes.append(drop_cube)
 
-            # We can't refer to this directly because of the template name
+            # We can't refer to the dropped cube directly because of the template name
             # mangling.
             drop_cube['targetname'] = conditions.local_name(
                 pair.dropper, 'box',
