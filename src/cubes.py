@@ -122,6 +122,15 @@ class CubeEntType(Enum):
     antique = 'ANTIQUE'
     franken = 'FRANKEN'  # prop_monster_box
 
+# The skin used for bounce-gel for this cube type.
+BOUNCE_SKINS = {
+    CubeEntType.norm: '6',
+    CubeEntType.comp: '8',
+    CubeEntType.reflect: '2',
+    CubeEntType.sphere: '2',
+    CubeEntType.antique: '1',
+}
+
 
 class CubeVoiceEvents(Enum):
     """Certain dropper events can trigger dialogue."""
@@ -1371,9 +1380,10 @@ def make_cube(
             elif pair.paint_type is CubePaintType.BOUNCE:
                 ent['rendercolor'] = '0 165 255'
 
-            painter = vmf.create_ent(
+            vmf.create_ent(
                 targetname=conditions.local_name(targ_inst, 'cube_addon_painter'),
                 classname='info_paint_sprayer',
+                origin=ent['origin'],
                 ambientsound=0,
                 drawonly=0,
                 silent=1,
@@ -1385,6 +1395,37 @@ def make_cube(
             # Dropperless cubes should spawn bouncing around.
             if not in_dropper or pair.paint_type is CubePaintType.SPEED:
                 ent['PaintPower'] = pair.paint_type.value
+
+            # Another special case - droppers which can spawn bounce-gel
+            # directly.
+            # Make the dropper 'non-stick' by manually applying the skin,
+            # then set paint type after exiting. That way it can't bounce off
+            # the dropper walls, but will look visually painted.
+            elif pair.drop_type.bounce_paint_file.casefold() == '<prepaint>':
+                # Apply the skin after spawn.
+                ent.add_out(
+                    Output(
+                        'OnUser4',
+                        '!self',
+                        'Skin',
+                        BOUNCE_SKINS[pair.cube_type.type],
+                        only_once=True,
+                    )
+                )
+
+                # Manually add the dropper outputs here, so they only add to the
+                # actual dropper (not the other cube if present).
+                drop_name, drop_cmd = pair.drop_type.out_finish_drop
+                pair.dropper.add_out(
+                    # Paint the cube, so it now has the functionality.
+                    Output(
+                        drop_cmd,
+                        '!activator',
+                        'SetPaint',
+                        pair.paint_type.value,
+                        inst_out=drop_name,
+                    )
+                )
             else:
                 # Add the bounce painter. This is only on the dropper.
                 vmf.create_ent(
