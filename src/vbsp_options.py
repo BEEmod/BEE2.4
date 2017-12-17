@@ -467,18 +467,6 @@ DEFAULTS = [
         """Apply clumping to floors as well.
         """),
 
-    # Default to the origin of the elevator instance - that's likely to
-    # be enclosed
-    Opt('music_location_sp', Vec(-2000, 2000, 0),
-        """The location of music entities in SP.
-
-        The default is the location of the entry elevator instance.
-        """),
-    Opt('music_location_coop', Vec(-2000, -2000, 0),
-        """The location of music entities in Coop.
-
-        The default is the location of the disassembly room instance.
-        """),
     # Instance used for pti_ents
     Opt('global_pti_ents', "instances/BEE2/global_pti_ents.vmf",
         """The instance used for `global_pti_ents`.

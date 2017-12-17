@@ -2664,10 +2664,7 @@ def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
-    if mode == "COOP":
-        loc = vbsp_options.get(Vec, 'music_location_coop')
-    else:
-        loc = vbsp_options.get(Vec, 'music_location_sp')
+    loc = vbsp_options.get(Vec, 'global_ents_loc')
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
