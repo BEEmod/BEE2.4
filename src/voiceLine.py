@@ -4,7 +4,7 @@ import os
 import random
 from collections import namedtuple
 from decimal import Decimal
-from typing import List
+from typing import List, Set
 
 import conditions.monitor
 import srctools
@@ -99,17 +99,18 @@ def generate_resp_script(file, allow_dings):
     ))
 
 
-def mode_quotes(prop_block):
+def mode_quotes(prop_block: Property, flag_set: Set[str]):
     """Get the quotes from a block which match the game mode."""
-    is_sp = (vbsp.GAME_MODE == 'SP')
+
     for prop in prop_block:
         if prop.name == 'line':
             # Ones that apply to both modes
             yield prop
-        elif prop.name == 'line_sp' and is_sp:
-            yield prop
-        elif prop.name == 'line_coop' and not is_sp:
-            yield prop
+        elif prop.name.startswith('line_'):
+            # Conditions applied to the name.
+            # Check all are in the flags set.
+            if flag_set.issuperset(prop.name.split('_')[1:]):
+                yield prop
 
 
 @conditions.make_result('QuoteEvent')
@@ -120,7 +121,7 @@ def res_quote_event(res: Property):
     return conditions.RES_EXHAUSTED
 
 
-def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
+def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name, player_flag_set):
     """Scan through a group, looking for applicable quote options."""
     is_mid = (group.name == 'midchamber')
 
@@ -136,7 +137,7 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
         valid_quote = True
         for flag in quote:
             name = flag.name
-            if name in ('priority', 'name', 'id', 'line', 'line_sp', 'line_coop'):
+            if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
             if not conditions.check_flag(flag, fake_inst):
@@ -150,7 +151,7 @@ def find_group_quotes(group, mid_quotes, use_dings, conf, mid_name):
 
         poss_quotes = []
         line_mid_quotes = []
-        for line in mode_quotes(quote):
+        for line in mode_quotes(quote, player_flag_set):
             line_id = line['id', line['name', '']].casefold()
 
             # Check if the ID is enabled!
@@ -378,9 +379,9 @@ def add_quote(quote: Property, targetname, quote_loc: Vec, use_dings=False):
                 prop['target'],
                 prop['input'],
                 prop['parm', ''],
-                srctools.conv_float(prop['delay']),
-                only_once=srctools.conv_bool(prop['only_once', None]),
-                times=srctools.conv_int(prop['times', None], -1),
+                prop.float('delay'),
+                only_once=prop.bool('only_once'),
+                times=prop.int('times', -1),
             ))
 
     if cc_emit_name:
@@ -521,14 +522,36 @@ def add_voice(
             fixup_style='0',
         )
 
+    # Determine the flags that enable/disable specific lines based on which
+    # players are used.
+    player_model = vbsp.BEE2_config.get_val(
+        'General', 'player_model', 'PETI',
+    ).casefold()
+
+    is_coop = (vbsp.GAME_MODE == 'COOP')
+    is_sp = (vbsp.GAME_MODE == 'SP')
+
+    player_flags = {
+        'sp': is_sp,
+        'coop': is_coop,
+        'atlas': is_coop or player_model == 'atlas',
+        'pbody': is_coop or player_model == 'pbody',
+        'bendy': is_sp and player_model == 'peti',
+        'chell': is_sp and player_model == 'sp',
+        'human': is_sp and player_model in ('peti', 'sp'),
+        'robot': is_coop or player_model in ('atlas', 'pbody'),
+    }
+    # All which are True.
+    player_flag_set = {val for val, flag in player_flags.items() if flag}
+
     # For each group, locate the voice lines.
     for group in itertools.chain(
         QUOTE_DATA.find_all('group'),
         QUOTE_DATA.find_all('midchamber'),
-    ):
+    ):  # type: Property
 
         quote_targetname = group['Choreo_Name', '@choreo']
-        use_dings = srctools.conv_bool(group['use_dings', ''], allow_dings)
+        use_dings = group.bool('use_dings', allow_dings)
 
         possible_quotes = sorted(
             find_group_quotes(
@@ -537,6 +560,7 @@ def add_voice(
                 use_dings,
                 conf=mid_config if group.name == 'midchamber' else norm_config,
                 mid_name=quote_targetname,
+                player_flag_set=player_flag_set,
             ),
             key=sort_func,
             reverse=True,
