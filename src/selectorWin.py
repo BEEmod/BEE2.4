@@ -359,8 +359,6 @@ class selWin:
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
-
-    :type suggested: Item | None
     """
     def __init__(
             self,

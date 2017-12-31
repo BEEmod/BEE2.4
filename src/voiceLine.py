@@ -196,14 +196,15 @@ def add_bullseye(quote_loc: Vec, name: str):
 
 
 def add_choreo(
-        c_line: str,
-        targetname: str,
-        loc: Vec,
-        use_dings=False,
-        is_first=True,
-        is_last=True,
-        only_once=False,
-):
+    c_line: str,
+    targetname: str,
+    loc: Vec,
+    use_dings=False,
+    is_first=True,
+    is_last=True,
+    only_once=False,
+) -> Entity:
+    """Create a choreo scene."""
     # Add this to the beginning, since all scenes need it...
     if not c_line.startswith('scenes/'):
         c_line = 'scenes/' + c_line
@@ -567,8 +568,7 @@ def add_voice(
         )
 
         if possible_quotes:
-
-            choreo_loc = Vec.from_str(group['choreo_loc', quote_loc])
+            choreo_loc = group.vec('choreo_loc', *quote_loc)
 
             if use_priority:
                 chosen = possible_quotes[0].lines
@@ -597,7 +597,7 @@ def add_voice(
                 use_dings,
             )
 
-    if ADDED_BULLSEYES or srctools.conv_bool(QUOTE_DATA['UseMicrophones', '']):
+    if ADDED_BULLSEYES or QUOTE_DATA.bool('UseMicrophones'):
         # Add microphones that broadcast audio directly at players.
         # This ensures it is heard regardless of location.
         # This is used for Cave and core Wheatley.
