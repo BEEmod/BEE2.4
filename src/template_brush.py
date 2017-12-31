@@ -201,7 +201,7 @@ class Template:
 
     def visgrouped(
         self,
-        visgroups: Iterable[str]=(),
+        visgroups: Set[str]=(),
     ) -> Tuple[List[Solid], List[Solid], List[Entity]]:
         """Given some visgroups, return the matching data.
 
