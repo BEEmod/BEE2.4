@@ -8,6 +8,7 @@ from instanceLocs import resolve_one as resolve_single
 from template_brush import Template, get_template
 from connections import ITEMS
 from comp_consts import FixupVars
+import vbsp
 
 COND_MOD_NAME = 'Piston Platform'
 
@@ -18,9 +19,10 @@ INST_NAMES = [
     'static_1',
     'static_2',
     'static_3',
-    'static_4',
+    # 4 can't happen, if it's not moving the whole thing isn't.
+    # Fullstatic is used.
 
-    # Moving pistons
+    # Moving pistons.
     'dynamic_1',
     'dynamic_2',
     'dynamic_3',
@@ -49,23 +51,25 @@ STOP_SND <- "{stop}";
 @make_result_setup('PistonPlatform')
 def res_piston_plat_setup(res: Property):
     # Allow reading instances direct from the ID.
-    if 'itemid' in res:
-        item_id = res['itemid']
-        inst = {
-            name: resolve_single('<{}:bee2_pist_{}>'.format(item_id, name))
-            for name in INST_NAMES
-        }
-    else:
-        inst = {
-            name: resolve_single(res[name])
-            for name in INST_NAMES
-        }
+    # But use direct ones first.
+    item_id = res['itemid', None]
+    inst = {}
+    for name in INST_NAMES:
+        if name in res:
+            lookup = res[name]
+        elif item_id is not None:
+            lookup = '<{}:bee2_pist_{}>'.format(item_id, name)
+        else:
+            raise ValueError('No "{}" specified!'.format(name))
+        inst[name] = resolve_single(lookup, error=True)
+
     template = get_template(res['template'])
 
     return (
         template,
         inst,
         res['auto_var', ''],
+        res['source_ent', ''],
         res['snd_start', ''],
         res['snd_loop', ''],
         res['snd_stop', ''],
@@ -79,6 +83,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         template,
         inst_filenames,
         automatic_var,
+        source_ent,
         snd_start,
         snd_loop,
         snd_stop,
@@ -104,6 +109,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
             return
 
     scripts = ['BEE2/piston/common.nut']
+    vbsp.PACK_FILES.add('scripts/vscripts/BEE2/piston/common.nut')
 
     if snd_start or snd_stop:
         snd_key = snd_start.casefold(), snd_stop.casefold()
@@ -120,17 +126,19 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
     if start_up:
         # Notify the script that we start up.
         scripts.append('BEE2/piston/spawn_up.nut')
+        vbsp.PACK_FILES.add('scripts/vscripts/BEE2/piston/spawn_up.nut')
 
     script_ent = vmf.create_ent(
         classname='info_target',
         targetname=local_name(inst, 'script'),
         vscripts=' '.join(scripts),
+        origin=inst['origin'],
     )
 
     if start_up:
-        st_pos, end_pos = min_pos, max_pos
-    else:
         st_pos, end_pos = max_pos, min_pos
+    else:
+        st_pos, end_pos = min_pos, max_pos
 
     script_ent.add_out(
         Output('OnUser1', '!self', 'RunScriptCode', 'moveto({})'.format(st_pos)),
@@ -151,24 +159,11 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         pist_ent = inst.copy()
         vmf.add_ent(pist_ent)
 
-        world, detail, overlays = template.visgrouped('pist' + str(pist_ind))
-        temp_brushes = world + detail  # type: List[Solid]
-        brushes = []
-
-        if start_up:
-            spawn_pos = origin + pist_ind * off
-
-        for orig_brush in temp_brushes:
-            new_brush = orig_brush.copy(map=vmf)
-            new_brush.localise(origin, angles)
-            brushes.append(new_brush)
-        del temp_brushes, world, detail, overlays
-
         if pist_ind <= min_pos:
             # It's below the lowest position, so it can be static.
             pist_ent['file'] = inst_filenames['static_' + str(pist_ind)]
-            pist_ent['origin'] = origin + pist_ind * off
-            static_ent.solids.extend(brushes)
+            pist_ent['origin'] = brush_pos = origin + pist_ind * off
+            temp_targ = static_ent
         else:
             # It's a moving component.
             pist_ent['file'] = inst_filenames['dynamic_' + str(pist_ind)]
@@ -176,18 +171,43 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
                 # It's 'after' the highest position, so it never extends.
                 # So simplify by merging those all.
                 # That's before this so it'll have to exist.
-                pistons[max_pos].solids.extend(brushes)
-                pist_ent['origin'] = origin + max_pos * off
-                pist_ent.fixup['$parent'] = local_name(pist_ent, 'pist' + str(max_pos))
+                temp_targ = pistons[max_pos]
+                if start_up:
+                    pist_ent['origin'] = brush_pos = origin + max_pos * off
+                else:
+                    pist_ent['origin'] = brush_pos = origin + min_pos * off
+                pist_ent.fixup['$parent'] = 'pist' + str(max_pos)
             else:
                 # It's actually a moving piston.
-                pistons[pist_ind] = vmf.create_ent(
-                    'func_movelinear',
-                    origin=origin + pist_ind * off,
-                    movedist=128,
-                    speed=100,
+                if start_up:
+                    brush_pos = origin + pist_ind * off
+                else:
+                    brush_pos = origin + min_pos * off
 
+                pist_ent['origin'] = brush_pos
+                pist_ent.fixup['$parent'] = 'pist' + str(pist_ind)
+
+                pistons[pist_ind] = temp_targ = vmf.create_ent(
+                    'func_movelinear',
+                    targetname=local_name(pist_ent, 'pist' + str(pist_ind)),
+                    origin=brush_pos - off,
+                    movedir=move_ang,
+                    startposition=start_up,
+                    movedistance=128,
+                    speed=100,
                 )
+                if pist_ind - 1 in pistons:
+                    pistons[pist_ind]['parentname'] = local_name(
+                        pist_ent, 'pist' + str(pist_ind - 1),
+                    )
+
+        world, detail, overlays = template.visgrouped({'pist_' + str(pist_ind)})
+        temp_brushes = world + detail  # type: List[Solid]
+
+        for orig_brush in temp_brushes:
+            new_brush = orig_brush.copy(map=vmf)
+            new_brush.localise(brush_pos, angles)
+            temp_targ.solids.append(new_brush)
 
     if not static_ent.solids:
         static_ent.remove()
@@ -200,7 +220,10 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         script_ent['spawnflags'] = 16  # Start silent, looped.
         script_ent['radius'] = 1024
 
-
+        if source_ent:
+            # Parent is irrelevant for actual entity locations, but it
+            # survives for the script to read.
+            script_ent['SourceEntityName'] = script_ent['parentname'] = local_name(inst, source_ent)
 
 
 def write_vscripts(vrad_conf: Property):
@@ -211,6 +234,6 @@ def write_vscripts(vrad_conf: Property):
     conf_block = vrad_conf.ensure_exists('InjectFiles')
 
     for filename, code in SOUNDS.values():
-        with open('BEE2/inject' + filename, 'w') as f:
+        with open('BEE2/inject/' + filename, 'w') as f:
             f.write(code)
         conf_block[filename] = SOUND_LOC + filename
