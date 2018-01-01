@@ -87,7 +87,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
         snd_start,
         snd_loop,
         snd_stop,
-    ) = res.value  # type: Tuple[Template, Dict[str, str], str, str, str]
+    ) = res.value  # type: Tuple[Template, Dict[str, str], str, str, str, str, str]
 
     min_pos = inst.fixup.int(FixupVars.PIST_BTM)
     max_pos = inst.fixup.int(FixupVars.PIST_TOP)
@@ -194,7 +194,7 @@ def res_piston_plat(vmf: VMF, inst: Entity, res: Property):
                     movedir=move_ang,
                     startposition=start_up,
                     movedistance=128,
-                    speed=100,
+                    speed=150,
                 )
                 if pist_ind - 1 in pistons:
                     pistons[pist_ind]['parentname'] = local_name(
