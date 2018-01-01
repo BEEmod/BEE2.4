@@ -620,8 +620,6 @@ class Game:
             'PackTriggers',
         )
 
-        self.generate_fizzler_sides(vbsp_config)
-
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
@@ -651,10 +649,6 @@ class Game:
                     editor_section['deletable'] = '1'
                     editor_section['copyable'] = '1'
                     editor_section['DesiredFacing'] = 'DESIRES_UP'
-
-        LOGGER.info('Optimizing editor models...')
-        self.clean_editor_models(editoritems)
-        export_screen.step('EXP')
 
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
@@ -726,6 +720,12 @@ class Game:
             LOGGER.info('Copying Resources!')
             music_files = self.copy_mod_music()
             self.refresh_cache(music_files)
+
+        LOGGER.info('Optimizing editor models...')
+        self.clean_editor_models(editoritems)
+        export_screen.step('EXP')
+
+        self.generate_fizzler_sides(vbsp_config)
 
         if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
             os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
@@ -869,7 +869,6 @@ class Game:
                 commands.append(comm_block)
 
         return root_block.export()
-
 
     def generate_fizzler_sides(self, conf: Property):
         fizz_colors = {}
