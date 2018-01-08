@@ -2671,7 +2671,6 @@ def add_extra_ents(mode):
         # events we might want to track - death, pings, camera taunts, etc.
         glados_scripts = [
             'choreo/glados.nut',  # Implements Multiverse Cave..
-            'bee2/auto_run.nut',  # Automatically run to cache sounds.
         ]
         if voiceLine.has_responses():
             glados_scripts.append('bee2/coop_responses.nut')
