@@ -71,6 +71,10 @@ INCLUDES = [
 
 bee_version = input('BEE2 Version (or blank for dev): ')
 
+import seecompiler
+
+[seecomp_loc] = seecompiler.__path__
+
 setup(
     name='VBSP_VRAD',
     version='0.1',
@@ -87,6 +91,10 @@ setup(
             # Include all modules in the zip..
             'zip_include_packages': '*',
             'zip_exclude_packages': '',
+            'zip_includes': [
+                # Add the FGD data for us.
+                (seecomp_loc + '/fgd.lzma', 'seecompiler/fgd.lzma')
+            ],
         },
     },
     description='BEE2 VBSP and VRAD compilation hooks, '
