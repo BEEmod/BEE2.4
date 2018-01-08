@@ -156,6 +156,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
     )
     # Avoid error without this package.
     if HOLES:
+        # Grab the template solids we need.
         hole_temp = template_brush.get_template(
             vbsp_options.get(str, 'glass_hole_temp')
         )
@@ -163,8 +164,10 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
         hole_temp_small = hole_world + hole_detail
         hole_world, hole_detail, _ = hole_temp.visgrouped({'large'})
         hole_temp_large = hole_world + hole_detail
+        hole_world, hole_detail, _ = hole_temp.visgrouped({'large_corner'})
+        hole_temp_corner = hole_world + hole_detail
     else:
-        hole_temp_small = hole_temp_large = None
+        hole_temp_small = hole_temp_large = hole_temp_corner = None
 
     floorbeam_temp = vbsp_options.get(str, 'glass_floorbeam_temp')
 
@@ -188,10 +191,6 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             negated=1,
             filterclass='prop_paint_bomb',
         )
-
-    # # This needs to be a func_brush, otherwise the clip texture data will be
-    # # merged with other clips.
-    # glass_clip_ent = vmf.create_ent(classname='func_brush', solidbsp=1)
 
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
@@ -234,13 +233,19 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
         ]
         if hole_type is HoleType.LARGE:
             offsets = (-80, -48, -16, 16, 48, 80)
-            hole_temp = hole_temp_large
+            hole_temp = hole_temp_large.copy()
         else:
             offsets = (-16, 16)
-            hole_temp = hole_temp_small
+            hole_temp = hole_temp_small.copy()
         for u_off in offsets:
             for v_off in offsets:
-                slice_plane.remove((
+                # Skip the corners on large holes.
+                # Those aren't actually used, so skip them. That way
+                # we can have them diagonally or  without glass in the corner.
+                if u_off in (-80, 80) and v_off in (-80, 80):
+                    continue
+
+                slice_plane.discard((
                     (u + u_off) // 32,
                     (v + v_off) // 32,
                 ))
@@ -256,15 +261,33 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
         else:
             raise NotImplementedError
 
+        angles = normal.to_angle(0)
+        # Angle corresponding to the brush, for the corners.
+        angle_list = [angles] * len(hole_temp)
+
+        # This is a tricky bit. Two large templates would collide
+        # diagonally,
+        # so chop off the corners, then put them back only if there's not
+        # one diagonally.
+        for roll in (0, 90, 180, 270):
+            corn_angles = angles.copy()
+            corn_angles.z = roll
+            hole_off = origin + Vec(y=128, z=128).rotate(*corn_angles)
+            diag_type = HOLES.get((hole_off.as_tuple(), normal.as_tuple()), None)
+            if diag_type is not HoleType.LARGE:
+                hole_temp += hole_temp_corner
+                angle_list += [corn_angles] * len(hole_temp_corner)
+
         def solid_pane_func(off1, off2, mat):
-            angles = normal.to_angle()
+            """Given the two thicknesses, produce the curved hole from the template."""
             off_min = min(off1, off2)
             off_max = max(off1, off2)
             new_brushes = [
                 brush.copy(map=vmf)
                 for brush in hole_temp
             ]
-            for brush in new_brushes:
+
+            for brush, br_angles in zip(new_brushes, angle_list):
                 for face in brush.sides:
                     face.mat = mat
                     f_norm = face.normal()
@@ -274,7 +297,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
                     elif f_norm.x == -1:
                         face.translate(Vec(x=-4 - off_min))
                         # face.mat = 'max'
-                    face.localise(origin, angles)
+                    face.localise(origin, br_angles)
             return new_brushes
 
         make_glass_grating(
@@ -302,6 +325,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             raise NotImplementedError
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+
         for min_u, min_v, max_u, max_v in grid_optimise(dict.fromkeys(pos_slice, True)):
             # These are two points in the origin plane, at the borders.
             pos_min = Vec.with_axes(
@@ -316,6 +340,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
             )
 
             def solid_pane_func(pos1, pos2, mat):
+                """Make the solid brush."""
                 return [vmf.make_prism(
                     pos_min + normal * (64.0 - pos1),
                     pos_max + normal * (64.0 - pos2),
@@ -380,6 +405,8 @@ def make_glass_grating(
         player_clip = vmf.create_ent('func_detail')
         player_clip_mat = consts.Tools.PLAYER_CLIP
     else:
+        # This needs to be a func_brush, otherwise the clip texture data
+        # will be merged with other clips.
         player_clip = vmf.create_ent(
             'func_brush',
             solidbsp=1,
