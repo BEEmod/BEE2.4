@@ -387,6 +387,11 @@ DEFAULTS = [
         is set, they are removed by default. This disables that behaviour.
         """),
 
+    Opt('glass_hole_temp', TYPE.STR,
+        """Template used to generate glass/grating holes. This should have 
+        'large' and 'small' visgroup sections. It should range from x=60-64.
+        """),
+
     # Packlists for glass and gratings
     Opt('glass_pack', "PACK_PLAYER_CLIP_GLASS",
         """Packlist for glass clips.
