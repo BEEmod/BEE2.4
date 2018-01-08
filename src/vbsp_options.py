@@ -398,35 +398,16 @@ DEFAULTS = [
 
         This is used for `grating_clip`.
         """),
-    Opt('glass_template', TYPE.STR,
-        """A template for rotation and scaling of glass.
-
-        This overrides `glass_scale` if set. It should be a single brush
-        cube - the glass is set to the same rotation as the matching side.
-        """),
-    Opt('grating_template', TYPE.STR,
-        """A template for rotation and scaling of grates.
-
-        This overrides `grating_scale` if set. It should be a single brush
-        cube - the grate is set to the same rotation as the matching side.
-        """),
+    Opt('glass_template', 'BEE2_GLASS_TEMPLATE',
+        """A template for rotation and scaling of glass."""),
+    Opt('grating_template', 'BEE2_GRATING_TEMPLATE',
+        """A template for rotation and scaling of grates."""),
 
     Opt('goo_wall_scale_temp', TYPE.STR,
         """A template for rotation and scaling for `goo_wall` textures.
 
         It should be a single brush cube - the wall is set to the same
         rotation as the matching side. (The bottom is ignored).
-        """),
-
-    Opt('glass_scale', 0.15,
-        """Scale of glass textures.
-
-        This is overridden by `glass_template`.
-        """),
-    Opt('grating_scale', 0.15,
-        """Scale of grating textures.
-
-        This is overridden by `grating_template`.
         """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,
