@@ -269,14 +269,18 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
         # diagonally,
         # so chop off the corners, then put them back only if there's not
         # one diagonally.
-        for roll in (0, 90, 180, 270):
-            corn_angles = angles.copy()
-            corn_angles.z = roll
-            hole_off = origin + Vec(y=128, z=128).rotate(*corn_angles)
-            diag_type = HOLES.get((hole_off.as_tuple(), normal.as_tuple()), None)
-            if diag_type is not HoleType.LARGE:
-                hole_temp += hole_temp_corner
-                angle_list += [corn_angles] * len(hole_temp_corner)
+        if hole_type is HoleType.LARGE:
+            for roll in (0, 90, 180, 270):
+                corn_angles = angles.copy()
+                corn_angles.z = roll
+                hole_off = origin + Vec(y=128, z=128).rotate(*corn_angles)
+                diag_type = HOLES.get(
+                    (hole_off.as_tuple(), normal.as_tuple()),
+                    None,
+                )
+                if diag_type is not HoleType.LARGE:
+                    hole_temp += hole_temp_corner
+                    angle_list += [corn_angles] * len(hole_temp_corner)
 
         def solid_pane_func(off1, off2, mat):
             """Given the two thicknesses, produce the curved hole from the template."""
