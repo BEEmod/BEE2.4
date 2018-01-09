@@ -376,17 +376,6 @@ DEFAULTS = [
         lighting. It should be set to the ambient light color.
         """),
 
-    Opt('glass_clip', "BEE2/glass_player_clip",
-        """Texture used for glass player clips.
-        """),
-    Opt('grating_clip', "BEE2/grate_player_clip",
-        """Texture used for grating player clips.
-        """),
-    Opt('keep_barrier_inst', False,
-        """Keep glass/grating brush instances. If glass_clip or grating_clip
-        is set, they are removed by default. This disables that behaviour.
-        """),
-
     Opt('glass_hole_temp', TYPE.STR,
         """Template used to generate glass/grating holes. This should have 
         'large' and 'small' visgroup sections. It should range from x=60-64.

@@ -1864,21 +1864,6 @@ def set_barrier_frame_type():
             pass
 
 
-def remove_barrier_ents():
-    """If glass_clip or grating_clip is defined, we should remove the glass instances.
-
-    They're not used since we added their contents into the map directly.
-    """
-    if vbsp_options.get(bool, 'keep_barrier_inst'):
-        return  # They're being used.
-
-    barrier_file = instanceLocs.resolve('[glass_128]')
-
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() in barrier_file:
-            inst.remove()
-
-
 def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     '''Fix a squarebeams brush for use in other styles.
 
@@ -3517,7 +3502,6 @@ def main():
         change_func_brush()
         barriers.make_barriers(VMF, get_tex)
         remove_static_ind_toggles()
-        remove_barrier_ents()
         fix_worldspawn()
 
         make_packlist(path)
