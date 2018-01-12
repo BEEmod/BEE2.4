@@ -126,7 +126,7 @@ def res_glass_hole(inst: Entity, res: Property):
     normal = Vec(z=-1).rotate_by_str(inst['angles'])
     origin = Vec.from_str(inst['origin']) // 128 * 128 + 64
 
-    if test_hole_spot(normal, origin, hole_type):
+    if test_hole_spot(origin, normal, hole_type):
         HOLES[origin.as_tuple(), normal.as_tuple()] = hole_type
         inst['origin'] = origin
         inst['angles'] = normal.to_angle()
