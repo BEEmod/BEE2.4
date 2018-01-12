@@ -2654,7 +2654,7 @@ class EditorSound(PakObject, has_img=False):
         )
 
 
-class BrushTemplate(PakObject, has_img=False):
+class BrushTemplate(PakObject, has_img=False, allow_mult=True):
     """A template brush which will be copied into the map, then retextured.
 
     This allows the sides of the brush to swap between wall/floor textures
