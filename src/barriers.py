@@ -1,6 +1,6 @@
 """Implements Glass and Grating."""
 from enum import Enum
-from typing import Dict, Tuple, List, Set, Callable
+from typing import Dict, Tuple, List, Set, Callable, Iterable
 
 from collections import defaultdict
 
@@ -363,7 +363,7 @@ def make_barriers(vmf: VMF, get_tex: Callable[[str], str]):
 
     if floorbeam_temp:
         LOGGER.info('Adding Glass floor beams...')
-        add_glass_floorbeams(floorbeam_temp)
+        add_glass_floorbeams(vmf, floorbeam_temp)
         LOGGER.info('Done!')
 
 
@@ -434,12 +434,25 @@ def make_glass_grating(
         phys_clip.solids = solid_func(0, 2, consts.Tools.TRIGGER)
 
 
-def add_glass_floorbeams(temp_name):
+def add_glass_floorbeams(vmf: VMF, temp_name: str):
     """Add beams to separate large glass panels.
 
     The texture is assumed to match plasticwall004a's shape.
     """
     template = template_brush.get_template(temp_name)
+    temp_world, temp_detail, temp_over = template.visgrouped()
+    try:
+        [beam_template] = temp_world + temp_detail  # type: Solid
+    except ValueError:
+        raise ValueError('Bad Glass Floorbeam template!')
+
+    # Grab the 'end' side, which we move around.
+    for side in beam_template.sides:
+        if side.normal() == (-1, 0, 0):
+            beam_end_face = side
+            break
+    else:
+        raise ValueError('Not aligned to world...')
 
     separation = vbsp_options.get(int, 'glass_floorbeam_sep') + 1
     separation *= 128
@@ -448,11 +461,18 @@ def add_glass_floorbeams(temp_name):
     # This is a mapping from some glass piece to its group list.
     groups = {}
 
-    for origin, normal, barr_type in BARRIERS.items():
+    for (origin, normal), barr_type in BARRIERS.items():
+        # Grating doesn't use it.
         if barr_type is not BarrierType.GLASS:
             continue
 
-        pos = origin + normal * 62
+        normal = Vec(normal)
+
+        if not normal.z:
+            # Not walls.
+            continue
+
+        pos = Vec(origin) + normal * 62
 
         groups[pos.as_tuple()] = [pos]
 
@@ -497,23 +517,101 @@ def add_glass_floorbeams(temp_name):
         dimensions = bbox_max - bbox_min
         LOGGER.info('Size = {}', dimensions)
 
+        # Our beams align to the smallest axis.
         if dimensions.y > dimensions.x:
-            axis = 'y'
+            beam_ax = 'x'
+            side_ax = 'y'
             rot = Vec(0, 0, 0)
         else:
-            axis = 'x'
+            beam_ax = 'y'
+            side_ax = 'x'
             rot = Vec(0, 90, 0)
 
+        # Build min, max tuples for each axis in the other direction.
+        # This tells us where the beams will be.
+        beams = {}  # type: Dict[int, Tuple[int, int]]
+
         # Add 128 so the first pos isn't a beam.
-        offset = bbox_min[axis] + 128
+        offset = bbox_min[side_ax] + 128
 
         for pos in group:
-            # Every 'sep' positions..
-            if (pos[axis] - offset) % separation == 0:
-                template_brush.import_template(
-                    template,
-                    pos,
-                    rot,
-                    force_type=template_brush.TEMP_TYPES.detail,
-                    add_to_map=True,
-                )
+            side_off = pos[side_ax]
+            beam_off = pos[beam_ax]
+            # Skip over non-'sep' positions..
+            if (side_off - offset) % separation != 0:
+                continue
+
+            try:
+                min_pos, max_pos = beams[side_off]
+            except KeyError:
+                beams[side_off] = beam_off, beam_off
+            else:
+                beams[side_off] = min(min_pos, beam_off), max(max_pos, beam_off)
+
+        detail = vmf.create_ent('func_detail')
+
+        for side_off, (min_off, max_off) in beams.items():
+            for min_pos, max_pos in beam_hole_split(
+                beam_ax,
+                Vec.with_axes(side_ax, side_off, beam_ax, min_off, 'z', bbox_min),
+                Vec.with_axes(side_ax, side_off, beam_ax, max_off, 'z', bbox_min),
+            ):
+
+                if min_pos[beam_ax] >= max_pos[beam_ax]:
+                    raise ValueError(min_pos, max_pos, beam_ax)
+
+                # Make the beam.
+                # Grab the end face and snap to the length we want.
+                beam_end_off = max_pos[beam_ax] - min_pos[beam_ax]
+                assert beam_end_off > 0, beam_end_off
+                for plane in beam_end_face.planes:
+                    plane.x = beam_end_off
+
+                new_beam = beam_template.copy(map=vmf)
+                new_beam.localise(min_pos, rot)
+                detail.solids.append(new_beam)
+
+
+def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
+    """Break up floor beams to fit around holes."""
+
+    # Go along the shape. For each point, check if a hole is present,
+    # and split at that.
+    # Our positions are centered, but we return ones at the ends.
+
+    # Inset in 4 units from each end to not overlap with the frames.
+    start_pos = min_pos - Vec.with_axes(axis, 60)
+    if HOLES:
+        hole_size_large = vbsp_options.get(float, 'glass_hole_size_large') / 2
+        hole_size_small = vbsp_options.get(float, 'glass_hole_size_small') / 2
+
+        # Extract normal from the z-axis.
+        grid_height = min_pos.z // 128 * 128 + 64
+        if grid_height < min_pos.z:
+            normal = (0, 0, 1)
+        else:
+            normal = (0, 0, -1)
+        import vbsp
+        for pos in min_pos.iter_line(max_pos, 128):
+            vbsp.VMF.create_ent(
+                'info_particle_system',
+                origin=Vec(pos.x, pos.y, grid_height),
+                angles=Vec(normal).to_angle(),
+            )
+            try:
+                hole_type = HOLES[(pos.x, pos.y, grid_height), normal]
+            except KeyError:
+                continue
+            else:
+                if hole_type is HoleType.SMALL:
+                    size = hole_size_small
+                elif hole_type is HoleType.LARGE:
+                    size = hole_size_large
+                else:
+                    raise AssertionError(hole_type)
+
+                yield start_pos, pos - Vec.with_axes(axis, size)
+                start_pos = pos + Vec.with_axes(axis, size)
+
+    # Last segment, or all if no holes.
+    yield start_pos, max_pos + Vec.with_axes(axis, 60)

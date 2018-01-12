@@ -412,6 +412,16 @@ DEFAULTS = [
     Opt('glass_floorbeam_sep', 2,
         """Number of blocks between beams.
         """),
+    Opt('glass_hole_size_small', 32.0,
+        """Size of the small glass hole. 
+        
+        This is used for glass floor beams.
+        """),
+    Opt('glass_hole_size_large', 160.0,
+        """Size of the large glass hole. 
+        
+        This is used for glass floor beams.
+        """),
 
     Opt('clump_wall_tex', False,
         """Use the clumping wall algorithm.
