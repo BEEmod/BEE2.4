@@ -3,6 +3,8 @@ import itertools
 import os
 from decimal import Decimal
 from enum import Enum
+from typing import Iterator, List, Tuple, Dict
+
 from tkinter import *
 from tkinter import font
 from tkinter import ttk
@@ -12,6 +14,7 @@ import srctools
 import tk_tools
 import utils
 from BEE2_config import ConfigFile
+from tooltip import add_tooltip
 from srctools import Property
 from tk_tools import TK_ROOT
 
@@ -27,8 +30,22 @@ TABS = {}
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
 
-SP_IMG = img.png('icons/quote_sp')
-COOP_IMG = img.png('icons/quote_coop')
+IMG_TEXT = {
+    'sp': _('Singleplayer'),
+    'coop': _('Cooperative'),
+    'atlas': _('ATLAS (SP/Coop)'),
+    'pbody': _('P-Body (SP/Coop)'),
+    'bendy': _('Bendy'),
+    'chell': _('Chell'),
+    'human': _('Human characters (Bendy and Chell)'),
+    'robot': _('AI characters (ATLAS, P-Body, or Coop)'),
+}
+
+IMG = {
+    spr: (img.png('icons/quote_' + spr), ctx)
+    for spr, ctx in IMG_TEXT.items()
+}  # type: Dict[str, Tuple[PhotoImage, str]]
+
 
 # Friendly names given to certain response channels.
 RESPONSE_NAMES = {
@@ -427,15 +444,26 @@ def make_tab(group, config: ConfigFile, tab_type):
         else:
             line_iter = find_lines(quote)
 
-        for badge, line, line_id in line_iter:
-            if line_id is None:
-                line_id = line['id', line['name']]
-            check = ttk.Checkbutton(
+        for badges, line, line_id in line_iter:
+            line_frame = ttk.Frame(
                 frame,
+            )
+            line_frame.grid(
+                column=0,
+                padx=(10, 0),
+                sticky=W,
+            )
+            for x, (img, ctx) in enumerate(badges):
+                label = ttk.Label(line_frame, image=img, padding=0)
+                label.grid(row=0, column=x)
+                add_tooltip(label, ctx)
+
+            line_frame.columnconfigure(len(badges), weight=1)
+
+            check = ttk.Checkbutton(
+                line_frame,
                 # note: default voice line name next to checkbox.
                 text=line['name', _('No Name?')],
-                compound=LEFT,
-                image=badge,
             )
 
             check.quote_var = IntVar(
@@ -450,12 +478,10 @@ def make_tab(group, config: ConfigFile, tab_type):
                 config_section=config[group_id],
                 quote_id=line_id,
             )
-
             check.transcript = list(get_trans_lines(line))
             check.grid(
-                column=0,
-                padx=(10, 0),
-                sticky=W,
+                row=0,
+                column=len(badges),
             )
             check.bind("<Enter>", show_trans)
     canv.bind('<Configure>', configure_canv)
@@ -463,21 +489,44 @@ def make_tab(group, config: ConfigFile, tab_type):
     return outer_frame
 
 
-def find_lines(quote_block):
+def find_lines(quote_block: Property) -> Iterator[Tuple[
+    List[Tuple[PhotoImage, str]],
+    Property,
+    str,
+]]:
     """Find the line property blocks in a quote."""
     for prop in quote_block:
+        if not prop.name.startswith('line'):
+            continue
+
+        line_id = prop['id', prop['name']]
+
         if prop.name == 'line':
-            yield None, prop, None
-        elif prop.name == 'line_sp':
-            yield SP_IMG, prop, None
-        elif prop.name == 'line_coop':
-            yield COOP_IMG, prop, None
+            yield [], prop, line_id
+        elif prop.name.startswith('line_'):
+            try:
+                images = [
+                    IMG[img]
+                    for img in
+                    prop.name.split('_')[1:]
+                ]
+            except KeyError as exc:
+                LOGGER.warning('Invalid line type in "{}" {!r}!',
+                    prop.name,
+                    exc.args,
+                )
+                images = []
+            yield images, prop, line_id
 
 
-def find_resp_lines(quote_block):
+def find_resp_lines(quote_block: Property) -> Iterator[Tuple[
+    List[Tuple[PhotoImage, str]],
+    Property,
+    str,
+]]:
     """Find the line blocks in response items."""
     for index, prop in enumerate(quote_block):
-        yield None, prop, 'line_{}'.format(index)
+        yield [], prop, 'line_{}'.format(index)
 
 
 def get_trans_lines(trans_block):

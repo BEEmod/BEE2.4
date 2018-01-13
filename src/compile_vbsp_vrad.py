@@ -68,10 +68,9 @@ INCLUDES = [
 ]
 
 # Get the list of condition sub-modules that we need to also include.
-import conditions
 condition_modules = [
-    module
-    for loader, module, is_package in
+    name
+    for loader, name, is_package in
     pkgutil.iter_modules(['conditions'])
 ]
 
@@ -118,6 +117,21 @@ setup(
             base='Console',
             icon=ico_path,
             targetName='vrad' + suffix,
+        ),
+
+        # Generate dummy exes, so if the above are renamed they
+        # error cleanly.
+        Executable(
+            'vbsp_vrad_orig_err.py',
+            base='Console',
+            icon=ico_path,
+            targetName='vbsp_original' + suffix,
+        ),
+        Executable(
+            'vbsp_vrad_orig_err.py',
+            base='Console',
+            icon=ico_path,
+            targetName='vrad_original' + suffix,
         ),
     ]
 )

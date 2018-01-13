@@ -5,6 +5,7 @@ Does stuff related to the actual games.
 - Modifying GameInfo to support our special content folder.
 - Generating and saving editoritems/vbsp_config
 """
+import itertools
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 from tkinter import messagebox  # simple, standard modal dialogs
@@ -29,7 +30,8 @@ import packageLoader
 import utils
 import srctools
 
-from typing import List, Tuple
+from typing import List, Tuple, Set
+
 
 LOGGER = utils.getLogger(__name__)
 
@@ -419,11 +421,13 @@ class Game:
         ):
             return True
 
-    def refresh_cache(self):
-        """Copy over the resource files into this game."""
+    def refresh_cache(self, already_copied: Set[str]):
+        """Copy over the resource files into this game.
+
+        already_copied is passed from copy_mod_music(), to
+        indicate which files should remain. It is the full path to the files.
+        """
         screen_func = export_screen.step
-        
-        already_copied = set()
 
         with res_system:
             for file in res_system.walk_folder_repeat():
@@ -455,6 +459,21 @@ class Game:
                 screen_func('RES')
 
         LOGGER.info('Cache copied.')
+
+        for path in [INST_PATH, 'bee2', 'bee2_dev']:
+            abs_path = self.abs_path(path)
+            for dirpath, dirnames, filenames in os.walk(abs_path):
+                for file in filenames:
+                    # Keep VMX backups, disabled editor models, and the coop
+                    # gun instance.
+                    if file.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
+                        continue
+                    path = os.path.normcase(os.path.join(dirpath, file))
+
+                    if path.replace('bee2_dev', 'bee2') not in already_copied:
+                        LOGGER.info('Deleting: {}', path)
+                        os.remove(path)
+
         # Save the new cache modification date.
         self.mod_times.clear()
         for pack_id, pack in packageLoader.packages.items():
@@ -601,8 +620,6 @@ class Game:
             'PackTriggers',
         )
 
-        self.generate_fizzler_sides(vbsp_config)
-
         for name, file, ext in FILES_TO_BACKUP:
             item_path = self.abs_path(file + ext)
             backup_path = self.abs_path(file + '_original' + ext)
@@ -633,10 +650,6 @@ class Game:
                     editor_section['copyable'] = '1'
                     editor_section['DesiredFacing'] = 'DESIRES_UP'
 
-        LOGGER.info('Optimizing editor models...')
-        self.clean_editor_models(editoritems)
-        export_screen.step('EXP')
-
         LOGGER.info('Editing Gameinfo!')
         self.edit_gameinfo(True)
 
@@ -665,6 +678,10 @@ class Game:
         if num_compiler_files > 0:
             LOGGER.info('Copying Custom Compiler!')
             for file in os.listdir('../compiler'):
+                # Ignore these dummy executables.
+                if 'original' in file:
+                    continue
+
                 src_path = os.path.join('../compiler', file)
                 if not os.path.isfile(src_path):
                     continue
@@ -699,12 +716,16 @@ class Game:
                     return False, vpk_success
                 export_screen.step('COMP')
 
-
         if should_refresh:
             LOGGER.info('Copying Resources!')
-            self.refresh_cache()
+            music_files = self.copy_mod_music()
+            self.refresh_cache(music_files)
 
-            self.copy_mod_music()
+        LOGGER.info('Optimizing editor models...')
+        self.clean_editor_models(editoritems)
+        export_screen.step('EXP')
+
+        self.generate_fizzler_sides(vbsp_config)
 
         if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
             os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
@@ -972,7 +993,6 @@ class Game:
 
         return root_block.export()
 
-
     def generate_fizzler_sides(self, conf: Property):
         """Create the VMTs used for fizzler sides."""
         fizz_colors = {}
@@ -1005,8 +1025,11 @@ class Game:
         url = 'steam://rungameid/' + str(self.steamID)
         webbrowser.open(url)
 
-    def copy_mod_music(self):
-        """Copy music files from Tag and PS:Mel."""
+    def copy_mod_music(self) -> Set[str]:
+        """Copy music files from Tag and PS:Mel.
+
+        This returns a list of all the paths it copied to.
+        """
         tag_dest = self.abs_path('bee2/sound/music/')
         # Mel's music has similar names to P2's, so put it in a subdir
         # to avoid confusion.
@@ -1016,6 +1039,8 @@ class Game:
             self.steamID != utils.STEAM_IDS['APERTURE TAG'] and
             MUSIC_TAG_LOC is not None
         )
+
+        copied_files = set()
 
         file_count = 0
         if copy_tag:
@@ -1039,6 +1064,7 @@ class Game:
                 dest_loc = os.path.join(tag_dest, filename)
                 if os.path.isfile(src_loc) and not os.path.exists(dest_loc):
                     shutil.copy(src_loc, dest_loc)
+                copied_files.add(dest_loc)
                 export_screen.step('MUS')
 
         if MUSIC_MEL_VPK is not None:
@@ -1048,7 +1074,10 @@ class Game:
                 if not os.path.exists(dest_loc):
                     with open(dest_loc, 'wb') as dest:
                         dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
+                copied_files.add(dest_loc)
                 export_screen.step('MUS')
+
+        return copied_files
 
     def init_trans(self):
         """Try and load a copy of basemodui from Portal 2 to translate.

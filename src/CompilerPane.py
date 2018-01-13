@@ -304,7 +304,7 @@ def find_screenshot(e=None):
         filetypes=[
             # note: File type description
             (_('Image Files'), '*.jpg *.jpeg *.jpe *.jfif *.png *.bmp'
-                              '*.tiff *.tga *.ico *.psd'),
+                               '*.tiff *.tga *.ico *.psd'),
         ],
         initialdir='C:',
     )
@@ -333,13 +333,13 @@ def set_screen_type():
 
 def load_screenshot(path):
     """Copy the selected image, changing format if needed."""
-    img = Image.open(path)
+    img = Image.open(path).convert('RGB')  # Remove alpha channel if present.
     COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
     img.save(SCREENSHOT_LOC)
     set_screenshot(img)
 
 
-def set_screenshot(img=None):
+def set_screenshot(img: Image.Image=None):
     # Make the visible screenshot small
     global tk_screenshot
     if img is None:
