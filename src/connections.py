@@ -386,6 +386,20 @@ class Item:
                 return None, COUNTER_AND_OFF
         return self.item_type.output_deact
 
+    def delete_antlines(self):
+        """Delete the antlines and checkmarks outputting from this item."""
+        for ent in self.antlines:
+            ent.remove()
+        for ent in self.ind_panels:
+            ent.remove()
+        for sign in self.shape_signs:
+            for ent in sign.overlays:
+                ent.remove()
+
+        self.antlines.clear()
+        self.ind_panels.clear()
+        self.shape_signs.clear()
+
 
 class Connection:
     """Represents a connection between two items."""
@@ -457,9 +471,11 @@ def collapse_item(item: Item):
 
     input_item.antlines |= item.antlines
     input_item.ind_panels |= item.ind_panels
+    input_item.shape_signs += item.shape_signs
 
     item.antlines.clear()
     item.ind_panels.clear()
+    item.shape_signs.clear()
 
     for conn in list(item.outputs):
         conn.from_item = input_item

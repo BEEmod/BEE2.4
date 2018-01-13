@@ -65,12 +65,7 @@ def chain(
 
         # If we don't have real IO, we can delete the antlines automatically.
         if not has_other_io:
-            for ent in node.item.antlines:
-                ent.remove()
-            for ent in node.item.ind_panels:
-                ent.remove()
-            node.item.antlines.clear()
-            node.item.ind_panels.clear()
+            node.item.delete_antlines()
 
     todo = set(nodes.values())
     while todo:
