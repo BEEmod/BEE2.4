@@ -812,6 +812,8 @@ class Game:
         # so make those blank.
         output_format = ',{},,0.0,-1'.replace(',', Output.SEP).format
 
+        old_items = set()
+
         def conv_peti_input(key: str, name: str):
             """Do comm_block[key] = block[name], but convert the formats.
 
@@ -822,6 +824,9 @@ class Game:
                 comm_block[key] = output_format(block[name])
             except IndexError:
                 pass
+            if item_id not in old_items:
+                old_items.add(item_id)
+                LOGGER.warning('<{}> using old logic..', item_id)
 
         for item in editoritems.find_all("Item"):
             item_id = item['Type']
