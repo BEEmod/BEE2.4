@@ -199,8 +199,10 @@ class ItemType:
         self.invert_var = invert_var
 
         # IO commands for enabling/disabling the item.
-        self.enable_cmd = list(enable_cmd)
-        self.disable_cmd = list(disable_cmd)
+        # These are copied to the item, so it can have modified ones.
+        # We use tuples so all can reuse the same object.
+        self.enable_cmd = tuple(enable_cmd)
+        self.disable_cmd = tuple(disable_cmd)
 
         # If no A/B type is set on the input, use this type.
         # Set to None to indicate no secondary is present.
@@ -208,8 +210,8 @@ class ItemType:
 
         # Same for secondary items.
         self.sec_invert_var = sec_invert_var
-        self.sec_enable_cmd = list(sec_enable_cmd)
-        self.sec_disable_cmd = list(sec_disable_cmd)
+        self.sec_enable_cmd = tuple(sec_enable_cmd)
+        self.sec_disable_cmd = tuple(sec_disable_cmd)
 
         # Sets the affinity used for outputs from this item - makes the
         # Input A/B converter items work.
@@ -320,6 +322,8 @@ class Item:
         'timer',
         'inputs', 'outputs',
         'item_type', 'io_outputs',
+        'enable_cmd', 'disable_cmd',
+        'sec_enable_cmd', 'sec_disable_cmd',
     ]
 
     def __init__(
@@ -348,6 +352,12 @@ class Item:
         self.outputs = set()  # type: Set[Connection]
         # To this item
         self.inputs = set()  # type: Set[Connection]
+
+        self.enable_cmd = item_type.enable_cmd
+        self.disable_cmd = item_type.disable_cmd
+
+        self.sec_enable_cmd = item_type.sec_enable_cmd
+        self.sec_disable_cmd = item_type.sec_disable_cmd
 
         assert self.name, 'Blank name!'
 
@@ -763,6 +773,8 @@ def gen_item_outputs(vmf: VMF):
     connection count and inversion values are not valid. After this point,
     items may not have connections altered.
     """
+    LOGGER.info('Generating item IO...')
+
     pan_switching_check = vbsp_options.get(PanelSwitchingStyle, 'ind_pan_check_switching')
     pan_switching_timer = vbsp_options.get(PanelSwitchingStyle, 'ind_pan_timer_switching')
 
@@ -822,8 +834,8 @@ def gen_item_outputs(vmf: VMF):
                 InputType.AND,
                 prim_inputs,
                 const.FixupVars.BEE_CONN_COUNT_A,
-                item.item_type.enable_cmd,
-                item.item_type.disable_cmd,
+                item.enable_cmd,
+                item.disable_cmd,
                 item.item_type.invert_var,
             )
             add_item_inputs(
@@ -831,8 +843,8 @@ def gen_item_outputs(vmf: VMF):
                 InputType.AND,
                 sec_inputs,
                 const.FixupVars.BEE_CONN_COUNT_B,
-                item.item_type.sec_enable_cmd,
-                item.item_type.sec_disable_cmd,
+                item.sec_enable_cmd,
+                item.sec_disable_cmd,
                 item.item_type.sec_invert_var,
             )
         else:
@@ -841,10 +853,12 @@ def gen_item_outputs(vmf: VMF):
                 item.item_type.input_type,
                 list(item.inputs),
                 const.FixupVars.CONN_COUNT,
-                item.item_type.enable_cmd,
-                item.item_type.disable_cmd,
+                item.enable_cmd,
+                item.disable_cmd,
                 item.item_type.invert_var,
             )
+
+    LOGGER.info('Item IO generated.')
 
 
 def add_item_inputs(
@@ -852,8 +866,8 @@ def add_item_inputs(
     logic_type: InputType,
     inputs: List[Connection],
     count_var: str,
-    enable_cmd: List[Output],
-    disable_cmd: List[Output],
+    enable_cmd: Iterable[Output],
+    disable_cmd: Iterable[Output],
     invert_var: str,
 ):
     """Handle either the primary or secondary inputs to an item."""
