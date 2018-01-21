@@ -109,6 +109,6 @@ def res_locking_output():
 
 @make_flag('LockingIO')
 def res_locking_input():
-    LOGGER.warning('MarkLocking is no longer used.')
+    LOGGER.warning('LockingIO is no longer used.')
     return False
 
