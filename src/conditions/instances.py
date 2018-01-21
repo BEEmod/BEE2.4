@@ -12,6 +12,7 @@ from conditions import (
     ALL_INST,
 )
 import instanceLocs
+import instance_traits
 from srctools import Property, Vec, Entity, Output, VMF
 
 
@@ -39,6 +40,65 @@ def flag_has_inst(flag: Property):
         for inst in
         ALL_INST
     )
+
+
+@make_flag('hasTrait')
+def flag_has_trait(inst: Entity, flag: Property):
+    """Check if the instance has a specific 'trait', which is set by code.
+
+    Current traits:
+        * `white`, `black`: If editoritems indicates the colour of the item.
+        * `arrival_departure_transition`: `arrival_departure_transition_ents`.
+        * `barrier`: Glass/grating instances:
+            * `barrier_128`: Segment instance.
+            * `barrier_frame`: Any frame part.
+                * `frame_convex_corner`: Convex corner (unused).
+                * `frame_short`: Shortened frame to fit a corner.
+                * `frame_straight`: Straight frame section.
+                * `frame_corner`: Frame corner section.
+                * `frame_left`: Left half of the frame.
+                * `frame_right`: Right half of the frame.
+        * `floor_button`: ItemButtonFloor type item:
+            * `btn_ball`: Button Type = Sphere.
+            * `btn_cube`: Button Type = Cube
+            * `weighted`: Button Type = Weighted
+        * `dropperless`: A dropperless Cube:
+            * `cube_standard`: Normal Cube.
+            * `cube_companion`: Companion Cube.
+            * `cube_ball`: Edgeless Safety Cube.
+            * `cube_reflect`: Discouragment Redirection Cube.
+            * `cube_franken`: FrankenTurret.
+        * `coop_corridor`: A Coop exit Corridor.
+        * `sp_corridor`: SP entry or exit corridor.
+        * `corridor_frame`: White/black door frame.
+        * `corridor_1`-`7`: The specified entry/exit corridor.
+        * `elevator`: An elevator instance.
+        * `entry_elevator`: Entry Elevator.
+        * `exit_elevator`: Exit Elevator.
+        * `entry_corridor`: Entry SP Corridor.
+        * `exit_corridor`: Exit SP/Coop Corridor.
+        * `fizzler`: A fizzler item:
+            * `fizzler_base`: Logic instance.
+            * `fizzler_model`: Model instance.
+        * `locking_targ`: Target of a locking pedestal button.
+        * `locking_btn`: Locking pedestal button.
+        * `paint_dropper`: Gel Dropper:
+            * `paint_dropper_bomb`: Bomb-type dropper.
+            * `paint_dropper_sprayer`: Sprayer-type dropper.
+        * `panel_angled`: Angled Panel-type item.
+        * `track_platform`: Track Platform-style item:
+            * `plat_bottom`: Bottom frame.
+            * `plat_bottom_grate`: Grating.
+            * `plat_middle`: Middle frame.
+            * `plat_single`: One-long frame.
+            * `plat_top`: Top frame.
+            * `plat_non_osc`: Non-oscillating platform.
+            * `plat_osc`: Oscillating platform.
+        * `tbeam_emitter`: Funnel emitter.
+        * `tbeam_frame`: Funnel frame.
+    """
+    return flag.value.casefold() in instance_traits.get(inst)
+
 
 INSTVAR_COMP = {
     '=': operator.eq,
