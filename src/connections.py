@@ -171,7 +171,6 @@ class ShapeSignage:
 
 class ItemType:
     """Represents an item, with inputs and outputs."""
-
     def __init__(
         self,
         id: str,
@@ -189,6 +188,12 @@ class ItemType:
         output_type: ConnType=ConnType.DEFAULT,
         output_act: Optional[Tuple[Optional[str], str]]=None,
         output_deact: Optional[Tuple[Optional[str], str]]=None,
+
+        lock_cmd: List[Output]=(),
+        unlock_cmd: List[Output]=(),
+        output_lock: Optional[Tuple[Optional[str], str]]=None,
+        output_unlock: Optional[Tuple[Optional[str], str]]=None,
+        inf_lock_only: bool=False,
     ):
         self.id = id
 
@@ -241,6 +246,22 @@ class ItemType:
             else:
                 self.output_deact = output_deact
 
+        # For locking buttons, this is the command to reactivate,
+        # and force-lock it.
+        # If both aren't present, erase both.
+        if lock_cmd and unlock_cmd:
+            self.lock_cmd = tuple(lock_cmd)
+            self.unlock_cmd = tuple(unlock_cmd)
+        else:
+            self.lock_cmd = self.unlock_cmd = ()
+
+        # If True, the locking button must be infinite to enable the behaviour.
+        self.inf_lock_only = inf_lock_only
+
+        # For the target, the commands to lock/unlock the attached button.
+        self.output_lock = output_lock
+        self.output_unlock = output_unlock
+
     @staticmethod
     def parse(item_id: str, conf: Property):
         """Read the item type info from the given config."""
@@ -255,6 +276,10 @@ class ItemType:
 
         enable_cmd = get_outputs('enable_cmd')
         disable_cmd = get_outputs('disable_cmd')
+        lock_cmd = get_outputs('lock_cmd')
+        unlock_cmd = get_outputs('unlock_cmd')
+
+        inf_lock_only = conf.bool('inf_lock_only')
 
         try:
             input_type = InputType(
@@ -305,11 +330,22 @@ class ItemType:
         except IndexError:
             out_deact = None
 
+        try:
+            out_lock = Output.parse_name(conf['out_lock'])
+        except IndexError:
+            out_lock = None
+
+        try:
+            out_unlock = Output.parse_name(conf['out_unlock'])
+        except IndexError:
+            out_unlock = None
+
         return ItemType(
             item_id, default_dual, input_type,
             invert_var, enable_cmd, disable_cmd,
             sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
+            lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
         )
 
 
@@ -329,7 +365,7 @@ class Item:
     def __init__(
         self,
         inst: Entity,
-        item_type: ItemType,
+        item_type: Optional[ItemType],
         panels: Iterable[Entity]=(),
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -530,9 +566,6 @@ def calc_connections(
     # Indicator panels
     panels = {}  # type: Dict[str, Entity]
 
-    panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
-    panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
-
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
     tbeam_polarity = {OutNames.IN_SEC_ACT, OutNames.IN_SEC_DEACT}
@@ -560,8 +593,9 @@ def calc_connections(
             except KeyError:
                 # These aren't made for non-io items. If it has outputs,
                 # that'll be a problem later.
-                item_type = None
-            ITEMS[inst_name] = Item(inst, item_type)
+                pass
+            else:
+                ITEMS[inst_name] = Item(inst, item_type)
 
     for over in vmf.by_class['info_overlay']:
         name = over['targetname']
@@ -637,12 +671,6 @@ def calc_connections(
                             )
                         )
 
-        desired_panel_inst = panel_check if item.timer is None else panel_timer
-
-        # Check/cross instances sometimes don't match the kind of timer delay.
-        for pan in item.ind_panels:
-            pan['file'] = desired_panel_inst
-            pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
 
         for inp_item in input_items:  # type: Item
             # Default A/B type.
@@ -848,6 +876,9 @@ def gen_item_outputs(vmf: VMF):
                 item.item_type.sec_invert_var,
             )
         else:
+            # If we have commands defined, try to add locking.
+            if item.item_type.output_unlock is not None:
+                add_locking(item)
             add_item_inputs(
                 item,
                 item.item_type.input_type,
@@ -858,7 +889,71 @@ def gen_item_outputs(vmf: VMF):
                 item.item_type.invert_var,
             )
 
+    # Check/cross instances sometimes don't match the kind of timer delay.
+    # We also might want to swap them out.
+
+    panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
+    panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
+
+    for item in ITEMS.values():
+        desired_panel_inst = panel_check if item.timer is None else panel_timer
+
+        for pan in item.ind_panels:
+            pan['file'] = desired_panel_inst
+            pan.fixup[const.FixupVars.TIM_ENABLED] = item.timer is not None
+
     LOGGER.info('Item IO generated.')
+
+
+def add_locking(item: Item):
+    """Create IO to control buttons from the target item.
+
+    This allows items to customise how buttons behave.
+    """
+    # If more than one, it's not logical to lock the button.
+    try:
+        [lock_conn] = item.inputs  # type: Connection
+    except ValueError:
+        return
+
+    lock_button = lock_conn.from_item
+
+    if item.item_type.inf_lock_only and lock_button.timer is not None:
+        return
+
+    # Check the button doesn't also activate other things -
+    # we need exclusive control.
+    # Also the button actually needs to be lockable.
+    if len(lock_button.outputs) != 1 or not lock_button.item_type.lock_cmd:
+        return
+
+    instance_traits.get(item.inst).add('locking_targ')
+    instance_traits.get(lock_button.inst).add('locking_btn')
+
+    for output, input_cmds in [
+        (item.item_type.output_lock, lock_button.item_type.lock_cmd),
+        (item.item_type.output_unlock, lock_button.item_type.unlock_cmd)
+    ]:
+        if not output:
+            continue
+
+        out_name, out_cmd = output
+        for cmd in input_cmds:
+            if cmd.target:
+                target = conditions.local_name(lock_button.inst, cmd.target)
+            else:
+                target = lock_button.inst
+            item.inst.add_out(
+                Output(
+                    out_cmd,
+                    target,
+                    cmd.input,
+                    cmd.params,
+                    delay=cmd.delay,
+                    times=cmd.times,
+                    inst_out=out_name,
+                )
+            )
 
 
 def add_item_inputs(
