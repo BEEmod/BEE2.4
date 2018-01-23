@@ -2,11 +2,13 @@
 import random
 from typing import NamedTuple, List
 
-from srctools import vmf, Vec, Property, conv_float, Entity
-from vbsp import VMF, IGNORED_OVERLAYS
+from srctools import Vec, Property, conv_float, Entity, VMF
+import srctools.vmf
+import comp_consts as const
 
 
 class AntTex(NamedTuple):
+    """Represents a single texture, and the parameters it has."""
     texture: str
     scale: float
     static: bool
@@ -56,7 +58,11 @@ class AntTex(NamedTuple):
 
 
 class AntType:
-    """Defines the style of antline to use."""
+    """Defines the style of antline to use.
+
+    For broken antlines, 'broken_chance' is the percentage chance for brokenness
+    per dot.
+    """
     def __init__(
         self,
         tex_straight: List[AntTex],
@@ -68,9 +74,34 @@ class AntType:
         self.tex_straight = tex_straight
         self.tex_corner = tex_corner
 
+        if broken_chance == 0:
+            broken_corner = broken_straight = []
+
         self.broken_corner = broken_corner
         self.broken_straight = broken_straight
         self.broken_chance = broken_chance
+
+    @classmethod
+    def parse(cls, prop: Property):
+        """Parse this from a property block."""
+        broken_chance = prop.float('broken_chance')
+        tex_straight = []
+        tex_corner = []
+        brok_straight = []
+        brok_corner = []
+        for ant_list, name in zip(
+            [tex_straight, tex_corner, brok_straight, brok_corner],
+            ('straight', 'corner', 'broken_straight', 'broken_corner'),
+        ):
+            for sub_prop in prop.find_all(name):
+                ant_list.append(AntTex.parse(sub_prop))
+        return cls(
+            tex_straight,
+            tex_corner,
+            brok_straight,
+            brok_corner,
+            broken_chance,
+        )
 
 
 def broken_antline_iter(dist, chance):
@@ -92,22 +123,10 @@ def broken_antline_iter(dist, chance):
     return
 
 
-def set_antline_mat(over: Entity, conf: AntType, floor_conf: AntType):
+def set_antline_mat(vmf: VMF, over: Entity, conf: AntType, floor_conf: AntType):
     """Retexture an antline.
 
-    floor_mat, if set is an alternate material to use for floors.
-    The material is split into 3 parts, separated by '|':
-    - Scale: the u-axis width of the material, used for clean antlines.
-    - Material: the material
-    - Static: if 'static', the antline will lose the targetname. This
-      makes it non-dynamic, and removes the info_overlay_accessor
-      entity from the compiled map.
-    If only 2 parts are given, the overlay is assumed to be dynamic.
-    If one part is given, the scale is assumed to be 0.25.
-
-    For broken antlines,  'broken_chance' is the percentage chance for
-    brokenness. broken_dist is the largest run of lights that can be broken.
-    broken and broken_floor are the textures used for the broken lights.
+    floor_conf, if set is an alternate texture set to use on floors and ceilings.
     """
     # Choose a random one
     random.seed(over['origin'])
@@ -116,47 +135,50 @@ def set_antline_mat(over: Entity, conf: AntType, floor_conf: AntType):
     if Vec.from_str(over['basisNormal']).z != 0:
         conf = floor_conf
 
-    if broken_chance and any(broken):  # We can have `broken` antlines.
-        bbox_min, bbox_max = vmf.overlay_bounds(over)
+    if over['material'] == const.Antlines.STRAIGHT:
+        mats = conf.tex_straight
+        broken_mats = conf.broken_straight
+    elif over['material'] == const.Antlines.CORNER:
+        mats = conf.tex_corner
+        broken_mats = conf.broken_corner
+    else:
+        raise ValueError('"{}" is not an antline!'.format(over['material']))
+
+    if conf.broken_chance:  # We can have `broken` antlines.
+        bbox_min, bbox_max = srctools.vmf.overlay_bounds(over)
         # Number of 'circles' and the length-wise axis
         length = max(bbox_max - bbox_min)
         long_axis = Vec(0, 1, 0).rotate_by_str(over['angles']).axis()
 
         # It's a corner or short antline - replace instead of adding more
-        if length // 16 < broken_dist:
-            if random.randrange(100) < broken_chance:
-                mats = broken
-                floor_mats = broken_floor
+        if length <= 48:
+            if random.randrange(100) < conf.broken_corner:
+                mats = broken_mats
         else:
+            # Generate multiple for broken overlays.
             min_origin = Vec.from_str(over['origin'])
             min_origin[long_axis] -= length / 2
 
             broken_iter = broken_antline_iter(
                 length // 16,
-                broken_chance,
+                conf.broken_chance,
             )
             for sect_min, sect_max, is_broken in broken_iter:
-
-                if is_broken:
-                    tex, floor_tex = broken, broken_floor
-                else:
-                    tex, floor_tex = mats, floor_mats
+                sect_mats = broken_mats if is_broken else mats
 
                 sect_length = sect_max - sect_min
 
                 # Make a section - base it off the original, and shrink it
                 new_over = over.copy()
-                VMF.add_ent(new_over)
-                # Make sure we don't restyle this twice.
-                IGNORED_OVERLAYS.add(new_over)
+                vmf.add_ent(new_over)
 
                 # Repeats lengthways
-                new_over['startV'] = str(sect_length)
+                new_over['startV'] = sect_length
                 sect_center = (sect_min + sect_max) / 2
 
                 sect_origin = min_origin.copy()
                 sect_origin[long_axis] += sect_center * 16
-                new_over['basisorigin'] = new_over['origin'] = sect_origin.join(' ')
+                new_over['basisorigin'] = new_over['origin'] = sect_origin
 
                 # Set the 4 corner locations to determine the overlay size.
                 # They're in local space - x is -8/+8, y=length, z=0
@@ -169,31 +191,9 @@ def set_antline_mat(over: Entity, conf: AntType, floor_conf: AntType):
                         pos.y = 8 * sect_length
                     new_over['uv' + axis] = pos.join(' ')
 
-                # Recurse to allow having values in the material value
-                set_antline_mat(new_over, tex, floor_tex, broken_chance=0)
+                random.choice(sect_mats).apply(new_over)
             # Remove the original overlay
-            VMF.remove_ent(over)
+            vmf.remove_ent(over)
+            return  # Don't texture the original.
 
-    if any(floor_mats):  # Ensure there's actually a value
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        if Vec.from_str(over['basisNormal']).z != 0:
-            mats = floor_mats
-
-    mat = random.choice(mats).split('|')
-    opts = []
-
-    if len(mat) == 2:
-        # rescale antlines if needed
-        over['endu'], over['material'] = mat
-    elif len(mat) > 2:
-        over['endu'], over['material'], *opts = mat
-    else:
-        # Unpack to ensure it only has 1 section
-        over['material'], = mat
-        over['endu'] = '0.25'
-
-    if 'static' in opts:
-        # If specified, remove the targetname so the overlay
-        # becomes static.
-        del over['targetname']
+    random.choice(mats).apply(over)
