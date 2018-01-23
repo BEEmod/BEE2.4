@@ -3,6 +3,7 @@
 """
 from collections import defaultdict
 
+import antlines
 import conditions
 import srctools
 import template_brush
@@ -244,9 +245,9 @@ def res_cust_antline(inst: Entity, res: Property):
             ):
         folded_mat = over['material'].casefold()
         if folded_mat == straight_ant:
-            vbsp.set_antline_mat(over, *straight_args)
+            antlines.set_antline_mat(over, *straight_args)
         elif folded_mat == corner_ant:
-            vbsp.set_antline_mat(over, *corner_args)
+            antlines.set_antline_mat(over, *corner_args)
 
         # Ensure this isn't overriden later!
         vbsp.IGNORED_OVERLAYS.add(over)

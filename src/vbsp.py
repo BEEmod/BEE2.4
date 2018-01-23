@@ -1,5 +1,8 @@
 import utils
 # Do this very early, so we log the startup sequence.
+from antlines import set_antline_mat
+
+
 LOGGER = utils.init_logging('bee2/vbsp.log')
 
 import os
@@ -2229,148 +2232,6 @@ def get_face_orient(face):
     return ORIENT.wall
 
 
-def broken_antline_iter(dist, max_step, chance):
-    """Iterator used in set_antline_mat().
-
-    This produces min,max pairs which fill the space from 0-dist.
-    Their width is random, from 1-max_step.
-    Neighbouring sections will be merged when they have the same type.
-    """
-    last_val = next_val = 0
-    last_type = random.randrange(100) < chance
-
-    while True:
-        is_broken = (random.randrange(100) < chance)
-
-        next_val += random.randint(1, max_step)
-
-        if next_val >= dist:
-            # We hit the end - make sure we don't overstep.
-            yield last_val, dist, is_broken
-            return
-
-        if is_broken == last_type:
-            # Merge the two sections - don't make more overlays
-            # than needed..
-            continue
-
-        yield last_val, next_val, last_type
-        last_type = is_broken
-        last_val = next_val
-
-
-def set_antline_mat(
-        over,
-        mats: list,
-        floor_mats: list=(),
-        broken_chance=0,
-        broken_dist=0,
-        broken: list=(),
-        broken_floor: list=(),
-        ):
-    """Retexture an antline, with various options encoded into the material.
-
-    floor_mat, if set is an alternate material to use for floors.
-    The material is split into 3 parts, separated by '|':
-    - Scale: the u-axis width of the material, used for clean antlines.
-    - Material: the material
-    - Static: if 'static', the antline will lose the targetname. This
-      makes it non-dynamic, and removes the info_overlay_accessor
-      entity from the compiled map.
-    If only 2 parts are given, the overlay is assumed to be dynamic.
-    If one part is given, the scale is assumed to be 0.25.
-
-    For broken antlines,  'broken_chance' is the percentage chance for
-    brokenness. broken_dist is the largest run of lights that can be broken.
-    broken and broken_floor are the textures used for the broken lights.
-    """
-    # Choose a random one
-    random.seed(over['origin'])
-
-    if broken_chance and any(broken):  # We can have `broken` antlines.
-        bbox_min, bbox_max = VLib.overlay_bounds(over)
-        # Number of 'circles' and the length-wise axis
-        length = max(bbox_max - bbox_min)
-        long_axis = Vec(0, 1, 0).rotate_by_str(over['angles']).axis()
-
-        # It's a corner or short antline - replace instead of adding more
-        if length // 16 < broken_dist:
-            if random.randrange(100) < broken_chance:
-                mats = broken
-                floor_mats = broken_floor
-        else:
-            min_origin = Vec.from_str(over['origin'])
-            min_origin[long_axis] -= length / 2
-
-            broken_iter = broken_antline_iter(
-                length // 16,
-                broken_dist,
-                broken_chance,
-            )
-            for sect_min, sect_max, is_broken in broken_iter:
-
-                if is_broken:
-                    tex, floor_tex = broken, broken_floor
-                else:
-                    tex, floor_tex = mats, floor_mats
-
-                sect_length = sect_max - sect_min
-
-                # Make a section - base it off the original, and shrink it
-                new_over = over.copy()
-                VMF.add_ent(new_over)
-                # Make sure we don't restyle this twice.
-                IGNORED_OVERLAYS.add(new_over)
-
-                # Repeats lengthways
-                new_over['startV'] = str(sect_length)
-                sect_center = (sect_min + sect_max) / 2
-
-                sect_origin = min_origin.copy()
-                sect_origin[long_axis] += sect_center * 16
-                new_over['basisorigin'] = new_over['origin'] = sect_origin.join(' ')
-
-                # Set the 4 corner locations to determine the overlay size.
-                # They're in local space - x is -8/+8, y=length, z=0
-                # Match the sign of the current value
-                for axis in '0123':
-                    pos = Vec.from_str(new_over['uv' + axis])
-                    if pos.y < 0:
-                        pos.y = -8 * sect_length
-                    else:
-                        pos.y = 8 * sect_length
-                    new_over['uv' + axis] = pos.join(' ')
-
-                # Recurse to allow having values in the material value
-                set_antline_mat(new_over, tex, floor_tex, broken_chance=0)
-            # Remove the original overlay
-            VMF.remove_ent(over)
-
-    if any(floor_mats):  # Ensure there's actually a value
-        # For P1 style, check to see if the antline is on the floor or
-        # walls.
-        if Vec.from_str(over['basisNormal']).z != 0:
-            mats = floor_mats
-
-    mat = random.choice(mats).split('|')
-    opts = []
-
-    if len(mat) == 2:
-        # rescale antlines if needed
-        over['endu'], over['material'] = mat
-    elif len(mat) > 2:
-        over['endu'], over['material'], *opts = mat
-    else:
-        # Unpack to ensure it only has 1 section
-        over['material'], = mat
-        over['endu'] = '0.25'
-
-    if 'static' in opts:
-        # If specified, remove the targetname so the overlay
-        # becomes static.
-        del over['targetname']
-
-
 def change_overlays():
     """Alter the overlays."""
     LOGGER.info("Editing Overlays...")
@@ -2379,10 +2240,10 @@ def change_overlays():
     sign_inst = vbsp_options.get(str, 'signInst')
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size =  vbsp_options.get(int, 'signSize') / 2
+    sign_size = vbsp_options.get(int, 'signSize') / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack =  vbsp_options.get(str, 'signPack')
+    sign_inst_pack = vbsp_options.get(str, 'signPack')
 
     # Grab all the textures we're using...
 
