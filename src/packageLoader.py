@@ -13,7 +13,6 @@ import srctools
 import tkMarkdown
 import utils
 from packageMan import PACK_CONFIG
-from selectorWin import SelitemData
 from srctools import (
     Property, NoKeyError,
     Vec, EmptyMapping,
@@ -31,6 +30,7 @@ from typing import (
 
 if TYPE_CHECKING:
     from gameMan import Game
+    from selectorWin import SelitemData
     from loadScreen import BaseLoadScreen
 
 LOGGER = utils.getLogger(__name__)
@@ -336,6 +336,22 @@ def close_filesystems():
         sys.close_ref()
 
 
+def no_packages_err(pak_dir, msg):
+    """Show an error message indicating no packages are present."""
+    from tkinter import messagebox
+    import sys
+    # We don't have a packages directory!
+    messagebox.showerror(
+        title='BEE2 - Invalid Packages Directory!',
+        message=(
+            '{}\nGet the packages from '
+            '"http://github.com/BEEmod/BEE2-items" '
+            'and place them in "{}".').format(msg, pak_dir + os.path.sep),
+        # Add slash to the end to indicate it's a folder.
+    )
+    sys.exit()
+
+
 def load_packages(
         pak_dir,
         loader: 'BaseLoadScreen',
@@ -351,18 +367,7 @@ def load_packages(
     pak_dir = os.path.abspath(os.path.join(os.getcwd(), '..', pak_dir))
 
     if not os.path.isdir(pak_dir):
-        from tkinter import messagebox
-        import sys
-        # We don't have a packages directory!
-        messagebox.showerror(
-            title='BEE2 - Invalid Packages Directory!',
-            message='The given packages directory is not present!\n'
-                    'Get the packages from '
-                    '"http://github.com/BEEmod/BEE2-items" '
-                    'and place them in "' + pak_dir + os.path.sep + '".',
-                    # Add slash to the end to indicate it's a folder.
-        )
-        sys.exit()
+        no_packages_err(pak_dir, 'The given packages directory is not present!')
 
     LOG_ENT_COUNT = log_missing_ent_count
     CHECK_PACKFILE_CORRECTNESS = log_incorrect_packfile
@@ -374,6 +379,17 @@ def load_packages(
 
         pack_count = len(packages)
         loader.set_length("PAK", pack_count)
+
+        if pack_count == 0:
+            no_packages_err(pak_dir, 'No packages found!')
+
+        # We must have the clean style package.
+        if CLEAN_PACKAGE not in packages:
+            no_packages_err(
+                pak_dir,
+                'No Clean Style package! This is required for some '
+                'essential resources and objects.'
+            )
 
         for obj_type in OBJ_TYPES:
             all_obj[obj_type] = {}
@@ -707,12 +723,29 @@ def parse_item_folder(folders: Dict[str, Any], filesystem: FileSystem, pak_id):
                 'Folder likely missing! '
             ) from err
 
-        editor_iter = Property.find_all(editor, 'Item')
+        try:
+            editoritems, *editor_extra = Property.find_all(editor, 'Item')
+        except ValueError:
+            raise ValueError(
+                '"{}:items/{}/editoritems.txt has no '
+                '"Item" block!'.format(pak_id, fold)
+            )
+
+        # editor_extra is any extra blocks (offset catchers, extent items).
+        # These must not have a palette section - it'll override any the user
+        # chooses.
+        for item_block in editor_extra:  # type: Property
+            for subtype in item_block.find_all('Editor', 'SubType'):
+                while 'palette' in subtype:
+                    LOGGER.warning(
+                        '"{}:items/{}/editoritems.txt has palette set for extra'
+                        ' item blocks. Deleting.'.format(pak_id, fold)
+                    )
+                    del subtype['palette']
+
         folders[fold] = ItemVariant(
-            # The first Item block found
-            editoritems=next(editor_iter),
-            # Any extra blocks (offset catchers, extent items)
-            editor_extra=editor_iter,
+            editoritems=editoritems,
+            editor_extra=editor_extra,
 
             # Add the folder the item definition comes from,
             # so we can trace it later for debug messages.
@@ -2638,7 +2671,7 @@ class EditorSound(PakObject, has_img=False):
         )
 
 
-class BrushTemplate(PakObject, has_img=False):
+class BrushTemplate(PakObject, has_img=False, allow_mult=True):
     """A template brush which will be copied into the map, then retextured.
 
     This allows the sides of the brush to swap between wall/floor textures
@@ -2931,6 +2964,8 @@ def desc_parse(info, id='', *, prop_name='description'):
 def get_selitem_data(info):
     """Return the common data for all item types - name, author, description.
     """
+    from selectorWin import SelitemData
+
     auth = sep_values(info['authors', ''])
     short_name = info['shortName', None]
     name = info['name']
@@ -2962,6 +2997,7 @@ def join_selitem_data(our_data: 'SelitemData', over_data: 'SelitemData'):
     This uses the over_data values if defined, using our_data if not.
     Authors and descriptions will be joined to each other.
     """
+    from selectorWin import SelitemData
     (
         our_name,
         our_short_name,

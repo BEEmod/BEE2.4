@@ -234,6 +234,9 @@ class Tools(MaterialGroup):
     SKYBOX = 'tools/toolsskybox'
     BLACK = 'tools/toolsblack'
 
+    PLAYER_CLIP_GRATE = 'BEE2/grate_player_clip'
+    PLAYER_CLIP_GLASS = 'BEE2/glass_player_clip'
+
 
 class Fizzler(MaterialGroup):
     """Fizzler textures."""

@@ -10,7 +10,8 @@ import vbsp
 import comp_consts as consts
 import instanceLocs
 from perlin import SimplexNoise
-from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis
+from srctools import Property, Vec_tuple, Vec, Entity, Side, UVAxis, VMF
+
 
 COND_MOD_NAME = None
 
@@ -71,7 +72,7 @@ def find_indicator_panels(inst: Entity):
 
 
 @conditions.make_result('CutOutTile')
-def res_cutout_tile(res: Property):
+def res_cutout_tile(vmf: srctools.VMF, res: Property):
     """Generate random quarter tiles, like in Destroyed or Retro maps.
 
     - "MarkerItem" is the instance to look for.
@@ -103,7 +104,7 @@ def res_cutout_tile(res: Property):
     sign_loc = set(FORCE_LOCATIONS)
     # If any signage is present in the map, we need to force tiles to
     # appear at that location!
-    for over in conditions.VMF.by_class['info_overlay']:
+    for over in vmf.by_class['info_overlay']:
         if (
                 over['material'].casefold() in FORCE_TILE_MATS and
                 # Only check floor/ceiling overlays
@@ -147,7 +148,7 @@ def res_cutout_tile(res: Property):
     # placing tiles - blocks away from the sides generate fewer tiles.
     floor_neighbours = defaultdict(dict)  # all_floors[z][x,y] = count
 
-    for mat_prop in res['Materials', []]:
+    for mat_prop in res.find_key('Materials', []):
         MATS[mat_prop.name].append(mat_prop.value)
 
     if SETTINGS['base_is_disp']:
@@ -166,7 +167,7 @@ def res_cutout_tile(res: Property):
             MATS[key] = [default]
 
     # Find our marker ents
-    for inst in conditions.VMF.by_class['func_instance']: # type: VLib.Entity
+    for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in item:
             continue
         targ = inst['targetname']
@@ -193,7 +194,7 @@ def res_cutout_tile(res: Property):
     for start_floor, end_floor in FLOOR_IO:
         if end_floor not in INST_LOCS:
             # Not a marker - remove this and the antline.
-            for toggle in conditions.VMF.by_target[end_floor]:
+            for toggle in vmf.by_target[end_floor]:
                 conditions.remove_ant_toggle(toggle)
             continue
 
@@ -210,6 +211,7 @@ def res_cutout_tile(res: Property):
         if SETTINGS['rotate_beams']:
             # We have to generate 1 model per 64x64 block to do rotation...
             gen_rotated_squarebeams(
+                vmf,
                 box_min - (64, 64, 0),
                 box_max + (64, 64, -8),
                 skin=SETTINGS['beam_skin'],
@@ -218,13 +220,14 @@ def res_cutout_tile(res: Property):
         else:
             # Make the squarebeams props, using big models if possible
             gen_squarebeams(
+                vmf,
                 box_min + (-64, -64, 0),
                 box_max + (64, 64, -8),
                 skin=SETTINGS['beam_skin']
             )
 
         # Add a player_clip brush across the whole area
-        conditions.VMF.add_brush(conditions.VMF.make_prism(
+        vmf.add_brush(vmf.make_prism(
             p1=box_min - (64, 64, FLOOR_DEPTH),
             p2=box_max + (64, 64, 0),
             mat=MATS['clip'][0],
@@ -232,14 +235,14 @@ def res_cutout_tile(res: Property):
 
         # Add a noportal_volume covering the surface, in case there's
         # room for a portal.
-        noportal_solid = conditions.VMF.make_prism(
+        noportal_solid = vmf.make_prism(
             # Don't go all the way to the sides, so it doesn't affect wall
             # brushes.
             p1=box_min - (63, 63, 9),
             p2=box_max + (63, 63, 0),
             mat='tools/toolsinvisible',
         ).solid
-        noportal_ent = conditions.VMF.create_ent(
+        noportal_ent = vmf.create_ent(
             classname='func_noportal_volume',
             origin=box_min.join(' '),
         )
@@ -248,6 +251,7 @@ def res_cutout_tile(res: Property):
         if SETTINGS['base_is_disp']:
             # Use displacements for the base instead.
             make_alpha_base(
+                vmf,
                 box_min + (-64, -64, 0),
                 box_max + (64, 64, 0),
                 noise=alpha_noise,
@@ -345,12 +349,13 @@ def res_cutout_tile(res: Property):
             weights[x, y] = min((tile_count + 0.5) / 8, 1)
 
         # Share the detail entity among same-height tiles..
-        detail_ent = conditions.VMF.create_ent(
+        detail_ent = vmf.create_ent(
             classname='func_detail',
         )
 
         for x, y in xy_dict:
             convert_floor(
+                vmf,
                 Vec(x, y, z),
                 overlay_ids,
                 MATS,
@@ -361,7 +366,7 @@ def res_cutout_tile(res: Property):
                 noise_func=noise,
             )
 
-    add_floor_sides(floor_edges)
+    add_floor_sides(vmf, floor_edges)
 
     conditions.reallocate_overlays(overlay_ids)
 
@@ -383,14 +388,15 @@ def get_noise(loc: Vec, noise_func: SimplexNoise):
 
 
 def convert_floor(
-        loc: Vec,
-        overlay_ids,
-        mats,
-        settings,
-        signage_loc,
-        detail,
-        noise_weight,
-        noise_func: SimplexNoise,
+    vmf: VMF,
+    loc: Vec,
+    overlay_ids,
+    mats,
+    settings,
+    signage_loc,
+    detail,
+    noise_weight,
+    noise_func: SimplexNoise,
 ):
     """Cut out tiles at the specified location."""
     try:
@@ -455,6 +461,7 @@ def convert_floor(
         if should_make_tile:
             # Full tile
             tile = make_tile(
+                vmf,
                 p1=tile_loc - (16, 16, 0),
                 p2=tile_loc + (16, 16, -2),
                 top_mat=vbsp.get_tex(str(brush.color) + '.floor'),
@@ -467,6 +474,7 @@ def convert_floor(
             # 'Glue' tile - this chance should be higher, making these appear
             # bordering the full tiles.
             tile = make_tile(
+                vmf,
                 p1=tile_loc - (16, 16, 1),
                 p2=tile_loc + (16, 16, -2),
                 top_mat=random.choice(mats['tile_glue']),
@@ -481,11 +489,11 @@ def convert_floor(
     return True
 
 
-def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
+def make_tile(vmf: VMF, p1: Vec, p2: Vec, top_mat, bottom_mat, beam_mat):
     """Generate a 2 or 1 unit thick squarebeams tile.
 
     """
-    prism = conditions.VMF.make_prism(p1, p2)
+    prism = vmf.make_prism(p1, p2)
     brush, t, b, n, s, e, w = prism
     t.mat = top_mat
     b.mat = bottom_mat
@@ -532,19 +540,19 @@ def make_tile(p1, p2, top_mat, bottom_mat, beam_mat):
     return prism
 
 
-def _make_squarebeam(origin, skin='0', size=''):
+def _make_squarebeam(vmf: VMF, origin: Vec, skin='0', size=''):
     """Make a squarebeam prop at the given location."""
-    return conditions.VMF.create_ent(
+    return vmf.create_ent(
         classname='prop_static',
         angles='0 0 0',
-        origin=origin.join(' '),
+        origin=origin,
         model='models/anim_wp/framework/squarebeam_off' + size + '.mdl',
         skin=skin,
         disableshadows='1',
     )
 
 
-def gen_rotated_squarebeams(p1: Vec, p2: Vec, skin, max_rot: int):
+def gen_rotated_squarebeams(vmf: VMF, p1: Vec, p2: Vec, skin, max_rot: int):
     """Generate broken/rotated squarebeams in a region.
 
     They will be rotated around their centers, not the model origin.
@@ -562,11 +570,11 @@ def gen_rotated_squarebeams(p1: Vec, p2: Vec, skin, max_rot: int):
 
         # Squarebeams are offset 5 units from their real center
         offset = Vec(0, 0, 5).rotate(rand_x, 0, rand_z)
-        prop = _make_squarebeam(Vec(x + 32, y + 32, z) + offset, skin=skin)
+        prop = _make_squarebeam(vmf, Vec(x + 32, y + 32, z) + offset, skin=skin)
         prop['angles'] = '{} 0 {}'.format(rand_x, rand_z)
 
 
-def gen_squarebeams(p1, p2, skin, gen_collision=True):
+def gen_squarebeams(vmf: VMF, p1: Vec, p2: Vec, skin, gen_collision=True):
     """Generate squarebeams props to fill the space given.
 
     The space should be in multiples of 64. The squarebeams brush will
@@ -599,30 +607,34 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             # Make 1 prop every 512 units, at the center
             if x % 512 == 0 and y % 512 == 0:
                 _make_squarebeam(
+                    vmf,
                     Vec(min_x + x + 256, min_y +  y + 256, z),
                     skin, '_8x8',
                 )
         elif x < cutoff_256_x and y < cutoff_256_y:
             if x % 256 == 0 and y % 256 == 0:
                 _make_squarebeam(
+                    vmf,
                     Vec(min_x + x + 128, min_y + y + 128, z),
                     skin, '_4x4',
                 )
         elif x < cutoff_128_x and y < cutoff_128_y:
             if x % 128 == 0 and y % 128 == 0:
                 _make_squarebeam(
+                    vmf,
                     Vec(min_x + x + 64, min_y + y + 64, z),
                     skin, '_2x2',
                 )
         else:
             # Make squarebeams for every point!
             _make_squarebeam(
+                vmf,
                 Vec(min_x + x + 32, min_y + y + 32, z),
                 skin,
             )
 
     if gen_collision:
-        collision = conditions.VMF.create_ent(
+        collision = vmf.create_ent(
             classname='func_brush',
             disableshadows='1',
             disableflashlight='1',
@@ -633,7 +645,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
         )
         for x in range(int(min_x)+64, int(max_x), 64):
             collision.solids.append(
-                conditions.VMF.make_prism(
+                vmf.make_prism(
                     p1=Vec(x-2, min_y+2, z-2),
                     p2=Vec(x+2, max_y-2, z-8),
                     mat='tools/toolsnodraw',
@@ -641,7 +653,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             )
         for y in range(int(min_y)+64, int(max_y), 64):
             collision.solids.append(
-                conditions.VMF.make_prism(
+                vmf.make_prism(
                     p1=Vec(min_x+2, y-2, z-2),
                     p2=Vec(max_x-2, y+2, z-8),
                     mat='tools/toolsnodraw',
@@ -654,7 +666,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
                 (max_x, min_y, max_x-2, max_y),
                 ]:
             collision.solids.append(
-                conditions.VMF.make_prism(
+                vmf.make_prism(
                     p1=Vec(x1, y1, z-2),
                     p2=Vec(x2, y2, z-8),
                     mat='tools/toolsnodraw',
@@ -662,7 +674,7 @@ def gen_squarebeams(p1, p2, skin, gen_collision=True):
             )
 
 
-def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
+def make_alpha_base(vmf: VMF, bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
     """Add the base to a CutoutTile, using displacements."""
     # We want to limit the size of brushes to 512, so the vertexes don't
     # get too far apart.
@@ -688,7 +700,7 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
         for y1, y2 in zip(heights, heights[1:]):
             # We place our displacement 1 unit above the surface, then offset
             # the verts down.
-            brush = conditions.VMF.make_prism(
+            brush = vmf.make_prism(
                 Vec(x + x1, y + y1, z - FLOOR_DEPTH),
                 Vec(x + x2, y + y2, z - FLOOR_DEPTH - 1),
             )
@@ -698,7 +710,7 @@ def make_alpha_base(bbox_min: Vec, bbox_max: Vec, noise: SimplexNoise):
                 offset=-1,
                 noise=noise,
             )
-            conditions.VMF.add_brush(brush.solid)
+            vmf.add_brush(brush.solid)
 
 
 def make_displacement(
@@ -758,7 +770,7 @@ def make_displacement(
     ]
 
 
-def add_floor_sides(locs):
+def add_floor_sides(vmf: VMF, locs):
     """We need to replace nodraw textures around the outside of the holes.
 
     This requires looping through all faces, since these will have been
@@ -770,7 +782,7 @@ def add_floor_sides(locs):
         locs
     }
 
-    for face in conditions.VMF.iter_wfaces(world=True, detail=False):
+    for face in vmf.iter_wfaces(world=True, detail=False):
         if face.mat != 'tools/toolsnodraw':
             continue
         loc = face.get_origin().as_tuple()

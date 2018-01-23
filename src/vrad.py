@@ -67,6 +67,9 @@ INJECT_FILES = {
 
     # Commands for monitor items.
     'monitor_args.nut': 'scripts/vscripts/BEE2/mon_camera_args.nut',
+
+    # Script for setting model types on cubes.
+    'cube_setmodel.nut': 'scripts/vscripts/BEE2/cube_setmodel.nut',
 }
 
 # Additional parts to add if we have a mdl file.
@@ -911,17 +914,29 @@ def run_vrad(args):
 
 def main(argv):
     LOGGER.info('BEE2 VRAD hook started!')
+        
     args = " ".join(argv)
     fast_args = argv[1:]
     full_args = argv[1:]
+    
+    if not fast_args:
+        # No arguments!
+        LOGGER.info(
+            'No arguments!\n'
+            "The BEE2 VRAD takes all the regular VRAD's "
+            'arguments, with some extra arguments:\n'
+            '-force_peti: Force enabling map conversion. \n'
+            "-force_hammer: Don't convert the map at all.\n"
+            "If not specified, the map name must be \"preview.bsp\" to be "
+            "treated as PeTI."
+        )
+        sys.exit()
 
     # The path is the last argument to vrad
     # P2 adds wrong slashes sometimes, so fix that.
     fast_args[-1] = path = os.path.normpath(argv[-1])
 
     LOGGER.info("Map path is " + path)
-    if path == "":
-        raise Exception("No map passed!")
 
     load_config()
 
@@ -948,6 +963,11 @@ def main(argv):
 
     if not path.endswith(".bsp"):
         path += ".bsp"
+
+    if not os.path.exists(path):
+        raise ValueError('"{}" does not exist!'.format(path))
+    if not os.path.isfile(path):
+        raise ValueError('"{}" is not a file!'.format(path))
 
     # If VBSP thinks it's hammer, trust it.
     if CONF.bool('is_hammer', False):

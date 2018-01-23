@@ -676,8 +676,8 @@ def setup_localisations(logger: logging.Logger):
         try:
             file = open('../i18n/{}.mo'.format(lang), 'rb')
         except FileNotFoundError:
-            pass
-        else:
+            continue
+        with file:
             trans = gettext.GNUTranslations(file)
             break
     else:

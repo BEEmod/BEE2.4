@@ -30,6 +30,7 @@ class ResIcon(Enum):
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
     STEAM = 'menu_steam'
+    MUSIC_CHANGER = 'menu_music_changer'
 
     PORTAL2 = 'menu_p2'
     TAG = 'menu_tag'
@@ -43,11 +44,12 @@ BEE2_ITEMS_REPO = 'https://github.com/BEEmod/BEE2-items/'
 DISCORD_SERVER = 'https://discord.me/beemod'
 # Open https://steamcommunity.com/groups/beemod direct in the Steam Client
 STEAM_GROUP = 'steam://url/GroupSteamIDPage/103582791458212641'
-
+MUSIC_CHANGER = 'https://beemmc.boards.net/'
 
 def steam_url(name):
     """Return the URL to open the given game in Steam."""
     return 'steam://store/' + utils.STEAM_IDS[name]
+
 
 Res = WebResource = namedtuple('WebResource', ['name', 'url', 'icon'])
 WEB_RESOURCES = [
@@ -60,6 +62,7 @@ WEB_RESOURCES = [
     # i18n: The chat program.
     Res(_('Discord Server...'), DISCORD_SERVER, ResIcon.DISCORD),
     Res(_('Steam Group...'), STEAM_GROUP, ResIcon.STEAM),
+    Res(_("aerond's Music Changer..."), MUSIC_CHANGER, ResIcon.MUSIC_CHANGER),
     SEPERATOR,
     Res(_('Application Repository...'), BEE2_REPO, ResIcon.GITHUB),
     Res(_('Items Repository...'), BEE2_ITEMS_REPO, ResIcon.GITHUB),
@@ -203,6 +206,7 @@ class Dialog(tk.Toplevel):
         self.title(title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
+        self.text = text
         tk_tools.set_window_icon(self)
 
         # Hide when the exit button is pressed, or Escape
@@ -229,9 +233,6 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        parsed_text = tkMarkdown.convert(text)
-        self.textbox.set_text(parsed_text)
-
         ttk.Button(
             frame,
             text=_('Close'),
@@ -241,6 +242,13 @@ class Dialog(tk.Toplevel):
         )
 
     def show(self, e=None):
+        # The first time we're shown, decode the text.
+        # That way we don't need to do it on startup.
+        if self.text is not None:
+            parsed_text = tkMarkdown.convert(self.text)
+            self.textbox.set_text(parsed_text)
+            self.text = None
+
         self.deiconify()
         self.update_idletasks()
         utils.center_win(self, TK_ROOT)

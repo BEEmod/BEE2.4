@@ -139,13 +139,27 @@ def check_file(file: Path, portal2: Path, packages: Path):
 
         if not target_systems:
             # This file is totally new.
-            target_systems.append(get_package(rel_loc))
+            try:
+                target_systems.append(get_package(rel_loc))
+            except KeyboardInterrupt:
+                return
 
         for fsys in target_systems:
             full_loc = fsys.path / rel_loc
             LOGGER.info('"{}" -> "{}"', file, full_loc)
             os.makedirs(str(full_loc.parent), exist_ok=True)
             shutil.copy(str(file), str(full_loc))
+
+
+def print_package_ids():
+    """Print all the packages out."""
+    id_len = max(len(pack.id) for pack in PACKAGES.values())
+    row_count = 128 // (id_len + 2)
+    for i, pack in enumerate(sorted(pack.id for pack in PACKAGES.values()), start=1):
+        print(' {0:<{1}} '.format(pack, id_len), end='')
+        if i % row_count == 0:
+            print()
+    print()
 
 
 def main(files: List[str]):
@@ -175,6 +189,8 @@ def main(files: List[str]):
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
+
+    print_package_ids()
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
 

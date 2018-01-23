@@ -155,12 +155,13 @@ else:
                 self.stop()
                 return
 
-            try:
-                file = self.system[self.cur_file]
-            except KeyError:
-                self.stop_callback()
-                LOGGER.error('Sound sample not found: "{}"', self.cur_file)
-                return  # Abort if music isn't found..
+            with self.system:
+                try:
+                    file = self.system[self.cur_file]
+                except (KeyError, FileNotFoundError):
+                    self.stop_callback()
+                    LOGGER.error('Sound sample not found: "{}"', self.cur_file)
+                    return  # Abort if music isn't found..
 
             # TODO: Pyglet doesn't support direct streams, so we have to
             # TODO: extract sounds to disk first.

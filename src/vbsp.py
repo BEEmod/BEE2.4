@@ -27,8 +27,8 @@ import instance_traits
 import template_brush
 import fizzler
 import comp_consts as consts
-import conditions.globals
-import conditions.cubes
+import cubes
+import barriers
 
 from typing import (
     Dict, Tuple, List
@@ -209,6 +209,7 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 # UTIL functions #
 ##################
 
+
 def get_tex(name):
     if name in settings['textures']:
         return random.choice(settings['textures'][name])
@@ -332,7 +333,7 @@ def load_settings():
         conditions.add(cond)
 
     # Data for different cube types.
-    conditions.cubes.parse_conf(conf)
+    cubes.parse_conf(conf)
 
     # Fizzler data
     fizzler.read_configs(conf)
@@ -965,7 +966,24 @@ def set_player_portalgun():
             pgun_script['Template01'] = '__pgun_template'
             pgun_script['spawnflags'] = 2
         else:
+            # In coop we have not need to actually spawn portalguns.
             pgun_script['classname'] = 'logic_script'
+
+            # For Absolute Fizzler or otherwise, this fizzles portals on a
+            # player remotely.
+            cleanser = VMF.create_ent(
+                classname='trigger_portal_cleanser',
+                targetname='__pgun_cleanser',
+                parentname=pgun_script['targetname'],
+                origin=ent_pos,
+                startdisabled=0,
+                visible=0,
+                spawnflags=1,  # Clients only.
+            )
+            cleanser.solids.append(VMF.make_prism(
+                ent_pos - 4, ent_pos + 4,
+                mat=consts.Tools.TRIGGER,
+            ).solid)
 
         # For removing portalguns from players.
         trig_stripper = VMF.create_ent(
@@ -1846,21 +1864,6 @@ def set_barrier_frame_type():
             pass
 
 
-def remove_barrier_ents():
-    """If glass_clip or grating_clip is defined, we should remove the glass instances.
-
-    They're not used since we added their contents into the map directly.
-    """
-    if vbsp_options.get(bool, 'keep_barrier_inst'):
-        return  # They're being used.
-
-    barrier_file = instanceLocs.resolve('[glass_128]')
-
-    for inst in VMF.by_class['func_instance']:
-        if inst['file'].casefold() in barrier_file:
-            inst.remove()
-
-
 def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
     '''Fix a squarebeams brush for use in other styles.
 
@@ -1885,20 +1888,8 @@ def fix_squarebeams(face, rotate, reset_offset: bool, scale: float):
 def change_brush():
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
-    glass_clip_mat = vbsp_options.get(str, 'glass_clip')
-    glass_scale = vbsp_options.get(float, 'glass_scale')
+
     goo_scale = vbsp_options.get(float, 'goo_scale')
-
-    glass_temp = vbsp_options.get(str, "glass_template")
-    if glass_temp:
-        glass_temp = template_brush.get_scaling_template(glass_temp)
-    else:
-        glass_temp = None
-
-    if vbsp_options.get(str, 'glass_floorbeam_temp'):
-        floorbeam_locs = []
-    else:
-        floorbeam_locs = None
 
     # Goo mist must be enabled by both the style and the user.
     make_goo_mist = vbsp_options.get(bool, 'goo_mist') and srctools.conv_bool(
@@ -1940,10 +1931,6 @@ def change_brush():
 
     LOGGER.info('Goo heights: {} <- {}', best_goo, goo_heights)
 
-    # This needs to be a func_brush, otherwise the clip texture data will be
-    # merged with other clips.
-    glass_clip_ent = VMF.create_ent(classname='func_brush', solidbsp=1)
-
     for solid in VMF.iter_wbrushes(world=True, detail=True):
         is_glass = False
         for face in solid:
@@ -1968,29 +1955,6 @@ def change_brush():
                     face.planes[0].z == best_goo
                     else 'special.goo_cheap'
                 )
-            if face.mat == consts.Special.GLASS:
-                if glass_temp is not None:
-                    glass_temp.apply(face, change_mat=False)
-                else:
-                    # Apply the glass scaling option
-                    face.scale = glass_scale
-                settings['has_attr']['glass'] = True
-                is_glass = True
-        if is_glass and glass_clip_mat:
-            glass_clip, glass_loc, glass_norm = make_barrier_solid(
-                solid.get_origin(),
-                glass_clip_mat,
-            )
-            glass_clip_ent.solids.append(glass_clip.solid)
-            if floorbeam_locs is not None and glass_norm.z != 0:
-                floorbeam_locs.append((glass_loc, glass_norm))
-
-    # Remove if it's empty.
-    if not glass_clip_ent.solids:
-        glass_clip_ent.remove()
-
-    if vbsp_options.get(str, 'glass_pack') and settings['has_attr']['glass']:
-        TO_PACK.add(vbsp_options.get(str, 'glass_pack').casefold())
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
@@ -2000,11 +1964,6 @@ def change_brush():
     if make_goo_mist:
         LOGGER.info('Adding Goo Mist...')
         add_goo_mist(mist_solids)
-        LOGGER.info('Done!')
-
-    if floorbeam_locs:
-        LOGGER.info('Adding Glass floor beams...')
-        add_glass_floorbeams(floorbeam_locs)
         LOGGER.info('Done!')
 
     if can_clump():
@@ -2017,125 +1976,6 @@ def can_clump():
     """Check the clump algorithm is enabled."""
     return vbsp_options.get(bool, "clump_wall_tex")
 
-
-def make_barrier_solid(origin, material, thin_player_clip=False):
-    """Make a brush covering a given glass/grating location.
-    """
-    # Find the center point of this location to find where the brush
-    # will be.
-    loc = Vec(
-        origin.x // 128 * 128 + 64,
-        origin.y // 128 * 128 + 64,
-        origin.z // 128 * 128 + 64,
-    )
-    normal = (origin - loc).norm()  # This points outward.
-    # This sets the two side axes to 1, and the normal axis to 0.
-    side_offset = 1 - abs(normal)  # type: Vec
-    side_offset *= 64
-    
-    # The func_brush player clip doesn't block you going through a portal,
-    # so add a normal player clip inside it as func_detail to ensure it is
-    # detected.
-    if thin_player_clip:
-        clip = VMF.create_ent('func_detail')
-        clip.solids.append(VMF.make_prism(
-            (loc + normal*61 + side_offset),
-            (loc + normal*63 - side_offset),
-            mat=consts.Tools.PLAYER_CLIP,
-        ).solid)
-
-    return VMF.make_prism(
-        # Adding the side_offset moves the other directions out 64
-        # to make it 128 large in total.
-        # We want the brush to be 4 units thick.
-        (loc + normal * 60 + side_offset),
-        (loc + normal * 64 - side_offset),
-        mat=material,
-    ), loc, normal
-
-
-def add_glass_floorbeams(glass_locs):
-    """Add beams to separate large glass panels.
-
-    The texture is assumed to match plasticwall004a's shape.
-    """
-    temp_name = vbsp_options.get(str, 'glass_floorbeam_temp')
-
-    separation = vbsp_options.get(int, 'glass_floorbeam_sep') + 1
-    separation *= 128
-
-    # First we want to find all the groups of contiguous glass sections.
-    # This is a mapping from some glass piece to its group list.
-    groups = {}
-
-    for origin, normal in glass_locs:
-        pos = origin + normal * 62  # type: Vec
-
-        groups[pos.as_tuple()] = [pos]
-
-    # Loop over every pos and check in the +x/y diections for another glass
-    # piece. If there, merge the two lists and set every pos in the group to
-    # point to the new list.
-    # Once done, every unique list = a group.
-
-    for pos_tup in groups.keys():
-        pos = Vec(pos_tup)
-        for off in ((128, 0, 0), (0, 128, 0)):
-            neighbour = (pos + off).as_tuple()
-            if neighbour in groups:
-                our_group = groups[pos_tup]
-                neigh_group = groups[neighbour]
-                if our_group is neigh_group:
-                    continue
-
-                # Now merge the two lists. We then need to update all dict locs
-                # to point to the new list.
-
-                if len(neigh_group) > len(our_group):
-                    small_group, large_group = our_group, neigh_group
-                else:
-                    small_group, large_group = neigh_group, our_group
-
-                large_group.extend(small_group)
-                for pos in small_group:
-                    groups[pos.as_tuple()] = large_group
-
-    # Remove duplicates objects by using the ID as key..
-    groups = list({
-        id(group): group
-        for group in groups.values()
-    }.values())
-
-    LOGGER.info('Groups: {}', groups)
-
-    # Side -> u, v or None
-
-    for group in groups:
-
-        bbox_min, bbox_max = Vec.bbox(group)
-        dimensions = bbox_max - bbox_min
-        LOGGER.info('Size = {}', dimensions)
-
-        if dimensions.y > dimensions.x:
-            axis = 'y'
-            rot = Vec(0, 0, 0)
-        else:
-            axis = 'x'
-            rot = Vec(0, 90, 0)
-
-        # Add 128 so the first pos isn't a beam.
-        offset = bbox_min[axis] + 128
-
-        for pos in group:
-            # Every 'sep' positions..
-            if (pos[axis] - offset) % separation == 0:
-                template_brush.import_template(
-                    temp_name,
-                    pos,
-                    rot,
-                    force_type=template_brush.TEMP_TYPES.detail,
-                    add_to_map=True,
-                )
 
 
 
@@ -2648,10 +2488,7 @@ def add_extra_ents(mode):
     """Add the various extra instances to the map."""
     LOGGER.info("Adding Music...")
 
-    if mode == "COOP":
-        loc = vbsp_options.get(Vec, 'music_location_coop')
-    else:
-        loc = vbsp_options.get(Vec, 'music_location_sp')
+    loc = vbsp_options.get(Vec, 'global_ents_loc')
 
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
@@ -2843,35 +2680,6 @@ def add_extra_ents(mode):
 def change_func_brush():
     """Edit func_brushes."""
     LOGGER.info("Editing Brush Entities...")
-    grating_clip_mat = vbsp_options.get(str, "grating_clip")
-    grating_scale = vbsp_options.get(float, "grating_scale")
-
-    grate_temp = vbsp_options.get(str, "grating_template")
-    if grate_temp:
-        grate_temp = template_brush.get_scaling_template(grate_temp)
-    else:
-        grate_temp = None
-
-    if vbsp_options.get_itemconf('BEE_PELLET:PelletGrating', False):
-        # Merge together these existing filters in global_pti_ents
-        VMF.create_ent(
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            targetname='@grating_filter',
-            classname='filter_multi',
-            filtertype=0,
-            negated=0,
-            filter01='@not_pellet',
-            filter02='@not_paint_bomb',
-        )
-    else:
-        # Just skip paint bombs.
-        VMF.create_ent(
-            origin=vbsp_options.get(Vec, 'global_pti_ents_loc'),
-            targetname='@grating_filter',
-            classname='filter_activator_class',
-            negated=1,
-            filterclass='prop_paint_bomb',
-        )
 
     dynamic_pan_temp = vbsp_options.get(str, "dynamic_pan_temp")
     dynamic_pan_parent = vbsp_options.get(str, "dynamic_pan_parent")
@@ -2896,13 +2704,6 @@ def change_func_brush():
         rotate_edge = vbsp_options.get(bool, 'rotate_edge_special')
         edge_off = vbsp_options.get(bool, 'reset_edge_off_special')
         edge_scale = vbsp_options.get(float, 'edge_scale_special')
-
-    # TODO: Merge nearby grating brushes
-    # Clips are shared every 512 grid spaces
-
-    # This needs to be a func_brush, otherwise the clip texture data will be
-    # merged with other clips.
-    grate_player_clip = VMF.create_ent(classname='func_brush', solidbsp=1)
 
     for brush in VMF.by_class['func_brush'] | VMF.by_class['func_door_rotating']:  # type: VLib.Entity
         if brush in IGNORED_BRUSH_ENTS:
@@ -2960,12 +2761,6 @@ def change_func_brush():
                 set_special_mat(side, 'black')
                 surf_face = side
             else:
-                if side.mat == consts.Special.GRATING:
-                    is_grating = True
-                    if grate_temp is not None:
-                        grate_temp.apply(side, change_mat=False)
-                    else:
-                        side.scale = grating_scale
 
                 alter_mat(side)  # for gratings, laserfields and some others
 
@@ -2977,33 +2772,6 @@ def change_func_brush():
         if delete_brush:
             VMF.remove_ent(brush)
             continue
-
-        if is_grating:
-            # Set solidbsp to true on grating brushes. This makes the
-            # correct footstep sounds play.
-            brush['solidbsp'] = '1'
-            settings['has_attr']['grating'] = True
-
-            brush_loc = brush.get_origin()  # type: Vec
-
-        if is_grating and grating_clip_mat:
-            grate_clip, _, _ = make_barrier_solid(
-                brush_loc,
-                grating_clip_mat,
-                thin_player_clip=True,
-            )
-            grate_player_clip.solids.append(grate_clip.solid)
-
-            grate_phys_clip_solid = grate_clip.solid.copy()  # type: VLib.Solid
-            for face in grate_phys_clip_solid.sides:
-                face.mat = consts.Tools.TRIGGER
-
-            clip_ent = VMF.create_ent(
-                classname='func_clip_vphysics',
-                origin=brush_loc.join(' '),
-                filtername='@grating_filter',
-            )
-            clip_ent.solids.append(grate_phys_clip_solid)
 
         if "-model_arms" in parent:  # is this an angled panel?:
             # strip only the model_arms off the end
@@ -3056,10 +2824,6 @@ def change_func_brush():
 
                 break  # Don't run twice - there might be a second matching
                 # overlay instance!
-
-    # Remove if it's empty.
-    if not grate_player_clip.solids:
-        grate_player_clip.remove()
 
     if vbsp_options.get(str, 'grating_pack') and settings['has_attr']['grating']:
         TO_PACK.add(vbsp_options.get(str, 'grating_pack').casefold())
@@ -3365,8 +3129,12 @@ def make_vrad_config(is_peti: bool):
             # block when written.
             conf['MusicScript'] = settings['music_conf']
 
-        from conditions.cubes import write_vscripts
-        write_vscripts(conf)
+        import cubes
+        import conditions.piston_platform
+
+        cubes.write_vscripts(conf)
+        conditions.piston_platform.write_vscripts(conf)
+
 
     with open('bee2/vrad_config.cfg', 'w', encoding='utf8') as f:
         for line in conf.export():
@@ -3714,6 +3482,7 @@ def main():
         brushLoc.POS.read_from_map(VMF, settings['has_attr'])
 
         fizzler.parse_map(VMF, settings['has_attr'], TO_PACK)
+        barriers.parse_map(VMF, settings['has_attr'], TO_PACK)
 
         conditions.init(
             seed=MAP_RAND_SEED,
@@ -3731,8 +3500,8 @@ def main():
         change_overlays()
         collapse_goo_trig()
         change_func_brush()
+        barriers.make_barriers(VMF, get_tex)
         remove_static_ind_toggles()
-        remove_barrier_ents()
         fix_worldspawn()
 
         make_packlist(path)

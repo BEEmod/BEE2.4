@@ -52,9 +52,10 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     - This caches images, so it won't be deleted (Tk doesn't keep a reference
       to the Python object), and subsequent calls don't touch the hard disk.
     """
-    if not path.casefold().endswith(".png"):
-        path += ".png"
     path = path.casefold().replace('\\', '/')
+    if not path.endswith(".png"):
+        path += ".png"
+
     orig_path = path
 
     resize_width, resize_height = resize_to = tuple_size(resize_to)
@@ -67,7 +68,7 @@ def png(path: str, resize_to=0, error=None, algo=Image.NEAREST):
     with filesystem:
         try:
             img_file = filesystem[path]
-        except KeyError:
+        except (KeyError, FileNotFoundError):
             LOGGER.warning('ERROR: "images/{}" does not exist!', orig_path)
             return error or img_error
         with img_file.open_bin() as file:
@@ -93,7 +94,7 @@ def spr(name, error=None):
 
 def icon(name, error=None):
     """Load in a palette icon, using the correct directory and size."""
-    return png(os.path.join("items", name), error=error, resize_to=64)
+    return png('items/' + name, error=error, resize_to=64)
 
 
 def get_app_icon():

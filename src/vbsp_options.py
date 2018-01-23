@@ -376,15 +376,9 @@ DEFAULTS = [
         lighting. It should be set to the ambient light color.
         """),
 
-    Opt('glass_clip', "BEE2/glass_player_clip",
-        """Texture used for glass player clips.
-        """),
-    Opt('grating_clip', "BEE2/grate_player_clip",
-        """Texture used for grating player clips.
-        """),
-    Opt('keep_barrier_inst', False,
-        """Keep glass/grating brush instances. If glass_clip or grating_clip
-        is set, they are removed by default. This disables that behaviour.
+    Opt('glass_hole_temp', TYPE.STR,
+        """Template used to generate glass/grating holes. This should have 
+        'large' and 'small' visgroup sections. It should range from x=60-64.
         """),
 
     # Packlists for glass and gratings
@@ -398,35 +392,16 @@ DEFAULTS = [
 
         This is used for `grating_clip`.
         """),
-    Opt('glass_template', TYPE.STR,
-        """A template for rotation and scaling of glass.
-
-        This overrides `glass_scale` if set. It should be a single brush
-        cube - the glass is set to the same rotation as the matching side.
-        """),
-    Opt('grating_template', TYPE.STR,
-        """A template for rotation and scaling of grates.
-
-        This overrides `grating_scale` if set. It should be a single brush
-        cube - the grate is set to the same rotation as the matching side.
-        """),
+    Opt('glass_template', 'BEE2_GLASS_TEMPLATE',
+        """A template for rotation and scaling of glass."""),
+    Opt('grating_template', 'BEE2_GRATING_TEMPLATE',
+        """A template for rotation and scaling of grates."""),
 
     Opt('goo_wall_scale_temp', TYPE.STR,
         """A template for rotation and scaling for `goo_wall` textures.
 
         It should be a single brush cube - the wall is set to the same
         rotation as the matching side. (The bottom is ignored).
-        """),
-
-    Opt('glass_scale', 0.15,
-        """Scale of glass textures.
-
-        This is overridden by `glass_template`.
-        """),
-    Opt('grating_scale', 0.15,
-        """Scale of grating textures.
-
-        This is overridden by `grating_template`.
         """),
 
     Opt('glass_floorbeam_temp', TYPE.STR,
@@ -436,6 +411,16 @@ DEFAULTS = [
         """),
     Opt('glass_floorbeam_sep', 2,
         """Number of blocks between beams.
+        """),
+    Opt('glass_hole_size_small', 32.0,
+        """Size of the small glass hole. 
+        
+        This is used for glass floor beams.
+        """),
+    Opt('glass_hole_size_large', 160.0,
+        """Size of the large glass hole. 
+        
+        This is used for glass floor beams.
         """),
 
     Opt('clump_wall_tex', False,
@@ -467,18 +452,6 @@ DEFAULTS = [
         """Apply clumping to floors as well.
         """),
 
-    # Default to the origin of the elevator instance - that's likely to
-    # be enclosed
-    Opt('music_location_sp', Vec(-2000, 2000, 0),
-        """The location of music entities in SP.
-
-        The default is the location of the entry elevator instance.
-        """),
-    Opt('music_location_coop', Vec(-2000, -2000, 0),
-        """The location of music entities in Coop.
-
-        The default is the location of the disassembly room instance.
-        """),
     # Instance used for pti_ents
     Opt('global_pti_ents', "instances/BEE2/global_pti_ents.vmf",
         """The instance used for `global_pti_ents`.

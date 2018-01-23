@@ -32,6 +32,12 @@ def flag_not(inst: Entity, flag: Property):
     return False
 
 
+@make_flag('XOR')
+def flag_xor(inst: Entity, flag:Property):
+    """The XOR group returns True if the number of true sub-flags is odd."""
+    return sum([check_flag(sub_flag, inst) for sub_flag in flag]) % 2 == 1
+
+
 @make_flag('NOR')
 def flag_nor(inst: Entity, flag: Property):
     """The NOR group evaluates True if any sub-flags are False."""

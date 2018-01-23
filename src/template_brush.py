@@ -100,6 +100,7 @@ TEMPLATE_RETEXTURE = {
     'tile/white_wall_tile_bullseye': (W, 'special'),  # For symmetry
 
     consts.Special.BACKPANELS: 'special.behind',
+    consts.Special.BACKPANELS_CHEAP: 'special.behind',
     consts.Special.SQUAREBEAMS: 'special.edge',
     consts.Special.GLASS: 'special.glass',
     consts.Special.GRATING: 'special.grating',
@@ -201,7 +202,7 @@ class Template:
 
     def visgrouped(
         self,
-        visgroups: Iterable[str]=(),
+        visgroups: Set[str]=(),
     ) -> Tuple[List[Solid], List[Solid], List[Entity]]:
         """Given some visgroups, return the matching data.
 
