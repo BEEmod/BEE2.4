@@ -273,6 +273,8 @@ class ItemType:
                 Output.parse(prop)
                 for prop in
                 conf.find_all(prop_name)
+                # Allow blank to indicate no output.
+                if prop.value != ''
             ]
 
         enable_cmd = get_outputs('enable_cmd')
@@ -362,6 +364,7 @@ class Item:
         'item_type', 'io_outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
+        'ant_toggle_var',
     ]
 
     def __init__(
@@ -374,6 +377,7 @@ class Item:
         antlines: Iterable[Entity]=(),
         shape_signs: Iterable[ShapeSignage]=(),
         timer_count: int=None,
+        ant_toggle_var: str='',
     ):
         self.inst = inst
         self.item_type = item_type
@@ -388,6 +392,11 @@ class Item:
         # And the style to use for the antlines.
         self.ant_floor_style = ant_floor_style
         self.ant_wall_style = ant_wall_style
+
+        # If set, the item has special antlines. This is a fixup var,
+        # which gets the antline name filled in for us.
+        self.ant_toggle_var = ant_toggle_var
+
         # None = Infinite/normal.
         self.timer = timer_count
 
@@ -680,7 +689,6 @@ def calc_connections(
                                 instance_traits.get_item_id(inp_item.inst)
                             )
                         )
-
 
         for inp_item in input_items:  # type: Item
             # Default A/B type.
@@ -1195,6 +1203,13 @@ def add_item_indicators(
     # style_antline(). So check if the overlay actually exists still, to
     # see if we need to add the toggle.
     has_ant = len(item.inst.map.by_target[ant_name]) > 0
+
+    # Special case - the item wants full control over its antlines.
+    if has_ant and item.ant_toggle_var:
+        item.inst.fixup[item.ant_toggle_var] = ant_name
+        # We don't have antlines to control.
+        has_ant = False
+
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
